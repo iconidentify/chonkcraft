@@ -1,5 +1,7 @@
 name: Publish Game Update
 
+# Deployment is master-only; pull-request code never receives production secrets.
+
 on:
   push:
     branches: [master]
