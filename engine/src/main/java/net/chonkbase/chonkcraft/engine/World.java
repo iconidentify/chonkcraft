@@ -406,6 +406,11 @@ public final class World {
         return movement.orderMove(unit, tileX, tileY);
     }
 
+    /** Applies a player command at the deterministic network command boundary. */
+    public boolean orderCommandMove(Unit unit, int tileX, int tileY) {
+        return movement.orderCommandMove(unit, tileX, tileY);
+    }
+
     /** @see BattleNetCombatSystem#orderAttackMove */
     public boolean orderAttackMove(Unit unit, int tileX, int tileY) {
         return combat.orderAttackMove(unit, tileX, tileY);
@@ -7643,7 +7648,9 @@ public final class World {
                 beginNextQueuedOrder(unit);
             }
             if (unit.reportsActionBeforeQueued()
-                    && !unit.animation().unbreakable()) {
+                    && !unit.animation().unbreakable()
+                    && !(unit.order() == Unit.Order.MOVE
+                        && unit.battleNetOrderDelay() > 3)) {
                 // The label's wipe is the queue's pop, and the pop wipes the
                 // wait with it: "unit.Orders.erase(...); unit.Wait = 0"
                 // A command lands on

@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,6 +32,27 @@ import org.junit.jupiter.api.Test;
  * computer hall's Still animation marker.
  */
 class BattleNetTrainWorkerTest {
+
+    @Test
+    @DisplayName("construction milestones wait for the ready-worker scan")
+    void constructionMilestonesAreNotArmedWhileDecodingTheProfile()
+            throws Exception {
+        AiPlayer ai = new AiPlayer(0);
+        ai.setBattleNetBuildProfile(retailAiBin(), 10);
+        assertFalse(ai.battleNetHasAction33Candidate(0x80),
+                "Orc 7 profile 10 must not buy arrow1 merely because 0x80 "
+                        + "is the first encoded high byte");
+    }
+
+    @Test
+    @DisplayName("a construction prefix exposes its terminal milestone")
+    void constructionPrefixArmsItsTerminalMilestone() throws Exception {
+        AiPlayer ai = new AiPlayer(2);
+        ai.setBattleNetBuildProfile(retailAiBin(), 67);
+        assertTrue(ai.battleNetHasAction33Candidate(0x86),
+                "XHuman 10 profile 67 reaches blacksmith weapon1 after its "
+                        + "eleven-entry construction prefix");
+    }
 
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());

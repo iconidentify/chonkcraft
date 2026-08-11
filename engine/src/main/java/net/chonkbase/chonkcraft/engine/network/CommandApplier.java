@@ -136,7 +136,8 @@ public final class CommandApplier {
 
         boolean accepted = true;
         switch (command.kind()) {
-            case MOVE -> accepted = world.orderMove(unit, command.x(), command.y());
+            case MOVE -> accepted = world.orderCommandMove(
+                    unit, command.x(), command.y());
             case STOP -> world.orderStop(unit);
             case HARVEST -> accepted = world.orderHarvest(unit, command.x(), command.y());
             case ATTACK -> {

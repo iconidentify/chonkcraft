@@ -14,6 +14,7 @@ mkdir -p "$(dirname "${diagnostic_log}")"
   -Dsurefire.failIfNoSpecifiedTests=false
 
 set +e
+rm -f "${report}"
 "${repo_root}/scripts/run-tests.sh" -pl engine -am \
   '-Dtest=SimulationTest' \
   -Dsurefire.failIfNoSpecifiedTests=false >"${diagnostic_log}" 2>&1
@@ -51,10 +52,11 @@ actual = {case.attrib["name"] for case in xml.findall("testcase")
 unknown = sorted(actual - set(names))
 if unknown:
     raise SystemExit("unclassified SimulationTest failures: " + ", ".join(unknown))
-if actual and status == 0:
-    raise SystemExit("SimulationTest reported failures but returned success")
-if not actual and status != 0:
-    raise SystemExit(f"SimulationTest exited {status} with a clean report")
+if status != 0:
+    raise SystemExit(f"SimulationTest diagnostic runner exited {status}")
+# run-tests.sh deliberately uses Maven --fail-never. Its zero status allows
+# classified assertion failures; the freshly generated Surefire XML above is
+# the authority for exact names, count and error state.
 print(f"SimulationTest: {tests - len(actual)} pass, {len(actual)} classified, "
       f"0 unclassified, {len(set(names) - actual)} retired")
 PY

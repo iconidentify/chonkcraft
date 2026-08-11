@@ -31,6 +31,16 @@ python3 tools/bne-harness/scripts/bne_java.py survey CORPUS_INDEX \
   --asset-pack PACK --semantic-v2 --semantic-v2-family player --through 1800
 ```
 
+Feed that receipt to `ai-rank`. It suppresses economy differences occurring
+after a casualty/count split in the same case, because those are normally
+combat fallout rather than an independent AI choice. Research and economy
+differences that precede casualties become the actionable executive queue:
+
+```sh
+python3 tools/bne-harness/scripts/bne_java.py ai-rank \
+  OUTPUT_DIRECTORY/bne-java-survey.json
+```
+
 ## Controlled movement corpus
 
 The idle campaign corpus cannot ask a particular unit to make a particular
@@ -55,3 +65,6 @@ The first 19-case capture on 2026-08-11 proved the value of this method: every
 normal ground/air lane exposed the same early Java step family, while sea and
 occupied lanes separated order acceptance/refusal behavior. That replaces a
 campaign-specific anecdote with a repeatable native decision matrix.
+
+The completed measurement and engine results are recorded in
+[`TOP_THREE_CONVERGENCE.md`](TOP_THREE_CONVERGENCE.md).

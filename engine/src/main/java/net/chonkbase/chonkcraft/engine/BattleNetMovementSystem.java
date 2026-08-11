@@ -57,6 +57,30 @@ final class BattleNetMovementSystem {
      * @return whether a route was found
      */
     boolean orderMove(Unit unit, int toX, int toY) {
+        return orderMove(unit, toX, toY, 2);
+    }
+
+    /** Applies a serialized player/network move at the retail command boundary. */
+    boolean orderCommandMove(Unit unit, int toX, int toY) {
+        Unit.Order before = unit.currentAction();
+        // A command is appended behind the action currently serving its
+        // animation timer. Timer one reaches the pop during this visit;
+        // higher values keep the old action visible and postpone the move by
+        // the remaining quiet visits.
+        int queueWait = Math.max(0, unit.battleNetAnimationTimer() - 1);
+        boolean accepted = orderMove(unit, toX, toY, 3 + queueWait);
+        if (accepted) {
+            // ReleaseOrders installs the replacement but CurrentAction keeps
+            // reporting the interrupted head until HandleUnitAction may pop
+            // it. A breakable head pops in this same cycle; a ship still in
+            // its committed animation does not (controlled sea-E: command 5,
+            // Move becomes visible at 6 and the first tile commits at 9).
+            unit.rememberActionBeforeQueued(before);
+        }
+        return accepted;
+    }
+
+    private boolean orderMove(Unit unit, int toX, int toY, int initialDelay) {
         if (unit.type().building() || unit.type().speed() <= 0 || !world.map.contains(toX, toY)) {
             return false;
         }
@@ -90,12 +114,14 @@ final class BattleNetMovementSystem {
         unit.clearPath();
         unit.setOrder(Unit.Order.MOVE);
         // BNE queues the new order behind the Still action which issued
-        // it. The following two HandleUnitAction visits advance the
-        // native move animation without reserving the destination tile;
-        // the third visit makes the logical tile step. This is visible in
-        // the retail corpus for critters commanded during either hidden
-        // startup tick: both retain their source tile for two calls.
-        unit.setBattleNetOrderDelay(2);
+        // it. The following three HandleUnitAction visits leave an external
+        // command on its source tile; the next visit may commit the logical
+        // step. The controlled retail command matrix proves this across all
+        // ordinary ground and air headings (command at fixture cycle 5,
+        // first tile commit at 8). Two was inferred from autonomous startup
+        // orders, whose issuing Still visit has already paid one beat, and
+        // made external commands walk a cycle early.
+        unit.setBattleNetOrderDelay(initialDelay);
         return true;
     }
 

@@ -237,11 +237,32 @@ public final class AiPlayer {
             decoded.add(code);
             if (code == 0xff) {
                 battleNetBuildPriorities = List.copyOf(decoded);
-                // Arm only the first high-byte milestone. Native
-                // FUN_00439740 enables one candidate at a time; arming every
-                // 0x80+ at init over-spent lumber mills on maps that never
-                // reach those later list positions in the early horizon.
-                battleNetArmNextHighMilestone();
+                // Temple spell milestones are installed with the profile and
+                // can fire without a surviving ready worker (Human 14
+                // profile 27, raise-dead at fixture 35). Construction-linked
+                // 0x80..0x8f milestones are different: the ready-worker scan
+                // must reach them before a producer may consume them.
+                int firstHighIndex = -1;
+                for (int index = 0; index < decoded.size(); index++) {
+                    int value = decoded.get(index);
+                    if (value >= 0x80 && value != 0xff) {
+                        firstHighIndex = index;
+                        break;
+                    }
+                }
+                int firstHigh = firstHighIndex < 0
+                        ? -1 : decoded.get(firstHighIndex);
+                // A high milestone following a construction prefix is the
+                // terminal result of the profile's bootstrap scan. Profile
+                // 67 (XHuman 10 p2) reaches 0x86 after eleven satisfied low
+                // entries before its first action-33 pulse. A pure-high list
+                // has no such bootstrap evidence: profile 10 (Orc 7 p0) must
+                // wait for a ready worker, while profile 35 (XOrc 8 p2) gets
+                // its 0x80 from that live scan at fixture 15. Spell blocks
+                // remain profile-installed because they do not need a worker.
+                if (firstHigh >= 0x90 || firstHighIndex > 0) {
+                    battleNetAction33Candidates.add(firstHigh);
+                }
                 // Install the retail bytecode program. Wants and list bound
                 // come from the interpreter; profile-ID soldier/tanker
                 // exceptions remain only as fallbacks when install fails
@@ -717,23 +738,6 @@ public final class AiPlayer {
             // the action-33 consume path. Re-arming here made XHuman 10/11
             // spend lumber-mill axe1 at c15 right after blacksmith axe1 at
             // c13/c15 consumed 0x86.
-        }
-    }
-
-    /**
-     * Enables the first unresolved high-byte code from the profile list.
-     * Mirrors the ready-worker milestone scan that writes one candidate byte.
-     */
-    private void battleNetArmNextHighMilestone() {
-        for (int code : battleNetBuildPriorities) {
-            if (code < 0x80 || code == 0xff) {
-                continue;
-            }
-            if (battleNetAction33ResolvedHigh.contains(code)) {
-                continue;
-            }
-            battleNetAction33Candidates.add(code);
-            return;
         }
     }
 
@@ -2863,7 +2867,20 @@ public final class AiPlayer {
         for (int index = 0; index < battleNetBuildPriorities.size()
                 && index < battleNetBuildPriorityLimit; index++) {
             int listed = battleNetBuildPriorities.get(index);
-            if (listed == 0xff || listed >= 0x80) {
+            if (listed == 0xff) {
+                return false;
+            }
+            if (listed >= 0x80) {
+                // High bytes are milestones encountered by the ready-worker
+                // construction scan, not startup flags. Arming the first one
+                // while decoding the profile let an idle mill consume 0x80
+                // even when no worker ever advanced the list that far
+                // (Orc 7 profile 10: Java paid arrow1 at fixture 60; retail
+                // held both the bank and upgrade through 1,800). The scan
+                // exposes one unresolved milestone and stops at that byte.
+                if (!battleNetAction33ResolvedHigh.contains(listed)) {
+                    battleNetAction33Candidates.add(listed);
+                }
                 return false;
             }
             if (satisfied[index]) {

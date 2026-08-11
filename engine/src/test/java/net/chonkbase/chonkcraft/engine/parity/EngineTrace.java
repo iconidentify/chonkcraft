@@ -198,7 +198,8 @@ public final class EngineTrace {
                         .findFirst().orElseThrow(() -> new IllegalArgumentException(
                                 "scripted command unit " + command.unitId()
                                 + " is absent at cycle " + cycle));
-                boolean accepted = world.orderMove(unit, command.x(), command.y());
+                boolean accepted = world.orderCommandMove(
+                        unit, command.x(), command.y());
                 System.err.printf("JBNECOMMAND cycle=%d unit=%d x=%d y=%d accepted=%d%n",
                         cycle, unit.id(), command.x(), command.y(), accepted ? 1 : 0);
                 if (!accepted) {

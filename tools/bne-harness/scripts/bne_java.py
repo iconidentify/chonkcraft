@@ -1642,6 +1642,18 @@ def command_matrix_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def ai_rank_command(args: argparse.Namespace) -> int:
+    from bne_ai_rank import rank, render
+
+    result = rank(json.loads(args.survey.read_text(encoding="utf-8")))
+    if args.json_output is not None:
+        args.json_output.write_text(
+            json.dumps(result, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+    print(render(result), end="")
+    return 0
+
+
 def routes_command(args: argparse.Namespace) -> int:
     from bne_routes import render, run_routes
 
@@ -2639,6 +2651,13 @@ def parser() -> argparse.ArgumentParser:
     command_matrix.add_argument("--command-cycle", type=int, default=5)
     command_matrix.add_argument("--distance", type=int, default=4)
     command_matrix.set_defaults(func=command_matrix_command)
+
+    ai_rank = subcommands.add_parser(
+        "ai-rank",
+        help="separate AI policy divergence from downstream combat fallout")
+    ai_rank.add_argument("survey", type=Path)
+    ai_rank.add_argument("--json-output", type=Path)
+    ai_rank.set_defaults(func=ai_rank_command)
 
     micro_oracle_spec = subcommands.add_parser(
         "micro-oracle-spec",

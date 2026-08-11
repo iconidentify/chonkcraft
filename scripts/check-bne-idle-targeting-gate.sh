@@ -16,6 +16,11 @@ mkdir -p "$(dirname "${diagnostic_log}")"
 # cycle-level BNE hypothesis with 25 passing native-shaped checks and the
 # other explicitly specifies the superseded ChonkCraft/LegacyEngine chooser.
 set +e
+for test_class in \
+  net.chonkbase.chonkcraft.engine.BattleNetIdleAttackTest \
+  net.chonkbase.chonkcraft.engine.TargetChoiceTest; do
+  rm -f "${repo_root}/engine/target/surefire-reports/TEST-${test_class}.xml"
+done
 "${repo_root}/scripts/run-tests.sh" -pl engine -am \
   '-Dtest=BattleNetIdleAttackTest,TargetChoiceTest' \
   -Dsurefire.failIfNoSpecifiedTests=false >"${diagnostic_log}" 2>&1
@@ -68,10 +73,11 @@ for inventory in catalog.get("inventories", []):
     print(f"{test_class}: {tests - len(actual)} pass, {len(actual)} classified, "
           f"0 unclassified, {len(set(names) - actual)} retired")
 
-if all_actual and process_status == 0:
-    raise SystemExit("idle-targeting diagnostics report failures but returned success")
-if not all_actual and process_status != 0:
-    raise SystemExit(f"idle-targeting diagnostics exited {process_status} with clean reports")
+if process_status != 0:
+    raise SystemExit(f"idle-targeting diagnostic runner exited {process_status}")
+# run-tests.sh deliberately uses Maven --fail-never. Classified assertion
+# failures therefore coexist with a zero process status; the newly generated
+# Surefire reports above remain the fail-closed authority.
 print(f"idle-targeting diagnostics: {len(all_actual)} classified, 0 unclassified, "
       f"{len(all_known - all_actual)} retired")
 PY

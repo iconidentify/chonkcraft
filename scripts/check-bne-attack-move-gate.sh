@@ -25,6 +25,7 @@ mkdir -p "$(dirname "${diagnostic_log}")"
 # AttackMoveTest is an upstream diagnostic inventory, not a release oracle.
 # It is allowed to be red only at explicitly reviewed names. Any new failure,
 # error, missing report or test-count drift fails this gate.
+rm -f "${diagnostic_report}"
 set +e
 "${repo_root}/scripts/run-tests.sh" -pl engine -am \
   '-Dtest=AttackMoveTest' \
@@ -57,8 +58,10 @@ if root.attrib.get("name") != catalog.get("test_class"):
     raise SystemExit("legacy diagnostic report is for the wrong test class")
 tests = int(root.attrib.get("tests", -1))
 errors = int(root.attrib.get("errors", -1))
-if tests != 65:
-    raise SystemExit(f"legacy diagnostic inventory changed size: expected 65, got {tests}")
+expected_tests = catalog.get("test_count")
+if not isinstance(expected_tests, int) or tests != expected_tests:
+    raise SystemExit(
+        f"legacy diagnostic inventory changed size: expected {expected_tests}, got {tests}")
 if errors:
     raise SystemExit(f"legacy diagnostic produced {errors} errors")
 
