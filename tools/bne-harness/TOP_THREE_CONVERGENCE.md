@@ -33,15 +33,36 @@ sealed in every fixture; ambiguous or unauthenticated cases fail closed.
 
 The corpus exposed one shared player-command boundary. Ordinary internal move
 orders keep their existing cadence, while serialized player/network commands
-now preserve three native quiet visits and wait out the interrupted animation's
-remaining timer. Results:
+now read the interrupted animation program to find its real action marker and
+read the unit's cold Still program to find the replacement marker. This
+replaces both guessed clocks with the scripts retail executes.
 
-- through cycle 20: **0/19 clean before, 16/19 clean after**;
-- ordinary air cases now first differ at cycle 48 instead of cycle 7;
-- ordinary ground cases now first differ at cycles 64-73 instead of cycle 7;
-- ordinary sea cases now first differ at cycles 73-74 instead of cycle 5; and
-- the remaining early cases are isolated to air-occupied, ground-NW, and
-  ground-occupied behavior at cycle 5.
+The same corpus then exposed and closed four downstream rules: terminal routes
+complete without an invented pathfinder wait; an occupied empty route executes
+its replacement Still marker in the same visit; every flyer uses retail's
+doubled movement lattice; and a doubled mover skirts an occupied point and
+accepts the occupied stride-neighbour selected by the native wall follower.
+Autonomous scouts interrupted by a point command re-enter the global scout
+callback before the next per-unit idle walk, preserving both the fresh patrol
+point and ownership of the two asynchronous draws.
+
+Results:
+
+- through cycle 20: **0/19 clean before, 19/19 clean after**;
+- through cycle 160: the commanded subject is exact in **15/19** cases;
+- the remaining four subjects are exact through cycle 133 and first differ at
+  134, after their commanded moves completed and a renewed autonomous patrol
+  had already run for more than eighty cycles;
+- every commanded ground unit and ship is exact through 160, including all
+  three occupied-destination cases; and
+- the occupied Human 13 daemon now stores retail's `NE,NE` route, lands at
+  `86,2`, and becomes Still on retail's cycle 62 rather than sleeping eleven
+  extra cycles.
+
+The ordinary whole-fixture survey is 7/19 clean through 160 because these
+campaign maps also contain uncontrolled critters and combatants. Subject-level
+scoring separates those ambient divergences from the authenticated command the
+corpus was built to adjudicate.
 
 The engine rule is shared by local commands, network commands, and the parity
 driver. AI/internal movement remains on its separately measured path.
@@ -73,19 +94,19 @@ The next independent AI item is now XHuman 6's extra building at cycle 311.
 
 - 34 focused Python harness tests pass.
 - `EngineTraceCommandPlanTest` and `BattleNetTrainWorkerTest` pass.
-- The 52-case cycle-80 candidate has **zero regressions** against a freshly
-  generated control from released master `cb51738d`.
-- The older accepted pointer still claims a common floor of 52, but released
-  master itself reproduces XHuman 10 at cycle 41 with both the old and current
-  packs. That stale pointer is historical debt, not a regression in this work.
+- The 52-case cycle-80 candidate has **zero regressions** against both released
+  master `cb51738d` and the authenticated pre-command convergence survey. The
+  regression receipt passes across all 52 cases.
 - The 17-lane playability gate's stale-report, test-count, signed-catalog, and
   environment-path issues were corrected or supplied during this checkpoint;
   every individual lane passes with its authenticated inputs.
+- Player-command ownership, both queue clocks, and the interrupted current
+  action now survive save/load and participate in the multiplayer sync hash.
 
 ## Next queue
 
-1. Mine the three cycle-5 occupied/NW command cases as one refusal/heading
-   cluster before touching later movement cadence.
+1. Mine the four scout subject divergences at cycle 134 as one long-patrol
+   route/refusal cluster; do not reopen the now-exact command boundary.
 2. Use the AI ranker's XHuman 6 cycle-311 building mismatch to identify the
    next independent executive branch.
 3. Map unit-facing and order-point representations into semantic-v2 only after

@@ -23,6 +23,24 @@ import org.junit.jupiter.api.Test;
 
 class BattleNetSeaOccupancyTest {
 
+    @Test
+    @DisplayName("a one-tile flyer still uses BNE's doubled movement grid")
+    void aOneTileFlyerStillUsesTheDoubledMovementGrid() {
+        GameMap map = new GameMap(16, 16, new Tileset());
+        UnitType daemon = new UnitType("unit-daemon");
+        daemon.setTileSize(1, 1);
+        daemon.setHitPoints(60);
+        daemon.setSpeed(14);
+        daemon.setAirUnit(true);
+
+        World world = new World(map);
+        Unit flyer = world.createUnit(daemon, 0, 4, 4);
+
+        assertTrue(flyer.battleNetDoubleStep(),
+                "native movement flag 0x1c bit 2 is set for every flyer");
+        assertEquals(2, world.battleNetMovementStride(flyer));
+    }
+
     private static UnitType tankerType() {
         UnitType tank = new UnitType("unit-orc-oil-tanker");
         tank.setTileSize(2, 2);

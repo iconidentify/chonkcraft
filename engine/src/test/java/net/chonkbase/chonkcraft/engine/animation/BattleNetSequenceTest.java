@@ -42,6 +42,11 @@ class BattleNetSequenceTest {
 
         BattleNetSequence.Tick wait = sequence.tick(common.offset(), common.timer());
         assertEquals(new BattleNetSequence.Tick(51, 4, false, false, true), wait);
+        assertEquals(3, sequence.quietTicksUntilActionMarker(
+                wait.offset(), wait.timer()),
+                "three quiet countdown visits remain after WAIT-4 is armed");
+        assertEquals(0, sequence.quietTicksUntilActionMarker(48, 1),
+                "a command already parked on OP0 pops this visit");
         wait = sequence.tick(wait.offset(), wait.timer());
         wait = sequence.tick(wait.offset(), wait.timer());
         wait = sequence.tick(wait.offset(), wait.timer());
@@ -96,6 +101,7 @@ class BattleNetSequenceTest {
         program[31] = 3;
         sequence = new BattleNetSequence(program);
         assertFalse(sequence.tick(31, 1).valid());
+        assertEquals(-1, sequence.quietTicksUntilActionMarker(31, 1));
     }
 
     private static void putWord(byte[] bytes, int offset, int value) {

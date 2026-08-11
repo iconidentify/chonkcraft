@@ -265,6 +265,36 @@ public final class BattleNetSequence {
         return Tick.invalid();
     }
 
+    /**
+     * Counts the quiet animation visits before the next order-action marker.
+     *
+     * <p>Player commands in BNE replace the queued order immediately, but the
+     * old current order remains visible until its animation reaches opcode
+     * zero. The unsigned timer alone is insufficient: a timer-one visit may
+     * first execute a frame and arm another wait before reaching that marker.
+     * This dry run follows the same bytecode and timer rules as {@link #tick}
+     * without changing the live unit.</p>
+     *
+     * @return the number of non-marker visits, or {@code -1} for malformed or
+     *         non-terminating bytecode
+     */
+    public int quietTicksUntilActionMarker(int offset, int timer) {
+        int cursor = offset;
+        int countdown = timer;
+        for (int quiet = 0; quiet < MAX_INSTRUCTIONS_PER_TICK; quiet++) {
+            Tick next = tick(cursor, countdown);
+            if (!next.valid()) {
+                return -1;
+            }
+            if (next.actionMarker()) {
+                return quiet;
+            }
+            cursor = next.offset();
+            countdown = next.timer();
+        }
+        return -1;
+    }
+
     private int unsignedShort(int offset) {
         return Byte.toUnsignedInt(program[offset])
                 | Byte.toUnsignedInt(program[offset + 1]) << 8;

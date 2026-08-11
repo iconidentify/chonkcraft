@@ -326,6 +326,7 @@ public final class Unit {
 
     /** BNE action calls remaining before a newly queued walk advances a tile. */
     private int battleNetOrderDelay;
+    private boolean battleNetPlayerCommandMove;
 
     /**
      * How many free stepPatrol visits a self-patrol combat flyer has spent
@@ -1452,6 +1453,9 @@ public final class Unit {
 
     public void setActionBeforeQueued(Order action) {
         this.actionBeforeQueued = action;
+        if (action == null) {
+            actionBeforeQueuedReleaseDelay = 3;
+        }
     }
 
     /**
@@ -1466,12 +1470,27 @@ public final class Unit {
      * build, and taking the second one's "before" would report the gathering.
      */
     public void rememberActionBeforeQueued(Order action) {
+        rememberActionBeforeQueued(action, 3);
+    }
+
+    /**
+     * Records the old current-action label and the new order's cold-action
+     * boundary. The label pops when the combined command delay reaches this
+     * value; the rest of the delay belongs to the replacement itself.
+     */
+    public void rememberActionBeforeQueued(Order action, int releaseDelay) {
         if (actionBeforeQueued == null) {
             actionBeforeQueued = action;
+            actionBeforeQueuedReleaseDelay = Math.max(0, releaseDelay);
         }
     }
 
+    public int actionBeforeQueuedReleaseDelay() {
+        return actionBeforeQueuedReleaseDelay;
+    }
+
     private Order actionBeforeQueued;
+    private int actionBeforeQueuedReleaseDelay = 3;
 
     public void setPendingAttack(Unit target, Order from, int x, int y) {
         this.pendingAttack = target;
@@ -2636,6 +2655,14 @@ public final class Unit {
 
     public int battleNetOrderDelay() {
         return battleNetOrderDelay;
+    }
+
+    public boolean battleNetPlayerCommandMove() {
+        return battleNetPlayerCommandMove;
+    }
+
+    public void setBattleNetPlayerCommandMove(boolean playerCommandMove) {
+        battleNetPlayerCommandMove = playerCommandMove;
     }
 
     /**

@@ -112,6 +112,23 @@ class BattleNetPathFinderTest {
     }
 
     @Test
+    @DisplayName("a stride-2 flyer skirts an occupied point on the native side")
+    void occupiedDaemonPointKeepsTheCapturedSecondNortheastStride() {
+        // Human 13 daemon 1556 is commanded from 82,6 to the occupied point
+        // 86,4. Retail stores NE,NE: it reaches 84,4, skirts the occupant on
+        // its north side, and commits the second doubled stride to 86,2.
+        BattleNetPathFinder.Passability pass =
+                (x, y) -> x != 86 || y != 4;
+
+        PathFinder.Path path = BattleNetPathFinder.find(
+                82, 6, 86, 4, 2, pass, pass, null,
+                false, false, true);
+
+        assertArrayEquals(new int[] {1, 1}, path.headings(),
+                "stored route executes as north-east, north-east");
+    }
+
+    @Test
     @DisplayName("Orc 14 tanker wall-follows around the stationary boarding hull")
     void orcFourteenTankerRoutesAroundStationaryTanker() {
         // Retail tanker 1566 plans from 116,6 toward the platform at 123,1

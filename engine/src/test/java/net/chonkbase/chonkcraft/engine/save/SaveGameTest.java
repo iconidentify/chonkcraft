@@ -307,6 +307,25 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a queued BNE point command keeps both of its clocks")
+    void playerCommandBoundaryRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit unit = bench.world().createUnit(
+                bench.types().get("unit-footman"), 0, 10, 10);
+        unit.setOrder(Unit.Order.MOVE);
+        unit.setBattleNetOrderDelay(7);
+        unit.rememberActionBeforeQueued(Unit.Order.STILL, 6);
+        unit.setBattleNetPlayerCommandMove(true);
+
+        Unit loaded = find(reload(bench), "unit-footman");
+
+        assertEquals(7, loaded.battleNetOrderDelay());
+        assertEquals(Unit.Order.STILL, loaded.currentAction());
+        assertEquals(6, loaded.actionBeforeQueuedReleaseDelay());
+        assertTrue(loaded.battleNetPlayerCommandMove());
+    }
+
+    @Test
     @DisplayName("a tanker resumes the same native oil action and cadence")
     void tankerOilStateRoundTrips() throws IOException {
         Bench bench = bench();

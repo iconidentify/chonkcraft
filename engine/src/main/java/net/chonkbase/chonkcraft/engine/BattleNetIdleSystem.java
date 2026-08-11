@@ -263,11 +263,52 @@ final class BattleNetIdleSystem {
             if (unit.type().canAttack() && unit.battleNetReadySuppressed()) {
                 continue;
             }
-            int x = unit.tileX() + world.battleNetRand() % span - radius;
-            int y = unit.tileY() + world.battleNetRand() % span - radius;
-            x = Math.max(0, Math.min(world.map.width() - 1, x));
-            y = Math.max(0, Math.min(world.map.height() - 1, y));
-            unit.setBattleNetPendingPatrol(x, y);
+            queueBattleNetScoutPatrol(unit, span, radius);
+        }
+    }
+
+    /**
+     * Re-enters the native scout callback after a player point-command has
+     * interrupted a Patrol.
+     *
+     * <p>The callback is not part of that flyer's later Still visit. Retail
+     * runs it before the per-unit idle walk on the cycle after the point Move
+     * completes. That placement matters because the two endpoint draws must
+     * precede every idle-random draw made by lower pool slots. Human 12's
+     * commanded zeppelin proves the boundary: Move ends at fixture 48, the
+     * callback writes 107,51 at 49, Patrol becomes current at 51, and the
+     * first east step lands at 54.</p>
+     */
+    void fireBattleNetCommandPatrolRestores() {
+        List<Unit> ready = world.unitsSnapshot();
+        for (int index = ready.size() - 1; index >= 0; index--) {
+            Unit unit = ready.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || unit.order() != Unit.Order.STILL
+                    || unit.savedOrder() != Unit.Order.PATROL) {
+                continue;
+            }
+            unit.takeSavedOrder();
+            queueBattleNetScoutPatrol(unit);
+        }
+    }
+
+    private void queueBattleNetScoutPatrol(Unit unit) {
+        int span = Math.max(1, world.map.width() / 2);
+        queueBattleNetScoutPatrol(unit, span, world.map.width() / 4);
+    }
+
+    private void queueBattleNetScoutPatrol(Unit unit, int span, int radius) {
+        int x = unit.tileX() + world.battleNetRand() % span - radius;
+        int y = unit.tileY() + world.battleNetRand() % span - radius;
+        x = Math.max(0, Math.min(world.map.width() - 1, x));
+        y = Math.max(0, Math.min(world.map.height() - 1, y));
+        unit.setBattleNetPendingPatrol(x, y);
+        if (World.BNE_IDLE_TRACE) {
+            System.err.printf("JBNEPATROLPASS cycle=%d unit=%d at=%d,%d"
+                            + " target=%d,%d seed=%s%n",
+                    world.cycle, unit.id(), unit.tileX(), unit.tileY(), x, y,
+                    Integer.toUnsignedString(world.battleNetRandomSeed));
         }
     }
 

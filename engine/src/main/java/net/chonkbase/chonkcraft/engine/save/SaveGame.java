@@ -563,6 +563,19 @@ public final class SaveGame {
         state.append(" progress = ").append(unit.progress()).append(",");
         state.append(" progressGoal = ").append(unit.progressGoal()).append(",");
         state.append(" wait = ").append(unit.waitCycles()).append(",");
+        if (unit.battleNetOrderDelay() != 0) {
+            state.append(" battleNetOrderDelay = ")
+                    .append(unit.battleNetOrderDelay()).append(",");
+        }
+        if (unit.reportsActionBeforeQueued()) {
+            state.append(" actionBeforeQueued = ")
+                    .append(quote(unit.currentAction().name())).append(",");
+            state.append(" actionBeforeQueuedReleaseDelay = ")
+                    .append(unit.actionBeforeQueuedReleaseDelay()).append(",");
+        }
+        if (unit.battleNetPlayerCommandMove()) {
+            state.append(" playerCommandMove = true,");
+        }
         if (unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             state.append(" oilAction = ")
                     .append(quote(unit.battleNetOilAction().name())).append(",");

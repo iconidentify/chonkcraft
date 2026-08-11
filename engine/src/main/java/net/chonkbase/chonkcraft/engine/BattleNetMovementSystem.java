@@ -64,18 +64,57 @@ final class BattleNetMovementSystem {
     boolean orderCommandMove(Unit unit, int toX, int toY) {
         Unit.Order before = unit.currentAction();
         // A command is appended behind the action currently serving its
-        // animation timer. Timer one reaches the pop during this visit;
-        // higher values keep the old action visible and postpone the move by
-        // the remaining quiet visits.
-        int queueWait = Math.max(0, unit.battleNetAnimationTimer() - 1);
-        boolean accepted = orderMove(unit, toX, toY, 3 + queueWait);
+        // animation program. Opcode zero is the pop boundary. The timer by
+        // itself cannot predict it: at timer one a frame opcode may arm a new
+        // wait before the program reaches OP0 (ground NW and an occupied
+        // daemon do exactly that in the authenticated command corpus).
+        int queueWait = -1;
+        if (world.battleNetSequence != null
+                && unit.battleNetSequenceOffset() >= 0) {
+            queueWait = world.battleNetSequence.quietTicksUntilActionMarker(
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer());
+        }
+        if (queueWait < 0) {
+            // Packs without script.bin retain the conservative timer-shaped
+            // approximation used by the native-data fallback.
+            queueWait = Math.max(0, unit.battleNetAnimationTimer() - 1);
+        }
+        // Once the queue pops, the replacement is serviced at this unit
+        // type's next cold Still OP0. Most walkers and ordinary flyers take
+        // three quiet visits; daemon Still has two frame/wait stretches and
+        // takes six. Reading the type's program replaces the old universal
+        // three-cycle approximation.
+        int actionWait = 3;
+        if (world.battleNetSequence != null) {
+            int stillStart = world.idle.battleNetStillSequenceStart(unit);
+            int scriptedWait = world.battleNetSequence
+                    .quietTicksUntilActionMarker(stillStart, 3);
+            if (scriptedWait >= 0) {
+                // SetOrder arms the newly selected Still sequence at three.
+                // Include the marker visit itself: the dry-run count is only
+                // the quiet visits that precede it.
+                actionWait = scriptedWait + 1;
+            }
+        }
+        boolean accepted = orderMove(unit, toX, toY,
+                actionWait + queueWait);
         if (accepted) {
+            unit.setBattleNetPlayerCommandMove(true);
+            // A scout's native Patrol order is suspended by a point command
+            // and restored when that Move completes (Human 12 zeppelin:
+            // Still at fixture 48, Patrol again at 51). Patrol owns its two
+            // endpoints separately, so the ordinary saved-order slot is the
+            // exact durable state needed here and survives save/load.
+            if (before == Unit.Order.PATROL && unit.savedOrder() == null) {
+                unit.setSavedOrder(Unit.Order.PATROL);
+            }
             // ReleaseOrders installs the replacement but CurrentAction keeps
             // reporting the interrupted head until HandleUnitAction may pop
             // it. A breakable head pops in this same cycle; a ship still in
             // its committed animation does not (controlled sea-E: command 5,
             // Move becomes visible at 6 and the first tile commits at 9).
-            unit.rememberActionBeforeQueued(before);
+            unit.rememberActionBeforeQueued(before, actionWait);
         }
         return accepted;
     }
@@ -112,6 +151,7 @@ final class BattleNetMovementSystem {
         unit.setOrderTarget(toX, toY);
         unit.setMoveRange(0);
         unit.clearPath();
+        unit.setBattleNetPlayerCommandMove(false);
         unit.setOrder(Unit.Order.MOVE);
         // BNE queues the new order behind the Still action which issued
         // it. The following three HandleUnitAction visits leave an external
@@ -194,6 +234,18 @@ final class BattleNetMovementSystem {
         // the unit is neither mid-step nor mid-animation
 
         if (!unit.isMoving() && !isStepping(unit) && unit.pathLength() == 0) {
+            // A spent route whose final tile is the requested point is a
+            // completed Move, not an intermediate empty route. Retail closes
+            // the action on this visit (ground/air/sea command matrix), while
+            // the generic PF_WAIT below is only paid before requesting the
+            // next route buffer. Treating the terminal buffer as intermediate
+            // left every commanded mover visibly on Move for ten extra ticks.
+            if (!"unit-critter".equals(unit.type().ident())
+                    && unit.routeSpent()
+                    && battleNetCommandPointReached(unit)) {
+                finishBattleNetMoveAtTarget(unit);
+                return;
+            }
             if (spendTheEmptyRoute(unit)) {
                 // Every PF_WAIT runs the blocker test, the count-born one
                 // included: {@code COrder_Move::Execute}'s wait arm
@@ -247,6 +299,18 @@ final class BattleNetMovementSystem {
                     return;
                 }
                 default -> {
+                    // An ordinary Move can also receive an empty FOUND route
+                    // when its destination is occupied. Retail promotes the
+                    // replacement Still action and executes its first idle
+                    // marker in this same unit visit (Human 2 grunt 1579 at
+                    // fixture cycle 12). Deferring the marker one world tick
+                    // hands its async draw to the next unit and can make an
+                    // unrelated critter wander several cycles early.
+                    if (path.length() == 0
+                            && !"unit-critter".equals(unit.type().ident())) {
+                        battleNetEmptyRouteStillAndDispatch(unit);
+                        return;
+                    }
                     // Empty FOUND (all-0xff) from a critter one-tile wander.
                     // Native FUN_004376c0 promotes Still immediately on a
                     // 20-byte 0xff route (building XOrc 2 1580 → 29,21,
@@ -360,6 +424,66 @@ final class BattleNetMovementSystem {
             }
         }
         stepMove(unit);
+    }
+
+    private void battleNetEmptyRouteStillAndDispatch(Unit unit) {
+        resetDisplacement(unit);
+        unit.clearPath();
+        unit.setBattleNetPlayerCommandMove(false);
+        world.finishOrder(unit);
+        unit.setActionBeforeQueued(null);
+        unit.setOrderTarget(unit.tileX(), unit.tileY());
+        if (world.battleNetSequence != null) {
+            unit.setBattleNetSequenceOffset(
+                    world.idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(1);
+        }
+        int phase = unit.battleNetIdlePhase();
+        unit.setBattleNetIdlePhase(phase + 1);
+        world.idle.dispatchBattleNetIdleMarker(unit,
+                PudUnitTypes.code(unit.type().ident()), phase);
+        world.battleNetEmptyRouteIdled = unit;
+    }
+
+    private void finishBattleNetMoveAtTarget(Unit unit) {
+        resetDisplacement(unit);
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.clearPath();
+        unit.setBattleNetPlayerCommandMove(false);
+        world.finishOrder(unit);
+        unit.setActionBeforeQueued(null);
+        if (world.battleNetSequence != null) {
+            unit.setBattleNetSequenceOffset(
+                    world.idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(3);
+        }
+    }
+
+    /**
+     * Whether the stored point route has reached the native command goal.
+     *
+     * <p>A doubled mover cannot necessarily land on an occupied point while
+     * staying on its two-tile lattice. Retail's point marker therefore also
+     * accepts the occupied stride-neighbour selected by the wall follower.
+     * Human 13 daemon 1556 is commanded to 86,4, stores NE,NE, and completes
+     * at 86,2 as soon as the second residual drains. Requiring literal point
+     * equality paid an invented ten-cycle pathfinder wait before Still.</p>
+     */
+    private boolean battleNetCommandPointReached(Unit unit) {
+        if (unit.tileX() == unit.orderTargetX()
+                && unit.tileY() == unit.orderTargetY()) {
+            return true;
+        }
+        if (!unit.battleNetPlayerCommandMove()
+                || !unit.battleNetDoubleStep()
+                || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
+                        Math.abs(unit.tileY() - unit.orderTargetY())) > 2) {
+            return false;
+        }
+        Unit blocker = world.blockerOnLayer(unit, unit.orderTargetX(),
+                unit.orderTargetY());
+        return blocker != null && blocker != unit;
     }
 
 
@@ -1444,6 +1568,7 @@ final class BattleNetMovementSystem {
                 // target search; order Still write at 0x453127.
                 if (walkedThisCycle && unit.stepDrained()
                         && unit.order() == Unit.Order.MOVE
+                        && !unit.battleNetPlayerCommandMove()
                         && !unit.battleNetBorrowedMoveForStep()
                         && !chaseMoveSequence
                         && unit.routeSpent()
@@ -1507,6 +1632,16 @@ final class BattleNetMovementSystem {
                         }
                         return;
                     }
+                }
+                // The last animation instruction may have drained the final
+                // residual in this call, after stepMoveOrder's entrance test.
+                // Retail closes the terminal Move immediately at that exact
+                // pixel; PF_WAIT belongs only between non-terminal buffers.
+                if (!"unit-critter".equals(unit.type().ident())
+                        && unit.routeSpent()
+                        && battleNetCommandPointReached(unit)) {
+                    finishBattleNetMoveAtTarget(unit);
+                    return;
                 }
                 if (spendTheEmptyRoute(unit)) {
                     return;

@@ -2838,8 +2838,15 @@ public final class World {
     /** Mirrors FUN_00451b50's three type-dependent construction draws. */
     private void initializeBattleNetUnit(Unit unit) {
         int type = PudUnitTypes.code(unit.type().ident());
+        // Native bit unit+0x1c&2 selects the doubled movement table. Every
+        // flyer carries it, even the daemon whose collision footprint is only
+        // 1x1; large ground/sea footprints carry it as well. Deriving the bit
+        // from footprint alone made commanded daemons half-step while retail
+        // commits directly to the next even-grid anchor.
         unit.setBattleNetDoubleStep(unit.canMove()
-                && (unit.type().tileWidth() > 1 || unit.type().tileHeight() > 1));
+                && (unit.type().airUnit()
+                    || unit.type().tileWidth() > 1
+                    || unit.type().tileHeight() > 1));
         if (type >= 0 && type < 58) {
             unit.setHeading(battleNetRand() & 7);
         }
@@ -7603,6 +7610,12 @@ public final class World {
         if (cycle > 2 && (cycle - 2) % 50 == 49) {
             idle.fireBattleNetNavalPatrolPass();
         }
+        // A point command temporarily replaces an autonomous scout Patrol.
+        // Retail re-enters the scout callback before HandleEachCycle on the
+        // tick after the Move finishes, so its two endpoint draws remain ahead
+        // of every per-unit idle draw. Doing this inside stepStill selected the
+        // same action at the same time but from the wrong RNG positions.
+        idle.fireBattleNetCommandPatrolRestores();
         ticking = true;
         // Over the copy, not the live list: "Unit list may be modified
         // during loop... so make a copy".
@@ -7650,7 +7663,8 @@ public final class World {
             if (unit.reportsActionBeforeQueued()
                     && !unit.animation().unbreakable()
                     && !(unit.order() == Unit.Order.MOVE
-                        && unit.battleNetOrderDelay() > 3)) {
+                        && unit.battleNetOrderDelay()
+                            > unit.actionBeforeQueuedReleaseDelay())) {
                 // The label's wipe is the queue's pop, and the pop wipes the
                 // wait with it: "unit.Orders.erase(...); unit.Wait = 0"
                 // A command lands on

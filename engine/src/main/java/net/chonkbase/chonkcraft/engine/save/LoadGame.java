@@ -610,6 +610,26 @@ public final class LoadGame {
         if (state.rawGet("wait") != null) {
             unit.setWaitCycles(integer(state.rawGet("wait")));
         }
+        if (state.rawGet("battleNetOrderDelay") != null) {
+            unit.setBattleNetOrderDelay(
+                    integer(state.rawGet("battleNetOrderDelay")));
+        }
+        if (state.rawGet("actionBeforeQueued") != null) {
+            try {
+                Unit.Order before = Unit.Order.valueOf(
+                        string(state.rawGet("actionBeforeQueued")));
+                int release = state.rawGet("actionBeforeQueuedReleaseDelay") == null
+                        ? 3
+                        : integer(state.rawGet("actionBeforeQueuedReleaseDelay"));
+                unit.rememberActionBeforeQueued(before, release);
+            } catch (IllegalArgumentException ignored) {
+                unit.setActionBeforeQueued(null);
+            }
+        }
+        if (state.rawGet("playerCommandMove") != null) {
+            unit.setBattleNetPlayerCommandMove(
+                    truthy(state.rawGet("playerCommandMove")));
+        }
         if (state.rawGet("oilAction") != null) {
             try {
                 unit.setBattleNetOilAction(Unit.BattleNetOilAction.valueOf(
