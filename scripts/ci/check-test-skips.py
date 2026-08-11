@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2118 tests,  17 skipped
-    no external input          2118 tests, 681 skipped
+    authenticated inputs       2143 tests,  17 skipped
+    no external input          2143 tests, 696 skipped
 
 Both can be green.
 
@@ -119,10 +119,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # None of the external inputs. The floor: what a newcomer gets by running
     # scripts/run-tests.sh with nothing configured. assetpack's 26 are the 21
     # Opus conformance tests that need the official vectors plus the 5 that
-    # need a music fixture. Engine's two additions are the BNE-backed troll
-    # projectile lifecycle checks: without the original graphics pack they
-    # cannot prove an axe crosses pixels or that an interrupted placeholder
-    # releases its retail pool slot.
+    # need a music fixture. The engine and desktop additions cover BNE-backed
+    # movement, projectiles, spells, sounds and rendered feedback. Their
+    # authenticated assertions deliberately skip when the retail installation
+    # or derived graphics pack is absent.
     "data-free": {
         "assetpack": (256, 26),
         "runtime": (99, 3),
@@ -130,8 +130,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 3),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1291, 400),
-        "desktop": (280, 228),
+        "engine": (1309, 412),
+        "desktop": (287, 231),
         "matchmaker-server": (4, 0),
     },
     # Everything configured. What a developer with the game data should see on
@@ -171,8 +171,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1291, 2),
-        "desktop": (280, 6),
+        "engine": (1309, 2),
+        "desktop": (287, 6),
         "matchmaker-server": (4, 0),
     },
 }

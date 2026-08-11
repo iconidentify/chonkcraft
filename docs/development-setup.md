@@ -485,7 +485,7 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 17 skips, so 2,100 tests actually run without exposing licensed
+It asserts 17 skips, so 2,126 tests actually run without exposing licensed
 media to public pull-request code.
 
 ## Packaging
@@ -584,5 +584,5 @@ discovering them one at a time.
    install them now.
 
    A second job was added on a self-hosted runner that has the game data, so
-   the `full` profile is asserted too: 17 of 2,106 tests skip, so 2,089 tests
+   the `full` profile is asserted too: 17 of 2,143 tests skip, so 2,126 tests
    actually run. See [the self-hosted runner](ci.md#the-self-hosted-runner).

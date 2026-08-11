@@ -23,12 +23,12 @@ observed = int(suite.attrib.get("tests", -1))
 skipped = int(suite.attrib.get("skipped", -1))
 failures = int(suite.attrib.get("failures", -1))
 errors = int(suite.attrib.get("errors", -1))
-if observed != 32 or skipped or failures or errors:
+if observed != 34 or skipped or failures or errors:
     raise SystemExit(
-        "LockstepTest: expected 32/0/0/0 tests/skips/failures/errors, "
+        "LockstepTest: expected 34/0/0/0 tests/skips/failures/errors, "
         f"got {observed}/{skipped}/{failures}/{errors}"
     )
-print("lockstep inventory: 32 pass, 0 skipped")
+print("lockstep inventory: 34 pass, 0 skipped")
 PY
 
 echo "network gate passed: independent peers converge through 1800 cycles and adverse UDP"
