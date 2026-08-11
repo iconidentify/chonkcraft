@@ -53,8 +53,8 @@ jobs:
           context: matchmaker-server
           push: true
           tags: |
-            ghcr.io/iconidentify/chonkcraft-matchmaker:${{ github.sha }}
-            ghcr.io/iconidentify/chonkcraft-matchmaker:latest
+            ghcr.io/iconidentify/chonkcraft-matchmaker-service:${{ github.sha }}
+            ghcr.io/iconidentify/chonkcraft-matchmaker-service:latest
 
   deploy:
     name: Roll out the multiplayer service
@@ -101,9 +101,9 @@ jobs:
           set -euo pipefail
           rendered="$RUNNER_TEMP/matchmaker.yaml"
           kubectl kustomize infra/k8s/matchmaker \
-            | sed "s|ghcr.io/iconidentify/chonkcraft-matchmaker:initial|ghcr.io/iconidentify/chonkcraft-matchmaker:${GITHUB_SHA}|" \
+            | sed "s|ghcr.io/iconidentify/chonkcraft-matchmaker-service:initial|ghcr.io/iconidentify/chonkcraft-matchmaker-service:${GITHUB_SHA}|" \
             > "$rendered"
-          grep -F "image: ghcr.io/iconidentify/chonkcraft-matchmaker:${GITHUB_SHA}" "$rendered"
+          grep -F "image: ghcr.io/iconidentify/chonkcraft-matchmaker-service:${GITHUB_SHA}" "$rendered"
           kubectl apply -f "$rendered"
           kubectl -n chonk-mp rollout status deployment/chonkcraft-matchmaker \
             --timeout=5m

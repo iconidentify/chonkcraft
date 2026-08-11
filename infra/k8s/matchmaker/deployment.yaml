@@ -30,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: matchmaker
-          image: ghcr.io/iconidentify/chonkcraft-matchmaker:initial
+          image: ghcr.io/iconidentify/chonkcraft-matchmaker-service:initial
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
