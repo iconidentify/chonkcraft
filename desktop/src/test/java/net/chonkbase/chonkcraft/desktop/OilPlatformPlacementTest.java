@@ -161,7 +161,7 @@ class OilPlatformPlacementTest {
 
         click(scene, px, py);
 
-        assertEquals("building " + platform.name(), scene.screen().status(),
+        assertEquals("", scene.screen().status(),
                 "the click over the oil patch at " + px + "," + py + " was refused: the screen "
                         + "asks canPlaceBuilding with no builder named, and the on-top rule "
                         + "turns down a site with anything naval standing in it -- which is the "
@@ -222,7 +222,8 @@ class OilPlatformPlacementTest {
         press(scene, tanker, "build", "unit-human-oil-platform");
         click(scene, sx, sy);
 
-        assertEquals("cannot build there", scene.screen().status(),
+        assertEquals("You must build an oil platform over a patch of oil.",
+                scene.screen().status(),
                 "a platform was accepted on open sea at " + sx + "," + sy + " once the tanker "
                         + "was named as the builder: skipping the builder must not skip the "
                         + "rule");

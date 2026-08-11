@@ -116,6 +116,12 @@ public final class Missile {
      */
     private int damage;
 
+    /** Remaining simulation cycles for persistent spell effects; -1 is unbounded. */
+    private int timeToLive = -1;
+
+    /** A persistent effect reached one of its damage beats this update. */
+    private boolean periodicHit;
+
     private boolean arrived;
     private int sleep;
 
@@ -373,6 +379,37 @@ public final class Missile {
         this.damage = damage;
     }
 
+    public int timeToLive() {
+        return timeToLive;
+    }
+
+    public void setTimeToLive(int cycles) {
+        timeToLive = cycles > 0 ? cycles : -1;
+    }
+
+    public boolean consumePeriodicHit() {
+        boolean result = periodicHit;
+        periodicHit = false;
+        return result;
+    }
+
+    public void triggerImpact() {
+        hit = true;
+        arrived = true;
+        timeToLive = 0;
+    }
+
+    public void redirect(double destinationX, double destinationY) {
+        fromX = x;
+        fromY = y;
+        toX = destinationX;
+        toY = destinationY;
+        travelled = 0;
+        total = distance(toX - fromX, toY - fromY);
+        moveStarted = false;
+        direction = headingOf(toX - fromX, toY - fromY, type.headingCount());
+    }
+
     /**
      * Replaces the aim point before the mobile constructor measures remaining.
      *
@@ -624,7 +661,8 @@ public final class Missile {
     public record SavedState(
             double x, double y, double fromX, double fromY, double toX, double toY,
             double travelled, double total, int bounces, boolean hit, int delay,
-            int damage, boolean arrived, int sleep, int cycleState, boolean moveStarted,
+            int damage, int timeToLive, boolean periodicHit,
+            boolean arrived, int sleep, int cycleState, boolean moveStarted,
             int frame, int direction, boolean battleNetMotion,
             boolean battleNetConstructorDrawn, boolean battleNetPendingImpact,
             int battleNetImpactWait, int battleNetSpeed, int battleNetError,
@@ -635,7 +673,8 @@ public final class Missile {
     /** A complete, immutable snapshot for {@code engine/save}. */
     public SavedState savedState() {
         return new SavedState(x, y, fromX, fromY, toX, toY, travelled, total,
-                bounces, hit, delay, damage, arrived, sleep, cycleState, moveStarted,
+                bounces, hit, delay, damage, timeToLive, periodicHit,
+                arrived, sleep, cycleState, moveStarted,
                 frame, direction, battleNetMotion, battleNetConstructorDrawn,
                 battleNetPendingImpact, battleNetImpactWait, battleNetSpeed,
                 battleNetError, battleNetMajor, battleNetMinor, battleNetFlags,
@@ -660,6 +699,8 @@ public final class Missile {
         missile.hit = state.hit();
         missile.delay = state.delay();
         missile.damage = state.damage();
+        missile.timeToLive = state.timeToLive();
+        missile.periodicHit = state.periodicHit();
         missile.arrived = state.arrived();
         missile.sleep = state.sleep();
         missile.cycleState = state.cycleState();
@@ -696,6 +737,13 @@ public final class Missile {
         if (arrived) {
             return;
         }
+        if (timeToLive == 0) {
+            arrived = true;
+            return;
+        }
+        if (timeToLive > 0) {
+            timeToLive--;
+        }
         if (delay > 0) {
             // Missile::Action's first line. A shard of a blizzard spends its
             // delay sitting invisibly at its start point, which is what
@@ -722,6 +770,18 @@ public final class Missile {
             // below would end it the moment its six frames had run, which is
             // under half a second.
             stepFire();
+            return;
+        }
+        if (type.missileClass() == MissileClass.LAND_MINE) {
+            frame = (frame + 1) % Math.max(1, type.animationSteps());
+            return;
+        }
+        if (type.missileClass() == MissileClass.FLAME_SHIELD) {
+            stepFlameShield();
+            return;
+        }
+        if (type.missileClass() == MissileClass.WHIRLWIND) {
+            stepWhirlwind();
             return;
         }
         if (!type.missileClass().travels()) {
@@ -800,6 +860,38 @@ public final class Missile {
         // fifteen-step animation would flick it through every heading on the
         // way to its target.
         frame = (frame + 1) % type.animationSteps();
+    }
+
+    /** One orbiting Flame Shield sprite; five staggered copies form the ring. */
+    private void stepFlameShield() {
+        frame = (frame + 1) % Math.max(1, type.animationSteps());
+        if (target == null || !target.isAlive() || !target.isOnMap()) {
+            if (timeToLive < 0 || timeToLive > 35) {
+                timeToLive = Math.floorMod(timeToLive, 36);
+            }
+            return;
+        }
+        int phase = Math.floorMod(timeToLive, 36);
+        double angle = phase * Math.PI * 2.0 / 36.0;
+        double centreX = target.pixelX()
+                + Math.max(1, target.type().tileWidth()) * Unit.TILE_PIXELS / 2.0;
+        double centreY = target.pixelY()
+                + Math.max(1, target.type().tileHeight()) * Unit.TILE_PIXELS / 2.0;
+        x = centreX + Math.sin(angle) * Unit.TILE_PIXELS;
+        y = centreY + Math.cos(angle) * Unit.TILE_PIXELS;
+        periodicHit = (timeToLive & 7) == 0;
+    }
+
+    /** Animated point movement for a persistent, periodically damaging whirlwind. */
+    private void stepWhirlwind() {
+        frame = (frame + 1) % Math.max(1, type.animationSteps());
+        periodicHit = timeToLive >= 0 && timeToLive % 10 == 0;
+        if (total <= 0) {
+            return;
+        }
+        travelled = Math.min(total, travelled + Math.max(1, type.speed()));
+        x = fromX + (toX - fromX) * (travelled / total);
+        y = fromY + (toY - fromY) * (travelled / total);
     }
 
     /**

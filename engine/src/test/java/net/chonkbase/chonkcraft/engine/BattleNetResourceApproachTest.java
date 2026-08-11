@@ -45,6 +45,31 @@ class BattleNetResourceApproachTest {
         return type;
     }
 
+    private static UnitType woodcutter() {
+        UnitType type = new UnitType("unit-peon");
+        type.setTileSize(1, 1);
+        type.setHitPoints(30);
+        type.setSpeed(10);
+        type.setLandUnit(true);
+        ResourceInfo wood = new ResourceInfo(UnitType.Resource.WOOD);
+        wood.setCapacity(100);
+        wood.setWaitAtResource(25);
+        wood.setStep(10);
+        wood.setTerrainHarvester(true);
+        type.gathering().put(UnitType.Resource.WOOD, wood);
+        AnimationSet animations = new AnimationSet("unit-peon");
+        animations.put(AnimationSet.State.STILL,
+                Animation.parse("still", java.util.List.of("frame 0", "wait 5")));
+        animations.put(AnimationSet.State.MOVE,
+                Animation.parse("move", java.util.List.of(
+                        "frame 0", "move 8", "wait 1", "frame 0", "wait 1")));
+        animations.put(AnimationSet.State.HARVEST,
+                Animation.parse("harvest", java.util.List.of(
+                        "frame 0", "wait 5", "frame 0", "wait 5")));
+        type.setAnimationSet(animations);
+        return type;
+    }
+
     @Test
     @DisplayName("BNE stages an adjacent tanker for three calls before entering")
     void adjacentTankerUsesNativeApproachState() {
@@ -646,6 +671,36 @@ class BattleNetResourceApproachTest {
         boolean secondMoved = second.resourceTileX() == 6 && second.resourceTileY() == 4;
         assertTrue((firstKept && secondMoved) || (secondKept && firstMoved),
                 "exactly one woodcutter must keep the claimed tree and the other re-aim");
+    }
+
+    @Test
+    @DisplayName("a moved woodcutter releases its tree for the next peon")
+    void replacingHarvestWithMoveReleasesTreeClaim() {
+        GameMap map = new GameMap(12, 12, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        map.field(6, 5).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+        World world = new World(map);
+        Unit first = world.createUnit(woodcutter(), 0, 5, 5);
+        Unit second = world.createUnit(woodcutter(), 0, 6, 6);
+        assertTrue(first != null && second != null, "peons must place");
+        assertTrue(world.orderHarvest(first, 6, 5));
+        world.tick();
+        assertTrue(first.gatherClockStarted(), "the first peon must own the tree");
+
+        assertTrue(world.orderMove(first, 2, 5), "the move must replace harvesting");
+        assertTrue(world.orderHarvest(second, 6, 5), "the second harvest is valid");
+        for (int cycle = 0; cycle < 20 && !second.gatherClockStarted(); cycle++) {
+            world.tick();
+        }
+
+        assertTrue(second.gatherClockStarted(),
+                "the abandoned claim made a valid peon loop beside the tree instead of chopping");
+        assertEquals(6, second.resourceTileX());
+        assertEquals(5, second.resourceTileY());
     }
 
     @Test

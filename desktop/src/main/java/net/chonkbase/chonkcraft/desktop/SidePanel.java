@@ -1471,16 +1471,13 @@ final class SidePanel {
      * <p>Warcraft II shows an icon and a number, not a labelled figure. The
      * layout script declares seven slots and this implementation drew four of them: the
      * score and the idle worker count -- {@code UI.Resources[ScoreCost]} and
-     * {@code [FreeWorkersCount]} -- were parsed, placed at the right hand end
-     * of the bar, and never filled in.
+     * {@code [FreeWorkersCount]} -- were parsed but never filled in.
      *
-     * <p>The positions start as the script's. They are not evenly spaced --
-     * gold, lumber and oil sit at 0, 75 and 150 from the left of the map area
-     * while food, score and workers are measured back from the right edge --
-     * so a fixed stride puts every one of them somewhere the panel art is not.
-     * A slot the script parks off screen, as it does the mana one at minus a
-     * hundred, is left undrawn, which is how {@code DrawResources} reads a
-     * negative {@code TextX}.
+     * <p>All six visible counters share one spacing rule: icon, four clear
+     * pixels, value, fourteen clear pixels, next icon. That keeps each value
+     * visibly attached to its own icon while preserving identical whitespace
+     * between counter groups. A slot parked off screen, as the mana one is,
+     * remains undrawn.
      *
      * <p>What the script cannot know is how wide the figures are. Its spacing
      * was measured for a bitmap face five pixels to the digit, and the last
@@ -1488,8 +1485,8 @@ final class SidePanel {
      * a sixteen pixel strip of art drawn over that edge; anything of two
      * digits ran under the strip. So the declared positions are treated as
      * where each count would like to be and {@link #layOutTopBar} moves the
-     * ones that would not fit, which is the only way the bar can be right at
-     * every interface size rather than at the one it was measured at.
+     * ones that would not fit, which keeps the cluster safe at every interface
+     * size rather than only at the one it was measured at.
      */
     private void drawResources(Graphics2D g2, int viewWidth) {
         Player player = world.player(localPlayer);
@@ -1583,7 +1580,7 @@ final class SidePanel {
     private static final int RIGHT_FILLER = 16;
 
     /** How much clear bar to leave between two counts. */
-    private static final int COUNT_GAP = 14;
+    static final int COUNT_GAP = 14;
 
     /**
      * Which count gives way first when the bar is too narrow to hold them all.
@@ -1599,13 +1596,12 @@ final class SidePanel {
     /**
      * Places the counts along the bar, moving any that would not fit.
      *
-     * <p>The script's own positions are the starting point and the answer
-     * whenever they work. Gold, lumber and oil are absolute, so they are placed
-     * left to right and each is pushed right only far enough to clear the one
-     * before it. Food, score and workers are measured back from the right edge,
-     * so they are placed right to left from inside the filler strip and each is
-     * pulled left only far enough to clear the one after it. If the two groups
-     * still meet, the least important count is dropped and the whole thing is
+     * <p>Every visible count advances by its icon-plus-value width and the same
+     * clear gap. This deliberately measures visual groups rather than icon
+     * centers: fixed-width number fields detach a one-digit value from its
+     * icon, while fixed icon positions leave different amounts of whitespace
+     * after values with different digit counts. If the group reaches the
+     * right trim, the least important count is dropped and the whole thing is
      * tried again.
      *
      * <p>Static and given its measurements rather than taking them, so a test
@@ -1653,35 +1649,17 @@ final class SidePanel {
             int[] textWidths, int viewWidth, java.util.List<Integer> shown) {
         java.util.Map<Integer, Integer> at = new java.util.LinkedHashMap<>();
 
-        // The left hand group, in the order the script declares it. Starting
-        // inside the strip's own moulding rather than at the 176 the script
-        // gives the first of them, which is the sidebar's edge: an icon there
-        // sits on the bevel exactly as a fourteen pixel one sat on the bevel
-        // at the top and bottom.
+        // One left-aligned group, in the order the script declares it. Start
+        // inside the strip's own moulding, then place every counter by the
+        // same icon/value/gap rule. Mixing fixed positions for the first three
+        // with packed positions for the last three caused the original uneven
+        // bar; fixed-width value fields then detached single digits from their
+        // icons. Content-width placement avoids both failures.
         int cursor = WIDTH + TOP_BAR_BEVEL;
         for (int slot : shown) {
-            if (slot > OIL_SLOT) {
-                continue;
-            }
-            int x = Math.max(declaredIconX(declared, slot), cursor);
+            int x = cursor;
             at.put(slot, x);
             cursor = x + cellWidth(declared, textWidths, slot) + COUNT_GAP;
-        }
-
-        // The right hand group, from the inside edge of the filler strip back.
-        java.util.List<Integer> right = new java.util.ArrayList<>();
-        for (int slot : shown) {
-            if (slot > OIL_SLOT) {
-                right.add(slot);
-            }
-        }
-        int limit = viewWidth - RIGHT_FILLER - 4;
-        for (int i = right.size() - 1; i >= 0; i--) {
-            int slot = right.get(i);
-            int width = cellWidth(declared, textWidths, slot);
-            int x = Math.min(declaredIconX(declared, slot), limit - width);
-            at.put(slot, x);
-            limit = x - COUNT_GAP;
         }
 
         java.util.List<TopBarCell> cells = new java.util.ArrayList<>();
@@ -1694,10 +1672,6 @@ final class SidePanel {
             if (x + width > viewWidth - RIGHT_FILLER) {
                 return null;
             }
-            // The script writes the figure eighteen pixels right of the icon,
-            // which is the icon and four clear pixels; keeping the offset the
-            // script declares rather than assuming it is the same on every
-            // layout costs nothing.
             int offset = declaredTextX(declared, slot) - declaredIconX(declared, slot);
             cells.add(new TopBarCell(slot, x, TOP_BAR_BEVEL,
                     x + (offset > 0 ? offset : RESOURCE_ICON + 4),

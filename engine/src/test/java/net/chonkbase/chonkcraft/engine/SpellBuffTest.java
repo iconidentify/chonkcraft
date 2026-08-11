@@ -4,11 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -68,10 +65,10 @@ class SpellBuffTest {
     }
 
     private static GameData load() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No authenticated BNE pack configured");
+        return new GameData(assets);
     }
 
     private static World armed(GameData data) {

@@ -173,11 +173,16 @@ public final class CommandApplier {
             }
             case CAST -> {
                 String ident = spellAt(command.typeIndex());
-                Unit target = command.targetId() == 0 ? unit : findUnit(command.targetId());
-                if (ident != null && target != null) {
-                    accepted = world.orderCast(unit, ident, target);
-                } else {
+                net.chonkbase.chonkcraft.engine.spell.Spell spell = ident == null
+                        || world.spells() == null ? null : world.spells().get(ident);
+                if (spell == null) {
                     accepted = false;
+                } else if (spell.target()
+                        == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION) {
+                    accepted = world.orderCast(unit, ident, command.x(), command.y());
+                } else {
+                    Unit target = command.targetId() == 0 ? unit : findUnit(command.targetId());
+                    accepted = target != null && world.orderCast(unit, ident, target);
                 }
             }
             case PATROL -> accepted = world.orderPatrol(unit, command.x(), command.y());

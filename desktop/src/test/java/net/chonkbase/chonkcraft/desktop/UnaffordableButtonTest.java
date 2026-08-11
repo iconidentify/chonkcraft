@@ -302,7 +302,7 @@ class UnaffordableButtonTest {
         scene.screen().selectForTest(hall);
         press(scene, hall, "train-unit", "unit-peasant");
 
-        assertEquals("cannot train that now", scene.screen().status(),
+        assertEquals("Cannot train that now.", scene.screen().status(),
                 "the status line announced work the command applier rejected");
         assertNull(hall.producing(), "the rejected order unexpectedly began training");
     }

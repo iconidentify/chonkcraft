@@ -85,14 +85,9 @@ class SidePanelGeometryTest {
         return slots;
     }
 
-    /** Icon, gap and figure, which is what one count covers on the bar. */
-    private static int width(int textWidth) {
-        return 18 + textWidth;
-    }
-
     @Test
-    @DisplayName("counts that fit are left exactly where the script puts them")
-    void thedeclaredPositionsAreKeptWhenTheyWork() {
+    @DisplayName("the original resources lead one compact left-aligned counter group")
+    void theCountersStayTogetherWhenTheyFit() {
         int view = 1280;
         int[] widths = {30, 30, 24, 32, 40, -1, 12};
         var cells = SidePanel.layOutTopBar(declared(view), widths, view);
@@ -100,22 +95,22 @@ class SidePanelGeometryTest {
         // Two in from the 176 the script declares, which is the sidebar's own
         // edge: the strip has a two pixel moulding and the icon goes inside it.
         assertEquals(176 + SidePanel.TOP_BAR_BEVEL, cells.get(0).iconX());
-        assertEquals(176 + 75, cells.get(1).iconX());
-        assertEquals(176 + 150, cells.get(2).iconX());
-        // The three measured back from the right edge are pulled in, never
-        // pushed out. The script's own spacing does not survive contact with a
-        // figure of any width: the idle worker count is declared twenty-four
-        // pixels from the strip of art down the right hand edge and a count and
-        // its icon are thirty, so it moves, and the score and the food move
-        // ahead of it.
-        int[] declaredRight = {view - 16 - 154, view - 16 - 84, view - 16 - 24};
-        for (int i = 0; i < 3; i++) {
-            assertTrue(cells.get(3 + i).iconX() <= declaredRight[i],
-                    "slot " + cells.get(3 + i).slot() + " is at " + cells.get(3 + i).iconX()
-                            + ", right of the " + declaredRight[i] + " the script declares");
+        // Every value remains attached to its own icon, and every following
+        // icon begins after exactly the same visible whitespace.
+        for (int i = 1; i < cells.size(); i++) {
+            var left = cells.get(i - 1);
+            var right = cells.get(i);
+            assertEquals(18, left.textX() - left.iconX(),
+                    "slot " + left.slot() + " detached its value from its icon");
+            assertEquals(SidePanel.COUNT_GAP,
+                    right.iconX() - (left.textX() + widths[left.slot()]),
+                    "slot " + left.slot() + " leaves uneven visible whitespace");
         }
-        // The last of them ends inside the strip, which is the whole point.
-        assertEquals(view - 16 - 4 - width(12), cells.get(5).iconX());
+        var last = cells.get(cells.size() - 1);
+        assertEquals(18, last.textX() - last.iconX(),
+                "the final worker value detached from its icon");
+        assertTrue(cells.get(5).iconX() + cells.get(5).width() < view / 2,
+                "the cluster still stretches across the otherwise empty right half");
     }
 
     @Test

@@ -92,6 +92,15 @@ def verify(executable: Path, evidence_path: Path) -> None:
         actual_digest = hashlib.sha256(code).hexdigest()
         if actual_digest != item["sha256"]:
             raise ValueError(f"{item['name']} code slice hash mismatch")
+        for required in item.get("required_bytes", []):
+            offset = integer(required["offset"])
+            expected = bytes.fromhex(required["hex"])
+            actual = code[offset:offset + len(expected)]
+            if actual != expected:
+                raise ValueError(
+                    f"{item['name']} bytes at +{offset:#x} differ: "
+                    f"{actual.hex()} != {expected.hex()}"
+                )
         calls = direct_calls(code, start)
         for required in item.get("required_calls", []):
             target = integer(required["target"])

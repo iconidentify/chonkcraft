@@ -332,6 +332,70 @@ class LockstepTest {
         }
     }
 
+    @Test
+    @DisplayName("chat reaches the other peer without changing or waiting on the world")
+    void chatIsSideBandAndAuthenticated() throws Exception {
+        World hostWorld = battlefield();
+        World guestWorld = battlefield();
+        UnitType type = hostWorld.units().getFirst().type();
+        try (NetworkSession hostSession = new NetworkSession(0, 0);
+                NetworkSession guestSession = new NetworkSession(1, 0)) {
+            InetAddress loopback = InetAddress.getLoopbackAddress();
+            hostSession.addPeer(1, loopback, guestSession.localPort());
+            guestSession.addPeer(0, loopback, hostSession.localPort());
+            NetworkGame host = new NetworkGame(hostWorld, hostSession,
+                    new LockstepScheduler(2),
+                    new CommandApplier(hostWorld, List.of(type)), 0);
+            NetworkGame guest = new NetworkGame(guestWorld, guestSession,
+                    new LockstepScheduler(2),
+                    new CommandApplier(guestWorld, List.of(type)), 1);
+            host.setPlayerNames(Map.of(0, "Chris", 1, "Alex"));
+            guest.setPlayerNames(Map.of(0, "Chris", 1, "Alex"));
+            host.setHostPlayer(0);
+            guest.setHostPlayer(0);
+            host.start();
+            guest.start();
+            assertTrue(guest.sendChat(1 << 0, "Ready?"));
+            assertEquals("Ready?", guest.drainChatEvents().getFirst().text(),
+                    "the sender needs an immediate local echo");
+
+            NetworkGame.ChatEvent received = null;
+            long deadline = System.currentTimeMillis() + 2_000;
+            while (received == null && System.currentTimeMillis() < deadline) {
+                host.update();
+                guest.update();
+                List<NetworkGame.ChatEvent> events = host.drainChatEvents();
+                if (!events.isEmpty()) {
+                    received = events.getFirst();
+                }
+            }
+            assertEquals("Alex", received.playerName());
+            assertEquals("Ready?", received.text());
+            assertFalse(received.local());
+            assertEquals(hostWorld.cycle(), guestWorld.cycle());
+            assertEquals(SyncHash.of(hostWorld), SyncHash.of(guestWorld),
+                    "chat put the two deterministic worlds out of step");
+        }
+    }
+
+    @Test
+    @DisplayName("one player cannot flood the match message line")
+    void chatBurstIsBounded() throws Exception {
+        World world = battlefield();
+        UnitType type = world.units().getFirst().type();
+        try (NetworkSession session = new NetworkSession(0, 0)) {
+            session.addPeer(1, InetAddress.getLoopbackAddress(), 9);
+            NetworkGame game = new NetworkGame(world, session, new LockstepScheduler(2),
+                    new CommandApplier(world, List.of(type)), 0);
+            game.setPlayerNames(Map.of(0, "Chris", 1, "Alex"));
+            for (int i = 0; i < 6; i++) {
+                assertTrue(game.sendChat(1 << 1, "line " + i));
+            }
+            assertFalse(game.sendChat(1 << 1, "line 7"));
+            assertEquals(6, game.drainChatEvents().size());
+        }
+    }
+
     /** One datagram retained by the deterministic adverse-network proxy. */
     private record FaultPacket(byte[] bytes, int destinationPort, int releaseRound) {}
 

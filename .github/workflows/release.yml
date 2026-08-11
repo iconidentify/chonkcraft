@@ -12,7 +12,7 @@ on:
       version:
         description: "Public version to stamp"
         required: true
-        default: "0.1.1-beta10"
+        default: "0.1.1-beta11"
         type: string
       draft:
         description: "Keep the published GitHub release as a draft"
@@ -526,14 +526,14 @@ jobs:
           set -euo pipefail
           tag="v${CHONKCRAFT_VERSION}"
           title="ChonkCraft ${CHONKCRAFT_VERSION}"
-          notes="Cross-platform ChonkCraft launcher. Bring your own original Warcraft II media; the launcher keeps game code current automatically."
+          test -s RELEASE_NOTES.md
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            flags=(--title "$title")
+            flags=(--title "$title" --notes-file RELEASE_NOTES.md)
             [[ "$RELEASE_DRAFT" == true ]] && flags+=(--draft) || flags+=(--draft=false)
             [[ "$RELEASE_PRERELEASE" == true ]] && flags+=(--prerelease) || flags+=(--prerelease=false)
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
           else
-            flags=(--target "$GITHUB_SHA" --title "$title" --notes "$notes")
+            flags=(--target "$GITHUB_SHA" --title "$title" --notes-file RELEASE_NOTES.md)
             [[ "$RELEASE_DRAFT" == true ]] && flags+=(--draft)
             [[ "$RELEASE_PRERELEASE" == true ]] && flags+=(--prerelease)
             gh release create "$tag" --repo "$GITHUB_REPOSITORY" "${flags[@]}"

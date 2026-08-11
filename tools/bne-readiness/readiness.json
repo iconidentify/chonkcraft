@@ -94,16 +94,22 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/NavalPatrolCoastGoalRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/pathfinder/BattleNetPathFinderTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetWallFollowBoundsTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/RefusedStepTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetRefusalSleepTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetChaseRefusalTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSeaOccupancyTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/PathAroundUnitsTest.java",
         "scripts/check-bne-movement-gate.sh"
       ],
       "retail_evidence": [
         "The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.",
-        "The movement gate runs focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only."
+        "The movement gate runs 85 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.",
+        "Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes."
       ],
       "blockers": [],
       "gate": {
         "driver": "Player wire commands move retail land, naval and air units through authenticated maps and unit data.",
-        "success": "Real units complete formation detours and terrain-domain passages while the focused movement and terrain rules pass.",
+        "success": "Real units complete formation detours and terrain-domain passages while 85 large-footprint, congestion and refusal checks pass with zero skips.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-movement-gate.sh"]
       }
@@ -287,19 +293,25 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/missile/NativeMissileRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/CombatFeedbackTest.java",
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/MissileRenderingTest.java",
-        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/ImpactRenderingTest.java"
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/ImpactRenderingTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/ClickMarkerTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/PresentationAheadProjectilePrepareTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/RareSpellBehaviorTest.java",
+        "scripts/check-bne-projectile-gate.sh"
       ],
       "retail_evidence": [
         "Projectile pool order, constructor RNG, impact delay and integer direction stepping have dedicated ledgers and authenticated captures.",
         "Pinned BNE 2.02b constructors write facing at projectile +0x0a once; point action 0x004101f0 and parabolic action 0x00410260 never rewrite it. An efficacy-proved rendered-frame regression fails on the old alternating shallow-arrow sprite and passes when launch facing is preserved.",
-        "Pinned BNE 2.02b function 0x00410260 advances the parabolic arc accumulator at projectile +0x24, divides by the stride at +0x26 and selects flattened frames 0,5,10,5,0 from table 0x0049067c without adding a fake height coordinate; the zero-skip player/referee lane proves those phases, post-zero impact timing, visible flight and visible impact art."
+        "Pinned BNE 2.02b function 0x00410260 advances the parabolic arc accumulator at projectile +0x24, divides by the stride at +0x26 and selects flattened frames 0,5,10,5,0 from table 0x0049067c without adding a fake height coordinate; the zero-skip player/referee lane proves those phases, post-zero impact timing, visible flight and visible impact art.",
+        "All 35 retail missile declarations are loaded. Land mines now persist until triggered or expired, Whirlwinds move and pulse, Flame Shields orbit and pulse without striking their protected center, and Death Coil returns life; their live state also survives save/load.",
+        "The retail green-cross map confirmation is a first-class projectile lifecycle: the issued location is retained, its visible cycles are counted, and it is covered by the same 54-check zero-skip referee."
       ],
       "blockers": [],
       "gate": {
         "driver": "A retail-data firer launches arrows and boulders while the referee follows native construction, pool order, integer flight, parabolic frame phases, impact damage, art and screen pixels.",
-        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its impact once and renders both flight and impact with zero skipped checks.",
+        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its complete transient or persistent effect once and renders flight, impact and green-cross feedback across 54 zero-skip checks.",
         "required_inputs": ["asset_pack"],
-        "command": ["scripts/run-tests.sh", "-pl", "desktop", "-am", "-Dtest=BattleNetProjectilePoolOrderTest,BattleNetMissileMotionTest,CombatFeedbackTest,MissileRenderingTest,ImpactRenderingTest,NativeMissileRealDataTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
+        "command": ["scripts/check-bne-projectile-gate.sh"]
       }
     },
     {
@@ -341,12 +353,15 @@
       "implementation": [
         "engine/src/main/java/net/chonkbase/chonkcraft/engine/spell/Spell.java",
         "engine/src/main/java/net/chonkbase/chonkcraft/engine/spell/SpellCatalog.java",
-        "engine/src/main/java/net/chonkbase/chonkcraft/engine/World.java"
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/World.java",
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/missile/Missile.java"
       ],
       "checks": [
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/spell/OffensiveSpellTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/spell/SpellRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/SpellCastingTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/SpellBuffTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/RareSpellBehaviorTest.java",
         "tools/bne-readiness/spell-dispatch.json",
         "tools/bne-readiness/check_spell_dispatch.py",
         "scripts/check-bne-spell-gate.sh"
@@ -354,13 +369,14 @@
       "retail_evidence": [
         "The official Warcraft II Battle.net Edition manual describes Blizzard and Death and Decay as damaging persistent area spells, while the pinned retail executable carries distinct Blizzard/fireball graphics and spell sound assets.",
         "The authenticated 2.02b dispatch table maps all 19 spell orders to their retail handlers. Code-slice proofs establish one Fireball constructor, five Blizzard and five Death-and-Decay field constructors, ten delayed successors per field and two retail random draws selecting every field in a five-wide patch.",
-        "The pinned Exorcism handler reaches retail HitUnit and its 0x0040a9d0 offer boundary before damage; the Java direct-spell path now uses that same offer-and-wait policy instead of layering LegacyEngine flee/attack-back on top.",
-        "The BNE player/referee lane proves fireball, death coil, delayed Blizzard, death and decay, demolish, targeted casting, self casting and mana exhaustion; its native catalog sweep proves all 22 spell definitions and their effect argument trees load with no script tree, for 21 passing checks and zero skips."
+        "The pinned Exorcism handler reaches retail HitUnit and its 0x0040a9d0 offer boundary before damage; the Java direct-spell path now uses that same offer-and-wait policy instead of layering a second flee/attack-back tail on top.",
+        "Authenticated handler slices prove Polymorph's critter conversion, Eye of Kilrogg's summoned unit type and Unholy Armor's 500-cycle duration plus hit-point halving.",
+        "The player/referee lane proves all previously unmodelled rare effects, true position-target commands, fireball, life-returning Death Coil, persistent Flame Shield, Whirlwind and Runes, delayed Blizzard, death and decay, demolish, targeted casting, self casting and mana exhaustion for 36 passing checks and zero skips."
       ],
       "blockers": [],
       "gate": {
         "driver": "A scripted caster spends mana on legal targets while the referee observes missiles, delays and effects.",
-        "success": "The pinned retail dispatch and spell call shapes authenticate the implementation; representative offensive and buff spells spend the declared cost, apply their complete effects and use BNE's hit reaction with no skipped checks.",
+        "success": "The pinned retail dispatch and rare-handler code shapes authenticate the implementation; all generated effects are explicitly modelled, spend the declared cost and pass 36 behavior checks with zero skips.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-spell-gate.sh"]
       }
@@ -509,20 +525,22 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/UnitVoicesWithoutScriptsRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundChoiceTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/CritterVoiceRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BuilderReportsWorkCompleteTest.java",
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java"
       ],
       "retail_evidence": [
-        "All 371 sound bindings and all 398 voice-event bindings for 107 voiced units were sealed only after full legacy differentials, while every decoded clip comes from the retail BNE asset pack.",
+        "All 371 sound bindings and all 398 voice-event bindings for 107 voiced units were sealed only after full declaration differentials, while every decoded clip comes from the retail BNE asset pack.",
+        "Neutral critters resolve their audible selection and death voice from the map tileset: sheep, seal, pig or warthog; death never falls through to the old explosion placeholder.",
         "The authenticated town-hall dead binding renders audible PCM from BNE's three-clip building-destroyed group even when destroying the local hall removes the last sight that made it visible.",
         "The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer."
       ],
       "blockers": [],
       "gate": {
         "driver": "A worker completes a player-issued build order while the referee follows its sound event through the script-free retail bindings and real mixer.",
-        "success": "Every retail binding matches its authority, unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks.",
+        "success": "Every retail binding matches its authority, neutral and player unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks.",
         "required_inputs": ["asset_pack"],
-        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
+        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
       }
     },
     {

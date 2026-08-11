@@ -140,6 +140,11 @@ public record GameCommand(Kind kind, int player, int unitId, int x, int y, int t
         return new GameCommand(Kind.CAST, player, unitId, 0, 0, targetId, spellIndex, false);
     }
 
+    /** A position-target spell; the selected square survives lockstep unchanged. */
+    public static GameCommand castAt(int player, int unitId, int x, int y, int spellIndex) {
+        return new GameCommand(Kind.CAST, player, unitId, x, y, 0, spellIndex, false);
+    }
+
     /**
      * Sets or clears a caster's standing spell.
      *

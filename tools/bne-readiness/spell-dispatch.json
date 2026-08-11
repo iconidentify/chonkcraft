@@ -78,6 +78,31 @@
       "size": 167,
       "sha256": "4cfa5185404b8c6da1a77d0c7eec2c9ae5657d62d3431c99566df3f503dc34d1",
       "required_calls": [{"target": "0x0040a9d0", "count": 1}]
+    },
+    {
+      "name": "polymorph-handler",
+      "start": "0x00442b20",
+      "size": 192,
+      "sha256": "466cc2d614120291b7839df0009e8695e009c74269e0c26b9e86b6635b2d9a5c",
+      "required_bytes": [{"offset": "0x6e", "hex": "6a0b"}]
+    },
+    {
+      "name": "eye-of-kilrogg-handler",
+      "start": "0x00442c60",
+      "size": 144,
+      "sha256": "3f0fa30fe75b9c536cbaf1c9802724805adbbca47a0ed56f664a48430daf76be",
+      "required_bytes": [{"offset": "0x5e", "hex": "6a2d"}]
+    },
+    {
+      "name": "unholy-armor-handler",
+      "start": "0x004433e0",
+      "size": 160,
+      "sha256": "4ad30227afee502e555a8ade26b6ab2882f184a5958cef58ce75779b798290f7",
+      "required_bytes": [
+        {"offset": "0x76", "hex": "66837e2202"},
+        {"offset": "0x7b", "hex": "66c74646f401"},
+        {"offset": "0x83", "hex": "66d16e22"}
+      ]
     }
   ],
   "established_semantics": [
@@ -85,6 +110,7 @@
     "Fireball launches one retail projectile constructor.",
     "Blizzard and Death and Decay each create five fields and pass ten delayed successors to every field constructor, yielding eleven shards per field.",
     "Each field independently chooses both axes with retail's random routine inside a five-wide patch.",
-    "The shipped direct-damage Exorcism path reaches retail HitUnit, which offers the aggressor through 0x0040a9d0 before applying damage; no separate ChonkCraft flee/attack-back tail follows."
+    "The shipped direct-damage Exorcism path reaches retail HitUnit, which offers the aggressor through 0x0040a9d0 before applying damage; no separate ChonkCraft flee/attack-back tail follows.",
+    "Polymorph's authenticated handler selects retail unit type 11, Eye of Kilrogg selects unit type 45, and Unholy Armor writes a 500-cycle timer then halves hit points when the target has at least two."
   ]
 }

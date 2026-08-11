@@ -516,7 +516,7 @@ signed, notarized, stapled, Gatekeeper-assessed and accompanied by a SHA-256
 file. The optional `publish_macos_release` workflow input attaches both files
 to `v<version>`; leave it disabled for an Actions-only test artifact.
 
-`CHONKCRAFT_VERSION` stamps the public version, currently `0.1.1-beta4`.
+`CHONKCRAFT_VERSION` stamps the public version, currently `0.1.1-beta11`.
 `jpackage` receives a private nonzero seed to satisfy its validation; before
 signing, the bundle metadata is replaced with the honest `0.1.0` marketing
 version and an Actions run-number build value.

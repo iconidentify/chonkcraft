@@ -243,7 +243,7 @@ class HotkeyBindingTest {
                     scene.screen(), KeyEvent.KEY_PRESSED, System.currentTimeMillis(),
                     modifiers, KeyEvent.VK_E, 'E'));
             assertTrue(handled, "the Mac evidence shortcut was ignored");
-            assertTrue(scene.screen().status().startsWith("evidence saved playtest-"),
+            assertTrue(scene.screen().status().startsWith("Evidence saved playtest-"),
                     "there was no visible success confirmation: " + scene.screen().status());
 
             Path root = home.resolve(".chonkcraft/evidence");

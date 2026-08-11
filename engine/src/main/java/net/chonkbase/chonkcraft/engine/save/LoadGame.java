@@ -295,6 +295,9 @@ public final class LoadGame {
                     number(state.rawGet("travelled")), number(state.rawGet("total")),
                     integer(state.rawGet("bounces")), truthy(state.rawGet("hit")),
                     integer(state.rawGet("delay")), integer(state.rawGet("damage")),
+                    state.rawGet("timeToLive") == null
+                            ? -1 : integer(state.rawGet("timeToLive")),
+                    truthy(state.rawGet("periodicHit")),
                     truthy(state.rawGet("arrived")), integer(state.rawGet("sleep")),
                     integer(state.rawGet("cycleState")), truthy(state.rawGet("moveStarted")),
                     integer(state.rawGet("frame")), integer(state.rawGet("direction")),
@@ -353,7 +356,8 @@ public final class LoadGame {
         reader.register("SetSavedTile", args -> {
             if (args.length >= 5) {
                 world.map().restoreSavedTile(integer(args[0]), integer(args[1]), integer(args[2]),
-                        flagWord(args[3]), integer(args[4]));
+                        flagWord(args[3]), integer(args[4]),
+                        args.length >= 6 ? integer(args[5]) : -1);
             }
             return new Object[0];
         });
@@ -502,6 +506,11 @@ public final class LoadGame {
         });
 
         run(reader, script);
+
+        // Schema-two saves could name runtime-only wood/rock transition
+        // codes. Their flags have now all been restored, so any such picture
+        // can be reconstructed against its complete neighbourhood.
+        world.map().finishSavedTerrainRestore();
 
         // Unit construction can initialize animations and consume the BNE
         // asynchronous stream. The save names the state at the save boundary,
@@ -760,7 +769,7 @@ public final class LoadGame {
         // Unknown calls are ignored by NativeSaveReader for forward compatibility.
     }
 
-    /** Accepts native schema 2 and historical unversioned saves for migration. */
+    /** Accepts schema 3 plus historical schemas 1 and 2 for migration. */
     private static void requireSupportedFormat(String source) {
         NativeSaveReader reader = new NativeSaveReader();
         int[] version = {1};
@@ -772,7 +781,7 @@ public final class LoadGame {
             return new Object[0];
         });
         reader.run(source);
-        if (version[0] != 1 && version[0] != 2) {
+        if (version[0] != 1 && version[0] != 2 && version[0] != 3) {
             throw new IllegalArgumentException("unsupported save format version " + version[0]);
         }
     }

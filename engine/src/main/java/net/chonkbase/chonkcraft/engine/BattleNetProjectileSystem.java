@@ -377,6 +377,7 @@ final class BattleNetProjectileSystem {
         // takes one or two async draws per FUN_00410260.
         List<Missile> finishedNow = new ArrayList<>();
         for (Missile missile : flying) {
+            preparePersistentEffect(missile);
             Long started = world.battleNetProjectileStartCycles.get(missile);
             if (started == null
                     && world.battleNetPendingProjectileShots.containsValue(missile)) {
@@ -408,8 +409,19 @@ final class BattleNetProjectileSystem {
                 }
             }
             missile.step();
+            if (missile.consumePeriodicHit()) {
+                resolvePersistentPulse(missile);
+            }
             if (missile.consumeHit()) {
+                boolean returnsLife = missile.type().missileClass() == MissileClass.DEATH_COIL
+                        && missile.source() != null && missile.source().isAlive()
+                        && missile.target() != null && missile.target().isAlive();
                 resolve(missile);
+                if (returnsLife && missile.source().isAlive()) {
+                    Unit source = missile.source();
+                    source.setHitPoints(Math.min(source.type().hitPoints(),
+                            source.hitPoints() + missile.damage()));
+                }
             }
             if (missile.hasArrived()) {
                 finishedNow.add(missile);
@@ -424,6 +436,56 @@ final class BattleNetProjectileSystem {
         // Last, after anything an impact added, so the renderer never
         // sees a half-built cycle.
         world.missileSnapshot = List.copyOf(world.missiles);
+    }
+
+    /** World-aware setup for runes and the roaming Whirlwind. */
+    private void preparePersistentEffect(Missile missile) {
+        MissileClass kind = missile.type().missileClass();
+        if (kind == MissileClass.LAND_MINE) {
+            for (Unit unit : List.copyOf(world.units)) {
+                if (!unit.isAlive() || unit.isDying() || !unit.isOnMap()
+                        || unit.type().moveType() == UnitType.Movement.FLY
+                        || unit == missile.source() && !missile.type().canHitOwner()) {
+                    continue;
+                }
+                if (unit.distanceTo(missile.tileX(), missile.tileY()) == 0) {
+                    missile.triggerImpact();
+                    return;
+                }
+            }
+        } else if (kind == MissileClass.WHIRLWIND
+                && missile.timeToLive() > 0 && missile.timeToLive() % 100 == 0) {
+            int tileX;
+            int tileY;
+            do {
+                tileX = missile.tileX() + world.syncRand(5) - 2;
+                tileY = missile.tileY() + world.syncRand(5) - 2;
+            } while (!world.map.contains(tileX, tileY));
+            missile.redirect(tileX * Unit.TILE_PIXELS + Unit.TILE_PIXELS / 2.0,
+                    tileY * Unit.TILE_PIXELS + Unit.TILE_PIXELS / 2.0);
+        }
+    }
+
+    /** Damage beat for Flame Shield's ring and the roaming Whirlwind. */
+    private void resolvePersistentPulse(Missile missile) {
+        Unit source = missile.source();
+        if (source == null || !source.isAlive()) {
+            return;
+        }
+        MissileClass kind = missile.type().missileClass();
+        Unit protectedUnit = kind == MissileClass.FLAME_SHIELD ? missile.target() : null;
+        int centreX = protectedUnit != null ? protectedUnit.tileX() : missile.tileX();
+        int centreY = protectedUnit != null ? protectedUnit.tileY() : missile.tileY();
+        int radius = Math.max(1, missile.type().range());
+        for (Unit candidate : List.copyOf(world.units)) {
+            if (!candidate.isAlive() || candidate.isDying() || !candidate.isOnMap()
+                    || candidate == protectedUnit
+                    || candidate == source && !missile.type().canHitOwner()
+                    || candidate.distanceTo(centreX, centreY) > radius) {
+                continue;
+            }
+            world.combat.applyDamage(source, candidate, 1, missile);
+        }
     }
 
 

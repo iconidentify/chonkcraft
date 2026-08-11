@@ -12,7 +12,7 @@ release_repo_root() {
 # version and then receives the real marketing/build values before signing, so
 # an honest 0.x beta can be shipped without lying in the filename or release.
 release_version() {
-  echo "${CHONKCRAFT_VERSION:-0.1.1-beta7}"
+  echo "${CHONKCRAFT_VERSION:-0.1.1-beta11}"
 }
 
 release_marketing_version() {

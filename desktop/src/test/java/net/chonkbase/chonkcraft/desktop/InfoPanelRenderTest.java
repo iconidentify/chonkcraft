@@ -377,19 +377,30 @@ class InfoPanelRenderTest {
         keep(frame, "topbar");
 
         // UI.Resources[ScoreCost] and [FreeWorkersCount] are the fifth and
-        // seventh slots, measured back from the right edge. Both were parsed
-        // and neither was drawn.
-        var score = scene.layout().resources().get(4);
-        var workers = scene.layout().resources().get(6);
-        assertTrue(score.iconX() > 0 && workers.iconX() > 0, "both slots are on screen");
+        // seventh slots. Read their resolved positions from the painted bar:
+        // unlike gold, lumber and oil, their declared positions are right-edge
+        // anchors that the compact cluster intentionally does not retain.
+        SidePanel.TopBarCell score = null;
+        SidePanel.TopBarCell workers = null;
+        for (var cell : scene.panel().topBarForTest()) {
+            if (cell.slot() == 4) {
+                score = cell;
+            } else if (cell.slot() == 6) {
+                workers = cell;
+            }
+        }
+        assertNotNull(score, "the score slot is on screen");
+        assertNotNull(workers, "the idle-worker slot is on screen");
         assertTrue(busyPixels(frame,
-                new java.awt.Rectangle(score.iconX(), score.iconY(), 14, 14)) > 20,
+                new java.awt.Rectangle(score.iconX(), score.iconY(),
+                        SidePanel.RESOURCE_ICON, SidePanel.RESOURCE_ICON)) > 20,
                 "the score icon is drawn");
         assertTrue(busyPixels(frame,
                 new java.awt.Rectangle(score.textX(), score.textY(), 40, 14)) > 20,
                 "the score figure is written");
         assertTrue(busyPixels(frame,
-                new java.awt.Rectangle(workers.iconX(), workers.iconY(), 14, 14)) > 20,
+                new java.awt.Rectangle(workers.iconX(), workers.iconY(),
+                        SidePanel.RESOURCE_ICON, SidePanel.RESOURCE_ICON)) > 20,
                 "the idle worker icon is drawn");
         // One peasant, standing about.
         assertEquals(1, SidePanel.idleWorkers(scene.world(), 0).size());

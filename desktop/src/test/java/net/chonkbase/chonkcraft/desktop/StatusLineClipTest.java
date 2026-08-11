@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.desktop;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
@@ -9,7 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
@@ -49,10 +50,10 @@ class StatusLineClipTest {
     private record Scene(GameScreen screen, UiLayout.Layout layout, GameFont font) {}
 
     private static GameData data() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource source = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(source != null,
+                "No Warcraft II installation or ChonkPack configured.");
+        return new GameData(source);
     }
 
     private static Scene scene() {
@@ -141,5 +142,20 @@ class StatusLineClipTest {
                 "the status line reaches column " + rightmost + ", past the end of its declared "
                         + width + "-pixel strip at " + (left + width)
                         + ": UI.StatusLine.Width is not being applied");
+    }
+
+    @Test
+    @DisplayName("the retail food warning renders as a complete polished sentence")
+    void theFoodWarningIsVisuallyUsable() {
+        Scene scene = scene();
+        String warning = BattleNetMessages.text(null,
+                BattleNetMessages.Key.NOT_ENOUGH_FOOD);
+        scene.screen().setStatus(warning);
+
+        assertEquals("Not enough food...build more farms.", scene.screen().status());
+        BufferedImage frame = paint(scene.screen());
+        save(frame, "status-line-not-enough-food.png");
+        assertTrue(scene.font().widthOf(warning) <= scene.layout().statusLineWidth(),
+                "the authentic BNE sentence does not fit its declared status strip");
     }
 }

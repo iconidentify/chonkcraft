@@ -41,6 +41,14 @@ public final class NetworkGame implements AutoCloseable {
     public record DepartureEvent(int player, String playerName,
             GameCommand.DepartureReason reason, int controlMask, boolean hostLeft) {}
 
+    /** A side-band player message. It never participates in world simulation. */
+    public record ChatEvent(int player, String playerName, int recipientMask, String text,
+            boolean local) {}
+
+    /** One human who is still connected to this match. */
+    public record PlayerPresence(int player, String name, boolean local, boolean host,
+            boolean allied) {}
+
     private final World world;
     private final NetworkSession session;
     private final LockstepScheduler scheduler;
@@ -64,6 +72,13 @@ public final class NetworkGame implements AutoCloseable {
     private boolean leaveSent;
     private Map<Integer, String> playerNames = Map.of();
     private final ArrayDeque<DepartureEvent> departures = new ArrayDeque<>();
+    private final ArrayDeque<ChatEvent> chatEvents = new ArrayDeque<>();
+    private final Map<Integer, Long> lastChatId = new java.util.HashMap<>();
+    private final Map<Integer, ArrayDeque<Long>> chatTimes = new java.util.HashMap<>();
+    private long nextChatId = 1;
+
+    private static final int CHAT_BURST = 6;
+    private static final long CHAT_WINDOW_MILLIS = 5_000L;
 
     /**
      * The last cycle whose batch has been sent.
@@ -175,6 +190,94 @@ public final class NetworkGame implements AutoCloseable {
         List<DepartureEvent> result = new ArrayList<>(departures);
         departures.clear();
         return List.copyOf(result);
+    }
+
+    /** Player messages not yet consumed by the desktop. */
+    public List<ChatEvent> drainChatEvents() {
+        List<ChatEvent> result = new ArrayList<>(chatEvents);
+        chatEvents.clear();
+        return List.copyOf(result);
+    }
+
+    /**
+     * Sends text immediately, beside lockstep rather than through it.
+     *
+     * @return false when it is empty, has no recipients, or exceeds the short
+     *         anti-spam burst allowed in one match
+     */
+    public boolean sendChat(int recipientMask, String text) {
+        String safe = NetworkSession.sanitizeChat(text);
+        int recipients = recipientMask & connectedHumanMask() & ~(1 << localPlayer);
+        if (safe.isEmpty() || recipients == 0 || !withinChatRate(localPlayer)) {
+            return false;
+        }
+        long id = nextChatId++;
+        try {
+            session.broadcastChat(id, recipients, safe, relaying);
+        } catch (IOException unableToSend) {
+            return false;
+        }
+        chatEvents.add(new ChatEvent(localPlayer, playerName(localPlayer), recipients,
+                safe, true));
+        return true;
+    }
+
+    /** All connected opponents, matching BNE's default Messages selection. */
+    public int everyoneChatMask() {
+        return connectedHumanMask() & ~(1 << localPlayer);
+    }
+
+    /** Connected mutual allies only. */
+    public int alliesChatMask() {
+        int mask = 0;
+        for (int player : playerNames.keySet()) {
+            if (player != localPlayer && scheduler.isActive(player)
+                    && world.isAllied(localPlayer, player)
+                    && world.isAllied(player, localPlayer)) {
+                mask |= 1 << player;
+            }
+        }
+        return mask;
+    }
+
+    /** The authoritative in-match roster, in player/colour order. */
+    public List<PlayerPresence> connectedPlayers() {
+        List<PlayerPresence> present = new ArrayList<>();
+        for (Map.Entry<Integer, String> entry : playerNames.entrySet()) {
+            int player = entry.getKey();
+            if (!scheduler.isActive(player)) {
+                continue;
+            }
+            present.add(new PlayerPresence(player, playerName(player), player == localPlayer,
+                    player == hostPlayer, player == localPlayer
+                            || (world.isAllied(localPlayer, player)
+                                    && world.isAllied(player, localPlayer))));
+        }
+        present.sort(java.util.Comparator.comparingInt(PlayerPresence::player));
+        return List.copyOf(present);
+    }
+
+    private int connectedHumanMask() {
+        int mask = 0;
+        for (int player : playerNames.keySet()) {
+            if (scheduler.isActive(player)) {
+                mask |= 1 << player;
+            }
+        }
+        return mask;
+    }
+
+    private boolean withinChatRate(int player) {
+        long now = System.currentTimeMillis();
+        ArrayDeque<Long> recent = chatTimes.computeIfAbsent(player, ignored -> new ArrayDeque<>());
+        while (!recent.isEmpty() && now - recent.peekFirst() >= CHAT_WINDOW_MILLIS) {
+            recent.removeFirst();
+        }
+        if (recent.size() >= CHAT_BURST) {
+            return false;
+        }
+        recent.addLast(now);
+        return true;
     }
 
     public boolean isRelaying() {
@@ -554,6 +657,35 @@ public final class NetworkGame implements AutoCloseable {
                 if (ourHash != null) {
                     checkHashes(batch.hashCycle(), ourHash);
                 }
+            }
+        }
+        receiveChats();
+    }
+
+    private void receiveChats() {
+        for (NetworkSession.ChatPacket chat : session.drainChats()) {
+            if (!scheduler.isActive(chat.player()) || !playerNames.containsKey(chat.player())) {
+                continue;
+            }
+            long prior = lastChatId.getOrDefault(chat.player(), 0L);
+            if (chat.id() <= prior) {
+                continue;
+            }
+            lastChatId.put(chat.player(), chat.id());
+            if (!withinChatRate(chat.player())) {
+                continue;
+            }
+            if (relaying) {
+                try {
+                    session.relay(chat);
+                } catch (IOException unreachable) {
+                    System.err.println("chat relay failed for player " + chat.player()
+                            + ": " + unreachable.getMessage());
+                }
+            }
+            if ((chat.recipientMask() & (1 << localPlayer)) != 0) {
+                chatEvents.add(new ChatEvent(chat.player(), playerName(chat.player()),
+                        chat.recipientMask(), chat.text(), false));
             }
         }
     }

@@ -1507,12 +1507,59 @@ public final class World {
         return true;
     }
 
+    /** Sends a caster to cast a position spell at the selected map square. */
+    public boolean orderCast(Unit caster, String spellIdent, int tileX, int tileY) {
+        Spell spell = spellSet == null ? null : spellSet.get(spellIdent);
+        if (spell == null || spell.target() != Spell.Target.POSITION
+                || caster == null || !caster.isAlive() || !caster.isCaster()
+                || !map.contains(tileX, tileY)) {
+            return false;
+        }
+        if (!spell.dependUpgrade().isEmpty()
+                && !upgrades(caster.player()).has(spell.dependUpgrade())) {
+            return false;
+        }
+        // A zero range is global (Holy Vision), not melee range.
+        if (spell.range() == 0 || caster.distanceTo(tileX, tileY) <= spell.range()) {
+            return castSpell(caster, spellIdent, null, tileX, tileY);
+        }
+        caster.clearPath();
+        caster.setTarget(null);
+        caster.setOrderTarget(tileX, tileY);
+        caster.setCastingSpell(spellIdent);
+        caster.setOrder(Unit.Order.SPELL_CAST);
+        return true;
+    }
+
     /** Walks a caster into range and casts when it arrives. */
     private void stepSpellCast(Unit unit) {
         String ident = unit.castingSpell();
         Spell spell = ident == null || spellSet == null ? null : spellSet.get(ident);
         Unit target = unit.target();
-        if (spell == null || target == null || !target.isAlive() || !unit.isAlive()) {
+        if (spell == null || !unit.isAlive()) {
+            unit.setCastingSpell(null);
+            unit.setTarget(null);
+            unit.setOrder(Unit.Order.STILL);
+            return;
+        }
+        if (spell.target() == Spell.Target.POSITION) {
+            int tileX = unit.orderTargetX();
+            int tileY = unit.orderTargetY();
+            if (!map.contains(tileX, tileY)) {
+                unit.setCastingSpell(null);
+                unit.setOrder(Unit.Order.STILL);
+                return;
+            }
+            if (spell.range() > 0 && unit.distanceTo(tileX, tileY) > spell.range()) {
+                movement.walkTowards(unit, tileX, tileY);
+                return;
+            }
+            castSpell(unit, ident, null, tileX, tileY);
+            unit.setCastingSpell(null);
+            unit.setOrder(Unit.Order.STILL);
+            return;
+        }
+        if (target == null || !target.isAlive()) {
             unit.setCastingSpell(null);
             unit.setTarget(null);
             unit.setOrder(Unit.Order.STILL);
@@ -1530,6 +1577,18 @@ public final class World {
     }
 
     public boolean castSpell(Unit caster, String spellIdent, Unit target) {
+        int tileX = target == null ? caster.tileX() : target.tileX();
+        int tileY = target == null ? caster.tileY() : target.tileY();
+        return castSpell(caster, spellIdent, target, tileX, tileY);
+    }
+
+    /** Casts a position spell immediately at a map square. */
+    public boolean castSpell(Unit caster, String spellIdent, int tileX, int tileY) {
+        return castSpell(caster, spellIdent, null, tileX, tileY);
+    }
+
+    private boolean castSpell(Unit caster, String spellIdent, Unit target,
+            int tileX, int tileY) {
         Spell spell = spellSet.get(spellIdent);
         if (spell == null || !caster.isAlive() || !caster.isCaster()) {
             return false;
@@ -1556,6 +1615,19 @@ public final class World {
                 return false;
             }
         }
+        if (spell.target() == Spell.Target.POSITION) {
+            if (!map.contains(tileX, tileY)) {
+                return false;
+            }
+            // A live order checks range before it reaches this resolver. The
+            // unit-target overload is also retained as a deterministic
+            // simulation seam for position effects aimed at an occupied tile;
+            // those callers have already selected the impact point.
+            if (target == null && spell.range() > 0
+                    && caster.distanceTo(tileX, tileY) > spell.range()) {
+                return false;
+            }
+        }
 
         // Casting anything drops the caster's own invisibility, before the
         // spell resolves. SpellCast's first line:
@@ -1571,7 +1643,7 @@ public final class World {
         // played, because nothing ever cast anything.
         announceNamed(caster, spell.soundWhenCast());
         for (Spell.Effect effect : spell.effects()) {
-            applyEffect(caster, victim, spell, effect);
+            applyEffect(caster, victim, tileX, tileY, spell, effect);
         }
         // Adjust-vitals determines how many repetitions fit in the caster's
         // mana and pays for all of them itself.
@@ -1582,7 +1654,8 @@ public final class World {
     }
 
     /** Applies one of a spell's effects. */
-    private void applyEffect(Unit caster, Unit victim, Spell spell, Spell.Effect effect) {
+    private void applyEffect(Unit caster, Unit victim, int tileX, int tileY,
+            Spell spell, Spell.Effect effect) {
         switch (effect.kind()) {
             case ADJUST_VITALS -> adjustVitals(caster, victim, spell, effect);
             case AREA_ADJUST_VITALS -> {
@@ -1603,25 +1676,26 @@ public final class World {
                 }
             }
             case DEMOLISH -> demolish(caster, victim, effect);
-            case SPAWN_MISSILE -> spawnMissile(caster, victim, effect);
-            case AREA_BOMBARDMENT -> bombard(caster, victim, effect);
+            case SPAWN_MISSILE -> spawnMissile(caster, victim, tileX, tileY, effect);
+            case AREA_BOMBARDMENT -> bombard(caster, victim, tileX, tileY, effect);
             case SUMMON -> {
-                if (victim != null) {
-                    UnitType type = summonType(effect.what());
-                    if (type != null) {
-                        // The game drops the new unit out west.
-                        int[] spot = dropOutOnSide(type, LOOKING_WEST, victim,
-                                victim.tileX(), victim.tileY());
-                        if (spot != null) {
-                            createUnit(type, caster.player(), spot[0], spot[1]);
-                        }
+                UnitType type = summonType(effect.what());
+                if (type != null) {
+                    int[] spot = dropOutNearest(type, tileX, tileY, null, tileX, tileY);
+                    if (spot != null) {
+                        createUnit(type, caster.player(), spot[0], spot[1]);
                     }
                 }
             }
             case ADJUST_VARIABLE -> adjustVariable(victim, effect);
-            // Map reveals are a system not yet ported; the spell still costs
-            // its mana and its other effects still land.
-            case REVEAL, OTHER -> { }
+            case EYE_OF_KILROGG -> summonEye(caster, tileX, tileY);
+            case POLYMORPH -> polymorph(victim, effect);
+            case UNHOLY_ARMOR -> unholyArmor(victim);
+            // No generated spell currently carries either kind. Keeping the
+            // refusal explicit prevents a future declaration silently
+            // masquerading as implemented behavior.
+            case REVEAL, OTHER -> throw new IllegalStateException(
+                    "unimplemented spell effect " + effect.kind() + " in " + spell.ident());
         }
     }
 
@@ -1746,20 +1820,58 @@ public final class World {
      * fall through to the firer's stats and have a mage doing melee damage at
      * range with the visual effect of a healing sparkle.
      */
-    private void spawnMissile(Unit caster, Unit victim, Spell.Effect effect) {
+    private void spawnMissile(Unit caster, Unit victim, int tileX, int tileY,
+            Spell.Effect effect) {
         MissileType type = missileTypes == null ? null : missileTypes.get(effect.what());
         if (type == null || caster == null) {
             return;
         }
-        Unit goal = victim != null ? victim : caster;
+        Unit goal = victim;
         int damage = effect.number("damage", 0);
+        double[] start = spellPoint(effect.args().get("start-point"), caster, goal,
+                tileX, tileY, true);
+        double[] end = spellPoint(effect.args().get("end-point"), caster, goal,
+                tileX, tileY, false);
         Missile shot = spawn(new Missile(type, damage != 0 ? caster : null, goal,
-                caster.pixelX() + centreOffset(caster.type(), true),
-                caster.pixelY() + centreOffset(caster.type(), false),
-                goal.tileX() * TILE_SIZE + centreOffset(goal.type(), true),
-                goal.tileY() * TILE_SIZE + centreOffset(goal.type(), false)));
+                start[0], start[1], end[0], end[1]));
         shot.setDamage(damage);
+        shot.setTimeToLive(effect.number("ttl", 0));
         missileSnapshot = List.copyOf(missiles);
+    }
+
+    /** Resolves a generated spell point such as base/target/add-x/add-y. */
+    private static double[] spellPoint(Object declaration, Unit caster, Unit target,
+            int tileX, int tileY, boolean defaultCaster) {
+        boolean useTarget = !defaultCaster;
+        int addX = 0;
+        int addY = 0;
+        if (declaration instanceof List<?> words) {
+            useTarget = words.contains("target") && !words.contains("caster");
+            for (int index = 0; index + 1 < words.size(); index++) {
+                Object value = words.get(index + 1);
+                if ("add-x".equals(words.get(index)) && value instanceof Number number) {
+                    addX = number.intValue();
+                } else if ("add-y".equals(words.get(index)) && value instanceof Number number) {
+                    addY = number.intValue();
+                }
+            }
+        }
+        if (!useTarget) {
+            return new double[] {
+                    caster.pixelX() + centreOffset(caster.type(), true) + addX,
+                    caster.pixelY() + centreOffset(caster.type(), false) + addY
+            };
+        }
+        if (target != null) {
+            return new double[] {
+                    target.tileX() * TILE_SIZE + centreOffset(target.type(), true) + addX,
+                    target.tileY() * TILE_SIZE + centreOffset(target.type(), false) + addY
+            };
+        }
+        return new double[] {
+                tileX * TILE_SIZE + TILE_SIZE / 2.0 + addX,
+                tileY * TILE_SIZE + TILE_SIZE / 2.0 + addY
+        };
     }
 
     /**
@@ -1840,10 +1952,10 @@ public final class World {
      * its missile type's own {@code Damage} -- {@code Rand(10)} for both, rolled
      * fresh per unit struck. Fifty-five shards of nought to nine is the spell.
      */
-    private void bombard(Unit caster, Unit victim, Spell.Effect effect) {
+    private void bombard(Unit caster, Unit victim, int targetX, int targetY,
+            Spell.Effect effect) {
         MissileType type = missileTypes == null ? null : missileTypes.get(effect.what());
-        Unit centre = victim != null ? victim : caster;
-        if (type == null || caster == null || centre == null) {
+        if (type == null || caster == null) {
             return;
         }
         int fields = effect.number("fields", 1);
@@ -1859,8 +1971,8 @@ public final class World {
             // square is on it, and the draws must come off the synchronised
             // generator in the same order on every machine.
             do {
-                tileX = centre.tileX() + syncRand(5) - 2;
-                tileY = centre.tileY() + syncRand(5) - 2;
+                tileX = targetX + syncRand(5) - 2;
+                tileY = targetY + syncRand(5) - 2;
             } while (!map.contains(tileX, tileY));
 
             double destX = tileX * TILE_SIZE + TILE_SIZE / 2.0;
@@ -1873,6 +1985,52 @@ public final class World {
             }
         }
         missileSnapshot = List.copyOf(missiles);
+    }
+
+    /** Retail order 48: create the player's flying eye on the selected square. */
+    private void summonEye(Unit caster, int tileX, int tileY) {
+        UnitType eye = summonType("unit-eye-of-vision");
+        if (eye == null || !map.contains(tileX, tileY)) {
+            return;
+        }
+        int[] spot = dropOutNearest(eye, tileX, tileY, null, tileX, tileY);
+        if (spot != null) {
+            createUnit(eye, caster.player(), spot[0], spot[1]);
+        }
+    }
+
+    /** Retail order 46: preserve the slot but turn the victim into a neutral critter. */
+    private void polymorph(Unit victim, Spell.Effect effect) {
+        if (victim == null || !victim.isAlive()) {
+            return;
+        }
+        UnitType critter = summonType(effect.text("new-form", "unit-critter"));
+        if (critter == null || !transformInto(victim, critter)) {
+            return;
+        }
+        if (effect.flag("player-neutral") && victim.player() != NEUTRAL_PLAYER) {
+            markSight(victim, false);
+            unregisterPlayerUnit(victim);
+            victim.setPlayer(NEUTRAL_PLAYER);
+            registerPlayerUnit(victim);
+            unitCountSeen(victim);
+            markSight(victim, true);
+            recalculateSupply();
+        }
+        victim.clearPath();
+        victim.setTarget(null);
+        victim.setOrder(Unit.Order.STILL);
+    }
+
+    /** Retail order 54: halve life and grant exactly 500 cycles of invulnerability. */
+    private static void unholyArmor(Unit victim) {
+        if (victim == null || !victim.isAlive()) {
+            return;
+        }
+        if (victim.hitPoints() >= 2) {
+            victim.setHitPoints(victim.hitPoints() / 2);
+        }
+        victim.setBuff(Unit.Buff.UNHOLY_ARMOR, 500);
     }
 
     /** How long the nth shard of a bombardment waits before it falls. */
@@ -7102,6 +7260,14 @@ public final class World {
      * again from wherever the boat now is.
      */
     private void stepUnload(Unit unit) {
+        boolean traceUnload = System.getenv("CHONKCRAFT_TRACE_UNLOAD") != null;
+        if (traceUnload) {
+            System.err.printf("JUNLOAD cycle=%d unit=%d state=%d at=%d,%d goal=%d,%d"
+                            + " cargo=%d path=%d moving=%d retries=%d%n",
+                    cycle, unit.id(), unit.unloadState(), unit.tileX(), unit.tileY(),
+                    unit.orderTargetX(), unit.orderTargetY(), unit.cargo().size(),
+                    unit.pathLength(), unit.isMoving() ? 1 : 0, unit.unloadRetries());
+        }
         if (unit.cargo().isEmpty()) {
             unit.setTarget(null);
             unit.setOrder(Unit.Order.STILL);
@@ -7121,6 +7287,11 @@ public final class World {
         if (unit.unloadState() == Unit.UNLOAD_FIND_DROPZONE) {
             int[] zone = closestFreeDropZone(unit,
                     unit.orderTargetX(), unit.orderTargetY(), MAX_UNLOAD_SEARCH_RANGE);
+            if (traceUnload) {
+                System.err.printf("JUNLOADZONE cycle=%d unit=%d zone=%s%n",
+                        cycle, unit.id(), zone == null ? "none"
+                                : zone[0] + "," + zone[1]);
+            }
             if (zone == null) {
                 unit.setUnloadRetries(MAX_UNLOAD_RETRIES);
                 return;
@@ -7141,8 +7312,18 @@ public final class World {
                 unit.setUnloadState(Unit.UNLOAD_LEAVING);
             } else {
                 if (unit.pathLength() == 0 && !unit.isMoving()) {
-                    PathFinder.Path path = pathFinder.find(
-                            unit.tileX(), unit.tileY(), goalX, goalY, moverFor(unit));
+                    // Action 30 re-evaluates unit+0x1c&2 against every new
+                    // order point. In particular, a one-tile final approach
+                    // clears double-step; planning with the stale bit made a
+                    // crowded transport repeatedly reject the very anchor it
+                    // had just selected.
+                    unit.setBattleNetDoubleStep(
+                            battleNetTransportDoubleStep(unit, goalX, goalY));
+                    // Large BNE ships consume a route on their native anchor
+                    // stride. A one-tile path consumed as two-tile steps can
+                    // sail past the selected drop zone forever.
+                    PathFinder.Path path = findBattleNetPointPath(
+                            unit, goalX, goalY);
                     if (path.result() == PathFinder.Result.REACHED) {
                         unit.setUnloadRetries(0);
                         unit.setUnloadState(Unit.UNLOAD_LEAVING);
@@ -7160,8 +7341,13 @@ public final class World {
                 }
                 if (unit.unloadState() == Unit.UNLOAD_MOVE_TO_DROPZONE) {
                     Unit.Order saved = unit.order();
+                    unit.setBattleNetBorrowedMoveForStep(true);
                     unit.setOrder(Unit.Order.MOVE);
-                    movement.stepMove(unit, false);
+                    try {
+                        movement.stepMove(unit, false);
+                    } finally {
+                        unit.setBattleNetBorrowedMoveForStep(false);
+                    }
                     if (unit.order() == Unit.Order.DYING) {
                         return;
                     }
@@ -7323,7 +7509,9 @@ public final class World {
                 case ATTACK -> orderAttack(unit, queued.target());
                 case HARVEST -> harvest.orderHarvest(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());
-                case CAST -> orderCast(unit, queued.value(), queued.target());
+                case CAST -> queued.target() != null
+                        ? orderCast(unit, queued.value(), queued.target())
+                        : orderCast(unit, queued.value(), queued.x(), queued.y());
                 case PATROL -> orderPatrol(unit, queued.x(), queued.y());
                 case REPAIR -> construction.orderRepair(unit, queued.target());
                 case EXPLORE -> orderExplore(unit);
@@ -8004,6 +8192,14 @@ public final class World {
 
     /** Ends a fight and restores the patrol or exploration it interrupted. */
     void finishAttackOrder(Unit unit) {
+        // A presentation frame may have drawn a mobile weapon at the muzzle
+        // before retail opcode ten constructs it. That placeholder belongs to
+        // this attack order, not to the unit or the global missile list. When
+        // the target dies before the handoff, ending the order must destroy an
+        // unconstructed placeholder (or arm one whose constructor already
+        // ran). Otherwise it remains painted forever and a later attack makes
+        // the abandoned projectile start moving again.
+        projectiles.interruptPendingAttack(unit);
         unit.setChasing(false);
         unit.setFighting(false);
         unit.setBattleNetStationaryAttack(false);
@@ -12280,6 +12476,11 @@ public final class World {
      * new wander on 47, three numbers each, where this implementation's drew nothing.
      */
     void finishOrder(Unit unit) {
+        // Generic order endings own the same cleanup. Most calls have no
+        // pending shot; keeping the rule at both order termination boundaries
+        // prevents attack-ground, weak auto-target, and queued replacements
+        // from leaking presentation-ahead missiles through a different exit.
+        projectiles.interruptPendingAttack(unit);
         unit.rememberActionBeforeQueued(unit.order());
         unit.setOrder(Unit.Order.STILL);
         unit.setRandomMoveSleep(0);

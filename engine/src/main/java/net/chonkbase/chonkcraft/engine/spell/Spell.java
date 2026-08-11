@@ -60,6 +60,12 @@ public final class Spell {
         AREA_BOMBARDMENT,
         /** Reveal terrain. */
         REVEAL,
+        /** Create the flying Eye of Kilrogg at a map position. */
+        EYE_OF_KILROGG,
+        /** Turn a living unit into a neutral critter. */
+        POLYMORPH,
+        /** Halve a unit's life and make it invulnerable for 500 cycles. */
+        UNHOLY_ARMOR,
         /** Anything the implementation does not model yet. */
         OTHER
     }

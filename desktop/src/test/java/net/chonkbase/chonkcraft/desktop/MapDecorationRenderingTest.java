@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import javax.imageio.ImageIO;
 import net.chonkbase.chonkcraft.data.graphic.IndexedImage;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
@@ -25,22 +25,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A mage's mana and a barracks' progress are visible without clicking them.
+ * BNE keeps changing game state out of the map's unit-footprint decorations.
  *
- * <p>{@code ui.legacy-declaration:42-52} declares six decorations at one position under every
- * unit -- Mana, Transport, Research, Training, UpgradeTo and CarryResource --
- * and this implementation drew none of them. The state was not missing: the info panel
- * showed a selected caster's mana correctly, which is exactly why nobody
- * noticed the field did not. What a player lost was the thing the decoration
- * exists for: whether it is safe to close on that mage, and whether that
- * barracks is making something, answered without selecting either.
- *
- * <p>Rendered rather than reasoned about. Each check paints the real
- * {@link GameScreen} and looks for a run of the bar's own colour on the row
- * {@code Offset = {0, -1}} of {@code OffsetPercent = {50, 100}} puts it on,
- * and each is paired with a frame of the same unit in the state that draws
- * nothing -- a caster at full mana, an idle barracks -- so that finding the
- * colour means the bar and not the grass.
+ * <p>An old compatibility UI declaration led the desktop renderer to invent
+ * coloured field gauges for mana, building work, transport occupancy, worker
+ * loads and deposits. BNE presents that information in the selected-unit
+ * panel instead. These rendered checks keep those artificial gauges off the
+ * map while retaining BNE's actual spell-status badges.
  */
 class MapDecorationRenderingTest {
 
@@ -49,16 +40,19 @@ class MapDecorationRenderingTest {
     private static final int HEIGHT = 480;
     private static final int TILE = 32;
 
-    /** {@code GameScreen.MANA_BAR} and {@code PROGRESS_BAR}, as painted. */
+    /** Colours of the removed artificial field gauges. */
     private static final int MANA = 0xFF2020FF;
 
     private static final int PROGRESS = 0xFF00C000;
 
+    private static final int CARRY = 0xFFC0C000;
+
     private static GameData data() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II assets configured. Set CHONKCRAFT_ASSET_PACK or"
+                        + " -Dwc2.install.dir=/path/to/game.");
+        return new GameData(assets);
     }
 
     private record Scene(GameScreen screen, World world, GameData data) {}
@@ -139,11 +133,6 @@ class MapDecorationRenderingTest {
         return -1;
     }
 
-    /** Where the second bar's top row belongs: {@code Offset = {0, -1}}. */
-    private static int expectedRow(Unit unit) {
-        return unit.pixelY() + Math.max(1, unit.type().tileHeight()) * TILE - 1;
-    }
-
     private static int[] band(Unit unit) {
         return new int[] {unit.pixelX(),
                 Math.max(1, unit.type().tileWidth()) * TILE,
@@ -152,8 +141,8 @@ class MapDecorationRenderingTest {
     }
 
     @Test
-    @DisplayName("a mage half out of mana carries a bar, and a full one does not")
-    void manaIsDrawnOnTheField() {
+    @DisplayName("mana stays in the selected-unit panel instead of under a mage")
+    void manaDoesNotDrawAFieldGauge() {
         Scene scene = scene();
         Unit mage = place(scene, "unit-mage");
         Assumptions.assumeTrue(mage != null, "nowhere on this map to stand a mage");
@@ -161,30 +150,16 @@ class MapDecorationRenderingTest {
         Assumptions.assumeTrue(type.mana() > 0 && mage.isCaster(),
                 "the shipped mage declares no mana, so there is nothing to draw");
 
-        // Full first. ShowWhenMax defaults false, so this
-        // frame must hold none of the colour -- which is what makes the second
-        // frame's run a bar rather than a shade of the ground.
-        mage.setMana(type.mana());
-        BufferedImage full = paint(scene.screen(), "map-decorations-mana-full.png");
-        int[] box = band(mage);
-        assertEquals(-1, barTop(full, box[0], box[1], box[2], box[3], MANA),
-                "a caster at full mana drew a mana bar, which ShowWhenMax says it should"
-                        + " not -- or the terrain contains the colour this test looks for");
-
         mage.setMana(type.mana() / 2);
-        BufferedImage half = paint(scene.screen(), "map-decorations-mana-half.png");
-        int found = barTop(half, box[0], box[1], box[2], box[3], MANA);
-        assertTrue(found >= 0,
-                "a mage at half mana drew no mana bar on the field: ui.legacy-declaration declares"
-                        + " DefineDecorations{Index = \"Mana\"} and nothing read it");
-        assertEquals(expectedRow(mage), found,
-                "the mana bar is at row " + found + " rather than " + expectedRow(mage)
-                        + ", which is Offset {0, -1} of OffsetPercent {50, 100}");
+        BufferedImage frame = paint(scene.screen(), "map-decorations-no-mana-gauge.png");
+        int[] box = band(mage);
+        assertEquals(-1, barTop(frame, box[0], box[1], box[2], box[3], MANA),
+                "a half-mana mage wore a custom blue field gauge");
     }
 
     @Test
-    @DisplayName("a barracks making a footman says so without being clicked")
-    void aBuildingAtWorkShowsItsProgress() {
+    @DisplayName("building work stays in the selected-unit panel")
+    void buildingWorkDoesNotDrawAFieldGauge() {
         Scene scene = scene();
         Unit barracks = place(scene, "unit-human-barracks");
         Assumptions.assumeTrue(barracks != null, "nowhere to put a barracks");
@@ -198,81 +173,81 @@ class MapDecorationRenderingTest {
         }
         scene.world().recalculateSupply();
 
-        BufferedImage idle = paint(scene.screen(), "map-decorations-idle.png");
-        int[] box = band(barracks);
-        assertEquals(-1, barTop(idle, box[0], box[1], box[2], box[3], PROGRESS),
-                "an idle barracks drew a progress bar, so the frame below proves nothing");
-
         UnitType footman = scene.data().unitTypes().types().get("unit-footman");
         Assumptions.assumeTrue(scene.world().orderTrain(barracks, footman),
                 "the barracks would not start a footman, so there is no job to show");
-        // Part way through, or the bar is nought pixels wide and invisible.
         for (int cycle = 0; cycle < 200; cycle++) {
             scene.world().tick();
         }
-        Assumptions.assumeTrue(barracks.progressFraction() > 0.05,
-                "the job has not got far enough to draw a bar wider than the run"
-                        + " this test looks for");
-
-        BufferedImage working = paint(scene.screen(), "map-decorations-training.png");
-        int found = barTop(working, box[0], box[1], box[2], box[3], PROGRESS);
-        assertTrue(found >= 0,
-                "a barracks part way through a footman drew nothing on the field:"
-                        + " ui.legacy-declaration declares DefineDecorations{Index = \"Training\"}");
-        assertEquals(expectedRow(barracks), found,
-                "the progress bar is at row " + found + " rather than "
-                        + expectedRow(barracks));
+        BufferedImage frame = paint(scene.screen(), "map-decorations-no-training-gauge.png");
+        int[] box = band(barracks);
+        assertEquals(-1, barTop(frame, box[0], box[1], box[2], box[3], PROGRESS),
+                "a working barracks wore a custom green field gauge");
     }
 
-    /** The longest run of {@code colour} on one row, so a bar has a width. */
-    private static int runOn(BufferedImage frame, int y, int left, int width, int colour) {
-        if (y < 0 || y >= frame.getHeight()) {
-            return 0;
-        }
-        int best = 0;
-        int run = 0;
-        for (int x = Math.max(0, left); x < Math.min(frame.getWidth(), left + width); x++) {
-            run = frame.getRGB(x, y) == colour ? run + 1 : 0;
-            best = Math.max(best, run);
-        }
-        return best;
+    @Test
+    @DisplayName("research, upgrading and transport occupancy stay off the map")
+    void otherCompatibilityGaugesStayOffTheMap() {
+        Scene scene = scene();
+        Unit building = place(scene, "unit-human-barracks");
+        Assumptions.assumeTrue(building != null, "nowhere to put a building");
+        building.setProgressGoal(100);
+        building.setProgress(50);
+
+        building.setResearching("upgrade-sword1");
+        assertNoGauge(scene, building, PROGRESS, "research");
+        building.setResearching(null);
+
+        UnitType keep = scene.data().unitTypes().types().get("unit-keep");
+        Assumptions.assumeTrue(keep != null, "the shipped data has no keep");
+        building.setUpgradingTo(keep);
+        assertNoGauge(scene, building, PROGRESS, "upgrade");
+        building.setUpgradingTo(null);
+
+        Unit transport = place(scene, "unit-human-transport");
+        Unit passenger = place(scene, "unit-footman");
+        Assumptions.assumeTrue(transport != null && passenger != null,
+                "nowhere on this map to create a loaded transport");
+        transport.cargo().add(passenger);
+        assertNoGauge(scene, transport, PROGRESS, "transport-occupancy");
+    }
+
+    private static void assertNoGauge(Scene scene, Unit unit, int colour, String state) {
+        BufferedImage frame = paint(scene.screen(), "map-decorations-no-" + state + "-gauge.png");
+        int[] box = band(unit);
+        assertEquals(-1, barTop(frame, box[0], box[1], box[2], box[3], colour),
+                state + " drew an artificial field gauge");
     }
 
     /**
-     * A gold mine says how much is in it, all the time, and the bar drains.
-     *
-     * <p>{@code GiveResource} is the one decoration declaring
-     * {@code ShowWhenMax = true} and {@code HideNeutral = false}
-     * ({@code ui.legacy-declaration:50}), so upstream shows it on every mine at every
-     * moment. This implementation had no state for it until the save lane gave
-     * deposits {@code resourcesHeld}, and then drew nothing with it: a mine
-     * about to run dry looked exactly like a fresh one.
+     * Resource state belongs in the selected-unit panel, not on the map.
      */
     @Test
-    @DisplayName("a gold mine wears its bar when full, and the bar drains with the gold")
-    void aMineShowsWhatIsLeft() {
+    @DisplayName("deposits and carried resources do not wear field gauges")
+    void resourcesDoNotDrawFieldGauges() {
         Scene scene = scene();
         Unit mine = place(scene, "unit-gold-mine");
         Assumptions.assumeTrue(mine != null, "nowhere on this map to put a mine");
         Assumptions.assumeTrue(mine.resourcesHeld() > 0,
                 "the placed mine holds nothing, so there is no amount to show");
 
-        BufferedImage full = paint(scene.screen(), "map-decorations-mine-full.png");
-        int row = expectedRow(mine);
-        int[] box = band(mine);
-        int fullRun = runOn(full, row, box[0], box[1], MANA);
-        assertTrue(fullRun >= 8,
-                "a full mine drew no bar: GiveResource declares ShowWhenMax = true, which"
-                        + " is exactly what separates it from the mana bar beside it");
-
         mine.setResourcesHeld(mine.resourcesHeld() / 2);
-        BufferedImage half = paint(scene.screen(), "map-decorations-mine-half.png");
-        int halfRun = runOn(half, row, box[0], box[1], MANA);
-        assertTrue(halfRun >= 8, "the half-drained mine lost its bar entirely");
-        assertTrue(halfRun < fullRun,
-                "the bar does not drain: " + halfRun + " pixels against " + fullRun
-                        + " when half the gold is gone, so the figure it shows is not"
-                        + " the amount left");
+        BufferedImage mineFrame = paint(scene.screen(), "map-decorations-no-mine-gauge.png");
+        int[] box = band(mine);
+        assertEquals(-1, barTop(mineFrame, box[0], box[1], box[2], box[3], MANA),
+                "a gold mine wore a custom always-visible remaining-resource gauge");
+
+        Unit peasant = place(scene, "unit-peasant");
+        Assumptions.assumeTrue(peasant != null, "nowhere on this map to stand a peasant");
+        var gather = peasant.type().gathering().get(UnitType.Resource.WOOD);
+        Assumptions.assumeTrue(gather != null && gather.capacity() > 0,
+                "the shipped peasant cannot carry wood");
+        peasant.setCarrying(UnitType.Resource.WOOD);
+        peasant.setCarried(Math.max(1, gather.capacity() / 2));
+        BufferedImage workerFrame = paint(scene.screen(), "map-decorations-no-worker-gauge.png");
+        box = band(peasant);
+        assertEquals(-1, barTop(workerFrame, box[0], box[1], box[2], box[3], CARRY),
+                "a wood-carrying peasant wore a custom harvest-progress-looking gauge");
     }
 
     /**

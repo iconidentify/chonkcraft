@@ -6,9 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -82,6 +79,50 @@ class OilPlatformTest {
             }
         }
         return null;
+    }
+
+    @Test
+    @DisplayName("an oil-platform route ignores a tanker's stale prior destination")
+    void oilPlatformRouteIgnoresStalePriorDestination() {
+        GameData data = load();
+        Mission mission = mission(data, "campaigns/orc/level03o");
+        World world = mission.world();
+        for (Unit unit : new ArrayList<>(world.units())) {
+            world.remove(unit);
+        }
+        UnitType patchType = data.unitTypes().types().get("unit-oil-patch");
+        UnitType tankerType = data.unitTypes().types().get("unit-orc-oil-tanker");
+        UnitType destroyerType = data.unitTypes().types().get("unit-orc-destroyer");
+        UnitType shipyardType = data.unitTypes().types().get("unit-orc-shipyard");
+        UnitType platform = data.unitTypes().types().get("unit-orc-oil-platform");
+        Unit patch = world.createUnit(patchType, 15, 7, 51);
+        Unit destroyer = world.createUnit(destroyerType, 0, 14, 50);
+        Unit shipyard = world.createUnit(shipyardType, 0, 21, 48);
+        Unit tanker = world.createUnit(tankerType, 0, 19, 49);
+        assertNotNull(patch, "the Orc mission coast rejected its oil patch");
+        assertNotNull(destroyer, "the saved-game destroyer could not be reconstructed");
+        assertNotNull(shipyard, "the saved-game shipyard could not be reconstructed");
+        assertNotNull(tanker, "the saved-game tanker could not be reconstructed");
+        world.player(0).set(UnitType.Resource.GOLD, 5000);
+        world.player(0).set(UnitType.Resource.WOOD, 5000);
+
+        // The play report came after this tanker had previously sailed toward
+        // 15,39. BUILD has its own live site and route, but orderTarget still
+        // legitimately retains that older point. A patrol-only residual
+        // shortcut used it to replace each multi-step platform route: at
+        // 13,47 it chose west, at 11,47 it chose east, forever.
+        tanker.setOrderTarget(15, 39);
+        assertTrue(world.orderBuild(tanker, platform, patch.tileX(), patch.tileY()),
+                "the reconstructed tanker refused the platform order");
+
+        Unit built = null;
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 120 && built == null; cycle++) {
+            world.tick();
+            built = at(world, platform.ident(), patch.tileX(), patch.tileY());
+        }
+        assertNotNull(built,
+                "the tanker alternated between 13,47 and 11,47 instead of"
+                        + " preserving its BNE route to the oil patch");
     }
 
     /** A clear square of open water within reach of a patch to start a tanker on. */

@@ -106,7 +106,7 @@ final class RenderingTruth {
         BURNING,
         /** A spell in the air or on the ground. */
         SPELL,
-        /** A health, mana or progress bar under a unit. */
+        /** A health bar under a damaged unit. */
         DECORATION,
         /** A building the player has scouted and can no longer see. */
         REMEMBERED,
@@ -975,7 +975,7 @@ final class RenderingTruth {
             found.add(new Candidate(category, what, spriteRectangle(unit),
                     unit, null, null, null));
 
-            if (category == Category.LIVING && carriesADecoration(unit, local)) {
+            if (category == Category.LIVING && carriesADecoration(unit)) {
                 found.add(new Candidate(Category.DECORATION, what,
                         decorationRectangle(unit), unit, unit, null, null));
             }
@@ -1047,23 +1047,10 @@ final class RenderingTruth {
         return false;
     }
 
-    /** Whether a bar of some sort belongs under this unit. */
-    private static boolean carriesADecoration(Unit unit, int local) {
+    /** Whether BNE's damage bar belongs under this unit. */
+    private static boolean carriesADecoration(Unit unit) {
         UnitType type = unit.type();
-        if (unit.hitPoints() < type.hitPoints()) {
-            return true;
-        }
-        if (unit.player() != local) {
-            return false;
-        }
-        if (unit.producing() != null || unit.researching() != null
-                || unit.upgradingTo() != null) {
-            return true;
-        }
-        if (type.mana() > 0 && unit.isCaster() && unit.mana() < type.mana()) {
-            return true;
-        }
-        return type.maxOnBoard() > 0 && !unit.cargo().isEmpty();
+        return unit.hitPoints() < type.hitPoints();
     }
 
     /** Where {@code drawUnit} puts the sprite, in world pixels. */
@@ -1080,8 +1067,7 @@ final class RenderingTruth {
     }
 
     /**
-     * The strip the bars live in: the bottom of the footprint, which is what
-     * {@code OffsetPercent = {50, 100}} names, with room for both rows.
+     * The strip the damage bar lives in at the bottom of the footprint.
      */
     private static Rectangle decorationRectangle(Unit unit) {
         UnitType type = unit.type();

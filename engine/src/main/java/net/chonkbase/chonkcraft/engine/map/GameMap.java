@@ -59,6 +59,9 @@ public final class GameMap {
     private final long[] loadedFlags;
     private final int[] loadedValues;
 
+    /** Runtime-only tile codes found in an older save and needing reconstruction. */
+    private final java.util.BitSet legacySavedPictures = new java.util.BitSet();
+
     public GameMap(int width, int height, Tileset tileset) {
         this.width = width;
         this.height = height;
@@ -462,7 +465,7 @@ public final class GameMap {
      * @param value the square's spare value: wall hit points, or the wood a
      *              forest square still holds
      */
-    public record TerrainChange(int x, int y, int tile, long flags, int value) {}
+    public record TerrainChange(int x, int y, int tile, int graphic, long flags, int value) {}
 
     /**
      * Takes the map as it now stands to be the map as it was loaded.
@@ -515,8 +518,8 @@ public final class GameMap {
                     && field.value() == loadedValues[i]) {
                 continue;
             }
-            changed.add(new TerrainChange(i % width, i / width, field.tile(), flags,
-                    field.value()));
+            changed.add(new TerrainChange(i % width, i / width, field.tile(),
+                    tileset.graphicFor(field.tile()), flags, field.value()));
         }
         return changed;
     }
@@ -538,13 +541,71 @@ public final class GameMap {
      * square by square, mend it against half-restored ground.
      */
     public void restoreSavedTile(int x, int y, int tile, long terrainFlags, int value) {
+        restoreSavedTile(x, y, tile, terrainFlags, value, -1);
+    }
+
+    /**
+     * Restores one saved square using its stable picture when the save has one.
+     *
+     * <p>Runtime transition codes begin beyond the PUD table and belong only
+     * to the tileset instance that minted them. Reusing one in a new instance
+     * resolves to graphic zero, which is the solid black tile reported after
+     * F12. Schema-three saves include the graphic and intern it here. For an
+     * older save, cleared wood and rock can be identified from the loaded and
+     * restored flags; surviving transition edges are repaired once all saved
+     * squares have been read.
+     */
+    public void restoreSavedTile(int x, int y, int tile, long terrainFlags, int value,
+            int graphic) {
         MapField field = fieldOrNull(x, y);
         if (field == null) {
             return;
         }
-        repaintTile(field, x, y, tile);
+        int index = y * width + x;
+        int restoredCode = tile;
+        if (graphic >= 0) {
+            // Ordinary PUD codes are stable and may carry structural meaning
+            // beyond their picture (notably a wall's direction group). Keep
+            // one when it resolves to the saved graphic. Only runtime-only or
+            // otherwise missing codes need to be interned again.
+            restoredCode = tileset.tile(tile).isDefined()
+                            && tileset.graphicFor(tile) == graphic
+                    ? tile
+                    : tileset.codeForSavedGraphic(graphic,
+                            terrainFlags & ~OCCUPANCY_FLAGS);
+        } else if (!tileset.tile(tile).isDefined()) {
+            long before = loadedFlags[index];
+            if ((before & TileFlag.FOREST) != 0 && (terrainFlags & TileFlag.FOREST) == 0) {
+                restoredCode = tileset.removedTreeCode();
+            } else if ((before & TileFlag.ROCKS) != 0
+                    && (terrainFlags & TileFlag.ROCKS) == 0) {
+                restoredCode = tileset.removedRockCode();
+            } else {
+                // Keep a drawable map-file picture until the complete saved
+                // neighbourhood is available for the transition repair.
+                restoredCode = loadedTiles[index];
+                legacySavedPictures.set(index);
+            }
+        }
+        repaintTile(field, x, y, restoredCode);
         field.setFlags((terrainFlags & ~OCCUPANCY_FLAGS) | (field.flags() & OCCUPANCY_FLAGS));
         field.setValue(value);
+    }
+
+    /** Finishes migration of runtime transition codes from schema-two saves. */
+    public void finishSavedTerrainRestore() {
+        for (int index = legacySavedPictures.nextSetBit(0); index >= 0;
+                index = legacySavedPictures.nextSetBit(index + 1)) {
+            int x = index % width;
+            int y = index / width;
+            MapField field = fields[index];
+            if (field.isForest()) {
+                fixWoodTile(x, y);
+            } else if (field.hasFlag(TileFlag.ROCKS)) {
+                fixRockTile(x, y);
+            }
+        }
+        legacySavedPictures.clear();
     }
 
     /** The graphic a square currently draws. */

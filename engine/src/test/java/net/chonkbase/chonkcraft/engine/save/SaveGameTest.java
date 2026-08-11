@@ -78,7 +78,7 @@ class SaveGameTest {
         Fixture fixture = load();
         String script = save(fixture);
 
-        assertTrue(script.startsWith("SaveFormat(\"chonkcraft-save\", 2)"));
+        assertTrue(script.startsWith("SaveFormat(\"chonkcraft-save\", 3)"));
         assertTrue(!script.contains("function CreateUnit") && !script.contains("Load("),
                 "the native save still embeds executable map-loading source");
 

@@ -202,6 +202,19 @@ public final class Tileset {
     }
 
     /**
+     * Gives a saved terrain picture a code in this particular tileset instance.
+     *
+     * <p>The special pictures used while wood and rock are cleared cannot be
+     * named by a PUD tile code. They are interned at runtime, so the numeric
+     * code minted in one game is not meaningful in a freshly loaded tileset.
+     * Saves therefore carry the stable graphic index and ask the receiving
+     * tileset to intern it again.
+     */
+    public int codeForSavedGraphic(int graphic, long flags) {
+        return codeFor(graphic, flags);
+    }
+
+    /**
      * The forest terrain's own flags, taken from its solid slot.
      *
      * <p>Land, forest and unpassable in every shipped tileset, but read rather

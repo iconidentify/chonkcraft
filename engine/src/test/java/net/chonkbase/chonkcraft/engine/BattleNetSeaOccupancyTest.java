@@ -248,7 +248,12 @@ class BattleNetSeaOccupancyTest {
         destroyer.setWalkHolding(false);
         destroyer.setStepDrained(true);
         destroyer.setBattleNetOrderDelay(0);
-        world.movement.stepMove(destroyer, true);
+        destroyer.setBattleNetBorrowedMoveForStep(true);
+        try {
+            world.movement.stepMove(destroyer, true);
+        } finally {
+            destroyer.setBattleNetBorrowedMoveForStep(false);
+        }
         assertEquals(8, destroyer.tileX(),
                 "free-closer must step east onto the SE cell's column");
         assertEquals(20, destroyer.tileY(),

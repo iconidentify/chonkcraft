@@ -1864,6 +1864,7 @@ public final class Main {
         GameScreen screen = new GameScreen(world, data, terrain, palette, tilesetName,
                 localPlayer, viewWidth, viewHeight, audio, panel, commands, applier, sink,
                 cyclingRanges, race);
+        screen.setNetworkChat(network);
         // The fog draws its edges with the tileset's own masks, and the screen
         // is handed the map already rasterised rather than the sheet they live
         // in, so they come across separately.
@@ -2228,6 +2229,9 @@ public final class Main {
                 // at all for a while and that is correct rather than a stall.
                 try {
                     var step = network.update();
+                    for (var message : network.drainChatEvents()) {
+                        screen.acceptChat(message);
+                    }
                     for (var departure : network.drainDepartureEvents()) {
                         String message;
                         if (departure.hostLeft()) {

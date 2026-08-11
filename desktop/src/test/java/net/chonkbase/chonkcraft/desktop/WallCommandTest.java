@@ -83,7 +83,9 @@ class WallCommandTest {
     void aWallClickIsAnAttackCommand() {
         Rig rig = rig();
 
-        assertEquals("attacking wall", rig.screen().rightClickForTest(rig.footman(), 12, 10));
+        assertEquals("", rig.screen().rightClickForTest(rig.footman(), 12, 10),
+                "BNE acknowledges an accepted attack with voice and target feedback, not"
+                        + " a lowercase debug verb in the status strip");
         assertEquals(1, rig.sent().size(), "the wall click sent more than one order");
         assertEquals(GameCommand.Kind.ATTACK_GROUND, rig.sent().getFirst().kind(),
                 "the wall click was turned into a move rather than a tile attack");
@@ -106,7 +108,7 @@ class WallCommandTest {
     void aShiftedClickReachesTheWireAsQueued() {
         Rig rig = rig();
 
-        assertEquals("moving", rig.screen().rightClickForTest(rig.footman(), 20, 10, true));
+        assertEquals("", rig.screen().rightClickForTest(rig.footman(), 20, 10, true));
 
         assertEquals(1, rig.sent().size());
         assertEquals(GameCommand.Kind.MOVE, rig.sent().getFirst().kind());
@@ -120,8 +122,7 @@ class WallCommandTest {
         Unit friend = rig.world().createUnit(rig.footman().type(), 0, 16, 10);
         assertNotNull(friend);
 
-        assertEquals("following " + friend.type().name(),
-                rig.screen().rightClickForTest(rig.footman(), 16, 10));
+        assertEquals("", rig.screen().rightClickForTest(rig.footman(), 16, 10));
 
         assertEquals(1, rig.sent().size());
         assertEquals(GameCommand.Kind.FOLLOW, rig.sent().getFirst().kind());

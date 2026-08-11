@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
@@ -67,10 +67,11 @@ class SidePanelVisualTest {
             GameData data, int viewWidth, int viewHeight, double scale) {}
 
     private static GameData data() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II assets configured. Set CHONKCRAFT_ASSET_PACK or"
+                        + " -Dwc2.install.dir=/path/to/game.");
+        return new GameData(assets);
     }
 
     /**
@@ -348,6 +349,37 @@ class SidePanelVisualTest {
                 previous = box;
             }
         }
+    }
+
+    @Test
+    @DisplayName("food, score and workers continue the resource cluster after oil")
+    void theTopBarIsOneLeftAlignedCluster() {
+        Scene scene = scene(4);
+        var cells = SidePanel.layOutTopBar(scene.layout().resources(),
+                widths(scene), scene.viewWidth());
+        java.util.Map<Integer, SidePanel.TopBarCell> bySlot = new java.util.HashMap<>();
+        for (var cell : cells) {
+            bySlot.put(cell.slot(), cell);
+        }
+        assertEquals(6, cells.size(), "the ordinary 640-pixel interface lost a counter");
+
+        int[][] neighbours = {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 6}};
+        for (int[] pair : neighbours) {
+            var left = bySlot.get(pair[0]);
+            var right = bySlot.get(pair[1]);
+            assertNotNull(left, "missing top-bar slot " + pair[0]);
+            assertNotNull(right, "missing top-bar slot " + pair[1]);
+            int[] textWidths = widths(scene);
+            assertEquals(18, left.textX() - left.iconX(),
+                    "slot " + pair[0] + " detached its value from its icon");
+            assertEquals(SidePanel.COUNT_GAP,
+                    right.iconX() - (left.textX() + textWidths[left.slot()]),
+                    "slot " + pair[0] + " leaves an uneven visible gap");
+        }
+        var workers = bySlot.get(6);
+        assertNotNull(workers, "the idle-worker counter disappeared");
+        assertEquals(18, workers.textX() - workers.iconX(),
+                "the idle-worker value detached from its icon");
     }
 
     /**

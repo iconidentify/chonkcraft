@@ -1237,6 +1237,18 @@ final class BattleNetHarvestSystem {
         if (!worker.gatherClockStarted()) {
             int targetIndex = targetX + targetY * world.map.width();
             Unit claimant = world.battleNetClaimedWood.get(targetIndex);
+            if (claimant != null && !isActiveWoodClaim(claimant, targetX, targetY)) {
+                // FUN_0044df10 restores a claimed forest square when its
+                // gathering order is destroyed. A player Move/Attack/Build
+                // replaces that order before another unit reaches the tree.
+                // Keeping the Java-side reservation after the owner left made
+                // every later peon rediscover the same still-forest square,
+                // reject it as claimed, wait, and repeat forever. Validate at
+                // the reservation boundary as well as at normal harvest exits
+                // so every command kind gets the native release semantics.
+                world.battleNetClaimedWood.remove(targetIndex);
+                claimant = null;
+            }
             if (claimant != null && claimant != worker) {
                 // Native StartGathering first requires square code -2.
                 // The preceding worker in low-to-high pool order has
@@ -2077,6 +2089,22 @@ final class BattleNetHarvestSystem {
         if (owner == worker) {
             world.battleNetClaimedWood.remove(index);
         }
+    }
+
+    /** Whether a native-style forest reservation still has a live owner. */
+    private boolean isActiveWoodClaim(Unit worker, int x, int y) {
+        return worker != null
+                && worker.isAlive()
+                && worker.isOnMap()
+                && worker.gatherClockStarted()
+                // A flush-on command waits behind an unbreakable axe swing in
+                // retail. Keep the claim through that committed swing even
+                // if Java has already installed the replacement order.
+                && (worker.order() == Unit.Order.HARVEST
+                        || worker.animation().unbreakable())
+                && worker.resourceUnit() == null
+                && worker.resourceTileX() == x
+                && worker.resourceTileY() == y;
     }
 
 

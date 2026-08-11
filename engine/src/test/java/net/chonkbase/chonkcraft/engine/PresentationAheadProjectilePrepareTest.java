@@ -125,6 +125,32 @@ class PresentationAheadProjectilePrepareTest {
         return type;
     }
 
+    private static UnitType cannonShip() {
+        UnitType type = destroyer();
+        type.setSpeed(10);
+        type.setCanAttack(true);
+        type.setCanTargetLand(true);
+        type.setBasicDamage(12);
+        type.setPiercingDamage(8);
+        type.setMaxAttackRange(4);
+        type.setSightRange(5);
+        type.setReactRangeComputer(5);
+        type.setReactRangePerson(5);
+        type.setMissile("missile-small-cannon");
+        type.animationSet().put(AnimationSet.State.ATTACK,
+                Animation.parse("attack", List.of(
+                        "unbreakable begin", "frame 0", "wait 3", "attack",
+                        "unbreakable end", "wait 1")));
+        return type;
+    }
+
+    private static MissileType smallCannon() {
+        return new MissileType("missile-small-cannon", null,
+                MissileClass.PARABOLIC, 32, 32, 15, 9, 22, 1, 2, 3, 50,
+                "missile-cannon-tower-explosion", "explosion", false,
+                0, 0, false, null, 0);
+    }
+
     private static MissileType axeMissile() {
         // range 1: single target (not splash). Splash skips the damage-band
         // async draw and would leave only the two aim jitters.
@@ -502,6 +528,44 @@ class PresentationAheadProjectilePrepareTest {
         assertTrue(world.battleNetPendingProjectileShots.isEmpty());
         assertFalse(world.battleNetProjectileSlots[slot],
                 "the cancelled placeholder leaked its fixed BNE pool slot");
+    }
+
+    @Test
+    @DisplayName("a destroyer's unconstructed final shell vanishes when its target dies")
+    void targetDeathCancelsTheShipsOrphanedPendingCannonball() throws IOException {
+        GameMap map = grass(24);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setMissileTypes(Map.of("missile-small-cannon", smallCannon()));
+        world.setBattleNetSequenceData(retailScriptBin());
+
+        Unit ship = world.createUnit(cannonShip(), 0, 8, 10);
+        Unit victim = world.createUnit(grunt(), 1, 11, 10);
+        assertTrue(ship != null && victim != null, "ship and shore target must place");
+        world.player(0).setType(
+                net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.PERSON);
+        assertTrue(world.orderAttack(ship, victim), "ship attack accepted");
+
+        // Presentation has drawn the shell at the muzzle, but retail opcode
+        // ten has not constructed it yet. Killing the target ends the order
+        // before that handoff -- the exact visible orphan from playtesting.
+        world.hit(ship, victim);
+        assertEquals(1, world.missiles().size(), "one pending cannonball");
+        Missile orphan = world.missiles().get(0);
+        int orphanSlot = orphan.battleNetPoolSlot();
+        assertFalse(orphan.battleNetConstructorDrawn(),
+                "the fixture must still be before opcode ten");
+        world.kill(victim, ship);
+        world.tick();
+
+        assertFalse(world.missiles().contains(orphan),
+                "the dead attack order left its cannonball painted in the water");
+        assertTrue(world.battleNetPendingProjectileShots.isEmpty(),
+                "the next attack could revive the orphaned shell");
+        assertFalse(world.battleNetProjectileSlots[orphanSlot],
+                "the abandoned cannonball leaked its fixed BNE projectile slot");
     }
 
     @Test

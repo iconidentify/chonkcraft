@@ -103,6 +103,38 @@ class AttackMoveTest {
     }
 
     @Test
+    @DisplayName("a destroyer chase keeps its target route instead of an old command point")
+    void destroyerChaseKeepsTargetRouteOverOldCommandPoint() {
+        World world = twoSideField();
+        UnitType destroyerType = soldier("unit-orc-destroyer");
+        destroyerType.setTileSize(2, 2);
+        Unit destroyer = world.createUnit(destroyerType, 0, 10, 10);
+        Unit quarry = world.createUnit(soldier("unit-human-destroyer"), 1, 20, 10);
+        assertTrue(destroyer.battleNetDoubleStep(),
+                "the regression needs BNE's doubled ship route grid");
+
+        // The current chase route is east. The point is deliberately stale:
+        // it represents a prior player command, just as it can during a live
+        // fight after the target order has replaced a march. A patrol-only
+        // residual correction used that westward point to replace the whole
+        // attack route with one west step, so replanning could alternate the
+        // ship forever instead of closing on its quarry.
+        destroyer.setOrder(Unit.Order.ATTACK);
+        destroyer.setTarget(quarry);
+        destroyer.setChasing(true);
+        destroyer.setOrderTarget(0, 10);
+        destroyer.setPathGoal(-1, -1);
+        destroyer.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND, new int[] {2, 2}));
+
+        world.combat.stepMoveTowardsTarget(destroyer);
+
+        assertEquals(12, destroyer.tileX(),
+                "the destroyer reversed toward an obsolete command point");
+        assertEquals(10, destroyer.tileY());
+    }
+
+    @Test
     @DisplayName("a standing unit that goes to fight comes back to its post, still hunting")
     void aStandingUnitReturnsToAnAttackMoveAtThePostItLeft() {
         World world = twoSideField();

@@ -94,6 +94,36 @@ class MatchmakerEndToEndTest {
                     assertEquals(7, batch[0].netCycle());
                     assertEquals(0, batch[0].player());
                     assertTrue(batch[0].commands().isEmpty());
+
+                    hostGame.broadcastChat(1, 1 << joiner.state().localSlot(),
+                            "The relay is ready");
+                    final NetworkSession.ChatPacket[] chat = new NetworkSession.ChatPacket[1];
+                    await(Duration.ofSeconds(2), () -> {
+                        clientGame.poll();
+                        var received = clientGame.drainChats();
+                        if (!received.isEmpty()) {
+                            chat[0] = received.getFirst();
+                        }
+                        return chat[0] != null;
+                    });
+                    assertEquals("The relay is ready", chat[0].text());
+                    assertEquals(0, chat[0].player());
+
+                    for (long id = 1; id <= 7; id++) {
+                        clientGame.broadcastChat(id, 1, "guest line " + id);
+                    }
+                    List<NetworkSession.ChatPacket> limited = new java.util.ArrayList<>();
+                    await(Duration.ofSeconds(2), () -> {
+                        hostGame.poll();
+                        limited.addAll(hostGame.drainChats());
+                        return limited.size() >= 6;
+                    });
+                    Thread.sleep(50);
+                    hostGame.poll();
+                    limited.addAll(hostGame.drainChats());
+                    assertEquals(6, limited.size(),
+                            "the public relay did not enforce its per-participant burst");
+                    assertEquals("guest line 6", limited.getLast().text());
                 }
             }
         }

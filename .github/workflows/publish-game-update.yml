@@ -77,13 +77,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          title="$(git log -1 --pretty=%s)"
-          before='${{ github.event.before }}'
-          if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] \
-              && git cat-file -e "$before^{commit}" 2>/dev/null; then
-            notes="$(git log --reverse --pretty='- %s' "$before..${GITHUB_SHA}")"
+          if [[ -s RELEASE_NOTES.md ]]; then
+            title="$(sed -n '1s/^# //p' RELEASE_NOTES.md)"
+            notes="$(tail -n +3 RELEASE_NOTES.md)"
+            test -n "$title"
+            test -n "$notes"
           else
-            notes="- $title"
+            title="$(git log -1 --pretty=%s)"
+            before='${{ github.event.before }}'
+            if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] \
+                && git cat-file -e "$before^{commit}" 2>/dev/null; then
+              notes="$(git log --reverse --pretty='- %s' "$before..${GITHUB_SHA}")"
+            else
+              notes="- $title"
+            fi
           fi
           export CHONKCRAFT_RELEASE_TITLE="$title"
           export CHONKCRAFT_RELEASE_NOTES="$notes"

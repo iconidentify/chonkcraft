@@ -74,13 +74,13 @@ remain explicit; generation is not used to disguise provenance.
 | buttons and icons | generated snapshot of the documented historical declarations | `GeneratedInterface` + `IconCatalog` in the JAR | historical GPL declarations, retained with provenance; retail art remains in the pack | native runtime complete; retail-authority replacement remains precision work |
 | missiles and burning-building rows | generated snapshot of documented historical declarations | `MissileCatalog` in the JAR | historical GPL declarations plus pinned executable behavior | native runtime complete |
 | construction animations | generated snapshot of documented historical declarations | `ConstructionCatalog` in the JAR | historical GPL declarations, retained with provenance; retail art remains in the pack | native runtime complete |
-| spells | generated snapshot of documented historical declarations | `SpellCatalog` in the JAR | historical GPL declarations plus pinned retail dispatch/behavior evidence | native definition runtime complete; four legacy-unmodelled effect behaviors remain open |
+| spells | generated snapshot of documented historical declarations | `SpellCatalog` in the JAR | historical GPL declarations plus pinned retail dispatch/behavior evidence | native runtime complete; all declared effect behaviors are explicitly modelled and fail closed if an unknown effect appears |
 | tileset semantics | `TilesetCatalog` + versioned `tilesets.tsv` | versioned terrain schema + native reader | historical GPL declarations sealed after an all-code differential; retail tile data and movement oracle | native runtime complete |
 | UI layout and colour policy | typed `UiLayout`, `PlayerColours` and `FogOfWarSettings` | fixed Java presentation | GPL historical GPL layout declarations retained with provenance; retail pixels and executable behavior | native runtime complete |
 | campaigns and 52 mission wrappers | `MissionDefinitionCatalog` + `missions.tsv` | versioned native mission declarations | retail PUD/campaign data plus sealed wrapper differential | native runtime complete: 52 missions, 137 triggers |
 | mission triggers | typed postfix predicates/actions in `TriggerSystem` | native predicate/action evaluator | authenticated mission behavior | native runtime complete |
 | retail AI | `ai.bin` bytecode and native managers | native bytecode/state machine only | `maindat` 277 and executable | native runtime complete for all campaign assignments |
-| save/load | `chonkcraft-save` schema 2 + `NativeSaveReader` | versioned native save format | complete deterministic engine state | native runtime complete; historical schema 1 remains migration-only |
+| save/load | `chonkcraft-save` schema 3 + `NativeSaveReader` | versioned native save format | complete deterministic engine state plus portable terrain pictures | native runtime complete; historical schemas 1 and 2 remain migration-only |
 | launcher/update content | verified game JAR plus selected pack | game artifact plus chosen pack | application release contract | native two-file runtime complete |
 
 ## Acceptance rule for each row

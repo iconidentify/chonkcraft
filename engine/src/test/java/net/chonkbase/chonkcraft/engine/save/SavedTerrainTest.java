@@ -68,7 +68,8 @@ class SavedTerrainTest {
      * re-derive a square's picture from the tileset's transition tables, and a
      * made-up code would exercise none of that.
      */
-    private record Sample(GameData data, Tileset tileset, int grass, long grassFlags,
+    private record Sample(GameData data, PudMap.Tileset tilesetKind, Tileset tileset,
+            int grass, long grassFlags,
             int forest, long forestFlags, int wall, long wallFlags) {}
 
     private static Sample sample() {
@@ -105,7 +106,8 @@ class SavedTerrainTest {
         }
         Assumptions.assumeTrue(grass >= 0 && forest >= 0 && wall >= 0,
                 "the seventh human mission has no forest, wall and open ground to copy");
-        return new Sample(data, tileset, grass, grassFlags, forest, forestFlags, wall, wallFlags);
+        return new Sample(data, source.tileset(), tileset, grass, grassFlags,
+                forest, forestFlags, wall, wallFlags);
     }
 
     /**
@@ -118,7 +120,11 @@ class SavedTerrainTest {
      * cleared it.
      */
     private static GameMap ground(Sample sample) {
-        GameMap map = new GameMap(SIZE, SIZE, sample.tileset());
+        return ground(sample, sample.tileset());
+    }
+
+    private static GameMap ground(Sample sample, Tileset tileset) {
+        GameMap map = new GameMap(SIZE, SIZE, tileset);
         for (int y = 0; y < SIZE; y++) {
             for (int x = 0; x < SIZE; x++) {
                 MapField field = map.field(x, y);
@@ -212,6 +218,60 @@ class SavedTerrainTest {
         World reloaded = world(cleared.sample(), map);
         LoadGame.apply(reloaded, script, cleared.sample().data().unitTypes().types());
         return reloaded;
+    }
+
+    /** Reloads through the fresh tileset instance a real F12 load creates. */
+    private static World reloadFresh(Cleared cleared, String script) {
+        Tileset fresh = cleared.sample().data().loadTileset(
+                cleared.sample().tilesetKind()).tileset();
+        GameMap map = ground(cleared.sample(), fresh);
+        World reloaded = world(cleared.sample(), map);
+        LoadGame.apply(reloaded, script, cleared.sample().data().unitTypes().types());
+        return reloaded;
+    }
+
+    @Test
+    @DisplayName("runtime terrain pictures survive a fresh tileset instance")
+    void runtimeTerrainPicturesSurviveFreshTileset() throws IOException {
+        Cleared cleared = cleared();
+        java.util.List<GameMap.TerrainChange> changes =
+                cleared.map().terrainChangedSinceLoad();
+        assertTrue(changes.stream().anyMatch(change ->
+                        change.tile() >= cleared.sample().data().loadTileset(
+                                cleared.sample().tilesetKind()).tileset().tileCount()),
+                "the fixture minted no runtime-only tile code, so it cannot reproduce F12");
+
+        World reloaded = reloadFresh(cleared, save(cleared));
+        for (GameMap.TerrainChange change : changes) {
+            int restored = reloaded.map().tileset().graphicFor(
+                    reloaded.map().field(change.x(), change.y()).tile());
+            assertEquals(change.graphic(), restored,
+                    "the terrain picture changed at " + change.x() + "," + change.y());
+            assertTrue(restored != 0,
+                    "a runtime transition became the solid black tile at "
+                            + change.x() + "," + change.y());
+        }
+    }
+
+    @Test
+    @DisplayName("schema-two runtime terrain codes migrate without black squares")
+    void oldRuntimeTerrainCodesDoNotBecomeBlack() throws IOException {
+        Cleared cleared = cleared();
+        String legacy = save(cleared)
+                .replace("SaveFormat(\"chonkcraft-save\", 3)",
+                        "SaveFormat(\"chonkcraft-save\", 2)")
+                .replaceAll("SetSavedTile\\(([-0-9]+), ([-0-9]+), ([-0-9]+), "
+                                + "(\\\"0x[0-9a-f]+\\\"), ([-0-9]+), [-0-9]+\\)",
+                        "SetSavedTile($1, $2, $3, $4, $5)");
+
+        World reloaded = reloadFresh(cleared, legacy);
+        for (GameMap.TerrainChange change : cleared.map().terrainChangedSinceLoad()) {
+            int restored = reloaded.map().tileset().graphicFor(
+                    reloaded.map().field(change.x(), change.y()).tile());
+            assertTrue(restored != 0,
+                    "legacy runtime code became the solid black tile at "
+                            + change.x() + "," + change.y());
+        }
     }
 
     @Test

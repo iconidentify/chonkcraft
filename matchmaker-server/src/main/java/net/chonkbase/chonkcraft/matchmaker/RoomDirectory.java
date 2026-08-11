@@ -31,6 +31,10 @@ final class RoomDirectory {
     static final long RECONNECT_MILLIS = 30_000;
     static final long UNUSED_TICKET_MILLIS = 20_000;
     static final int MAX_RELAY_PAYLOAD = 1_200;
+    private static final int CHAT_MAGIC = 0x43484354; // NetworkSession "CHCT"
+    private static final int MAX_CHAT_PACKET = 20 + 384;
+    private static final int CHAT_BURST = 6;
+    private static final long CHAT_WINDOW_MILLIS = 5_000L;
 
     enum Failure {
         NOT_FOUND,
@@ -64,6 +68,8 @@ final class RoomDirectory {
         private final long reservedAt;
         private Channel channel;
         private long lastSeen;
+        private long lastChatId;
+        private final java.util.ArrayDeque<Long> chatTimes = new java.util.ArrayDeque<>();
 
         private Participant(int endpointId, String ticket, String name, long now) {
             this.endpointId = endpointId;
@@ -259,6 +265,30 @@ final class RoomDirectory {
             return false;
         }
         long now = clock.millis();
+        if (isChat(payload)) {
+            if (payload.readableBytes() > MAX_CHAT_PACKET) {
+                return false;
+            }
+            // The host forwards one accepted message to the chosen seats. A
+            // joining endpoint, however, can originate only toward the host,
+            // so this is the one place the public service can stop a flood
+            // before it reaches anybody's game process.
+            if (sender.endpointId() != 0) {
+                long id = payload.getLong(payload.readerIndex() + 8);
+                if (id <= source.lastChatId) {
+                    return true;
+                }
+                source.lastChatId = id;
+                while (!source.chatTimes.isEmpty()
+                        && now - source.chatTimes.peekFirst() >= CHAT_WINDOW_MILLIS) {
+                    source.chatTimes.removeFirst();
+                }
+                if (source.chatTimes.size() >= CHAT_BURST) {
+                    return false;
+                }
+                source.chatTimes.addLast(now);
+            }
+        }
         source.lastSeen = now;
         if (sender.endpointId() == 0) {
             room.hostSeen = now;
@@ -269,6 +299,11 @@ final class RoomDirectory {
         envelope.writeBytes(payload, payload.readerIndex(), payload.readableBytes());
         target.channel.writeAndFlush(new BinaryWebSocketFrame(envelope));
         return true;
+    }
+
+    private static boolean isChat(ByteBuf payload) {
+        return payload.readableBytes() >= 20
+                && payload.getInt(payload.readerIndex()) == CHAT_MAGIC;
     }
 
     synchronized void markPlaying(Binding sender) {

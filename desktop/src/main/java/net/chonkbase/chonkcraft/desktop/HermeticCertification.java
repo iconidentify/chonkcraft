@@ -75,7 +75,7 @@ public final class HermeticCertification {
         SaveGame.write(saveSubject.world(), "campaigns/human/level01h", "human", 1,
                 saveSubject.triggers().armedTriggers(), saved);
         String document = saved.toString();
-        check(document.startsWith("SaveFormat(\"chonkcraft-save\", 2)"),
+        check(document.startsWith("SaveFormat(\"chonkcraft-save\", 3)"),
                 "native save schema missing");
         LoadGame.Header header = require(LoadGame.header(document), "save header");
         check("campaigns/human/level01h".equals(header.mapPath()), "save map changed");

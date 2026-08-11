@@ -89,7 +89,7 @@ public final class SaveGame {
     /** The same, naming the triggers the mission has not used yet. */
     public static void write(World world, String mapPath, String campaign, int mission,
             java.util.List<Integer> armedTriggers, Writer out) throws IOException {
-        out.write("SaveFormat(\"chonkcraft-save\", 2)\n\n");
+        out.write("SaveFormat(\"chonkcraft-save\", 3)\n\n");
 
         out.write("SavedGameInfo({\n");
         out.write("  SaveFile = " + quote(mapPath) + ",\n");
@@ -156,6 +156,8 @@ public final class SaveGame {
                     + ", travelled = " + state.travelled() + ", total = " + state.total()
                     + ", bounces = " + state.bounces() + ", hit = " + state.hit()
                     + ", delay = " + state.delay() + ", damage = " + state.damage()
+                    + ", timeToLive = " + state.timeToLive()
+                    + ", periodicHit = " + state.periodicHit()
                     + ", arrived = " + state.arrived() + ", sleep = " + state.sleep()
                     + ", cycleState = " + state.cycleState()
                     + ", moveStarted = " + state.moveStarted()
@@ -206,7 +208,8 @@ public final class SaveGame {
      * felled, 3,799 changed once the edges of the wood are mended -- at 3,799
      * lines and 143KB of text before the save is gzipped.
      *
-     * <p>Three numbers per square rather than upstream's five. The seen tile is
+     * <p>Four values per square rather than upstream's five: the runtime tile
+     * code, its stable graphic, terrain flags and the resource/wall value. The seen tile is
      * not among them because this implementation has none at all: it keeps the explored
      * bits and the buildings each player remembers, and no per-square memory of
      * terrain, so ground that changes under the fog changes for everybody at
@@ -230,7 +233,7 @@ public final class SaveGame {
         for (GameMap.TerrainChange change : changed) {
             out.write("SetSavedTile(" + change.x() + ", " + change.y() + ", " + change.tile()
                     + ", " + quote("0x" + Long.toHexString(change.flags())) + ", "
-                    + change.value() + ")\n");
+                    + change.value() + ", " + change.graphic() + ")\n");
         }
         out.write("\n");
     }

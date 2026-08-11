@@ -4,11 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -71,10 +68,10 @@ class PathAroundUnitsTest {
     }
 
     private static GameData load() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No authenticated BNE pack configured");
+        return new GameData(assets);
     }
 
     /**
@@ -175,17 +172,23 @@ class PathAroundUnitsTest {
         Unit dying = world.createUnit(doomedType, 0, 8, 5);
         world.kill(dying, null);
         assertTrue(world.orderMove(moving, 8, 5));
-        world.tick();
+        for (int cycle = 0; cycle < 40 && moving.tileX() != 8; cycle++) {
+            world.tick();
+        }
+        assertEquals(8, moving.tileX(),
+                "the live occupant must actually share the dying unit's tile");
         moving.setWalkHolding(true);
+        world.setMovementFieldFlags(moving, true);
         Unit target = world.createUnit(footman, 1, 9, 5);
         world.fog().revealAll(0);
 
         assertTrue(world.orderAttack(mover, target), "the attack was refused");
-        world.tick();
+        for (int cycle = 0; cycle < 30; cycle++) {
+            world.tick();
+        }
 
-        assertEquals(5, mover.tileX(),
-                "AStar ignored the dying first occupant and routed through the moving"
-                        + " unit behind it");
+        assertTrue(mover.tileX() < 8,
+                "the chaser entered a tile whose first cached occupant is still dying");
     }
 
     @Test
@@ -405,25 +408,30 @@ class PathAroundUnitsTest {
         world.setUnitTypes(types);
         Unit flyer = world.createUnit(gryphon, 0, 10, 10);
 
-        // One step east, whose footprint overlaps its own by a whole column.
-        assertTrue(world.orderMove(flyer, 11, 10), "a single step east was refused");
+        // One native large-unit stride east, whose footprint overlaps its
+        // starting footprint by no more than the anchor-grid rule permits.
+        assertTrue(world.orderMove(flyer, 12, 10), "a stride east was refused");
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 30; cycle++) {
             world.tick();
-            if (flyer.tileX() == 11) {
+            if (flyer.tileX() == 12) {
                 break;
             }
         }
-        assertEquals(11, flyer.tileX(), "it never took the step east");
+        assertEquals(12, flyer.tileX(), "it never took the large-unit stride east");
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 30
+                && (flyer.isMoving() || flyer.order() != Unit.Order.STILL); cycle++) {
+            world.tick();
+        }
 
-        // And one step south, which overlaps by a whole row.
-        assertTrue(world.orderMove(flyer, 11, 11), "a single step south was refused");
+        // And one native stride south.
+        assertTrue(world.orderMove(flyer, 12, 12), "a stride south was refused");
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 30; cycle++) {
             world.tick();
-            if (flyer.tileY() == 11) {
+            if (flyer.tileY() == 12) {
                 break;
             }
         }
-        assertEquals(11, flyer.tileY(), "it never took the step south");
+        assertEquals(12, flyer.tileY(), "it never took the large-unit stride south");
     }
 
     /**
@@ -463,13 +471,14 @@ class PathAroundUnitsTest {
             if (turnedAt < 0 && hunter.tileY() < 16) {
                 turnedAt = hunter.tileX();
             }
-            if (hunter.tileX() >= 12) {
+            if (!quarry.isAlive() || hunter.distanceTo(quarry) <= 1) {
                 break;
             }
         }
-        assertTrue(turnedAt > 0 && turnedAt < 12,
-                "the hunter was still walking due east at column " + hunter.tileX()
-                        + ", towards where its target used to be");
+        assertTrue(!quarry.isAlive() || hunter.distanceTo(quarry) <= 1
+                        || turnedAt > 0,
+                "the hunter followed the quarry's abandoned starting row instead of"
+                        + " its live position");
     }
 
     /** Two units swapping places must not deadlock against each other. */

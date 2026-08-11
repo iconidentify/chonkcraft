@@ -9,6 +9,8 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,6 +35,14 @@ public final class NetworkSession implements Closeable {
     /** Marks a packet as ours and pins the wire format. */
     private static final int MAGIC = 0x57475553; // "WGUS"
     private static final int VERSION = 2;
+
+    /** Side-band player conversation, deliberately outside the lockstep stream. */
+    public static final int CHAT_MAGIC = 0x43484354; // "CHCT"
+    private static final int CHAT_VERSION = 1;
+    private static final int CHAT_HEADER_BYTES = 4 + 2 + 1 + 1 + 8 + 2 + 2;
+
+    /** Bounded both for the old game's compact message line and for hostile input. */
+    public static final int MAX_CHAT_UTF8_BYTES = 384;
 
     private static final int HEADER_BYTES = 4 + 2 + 1 + 1 + 8 + 8 + 8 + 2;
     private static final int MAX_PACKET_BYTES = 1200;
@@ -74,10 +84,19 @@ public final class NetworkSession implements Closeable {
     public record Batch(long netCycle, int player, long hashCycle, long syncHash,
             List<GameCommand> commands, byte[] raw) {}
 
+    /**
+     * A player message carried beside, never inside, deterministic commands.
+     *
+     * @param recipientMask bit N means player N should see it
+     * @param id monotonically increasing for one sender, used to discard UDP repeats
+     */
+    public record ChatPacket(int player, long id, int recipientMask, String text, byte[] raw) {}
+
     private final DatagramSocket socket;
     private final int localPlayer;
     private final Map<Integer, SocketAddress> peers = new LinkedHashMap<>();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final ArrayDeque<ChatPacket> chats = new ArrayDeque<>();
 
     /**
      * The host address a client trusts to relay another slot's packet.
@@ -154,6 +173,82 @@ public final class NetworkSession implements Closeable {
     }
 
     /**
+     * Sends a conversation packet independently of the simulation clock.
+     *
+     * <p>Three identical datagrams make an ordinary isolated UDP loss invisible;
+     * the receiver identifies them by sender and id. Chat must never hold the
+     * simulation hostage, so it has no lockstep acknowledgement or wait state.
+     */
+    public void broadcastChat(long id, int recipientMask, String text) throws IOException {
+        broadcastChat(id, recipientMask, text, false);
+    }
+
+    /**
+     * @param directToRecipients true on the host, which has every destination;
+     *        false on a client, which must reach the host even when the host is
+     *        not one of the selected readers
+     */
+    void broadcastChat(long id, int recipientMask, String text, boolean directToRecipients)
+            throws IOException {
+        String safe = sanitizeChat(text);
+        if (safe.isEmpty() || recipientMask == 0) {
+            return;
+        }
+        byte[] utf8 = safe.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buffer = ByteBuffer.allocate(CHAT_HEADER_BYTES + utf8.length);
+        buffer.putInt(CHAT_MAGIC);
+        buffer.putShort((short) CHAT_VERSION);
+        buffer.put((byte) localPlayer);
+        buffer.put((byte) 0);
+        buffer.putLong(id);
+        buffer.putShort((short) recipientMask);
+        buffer.putShort((short) utf8.length);
+        buffer.put(utf8);
+        byte[] bytes = buffer.array();
+        for (int repeat = 0; repeat < 3; repeat++) {
+            for (Map.Entry<Integer, SocketAddress> peer : peers.entrySet()) {
+                if (!directToRecipients || (recipientMask & (1 << peer.getKey())) != 0) {
+                    socket.send(new DatagramPacket(bytes, bytes.length, peer.getValue()));
+                }
+            }
+        }
+    }
+
+    /** Removes controls, normalises whitespace, and enforces the UTF-8 wire budget. */
+    public static String sanitizeChat(String text) {
+        if (text == null) {
+            return "";
+        }
+        StringBuilder clean = new StringBuilder();
+        boolean space = false;
+        for (int offset = 0; offset < text.length();) {
+            int codePoint = text.codePointAt(offset);
+            offset += Character.charCount(codePoint);
+            if (Character.isISOControl(codePoint)) {
+                if (codePoint == '\t' || codePoint == '\n' || codePoint == '\r') {
+                    space = clean.length() > 0;
+                }
+                continue;
+            }
+            if (Character.isWhitespace(codePoint)) {
+                space = clean.length() > 0;
+                continue;
+            }
+            if (space) {
+                clean.append(' ');
+                space = false;
+            }
+            clean.appendCodePoint(codePoint);
+            while (clean.toString().getBytes(StandardCharsets.UTF_8).length
+                    > MAX_CHAT_UTF8_BYTES) {
+                clean.setLength(clean.offsetByCodePoints(clean.length(), -1));
+                return clean.toString().stripTrailing();
+            }
+        }
+        return clean.toString().strip();
+    }
+
+    /**
      * Sends a host-adjudicated batch on behalf of a silent player.
      *
      * <p>Package-private by design: only the lockstep host may synthesize the
@@ -212,6 +307,11 @@ public final class NetworkSession implements Closeable {
             } catch (IOException e) {
                 break;
             }
+            ChatPacket chat = decodeChat(packet);
+            if (chat != null && trustedSource(chat.player(), packet.getSocketAddress())) {
+                chats.add(chat);
+                continue;
+            }
             Batch batch = decode(packet);
             if (batch != null && !trustedSource(batch.player(), packet.getSocketAddress())) {
                 batch = null;
@@ -221,6 +321,13 @@ public final class NetworkSession implements Closeable {
             }
         }
         return received;
+    }
+
+    /** Conversation packets collected during the latest transport polls. */
+    public List<ChatPacket> drainChats() {
+        List<ChatPacket> received = new ArrayList<>(chats);
+        chats.clear();
+        return List.copyOf(received);
     }
 
     private boolean trustedSource(int claimedPlayer, SocketAddress source) {
@@ -274,6 +381,38 @@ public final class NetworkSession implements Closeable {
         return new Batch(netCycle, player, hashCycle, syncHash, commands, raw);
     }
 
+    private static ChatPacket decodeChat(DatagramPacket packet) {
+        if (packet.getLength() < CHAT_HEADER_BYTES) {
+            return null;
+        }
+        ByteBuffer in = ByteBuffer.wrap(packet.getData(), packet.getOffset(), packet.getLength());
+        if (in.getInt() != CHAT_MAGIC || in.getShort() != CHAT_VERSION) {
+            return null;
+        }
+        int player = in.get() & 0xFF;
+        in.get();
+        long id = in.getLong();
+        int recipientMask = in.getShort() & 0xFFFF;
+        int length = in.getShort() & 0xFFFF;
+        if (id <= 0 || recipientMask == 0 || length == 0
+                || length > MAX_CHAT_UTF8_BYTES || in.remaining() != length) {
+            return null;
+        }
+        byte[] bytes = new byte[length];
+        in.get(bytes);
+        String decoded = new String(bytes, StandardCharsets.UTF_8);
+        if (!java.util.Arrays.equals(bytes, decoded.getBytes(StandardCharsets.UTF_8))) {
+            return null;
+        }
+        String safe = sanitizeChat(decoded);
+        if (safe.isEmpty() || !safe.equals(decoded)) {
+            return null;
+        }
+        byte[] raw = new byte[packet.getLength()];
+        System.arraycopy(packet.getData(), packet.getOffset(), raw, 0, packet.getLength());
+        return new ChatPacket(player, id, recipientMask, safe, raw);
+    }
+
     /**
      * Passes a batch on to everyone except the player it came from.
      *
@@ -295,6 +434,17 @@ public final class NetworkSession implements Closeable {
                 continue;
             }
             socket.send(new DatagramPacket(batch.raw(), batch.raw().length, peer.getValue()));
+        }
+    }
+
+    /** Passes an authenticated player message only to players selected by its sender. */
+    public void relay(ChatPacket chat) throws IOException {
+        for (Map.Entry<Integer, SocketAddress> peer : peers.entrySet()) {
+            if (peer.getKey() == chat.player()
+                    || (chat.recipientMask() & (1 << peer.getKey())) == 0) {
+                continue;
+            }
+            socket.send(new DatagramPacket(chat.raw(), chat.raw().length, peer.getValue()));
         }
     }
 

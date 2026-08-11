@@ -84,6 +84,9 @@ final class GameScreen extends JPanel {
 
     private volatile String status = "";
 
+    /** Player conversation, present only in a network match. */
+    private InGameChat chat;
+
     /**
      * Where orders go: straight into the world, or onto the network.
      *
@@ -351,8 +354,8 @@ final class GameScreen extends JPanel {
             case DEFINE -> {
                 groups.set(digit, java.util.List.copyOf(selectedIds()));
                 java.util.List<Integer> ids = groups.get(digit);
-                status = ids.isEmpty() ? "group " + digit + " cleared"
-                        : ids.size() + " units in group " + digit;
+                status = ids.isEmpty() ? "Group " + digit + " cleared."
+                        : ids.size() + " units in group " + digit + ".";
                 repaint();
                 return true;
             }
@@ -367,7 +370,7 @@ final class GameScreen extends JPanel {
                     }
                 }
                 groups.set(digit, java.util.List.copyOf(ids));
-                status = ids.size() + " units in group " + digit;
+                status = ids.size() + " units in group " + digit + ".";
                 repaint();
                 return true;
             }
@@ -389,7 +392,7 @@ final class GameScreen extends JPanel {
                     }
                 }
                 selectionChanged(selected == null ? firstSelected() : selected);
-                status = countSelected() + " selected";
+                status = countSelected() + " selected.";
                 repaint();
                 return true;
             }
@@ -408,7 +411,7 @@ final class GameScreen extends JPanel {
                     }
                 }
                 if (found == 0) {
-                    status = "group " + digit + " is empty";
+                    status = "Group " + digit + " is empty.";
                     repaint();
                     return true;
                 }
@@ -433,7 +436,7 @@ final class GameScreen extends JPanel {
             }
         }
         selectionChanged(first);
-        status = found == 0 ? "group " + digit + " is empty" : found + " selected";
+        status = found == 0 ? "Group " + digit + " is empty." : found + " selected.";
         if (first != null) {
             playUnit(first, "selected", this::chooseSample);
         }
@@ -805,7 +808,8 @@ final class GameScreen extends JPanel {
             return;
         }
         if (!spell.autoCastable()) {
-            status = spell.name() + " cannot be set to cast itself";
+            status = BattleNetMessages.sentence(
+                    spell.name() + " cannot be set to cast itself");
             return;
         }
         java.util.List<Unit> casters = new java.util.ArrayList<>();
@@ -824,7 +828,8 @@ final class GameScreen extends JPanel {
                 commands.issue(GameCommand.autoCast(localPlayer, each.id(), index, turningOn));
             }
         }
-        status = spell.name() + (turningOn ? ": cast on sight" : ": no longer cast on sight");
+        status = BattleNetMessages.sentence(
+                spell.name() + (turningOn ? ": cast on sight" : ": no longer cast on sight"));
     }
 
     /**
@@ -1349,6 +1354,10 @@ final class GameScreen extends JPanel {
                     repaint();
                     return;
                 }
+                if (chat != null && chat.click(toDesign(event.getX()), toDesign(event.getY()))) {
+                    repaint();
+                    return;
+                }
                 // Where the press landed, whatever it landed on: the drag
                 // handler decides what a drag means from this, and leaving it
                 // holding the last click on the map turns a drag across the
@@ -1378,15 +1387,15 @@ final class GameScreen extends JPanel {
                         if (shown.producing() != null) {
                             commands.issue(GameCommand.cancelTraining(
                                     localPlayer, shown.id()));
-                            status = "training cancelled";
+                            status = "Training cancelled.";
                         } else if (shown.upgradingTo() != null) {
                             commands.issue(GameCommand.cancelUpgradeTo(
                                     localPlayer, shown.id()));
-                            status = "upgrade cancelled";
+                            status = "Upgrade cancelled.";
                         } else {
                             commands.issue(GameCommand.cancelResearch(
                                     localPlayer, shown.id()));
-                            status = "research cancelled";
+                            status = "Research cancelled.";
                         }
                         repaint();
                         return;
@@ -1681,7 +1690,7 @@ final class GameScreen extends JPanel {
                         commands.issue(GameCommand.cast(localPlayer, each.id(), 0, index));
                     }
                 }
-                status = spell.name();
+                status = "";
                 return;
             }
             pendingSpell = button.value();
@@ -1709,13 +1718,13 @@ final class GameScreen extends JPanel {
                 return;
             }
             pendingAction = "unload";
-            status = "select a target";
+            status = "Select a target.";
             commandPanel.setLevel(CANCEL_LEVEL);
             return;
         }
         if (TARGETED_ACTIONS.contains(button.action())) {
             pendingAction = button.action();
-            status = "select a target";
+            status = "Select a target.";
             // Page nine is the cancel-only page. Warcraft II clears the grid
             // down to one ESC icon while it waits for the target, so there is
             // no doubt the next click is spoken for.
@@ -1757,7 +1766,7 @@ final class GameScreen extends JPanel {
                     status = cannotPay;
                 } else {
                     placing = what;
-                    status = placing == null ? "" : "place " + placing.name();
+                    status = placing == null ? "" : "Place " + placing.name() + ".";
                 }
             }
             // The eight below used to call the world where they stand, while
@@ -1785,14 +1794,13 @@ final class GameScreen extends JPanel {
                     refused = shortfall(what.costs());
                 }
                 if (index < 0) {
-                    status = "cannot train that now";
+                    status = "Cannot train that now.";
                 } else if (refused != null) {
                     status = refused;
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.train(localPlayer, unit.id(), index));
-                    status = accepted ? "training " + what.name()
-                            : "cannot train that now";
+                    status = accepted ? "" : "Cannot train that now.";
                 }
             }
             case "upgrade-to" -> {
@@ -1804,14 +1812,13 @@ final class GameScreen extends JPanel {
                 // the town hall it grew from, so it needs no extra food.
                 String cannotPay = what == null ? null : shortfall(what.costs());
                 if (index < 0) {
-                    status = "cannot upgrade now";
+                    status = "Cannot upgrade now.";
                 } else if (cannotPay != null) {
                     status = cannotPay;
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.upgradeTo(localPlayer, unit.id(), index));
-                    status = accepted ? "upgrading to " + what.name()
-                            : "cannot upgrade now";
+                    status = accepted ? "" : "Cannot upgrade now.";
                 }
             }
             case "research" -> {
@@ -1826,14 +1833,13 @@ final class GameScreen extends JPanel {
                         : world.upgradeSet().get(value);
                 String cannotPay = upgrade == null ? null : shortfall(upgrade.costs());
                 if (index < 0) {
-                    status = "cannot research that now";
+                    status = "Cannot research that now.";
                 } else if (cannotPay != null) {
                     status = cannotPay;
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.research(localPlayer, unit.id(), index));
-                    status = accepted ? "researching " + value
-                            : "cannot research that now";
+                    status = accepted ? "" : "Cannot research that now.";
                 }
             }
             // Four separate things, not one. Plain cancel abandons a pending
@@ -1844,7 +1850,7 @@ final class GameScreen extends JPanel {
             }
             case "cancel-train-unit" -> {
                 commands.issue(GameCommand.cancelTraining(localPlayer, unit.id()));
-                status = unit.producing() == null ? "" : "training cancelled";
+                status = unit.producing() == null ? "" : "Training cancelled.";
             }
             // One button, two meanings, as DoClicked_CancelUpgrade has it: it
             // stops whichever of the two a building is doing. Which of the two
@@ -1855,23 +1861,27 @@ final class GameScreen extends JPanel {
             case "cancel-upgrade" -> {
                 if (unit.upgradingTo() != null) {
                     commands.issue(GameCommand.cancelUpgradeTo(localPlayer, unit.id()));
-                    status = "upgrade cancelled";
+                    status = "Upgrade cancelled.";
                 } else if (unit.researching() != null) {
                     commands.issue(GameCommand.cancelResearch(localPlayer, unit.id()));
-                    status = "research cancelled";
+                    status = "Research cancelled.";
                 } else {
                     status = "";
                 }
             }
             case "cancel-build" -> {
                 commands.issue(GameCommand.cancelConstruction(localPlayer, unit.id()));
-                status = "construction cancelled";
+                status = "Construction cancelled.";
             }
             case "return-goods" -> {
+                boolean accepted = false;
                 for (Unit each : selectedUnits()) {
-                    commands.issue(GameCommand.returnGoods(localPlayer, each.id()));
+                    accepted |= commands.issueAccepted(
+                            GameCommand.returnGoods(localPlayer, each.id()));
                 }
-                status = unit.carrying() == null ? "nothing to return" : "";
+                status = unit.carrying() == null ? "Nothing to return."
+                        : accepted ? ""
+                        : bne(BattleNetMessages.Key.NOWHERE_TO_RETURN);
             }
             case "stand-ground" -> {
                 for (Unit each : selectedUnits()) {
@@ -1971,10 +1981,11 @@ final class GameScreen extends JPanel {
      * exactly one place left and three footmen on order is refused by the
      * world and allowed by this. The difference is that this implementation has a queue
      * and upstream's {@code CheckLimits} does not look at it either, so the
-     * screen agrees with upstream and disagrees with the engine for as long as
-     * a paid job is outstanding -- and in that case the player is told
-     * "training Footman" for an order the world drops. Better than the
-     * reverse, which would refuse an order the world would have taken.
+     * preflight agrees with upstream while the authoritative engine remains
+     * stricter. A local rejection is reported immediately. A network sink can
+     * only confirm that the command entered lockstep, so this screen stays
+     * silent rather than claiming the unit began training before the shared
+     * simulation applies it.
      */
     private String noRoom(UnitType what) {
         if (what == null || what.demand() <= 0) {
@@ -1990,7 +2001,8 @@ final class GameScreen extends JPanel {
             supply += unit.type().supply();
             demand += unit.type().demand();
         }
-        return demand + what.demand() <= supply ? null : message(STRING_NOT_ENOUGH_FOOD);
+        return demand + what.demand() <= supply
+                ? null : bne(BattleNetMessages.Key.NOT_ENOUGH_FOOD);
     }
 
     /**
@@ -2014,36 +2026,16 @@ final class GameScreen extends JPanel {
      */
     private String notEnough(UnitType.Resource resource) {
         return switch (resource) {
-            case GOLD -> message(STRING_NOT_ENOUGH_GOLD);
-            case WOOD -> message(STRING_NOT_ENOUGH_LUMBER);
-            case OIL -> message(STRING_NOT_ENOUGH_OIL);
+            case GOLD -> bne(BattleNetMessages.Key.NOT_ENOUGH_GOLD);
+            case WOOD -> bne(BattleNetMessages.Key.NOT_ENOUGH_LUMBER);
+            case OIL -> bne(BattleNetMessages.Key.NOT_ENOUGH_OIL);
             case TIME -> null;
         };
     }
 
-    /** "Not enough food...build more farms." */
-    private static final int STRING_NOT_ENOUGH_FOOD = 438;
-
-    /** "Not enough gold...mine more gold." */
-    private static final int STRING_NOT_ENOUGH_GOLD = 439;
-
-    /** "Not enough lumber...chop more trees." */
-    private static final int STRING_NOT_ENOUGH_LUMBER = 440;
-
-    /** "Not enough oil...drill for oil." */
-    private static final int STRING_NOT_ENOUGH_OIL = 441;
-
-    /**
-     * One of the game's own strings, or a plain stand-in.
-     *
-     * <p>The stand-in is not a translation and is not meant to be one: it is
-     * what a source with no readable string table leaves, and saying nothing
-     * would put the player back where this started, pressing a button that
-     * does nothing without being told why.
-     */
-    private String message(int index) {
-        String text = data.names() == null ? null : data.names().name(index);
-        return text == null || text.isEmpty() ? "not enough resources" : text;
+    /** One of the game's own strings, with an exact fallback for incomplete packs. */
+    private String bne(BattleNetMessages.Key key) {
+        return BattleNetMessages.text(data, key);
     }
 
     /**
@@ -2093,7 +2085,7 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "no selected unit can move there" : "";
+                status = answering == null ? "No selected unit can move there." : "";
             }
             // Point at the beach and the boat sails there. The square clicked
             // need not be water, or land, or reachable: COrder_Unload searches
@@ -2106,7 +2098,7 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "no selected transport can unload there" : "";
+                status = answering == null ? "No selected transport can unload there." : "";
             }
             case "attack" -> {
                 boolean wall = world.map().field(tileX, tileY).isWall();
@@ -2126,7 +2118,7 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "no selected unit can attack that" : "";
+                status = answering == null ? "No selected unit can attack that." : "";
             }
             case "patrol" -> {
                 for (Unit each : group) {
@@ -2136,7 +2128,7 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "no selected unit can patrol there" : "";
+                status = answering == null ? "No selected unit can patrol there." : "";
             }
             case "repair" -> {
                 if (under != null && world.canControl(localPlayer, under.player())) {
@@ -2149,9 +2141,9 @@ final class GameScreen extends JPanel {
                             }
                         }
                     }
-                    status = answering == null ? "no selected worker can repair that" : "";
+                    status = answering == null ? "No selected worker can repair that." : "";
                 } else {
-                    status = "nothing of yours to repair there";
+                    status = "Nothing of yours to repair there.";
                 }
             }
             case "harvest" -> {
@@ -2162,7 +2154,7 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "nothing to gather there" : "";
+                status = answering == null ? "Nothing to gather there." : "";
             }
             case "attack-ground" -> {
                 for (Unit each : group) {
@@ -2172,26 +2164,33 @@ final class GameScreen extends JPanel {
                         answering = each;
                     }
                 }
-                status = answering == null ? "no selected unit can attack the ground" : "";
+                status = answering == null ? "No selected unit can attack the ground." : "";
             }
             case "cast-spell" -> {
                 String ident = pendingSpell;
                 var spell = ident == null ? null : data.spells().spells().get(ident);
-                if (spell == null || under == null) {
-                    status = "nothing there to cast at";
+                if (spell == null) {
+                    status = "Nothing there to cast at.";
+                } else if (spell.target()
+                        == net.chonkbase.chonkcraft.engine.spell.Spell.Target.UNIT
+                        && under == null) {
+                    status = "Nothing there to cast at.";
                 } else {
                     int index = spellIndex(ident);
                     for (Unit each : group) {
-                        if (each.isCaster() && each != under) {
-                            if (commands.issueAccepted(GameCommand.cast(localPlayer, each.id(),
-                                    under.id(), index).withQueued(queued))
+                        if (each.isCaster() && (under == null || each != under)) {
+                            GameCommand cast = spell.target()
+                                    == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION
+                                    ? GameCommand.castAt(localPlayer, each.id(), tileX, tileY, index)
+                                    : GameCommand.cast(localPlayer, each.id(),
+                                            under == null ? each.id() : under.id(), index);
+                            if (commands.issueAccepted(cast.withQueued(queued))
                                     && answering == null) {
                                 answering = each;
                             }
                         }
                     }
-                    status = answering == null ? "no selected caster can cast that"
-                            : spell.name();
+                    status = answering == null ? "No selected caster can cast that." : "";
                 }
                 pendingSpell = null;
             }
@@ -2254,7 +2253,7 @@ final class GameScreen extends JPanel {
             }
         }
         selectionChanged(first);
-        status = count + " " + clicked.type().name();
+        status = count + " " + clicked.type().name() + ".";
         playUnit(clicked, "selected", this::chooseSample);
         repaint();
     }
@@ -2520,11 +2519,11 @@ final class GameScreen extends JPanel {
             boolean accepted = commands.issueAccepted(GameCommand.build(
                     localPlayer, worker.id(), index, tileX, tileY).withQueued(queued));
             if (!accepted) {
-                status = "cannot build there";
+                status = buildRefusal(what, tileX, tileY);
                 playUi("placement-error-" + race);
                 return;
             }
-            status = "building " + what.name();
+            status = "";
             // Holding Shift is also what lets a player stamp out several
             // sites without reopening the build menu for every one.
             //
@@ -2546,13 +2545,41 @@ final class GameScreen extends JPanel {
             playUi("placement-success-" + race);
             playUnit(worker, "acknowledge", this::chooseSample);
         } else {
-            status = "cannot build there";
+            status = buildRefusal(what, tileX, tileY);
             // The distinctive refusal thunk. Placing a
             // building on ground that will not take it was silent, which is
             // the one case where a player is looking at the map rather than at
             // the status line.
             playUi("placement-error-" + race);
         }
+    }
+
+    /**
+     * Chooses the specific retail placement notification that can be proved
+     * from the cursor state. More involved distance restrictions remain the
+     * authentic generic refusal until the engine exposes which rule failed;
+     * guessing a more specific sentence would be worse than being concise.
+     */
+    private String buildRefusal(UnitType what, int tileX, int tileY) {
+        int right = tileX + Math.max(1, what.tileWidth()) - 1;
+        int bottom = tileY + Math.max(1, what.tileHeight()) - 1;
+        if (!world.map().contains(tileX, tileY) || !world.map().contains(right, bottom)) {
+            return bne(BattleNetMessages.Key.BUILD_OFF_MAP);
+        }
+        for (int y = tileY; y <= bottom; y++) {
+            for (int x = tileX; x <= right; x++) {
+                if (!world.fog().isExplored(localPlayer, x, y)) {
+                    return bne(BattleNetMessages.Key.EXPLORE_FIRST);
+                }
+            }
+        }
+        if (what.givesResource() == UnitType.Resource.OIL) {
+            return bne(BattleNetMessages.Key.PLATFORM_OVER_OIL);
+        }
+        if (what.shoreBuilding()) {
+            return bne(BattleNetMessages.Key.BUILD_ON_COAST);
+        }
+        return bne(BattleNetMessages.Key.CANNOT_BUILD_THERE);
     }
 
     /** The roster, resolved once and kept. */
@@ -2629,7 +2656,7 @@ final class GameScreen extends JPanel {
             }
         }
         selectionChanged(first);
-        status = count == 0 ? "" : count + " selected";
+        status = count == 0 ? "" : count + " selected.";
         if (first != null) {
             playUnit(first, "selected", this::chooseSample);
         }
@@ -2658,7 +2685,7 @@ final class GameScreen extends JPanel {
             // how a mixed group is put together.
             clicked.setSelected(!clicked.selected());
             selectionChanged(clicked.selected() ? clicked : firstSelected());
-            status = countSelected() + " selected";
+            status = countSelected() + " selected.";
             return;
         }
         for (Unit unit : world.unitsSnapshot()) {
@@ -2916,7 +2943,7 @@ final class GameScreen extends JPanel {
         }
         boolean accepted = commands.issueAccepted(
                 GameCommand.rallyPoint(localPlayer, unit.id(), tileX, tileY));
-        status = accepted ? "rally point set" : "cannot set a rally point there";
+        status = accepted ? "" : "Cannot set a rally point there.";
         if (accepted) {
             playUi("click");
         }
@@ -3004,8 +3031,7 @@ final class GameScreen extends JPanel {
         if (keys.control() && keys.alt()
                 && unit.type() != null && unit.type().groundAttack()) {
             return issueStatus(GameCommand.attackGround(
-                    localPlayer, unit.id(), tileX, tileY).withQueued(queued),
-                    "attacking the ground");
+                    localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
         // Control alone follows anything at all, which is the only way to keep
         // a scout on an enemy unit rather than attacking it.
@@ -3035,11 +3061,10 @@ final class GameScreen extends JPanel {
                 && under.type() != null && unit.type() != null
                 && under.type().canCarry(unit.type())) {
             if (!under.hasRoom()) {
-                return under.type().name() + " is full";
+                return BattleNetMessages.sentence(under.type().name() + " is full");
             }
             return issueStatus(GameCommand.board(
-                    localPlayer, unit.id(), under.id()).withQueued(queued),
-                    "boarding " + under.type().name());
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
         }
 
         // A wall has no Unit under the pointer: it is terrain with hit points.
@@ -3049,8 +3074,7 @@ final class GameScreen extends JPanel {
         if (unit.type() != null && unit.type().canAttack()
                 && world.map().field(tileX, tileY).isWall()) {
             return issueStatus(GameCommand.attackGround(
-                    localPlayer, unit.id(), tileX, tileY).withQueued(queued),
-                    "attacking wall");
+                    localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
 
         String action = unit.type() == null || unit.type().rightMouseAction() == null
@@ -3093,8 +3117,7 @@ final class GameScreen extends JPanel {
                 && (under.player() == unit.player()
                         || world.isAllied(unit.player(), under.player()))) {
             return issueStatus(GameCommand.repair(
-                    localPlayer, unit.id(), under.id()).withQueued(queued),
-                    "repairing " + under.type().name());
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
         }
         // Deliver what is being carried. This is the first test inside
         // {@code DoRightButton_Harvest_Unit} and the
@@ -3109,12 +3132,11 @@ final class GameScreen extends JPanel {
                         || (world.isAllied(unit.player(), under.player())
                                 && world.isAllied(under.player(), unit.player())))) {
             return issueStatus(GameCommand.returnGoods(
-                    localPlayer, unit.id()).withQueued(queued),
-                    "returning to " + under.type().name());
+                    localPlayer, unit.id()).withQueued(queued));
         }
         if (world.canHarvestAt(unit, tileX, tileY)) {
             return issueStatus(GameCommand.harvest(
-                    localPlayer, unit.id(), tileX, tileY).withQueued(queued), "gathering");
+                    localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
         if (canFollow(unit, under)) {
             return follow(unit, under, tileX, tileY, queued);
@@ -3129,11 +3151,10 @@ final class GameScreen extends JPanel {
         // same fight one exchange earlier.
         if (under != null && world.isEnemyPlayer(unit.player(), under.player())) {
             return issueStatus(GameCommand.attack(
-                    localPlayer, unit.id(), under.id()).withQueued(queued),
-                    "attacking " + under.type().name());
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
         }
         return issueStatus(GameCommand.move(
-                localPlayer, unit.id(), tileX, tileY).withQueued(queued), "moving");
+                localPlayer, unit.id(), tileX, tileY).withQueued(queued));
     }
 
     /**
@@ -3154,8 +3175,7 @@ final class GameScreen extends JPanel {
         // everything it passed.
         if (control && under == null && unit.type() != null && unit.type().canAttack()) {
             return issueStatus(GameCommand.attackMove(
-                    localPlayer, unit.id(), tileX, tileY).withQueued(queued),
-                    "attacking towards there");
+                    localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
         if (canFollow(unit, under)) {
             return follow(unit, under, tileX, tileY, queued);
@@ -3163,11 +3183,10 @@ final class GameScreen extends JPanel {
         if (under != null && under != unit
                 && world.isEnemyPlayer(unit.player(), under.player())) {
             return issueStatus(GameCommand.attack(
-                    localPlayer, unit.id(), under.id()).withQueued(queued),
-                    "attacking " + under.type().name());
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
         }
         return issueStatus(GameCommand.move(
-                localPlayer, unit.id(), tileX, tileY).withQueued(queued), "moving");
+                localPlayer, unit.id(), tileX, tileY).withQueued(queued));
     }
 
     /** Everything else goes where it is sent. {@code DoRightButton_Follow}. */
@@ -3178,11 +3197,10 @@ final class GameScreen extends JPanel {
         if (under != null && under != unit && unit.type().canAttack()
                 && world.isEnemyPlayer(unit.player(), under.player())) {
             return issueStatus(GameCommand.attack(
-                    localPlayer, unit.id(), under.id()).withQueued(queued),
-                    "attacking " + under.type().name());
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
         }
         return issueStatus(GameCommand.move(
-                localPlayer, unit.id(), tileX, tileY).withQueued(queued), "moving");
+                localPlayer, unit.id(), tileX, tileY).withQueued(queued));
     }
 
     /**
@@ -3215,16 +3233,22 @@ final class GameScreen extends JPanel {
         blink(under);
         if (under.type().speed() <= 0) {
             return issueStatus(GameCommand.move(
-                    localPlayer, unit.id(), tileX, tileY).withQueued(queued), "moving");
+                    localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
         return issueStatus(GameCommand.follow(
-                localPlayer, unit.id(), under.id()).withQueued(queued),
-                "following " + under.type().name());
+                localPlayer, unit.id(), under.id()).withQueued(queued));
     }
 
-    /** Returns feedback only when the command path really accepted the order. */
-    private String issueStatus(GameCommand command, String acceptedStatus) {
-        return commands.issueAccepted(command) ? acceptedStatus : null;
+    /**
+     * Returns a non-null marker only when the command path accepted the order.
+     *
+     * <p>Retail acknowledges ordinary orders with the unit voice and target
+     * blink; it does not leave an English debug verb such as "moving" in the
+     * notification strip. The empty marker preserves the accepted/ignored
+     * distinction used by the caller without inventing player-facing copy.
+     */
+    private String issueStatus(GameCommand command) {
+        return commands.issueAccepted(command) ? "" : null;
     }
 
     /**
@@ -3337,7 +3361,7 @@ final class GameScreen extends JPanel {
 
     /** Puts a line in the status bar. */
     void setStatus(String status) {
-        this.status = status;
+        this.status = BattleNetMessages.sentence(status);
     }
 
     /** What the status line is saying, for the tests that read it. */
@@ -3359,6 +3383,17 @@ final class GameScreen extends JPanel {
 
     GameMenu menu() {
         return menu;
+    }
+
+    void setNetworkChat(net.chonkbase.chonkcraft.engine.network.NetworkGame network) {
+        chat = network == null ? null : new InGameChat(network, font, audio);
+    }
+
+    void acceptChat(net.chonkbase.chonkcraft.engine.network.NetworkGame.ChatEvent event) {
+        if (chat != null) {
+            chat.accept(event);
+            repaint();
+        }
     }
 
     /** What the screen can ask of the loop around it. */
@@ -3396,6 +3431,14 @@ final class GameScreen extends JPanel {
         boolean alt = event.isAltDown();
         boolean control = event.isControlDown() || event.isMetaDown();
 
+        // Once Enter has opened the BNE message line, gameplay hotkeys become
+        // ordinary text until the line is sent or cancelled.
+        if (chat != null && chat.isTyping()) {
+            chat.keyPressed(event);
+            repaint();
+            return true;
+        }
+
         // The arrows are claimed before anything else looks at them: they are
         // what a focus manager reaches for first, and scrolling the map must
         // never depend on what else happens to be bound.
@@ -3421,6 +3464,11 @@ final class GameScreen extends JPanel {
             return taken;
         }
 
+        if (chat != null && chat.keyPressed(event)) {
+            repaint();
+            return true;
+        }
+
         switch (code) {
             case KeyEvent.VK_F10, KeyEvent.VK_BACK_SPACE -> {
                 if (menu != null) {
@@ -3431,12 +3479,13 @@ final class GameScreen extends JPanel {
                 return true;
             }
             case KeyEvent.VK_F11 -> {
-                status = saveGame();
+                status = BattleNetMessages.sentence(saveGame());
                 repaint();
                 return true;
             }
             case KeyEvent.VK_F12 -> {
-                status = session == null ? "cannot load from here" : session.load();
+                status = BattleNetMessages.sentence(
+                        session == null ? "cannot load from here" : session.load());
                 repaint();
                 return true;
             }
@@ -3445,13 +3494,13 @@ final class GameScreen extends JPanel {
                 // ground so the dots can be read on their own.
                 if (panel != null) {
                     status = panel.toggleMinimapTerrain()
-                            ? "" : "minimap terrain hidden";
+                            ? "" : "Minimap terrain hidden.";
                     repaint();
                 }
                 return true;
             }
             case KeyEvent.VK_PRINTSCREEN -> {
-                status = screenshot();
+                status = BattleNetMessages.sentence(screenshot());
                 repaint();
                 return true;
             }
@@ -3478,7 +3527,7 @@ final class GameScreen extends JPanel {
             }
             case KeyEvent.VK_SPACE -> {
                 if (!showLastAlert()) {
-                    status = "nothing has happened yet";
+                    status = "Nothing has happened yet.";
                     repaint();
                 }
                 return true;
@@ -3501,7 +3550,7 @@ final class GameScreen extends JPanel {
         // same one-action packet. Function keys remain available for the BNE
         // save/load bindings without requiring an Fn-key setting change.
         if (control && event.isShiftDown() && code == KeyEvent.VK_E) {
-            status = evidencePacket();
+            status = BattleNetMessages.sentence(evidencePacket());
             repaint();
             return true;
         }
@@ -3524,12 +3573,13 @@ final class GameScreen extends JPanel {
                     return true;
                 }
                 case KeyEvent.VK_S -> {
-                    status = saveGame();
+                    status = BattleNetMessages.sentence(saveGame());
                     repaint();
                     return true;
                 }
                 case KeyEvent.VK_L -> {
-                    status = session == null ? "cannot load from here" : session.load();
+                    status = BattleNetMessages.sentence(
+                            session == null ? "cannot load from here" : session.load());
                     repaint();
                     return true;
                 }
@@ -3539,17 +3589,17 @@ final class GameScreen extends JPanel {
         if (control) {
             switch (code) {
                 case KeyEvent.VK_M -> {
-                    status = toggleMusic();
+                    status = BattleNetMessages.sentence(toggleMusic());
                     repaint();
                     return true;
                 }
                 case KeyEvent.VK_S -> {
-                    status = toggleSound();
+                    status = BattleNetMessages.sentence(toggleSound());
                     repaint();
                     return true;
                 }
                 case KeyEvent.VK_T -> {
-                    status = toggleTracking();
+                    status = BattleNetMessages.sentence(toggleTracking());
                     repaint();
                     return true;
                 }
@@ -3779,13 +3829,13 @@ final class GameScreen extends JPanel {
         // Upstream refuses in a network game, for the obvious reason that one
         // player cannot stop the others.
         if (session.isNetworked()) {
-            status = "cannot pause a network game";
+            status = "Cannot pause a network game.";
             repaint();
             return;
         }
         boolean paused = !session.isPaused();
         session.setPaused(paused);
-        status = paused ? "Game Paused" : "Game Resumed";
+        status = paused ? "Game paused." : "Game resumed.";
         repaint();
     }
 
@@ -3795,7 +3845,7 @@ final class GameScreen extends JPanel {
         }
         int wanted = Math.max(1, session.speed() + by);
         session.setSpeed(wanted);
-        status = by > 0 ? "Faster" : "Slower";
+        status = by > 0 ? "Faster." : "Slower.";
         repaint();
     }
 
@@ -3803,7 +3853,7 @@ final class GameScreen extends JPanel {
     private void bookmark(int slot, boolean save) {
         if (save) {
             bookmarks[slot] = new int[] {cameraX, cameraY};
-            status = "position " + (slot + 1) + " saved";
+            status = "Position " + (slot + 1) + " saved.";
         } else if (bookmarks[slot] != null) {
             cameraX = clamp(bookmarks[slot][0],
                     Math.max(0, terrain.getWidth() - visibleWorldWidth()));
@@ -3846,7 +3896,7 @@ final class GameScreen extends JPanel {
     private void findIdleWorker() {
         java.util.List<Unit> workers = SidePanel.idleWorkers(world, localPlayer);
         if (workers.isEmpty()) {
-            status = "no idle workers";
+            status = "No idle workers.";
             repaint();
             return;
         }
@@ -3856,7 +3906,7 @@ final class GameScreen extends JPanel {
         selectForTest(next);
         next.setSelected(true);
         centreOn(next.tileX(), next.tileY());
-        status = workers.size() == 1 ? "1 idle worker" : workers.size() + " idle workers";
+        status = workers.size() == 1 ? "1 idle worker." : workers.size() + " idle workers.";
         repaint();
     }
 
@@ -3963,7 +4013,7 @@ final class GameScreen extends JPanel {
             if (!world.canControl(localPlayer, unit.player())) {
                 continue;
             }
-            status = unit.type().name() + " is under attack";
+            status = unit.type().name() + " is under attack.";
             alertX = unit.tileX();
             alertY = unit.tileY();
         }
@@ -4236,8 +4286,8 @@ final class GameScreen extends JPanel {
      * comparisons a frame.
      *
      * @param unit        a unit whose sprite is not to be drawn, or null
-     * @param decorations a unit whose health and mana bars are not to be
-     *                    drawn, its sprite still being drawn, or null
+     * @param decorations a unit whose health bar and spell badges are not to
+     *                    be drawn, its sprite still being drawn, or null
      * @param missile     a projectile that is not to be drawn, or null
      * @param memory      a remembered building that is not to be drawn, or
      *                    null. One rather than all of them, because holding
@@ -4360,6 +4410,17 @@ final class GameScreen extends JPanel {
             }
             drawPopup(g2);
             drawStatus(g2);
+            g2.setTransform(savedTransform);
+        }
+
+        if (chat != null) {
+            var savedTransform = g2.getTransform();
+            g2.scale(interfaceScale, interfaceScale);
+            int mapX = layout == null ? toDesign(viewportX()) : layout.mapArea().x();
+            int mapY = layout == null ? toDesign(viewportY()) : layout.mapArea().y();
+            int mapWidth = layout == null ? toDesign(viewportWidth()) : layout.mapArea().width();
+            int mapHeight = layout == null ? toDesign(viewportHeight()) : layout.mapArea().height();
+            chat.draw(g2, mapX, mapY, mapWidth, mapHeight);
             g2.setTransform(savedTransform);
         }
 
@@ -5062,8 +5123,6 @@ final class GameScreen extends JPanel {
                     unit.pixelX() - cameraX, unit.pixelY() - cameraY);
         }
         if (unit.isAlive()) {
-            drawSecondBar(g2, unit, footprintWidth, footprintHeight,
-                    unit.pixelX() - cameraX, unit.pixelY() - cameraY);
             drawSpellBadges(g2, unit,
                     unit.pixelX() - cameraX, unit.pixelY() - cameraY);
         }
@@ -5200,95 +5259,6 @@ final class GameScreen extends JPanel {
         }
         return spellBadgeSheet;
     }
-
-    /**
-     * The second bar under a unit: mana, a job in progress, or a load.
-     *
-     * <p>{@code ui.legacy-declaration:42-52} declares six decorations at one position, all
-     * drawn with {@code sprite-mana} at {@code OffsetPercent = {50, 100}} and
-     * {@code Offset = {0, -1}} -- Mana, Transport, Research, Training,
-     * UpgradeTo and CarryResource. A unit is only ever doing one of them, so
-     * they share the slot, three pixels below the health bar.
-     *
-     * <p>None of it was drawn. A mage's mana was visible only in the info
-     * panel, so the state that decides whether it is safe to close was
-     * invisible on the field; a barracks gave no sign it was making anything
-     * until it was clicked; and a loaded transport looked like an empty one.
-     *
-     * <p>{@code GiveResource} is the seventh, and the odd one out twice over:
-     * it declares {@code ShowWhenMax = true} and {@code HideNeutral = false},
-     * so every gold mine and oil patch wears its bar all the time, whoever
-     * owns it and however full it is. That is the decoration a player reads
-     * to see a mine running dry without clicking it, and for a long time
-     * there was no state to read -- {@code Unit.resourcesHeld} arrived with
-     * the save lane, and the denominator, the amount the map put in,
-     * arrived with this. The five spell badges that used to be missing beside
-     * it are {@link #drawSpellBadges} now.
-     *
-     * <p>Only the local player's units for the mana and job bars, which is
-     * what the flags say: those decorations declare {@code HideNeutral} and,
-     * unlike {@code HitPoints}, no {@code ShowOpponent}, so an enemy caster's
-     * mana is hidden by the data's own choice rather than by omission.
-     */
-    private void drawSecondBar(Graphics2D g2, Unit unit, int footprintWidth,
-            int footprintHeight, int footprintX, int footprintY) {
-        UnitType type = unit.type();
-        if (type == null) {
-            return;
-        }
-        double fraction = -1;
-        Color colour = MANA_BAR;
-        if (type.givesResource() != null && unit.resourcesHeldPeak() > 0) {
-            fraction = Math.min(1.0,
-                    unit.resourcesHeld() / (double) unit.resourcesHeldPeak());
-        }
-        if (world.canControl(localPlayer, unit.player())) {
-            if (unit.producing() != null || unit.researching() != null
-                    || unit.upgradingTo() != null) {
-                // Training, Research and UpgradeTo: three decorations, one
-                // counter behind all three.
-                fraction = unit.progressFraction();
-                colour = PROGRESS_BAR;
-            } else if (type.mana() > 0 && unit.isCaster() && unit.mana() < type.mana()) {
-                // ShowWhenMax defaults false, so a caster at full mana carries
-                // no bar --.
-                fraction = unit.mana() / (double) type.mana();
-            } else if (type.maxOnBoard() > 0 && !unit.cargo().isEmpty()) {
-                fraction = unit.cargo().size() / (double) type.maxOnBoard();
-                colour = PROGRESS_BAR;
-            }
-        }
-        if (fraction < 0 && unit.carrying() != null && unit.carried() > 0) {
-            // CarryResource declares HideNeutral = false, so a worker's load
-            // shows whoever owns it.
-            var info = type.gathering().get(unit.carrying());
-            int capacity = info == null ? 0 : info.capacity();
-            if (capacity > 0) {
-                fraction = Math.min(1.0, unit.carried() / (double) capacity);
-                colour = CARRY_BAR;
-            }
-        }
-        if (fraction < 0) {
-            return;
-        }
-        int width = Math.max(12, footprintWidth - 4);
-        int x = footprintX + footprintWidth * DECORATION_OFFSET_PERCENT_X / 100 - width / 2;
-        // Offset {0, -1} against the health bar's {0, -4}: three pixels lower.
-        int y = footprintY + footprintHeight * DECORATION_OFFSET_PERCENT_Y / 100 - 1;
-        g2.setColor(Color.BLACK);
-        g2.fillRect(x, y, width, 3);
-        g2.setColor(colour);
-        g2.fillRect(x, y, (int) (width * fraction), 3);
-    }
-
-    /** The light blue the info panel's mana bar uses, so the two agree. */
-    private static final Color MANA_BAR = new Color(0x2020FF);
-
-    /** A job in progress, in the green the completed-progress bar uses. */
-    private static final Color PROGRESS_BAR = new Color(0x00C000);
-
-    /** A worker's load. */
-    private static final Color CARRY_BAR = new Color(0xC0C000);
 
     /**
      * A cross on the square a selected building sends its output to.
@@ -5480,13 +5450,12 @@ final class GameScreen extends JPanel {
     }
 
     /**
-     * The horizontal half of a decoration's {@code OffsetPercent}, as a
+     * The horizontal half of the health decoration's {@code OffsetPercent}, as a
      * percentage of the unit's tile footprint.
      *
-     * <p>Every bar decoration in {@code chonkcraft/scripts/ui.legacy-declaration} declares
-     * {@code OffsetPercent = {50, 100}} -- health, mana, transport, research,
-     * training, upgrade-to and the two resource bars. Fifty percent across and
-     * a hundred percent down is the bottom-centre of the footprint.
+     * <p>Fifty percent across and a hundred percent down is the bottom-centre
+     * of the footprint. Other changing values belong in BNE's selected-unit
+     * panel and are deliberately not field decorations.
      */
     private static final int DECORATION_OFFSET_PERCENT_X = 50;
 
@@ -5494,12 +5463,7 @@ final class GameScreen extends JPanel {
     private static final int DECORATION_OFFSET_PERCENT_Y = 100;
 
     /**
-     * The height of a bar decoration's sprite, from {@code DefineSprites}.
-     *
-     * <p>{@code ui/health2.png} and {@code ui/mana2.png} are both declared
-     * {@code Size = {31, 4}} with {@code Offset = {0, -4}} and {@code {0, -1}}
-     * respectively, so a health bar's four rows sit entirely above the bottom
-     * of the footprint and a mana bar's overlap it by three.
+     * The height of BNE's damage bar, whose rows sit above the footprint edge.
      */
     private static final int DECORATION_BAR_HEIGHT = 4;
 

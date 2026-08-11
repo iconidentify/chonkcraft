@@ -55,6 +55,26 @@ source identity. `GameLobby` still proves the host's exact map SHA-256 and bytes
 and `NetworkSession` still authenticates the claimed player against the host
 relay topology.
 
+## In-game messages and roster
+
+The controls follow the Battle.net Edition manual: **Enter** opens the message
+line, **Enter** sends it, **Escape** cancels it, and the **Messages** control at
+the top-right of the battlefield selects the recipients. The connected-player
+panel keeps the eight player colours and offers Everyone, mutual Allies, or an
+individual set. Its Mute control is local: it hides that player's later text
+and sound without changing the match, recipient choices, or another player's
+client. Departure and connection notices are system events and are never
+silenced by a player mute.
+
+Conversation is side-band data, not a `GameCommand`. It cannot delay a net
+cycle, enter the sync hash, or desynchronise two worlds. The same authenticated
+host topology carries it in both Direct/LAN and Online games. Sender identity
+comes from the settled lobby slot, text is valid bounded UTF-8, recipients are
+an explicit player bitmask, repeated UDP packets are deduplicated, and only the
+host forwards a client's packet. The public relay also deduplicates and limits
+client-originated message bursts before they reach a game process; the host
+enforces the same short burst for direct games.
+
 ## Exact-build admission
 
 Every published game JAR carries its authenticated release identifier into
@@ -96,6 +116,8 @@ them.
   30-second reconnect window, and a host-silent room expires after 90 seconds.
 - Rooms disappear from browsing as soon as the host enters STARTING or PLAYING.
 - Payloads above the game's 1,200-byte datagram budget are refused.
+- Chat payloads have a separate 384-byte UTF-8 limit and six-message/five-second
+  participant burst.
 
 Rooms and live sockets are intentionally memory-resident. The deployment is
 therefore one `Recreate` replica. Horizontal scaling requires a shared room
@@ -138,6 +160,11 @@ WebSockets, transfers a multi-chunk map through the unchanged `GameLobby`
 protocol, commits the final lobby roster, and proves the started room leaves
 the browser. Its incompatible-build lane proves HTTP 426 names both releases.
 `GameLobbyTest` proves a stale direct client gets no slot or map while a current
-client joins the same host. `MultiplayerVisualTest` renders the online browser, local fallback,
+client joins the same host. The same end-to-end relay test carries a chat line
+in both directions and proves the service drops the seventh message in one
+burst. `ChatTransportTest` covers selected-recipient routing and UTF-8 bounds;
+`InGameChatVisualTest` renders the live message line, roster, recipient controls,
+and mute state and drives Enter-to-send into the real network session.
+`MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.

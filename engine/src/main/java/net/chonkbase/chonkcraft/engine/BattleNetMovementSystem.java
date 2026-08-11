@@ -1615,6 +1615,17 @@ final class BattleNetMovementSystem {
                     || "unit-ogre-juggernaught".equals(unit.type().ident()));
             if (unit.battleNetDoubleStep()
                     && !capitalDoubleStep
+                    // This is the captured patrol residual correction. It
+                    // must not rewrite routes borrowed by construction,
+                    // harvesting, or combat: those orders keep their live
+                    // target separately, while orderTarget may still name an
+                    // older player command. Applying the patrol correction
+                    // there reduced every newly planned route to one heading
+                    // toward that stale point, producing a deterministic
+                    // two-tile ship oscillation.
+                    && unit.battleNetBorrowedMoveForStep()
+                    && unit.patrolX() >= 0
+                    && unit.resourceUnit() == null
                     && unit.pathLength() > 1
                     && unit.orderTargetX() >= 0
                     && unit.orderTargetY() >= 0) {
