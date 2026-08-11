@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.chonkbase.chonkcraft</groupId>
+    <artifactId>chonkcraft-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>ChonkCraft</name>
+    <description>
+        A native Java recreation of Warcraft II: Battle.net Edition, built on
+        the same desktop runtime and packaging technology as Seven Days to
+        Tomorrow and ChonkBlocker.
+    </description>
+
+    <!--
+      Module order is dependency order.
+
+        assetpack  The asset pack format: manifest, container, and the codecs
+                 a pack's payloads are stored in. Depends on NOTHING, by rule.
+                 The game reads packs; the extractor writes them; neither can
+                 see the other, and the format is the only thing they share.
+        runtime  net.chonkbase.runtime, copied from seven-days-to-tomorrow.
+                 Timing, Java2D pipeline selection, fullscreen, SDL input,
+                 PCM audio mixer. Kept source-identical so a sync is a diff.
+        data     wartool/StormLib port. Reads Warcraft II data, writes the
+                 extracted asset tree; also the PUD and SMP map formats.
+        extractor  Turns a 1995 Warcraft II installation into one asset pack.
+                 A build-time tool, not part of the game: it depends on
+                 assetpack and data and on nothing in engine or desktop, and
+                 an enforcement test fails the build if that ever changes.
+        launcher  The first screen: media import, graphics-pack selection,
+                 game updates, and the durable local library. It launches the
+                 replaceable desktop game in a child JVM.
+        matchmaking  Shared room protocol, service client, short codes, and
+                 the reconnecting opaque relay transport.
+        engine   Deterministic simulation, rendering, sound routing, AI and
+                 network. Also holds the generated native definitions under
+                 engine/.../engine/generated/.
+        desktop  The replaceable game entry point and its screens.
+        matchmaker-server  Bootable room directory and WebSocket relay. It
+                 sees packet destinations but no maps, commands, or game state.
+
+      Content behavior belongs in `engine/` and presentation belongs in
+      `desktop/`; no separately installed content or compatibility layer is
+      part of the runtime.
+    -->
+    <modules>
+        <module>assetpack</module>
+        <module>runtime</module>
+        <module>data</module>
+        <module>extractor</module>
+        <module>launcher</module>
+        <module>matchmaking</module>
+        <module>engine</module>
+        <module>desktop</module>
+        <module>matchmaker-server</module>
+    </modules>
+
+    <properties>
+        <!-- JetBrains Runtime 25, matching chonkblocker and seven-days. -->
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <junit.version>5.11.4</junit.version>
+        <libsdl4j.version>2.28.4-1.6</libsdl4j.version>
+        <jna.version>5.13.0</jna.version>
+        <jmpq3.version>1.9.6</jmpq3.version>
+        <!-- Kept in step with the deployed ChonkBlocker relay until the two
+             services can share the same small networking platform module. -->
+        <jackson.version>2.15.3</jackson.version>
+        <netty.version>4.1.104.Final</netty.version>
+    </properties>
+
+    <repositories>
+        <!--
+          JMPQ3 is published from its signed Git tag through JitPack rather
+          than Maven Central. It is the pure-Java reader used for Battle.net
+          Edition's INSTALL.EXE and embedded War2Dat.mpq.
+        -->
+        <repository>
+            <id>jitpack</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.libsdl4j</groupId>
+                <artifactId>libsdl4j</artifactId>
+                <version>${libsdl4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${jna.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.inwc3</groupId>
+                <artifactId>JMPQ3</artifactId>
+                <version>${jmpq3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.netty</groupId>
+                <artifactId>netty-all</artifactId>
+                <version>${netty.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonkcraft-matchmaking</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonk-assetpack</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonk-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonkcraft-data</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonkcraft-extractor</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.chonkbase.chonkcraft</groupId>
+                <artifactId>chonkcraft-engine</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.2</version>
+                    <configuration>
+                        <useModulePath>false</useModulePath>
+                        <argLine>-Djava.awt.headless=true</argLine>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>exec-maven-plugin</artifactId>
+                    <version>3.5.0</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.8.1</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

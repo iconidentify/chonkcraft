@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.chonkbase.chonkcraft</groupId>
+        <artifactId>chonkcraft-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>chonk-assetpack</artifactId>
+    <name>Chonk Asset Pack</name>
+
+    <!--
+      The asset pack format, and nothing else.
+
+      This module has NO dependencies: not on the engine, not on the desktop
+      layer, not on the Warcraft II format readers in chonkcraft-data, not on retired scripting language.
+      That is the point. A pack is a self-contained zip that a game loads and
+      an artist authors, and neither side should have to know what produced it.
+
+      Two consumers, deliberately on opposite sides of a wall:
+
+        extractor/  writes packs from a 1995 Warcraft II installation
+        engine/     reads packs at run time
+
+      Neither can see the other. Everything they share is in here.
+    -->
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

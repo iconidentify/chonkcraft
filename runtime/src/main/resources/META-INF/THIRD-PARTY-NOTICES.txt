@@ -1,0 +1,46 @@
+Seven Days to Tomorrow - controller runtime third-party notices
+================================================================
+
+This distribution includes or depends on the following components:
+
+LibSDL4J 2.28.4-1.6
+  Java bindings for SDL2 by the LibSDL4J contributors.
+  License: zlib License.
+  https://github.com/libsdl4j/libsdl4j
+
+SDL2 2.28.5 (macOS application-image builds)
+  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  License: zlib License.
+  https://www.libsdl.org/
+
+SDL2 2.28.4 (Windows x64 portable-payload builds)
+  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  License: zlib License.
+  The pinned binary is the win32-x86-64 runtime carried by LibSDL4J
+  2.28.4-1.6.
+  https://www.libsdl.org/
+
+SDL_GameControllerDB snapshot
+  Community-maintained controller mappings from SDL_GameControllerDB,
+  pinned at commit 7988b5e84c31616200ee2ffd2347386c6b3165a8.
+  Copyright (C) 1997-2025 Sam Lantinga.
+  License: zlib License.
+  https://github.com/mdqinc/SDL_GameControllerDB
+
+Java Native Access (JNA) 5.13.0
+  By the Java Native Access contributors.
+  Dual licensed under Apache-2.0 OR LGPL-2.1-or-later. Seven Days to
+  Tomorrow elects the Apache-2.0 option for this distribution.
+  https://github.com/java-native-access/jna
+
+JetBrains Java Annotations 23.0.0
+  By JetBrains s.r.o. and contributors.
+  License: Apache-2.0.
+  https://github.com/JetBrains/java-annotations
+
+SLF4J API 1.7.36
+  Copyright (c) 2004-2022 QOS.ch Sarl (Switzerland).
+  License: MIT.
+  https://www.slf4j.org/
+
+The corresponding license texts are bundled under META-INF/licenses/.

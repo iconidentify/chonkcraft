@@ -1,0 +1,312 @@
+package net.chonkbase.chonkcraft.engine.network;
+
+import java.io.Closeable;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+/**
+ * Carries command batches between machines over UDP.
+ *
+ * <p>UDP because that is what LegacyEngine uses and what the traffic wants: a
+ * batch is worthless once its cycle has passed, so TCP's retransmission would
+ * hold up the newer batches behind a stale one. Loss is handled at the
+ * lockstep layer instead, by refusing to advance until a cycle is complete and
+ * asking again if it does not arrive.
+ *
+ * <p>Every packet carries its net cycle and the sender's sync hash, so a
+ * divergence is caught at the earliest cycle where the two disagree rather
+ * than whenever somebody notices the game looks wrong.
+ */
+public final class NetworkSession implements Closeable {
+
+    /** Marks a packet as ours and pins the wire format. */
+    private static final int MAGIC = 0x57475553; // "WGUS"
+    private static final int VERSION = 2;
+
+    private static final int HEADER_BYTES = 4 + 2 + 1 + 1 + 8 + 8 + 8 + 2;
+    private static final int MAX_PACKET_BYTES = 1200;
+
+    /**
+     * How many commands fit in one packet.
+     *
+     * <p>Derived rather than written down, and that is the point. It used to
+     * be discovered only by overflowing: box-selecting a large army and giving
+     * it one order built a batch too big for a datagram,
+     * {@link #broadcast} threw out of the game loop, and the thread that draws
+     * the window died -- the game froze solid with no message and no way out.
+     * The measured limit was 72 when the fault was found and 68 by the time it
+     * was fixed, because {@code GameCommand} had grown a byte in between. A
+     * number kept in a comment would have been wrong again by now.
+     *
+     * <p>{@code MaxNetworkCommands} upstream, used the same way: fill a packet
+     * to the limit and leave the rest for the next cycle
+     *
+     * Nothing is dropped and nothing throws.
+     */
+    public static final int MAX_COMMANDS_PER_BATCH =
+            (MAX_PACKET_BYTES - HEADER_BYTES) / GameCommand.WIRE_BYTES;
+
+    /**
+     * A batch that arrived.
+     *
+     * @param netCycle  the cycle these commands run on
+     * @param hashCycle the cycle {@code syncHash} describes. Carried
+     *                  explicitly rather than inferred, because a batch is
+     *                  scheduled several cycles ahead while its hash describes
+     *                  a cycle already finished, and resending a batch later
+     *                  moves the two further apart still. Inferring it is an
+     *                  off-by-lag error that surfaces as a false desync.
+     * @param raw       the bytes it arrived in, kept so the host can pass it
+     *                  on without decoding and re-encoding it. A relay that
+     *                  re-encodes is a relay that can change what it forwards.
+     */
+    public record Batch(long netCycle, int player, long hashCycle, long syncHash,
+            List<GameCommand> commands, byte[] raw) {}
+
+    private final DatagramSocket socket;
+    private final int localPlayer;
+    private final Map<Integer, SocketAddress> peers = new LinkedHashMap<>();
+    private final AtomicBoolean closed = new AtomicBoolean();
+
+    /**
+     * The host address a client trusts to relay another slot's packet.
+     *
+     * <p>Without this check any UDP sender could put another player's number
+     * in the header and issue orders or manufacture a disconnect for them.
+     * A host accepts a claimed player only from that player's registered
+     * address; a client additionally accepts it from this one relay.
+     */
+    private SocketAddress trustedRelay;
+
+    /**
+     * @param localPlayer which slot this machine plays
+     * @param bindPort    the implementation to listen on, or 0 for any
+     */
+    public NetworkSession(int localPlayer, int bindPort) throws IOException {
+        this(localPlayer, new DatagramSocket(bindPort));
+    }
+
+    /**
+     * Takes over a socket somebody else opened.
+     *
+     * <p>The lobby uses this to hand the game the socket it did its own
+     * talking on. Closing the lobby's socket and binding the same port again
+     * leaves a window where the implementation is free, and on a machine running two
+     * copies of the game the other one takes it.
+     */
+    public NetworkSession(int localPlayer, DatagramSocket socket) throws IOException {
+        this.localPlayer = localPlayer;
+        this.socket = socket;
+        // Short timeout so a receive loop can poll without blocking the tick.
+        this.socket.setSoTimeout(1);
+    }
+
+    /** The implementation actually bound, useful when 0 was requested. */
+    public int localPort() {
+        return socket.getLocalPort();
+    }
+
+    public int localPlayer() {
+        return localPlayer;
+    }
+
+    /** Registers where a player can be reached. */
+    public void addPeer(int player, InetAddress address, int port) {
+        addPeer(player, new InetSocketAddress(address, port));
+    }
+
+    /** Registers a peer supplied by either the native UDP or central relay transport. */
+    public void addPeer(int player, SocketAddress address) {
+        peers.put(player, address);
+    }
+
+    /** The peers registered so far. */
+    public Map<Integer, SocketAddress> peers() {
+        return peers;
+    }
+
+    /** Allows packets for other slots only when they came through this host. */
+    public void setTrustedRelay(SocketAddress trustedRelay) {
+        this.trustedRelay = trustedRelay;
+    }
+
+    /**
+     * Sends a batch to every peer.
+     *
+     * <p>Sent even when the command list is empty: silence and a lost packet
+     * look the same to the other side, so a player with nothing to say has to
+     * say so.
+     */
+    public void broadcast(long netCycle, long hashCycle, long syncHash, List<GameCommand> commands)
+            throws IOException {
+        broadcastAs(localPlayer, netCycle, hashCycle, syncHash, commands);
+    }
+
+    /**
+     * Sends a host-adjudicated batch on behalf of a silent player.
+     *
+     * <p>Package-private by design: only the lockstep host may synthesize the
+     * absent player's QUIT. Ordinary callers always use {@link #broadcast}.
+     */
+    void broadcastAs(int player, long netCycle, long hashCycle, long syncHash,
+            List<GameCommand> commands) throws IOException {
+        // An invariant the caller now guarantees: NetworkGame takes at most
+        // MAX_COMMANDS_PER_BATCH off its queue and leaves the rest for the
+        // next net cycle. This stays because a silent truncation here would
+        // apply half a player's order on one machine and all of it on
+        // another, which is a desync rather than a dropped click.
+        if (commands.size() > MAX_COMMANDS_PER_BATCH) {
+            throw new IllegalArgumentException(
+                    "batch of " + commands.size() + " commands exceeds the packet budget of "
+                            + MAX_COMMANDS_PER_BATCH);
+        }
+        int size = HEADER_BYTES + commands.size() * GameCommand.WIRE_BYTES;
+
+        ByteBuffer buffer = ByteBuffer.allocate(size);
+        buffer.putInt(MAGIC);
+        buffer.putShort((short) VERSION);
+        buffer.put((byte) player);
+        buffer.put((byte) 0); // reserved, keeps the header aligned
+        buffer.putLong(netCycle);
+        buffer.putLong(hashCycle);
+        buffer.putLong(syncHash);
+        buffer.putShort((short) commands.size());
+        for (GameCommand command : commands) {
+            command.writeTo(buffer);
+        }
+
+        byte[] bytes = buffer.array();
+        for (SocketAddress peer : peers.values()) {
+            socket.send(new DatagramPacket(bytes, bytes.length, peer));
+        }
+    }
+
+    /**
+     * Collects whatever has arrived, without blocking.
+     *
+     * <p>Malformed and foreign packets are dropped silently. Anything can
+     * arrive on a UDP port, and a game should not fall over because something
+     * else on the network found it.
+     */
+    public List<Batch> poll() {
+        List<Batch> received = new ArrayList<>();
+        byte[] buffer = new byte[MAX_PACKET_BYTES];
+
+        while (!closed.get()) {
+            DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+            try {
+                socket.receive(packet);
+            } catch (SocketTimeoutException e) {
+                break;
+            } catch (IOException e) {
+                break;
+            }
+            Batch batch = decode(packet);
+            if (batch != null && !trustedSource(batch.player(), packet.getSocketAddress())) {
+                batch = null;
+            }
+            if (batch != null) {
+                received.add(batch);
+            }
+        }
+        return received;
+    }
+
+    private boolean trustedSource(int claimedPlayer, SocketAddress source) {
+        // A transport-only listener used by diagnostics has no topology and
+        // therefore cannot authenticate. Real games always register either a
+        // peer or a relay during lobby handoff.
+        if (peers.isEmpty() && trustedRelay == null) {
+            return true;
+        }
+        SocketAddress direct = peers.get(claimedPlayer);
+        return source.equals(direct) || source.equals(trustedRelay);
+    }
+
+    private static Batch decode(DatagramPacket packet) {
+        if (packet.getLength() < HEADER_BYTES) {
+            return null;
+        }
+        ByteBuffer in = ByteBuffer.wrap(packet.getData(), packet.getOffset(), packet.getLength());
+        if (in.getInt() != MAGIC || in.getShort() != VERSION) {
+            return null;
+        }
+        int player = in.get() & 0xFF;
+        in.get(); // reserved
+        long netCycle = in.getLong();
+        long hashCycle = in.getLong();
+        long syncHash = in.getLong();
+        int count = in.getShort() & 0xFFFF;
+
+        if (in.remaining() < count * GameCommand.WIRE_BYTES) {
+            // Truncated: better to drop it and let the cycle time out than to
+            // apply half a batch and desync.
+            return null;
+        }
+        List<GameCommand> commands = new ArrayList<>(count);
+        try {
+            for (int i = 0; i < count; i++) {
+                GameCommand command = GameCommand.readFrom(in);
+                if (command.player() != player) {
+                    // The authenticated packet owner may command a departed
+                    // ally through the authority mask, but it may never claim
+                    // to be that ally inside the command itself.
+                    return null;
+                }
+                commands.add(command);
+            }
+        } catch (RuntimeException e) {
+            return null;
+        }
+        byte[] raw = new byte[packet.getLength()];
+        System.arraycopy(packet.getData(), packet.getOffset(), raw, 0, packet.getLength());
+        return new Batch(netCycle, player, hashCycle, syncHash, commands, raw);
+    }
+
+    /**
+     * Passes a batch on to everyone except the player it came from.
+     *
+     * <p>What makes the host a relay. Eight players talking to each other
+     * directly is twenty-eight links, each one a place to stall or diverge;
+     * eight players talking to a host is eight, and the host is the only
+     * machine that has to know where anybody is. The cost is that the game
+     * ends when the host leaves, which is the bargain every game of this era
+     * made.
+     *
+     * <p>The bytes go out exactly as they came in. Decoding and re-encoding
+     * would let the host alter what it forwards, and a relay that can rewrite
+     * its traffic is a relay that can desync the table without anyone being
+     * able to tell.
+     */
+    public void relay(Batch batch) throws IOException {
+        for (Map.Entry<Integer, SocketAddress> peer : peers.entrySet()) {
+            if (peer.getKey() == batch.player()) {
+                continue;
+            }
+            socket.send(new DatagramPacket(batch.raw(), batch.raw().length, peer.getValue()));
+        }
+    }
+
+    /** Forgets a peer, when they have gone. */
+    public void removePeer(int player) {
+        peers.remove(player);
+    }
+
+    @Override
+    public void close() {
+        if (closed.compareAndSet(false, true)) {
+            socket.close();
+        }
+    }
+}

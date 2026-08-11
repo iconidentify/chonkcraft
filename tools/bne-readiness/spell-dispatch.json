@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "retail_executable": {
+    "edition": "Warcraft II Battle.net Edition 2.02b",
+    "sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
+  },
+  "dispatch_table": {
+    "virtual_address": "0x00496158",
+    "first_order": 38,
+    "entries": [
+      {"order": 38, "name": "vision", "handler": "0x00442490"},
+      {"order": 39, "name": "heal", "handler": "0x004425f0"},
+      {"order": 40, "name": "area-heal-unused", "handler": "0x00000000"},
+      {"order": 41, "name": "exorcism", "handler": "0x004426a0"},
+      {"order": 42, "name": "fire-shield", "handler": "0x004428d0"},
+      {"order": 43, "name": "fireball", "handler": "0x00442980"},
+      {"order": 44, "name": "slow", "handler": "0x004429e0"},
+      {"order": 45, "name": "invisibility", "handler": "0x00442a90"},
+      {"order": 46, "name": "polymorph", "handler": "0x00442b20"},
+      {"order": 47, "name": "blizzard", "handler": "0x00442be0"},
+      {"order": 48, "name": "eye-of-kilrogg", "handler": "0x00442c60"},
+      {"order": 49, "name": "bloodlust", "handler": "0x00442cf0"},
+      {"order": 50, "name": "raise-dead", "handler": "0x00442d80"},
+      {"order": 51, "name": "death-coil", "handler": "0x00442e90"},
+      {"order": 52, "name": "whirlwind", "handler": "0x004432c0"},
+      {"order": 53, "name": "haste", "handler": "0x00443330"},
+      {"order": 54, "name": "unholy-armor", "handler": "0x004433e0"},
+      {"order": 55, "name": "runes", "handler": "0x00443480"},
+      {"order": 56, "name": "death-and-decay", "handler": "0x004439c0"}
+    ]
+  },
+  "code_slices": [
+    {
+      "name": "fireball-handler",
+      "start": "0x00442980",
+      "size": 96,
+      "sha256": "865ec8e960884c50244d90d040aa88ba007f7ffb2e518f032fd1dd7583ce38cb",
+      "required_calls": [{"target": "0x004109e0", "count": 1}]
+    },
+    {
+      "name": "blizzard-handler",
+      "start": "0x00442be0",
+      "size": 128,
+      "sha256": "b5af8f24e83abe06fc52a9b6f71e5df9643d9ebcd7152f30c7fa27cc07f9f86d",
+      "required_calls": [{"target": "0x00410780", "count": 5, "pushed_argument": 10}]
+    },
+    {
+      "name": "death-and-decay-handler",
+      "start": "0x004439c0",
+      "size": 128,
+      "sha256": "49f30fd0be9e9838afd69b67884902abf4ad8dd8278e8718f3088031e469e268",
+      "required_calls": [{"target": "0x00410910", "count": 5, "pushed_argument": 10}]
+    },
+    {
+      "name": "blizzard-field-constructor",
+      "start": "0x00410780",
+      "size": 160,
+      "sha256": "eb73acfd996be7769aadd8bdba07bd8ee7d5ffae78f4ec903f0fa6330cd36177",
+      "required_calls": [{"target": "0x00479820", "count": 2}]
+    },
+    {
+      "name": "decay-field-constructor",
+      "start": "0x00410910",
+      "size": 208,
+      "sha256": "1d10dd59e9a198c3beb31dd2c13be9cbfc55179bc38d03ba15db48a1f01ccaa7",
+      "required_calls": [{"target": "0x00479820", "count": 2}]
+    },
+    {
+      "name": "exorcism-handler",
+      "start": "0x004426a0",
+      "size": 400,
+      "sha256": "72147f7ff95db685cddcfabc122fcb9e86ca1a551d87a8f791fcb620fb7c1b7f",
+      "required_calls": [{"target": "0x00442830", "count": 4}]
+    },
+    {
+      "name": "retail-hit-unit",
+      "start": "0x004184d0",
+      "size": 167,
+      "sha256": "4cfa5185404b8c6da1a77d0c7eec2c9ae5657d62d3431c99566df3f503dc34d1",
+      "required_calls": [{"target": "0x0040a9d0", "count": 1}]
+    }
+  ],
+  "established_semantics": [
+    "Orders 38 through 56 dispatch through the authenticated retail table.",
+    "Fireball launches one retail projectile constructor.",
+    "Blizzard and Death and Decay each create five fields and pass ten delayed successors to every field constructor, yielding eleven shards per field.",
+    "Each field independently chooses both axes with retail's random routine inside a five-wide patch.",
+    "The shipped direct-damage Exorcism path reaches retail HitUnit, which offers the aggressor through 0x0040a9d0 before applying damage; no separate ChonkCraft flee/attack-back tail follows."
+  ]
+}

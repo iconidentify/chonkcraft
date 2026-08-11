@@ -1,0 +1,431 @@
+# What the game calls each sound, and where the installation keeps it.
+#
+# kind	name	spec	annoyed	when
+#   file  <name>  <asset path>
+#   group <name>  <directory>          every numbered file in it, in order
+#   pair  <name>  <normal>  <annoyed>  two existing names, kept apart
+#
+# The paths are directories and files in the player's own installation;
+# a group's contents are counted there rather than listed here. 'when' is
+# empty for a binding every release shares, 'expansion' for one that needs
+# Beyond the Dark Portal's recordings, and 'base' for what a release
+# without them uses instead. 'tileset:<name>' is applied later, when a map has
+# been loaded and the tileset is known: the critter is a sheep in summer, a
+# seal in winter, a pig in wasteland and a warthog in swamp, and it is the only
+# thing in the game whose sound depends on the ground it stands on.
+#
+#   alias <name>  <existing name>     the files that name already holds, and
+#                                     its selection pair if it has one
+file	click	ui/click.wav		
+file	basic human voices ready	human/basic_voices/ready.wav		
+file	basic human voices help 1	human/basic_voices/help/1.wav		
+file	basic human voices help 2	human/basic_voices/help/2.wav		
+file	basic human voices dead	human/basic_voices/dead.wav		
+file	basic orc voices ready	orc/basic_voices/ready.wav		
+file	basic orc voices help 1	orc/basic_voices/help/1.wav		
+file	basic orc voices help 2	orc/basic_voices/help/2.wav		
+file	basic orc voices dead	orc/basic_voices/dead.wav		
+file	building construction	misc/building_construction.wav		
+file	ship sinking	ships/sinking.wav		
+file	catapult-ballista movement	units/catapult-ballista/acknowledgement/1.wav		
+file	placement error	ui/placement_error.wav		
+file	placement success	ui/placement_success.wav		
+file	blacksmith	buildings/blacksmith.wav		
+file	church-selected	human/buildings/church.wav		
+file	altar-of-storms-selected	orc/buildings/altar_of_storms.wav		
+file	stables-selected	human/buildings/stables.wav		
+file	ogre-mound-selected	orc/buildings/ogre_mound.wav		
+file	farm-selected	human/buildings/farm.wav		
+file	pig-farm-selected	orc/buildings/pig_farm.wav		
+file	gold-mine-selected	neutral/buildings/gold_mine.wav		
+file	shipyard	buildings/shipyard.wav		
+file	oil platform	buildings/oil_platform.wav		
+file	oil refinery	buildings/oil_refinery.wav		
+file	lumbermill	buildings/lumbermill.wav		
+file	transport docking	misc/transport_docking.wav		
+file	burning	misc/burning.wav		
+file	gryphon-aviary-selected	human/buildings/gryphon_aviary.wav		
+file	dragon-roost-selected	orc/buildings/dragon_roost.wav		
+file	foundry	buildings/foundry.wav		
+file	gnomish-inventor-selected	human/buildings/gnomish_inventor.wav		
+file	goblin-alchemist-selected	orc/buildings/goblin_alchemist.wav		
+file	mage-tower-selected	human/buildings/mage_tower.wav		
+file	temple-of-the-damned-selected	orc/buildings/temple_of_the_damned.wav		
+file	capture (human)	human/capture.wav		
+file	capture (orc)	orc/capture.wav		
+file	rescue (human)	human/rescue.wav		
+file	rescue (orc)	orc/rescue.wav		
+file	bloodlust	spells/bloodlust.wav		
+file	death and decay	spells/death_and_decay.wav		
+file	death coil	spells/death_coil.wav		
+file	exorcism	spells/exorcism.wav		
+file	flame shield	spells/flame_shield.wav		
+file	haste	spells/haste.wav		
+file	healing	spells/healing.wav		
+file	holy vision	spells/holy_vision.wav		
+file	blizzard	spells/blizzard.wav		
+file	invisibility	spells/invisibility.wav		
+file	eye of vision	spells/eye_of_kilrogg.wav		
+file	polymorph	spells/polymorph.wav		
+file	slow	spells/slow.wav		
+file	unholy armor	spells/unholy_armor.wav		
+file	whirlwind	spells/whirlwind.wav		
+file	peon-ready	orc/peon/ready.wav		
+file	death-knight-ready	orc/units/death_knight/ready.wav		
+file	dwarves-ready	human/units/dwarven_demolition_squad/ready.wav		
+file	elven archer-ranger ready	human/units/elven_archer-ranger/ready.wav		
+file	gnomish-flying-machine-ready	human/units/gnomish_flying_machine/ready.wav		
+file	gryphon-rider-ready	human/units/gryphon_rider/ready.wav		
+file	goblin-sappers-ready	orc/units/goblin_sappers/ready.wav		
+file	goblin-zeppelin-ready	orc/units/goblin_zeppelin/ready.wav		
+file	knight-ready	human/units/knight/ready.wav		
+file	paladin-ready	human/units/paladin/ready.wav		
+file	ogre-ready	orc/units/ogre/ready.wav		
+file	ogre-mage-ready	orc/units/ogre-mage/ready.wav		
+file	ships human ready	human/ships/ready.wav		
+file	ships orc ready	orc/ships/ready.wav		
+file	troll axethrower-berserker ready	orc/units/troll_axethrower-berserker/ready.wav		
+file	mage-ready	human/units/mage/ready.wav		
+file	peasant-ready	human/units/peasant/ready.wav		
+file	dragon-ready	orc/units/dragon/ready.wav		
+file	dragon-selected	orc/units/dragon/selected/1.wav		
+file	gryphon-rider-selected	human/units/gryphon_rider/selected/1.wav		
+file	sheep selected	neutral/units/sheep/selected/1.wav		
+file	seal selected	neutral/units/seal/selected/1.wav		
+file	pig selected	neutral/units/pig/selected/1.wav		
+file	warthog selected	neutral/units/pig/selected/1.wav		base
+file	warthog selected	neutral/units/warthog/selected/1.wav		expansion
+file	sheep annoyed	neutral/units/sheep/annoyed/1.wav		
+file	seal annoyed	neutral/units/seal/annoyed/1.wav		
+file	pig annoyed	neutral/units/pig/annoyed/1.wav		
+file	warthog annoyed	neutral/units/pig/annoyed/1.wav		base
+file	warthog annoyed	neutral/units/warthog/annoyed/1.wav		expansion
+file	catapult-ballista attack	missiles/catapult-ballista_attack.wav		
+file	punch	missiles/punch.wav		
+file	fireball hit	missiles/fireball_hit.wav		
+file	fireball throw	missiles/fireball_throw.wav		
+file	bow throw	missiles/bow_throw.wav		
+file	bow hit	missiles/bow_hit.wav		
+file	axe throw	missiles/axe_throw.wav		
+file	fist	missiles/fist.wav		
+file	peasant attack	human/units/peasant/attack.wav		
+file	lightning	spells/lightning.wav		
+file	touch of darkness	spells/touch_of_darkness.wav		
+group	basic human voices acknowledge	human/basic_voices/acknowledgement		
+group	basic orc voices acknowledge	orc/basic_voices/acknowledgement		
+group	peasant-acknowledge	human/units/peasant/acknowledgement		
+group	knight-acknowledge	human/units/knight/acknowledgement		
+group	ogre-acknowledge	orc/units/ogre/acknowledgement		
+group	elven archer-ranger acknowledge	human/units/elven_archer-ranger/acknowledgement		
+group	troll axethrower-berserker acknowledge	orc/units/troll_axethrower-berserker/acknowledgement		
+group	mage-acknowledge	human/units/mage/acknowledgement		
+group	death-knight-acknowledge	orc/units/death_knight/acknowledgement		
+group	paladin-acknowledge	human/units/paladin/acknowledgement		
+group	ogre-mage-acknowledge	orc/units/ogre-mage/acknowledgement		
+group	dwarves-acknowledge	human/units/dwarven_demolition_squad/acknowledgement		
+group	goblin-sappers-acknowledge	orc/units/goblin_sappers/acknowledgement		
+file	tanker acknowledge	ships/tanker/acknowledgement/1.wav		
+group	ships human acknowledge	human/ships/acknowledgement		
+group	ships orc acknowledge	orc/ships/acknowledgement		
+file	gnomish-flying-machine-acknowledge	human/units/gnomish_flying_machine/acknowledgement/1.wav		
+file	goblin-zeppelin-acknowledge	orc/units/goblin_zeppelin/acknowledgement/1.wav		
+file	gryphon-rider-acknowledge	human/units/gryphon_rider/acknowledgement/2.wav		
+group	dragon-acknowledge	orc/units/dragon/acknowledgement		
+group	alleria-acknowledge	human/units/elven_archer-ranger/acknowledgement		base
+group	alleria-acknowledge	human/units/alleria/acknowledgement		expansion
+group	teron-gorefiend-acknowledge	orc/units/death_knight/acknowledgement		base
+group	teron-gorefiend-acknowledge	orc/units/teron_gorefiend/acknowledgement		expansion
+file	kurdan-and-sky-ree-acknowledge	human/units/gryphon_rider/acknowledgement/2.wav		base
+group	kurdan-and-sky-ree-acknowledge	human/units/kurdan/acknowledgement		expansion
+group	dentarg-acknowledge	orc/units/ogre/acknowledgement		base
+group	dentarg-acknowledge	orc/units/dentarg/acknowledgement		expansion
+group	khadgar-acknowledge	human/units/mage/acknowledgement		base
+group	khadgar-acknowledge	human/units/khadgar/acknowledgement		expansion
+group	grom-hellscream-acknowledge	orc/basic_voices/acknowledgement		base
+group	grom-hellscream-acknowledge	orc/units/grom_hellscream/acknowledgement		expansion
+group	deathwing-acknowledge	orc/units/dragon/acknowledgement		base
+group	deathwing-acknowledge	orc/units/deathwing/acknowledgement		expansion
+group	turalyon-acknowledge	human/units/knight/acknowledgement		base
+group	turalyon-acknowledge	human/units/turalyon/acknowledgement		expansion
+group	danath-acknowledge	human/basic_voices/acknowledgement		base
+group	danath-acknowledge	human/units/danath/acknowledgement		expansion
+group	korgath-bladefist-acknowledge	orc/basic_voices/acknowledgement		base
+group	korgath-bladefist-acknowledge	orc/units/korgath_bladefist/acknowledgement		expansion
+group	basic human voices selected	human/basic_voices/selected		
+group	basic orc voices selected	orc/basic_voices/selected		
+group	death knight selected	orc/units/death_knight/selected		
+group	dwarven demolition squad selected	human/units/dwarven_demolition_squad/selected		
+group	elven archer-ranger selected	human/units/elven_archer-ranger/selected		
+group	goblin sappers selected	orc/units/goblin_sappers/selected		
+group	knight selected	human/units/knight/selected		
+group	paladin selected	human/units/paladin/selected		
+group	ogre selected	orc/units/ogre/selected		
+group	ogre-mage selected	orc/units/ogre-mage/selected		
+group	ships human selected	human/ships/selected		
+group	ships orc selected	orc/ships/selected		
+group	troll axethrower-berserker selected	orc/units/troll_axethrower-berserker/selected		
+group	mage selected	human/units/mage/selected		
+group	peasant selected	human/units/peasant/selected		
+group	alleria selected	human/units/elven_archer-ranger/selected		base
+group	alleria selected	human/units/alleria/selected		expansion
+group	danath selected	human/basic_voices/selected		base
+group	danath selected	human/units/danath/selected		expansion
+group	khadgar selected	human/units/mage/selected		base
+group	khadgar selected	human/units/khadgar/selected		expansion
+group	kurdan selected	human/basic_voices/selected		base
+group	kurdan selected	human/units/kurdan/selected		expansion
+group	turalyon selected	human/units/knight/selected		base
+group	turalyon selected	human/units/turalyon/selected		expansion
+group	deathwing selected	orc/basic_voices/selected		base
+group	deathwing selected	orc/units/deathwing/selected		expansion
+group	dentarg selected	orc/units/ogre/selected		base
+group	dentarg selected	orc/units/dentarg/selected		expansion
+group	grom hellscream selected	orc/basic_voices/selected		base
+group	grom hellscream selected	orc/units/grom_hellscream/selected		expansion
+group	korgath bladefist selected	orc/basic_voices/selected		base
+group	korgath bladefist selected	orc/units/korgath_bladefist/selected		expansion
+group	teron gorefiend selected	orc/basic_voices/selected		base
+group	teron gorefiend selected	orc/units/teron_gorefiend/selected		expansion
+group	basic human voices annoyed	human/basic_voices/annoyed		
+group	basic orc voices annoyed	orc/basic_voices/annoyed		
+group	death knight annoyed	orc/units/death_knight/annoyed		
+group	dwarven demolition squad annoyed	human/units/dwarven_demolition_squad/annoyed		
+group	elven archer-ranger annoyed	human/units/elven_archer-ranger/annoyed		
+group	gnomish flying machine annoyed	human/units/gnomish_flying_machine/annoyed		
+group	goblin sappers annoyed	orc/units/goblin_sappers/annoyed		
+group	goblin zeppelin annoyed	orc/units/goblin_zeppelin/annoyed		
+group	knight annoyed	human/units/knight/annoyed		
+group	paladin annoyed	human/units/paladin/annoyed		
+group	ogre annoyed	orc/units/ogre/annoyed		
+group	ogre-mage annoyed	orc/units/ogre-mage/annoyed		
+group	ships human annoyed	human/ships/annoyed		
+group	ships orc annoyed	orc/ships/annoyed		
+group	ships submarine annoyed	human/ships/gnomish_submarine/annoyed		
+group	troll axethrower-berserker annoyed	orc/units/troll_axethrower-berserker/annoyed		
+group	mage annoyed	human/units/mage/annoyed		
+group	peasant annoyed	human/units/peasant/annoyed		
+group	alleria annoyed	human/units/elven_archer-ranger/annoyed		base
+group	alleria annoyed	human/units/alleria/annoyed		expansion
+group	danath annoyed	human/basic_voices/annoyed		base
+group	danath annoyed	human/units/danath/annoyed		expansion
+group	khadgar annoyed	human/units/mage/annoyed		base
+group	khadgar annoyed	human/units/khadgar/annoyed		expansion
+group	kurdan annoyed	human/basic_voices/annoyed		base
+group	kurdan annoyed	human/units/kurdan/annoyed		expansion
+group	turalyon annoyed	human/units/knight/annoyed		base
+group	turalyon annoyed	human/units/turalyon/annoyed		expansion
+group	deathwing annoyed	orc/basic_voices/annoyed		base
+group	deathwing annoyed	orc/units/deathwing/annoyed		expansion
+group	dentarg annoyed	orc/units/ogre/annoyed		base
+group	dentarg annoyed	orc/units/dentarg/annoyed		expansion
+group	grom hellscream annoyed	orc/basic_voices/annoyed		base
+group	grom hellscream annoyed	orc/units/grom_hellscream/annoyed		expansion
+group	korgath bladefist annoyed	orc/basic_voices/annoyed		base
+group	korgath bladefist annoyed	orc/units/korgath_bladefist/annoyed		expansion
+group	teron gorefiend annoyed	orc/basic_voices/annoyed		base
+group	teron gorefiend annoyed	orc/units/teron_gorefiend/annoyed		expansion
+file	explosion	misc/explosion.wav		
+group	building destroyed	misc/building_explosion		
+group	sword attack	missiles/sword_attack		
+group	tree-chopping	misc/tree_chopping		
+pair	footman-selected	basic human voices selected	basic human voices annoyed	
+pair	grunt-selected	basic orc voices selected	basic orc voices annoyed	
+pair	peasant-selected	peasant selected	peasant annoyed	
+pair	knight-selected	knight selected	knight annoyed	
+pair	ogre-selected	ogre selected	ogre annoyed	
+pair	archer-selected	elven archer-ranger selected	elven archer-ranger annoyed	
+pair	axethrower-selected	troll axethrower-berserker selected	troll axethrower-berserker annoyed	
+pair	mage-selected	mage selected	mage annoyed	
+pair	death-knight-selected	death knight selected	death knight annoyed	
+pair	paladin-selected	paladin selected	paladin annoyed	
+pair	ogre-mage-selected	ogre-mage selected	ogre-mage annoyed	
+pair	dwarves-selected	dwarven demolition squad selected	dwarven demolition squad annoyed	
+pair	goblin-sappers-selected	goblin sappers selected	goblin sappers annoyed	
+pair	alleria-selected	alleria selected	alleria annoyed	
+pair	teron-gorefiend-selected	teron gorefiend selected	teron gorefiend annoyed	
+pair	kurdan-and-sky-ree-selected	kurdan selected	kurdan annoyed	
+pair	dentarg-selected	dentarg selected	dentarg annoyed	
+pair	khadgar-selected	khadgar selected	khadgar annoyed	
+pair	grom-hellscream-selected	grom hellscream selected	grom hellscream annoyed	
+pair	human-oil-tanker-selected	ships human selected	ships human annoyed	
+pair	orc-oil-tanker-selected	ships orc selected	ships orc annoyed	
+pair	deathwing-selected	deathwing selected	deathwing annoyed	
+pair	gnomish-submarine-selected	ships human selected	ships submarine annoyed	
+pair	gnomish-flying-machine-selected	click	gnomish flying machine annoyed	
+pair	goblin-zeppelin-selected	click	goblin zeppelin annoyed	
+pair	turalyon-selected	turalyon selected	turalyon annoyed	
+pair	danath-selected	danath selected	danath annoyed	
+pair	korgath-bladefist-selected	korgath bladefist selected	korgath bladefist annoyed	
+pair	sheep-selected	sheep selected	sheep annoyed	
+pair	seal-selected	seal selected	seal annoyed	
+pair	pig-selected	pig selected	pig annoyed	
+pair	warthog-selected	warthog selected	warthog annoyed	
+pair	ranger-selected	elven archer-ranger selected	elven archer-ranger annoyed	
+pair	berserker-selected	troll axethrower-berserker selected	troll axethrower-berserker annoyed	
+group	footman-acknowledge	human/basic_voices/acknowledgement		
+group	grunt-acknowledge	orc/basic_voices/acknowledgement		
+group	peon-acknowledge	orc/basic_voices/acknowledgement		
+file	ballista-acknowledge	units/catapult-ballista/acknowledgement/1.wav		
+file	catapult-acknowledge	units/catapult-ballista/acknowledgement/1.wav		
+group	archer-acknowledge	human/units/elven_archer-ranger/acknowledgement		
+group	axethrower-acknowledge	orc/units/troll_axethrower-berserker/acknowledgement		
+group	ranger-acknowledge	human/units/elven_archer-ranger/acknowledgement		
+group	berserker-acknowledge	orc/units/troll_axethrower-berserker/acknowledgement		
+file	human-oil-tanker-acknowledge	ships/tanker/acknowledgement/1.wav		
+file	orc-oil-tanker-acknowledge	ships/tanker/acknowledgement/1.wav		
+group	human-transport-acknowledge	human/ships/acknowledgement		
+group	orc-transport-acknowledge	orc/ships/acknowledgement		
+group	elven-destroyer-acknowledge	human/ships/acknowledgement		
+group	troll-destroyer-acknowledge	orc/ships/acknowledgement		
+group	battleship-acknowledge	human/ships/acknowledgement		
+group	ogre-juggernaught-acknowledge	orc/ships/acknowledgement		
+group	gnomish-submarine-acknowledge	human/ships/acknowledgement		
+group	giant-turtle-acknowledge	orc/ships/acknowledgement		
+group	cho-gall-acknowledge	orc/units/ogre-mage/acknowledgement		
+group	lothar-acknowledge	human/units/knight/acknowledgement		
+group	gul-dan-acknowledge	orc/units/death_knight/acknowledgement		
+group	uther-lightbringer-acknowledge	human/units/paladin/acknowledgement		
+group	zuljin-acknowledge	orc/units/troll_axethrower-berserker/acknowledgement		
+file	footman-ready	human/basic_voices/ready.wav		
+file	grunt-ready	orc/basic_voices/ready.wav		
+file	ballista-ready	human/basic_voices/ready.wav		
+file	catapult-ready	orc/basic_voices/ready.wav		
+file	archer-ready	human/units/elven_archer-ranger/ready.wav		
+file	axethrower-ready	orc/units/troll_axethrower-berserker/ready.wav		
+file	ranger-ready	human/units/elven_archer-ranger/ready.wav		
+file	berserker-ready	orc/units/troll_axethrower-berserker/ready.wav		
+file	human-oil-tanker-ready	human/ships/ready.wav		
+file	orc-oil-tanker-ready	orc/ships/ready.wav		
+file	human-transport-ready	human/ships/ready.wav		
+file	orc-transport-ready	orc/ships/ready.wav		
+file	elven-destroyer-ready	human/ships/ready.wav		
+file	troll-destroyer-ready	orc/ships/ready.wav		
+file	battleship-ready	human/ships/ready.wav		
+file	ogre-juggernaught-ready	orc/ships/ready.wav		
+file	gnomish-submarine-ready	human/ships/ready.wav		
+file	giant-turtle-ready	orc/ships/ready.wav		
+pair	peon-selected	basic orc voices selected	basic orc voices annoyed	
+file	ballista-selected	ui/click.wav		
+file	catapult-selected	ui/click.wav		
+pair	human-transport-selected	ships human selected	ships human annoyed	
+pair	orc-transport-selected	ships orc selected	ships orc annoyed	
+pair	elven-destroyer-selected	ships human selected	ships human annoyed	
+pair	troll-destroyer-selected	ships orc selected	ships orc annoyed	
+pair	battleship-selected	ships human selected	ships human annoyed	
+pair	ogre-juggernaught-selected	ships orc selected	ships orc annoyed	
+pair	giant-turtle-selected	ships orc selected	ships orc annoyed	
+file	eye-of-kilrogg-selected	ui/click.wav		
+pair	cho-gall-selected	ogre-mage selected	ogre-mage annoyed	
+pair	lothar-selected	knight selected	knight annoyed	
+pair	gul-dan-selected	death knight selected	death knight annoyed	
+pair	uther-lightbringer-selected	paladin selected	paladin annoyed	
+group	zuljin-selected	orc/units/troll_axethrower-berserker/selected		
+file	skeleton-selected	ui/click.wav		
+file	daemon-selected	ui/click.wav		
+file	human-barracks-selected	ui/click.wav		
+file	orc-barracks-selected	ui/click.wav		
+file	human-watch-tower-selected	ui/click.wav		
+file	orc-watch-tower-selected	ui/click.wav		
+file	human-shipyard-selected	buildings/shipyard.wav		
+file	orc-shipyard-selected	buildings/shipyard.wav		
+file	town-hall-selected	ui/click.wav		
+file	great-hall-selected	ui/click.wav		
+file	elven-lumber-mill-selected	buildings/lumbermill.wav		
+file	troll-lumber-mill-selected	buildings/lumbermill.wav		
+file	human-foundry-selected	buildings/foundry.wav		
+file	orc-foundry-selected	buildings/foundry.wav		
+file	human-blacksmith-selected	buildings/blacksmith.wav		
+file	orc-blacksmith-selected	buildings/blacksmith.wav		
+file	human-refinery-selected	buildings/oil_refinery.wav		
+file	orc-refinery-selected	buildings/oil_refinery.wav		
+file	human-oil-platform-selected	buildings/oil_platform.wav		
+file	orc-oil-platform-selected	buildings/oil_platform.wav		
+file	keep-selected	ui/click.wav		
+file	stronghold-selected	ui/click.wav		
+file	castle-selected	ui/click.wav		
+file	fortress-selected	ui/click.wav		
+file	oil-patch-selected	ui/click.wav		
+file	human-guard-tower-selected	ui/click.wav		
+file	orc-guard-tower-selected	ui/click.wav		
+file	human-cannon-tower-selected	ui/click.wav		
+file	orc-cannon-tower-selected	ui/click.wav		
+group	footman-attack	missiles/sword_attack		
+group	grunt-attack	missiles/sword_attack		
+file	peasant-attack	human/units/peasant/attack.wav		
+file	peon-attack	human/units/peasant/attack.wav		
+file	ballista-attack	missiles/catapult-ballista_attack.wav		
+file	catapult-attack	missiles/catapult-ballista_attack.wav		
+group	knight-attack	missiles/sword_attack		
+file	ogre-attack	missiles/punch.wav		
+file	archer-attack	missiles/bow_throw.wav		
+file	axethrower-attack	missiles/axe_throw.wav		
+file	mage-attack	spells/lightning.wav		
+file	death-knight-attack	spells/touch_of_darkness.wav		
+group	paladin-attack	missiles/sword_attack		
+file	ogre-mage-attack	missiles/punch.wav		
+group	dwarves-attack	missiles/sword_attack		
+group	goblin-sappers-attack	missiles/sword_attack		
+file	ranger-attack	missiles/bow_throw.wav		
+file	berserker-attack	missiles/axe_throw.wav		
+file	alleria-attack	missiles/bow_throw.wav		
+file	teron-gorefiend-attack	spells/touch_of_darkness.wav		
+file	kurdan-and-sky-ree-attack	spells/lightning.wav		
+file	dentarg-attack	missiles/punch.wav		
+file	khadgar-attack	spells/lightning.wav		
+group	grom-hellscream-attack	missiles/sword_attack		
+file	elven-destroyer-attack	missiles/fireball_throw.wav		
+file	troll-destroyer-attack	missiles/fireball_throw.wav		
+file	battleship-attack	missiles/fireball_throw.wav		
+file	ogre-juggernaught-attack	missiles/fireball_throw.wav		
+file	gnomish-submarine-attack	missiles/fireball_throw.wav		
+file	giant-turtle-attack	missiles/fireball_throw.wav		
+file	deathwing-attack	missiles/fireball_throw.wav		
+file	gryphon-rider-attack	spells/lightning.wav		
+file	dragon-attack	missiles/fireball_throw.wav		
+group	turalyon-attack	missiles/sword_attack		
+group	danath-attack	missiles/sword_attack		
+group	korgath-bladefist-attack	missiles/sword_attack		
+file	cho-gall-attack	missiles/punch.wav		
+group	lothar-attack	missiles/sword_attack		
+file	gul-dan-attack	spells/touch_of_darkness.wav		
+group	uther-lightbringer-attack	missiles/sword_attack		
+file	zuljin-attack	missiles/axe_throw.wav		
+file	skeleton-attack	missiles/fist.wav		
+file	gold-mine-help	orc/basic_voices/help/1.wav		
+file	critter-help	orc/basic_voices/help/1.wav		
+file	critter-dead	misc/explosion.wav		
+file	daemon-dead	misc/explosion.wav		
+file	peasant voice work complete	human/units/peasant/work_complete.wav		
+file	basic orc voices work complete	orc/basic_voices/work_complete.wav		
+file	basic human voices research complete	human/basic_voices/work_complete.wav		
+file	basic orc voices research complete	orc/basic_voices/work_complete.wav		
+file	human rescue	human/capture.wav		
+file	orc rescue	orc/capture.wav		
+file	placement-error-human	ui/placement_error.wav		
+file	placement-error-orc	ui/placement_error.wav		
+file	placement-success-human	ui/placement_success.wav		
+file	placement-success-orc	ui/placement_success.wav		
+file	transport-docking	misc/transport_docking.wav		
+file	chat-message	ui/click.wav		
+file	building-construction-human	misc/building_construction.wav		
+file	building-construction-orc	misc/building_construction.wav		
+file	work-complete-human	human/units/peasant/work_complete.wav		
+file	work-complete-orc	orc/basic_voices/work_complete.wav		
+file	research-complete-human	human/basic_voices/work_complete.wav		
+file	research-complete-orc	orc/basic_voices/work_complete.wav		
+file	rescue-human	human/capture.wav		
+file	rescue-orc	orc/capture.wav		
+file	highclick	ui/highclick.wav		
+file	statsthump	ui/statsthump.wav		
+file	skeleton-dead	orc/basic_voices/dead.wav		base
+file	skeleton-dead	neutral/units/skeleton/dead.wav		expansion
+file	skeleton-acknowledge	ui/click.wav		base
+file	skeleton-acknowledge	sounds/neutral/units/skeleton/acknowledgement/1.wav		expansion
+alias	critter-selected	sheep-selected		tileset:summer
+alias	critter-selected	seal-selected		tileset:winter
+alias	critter-selected	pig-selected		tileset:wasteland
+alias	critter-selected	warthog-selected		tileset:swamp
+alias	critter-dead	sheep-selected		tileset:summer
+alias	critter-dead	seal annoyed		tileset:winter
+alias	critter-dead	pig annoyed		tileset:wasteland
+alias	critter-dead	warthog annoyed		tileset:swamp

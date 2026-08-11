@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "test_class": "net.chonkbase.chonkcraft.engine.AttackMoveTest",
+  "authority": "Executable classification of the legacy LegacyEngine/ChonkCraft attack-move diagnostic suite; these names may remain red only while the BNE player/referee lane passes.",
+  "classified_failures": [
+    {
+      "name": "aBlockedChaseDoesNotReplanWhenFastCountsDownToZero",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts the upstream PathFinderOutput Fast countdown; BNE refusal cadence is owned by the authenticated refusal-machine and movement gates."
+    },
+    {
+      "name": "anOpeningScanServesSpentOutputAlreadyAimedAtItsTarget",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts the upstream spent-output service beat rather than the BNE opening acquisition transition."
+    },
+    {
+      "name": "simplifiedTargetingDoesNotLetThresholdSuppressAttackBack",
+      "category": "legacy-hit-reaction",
+      "disposition": "Asserts LegacyEngine HitUnit_AttackBack behavior; BNE retaliation is certified by the combat and idle-targeting systems."
+    },
+    {
+      "name": "aReachedDyingGoalStillBuysTheCommittedSwing",
+      "category": "precision-hypothesis",
+      "disposition": "Cycle-exact dying-goal swing timing belongs to the authenticated combat/death precision lane, not the player attack-move contract."
+    },
+    {
+      "name": "aBlockedArrivalRestoresTheSavedAttackOrder",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream COrder/SavedOrder restoration internals; BNE obstruction recovery is observed end to end by the player referee."
+    },
+    {
+      "name": "aBroadsideStartsAtTheWiggledShipNotOnlyItsTile",
+      "category": "precision-hypothesis",
+      "disposition": "Sub-tile broadside origin is owned by projectile and movement precision evidence, not order completion."
+    },
+    {
+      "name": "aStandingAutoAttackReplacesAnOlderSavedMove",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts replacement of an upstream SavedOrder object that the BNE order model does not use."
+    },
+    {
+      "name": "aGoalLessRefusalSpendsTheMoveArmsSecondScan",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts a LegacyEngine second-scan beat; BNE refused-step control flow is covered by the transcribed refusal machine."
+    },
+    {
+      "name": "aFreshAcquisitionSpendsTheMoveArmsSecondScanOnARefusal",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts a LegacyEngine second-scan beat after acquisition rather than a BNE player-visible outcome."
+    },
+    {
+      "name": "aChaserCanReachItsTargetWhileSharingGroundWithADyingBody",
+      "category": "precision-hypothesis",
+      "disposition": "Dying-body occupancy is owned by the authenticated movement/occupancy lane."
+    },
+    {
+      "name": "theSameMarchServesTheDeadChaseBlockedStepWait",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts upstream PF_WAIT bookkeeping after a dead chase; BNE recovery is certified by complete-loop movement and attack-move referees."
+    },
+    {
+      "name": "aLiveQuarryThatEscapesReactionRangeRestoresTheSavedPost",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts restoration through the upstream SavedOrder object rather than BNE's position-order fields."
+    },
+    {
+      "name": "anAiHitAfterGoalDeathUpdatesTheAttackOrdersGoalPosition",
+      "category": "legacy-hit-reaction",
+      "disposition": "Asserts LegacyEngine AI HitUnit_AttackBack goal mutation; BNE AI reaction is owned by retail-AI and combat lanes."
+    },
+    {
+      "name": "aNewAttackMoveDoesNotOverwriteAnUnbreakableChaseStep",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream order-object overwrite rules during an animation boundary, not the BNE command outcome."
+    },
+    {
+      "name": "anAiAttackOrderHandlesAHitFromItsExistingFight",
+      "category": "legacy-hit-reaction",
+      "disposition": "Asserts the upstream AI hit callback; BNE fight continuation is owned by combat and retail-AI referees."
+    },
+    {
+      "name": "aFreshBlockedArrivalKeepsTheUnitPathOutput",
+      "category": "legacy-refusal-timing",
+      "disposition": "Asserts preservation of upstream PathFinderOutput state; BNE route/refusal state has separate authenticated coverage."
+    },
+    {
+      "name": "anAutomaticAttackCapturesTheScanTimeTile",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts the upstream SavedOrder tile snapshot representation rather than the BNE stored position-order contract."
+    },
+    {
+      "name": "aChaseWakeReplansBeforeTheDirectRangeCheck",
+      "category": "precision-hypothesis",
+      "disposition": "Cycle ordering between route replanning and range checking belongs to the precision net."
+    },
+    {
+      "name": "aRestoredMarchKeepsTheRemainingRoute",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream SavedOrder plus route-buffer restoration internals; the BNE referee observes resumed visible progress."
+    },
+    {
+      "name": "underAttackDefersTheSavedOrderAtPfWaitArrival",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream SavedOrder behavior at PF_WAIT, a state pair absent from the BNE order model."
+    },
+    {
+      "name": "aStandingUnitReturnsToAnAttackMoveAtThePostItLeft",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream COrder/SavedOrder restoration; the BNE retail referee directly certifies kill-and-resume."
+    },
+    {
+      "name": "anInRangeRetargetDoesNotEraseTheCachedRoute",
+      "category": "precision-hypothesis",
+      "disposition": "Cached-route preservation during retargeting is owned by target-selection and route precision evidence."
+    },
+    {
+      "name": "aRestoredMarchAfterTheLastStepDoesNotKeepChasing",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts upstream last-step SavedOrder state; BNE completion is certified by destination arrival."
+    },
+    {
+      "name": "anAutomaticAttackStoresTwoAttackMoveDestinations",
+      "category": "legacy-corder-state",
+      "disposition": "Asserts two upstream attack-move destination copies; BNE uses its authenticated position-order representation."
+    }
+  ]
+}

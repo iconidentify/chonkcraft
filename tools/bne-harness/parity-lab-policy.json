@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "name": "BNE Parity Lab",
+  "objective": "Increase the globally earliest Battle.net Edition parity frontier without regressing any previously clean case.",
+  "priority": [
+    "Preserve the authenticated baseline gate.",
+    "Investigate the globally earliest divergent cycle.",
+    "Prefer the experiment with the highest expected information gain per cost.",
+    "Prefer a native/Java causal twin over visible-state inference.",
+    "Minimize evidence before placing it in agent context."
+  ],
+  "acceptance": {
+    "required": [
+      "focused case passes beyond its previous divergence",
+      "all 52 indexed campaign cases are present",
+      "full baseline regression gate passes",
+      "triage and lab manifests verify every retained artifact"
+    ],
+    "forbidden_shortcuts": [
+      "declaring parity from screenshots",
+      "using a partial survey as a full proof",
+      "editing or replacing a sealed native fixture",
+      "merging a tournament winner automatically",
+      "skipping an earlier divergence to work on a later case",
+      "declaring parity from a counterfactual state clamp"
+    ]
+  },
+  "automation": {
+    "safe": [
+      "read-only native disassembly",
+      "offline native trace capture in an isolated harness directory",
+      "Java diagnostics",
+      "causal alignment and minimization",
+      "bounded counterfactual replay in the test trace harness",
+      "offline named predicate slicing from authenticated branch history",
+      "failure-atlas queries",
+      "bounded explainable rule synthesis",
+      "candidate evaluation in disposable worktrees",
+      "dashboard export"
+    ],
+    "requires_human_or_agent_commit_decision": [
+      "changing engine behavior",
+      "accepting a candidate patch",
+      "committing or merging a tournament winner",
+      "regenerating the canonical corpus"
+    ]
+  },
+  "candidate_tournament": {
+    "parallel": true,
+    "automatic_merge": false,
+    "winner_requires_focused_pass": true,
+    "winner_requires_full_gate": true,
+    "winner_requires_no_regressions": true
+  },
+  "context_budget": {
+    "primary_handoff": ".bne-lab/latest.json -> manifest.json -> NEXT.md",
+    "load_case_files_only_for_selected_case": true,
+    "prefer_causal_minimized_json": true,
+    "read_full_PARITY_md_only_for_missing_historical_detail": true
+  }
+}

@@ -1,0 +1,416 @@
+# What each unit calls its own voice, and for which event.
+#
+# ident	event	sound name
+#
+# The six events are the ones the game raises: 'selected' and 'acknowledge'
+# when a player clicks a unit and orders it about, 'ready' when it comes out
+# of a building, 'help' when it is struck, 'dead' when it falls, and
+# 'work-complete' when a building finishes. The name in the third column is a
+# name in the sound table, which is where the files live; nothing here names a
+# file.
+#
+# A transcription of the Sounds = {...} blocks in scripts/units.legacy-declaration,
+# scripts/human/units.legacy-declaration and scripts/orc/units.legacy-declaration -- 107 units and 398
+# bindings, which is all of them. Of the 143 types the roster holds, 121 are
+# written out with a Sounds block and fourteen of those blocks are empty; the
+# other 22 are the unit-dead-vision-N-M markers that units.legacy-declaration:85 builds in a
+# loop, and the loop gives them Sounds = {} too. All 36 are absent from this
+# file and have no voice, which is what the scripts give them.
+unit-alchemist	selected	goblin-alchemist-selected
+unit-alchemist	help	basic orc voices help 2
+unit-alchemist	dead	building destroyed
+unit-altar-of-storms	selected	altar-of-storms-selected
+unit-altar-of-storms	help	basic orc voices help 2
+unit-altar-of-storms	dead	building destroyed
+unit-archer	selected	archer-selected
+unit-archer	acknowledge	archer-acknowledge
+unit-archer	ready	archer-ready
+unit-archer	help	basic human voices help 1
+unit-archer	dead	basic human voices dead
+unit-arthor-literios	selected	danath-selected
+unit-arthor-literios	acknowledge	danath-acknowledge
+unit-arthor-literios	help	basic human voices help 1
+unit-arthor-literios	dead	basic human voices dead
+unit-attack-peasant	selected	peasant-selected
+unit-attack-peasant	acknowledge	peasant-acknowledge
+unit-attack-peasant	ready	peasant-ready
+unit-attack-peasant	help	basic human voices help 1
+unit-attack-peasant	dead	basic human voices dead
+unit-attack-peon	selected	peon-selected
+unit-attack-peon	acknowledge	peon-acknowledge
+unit-attack-peon	ready	peon-ready
+unit-attack-peon	help	basic orc voices help 1
+unit-attack-peon	dead	basic orc voices dead
+unit-axethrower	selected	axethrower-selected
+unit-axethrower	acknowledge	axethrower-acknowledge
+unit-axethrower	ready	axethrower-ready
+unit-axethrower	help	basic orc voices help 1
+unit-axethrower	dead	basic orc voices dead
+unit-ballista	selected	ballista-selected
+unit-ballista	acknowledge	ballista-acknowledge
+unit-ballista	ready	ballista-ready
+unit-ballista	help	basic human voices help 1
+unit-ballista	dead	explosion
+unit-ballista-super	selected	ballista-selected
+unit-ballista-super	acknowledge	ballista-acknowledge
+unit-ballista-super	ready	ballista-ready
+unit-ballista-super	help	basic human voices help 1
+unit-ballista-super	dead	explosion
+unit-balloon	selected	gnomish-flying-machine-selected
+unit-balloon	acknowledge	gnomish-flying-machine-acknowledge
+unit-balloon	ready	gnomish-flying-machine-ready
+unit-balloon	help	basic human voices help 1
+unit-balloon	dead	explosion
+unit-battleship	selected	battleship-selected
+unit-battleship	acknowledge	battleship-acknowledge
+unit-battleship	ready	battleship-ready
+unit-battleship	help	basic human voices help 1
+unit-battleship	dead	ship sinking
+unit-beast-cry	selected	grom-hellscream-selected
+unit-beast-cry	acknowledge	grom-hellscream-acknowledge
+unit-beast-cry	help	basic orc voices help 1
+unit-beast-cry	dead	basic orc voices dead
+unit-berserker	selected	berserker-selected
+unit-berserker	acknowledge	berserker-acknowledge
+unit-berserker	ready	berserker-ready
+unit-berserker	help	basic orc voices help 1
+unit-berserker	dead	basic orc voices dead
+unit-castle	selected	castle-selected
+unit-castle	help	basic human voices help 2
+unit-castle	dead	building destroyed
+unit-catapult	selected	catapult-selected
+unit-catapult	acknowledge	catapult-acknowledge
+unit-catapult	ready	catapult-ready
+unit-catapult	help	basic orc voices help 1
+unit-catapult	dead	explosion
+unit-catapult-super	selected	catapult-selected
+unit-catapult-super	acknowledge	catapult-acknowledge
+unit-catapult-super	ready	catapult-ready
+unit-catapult-super	help	basic orc voices help 1
+unit-catapult-super	dead	explosion
+unit-church	selected	church-selected
+unit-church	help	basic human voices help 2
+unit-church	dead	building destroyed
+unit-circle-of-power	help	basic human voices help 2
+unit-circle-of-power	dead	building destroyed
+unit-critter	selected	critter-selected
+unit-critter	help	critter-help
+unit-critter	dead	critter-dead
+unit-daemon	selected	daemon-selected
+unit-daemon	help	basic orc voices help 1
+unit-daemon	dead	daemon-dead
+unit-dark-portal	help	basic orc voices help 2
+unit-dark-portal	dead	building destroyed
+unit-death-knight	selected	death-knight-selected
+unit-death-knight	acknowledge	death-knight-acknowledge
+unit-death-knight	ready	death-knight-ready
+unit-death-knight	help	basic orc voices help 1
+unit-death-knight	dead	basic orc voices dead
+unit-double-head	selected	cho-gall-selected
+unit-double-head	acknowledge	cho-gall-acknowledge
+unit-double-head	help	basic orc voices help 1
+unit-double-head	dead	basic orc voices dead
+unit-dragon	selected	dragon-selected
+unit-dragon	acknowledge	dragon-acknowledge
+unit-dragon	ready	dragon-ready
+unit-dragon	help	basic orc voices help 1
+unit-dragon	dead	explosion
+unit-dragon-roost	selected	dragon-roost-selected
+unit-dragon-roost	help	basic orc voices help 2
+unit-dragon-roost	dead	building destroyed
+unit-dwarves	selected	dwarves-selected
+unit-dwarves	acknowledge	dwarves-acknowledge
+unit-dwarves	ready	dwarves-ready
+unit-dwarves	help	basic human voices help 1
+unit-dwarves	dead	explosion
+unit-elven-lumber-mill	selected	elven-lumber-mill-selected
+unit-elven-lumber-mill	help	basic human voices help 2
+unit-elven-lumber-mill	dead	building destroyed
+unit-evil-knight	selected	teron-gorefiend-selected
+unit-evil-knight	acknowledge	teron-gorefiend-acknowledge
+unit-evil-knight	help	basic orc voices help 1
+unit-evil-knight	dead	basic orc voices dead
+unit-eye-of-vision	selected	eye-of-kilrogg-selected
+unit-eye-of-vision	help	basic orc voices help 1
+unit-fad-man	selected	dentarg-selected
+unit-fad-man	acknowledge	dentarg-acknowledge
+unit-fad-man	help	basic orc voices help 1
+unit-fad-man	dead	basic orc voices dead
+unit-farm	selected	farm-selected
+unit-farm	help	basic human voices help 2
+unit-farm	dead	building destroyed
+unit-female-hero	selected	alleria-selected
+unit-female-hero	acknowledge	alleria-acknowledge
+unit-female-hero	help	basic human voices help 1
+unit-female-hero	dead	basic human voices dead
+unit-fire-breeze	selected	deathwing-selected
+unit-fire-breeze	acknowledge	deathwing-acknowledge
+unit-fire-breeze	help	basic orc voices help 1
+unit-fire-breeze	dead	explosion
+unit-flying-angel	selected	kurdan-and-sky-ree-selected
+unit-flying-angel	acknowledge	kurdan-and-sky-ree-acknowledge
+unit-flying-angel	help	basic human voices help 1
+unit-flying-angel	dead	basic human voices dead
+unit-footman	selected	footman-selected
+unit-footman	acknowledge	footman-acknowledge
+unit-footman	ready	footman-ready
+unit-footman	help	basic human voices help 1
+unit-footman	dead	basic human voices dead
+unit-fortress	selected	fortress-selected
+unit-fortress	help	basic orc voices help 2
+unit-fortress	dead	building destroyed
+unit-goblin-sappers	selected	goblin-sappers-selected
+unit-goblin-sappers	acknowledge	goblin-sappers-acknowledge
+unit-goblin-sappers	ready	goblin-sappers-ready
+unit-goblin-sappers	help	basic orc voices help 1
+unit-goblin-sappers	dead	explosion
+unit-gold-mine	selected	gold-mine-selected
+unit-gold-mine	help	gold-mine-help
+unit-gold-mine	dead	building destroyed
+unit-great-hall	selected	great-hall-selected
+unit-great-hall	help	basic orc voices help 2
+unit-great-hall	dead	building destroyed
+unit-grunt	selected	grunt-selected
+unit-grunt	acknowledge	grunt-acknowledge
+unit-grunt	ready	grunt-ready
+unit-grunt	help	basic orc voices help 1
+unit-grunt	dead	basic orc voices dead
+unit-gryphon-aviary	selected	gryphon-aviary-selected
+unit-gryphon-aviary	help	basic human voices help 2
+unit-gryphon-aviary	dead	building destroyed
+unit-gryphon-rider	selected	gryphon-rider-selected
+unit-gryphon-rider	acknowledge	gryphon-rider-acknowledge
+unit-gryphon-rider	ready	gryphon-rider-ready
+unit-gryphon-rider	help	basic human voices help 1
+unit-gryphon-rider	dead	basic human voices dead
+unit-human-barracks	selected	human-barracks-selected
+unit-human-barracks	help	basic human voices help 2
+unit-human-barracks	dead	building destroyed
+unit-human-blacksmith	selected	human-blacksmith-selected
+unit-human-blacksmith	help	basic human voices help 2
+unit-human-blacksmith	dead	building destroyed
+unit-human-cannon-tower	selected	human-cannon-tower-selected
+unit-human-cannon-tower	help	basic human voices help 2
+unit-human-cannon-tower	dead	building destroyed
+unit-human-cannon-tower-super	selected	human-cannon-tower-selected
+unit-human-cannon-tower-super	help	basic human voices help 2
+unit-human-cannon-tower-super	dead	building destroyed
+unit-human-destroyer	selected	elven-destroyer-selected
+unit-human-destroyer	acknowledge	elven-destroyer-acknowledge
+unit-human-destroyer	ready	elven-destroyer-ready
+unit-human-destroyer	help	basic human voices help 1
+unit-human-destroyer	dead	ship sinking
+unit-human-foundry	selected	human-foundry-selected
+unit-human-foundry	help	basic human voices help 2
+unit-human-foundry	dead	building destroyed
+unit-human-guard-tower	selected	human-guard-tower-selected
+unit-human-guard-tower	help	basic human voices help 2
+unit-human-guard-tower	dead	building destroyed
+unit-human-guard-tower-super	selected	human-guard-tower-selected
+unit-human-guard-tower-super	help	basic human voices help 2
+unit-human-guard-tower-super	dead	building destroyed
+unit-human-oil-platform	selected	human-oil-platform-selected
+unit-human-oil-platform	help	basic human voices help 2
+unit-human-oil-platform	dead	building destroyed
+unit-human-oil-tanker	selected	human-oil-tanker-selected
+unit-human-oil-tanker	acknowledge	human-oil-tanker-acknowledge
+unit-human-oil-tanker	work-complete	basic human voices research complete
+unit-human-oil-tanker	ready	human-oil-tanker-ready
+unit-human-oil-tanker	help	basic human voices help 1
+unit-human-oil-tanker	dead	ship sinking
+unit-human-refinery	selected	human-refinery-selected
+unit-human-refinery	help	basic human voices help 2
+unit-human-refinery	dead	building destroyed
+unit-human-shipyard	selected	human-shipyard-selected
+unit-human-shipyard	help	basic human voices help 2
+unit-human-shipyard	dead	building destroyed
+unit-human-start-location	help	basic human voices help 2
+unit-human-start-location	dead	building destroyed
+unit-human-submarine	selected	gnomish-submarine-selected
+unit-human-submarine	acknowledge	gnomish-submarine-acknowledge
+unit-human-submarine	ready	gnomish-submarine-ready
+unit-human-submarine	help	basic human voices help 1
+unit-human-submarine	dead	ship sinking
+unit-human-transport	selected	human-transport-selected
+unit-human-transport	acknowledge	human-transport-acknowledge
+unit-human-transport	ready	human-transport-ready
+unit-human-transport	help	basic human voices help 1
+unit-human-transport	dead	ship sinking
+unit-human-wall	help	basic human voices help 2
+unit-human-wall	dead	building destroyed
+unit-human-watch-tower	selected	human-watch-tower-selected
+unit-human-watch-tower	help	basic human voices help 2
+unit-human-watch-tower	dead	building destroyed
+unit-ice-bringer	selected	gul-dan-selected
+unit-ice-bringer	acknowledge	gul-dan-acknowledge
+unit-ice-bringer	help	basic orc voices help 1
+unit-ice-bringer	dead	basic orc voices dead
+unit-inventor	selected	gnomish-inventor-selected
+unit-inventor	help	basic human voices help 2
+unit-inventor	dead	building destroyed
+unit-keep	selected	keep-selected
+unit-keep	help	basic human voices help 2
+unit-keep	dead	building destroyed
+unit-knight	selected	knight-selected
+unit-knight	acknowledge	knight-acknowledge
+unit-knight	ready	knight-ready
+unit-knight	help	basic human voices help 1
+unit-knight	dead	basic human voices dead
+unit-knight-rider	selected	turalyon-selected
+unit-knight-rider	acknowledge	turalyon-acknowledge
+unit-knight-rider	help	basic human voices help 1
+unit-knight-rider	dead	basic human voices dead
+unit-mage	selected	mage-selected
+unit-mage	acknowledge	mage-acknowledge
+unit-mage	ready	mage-ready
+unit-mage	help	basic human voices help 1
+unit-mage	dead	basic human voices dead
+unit-mage-tower	selected	mage-tower-selected
+unit-mage-tower	help	basic human voices help 2
+unit-mage-tower	dead	building destroyed
+unit-man-of-light	selected	uther-lightbringer-selected
+unit-man-of-light	acknowledge	uther-lightbringer-acknowledge
+unit-man-of-light	help	basic human voices help 1
+unit-man-of-light	dead	basic human voices dead
+unit-ogre	selected	ogre-selected
+unit-ogre	acknowledge	ogre-acknowledge
+unit-ogre	ready	ogre-ready
+unit-ogre	help	basic orc voices help 1
+unit-ogre	dead	basic orc voices dead
+unit-ogre-juggernaught	selected	ogre-juggernaught-selected
+unit-ogre-juggernaught	acknowledge	ogre-juggernaught-acknowledge
+unit-ogre-juggernaught	ready	ogre-juggernaught-ready
+unit-ogre-juggernaught	help	basic orc voices help 1
+unit-ogre-juggernaught	dead	ship sinking
+unit-ogre-mage	selected	ogre-mage-selected
+unit-ogre-mage	acknowledge	ogre-mage-acknowledge
+unit-ogre-mage	ready	ogre-mage-ready
+unit-ogre-mage	help	basic orc voices help 1
+unit-ogre-mage	dead	basic orc voices dead
+unit-ogre-mound	selected	ogre-mound-selected
+unit-ogre-mound	help	basic orc voices help 2
+unit-ogre-mound	dead	building destroyed
+unit-oil-patch	selected	oil-patch-selected
+unit-oil-patch	dead	building destroyed
+unit-orc-barracks	selected	orc-barracks-selected
+unit-orc-barracks	help	basic orc voices help 2
+unit-orc-barracks	dead	building destroyed
+unit-orc-blacksmith	selected	orc-blacksmith-selected
+unit-orc-blacksmith	help	basic orc voices help 2
+unit-orc-blacksmith	dead	building destroyed
+unit-orc-cannon-tower	help	basic orc voices help 2
+unit-orc-cannon-tower	dead	building destroyed
+unit-orc-cannon-tower-super	help	basic orc voices help 2
+unit-orc-cannon-tower-super	dead	building destroyed
+unit-orc-destroyer	selected	troll-destroyer-selected
+unit-orc-destroyer	acknowledge	troll-destroyer-acknowledge
+unit-orc-destroyer	ready	troll-destroyer-ready
+unit-orc-destroyer	help	basic orc voices help 1
+unit-orc-destroyer	dead	ship sinking
+unit-orc-foundry	selected	orc-foundry-selected
+unit-orc-foundry	help	basic orc voices help 2
+unit-orc-foundry	dead	building destroyed
+unit-orc-guard-tower	selected	orc-guard-tower-selected
+unit-orc-guard-tower	help	basic orc voices help 2
+unit-orc-guard-tower	dead	building destroyed
+unit-orc-guard-tower-super	selected	orc-guard-tower-selected
+unit-orc-guard-tower-super	help	basic orc voices help 2
+unit-orc-guard-tower-super	dead	building destroyed
+unit-orc-oil-platform	selected	orc-oil-platform-selected
+unit-orc-oil-platform	help	basic orc voices help 2
+unit-orc-oil-platform	dead	building destroyed
+unit-orc-oil-tanker	selected	orc-oil-tanker-selected
+unit-orc-oil-tanker	acknowledge	orc-oil-tanker-acknowledge
+unit-orc-oil-tanker	ready	orc-oil-tanker-ready
+unit-orc-oil-tanker	help	basic orc voices help 1
+unit-orc-oil-tanker	dead	ship sinking
+unit-orc-refinery	selected	orc-refinery-selected
+unit-orc-refinery	help	basic orc voices help 2
+unit-orc-refinery	dead	building destroyed
+unit-orc-shipyard	selected	orc-shipyard-selected
+unit-orc-shipyard	help	basic orc voices help 2
+unit-orc-shipyard	dead	building destroyed
+unit-orc-start-location	help	basic orc voices help 2
+unit-orc-start-location	dead	building destroyed
+unit-orc-submarine	selected	giant-turtle-selected
+unit-orc-submarine	acknowledge	giant-turtle-acknowledge
+unit-orc-submarine	ready	giant-turtle-ready
+unit-orc-submarine	help	basic orc voices help 1
+unit-orc-submarine	dead	ship sinking
+unit-orc-transport	selected	orc-transport-selected
+unit-orc-transport	acknowledge	orc-transport-acknowledge
+unit-orc-transport	ready	orc-transport-ready
+unit-orc-transport	help	basic orc voices help 1
+unit-orc-transport	dead	ship sinking
+unit-orc-wall	help	basic orc voices help 2
+unit-orc-wall	dead	building destroyed
+unit-orc-watch-tower	selected	orc-watch-tower-selected
+unit-orc-watch-tower	help	basic orc voices help 2
+unit-orc-watch-tower	dead	building destroyed
+unit-paladin	selected	paladin-selected
+unit-paladin	acknowledge	paladin-acknowledge
+unit-paladin	ready	paladin-ready
+unit-paladin	help	basic human voices help 1
+unit-paladin	dead	basic human voices dead
+unit-peasant	selected	peasant-selected
+unit-peasant	acknowledge	peasant-acknowledge
+unit-peasant	ready	peasant-ready
+unit-peasant	help	basic human voices help 1
+unit-peasant	dead	basic human voices dead
+unit-peon	selected	peon-selected
+unit-peon	acknowledge	peon-acknowledge
+unit-peon	ready	peon-ready
+unit-peon	help	basic orc voices help 1
+unit-peon	dead	basic orc voices dead
+unit-pig-farm	selected	pig-farm-selected
+unit-pig-farm	help	basic orc voices help 2
+unit-pig-farm	dead	building destroyed
+unit-pile-circle	help	basic human voices help 2
+unit-pile-circle	dead	building destroyed
+unit-quick-blade	selected	korgath-bladefist-selected
+unit-quick-blade	acknowledge	korgath-bladefist-acknowledge
+unit-quick-blade	help	basic orc voices help 1
+unit-quick-blade	dead	basic orc voices dead
+unit-ranger	selected	ranger-selected
+unit-ranger	acknowledge	ranger-acknowledge
+unit-ranger	ready	ranger-ready
+unit-ranger	help	basic human voices help 1
+unit-ranger	dead	basic human voices dead
+unit-runestone	help	basic orc voices help 2
+unit-runestone	dead	building destroyed
+unit-sharp-axe	selected	zuljin-selected
+unit-sharp-axe	acknowledge	zuljin-acknowledge
+unit-sharp-axe	help	basic orc voices help 1
+unit-sharp-axe	dead	basic orc voices dead
+unit-skeleton	selected	skeleton-selected
+unit-skeleton	acknowledge	skeleton-acknowledge
+unit-skeleton	help	basic orc voices help 1
+unit-skeleton	dead	skeleton-dead
+unit-stables	selected	stables-selected
+unit-stables	help	basic human voices help 2
+unit-stables	dead	building destroyed
+unit-stronghold	selected	stronghold-selected
+unit-stronghold	help	basic orc voices help 2
+unit-stronghold	dead	building destroyed
+unit-temple-of-the-damned	selected	temple-of-the-damned-selected
+unit-temple-of-the-damned	help	basic orc voices help 2
+unit-temple-of-the-damned	dead	building destroyed
+unit-town-hall	selected	town-hall-selected
+unit-town-hall	help	basic human voices help 2
+unit-town-hall	dead	building destroyed
+unit-troll-lumber-mill	selected	troll-lumber-mill-selected
+unit-troll-lumber-mill	help	basic orc voices help 2
+unit-troll-lumber-mill	dead	building destroyed
+unit-white-mage	selected	khadgar-selected
+unit-white-mage	acknowledge	khadgar-acknowledge
+unit-white-mage	help	basic human voices help 1
+unit-white-mage	dead	basic human voices dead
+unit-wise-man	selected	lothar-selected
+unit-wise-man	acknowledge	lothar-acknowledge
+unit-wise-man	help	basic human voices help 1
+unit-wise-man	dead	basic human voices dead
+unit-zeppelin	selected	goblin-zeppelin-selected
+unit-zeppelin	acknowledge	goblin-zeppelin-acknowledge
+unit-zeppelin	ready	goblin-zeppelin-ready
+unit-zeppelin	help	basic orc voices help 1
+unit-zeppelin	dead	explosion

@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.chonkbase.chonkcraft</groupId>
+        <artifactId>chonkcraft-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>chonkcraft-desktop</artifactId>
+    <name>ChonkCraft Game</name>
+
+    <!--
+      The replaceable game entry point. Native installers are built around the
+      separate launcher module; this shaded jar is bundled as the launcher's
+      first local version and is also what a release catalog updates.
+    -->
+
+    <properties>
+        <main.class>net.chonkbase.chonkcraft.desktop.Main</main.class>
+    </properties>
+
+    <dependencies>
+        <!--
+          Was chonkcraft-game, which had no sources and reached the engine only
+          transitively. The game module was removed from the reactor; see the
+          module comment in the root pom and docs/port-roadmap.md.
+        -->
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonkcraft-engine</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${maven.multiModuleProjectDirectory}/launcher/src/main/resources</directory>
+                <includes>
+                    <include>icons/chonkcraft.png</include>
+                </includes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+
+            <!--
+              One self-contained jar for jpackage to consume. The classifier
+              keeps it beside the plain jar rather than replacing it, so the
+              module is still usable as a normal dependency.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>app</shadedClassifierName>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer
+                                    implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>${main.class}</mainClass>
+                                </transformer>
+                            </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <!--
+                                      Signature files from signed dependencies
+                                      do not survive being merged into another
+                                      jar, and a stale one makes the JVM refuse
+                                      to load the archive.
+                                    -->
+                                    <excludes>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>module-info.class</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

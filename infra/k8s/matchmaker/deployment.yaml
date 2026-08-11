@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chonkcraft-matchmaker
+  namespace: chonk-mp
+  labels: &labels
+    app.kubernetes.io/name: chonkcraft-matchmaker
+    app.kubernetes.io/part-of: chonkcraft
+    app.kubernetes.io/component: multiplayer-relay
+spec:
+  # Room ownership and live sockets are intentionally process-local. Keep one
+  # replica until an external room directory is introduced; two replicas behind
+  # round-robin ingress would split a lobby even though both pods were healthy.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chonkcraft-matchmaker
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      terminationGracePeriodSeconds: 20
+      imagePullSecrets:
+        - name: ghcr-secret
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: matchmaker
+          image: ghcr.io/iconidentify/chonkcraft-matchmaker:initial
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9092
+          env:
+            - name: MATCHMAKER_PORT
+              value: "9092"
+            - name: PUBLIC_RELAY_URI
+              value: wss://match.chonkbase.net/relay
+            - name: PUBLIC_INVITE_BASE
+              value: https://chonkbase.net/chonkcraft/join/
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+          volumeMounts:
+            - name: temporary-files
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: temporary-files
+          emptyDir: {}

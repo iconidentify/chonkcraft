@@ -1,0 +1,57 @@
+# The maps that trace clean against LegacyEngine, and the windows they do it over.
+#
+# NOT A GATE, and no longer a statement about correctness. Parity is with the
+# retail Battle.net Edition; agreeing with LegacyEngine is neither necessary nor
+# sufficient, and this list gates nothing -- nothing in CI has ever run it.
+# See CONTRIBUTING.md's opening section.
+#
+# It is kept because it is still a cheap sanity check. A map that used to
+# trace clean against LegacyEngine and suddenly does not is worth a look: the two
+# engines agree about most of Warcraft II, so a new disagreement is more often
+# this port breaking than the oracles differing. Read a failure as a question,
+# never as a verdict, and never change engine behaviour to make a line here go
+# green -- that is how a port ends up matching the wrong game.
+#
+# scripts/parity-survey.py --gate FILE still reads it, for whoever wants the
+# check. Add a line when a map goes clean; do not remove one to tidy a run.
+maps/demo/demo01 900
+maps/demo/demo02 900
+maps/demo/demo03 900
+maps/skirmish/(2)2-players 900
+maps/skirmish/(2)x-marks-the-spot 900
+maps/skirmish/(2)cross-the-streams 900
+maps/skirmish/(2)one-way-in-one-way-out 900
+maps/skirmish/(2)mysterious-dragon-isle 900
+maps/skirmish/(3)critter-attack 900
+campaigns/human/level01h 900
+campaigns/human/level02h 900
+campaigns/human/level03h 900
+campaigns/orc/level01o 900
+campaigns/orc/level02o 900
+campaigns/human-exp/levelx01h 900
+campaigns/human-exp/levelx03h 900
+campaigns/orc-exp/levelx01o 900
+campaigns/orc-exp/levelx09o 900
+campaigns/human/level09h 300
+campaigns/orc/level13o 900
+campaigns/orc/level03o 900
+campaigns/orc/level06o 900
+campaigns/human/level06h 900
+campaigns/orc-exp/levelx10o 900
+campaigns/orc/level07o 900
+campaigns/human/level10h 900
+campaigns/orc/level12o 900
+campaigns/human/level12h 900
+campaigns/human/level04h 900
+campaigns/orc-exp/levelx12o 900
+campaigns/orc/level05o 900
+campaigns/orc/level08o 900
+campaigns/orc/level04o 900
+campaigns/orc/level14o 900
+campaigns/orc-exp/levelx02o 900
+campaigns/orc-exp/levelx06o 900
+campaigns/orc-exp/levelx04o 900
+campaigns/orc-exp/levelx05o 900
+campaigns/human-exp/levelx05h 900
+campaigns/human-exp/levelx07h 900
+campaigns/human-exp/levelx08h 900

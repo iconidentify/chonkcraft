@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: chonkcraft-update-publisher
+  namespace: chonkcraft-updates
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: chonkcraft-update-publisher
+  namespace: chonkcraft-updates
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: chonkcraft-update-publisher-token
+  namespace: chonkcraft-updates
+  annotations:
+    kubernetes.io/service-account.name: chonkcraft-update-publisher
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: chonkcraft-update-publisher
+  namespace: chonkcraft-updates
+subjects:
+  - kind: ServiceAccount
+    name: chonkcraft-update-publisher
+    namespace: chonkcraft-updates
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: chonkcraft-update-publisher

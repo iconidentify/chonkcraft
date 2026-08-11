@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.chonkbase.chonkcraft</groupId>
+        <artifactId>chonkcraft-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>chonkcraft-engine</artifactId>
+    <name>ChonkCraft Engine</name>
+
+    <!--
+      Native deterministic Warcraft II simulation and behavior.
+
+        net.chonkbase.chonkcraft.engine.map          <- src/map
+        net.chonkbase.chonkcraft.engine.unit         <- src/unit
+        net.chonkbase.chonkcraft.engine.action       <- src/action
+        net.chonkbase.chonkcraft.engine.pathfinder   <- src/pathfinder
+        net.chonkbase.chonkcraft.engine.missile      <- src/missile
+        net.chonkbase.chonkcraft.engine.spell        <- src/spell
+        net.chonkbase.chonkcraft.engine.ai           <- src/ai
+        net.chonkbase.chonkcraft.engine.video        <- src/video
+        net.chonkbase.chonkcraft.engine.ui           <- src/ui
+        net.chonkbase.chonkcraft.engine.sound        <- src/sound
+        net.chonkbase.chonkcraft.engine.network      <- src/network
+        net.chonkbase.chonkcraft.engine.script       <- typed native mission
+                                                    and definition utilities
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonkcraft-matchmaking</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonk-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonkcraft-data</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

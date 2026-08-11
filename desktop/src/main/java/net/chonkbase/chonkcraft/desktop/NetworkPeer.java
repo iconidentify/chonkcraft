@@ -1,0 +1,332 @@
+package net.chonkbase.chonkcraft.desktop;
+
+import java.net.InetAddress;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.data.map.PudReader;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.GameData;
+import net.chonkbase.chonkcraft.engine.Player;
+import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.network.CommandApplier;
+import net.chonkbase.chonkcraft.engine.network.GameCommand;
+import net.chonkbase.chonkcraft.engine.network.GameLobby;
+import net.chonkbase.chonkcraft.engine.network.LockstepScheduler;
+import net.chonkbase.chonkcraft.engine.network.NetworkGame;
+import net.chonkbase.chonkcraft.engine.network.NetworkSession;
+import net.chonkbase.chonkcraft.engine.network.SyncHash;
+import net.chonkbase.chonkcraft.engine.unit.Unit;
+import net.chonkbase.chonkcraft.engine.unit.UnitType;
+
+/**
+ * A headless peer for a networked game.
+ *
+ * <p>Exists so multiplayer can be tested the way it is actually played:
+ * separate operating-system processes talking over real sockets, each running
+ * its own simulation. A test that runs both sides inside one JVM proves the
+ * scheduling but not the wire, and the two failure modes are different.
+ *
+ * <pre>
+ *   NetworkPeer --player 0 --port 7100 --peer 1@127.0.0.1:7101 --cycles 600
+ *   NetworkPeer --player 1 --port 7101 --peer 0@127.0.0.1:7100 --cycles 600
+ * </pre>
+ *
+ * <p>The lobby form also proves map synchronization between separate JVMs.
+ * The joiner below deliberately hides its local map, receives the host's, and
+ * only then enters the same lockstep game:
+ *
+ * <pre>
+ *   NetworkPeer --lobby-host 7100 --map ALAMO.PUD --cycles 600
+ *   NetworkPeer --lobby-join 127.0.0.1:7100 --without-map true --cycles 600
+ * </pre>
+ *
+ * <p>Prints its final sync hash. Two peers that agree ran identical games; two
+ * that disagree diverged, and the exit status says which.
+ */
+public final class NetworkPeer {
+
+    private NetworkPeer() {
+    }
+
+    public static void main(String[] args) throws Exception {
+        int localPlayer = 0;
+        int port = 7100;
+        int cycles = 600;
+        List<String> peers = new ArrayList<>();
+        String mapName = null;
+        String lobbyHost = null;
+        String lobbyJoin = null;
+        boolean withoutMap = false;
+        boolean computerPlayer = false;
+
+        for (int i = 0; i + 1 < args.length; i += 2) {
+            switch (args[i]) {
+                case "--player" -> localPlayer = Integer.parseInt(args[i + 1]);
+                case "--port" -> port = Integer.parseInt(args[i + 1]);
+                case "--cycles" -> cycles = Integer.parseInt(args[i + 1]);
+                case "--peer" -> peers.add(args[i + 1]);
+                case "--map" -> mapName = args[i + 1];
+                case "--lobby-host" -> lobbyHost = args[i + 1];
+                case "--lobby-join" -> lobbyJoin = args[i + 1];
+                case "--without-map" -> withoutMap = Boolean.parseBoolean(args[i + 1]);
+                case "--computer-player" -> computerPlayer = Boolean.parseBoolean(args[i + 1]);
+                default -> { }
+            }
+        }
+
+        AssetSource assets = AssetSource.fromEnvironment();
+        if (assets == null) {
+            System.err.println("Set WC2_INSTALL_DIR to a Warcraft II installation, "
+                    + "or CHONKCRAFT_ASSET_PACK to an asset pack.");
+            System.exit(2);
+        }
+        // The map by name. Both peers have to simulate the same bytes, and a
+        // path is the one thing the two machines cannot agree on: they are
+        // different machines. --map has always been a name.
+        String wantedMap = mapName;
+        mapName = findMap(assets, wantedMap);
+        if (mapName == null && lobbyJoin == null) {
+            System.err.println("No map found.");
+            System.exit(2);
+        }
+        if (mapName == null) {
+            mapName = wantedMap == null ? "" : wantedMap;
+        }
+        if (lobbyHost != null && lobbyJoin != null) {
+            throw new IllegalArgumentException("choose either --lobby-host or --lobby-join");
+        }
+
+        LobbyRun lobbyRun = null;
+        byte[] selectedMap = assets.map(mapName);
+        if (lobbyHost != null || lobbyJoin != null) {
+            lobbyRun = meetInLobby(assets, mapName, selectedMap,
+                    lobbyHost, lobbyJoin, withoutMap, computerPlayer);
+            localPlayer = lobbyRun.localPlayer();
+            mapName = lobbyRun.mapName();
+            selectedMap = lobbyRun.mapBytes();
+        }
+
+        GameData data = new GameData(assets);
+        PudMap source = PudReader.read(selectedMap);
+        GameMap map = GameMap.from(source, data.loadTileset(source.tileset()).tileset());
+        Set<Integer> directPeers = lobbyRun == null
+                ? peerPlayers(localPlayer, peers) : Set.of();
+        World world = new World(map, lobbyRun == null
+                ? directPlayers(source, directPeers)
+                : new LobbySetup(Paths.get(mapName), lobbyRun.lobby()).players(source));
+        data.configureWorld(world, source);
+        data.populate(world, source);
+        world.recalculateSupply();
+        int visibleTiles = visibleTiles(world, localPlayer);
+        if (visibleTiles == 0) {
+            throw new IllegalStateException("player " + localPlayer
+                    + " has an all-black initial view");
+        }
+        System.out.printf("peer %d initial view: visible=%d start=%s%n",
+                localPlayer, visibleTiles,
+                java.util.Arrays.toString(source.startLocation(localPlayer)));
+
+        // The roster in a fixed order, so a unit type can travel as an index
+        // and mean the same thing on both machines.
+        NetworkGame game;
+        int listeningPort;
+        int peerCount;
+        if (lobbyRun != null) {
+            // Exercise the exact desktop lobby-to-game seam. Keeping a second
+            // implementation here once hid a production startup deadlock.
+            listeningPort = lobbyRun.lobby().localPort();
+            peerCount = lobbyRun.lobby().peers().size();
+            game = new LobbySetup(Paths.get(mapName), lobbyRun.lobby()).start(data, world).game();
+        } else {
+            List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
+            CommandApplier applier = new CommandApplier(world, roster);
+            data.configureCommands(applier);
+            NetworkSession session = new NetworkSession(localPlayer, port);
+            for (String peer : peers) {
+                // player@host:port
+                int at = peer.indexOf('@');
+                int colon = peer.lastIndexOf(':');
+                session.addPeer(Integer.parseInt(peer.substring(0, at)),
+                        InetAddress.getByName(peer.substring(at + 1, colon)),
+                        Integer.parseInt(peer.substring(colon + 1)));
+            }
+            LockstepScheduler scheduler = new LockstepScheduler(Player.MAX);
+            markAbsentPlayers(scheduler, directPeers);
+            game = new NetworkGame(world, session, scheduler, applier, localPlayer);
+            game.start();
+            listeningPort = session.localPort();
+            peerCount = session.peers().size();
+        }
+
+        System.out.printf("peer %d listening on %d, %d peers, map %s%n",
+                localPlayer, listeningPort, peerCount, mapName);
+
+        // A scripted order, identical on both machines by construction: each
+        // sends its own units somewhere at a fixed cycle. Both machines then
+        // execute both sets, and must agree.
+        int ordered = 0;
+        long deadline = System.currentTimeMillis() + 60_000;
+        int advanced = 0;
+
+        while (advanced < cycles && System.currentTimeMillis() < deadline) {
+            if (advanced == 60 && ordered == 0) {
+                for (Unit unit : world.units()) {
+                    if (unit.player() == localPlayer && !unit.type().building()
+                            && unit.type().speed() > 0 && ordered < 3) {
+                        game.issue(GameCommand.move(localPlayer, unit.id(),
+                                unit.tileX() + 3, unit.tileY() + 3));
+                        ordered++;
+                    }
+                }
+            }
+            NetworkGame.Step step = game.update();
+            if (step == NetworkGame.Step.ADVANCED) {
+                advanced++;
+            } else if (step == NetworkGame.Step.DESYNC) {
+                System.out.printf("DESYNC at net cycle %d with player %d%n",
+                        game.desyncCycle(), game.desyncPlayer());
+                game.close();
+                System.exit(3);
+            } else {
+                // Nothing to do until a packet arrives. A short sleep keeps
+                // this from spinning a core while a peer catches up.
+                Thread.sleep(1);
+            }
+        }
+
+        long hash = SyncHash.of(world);
+        System.out.printf("peer %d finished: cycles=%d units=%d hash=%016x%n",
+                localPlayer, world.cycle(), world.units().size(), hash);
+        game.close();
+    }
+
+    /**
+     * Marks every slot with nobody behind it as gone.
+     *
+     * <p>A scheduler waits for all active players, and a sixteen-slot map has
+     * fourteen empty ones. Without this the game would wait forever for
+     * players who do not exist.
+     */
+    private static Set<Integer> peerPlayers(int localPlayer, List<String> peers) {
+        Set<Integer> present = new LinkedHashSet<>();
+        present.add(localPlayer);
+        for (String peer : peers) {
+            present.add(Integer.parseInt(peer.substring(0, peer.indexOf('@'))));
+        }
+        return present;
+    }
+
+    private static Player[] directPlayers(PudMap source, Set<Integer> present) {
+        PudMap.PlayerType[] types = new PudMap.PlayerType[Player.MAX];
+        java.util.Arrays.fill(types, PudMap.PlayerType.NOBODY);
+        for (int player = 0; player < Player.MAX; player++) {
+            if (source.players()[player] == PudMap.PlayerType.NEUTRAL) {
+                types[player] = PudMap.PlayerType.NEUTRAL;
+            } else if (present.contains(player)) {
+                types[player] = PudMap.PlayerType.PERSON;
+            }
+        }
+        return Player.forNetworkGame(source, types, source.races());
+    }
+
+    private static void markAbsentPlayers(LockstepScheduler scheduler, Set<Integer> present) {
+        for (int slot = 0; slot < Player.MAX; slot++) {
+            if (!present.contains(slot)) {
+                scheduler.submit(0, slot, List.of(GameCommand.quit(slot)));
+            }
+        }
+    }
+
+    private static int visibleTiles(World world, int player) {
+        int visible = 0;
+        for (int y = 0; y < world.map().height(); y++) {
+            for (int x = 0; x < world.map().width(); x++) {
+                if (world.isVisibleTo(player, x, y)) {
+                    visible++;
+                }
+            }
+        }
+        return visible;
+    }
+
+    /** A lobby, its agreed map and the slot it assigned this process. */
+    private record LobbyRun(GameLobby lobby, int localPlayer, String mapName, byte[] mapBytes) {}
+
+    /** Meets one other process, synchronizes the map, and leaves the socket ready for play. */
+    private static LobbyRun meetInLobby(AssetSource assets, String mapName, byte[] selectedMap,
+            String hostPort, String joinAddress, boolean withoutMap,
+            boolean computerPlayer) throws Exception {
+        boolean hosting = hostPort != null;
+        GameLobby lobby;
+        if (hosting) {
+            int capacity = Math.max(2, Math.min(8,
+                    PudReader.read(selectedMap).playableSlots()));
+            lobby = GameLobby.host("Harness Host", mapName, selectedMap, capacity,
+                    Integer.parseInt(hostPort));
+        } else {
+            int colon = joinAddress.lastIndexOf(':');
+            InetAddress address = InetAddress.getByName(joinAddress.substring(0, colon));
+            int port = Integer.parseInt(joinAddress.substring(colon + 1));
+            lobby = GameLobby.join("Harness Client", address, port, wanted -> {
+                if (withoutMap) {
+                    return null;
+                }
+                String local = findMap(assets, wanted);
+                return local == null ? null : assets.map(local);
+            });
+        }
+
+        long deadline = System.currentTimeMillis() + 60_000L;
+        while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
+            lobby.poll();
+            if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
+                if (computerPlayer) {
+                    for (GameLobby.Slot slot : lobby.state().slots()) {
+                        if (slot.occupant() == GameLobby.Occupant.OPEN) {
+                            lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
+                            break;
+                        }
+                    }
+                }
+                for (GameLobby.Slot slot : lobby.state().slots()) {
+                    if (slot.occupant() == GameLobby.Occupant.OPEN) {
+                        lobby.setOccupant(slot.index(), GameLobby.Occupant.CLOSED);
+                    }
+                }
+                lobby.start();
+            }
+            Thread.sleep(2);
+        }
+        if (!lobby.isStarted() || lobby.mapBytes() == null) {
+            lobby.close();
+            throw new IllegalStateException("the lobby did not synchronize and start");
+        }
+        System.out.printf("lobby slot %d map %s bytes=%d source=%s%n",
+                lobby.state().localSlot(), lobby.state().map(), lobby.mapBytes().length,
+                lobby.mapWasTransferred() ? "host-transfer" : "local");
+        return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
+                lobby.mapBytes());
+    }
+
+    /**
+     * The map to play, by the name the source knows it by.
+     *
+     * <p>Nothing named on the command line takes the first map there is, which
+     * is how the two-process test is launched: neither side names one, and both
+     * take the same first because the source hands them out in one order.
+     */
+    private static String findMap(AssetSource assets, String wanted) {
+        for (String candidate : assets.mapNames()) {
+            if (wanted == null || candidate.equalsIgnoreCase(wanted)
+                    || Paths.get(candidate).getFileName().toString().equalsIgnoreCase(wanted)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+}

@@ -1,0 +1,48 @@
+target/
+*.class
+.DS_Store
+.idea/
+*.iml
+tmp/
+/.bne-artifacts/
+/.bne-lab/
+/.bne-counterfactual/
+/.bne-branch-witness/
+/.bne-semantic-slice/
+/.bne-semantic-bridge/
+/.bne-cadence/
+/.bne-test-efficacy/
+/.bne-doctor/
+/.bne-decision-miner/
+# Extracted Warcraft II assets are never committed. They are derived from the
+# user's own copy of the game and are not redistributable.
+/extracted/
+
+# Agent worktrees, which are their own checkouts
+.claude/worktrees/
+
+# Python bytecode from the helper scripts in scripts/
+__pycache__/
+*.pyc
+
+# Project-local emulation backend for the native decision micro-oracle, and
+# its content-addressed run root. Both are rebuilt from
+# tools/bne-harness/micro-oracle-requirements.txt.
+/tools/bne-harness/.venv-micro-oracle/
+/.bne-micro-oracle/
+
+# Content-addressed run root for the projectile pool ledger. Every run is
+# reproducible from the sealed fixture it names, so the outputs are derived
+# evidence rather than source.
+/.bne-projectile-ledger/
+
+# Content-addressed run root for the native evidence catalog. Every run is
+# rebuildable by walking the same evidence roots, so the outputs are derived.
+/.bne-evidence-catalog/
+
+# Content-addressed run root for compiled native capture plans. Dry runs only.
+/.bne-capture-plan/
+
+# Focused sub-tile Java diagnostic reruns, retained per blocker so cadence
+# stops asking for the same rerun twice.
+/.bne-subtile-evidence/

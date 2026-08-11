@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chonkcraft-updates
+  namespace: chonkcraft-updates
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "180"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: updates.chonkbase.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chonkcraft-updates
+                port:
+                  name: http
+  tls:
+    - hosts:
+        - updates.chonkbase.net
+      secretName: chonkcraft-updates-tls

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "authority": "Executable classification of target-choice diagnostics that are not BNE player-level release authority.",
+  "inventories": [
+    {
+      "test_class": "net.chonkbase.chonkcraft.engine.BattleNetIdleAttackTest",
+      "test_count": 26,
+      "classified_failures": [
+        {
+          "name": "rangedChaseRetargetHoldsThreeVisitsBeforeTheNextStep",
+          "category": "precision-hypothesis",
+          "disposition": "A three-visit cycle hypothesis from Human 13; the 52-case precision net owns its exact phase, while complete idle acquisition and combat outcomes remain clean."
+        }
+      ]
+    },
+    {
+      "test_class": "net.chonkbase.chonkcraft.engine.TargetChoiceTest",
+      "test_count": 9,
+      "classified_failures": [
+        {
+          "name": "idleScanningHasACadence",
+          "category": "legacy-legacyEngine-cadence",
+          "disposition": "Asserts COrder_Still's fifteen-cycle LegacyEngine schedule; BNE idle timers and acquisition markers have direct native-shaped coverage."
+        },
+        {
+          "name": "priorityHoldsInsideTheReactionLeash",
+          "category": "legacy-chonkcraft-chooser",
+          "disposition": "Asserts ChonkCraft SimplifiedAutoTargeting bit weights; BNE uses the transcribed 0x0040a4b0 distance-weighted scorer and retail UDTA priorities."
+        },
+        {
+          "name": "unreachableTargetsAreRejected",
+          "category": "legacy-chonkcraft-reachability",
+          "disposition": "Asserts ChonkCraft ComputeCost path-search and cache behavior; BNE reachability/refusal is owned by the movement corpus and complete-loop referees."
+        },
+        {
+          "name": "aSplashWeaponSearchesItsMissileRangeAsWell",
+          "category": "legacy-chonkcraft-chooser",
+          "disposition": "Asserts ChonkCraft AttackUnitsInDistance splash search expansion; BNE splash selection and victim order have direct binary-derived checks."
+        },
+        {
+          "name": "anAttackingUnitReconsidersItsTarget",
+          "category": "legacy-legacyEngine-cadence",
+          "disposition": "Asserts COrder_Attack's six-call reconsideration schedule; BNE free-scan, idle marker and target-switch timing are precision-owned."
+        }
+      ]
+    }
+  ]
+}

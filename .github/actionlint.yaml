@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - arc-i9beef-chonkcraft
+    - chonk-mac-arm64
+
+config-variables: null

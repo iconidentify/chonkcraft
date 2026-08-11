@@ -1,0 +1,123 @@
+name: Matchmaker Service
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'matchmaking/**'
+      - 'matchmaker-server/**'
+      - 'engine/src/main/java/net/chonkbase/chonkcraft/engine/network/**'
+      - 'pom.xml'
+      - '.github/workflows/matchmaker.yml'
+  pull_request:
+    paths:
+      - 'matchmaking/**'
+      - 'matchmaker-server/**'
+      - 'engine/src/main/java/net/chonkbase/chonkcraft/engine/network/**'
+      - 'pom.xml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: matchmaker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned runtime
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Build dependencies without running the known engine baseline
+        run: scripts/jbr/with-jbr-25.sh mvn -B -DskipTests install
+      - name: Prove codes, REST, relay, map transfer, and lobby start
+        run: |
+          scripts/jbr/with-jbr-25.sh mvn -B -pl matchmaking test
+          scripts/jbr/with-jbr-25.sh mvn -B -pl matchmaker-server \
+            -Dtest=MatchmakerEndToEndTest test
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish immutable image
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: matchmaker-server
+          push: true
+          tags: |
+            ghcr.io/iconidentify/chonkcraft-matchmaker:${{ github.sha }}
+            ghcr.io/iconidentify/chonkcraft-matchmaker:latest
+
+  deploy:
+    name: Roll out the multiplayer service
+    if: github.event_name == 'push'
+    needs: test-and-image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://match.chonkbase.net/health
+    steps:
+      - uses: actions/checkout@v4
+      - name: Load the matchmaker-only Kubernetes identity
+        shell: bash
+        env:
+          KUBECONFIG_B64: ${{ secrets.CHONKCRAFT_MATCHMAKER_KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KUBECONFIG_B64"
+          install -d -m 0700 "$RUNNER_TEMP/kube"
+          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kube/config"
+          chmod 0600 "$RUNNER_TEMP/kube/config"
+          echo "KUBECONFIG=$RUNNER_TEMP/kube/config" >> "$GITHUB_ENV"
+      - name: Verify the deployer cannot read secrets or alter other workloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl auth can-i get deployment/chonkcraft-matchmaker \
+            -n chonk-mp | grep -qx yes
+          kubectl auth can-i patch deployment/chonkcraft-matchmaker \
+            -n chonk-mp | grep -qx yes
+          if kubectl auth can-i get secrets -n chonk-mp >/dev/null; then
+            echo "The matchmaker deployer must not read namespace secrets." >&2
+            exit 1
+          fi
+          if kubectl auth can-i patch deployment/chonk-mp-relay \
+              -n chonk-mp >/dev/null; then
+            echo "The matchmaker deployer must not alter the existing relay." >&2
+            exit 1
+          fi
+      - name: Apply the exact commit image and wait for health
+        shell: bash
+        run: |
+          set -euo pipefail
+          rendered="$RUNNER_TEMP/matchmaker.yaml"
+          kubectl kustomize infra/k8s/matchmaker \
+            | sed "s|ghcr.io/iconidentify/chonkcraft-matchmaker:initial|ghcr.io/iconidentify/chonkcraft-matchmaker:${GITHUB_SHA}|" \
+            > "$rendered"
+          grep -F "image: ghcr.io/iconidentify/chonkcraft-matchmaker:${GITHUB_SHA}" "$rendered"
+          kubectl apply -f "$rendered"
+          kubectl -n chonk-mp rollout status deployment/chonkcraft-matchmaker \
+            --timeout=5m
+      - name: Prove the public directory and TLS endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error \
+                https://match.chonkbase.net/health \
+                | grep -q '"status":"ok"'; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "The public multiplayer health endpoint did not become ready." >&2
+          exit 1

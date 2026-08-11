@@ -1,0 +1,188 @@
+package net.chonkbase.chonkcraft.engine;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.map.TileFlag;
+import net.chonkbase.chonkcraft.engine.map.Tileset;
+import net.chonkbase.chonkcraft.engine.unit.ResourceInfo;
+import net.chonkbase.chonkcraft.engine.unit.Unit;
+import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/** End-to-end BNE oil economy failure and congestion gate. */
+class OilLifecycleGateTest {
+
+    private static GameMap sea() {
+        GameMap map = new GameMap(36, 36, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+        return map;
+    }
+
+    private static UnitType platform() {
+        UnitType type = new UnitType("unit-human-oil-platform");
+        type.setTileSize(3, 3);
+        type.setHitPoints(650);
+        type.setBuilding(true);
+        type.setGivesResource(UnitType.Resource.OIL);
+        type.setCanHarvest(true);
+        return type;
+    }
+
+    private static UnitType refinery() {
+        UnitType type = new UnitType("unit-human-refinery");
+        type.setTileSize(3, 3);
+        type.setHitPoints(600);
+        type.setBuilding(true);
+        type.stores().add(UnitType.Resource.OIL);
+        type.improveProduction().put(UnitType.Resource.OIL, 25);
+        return type;
+    }
+
+    private static UnitType tanker() {
+        UnitType type = new UnitType("unit-human-oil-tanker");
+        type.setTileSize(2, 2);
+        type.setHitPoints(90);
+        type.setSpeed(10);
+        type.setSeaUnit(true);
+        type.setNumDirections(8);
+        ResourceInfo oil = new ResourceInfo(UnitType.Resource.OIL);
+        oil.setCapacity(100);
+        oil.setWaitAtResource(150);
+        oil.setWaitAtDepot(150);
+        oil.setFileWhenLoaded("human/units/oil-tanker-full.png");
+        oil.setFileWhenEmpty("human/units/oil-tanker-empty.png");
+        type.gathering().put(UnitType.Resource.OIL, oil);
+        return type;
+    }
+
+    @Test
+    @DisplayName("two congested tankers both board and visibly bank their loads")
+    void twoTankersSurviveOnePlatformLane() {
+        World world = new World(sea());
+        world.createUnit(refinery(), 0, 10, 15);
+        Unit rig = world.createUnit(platform(), 15, 22, 15);
+        rig.setResourcesHeld(25_000);
+        world.recalculateSupply();
+        Unit first = world.createUnit(tanker(), 0, 18, 12);
+        Unit second = world.createUnit(tanker(), 0, 18, 18);
+        assertTrue(world.orderHarvest(first, rig));
+        assertTrue(world.orderHarvest(second, rig));
+
+        boolean firstBoarded = false;
+        boolean secondBoarded = false;
+        for (int cycle = 0; cycle < 5_000
+                && world.player(0).get(UnitType.Resource.OIL) < 250; cycle++) {
+            world.tick();
+            firstBoarded |= first.removed() && first.worksite() == rig;
+            secondBoarded |= second.removed() && second.worksite() == rig;
+        }
+
+        assertTrue(firstBoarded, "the first tanker never cleared the boarding lane");
+        assertTrue(secondBoarded, "the second tanker starved behind the first");
+        assertEquals(250, world.player(0).get(UnitType.Resource.OIL),
+                "two visible 100-oil loads must include the refinery's 25% bonus");
+        int oilInFlight = first.carried() + second.carried();
+        assertEquals(25_000,
+                rig.resourcesHeld() + 200 + oilInFlight,
+                "banked, carried and field oil must remain conserved while both tankers loop");
+    }
+
+    @Test
+    @DisplayName("destroying a platform releases its contained tanker to another field")
+    void destroyedPlatformReleasesAndReroutesContainedTanker() {
+        World world = new World(sea());
+        world.createUnit(refinery(), 0, 2, 16);
+        Unit doomed = world.createUnit(platform(), 15, 9, 9);
+        // The released hull is at (7,8); BNE's FindAnotherResource radius is
+        // eight footprint tiles, so this live field deliberately sits on the
+        // inclusive edge of that native search.
+        Unit replacement = world.createUnit(platform(), 15, 16, 9);
+        doomed.setResourcesHeld(25_000);
+        replacement.setResourcesHeld(25_000);
+        Unit boat = world.createUnit(tanker(), 0, 8, 8);
+        assertTrue(world.orderHarvest(boat, doomed));
+
+        for (int cycle = 0; cycle < 300 && boat.worksite() != doomed; cycle++) {
+            world.tick();
+        }
+        assertSame(doomed, boat.worksite(), "the fixture never contained the tanker");
+        world.kill(doomed);
+        assertTrue(boat.isOnMap(), "destroying a platform must release its tanker");
+        assertEquals(0, boat.waitCycles(),
+                "the released tanker must not serve the dead platform's dwell timer");
+
+        boolean reachedReplacement = false;
+        for (int cycle = 0; cycle < 2_500 && !reachedReplacement; cycle++) {
+            world.tick();
+            reachedReplacement = boat.resourceUnit() == replacement
+                    && (boat.worksite() == replacement || boat.isOnMap());
+        }
+        assertTrue(reachedReplacement, "the tanker did not reroute to the live platform");
+        assertSame(replacement, boat.resourceUnit());
+    }
+
+    @Test
+    @DisplayName("destroying the selected refinery reroutes a laden tanker")
+    void destroyedDepotReroutesTheLadenLeg() {
+        World world = new World(sea());
+        Unit doomed = world.createUnit(refinery(), 0, 8, 16);
+        Unit replacement = world.createUnit(refinery(), 0, 23, 16);
+        Unit rig = world.createUnit(platform(), 15, 17, 16);
+        rig.setResourcesHeld(25_000);
+        world.recalculateSupply();
+        Unit boat = world.createUnit(tanker(), 0, 16, 15);
+        assertTrue(world.orderHarvest(boat, rig));
+
+        for (int cycle = 0; cycle < 1_000 && boat.returnDepotGoal() != doomed; cycle++) {
+            world.tick();
+        }
+        assertSame(doomed, boat.returnDepotGoal(),
+                "the fixture must select the nearer refinery first");
+        assertEquals(100, boat.carried());
+        world.kill(doomed);
+
+        for (int cycle = 0; cycle < 2_500
+                && !(boat.removed() && boat.worksite() == replacement); cycle++) {
+            world.tick();
+        }
+        assertTrue(boat.removed(), "the laden tanker never entered the surviving refinery");
+        assertSame(replacement, boat.worksite());
+        assertEquals(125, world.player(0).get(UnitType.Resource.OIL));
+    }
+
+    @Test
+    @DisplayName("depletion destroys the dry platform and continues at the next one")
+    void depletionBanksTheLastLoadAndSelectsAnotherField() {
+        World world = new World(sea());
+        world.createUnit(refinery(), 0, 2, 16);
+        Unit lastLoad = world.createUnit(platform(), 15, 11, 16);
+        Unit next = world.createUnit(platform(), 15, 19, 16);
+        lastLoad.setResourcesHeld(100);
+        next.setResourcesHeld(25_000);
+        world.recalculateSupply();
+        UnitType type = tanker();
+        Unit boat = world.createUnit(type, 0, 10, 15);
+        assertTrue(world.orderHarvest(boat, lastLoad));
+
+        boolean selectedNext = false;
+        for (int cycle = 0; cycle < 4_000 && !selectedNext; cycle++) {
+            world.tick();
+            selectedNext = world.player(0).get(UnitType.Resource.OIL) >= 125
+                    && boat.resourceUnit() == next;
+        }
+        assertFalse(lastLoad.isAlive(), "the exhausted platform must be removed");
+        assertEquals(125, world.player(0).get(UnitType.Resource.OIL));
+        assertTrue(selectedNext, "the empty tanker did not continue at the next field");
+        assertEquals("human/units/oil-tanker-empty.png",
+                type.imageFileFor("summer", UnitType.Resource.OIL, false));
+    }
+}

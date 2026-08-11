@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "test_class": "net.chonkbase.chonkcraft.engine.SimulationTest",
+  "test_count": 22,
+  "authority": "Legacy grid/movement inventory retained beside the BNE scheduler authority.",
+  "classified_failures": [
+    {
+      "name": "aUnitIsLogicallyAtItsNextTileButDrawnBehindIt",
+      "category": "legacy-legacyEngine-movement",
+      "disposition": "Explicitly asserts LegacyEngine's immediate destination-tile reservation model; BNE movement timing and occupancy are owned by the authenticated movement system."
+    },
+    {
+      "name": "aUnitFinishesItsCurrentStepBeforeTurning",
+      "category": "legacy-legacyEngine-movement",
+      "disposition": "Its one-tick synthetic move assumes the upstream logical-tile/offset model rather than BNE's animation and committed-step cadence."
+    },
+    {
+      "name": "aUnitOrderedNowhereStaysPut",
+      "category": "legacy-legacyEngine-movement",
+      "disposition": "Asserts immediate first-action completion; BNE pays its native position-order visit before exposing Still."
+    }
+  ]
+}

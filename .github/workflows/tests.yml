@@ -1,0 +1,152 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-game-data:
+    name: Native Java, no game data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: chonkcraft
+      - name: Assert case-sensitive filesystem
+        run: |
+          set -euo pipefail
+          probe="$(mktemp -d)"
+          : > "$probe/casing.txt"
+          test ! -e "$probe/CASING.TXT"
+      - name: Install codec interoperability tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg flac
+      - uses: actions/cache@v4
+        with:
+          path: ~/.chonk/jdks
+          key: jbr-25.0.2-b329.117-${{ runner.os }}-${{ runner.arch }}
+      - name: Install pinned runtime
+        working-directory: chonkcraft
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Check source and documentation boundaries
+        working-directory: chonkcraft
+        run: |
+          python3 scripts/check-source-boundary.py
+          python3 scripts/check-native-runtime.py
+          python3 scripts/ci/check-comment-provenance.py
+          python3 scripts/check-docs.py --check
+          python3 scripts/check-bne-readiness.py
+      - name: Build
+        working-directory: chonkcraft
+        run: scripts/jbr/with-jbr-25.sh mvn -B -DskipTests install
+      - name: Run native test suite
+        id: suite
+        continue-on-error: true
+        working-directory: chonkcraft
+        run: scripts/run-tests.sh -B -Dwc2.install.dir=/nonexistent/no-game-data
+      - name: Assert expected coverage
+        working-directory: chonkcraft
+        run: scripts/ci/check-test-skips.py --profile data-free
+      - name: Reject new or stale failures
+        working-directory: chonkcraft
+        run: scripts/ci/check-test-failures.py --baseline scripts/ci/expected-failures-data-free.txt
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-data-free
+          path: chonkcraft/*/target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: error
+
+  authenticated-data:
+    name: Authenticated game data
+    # Never execute pull-request or branch code on the private runner. It has
+    # read-only access to licensed retail media that must remain off GitHub.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
+    runs-on: arc-i9beef-chonkcraft
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: chonkcraft
+      - name: Assert mounted inputs
+        run: |
+          set -euo pipefail
+          for file in /opt/wc2/install/DATA/MAINDAT.WAR \
+                      /opt/wc2/install/DATA/REZDAT.WAR \
+                      /opt/wc2/install/DATA/SFXDAT.SUD \
+                      /opt/wc2/install/DATA/STRDAT.WAR \
+                      /opt/wc2/install/chonkcraft-cache/MUDDAT.CUD \
+                      /opt/wc2/install/chonkcraft-cache/SNDDAT.WAR \
+                      /opt/wc2/opus_testvectors/testvector01.bit; do
+            test -r "$file"
+          done
+      - name: Install codec and font dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg flac fontconfig fonts-dejavu-core
+      - name: Install pinned runtime
+        working-directory: chonkcraft
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Check source and documentation boundaries
+        working-directory: chonkcraft
+        run: |
+          python3 scripts/check-source-boundary.py
+          python3 scripts/check-native-runtime.py
+          python3 scripts/ci/check-comment-provenance.py
+          python3 scripts/check-docs.py --check
+          python3 scripts/check-bne-readiness.py
+      - name: Build
+        working-directory: chonkcraft
+        run: scripts/jbr/with-jbr-25.sh mvn -B -DskipTests install
+      - name: Build authenticated asset pack
+        working-directory: chonkcraft
+        env:
+          WC2_INSTALL_DIR: /opt/wc2/install
+        run: scripts/build-asset-pack.sh --out "${{ runner.temp }}/wc2.chonkpack"
+      - name: Fetch public codec specification
+        run: |
+          curl --fail --location --retry 3 \
+            --output "${{ runner.temp }}/rfc6716.txt" \
+            https://www.rfc-editor.org/rfc/rfc6716.txt
+      - name: Prove real multiplayer startup
+        working-directory: chonkcraft
+        env:
+          CHONKCRAFT_ASSET_PACK: ${{ runner.temp }}/wc2.chonkpack
+        run: scripts/check-bne-network-gate.sh
+      - name: Run authenticated test suite
+        id: suite
+        continue-on-error: true
+        working-directory: chonkcraft
+        run: |
+          scripts/run-tests.sh -B \
+            -Dwc2.install.dir=/opt/wc2/install \
+            -Dchonkcraft.pack="${{ runner.temp }}/wc2.chonkpack" \
+            -Dopus.testvectors=/opt/wc2/opus_testvectors \
+            -Dopus.rfc="${{ runner.temp }}/rfc6716.txt"
+      - name: Assert expected coverage
+        working-directory: chonkcraft
+        run: scripts/ci/check-test-skips.py --profile full
+      - name: Reject new or stale failures
+        working-directory: chonkcraft
+        run: scripts/ci/check-test-failures.py
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports-full
+          path: chonkcraft/*/target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: error

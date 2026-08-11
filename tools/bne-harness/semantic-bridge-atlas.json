@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "symbol_families": [
+    {
+      "canonical": "unit.x",
+      "evidence": "BNE unit layout offset 0x18 and Java Unit.tileX() both name the unit's tile x coordinate",
+      "java": ["unit.x", "unit.tileX", "worker.tileX"],
+      "native": ["unit[*].x"]
+    },
+    {
+      "canonical": "unit.y",
+      "evidence": "BNE unit layout offset 0x1a and Java Unit.tileY() both name the unit's tile y coordinate",
+      "java": ["unit.y", "unit.tileY", "worker.tileY"],
+      "native": ["unit[*].y"]
+    },
+    {
+      "canonical": "unit.order_x",
+      "evidence": "BNE unit layout offset 0x84 and Java Unit.orderTargetX() are the stored order x coordinate",
+      "java": ["unit.order_x", "unit.orderTargetX", "worker.orderTargetX"],
+      "native": ["unit[*].order_x"]
+    },
+    {
+      "canonical": "unit.order_y",
+      "evidence": "BNE unit layout offset 0x86 and Java Unit.orderTargetY() are the stored order y coordinate",
+      "java": ["unit.order_y", "unit.orderTargetY", "worker.orderTargetY"],
+      "native": ["unit[*].order_y"]
+    }
+  ],
+  "unresolved": [
+    {
+      "native": "bne.table_004962b0[*]",
+      "reason": "A focus-scoped semantic slice may prove the lookup and its concrete index/value, but the table meaning still needs independent authentication. No Java threshold alias is allowed before that proof."
+    }
+  ]
+}

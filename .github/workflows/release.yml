@@ -1,0 +1,542 @@
+name: Release Builds
+
+# A release is deliberately all-or-nothing: every native artifact is built and
+# verified before the public download catalog moves. Tags publish automatically;
+# workflow_dispatch provides the same path for a beta or recovery build.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Public version to stamp"
+        required: true
+        default: "0.1.1-beta7"
+        type: string
+      draft:
+        description: "Keep the published GitHub release as a draft"
+        required: true
+        default: false
+        type: boolean
+      prerelease:
+        description: "Mark the GitHub release as a prerelease"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Resolve public release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      draft: ${{ steps.release.outputs.draft }}
+      prerelease: ${{ steps.release.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate version and release policy
+        id: release
+        shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          REQUESTED_DRAFT: ${{ inputs.draft }}
+          REQUESTED_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            draft=false
+            prerelease=$([[ "$version" == *-* ]] && echo true || echo false)
+          else
+            version="$REQUESTED_VERSION"
+            draft="${REQUESTED_DRAFT:-false}"
+            prerelease="${REQUESTED_PRERELEASE:-true}"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){1,2}([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release version: $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  macos:
+    name: Signed and notarized macOS DMG (Apple silicon)
+    needs: validate
+    runs-on: macos-15
+    env:
+      CHONKCRAFT_VERSION: ${{ needs.validate.outputs.version }}
+      MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+      MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+      MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add Homebrew tools to PATH
+        shell: bash
+        run: echo '/opt/homebrew/bin' >> "$GITHUB_PATH"
+      - name: Validate release metadata and Apple runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$CHONKCRAFT_VERSION" =~ ^[0-9]+(\.[0-9]+){1,2}([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release version: $CHONKCRAFT_VERSION" >&2
+            exit 1
+          fi
+          [[ "$(uname -s)" == Darwin ]]
+          [[ "$(uname -m)" == arm64 ]]
+          xcodebuild -version
+          xcrun notarytool --version
+      - name: Check release invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check-source-boundary.py
+          python3 scripts/check-native-runtime.py
+          python3 scripts/check-docs.py --check
+      - name: Install the pinned JetBrains Runtime
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Confirm the pinned build runtime
+        run: scripts/jbr/with-jbr-25.sh scripts/jbr/assert-jbr-25.sh
+      - name: Preserve the runner keychain configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          keychain_list="$RUNNER_TEMP/original-user-keychains.txt"
+          default_keychain="$RUNNER_TEMP/original-default-keychain.txt"
+          security list-keychains -d user \
+            | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//' > "$keychain_list"
+          security default-keychain -d user \
+            | sed 's/^[[:space:]]*"//; s/"[[:space:]]*$//' > "$default_keychain"
+          echo "MAC_ORIGINAL_KEYCHAIN_LIST=$keychain_list" >> "$GITHUB_ENV"
+          echo "MAC_ORIGINAL_DEFAULT_KEYCHAIN=$default_keychain" >> "$GITHUB_ENV"
+      - name: Resolve Apple signing capability
+        id: apple-signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          import_certificate=false
+          if [[ -n "$MAC_CERTIFICATE_P12_BASE64" && \
+                -n "$MAC_CERTIFICATE_PASSWORD" && \
+                -n "$MAC_SIGNING_IDENTITY" ]]; then
+            import_certificate=true
+          elif ! security find-identity -v -p codesigning \
+              | grep -q 'Developer ID Application:'; then
+            echo "A Developer ID Application identity is required." >&2
+            echo "Configure the MAC_CERTIFICATE_* secrets or install the identity on the runner." >&2
+            exit 1
+          fi
+
+          api_values=0
+          [[ -n "$APP_STORE_CONNECT_API_KEY_BASE64" ]] && ((api_values += 1))
+          [[ -n "$APP_STORE_CONNECT_KEY_ID" ]] && ((api_values += 1))
+          [[ -n "$APP_STORE_CONNECT_ISSUER_ID" ]] && ((api_values += 1))
+          apple_values=0
+          [[ -n "$APPLE_ID" ]] && ((apple_values += 1))
+          [[ -n "$APPLE_APP_PASSWORD" ]] && ((apple_values += 1))
+          [[ -n "$APPLE_TEAM_ID" ]] && ((apple_values += 1))
+          if [[ "$api_values" -ne 3 && "$apple_values" -ne 3 ]]; then
+            echo "Complete App Store Connect API or Apple-ID notarization credentials are required." >&2
+            exit 1
+          fi
+          echo "import_certificate=$import_certificate" >> "$GITHUB_OUTPUT"
+      - name: Import Developer ID certificate
+        if: steps.apple-signing.outputs.import_certificate == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert_path="$RUNNER_TEMP/chonkcraft-signing.p12"
+          keychain_path="$RUNNER_TEMP/chonkcraft-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          CERT_PATH="$cert_path" python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          Path(os.environ["CERT_PATH"]).write_bytes(
+              base64.b64decode(os.environ["MAC_CERTIFICATE_P12_BASE64"])
+          )
+          PY
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          curl -fsSL https://www.apple.com/appleca/AppleIncRootCertificate.cer \
+            -o "$RUNNER_TEMP/AppleIncRootCertificate.cer"
+          curl -fsSL https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer \
+            -o "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security import "$RUNNER_TEMP/AppleIncRootCertificate.cer" -A -k "$keychain_path"
+          security import "$RUNNER_TEMP/DeveloperIDG2CA.cer" -A -k "$keychain_path"
+          security import "$cert_path" -P "$MAC_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$keychain_path"
+          security list-keychains -d user -s \
+            "$keychain_path" "/Library/Keychains/System.keychain"
+          security default-keychain -s "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$keychain_password" "$keychain_path"
+          echo "MAC_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+      - name: Install App Store Connect key for notarization
+        if: env.APP_STORE_CONNECT_API_KEY_BASE64 != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_dir="$RUNNER_TEMP/notary-private-keys"
+          key_path="$key_dir/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          mkdir -p "$key_dir"
+          KEY_PATH="$key_path" python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          Path(os.environ["KEY_PATH"]).write_bytes(
+              base64.b64decode(os.environ["APP_STORE_CONNECT_API_KEY_BASE64"])
+          )
+          PY
+          chmod 600 "$key_path"
+          echo "APP_STORE_CONNECT_API_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+      - name: Build, sign, notarize, and staple the DMG
+        env:
+          CHONKCRAFT_MAC_SIGNING: require
+          CHONKCRAFT_MAC_NOTARIZATION: require
+        run: scripts/release/build-macos-app.sh --dmg
+      - name: Verify packaged application and Gatekeeper ticket
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="desktop/target/dist/macos/ChonkCraft.app"
+          dmg="desktop/target/dist/macos/ChonkCraft-${CHONKCRAFT_VERSION}.dmg"
+          codesign --verify --deep --strict=all --verbose=2 "$app"
+          codesign -dvv "$app" 2>&1 | grep -F 'Authority=Developer ID Application:'
+          codesign --verify --verbose=2 "$dmg"
+          xcrun stapler validate "$dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$dmg"
+          if /usr/libexec/PlistBuddy -c 'Print :NSMicrophoneUsageDescription' \
+              "$app/Contents/Info.plist" >/dev/null 2>&1; then
+            echo "The packaged app still requests microphone access." >&2
+            exit 1
+          fi
+          if find "$app/Contents/app" -type f \
+              \( -name '*.sms' -o -name '*content*.zip' \) \
+              | grep -q .; then
+            echo "Forbidden runtime script content was packaged." >&2
+            exit 1
+          fi
+          test -x "$app/Contents/runtime/Contents/Home/bin/java"
+          test -f "$app/Contents/app/bootstrap-game.jar"
+          test -f "$app/Contents/app/libjnidispatch.jnilib"
+          codesign --verify --strict=all --verbose=2 \
+            "$app/Contents/app/libjnidispatch.jnilib"
+          if unzip -Z1 "$app/Contents/app/bootstrap-game.jar" \
+              | grep -E '^com/sun/jna/darwin-.*/libjnidispatch\.jnilib$'; then
+            echo "The game JAR contains an unsigned macOS native library." >&2
+            exit 1
+          fi
+          smoke_home="$(mktemp -d -t chonkcraft-release-smoke)"
+          "$app/Contents/MacOS/ChonkCraft" \
+            --home "$smoke_home" --render "$smoke_home/launcher.png"
+          test -s "$smoke_home/launcher.png"
+          (cd desktop/target/dist/macos && \
+            shasum -a 256 "ChonkCraft-${CHONKCRAFT_VERSION}.dmg" \
+              > "ChonkCraft-${CHONKCRAFT_VERSION}.dmg.sha256")
+      - name: Upload signed macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chonkcraft-macos
+          path: |
+            desktop/target/dist/macos/*.dmg
+            desktop/target/dist/macos/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+      - name: Clean up signing keychain
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          original_keychains=()
+          if [[ -s "${MAC_ORIGINAL_KEYCHAIN_LIST:-}" ]]; then
+            while IFS= read -r keychain; do
+              [[ -n "$keychain" ]] && original_keychains+=("$keychain")
+            done < "$MAC_ORIGINAL_KEYCHAIN_LIST"
+          fi
+          if [[ "${#original_keychains[@]}" -gt 0 ]]; then
+            security list-keychains -d user -s "${original_keychains[@]}"
+          else
+            security list-keychains -d user -s "/Library/Keychains/System.keychain"
+          fi
+          if [[ -s "${MAC_ORIGINAL_DEFAULT_KEYCHAIN:-}" ]]; then
+            original_default="$(head -n 1 "$MAC_ORIGINAL_DEFAULT_KEYCHAIN")"
+            [[ -n "$original_default" ]] && security default-keychain -s "$original_default"
+          else
+            security default-keychain -s "/Library/Keychains/System.keychain"
+          fi
+          if [[ -n "${MAC_KEYCHAIN_PATH:-}" ]]; then
+            security delete-keychain "$MAC_KEYCHAIN_PATH" 2>/dev/null
+          fi
+          true
+
+  linux:
+    name: Linux x64 AppImage
+    needs: validate
+    runs-on: arc-i9beef-chonkcraft
+    env:
+      CHONKCRAFT_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux AppImage tools
+        run: |
+          sudo apt-get update -qq
+          # jlink needs objcopy. The render smoke needs system fonts. The
+          # remaining tools match the established sister-project AppImage lane.
+          sudo apt-get install -y -qq \
+            binutils desktop-file-utils fontconfig libfreetype6 squashfs-tools zsync
+      - name: Install the pinned JetBrains Runtime
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Stage checksum-pinned appimagetool
+        run: scripts/release/install-pinned-appimagetool.sh "$RUNNER_TEMP/appimagetool"
+      - name: Build portable AppImage
+        run: scripts/release/build-linux-appimage.sh "$RUNNER_TEMP/appimagetool"
+      - name: Inspect and smoke test the AppImage
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="desktop/target/dist/installers/ChonkCraft-${CHONKCRAFT_VERSION}-linux-x64.AppImage"
+          test -x "$package"
+          file "$package" | grep -Eq 'ELF 64-bit.*x86-64'
+          extract_dir="$(mktemp -d)"
+          (
+            cd "$extract_dir"
+            APPIMAGE_EXTRACT_AND_RUN=1 "$GITHUB_WORKSPACE/$package" --appimage-extract >/dev/null
+          )
+          extracted="$extract_dir/squashfs-root"
+          test -x "$extracted/AppRun"
+          test -f "$extracted/ChonkCraft.desktop"
+          test -s "$extracted/ChonkCraft.png"
+          test -x "$extracted/bin/chonkcraft"
+          test -x "$extracted/lib/runtime/bin/java"
+          test -f "$extracted/lib/app/bootstrap-game.jar"
+          smoke_home="$(mktemp -d)"
+          APPIMAGE_EXTRACT_AND_RUN=1 "$package" \
+            --home "$smoke_home" --render "$smoke_home/launcher.png"
+          test -s "$smoke_home/launcher.png"
+          sha256sum --check "$package.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chonkcraft-linux
+          path: desktop/target/dist/installers/*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows:
+    name: Signed Windows x64 MSI
+    needs: validate
+    runs-on: windows-2025
+    env:
+      CHONKCRAFT_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the pinned JetBrains Runtime
+        shell: bash
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Install WiX 3
+        shell: pwsh
+        run: scripts/release/install-wix.ps1
+      - name: Build Windows application image
+        shell: bash
+        run: scripts/release/build-windows-package.sh
+      - name: Make generated executables signable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $executables = @(Get-ChildItem 'desktop/target/dist/windows/ChonkCraft' `
+            -Filter *.exe -File -Recurse)
+          if ($executables.Count -eq 0) {
+            throw 'The Windows app image contains no executables to sign.'
+          }
+          foreach ($executable in $executables) {
+            # jpackage can preserve the launcher's read-only bit. SignTool can
+            # read that file but cannot replace its PE signature in place.
+            if ($executable.IsReadOnly) { $executable.IsReadOnly = $false }
+            Unblock-File -LiteralPath $executable.FullName -ErrorAction SilentlyContinue
+          }
+      - name: Require Azure Trusted Signing configuration
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          AZURE_TRUSTED_SIGNING_ACCOUNT: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          AZURE_TRUSTED_SIGNING_PROFILE: ${{ secrets.AZURE_TRUSTED_SIGNING_PROFILE }}
+        run: |
+          $required = @(
+            'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
+            'AZURE_TRUSTED_SIGNING_ENDPOINT', 'AZURE_TRUSTED_SIGNING_ACCOUNT',
+            'AZURE_TRUSTED_SIGNING_PROFILE'
+          )
+          $missing = @($required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($missing.Count -gt 0) {
+            throw "Windows signing secrets are missing: $($missing -join ', ')"
+          }
+      - name: Sign packaged Windows executables
+        uses: azure/trusted-signing-action@v1.2.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_TRUSTED_SIGNING_PROFILE }}
+          files-folder: desktop/target/dist/windows/ChonkCraft
+          files-folder-recurse: true
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          cache-dependencies: false
+      - name: Build MSI from signed application image
+        shell: bash
+        run: scripts/release/build-windows-package.sh --msi-from-app
+      - name: Sign Windows MSI
+        uses: azure/trusted-signing-action@v1.2.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_TRUSTED_SIGNING_PROFILE }}
+          files-folder: desktop/target/dist/windows
+          files-folder-recurse: false
+          files-folder-filter: msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+          cache-dependencies: false
+      - name: Verify, smoke test, and normalize Windows release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Resolve-Path 'desktop/target/dist/windows/ChonkCraft/ChonkCraft.exe'
+          $msi = Get-ChildItem 'desktop/target/dist/windows' -Filter *.msi | Select-Object -First 1
+          if (-not $msi) { throw 'Windows build did not produce an MSI.' }
+          foreach ($file in @($exe.Path, $msi.FullName)) {
+            $signature = Get-AuthenticodeSignature $file
+            if ($signature.Status -ne 'Valid') {
+              throw "Invalid Authenticode signature on ${file}: $($signature.Status)"
+            }
+          }
+          $smokeHome = Join-Path $env:RUNNER_TEMP 'chonkcraft-release-smoke'
+          $render = Join-Path $smokeHome 'launcher.png'
+          New-Item -ItemType Directory -Force -Path $smokeHome | Out-Null
+          $process = Start-Process -FilePath $exe.Path `
+            -ArgumentList @('--home', $smokeHome, '--render', $render) -Wait -PassThru
+          if ($process.ExitCode -ne 0 -or -not (Test-Path $render)) {
+            throw 'Packaged Windows launcher smoke test failed.'
+          }
+          $outputDir = 'desktop/target/dist/installers'
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+          $output = Join-Path $outputDir "ChonkCraft-$env:CHONKCRAFT_VERSION-windows-x64.msi"
+          Copy-Item $msi.FullName $output
+          $hash = (Get-FileHash $output -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $([IO.Path]::GetFileName($output))" | Set-Content "$output.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chonkcraft-windows
+          path: desktop/target/dist/installers/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish installers and update website catalog
+    needs: [validate, macos, linux, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://chonkbase.net/chonkcraft
+    env:
+      CHONKCRAFT_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: chonkcraft-*
+          path: desktop/target/dist/downloaded
+      - name: Normalize the complete installer set
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="desktop/target/dist/installers"
+          mkdir -p "$destination"
+          mac="$(find desktop/target/dist/downloaded/chonkcraft-macos -name '*.dmg' -print -quit)"
+          test -s "$mac"
+          mac_out="$destination/ChonkCraft-${CHONKCRAFT_VERSION}-macos-arm64.dmg"
+          cp "$mac" "$mac_out"
+          sha256sum "$mac_out" > "$mac_out.sha256"
+          find desktop/target/dist/downloaded/chonkcraft-linux -maxdepth 1 -type f -exec cp {} "$destination/" \;
+          find desktop/target/dist/downloaded/chonkcraft-windows -maxdepth 1 -type f -exec cp {} "$destination/" \;
+          for platform in macos-arm64.dmg windows-x64.msi linux-x64.AppImage; do
+            test -s "$destination/ChonkCraft-${CHONKCRAFT_VERSION}-$platform"
+            test -s "$destination/ChonkCraft-${CHONKCRAFT_VERSION}-$platform.sha256"
+          done
+      - name: Load least-privilege publisher credentials
+        shell: bash
+        env:
+          KUBECONFIG_B64: ${{ secrets.CHONKCRAFT_UPDATES_KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "$KUBECONFIG_B64"
+          install -d -m 0700 "$RUNNER_TEMP/kube"
+          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$RUNNER_TEMP/kube/config"
+          chmod 0600 "$RUNNER_TEMP/kube/config"
+          echo "KUBECONFIG=$RUNNER_TEMP/kube/config" >> "$GITHUB_ENV"
+      - name: Verify publisher is narrowly scoped
+        shell: bash
+        run: |
+          set -euo pipefail
+          kubectl auth can-i get pods -n chonkcraft-updates | grep -qx yes
+          kubectl auth can-i create pods --subresource=exec \
+            -n chonkcraft-updates | grep -qx yes
+          if kubectl auth can-i get secrets -n chonkcraft-updates | grep -qx yes; then
+            echo "Publisher unexpectedly has Secret read access." >&2
+            exit 1
+          fi
+      - name: Publish immutable installers and switch the catalog
+        run: scripts/release/publish-installer-kubernetes.sh
+      - name: Create or update complete GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRAFT: ${{ needs.validate.outputs.draft }}
+          RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          tag="v${CHONKCRAFT_VERSION}"
+          title="ChonkCraft ${CHONKCRAFT_VERSION}"
+          notes="Cross-platform ChonkCraft launcher. Bring your own original Warcraft II media; the launcher keeps game code current automatically."
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            flags=(--title "$title")
+            [[ "$RELEASE_DRAFT" == true ]] && flags+=(--draft) || flags+=(--draft=false)
+            [[ "$RELEASE_PRERELEASE" == true ]] && flags+=(--prerelease) || flags+=(--prerelease=false)
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
+          else
+            flags=(--target "$GITHUB_SHA" --title "$title" --notes "$notes")
+            [[ "$RELEASE_DRAFT" == true ]] && flags+=(--draft)
+            [[ "$RELEASE_PRERELEASE" == true ]] && flags+=(--prerelease)
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" "${flags[@]}"
+          fi
+          gh release upload "$tag" desktop/target/dist/installers/* \
+            --clobber --repo "$GITHUB_REPOSITORY"

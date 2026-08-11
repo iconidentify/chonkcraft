@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.chonkbase.chonkcraft</groupId>
+        <artifactId>chonkcraft-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>chonkcraft-extractor</artifactId>
+    <name>ChonkCraft Asset Pack Extractor</name>
+
+    <!--
+      Turns a 1995 Warcraft II installation into one asset pack.
+
+      A build-time tool, not part of the game. It depends on chonk-assetpack
+      for the format and chonkcraft-data for the 1995 file formats, and on nothing
+      in engine or desktop. That is deliberate and enforced: the pack is the
+      only thing the game and the extractor share, so the extractor cannot
+      grow an opinion about how the game works, and the game cannot start
+      depending on being able to read the original data.
+
+      IsolationTest fails the build if a dependency on the engine or the
+      desktop layer ever appears here.
+    -->
+
+    <dependencies>
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonk-assetpack</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>net.chonkbase.chonkcraft</groupId>
+            <artifactId>chonkcraft-data</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

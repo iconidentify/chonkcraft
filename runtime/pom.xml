@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>net.chonkbase.chonkcraft</groupId>
+        <artifactId>chonkcraft-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>chonk-runtime</artifactId>
+    <name>Chonk Runtime</name>
+
+    <!--
+      Vendored copy of seven-days-to-tomorrow/runtime. Everything under
+      net.chonkbase.runtime is kept identical to upstream so that
+      scripts/sync-runtime.sh is a plain diff; only this pom differs, and only
+      in its parent coordinates. ChonkCraft-specific code belongs in the engine
+      module, not here.
+    -->
+
+    <dependencies>
+        <!--
+          SDL2 controller bindings. The Java layer is always present; the
+          platform native remains optional and ControllerSession fails soft
+          when it is unavailable on a developer machine.
+        -->
+        <dependency>
+            <groupId>io.github.libsdl4j</groupId>
+            <artifactId>libsdl4j</artifactId>
+        </dependency>
+        <!-- Explicitly pin JNA rather than inheriting LibSDL4J's transitive line. -->
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
