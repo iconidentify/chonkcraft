@@ -131,6 +131,38 @@ class ConstructionTest {
     }
 
     @Test
+    @DisplayName("an inside builder continues to the fixed BNE footprint point")
+    void insideBuilderContinuesToTheFixedFootprintPoint() {
+        World world = richWorld(40);
+        Unit worker = world.createUnit(peasant(), 0, 16, 28);
+        UnitType farm = farm();
+
+        assertTrue(world.orderBuild(worker, farm, 16, 15));
+        assertEquals(16, worker.buildGoalX());
+        assertEquals(16, worker.buildGoalY(),
+                "a worker south of a two-tile footprint aims at its south edge");
+
+        // XHuman 6's short free-prefix lands on the other square inside the
+        // same footprint.  Being inside is not arrival: native still lays S.
+        world.markOccupancy(worker, false);
+        worker.setTile(16, 15);
+        world.markOccupancy(worker, true);
+        worker.setBuildWalked(true);
+        worker.setRouteSpent(true);
+        worker.setBattleNetGoldFreePrefix(true);
+        worker.setWaitCycles(0);
+
+        world.tick();
+
+        assertEquals(0, worker.waitCycles(),
+                "the wrong footprint square must not arm the arrival PF wait");
+        assertTrue(worker.pathLength() > 0
+                        || worker.tileY() == worker.buildGoalY(),
+                "the builder must retain or take the final south heading");
+        assertEquals(Unit.Order.BUILD, worker.order());
+    }
+
+    @Test
     void aWorkerWalksToTheSiteAndPutsUpABuilding() {
         World world = richWorld(30);
         Unit worker = world.createUnit(peasant(), 0, 3, 3);

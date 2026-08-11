@@ -2,9 +2,9 @@
 
 Date: 2026-08-11
 
-Released-base control: `cb51738d`
+Second-wave base control: `33b9318d`
 
-Implementation branch: `codex/bne-top-three-convergence`
+Implementation branch: `codex/bne-top-three-convergence-2`
 
 This checkpoint completes the three highest-leverage parity efforts selected
 by the audit: deeper authenticated state comparison, a controlled native
@@ -103,11 +103,76 @@ The next independent AI item is now XHuman 6's extra building at cycle 311.
 - Player-command ownership, both queue clocks, and the interrupted current
   action now survive save/load and participate in the multiplayer sync hash.
 
+## Second-wave closure: movement, combat causality, and the AI queue
+
+The next audit reused the authenticated command corpus and player-state ranker
+to close the first concrete finding in each of the three highest-impact lanes.
+
+### Movement and refusal lifecycle
+
+The remaining four air-command subjects were not four unrelated patrol bugs.
+They shared two lifecycle errors: a doubled flyer finishing its route invented
+an extra wait, and a spent point route did not preserve retail's occupied-step
+refusal. The same investigation found that a unit with a non-zero native
+refusal count must remain solid to the planner's soft-clear view.
+
+After the general correction, all four north/east/south/west air subjects are
+exact for position, hit points, order and heading through all 160 measured
+cycles. Across the full dense 52-case field corpus, paired positions improve
+by 511 and decision mismatches fall from 6,588 to 5,922, a 10.1% reduction,
+with no earlier semantic regression.
+
+The Human mission 5 save captured during this work was also replayed directly.
+Its former barracks occupied tiles 46–48 by 92–94. The loaded world contains
+no stale building or unit flag on any of those nine tiles, and the selected
+archer at 45,94 accepts the real player command and crosses the footprint to
+49,94. A focused lifecycle test now requires a killed building to become
+non-solid rubble immediately and requires a ground unit to traverse the whole
+former footprint while that rubble is still visible.
+
+### Combat causal pipeline
+
+XHuman 10's cycle-42 casualty mismatch was not a projectile or damage error:
+native footman 1492 and Java unit 108 enter Die on the same cycle at the same
+position and hit points. The mismatch came from score and kill accounting
+living in a desktop-side corpse observer. Headless and multiplayer simulation
+therefore omitted state which retail commits at the lethal hit.
+
+Kill ownership, points, kills and razings now commit synchronously in
+`World.kill`; the desktop no longer mutates deterministic player state, and
+the trace excludes a unit from the live roster on the cycle it enters Die.
+XHuman 10 is exact for all 9,000 player-state comparisons through cycle 100,
+and XHuman 2's formerly identical cycle-43 casualty mismatch disappears. The
+next combat item is now a real damage/event-order mismatch: Human 13 at cycle
+97, rather than another accounting artifact.
+
+### Independent AI-executive queue
+
+The player-state ranker's next item, XHuman 6's extra building at cycle 311,
+was also downstream rather than a new AI policy. Retail's refused ogre and the
+Java ogre now share the same movement transition; that exposed a worker which
+was allowed to found a building one tile before reaching its fixed BNE
+footprint point. Inside builders now require that exact stored point rather
+than the broad footprint-range predicate.
+
+XHuman 6 is exact for all 35,700 player-state comparisons through cycle 340,
+and its coarse first divergence moves from cycle 103 to 162. The next genuinely
+independent executive item is Orc 9's cycle-1,236 supply decision.
+
+### Second-wave regression proof
+
+- 60 focused movement, construction, combat and scoring tests pass.
+- The full 52-case semantic-v1 survey through cycle 200 remains 4 clean,
+  48 divergent and 0 failed, matching the clean baseline with no regression.
+- XHuman 6 and XHuman 10 have separate exact player-state proofs; neither
+  result is inferred from the aggregate survey.
+
 ## Next queue
 
-1. Mine the four scout subject divergences at cycle 134 as one long-patrol
-   route/refusal cluster; do not reopen the now-exact command boundary.
-2. Use the AI ranker's XHuman 6 cycle-311 building mismatch to identify the
-   next independent executive branch.
+1. Mine Human 13's true cycle-97 damage/event-order mismatch from the exact
+   projectile, attack-marker and RNG ledgers; the casualty accounting layer is
+   now closed and must not be reopened.
+2. Use the AI ranker's Orc 9 cycle-1,236 supply decision to identify the next
+   independent executive branch; XHuman 6's construction timing is closed.
 3. Map unit-facing and order-point representations into semantic-v2 only after
    native evidence proves their conversion; do not manufacture equality.

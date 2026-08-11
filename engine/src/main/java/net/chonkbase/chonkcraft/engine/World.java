@@ -8102,7 +8102,7 @@ public final class World {
                 "moving=%d moveanim=%d seqoff=%d movestart=%d attackstart=%d "
                         + "pathn=%d spent=%d drained=%d holding=%d "
                         + "ox=%d oy=%d coll=%d refusals=%d wait=%d delay=%d "
-                        + "chasing=%d order=%s",
+                        + "chasing=%d freeprefix=%d freeprefixn=%d order=%s",
                 unit.isMoving() ? 1 : 0,
                 battleNetMoveAnimation(unit) ? 1 : 0,
                 unit.battleNetSequenceOffset(), move, attack,
@@ -8112,6 +8112,8 @@ public final class World {
                 unit.battleNetCollisionCounter(), unit.battleNetRefusals(),
                 unit.waitCycles(),
                 unit.battleNetOrderDelay(), unit.chasing() ? 1 : 0,
+                unit.battleNetGoldFreePrefix() ? 1 : 0,
+                unit.battleNetGoldFreePrefixLength(),
                 unit.order())
                 + " route=" + battleNetFieldParityRoute(unit);
     }
@@ -9514,7 +9516,7 @@ public final class World {
     /**
      * Credits a kill to the side that made it.
      *
-     * <p>{@code HitUnit_IncreaseScoreForKill},, called
+     * <p>{@code HitUnit_IncreaseScoreForKill}, called
      * from {@code HitUnit} under {@code if (target.IsEnemy(*attacker))}. The
      * port had no notion of who struck the last blow, so the score was banked
      * by every player who counted the dead unit as an enemy. Two sides cannot
@@ -9522,17 +9524,32 @@ public final class World {
      * sided, which is how it survived; in a three-sided game it hands a
      * bystander points for a fight it took no part in.
      *
-     * <p>The killer is also recorded on the dead unit, so anything that looks
-     * at the field afterwards -- an end-of-mission tally, the kill and razing
-     * counters -- can ask who did it rather than guessing.
+     * <p>The scorer, kill/razing tally, and last-blow owner are all committed
+     * in this simulation event. A renderer is never part of game state.
      */
     private void creditKill(Unit victim, Unit killer) {
-        // Records who is owed the kill; does not pay it. ScoreKeeper banks it,
-        // and it is the only thing that does -- it already carries the
-        // seen-once set that stops a unit being paid for twice as it dies over
-        // several cycles, and the kill and razing tallies that go with the
-        // points. Paying here as well credited every kill twice.
-        victim.setKilledBy(killer == null ? -1 : killer.player());
+        int killerPlayer = killer == null ? -1 : killer.player();
+        victim.setKilledBy(killerPlayer);
+        if (killerPlayer < 0 || !isEnemyPlayer(killerPlayer, victim.player())) {
+            return;
+        }
+        Player scorer = player(killerPlayer);
+        if (scorer == null || !scorer.isActive()) {
+            return;
+        }
+        // HitUnit_IncreaseScoreForKill is part of the lethal hit, before the
+        // victim enters Die.  Deferring this to the desktop render loop made
+        // score and kill state absent from headless and multiplayer worlds,
+        // and one cycle late even when a screen happened to be running.
+        // XHuman 10 is the authenticated witness: footman 1492 enters Die at
+        // fixture 42 and retail's unit and kill counters change in that same
+        // snapshot.  kill() is already guarded against a second transition,
+        // so this is naturally paid once without a corpse-scanning sidecar.
+        int points = victim.type() == null ? 0 : victim.type().points();
+        if (points > 0) {
+            scorer.addScore(points);
+        }
+        scorer.addKill(victim.type() != null && victim.type().building());
     }
 
     /**

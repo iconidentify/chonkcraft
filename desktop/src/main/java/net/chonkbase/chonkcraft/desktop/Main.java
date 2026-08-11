@@ -1879,10 +1879,6 @@ public final class Main {
         if (panel != null) {
             panel.setFogOpacity(data.fogOfWar().minimapLevels());
         }
-        // Points for kills, which is the figure UI.Resources[ScoreCost]
-        // reserves a place for in every layout the game ships.
-        net.chonkbase.chonkcraft.engine.ScoreKeeper scores =
-                new net.chonkbase.chonkcraft.engine.ScoreKeeper(world);
         // Only the launcher knows where the world came from, so it is what
         // tells the screen how to write itself back out.
         screen.setLayout(layout);
@@ -1955,7 +1951,6 @@ public final class Main {
                 try {
                     for (int i = 0; i < afterCycles; i++) {
                         world.tick();
-                        scores.update();
                     }
                     // -Dchonkcraft.screenshot.select=unit-peasant picks that unit
                     // before the picture is taken. Without it a screenshot can
@@ -2293,9 +2288,6 @@ public final class Main {
             } else {
                 world.tick();
             }
-            // After the advance, so the deaths it caused are banked before the
-            // panel next draws the figure.
-            scores.update();
             if (mission != null) {
                 // The mission's own victory and defeat conditions, run once a
                 // second by the trigger system rather than every cycle.

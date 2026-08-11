@@ -537,7 +537,8 @@ public final class EngineTrace {
             int buildings = 0;
             for (Unit unit : world.units()) {
                 if (unit.player() != player.index() || unit.type() == null
-                        || unit.destroyed() || unit.type().revealer()) {
+                        || unit.destroyed() || unit.isDying()
+                        || unit.type().revealer()) {
                     continue;
                 }
                 if (unit.type().building()) {

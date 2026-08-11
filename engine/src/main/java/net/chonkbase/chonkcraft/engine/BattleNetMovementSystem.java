@@ -246,7 +246,17 @@ final class BattleNetMovementSystem {
                 finishBattleNetMoveAtTarget(unit);
                 return;
             }
-            if (spendTheEmptyRoute(unit)) {
+            // A route whose last stored tile borders its occupied point goal
+            // has not produced the ordinary empty-buffer PF_WAIT. Native
+            // goes straight through FUN_004379e0: XHuman 6 ogre 1495 drains
+            // at 14,88 beside its moving peon goal at 13,89, increments the
+            // refusal nibble on fixtures 87..94, then serves the eighth-
+            // refusal fifteen-count before stepping SW on 109. Paying the
+            // generic ten here postponed the first refusal until 98 and an
+            // empty replan promoted Still after only five of them.
+            if (battleNetOccupiedPointRefusal(unit)) {
+                unit.setRouteSpent(false);
+            } else if (spendTheEmptyRoute(unit)) {
                 // Every PF_WAIT runs the blocker test, the count-born one
                 // included: {@code COrder_Move::Execute}'s wait arm
                 // The game does not care where the
@@ -655,7 +665,8 @@ final class BattleNetMovementSystem {
         // counter alone answers this square the way 0x00450766 does 98.36% of
         // the time and the pair 99.13%, and every one of the mistakes it
         // removes is a unit this implementation stood aside where native holds.
-        if (candidate.battleNetCollisionCounter() > 0) {
+        if (candidate.battleNetCollisionCounter() > 0
+                || candidate.battleNetRefusals() > 0) {
             return false;
         }
         // Ranged multi leftover residual nearly settled while already in
@@ -1250,6 +1261,20 @@ final class BattleNetMovementSystem {
         return true;
     }
 
+    /** Whether a spent point route terminates in a live occupied step. */
+    boolean battleNetOccupiedPointRefusal(Unit unit) {
+        if (!unit.routeSpent()
+                || unit.order() != Unit.Order.MOVE
+                || unit.pathGoalX() < 0 || unit.pathGoalY() < 0
+                || Math.max(Math.abs(unit.tileX() - unit.pathGoalX()),
+                        Math.abs(unit.tileY() - unit.pathGoalY())) != 1) {
+            return false;
+        }
+        Unit blocker = world.blockerOnLayer(
+                unit, unit.pathGoalX(), unit.pathGoalY());
+        return blocker != null && blocker != unit && blocker.isAlive();
+    }
+
 
     void stepMove(Unit unit) {
         stepMove(unit, true);
@@ -1641,6 +1666,15 @@ final class BattleNetMovementSystem {
                         && unit.routeSpent()
                         && battleNetCommandPointReached(unit)) {
                     finishBattleNetMoveAtTarget(unit);
+                    return;
+                }
+                if (battleNetOccupiedPointRefusal(unit)) {
+                    // Residual settled during this visit. Native consults the
+                    // occupied terminal element now, not on the following
+                    // tick, so let the ordinary move executor lay and refuse
+                    // that one-heading route in the same visit.
+                    unit.setRouteSpent(false);
+                    stepMoveOrder(unit);
                     return;
                 }
                 if (spendTheEmptyRoute(unit)) {
@@ -3282,13 +3316,17 @@ final class BattleNetMovementSystem {
             }
             unit.setLastStepHeading(heading);
             unit.turnTo(heading);
-            // Patrol free-prefix after three consecutive identical headings:
-            // native writes route_index 20 and drains residual without taking
-            // the fourth (Orc 11 archers 1559/1560/1563 and knight 1558's
-            // NW+NE+NE+NE trailing run). stepsTaken>=3 alone REGs the knight's
-            // fourth step. Only walkTowards-borrowed patrol (patrol home set,
-            // no resource attachment) so gold/wood corridors keep long runs.
-            if (unit.pathLength() > 0
+            // Ground-patrol free-prefix after three consecutive identical
+            // headings: native writes route_index 20 and drains residual
+            // without taking the fourth (Orc 11 archers 1559/1560/1563 and
+            // knight 1558's NW+NE+NE+NE trailing run). The route-index rule
+            // is not used by the doubled movement lattice: Human 12's
+            // commanded zeppelin keeps E,E,E,E,NE and takes the diagonal on
+            // fixture 134. Applying the ground rule there cleared the route
+            // after its third east leg, and the replacement route postponed
+            // that north-east leg by one full twenty-cycle flight beat.
+            if (!unit.battleNetDoubleStep()
+                    && unit.pathLength() > 0
                     && unit.battleNetSameHeadingRun() >= 3
                     && unit.battleNetBorrowedMoveForStep()
                     && unit.patrolX() >= 0

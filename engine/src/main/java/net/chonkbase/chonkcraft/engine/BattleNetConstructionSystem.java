@@ -611,6 +611,13 @@ final class BattleNetConstructionSystem {
                         ? worker.buildGoalY() : siteY;
                 int cheb = Math.max(Math.abs(goalX - worker.tileX()),
                         Math.abs(goalY - worker.tileY()));
+                if (World.BNE_IDLE_TRACE) {
+                    System.err.printf("JBNBUILDWALK cycle=%d unit=%d at=%d,%d "
+                                    + "goal=%d,%d cheb=%d range=%d free=%d%n",
+                            world.cycle, worker.id(), worker.tileX(),
+                            worker.tileY(), goalX, goalY, cheb, maxRange,
+                            worker.battleNetGoldFreePrefix() ? 1 : 0);
+                }
                 if (cheb > maxRange) {
                     worker.setRouteSpent(false);
                     worker.setBattleNetGoldFreePrefix(false);
@@ -1178,7 +1185,22 @@ final class BattleNetConstructionSystem {
         // Upstream's builder is Moving through the last of it -- on 2-players
         // it is on its site from cycle 62 and still Moving until 76 -- and it
         // is the cycle it stops on that the path runs out under it.
-        boolean atSite = away <= reach && away >= nearest;
+        // Retail's build order walks to the fixed point chosen when the
+        // order is installed, not merely to any square in the footprint.
+        // The rectangle remains the placement test, but an inside-builder
+        // is not at the end of its walk until it reaches that point.  In
+        // XHuman 6 the pig-farm peon entered the top-left footprint square
+        // (16,85) while its fixed point was the south edge (16,86); native
+        // laid one final S route and founded five cycles later.  Treating the
+        // first footprint square as arrival founded immediately and made the
+        // AI look as though it had issued the build early.
+        boolean exactPointArrival = !what.builderOutside()
+                && what.onTopRule() == null
+                && worker.buildGoalX() >= 0 && worker.buildGoalY() >= 0;
+        boolean atSite = exactPointArrival
+                ? worker.tileX() == worker.buildGoalX()
+                        && worker.tileY() == worker.buildGoalY()
+                : away <= reach && away >= nearest;
         // Upstream does not measure whether it has arrived; it asks.
         // {@code COrder_Build}'s walk goes through {@code DoActionMove} like
         // any other, so the cycle a builder's route runs out costs the usual

@@ -78,6 +78,8 @@ class ScoreKeeperTest {
         assertEquals(0, world.player(0).score(), "nothing has died yet");
 
         world.kill(theirs, mine);
+        assertEquals(50, world.player(0).score(),
+                "the lethal simulation event banks the score before any observer runs");
         scores.update();
         assertEquals(50, world.player(0).score(), "the enemy footman was worth fifty");
         assertEquals(0, world.player(1).score(), "the side that lost it scores nothing");
