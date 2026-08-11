@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2143 tests,  17 skipped
-    no external input          2143 tests, 696 skipped
+    authenticated inputs       2157 tests,  17 skipped
+    no external input          2157 tests, 699 skipped
 
 Both can be green.
 
@@ -130,7 +130,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 3),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1309, 412),
+        "engine": (1323, 415),
         "desktop": (287, 231),
         "matchmaker-server": (4, 0),
     },
@@ -171,7 +171,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1309, 2),
+        "engine": (1323, 2),
         "desktop": (287, 6),
         "matchmaker-server": (4, 0),
     },
