@@ -445,7 +445,7 @@ final class RenderingTruth {
                 if (!declared.dependUpgrade().isEmpty()) {
                     world.upgrades(local).complete(declared.dependUpgrade());
                 }
-                if (world.orderCast(wizard, candidate, defenders.get(0))) {
+                if (orderStagedSpell(world, wizard, candidate, defenders.get(0))) {
                     spell = candidate;
                     break;
                 }
@@ -606,8 +606,8 @@ final class RenderingTruth {
                 for (Unit other : scene.world().unitsSnapshot()) {
                     if (other.isAlive() && other.player() == staged.enemy()
                             && other.type() != null && !other.type().building()
-                            && scene.world().orderCast(
-                                    staged.wizard(), staged.spell(), other)) {
+                            && orderStagedSpell(
+                                    scene.world(), staged.wizard(), staged.spell(), other)) {
                         break;
                     }
                 }
@@ -689,6 +689,18 @@ final class RenderingTruth {
             }
         }
         return new Report(scene.label(), measured, skipped, invisible, misplaced, paints);
+    }
+
+    /** Uses the same unit/position distinction as the production command path. */
+    private static boolean orderStagedSpell(
+            World world, Unit caster, String spellIdent, Unit target) {
+        var spell = world.spells().get(spellIdent);
+        if (spell != null
+                && spell.target()
+                        == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION) {
+            return world.orderCast(caster, spellIdent, target.tileX(), target.tileY());
+        }
+        return world.orderCast(caster, spellIdent, target);
     }
 
     /**
