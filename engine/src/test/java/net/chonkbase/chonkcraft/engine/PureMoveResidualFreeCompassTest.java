@@ -91,6 +91,15 @@ class PureMoveResidualFreeCompassTest {
         ally.setBattleNetCollisionCounter(1);
         assertFalse(world.movement.battleNetSoftClearMoveAlly(ally),
                 "elevated collision keeps occupancy (native unit+0x1d high nibble)");
+
+        // Java keeps the sticky 0x1d refusal history separately because its
+        // short-lived collision proxy is cleared by several replan arms.
+        // Native has one nibble, so either representation must keep the body
+        // solid to wall-follow.
+        ally.setBattleNetCollisionCounter(0);
+        ally.setBattleNetRefusals(8);
+        assertFalse(world.movement.battleNetSoftClearMoveAlly(ally),
+                "sticky refusal history also keeps native occupancy solid");
     }
 
     @Test
@@ -214,6 +223,40 @@ class PureMoveResidualFreeCompassTest {
         assertEquals(9, mover.tileY(), "NE from 8,10 lands y 9");
     }
 
+    @Test
+    @DisplayName("an exhausted point route beside its occupied goal refuses without PF_WAIT")
+    void anExhaustedPointRouteBesideItsOccupiedGoalRefusesWithoutPfWait() {
+        // XHuman 6 ogre 1495: its initial route drains beside the moving peon
+        // on its exact order point. Native increments unit+0x1d from 1 to 8
+        // on consecutive fixtures 87..94; the eighth refusal owns the
+        // fifteen-count. The generic empty-route pause delayed Java ten
+        // cycles before it even attempted this terminal step.
+        GameMap map = grass(24);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        Unit mover = world.createUnit(ogre(), 0, 10, 10);
+        Unit blocker = world.createUnit(ogre(), 0, 9, 11);
+        assertTrue(mover != null && blocker != null, "units place");
+
+        mover.setOrder(Unit.Order.MOVE);
+        mover.setPathGoal(9, 11);
+        mover.setOrderTarget(9, 11);
+        mover.clearPath();
+        mover.setRouteSpent(true);
+        mover.setStepDrained(true);
+        blocker.setOrder(Unit.Order.MOVE);
+        blocker.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND, new int[] {NW, NW}));
+        blocker.setOffset(16, -16);
+
+        assertTrue(world.movement.battleNetOccupiedPointRefusal(mover),
+                "the spent adjacent point route must select the refusal boundary");
+        world.movement.stepMoveOrder(mover);
+
+        assertEquals(0, mover.waitCycles(),
+                "first refusal must not inherit the empty-route PF_WAIT ten");
+    }
+
     private static UnitType archer() {
         UnitType type = new UnitType("unit-archer");
         type.setTileSize(1, 1);
@@ -309,5 +352,42 @@ class PureMoveResidualFreeCompassTest {
         takePatrolTileSteps(world, knight, 1);
         assertEquals(0, knight.pathLength(),
                 "third consecutive NE (fourth tile step) discards leftover");
+    }
+
+    @Test
+    @DisplayName("a doubled patrol keeps a long straight route")
+    void aDoubledPatrolKeepsALongStraightRoute() {
+        // Human 12 zeppelin 1500: retail keeps E,E,E,E,NE in one route and
+        // turns north-east on fixture 134. Ground patrols discard their
+        // leftover after three equal headings; doubled movers do not.
+        GameMap map = grass(40);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.restoreRandom(1, 0);
+
+        Unit zeppelin = world.createUnit(archer(), 0, 4, 20);
+        assertTrue(zeppelin != null, "zeppelin places");
+        zeppelin.setBattleNetDoubleStep(true);
+        assertTrue(world.orderPatrol(zeppelin, 30, 18),
+                "zeppelin accepts patrol");
+
+        // Stack order: travel E four times, then NE.
+        zeppelin.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {NE, E, E, E, E}));
+        zeppelin.setPathGoal(-1, -1);
+
+        takePatrolTileSteps(world, zeppelin, 4);
+        assertEquals(12, zeppelin.tileX(),
+                "four doubled east steps land eight tiles east");
+        assertEquals(20, zeppelin.tileY(),
+                "four doubled east steps retain the row");
+        assertEquals(1, zeppelin.pathLength(),
+                "doubled patrol retains the diagonal after four equal headings");
+
+        takePatrolTileSteps(world, zeppelin, 1);
+        assertEquals(14, zeppelin.tileX(),
+                "retained doubled north-east step advances x");
+        assertEquals(18, zeppelin.tileY(),
+                "retained doubled north-east step advances y");
     }
 }

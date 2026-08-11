@@ -381,6 +381,10 @@ class CombatFeedbackTest {
         UnitType rubble = soldier("unit-destroyed-4x4-place");
         rubble.setTileSize(4, 4);
         rubble.setBuilding(true);
+        // Retail's destroyed-place types are visual debris, not a second
+        // invisible building.  Their Vanishes flag keeps the old footprint
+        // traversable for the whole 400-cycle rubble animation.
+        rubble.setVanishes(true);
         rubble.setSpeed(0);
         AnimationSet decay = new AnimationSet("destroyed-place");
         decay.put(AnimationSet.State.DEATH, Animation.parse("death",
@@ -399,6 +403,9 @@ class CombatFeedbackTest {
         world.setUnitTypes(Map.of("unit-destroyed-4x4-place", rubble, "unit-town-hall", hall));
 
         Unit building = world.createUnit(hall, 0, 10, 10);
+        Unit mover = world.createUnit(soldier("unit-footman"), 0, 8, 11);
+        assertFalse(world.canEnter(mover, 10, 11),
+                "the standing keep must occupy its footprint before it dies");
         world.kill(building);
         world.tick();
 
@@ -406,6 +413,23 @@ class CombatFeedbackTest {
                         .anyMatch(unit -> "unit-destroyed-4x4-place".equals(unit.type().ident())),
                 "the keep stood there undamaged behind its own explosion; upstream's "
                         + "COrder_Die::Execute swaps it for rubble on the same cycle");
+        for (int y = 10; y < 14; y++) {
+            for (int x = 10; x < 14; x++) {
+                assertEquals(0, world.map().field(x, y).flags() & TileFlag.BUILDING,
+                        "rubble retained invisible building occupancy at " + x + "," + y);
+            }
+        }
+        assertTrue(world.canEnter(mover, 10, 11),
+                "a ground unit cannot enter the demolished building's open footprint");
+        assertTrue(world.orderMove(mover, 15, 11),
+                "the move through the former footprint was refused");
+        for (int cycle = 0; cycle < 500 && mover.order() != Unit.Order.STILL; cycle++) {
+            world.tick();
+        }
+        assertEquals(15, mover.tileX(),
+                "the ground unit did not cross the demolished building's footprint");
+        assertEquals(11, mover.tileY(),
+                "the ground unit detoured away from the demolished footprint");
     }
 
     @Test
@@ -572,11 +596,8 @@ class CombatFeedbackTest {
         while (victim.isAlive()) {
             world.hit(killer, victim);
         }
-        // The score is banked by ScoreKeeper, which is the one place that does
-        // it: it carries the seen-once set that stops a corpse being paid for
-        // on every cycle it lingers, and the kill and razing tallies that go
-        // with the points. The world's job is only to record who did it.
-        new ScoreKeeper(world).update();
+        // HitUnit_IncreaseScoreForKill is part of the lethal simulation event,
+        // not a later renderer pass.
 
         assertEquals(50, world.player(1).score(), "the side that made the kill banks it");
         assertEquals(0, world.player(0).score(),

@@ -1,10 +1,10 @@
-# ChonkCraft 0.1.1-beta12 — Native Movement Convergence
+# ChonkCraft 0.1.1-beta13 — Construction, Combat, and Movement Fidelity
 
-- Replaced guessed player-command delays with timing derived directly from each unit's Battle.net Edition animation sequence.
-- Corrected command completion for ground, naval, and flying units, including occupied destinations, terminal route steps, shoreline targets, and the native doubled movement lattice used by flyers.
-- Prevented autonomous target acquisition from stealing the end of an explicit player movement order.
-- Recreated native patrol interruption and resumption: a commanded patrol unit completes the player's order, consumes the correct endpoint random draws, chooses a fresh patrol destination, and resumes on the retail cadence.
-- Preserved the new command, delay, and interrupted-action state through save/load and included it in multiplayer synchronization hashes.
-- Expanded the authenticated movement playability inventory from 85 to 87 checks.
-- Raised the controlled command corpus from 0 of 19 to 19 of 19 exact cases through the command horizon, with all ground, naval, and occupied-air subjects remaining exact through the full 160-cycle certification window.
-- Passed the 52-campaign regression gate with zero regressions and the complete 17-lane authenticated playability certification.
+- Corrected builders that entered a construction footprint too early: they now finish the exact Battle.net Edition approach to the stored build point before founding the structure.
+- Recreated the occupied-destination refusal sequence used when a unit's route ends beside a moving blocker, including the native retry cadence and solid-to-soft congestion transition.
+- Preserved long terminal flight routes so air units no longer invent an extra pause before their final diagonal step.
+- Moved kill scores, kill counts, and razing counts into the deterministic simulation event where the lethal hit occurs. Headless games and multiplayer now receive the same immediate result as the visible desktop game.
+- Removed the old render-loop score sidecar and aligned parity traces with Battle.net Edition by excluding units already in their death lifecycle from live-unit totals.
+- Added regression coverage for exact construction arrival, occupied point refusals, long flyer routes, synchronous scoring, and traversal across a destroyed building's former footprint.
+- Investigated the reported Human Mission 5 blocked-barracks area from the saved game: the destroyed footprint is clear in the saved world and ground units cross it under the real player-command path; the lifecycle is now protected by an automated regression test.
+- Completed a clean build of every Java module and passed the focused gameplay suite, documentation gate, and 52-campaign semantic regression survey with zero failed fixtures.
