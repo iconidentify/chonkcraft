@@ -1,12 +1,10 @@
-# ChonkCraft 0.1.1-beta11 — BNE Gameplay and Feedback Update
+# ChonkCraft 0.1.1-beta12 — Native Movement Convergence
 
-- Completed the remaining Battle.net Edition movement and refusal edge states, including congestion recovery, large-unit footprints, chase refusal, crowded shoreline unloading, and native one-tile/two-tile transport transitions.
-- Completed projectile and combat-effect lifecycles: launch orientation, flight cadence, impact and vanish timing, interrupted-shot cleanup, persistent land mines, Flame Shield, Whirlwind, Runes, Death Coil healing, and the green-cross order marker.
-- Implemented the previously inert retail spell callbacks for Eye of Kilrogg, Polymorph, and Unholy Armor using authenticated Warcraft II BNE executable evidence.
-- Restored neutral critter voices and certified unit selection, destruction, work-complete, and interaction feedback against the authenticated BNE media pack.
-- Hardened harvesting and oil interactions so workers resume valid tree orders and ships no longer oscillate or strand cargo during congested approaches.
-- Preserved persistent effects and terrain state through save/load, preventing stale projectile art and black map squares after restoring a game.
-- Added deterministic in-game chat with connected-player presence and local muting across direct and online multiplayer sessions.
-- Standardized player-facing BNE status messages and corrected several clipped or stale interface states.
-- Rebuilt the resource strip as one visually verified group: every icon stays attached to its value and every counter has identical inter-group spacing at all supported UI scales.
-- Expanded the authenticated certification gates to 85 movement checks, 54 projectile/feedback checks, 36 spell checks, and 21 sound checks, all passing with zero skipped evidence tests.
+- Replaced guessed player-command delays with timing derived directly from each unit's Battle.net Edition animation sequence.
+- Corrected command completion for ground, naval, and flying units, including occupied destinations, terminal route steps, shoreline targets, and the native doubled movement lattice used by flyers.
+- Prevented autonomous target acquisition from stealing the end of an explicit player movement order.
+- Recreated native patrol interruption and resumption: a commanded patrol unit completes the player's order, consumes the correct endpoint random draws, chooses a fresh patrol destination, and resumes on the retail cadence.
+- Preserved the new command, delay, and interrupted-action state through save/load and included it in multiplayer synchronization hashes.
+- Expanded the authenticated movement playability inventory from 85 to 87 checks.
+- Raised the controlled command corpus from 0 of 19 to 19 of 19 exact cases through the command horizon, with all ground, naval, and occupied-air subjects remaining exact through the full 160-cycle certification window.
+- Passed the 52-campaign regression gate with zero regressions and the complete 17-lane authenticated playability certification.
