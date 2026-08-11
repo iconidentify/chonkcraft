@@ -70,7 +70,7 @@
         <jmpq3.version>1.9.6</jmpq3.version>
         <!-- Kept in step with the deployed ChonkBlocker relay until the two
              services can share the same small networking platform module. -->
-        <jackson.version>2.15.3</jackson.version>
+        <jackson.version>2.18.9</jackson.version>
         <netty.version>4.1.104.Final</netty.version>
     </properties>
 
