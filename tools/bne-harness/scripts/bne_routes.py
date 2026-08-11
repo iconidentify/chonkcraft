@@ -108,7 +108,8 @@ def read_state_stream(path: Path) -> Iterator[dict[str, Any]]:
             if tag == b"CYCL":
                 cycle, _seed, _pool, changed = CYCLE_HEADER.unpack(
                     payload.read(CYCLE_HEADER.size))
-                payload.read(players * PLAYER_RECORD.size)
+                player_records = [PLAYER_RECORD.unpack(
+                    payload.read(PLAYER_RECORD.size)) for _ in range(players)]
                 for _ in range(changed):
                     slot, _generation = UNIT_DELTA_HEADER.unpack(
                         payload.read(UNIT_DELTA_HEADER.size))
@@ -131,7 +132,8 @@ def read_state_stream(path: Path) -> Iterator[dict[str, Any]]:
                     cells[index] = cell
                     squares[index] = square
                 yield {"cycle": cycle, "units": dict(live), "cells": cells,
-                       "squares": squares, "map_size": size}
+                       "squares": squares, "map_size": size,
+                       "players": player_records}
 
 
 def spent(raw: bytes, steps: list[int]) -> bool:

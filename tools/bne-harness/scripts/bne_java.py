@@ -195,11 +195,13 @@ def inspect_fixture(path: Path, case_id: str | None = None,
         raise ValueError(
             f"BNE Java loop requires state schema 1.1, got {state_schema!r}"
         )
-    if run.get("commands") is not None:
-        raise ValueError(
-            "Java command replay is not implemented; this runner accepts "
-            "only the idle campaign baseline"
-        )
+    commands = run.get("commands")
+    if commands is not None:
+        if not isinstance(commands, dict) or commands.get("count", 0) < 1:
+            raise ValueError("commanded fixture does not prove an applied command")
+        with zipfile.ZipFile(path) as archive:
+            if "commands.txt" not in archive.namelist():
+                raise ValueError("commanded fixture is missing commands.txt")
     if cycles != validation["cycles"]:
         raise ValueError("fixture manifest and state stream disagree on cycle count")
     if not isinstance(seed, int) or seed < 0 or seed > 0xffffffff:
@@ -277,7 +279,8 @@ def java_classpath() -> str:
     return os.pathsep.join(str(ROOT / path) for path in paths)
 
 
-def java_command(args: argparse.Namespace, case: Case, output: Path) -> list[str]:
+def java_command(args: argparse.Namespace, case: Case, output: Path,
+        commands: Path | None = None) -> list[str]:
     launcher = ([str(args.java_wrapper.resolve()), args.java]
                 if args.java_wrapper is not None else [args.java])
     asset_argument = (
@@ -287,6 +290,15 @@ def java_command(args: argparse.Namespace, case: Case, output: Path) -> list[str
     )
     through = getattr(args, "through", None)
     cycles = case.cycles if through is None else min(case.cycles, through)
+    semantic_v2 = (["-Dchonkcraft.trace.bne.semantic-v2=true"]
+                   if getattr(args, "semantic_v2", False) else [])
+    semantic_families = getattr(args, "semantic_v2_family", None)
+    if semantic_v2 and semantic_families:
+        semantic_v2.append(
+            "-Dchonkcraft.trace.bne.semantic-v2.families="
+            + ",".join(semantic_families))
+    scripted = ([f"-Dchonkcraft.trace.commands={commands.resolve()}"]
+                if commands is not None else [])
     return [
         *launcher,
         "-cp", java_classpath(),
@@ -294,6 +306,8 @@ def java_command(args: argparse.Namespace, case: Case, output: Path) -> list[str
         "-Djava.awt.headless=true",
         f"-Dchonkcraft.trace.seed={case.seed}",
         "-Dchonkcraft.trace.profile=bne",
+        *semantic_v2,
+        *scripted,
         "net.chonkbase.chonkcraft.engine.parity.EngineTrace",
         case.java_map,
         str(cycles),
@@ -510,12 +524,74 @@ def _write_text_atomic(path: Path, content: str) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _translated_fixture_commands(args: argparse.Namespace, case: Case,
+        output_dir: Path) -> Path | None:
+    """Pair native command slots to Java ids before the commanded run."""
+    with zipfile.ZipFile(case.fixture) as archive:
+        if "commands.txt" not in archive.namelist():
+            return None
+        source = archive.read("commands.txt").decode("ascii")
+    command_pattern = re.compile(
+        r"cycle (\d+) move unit (\d+) x (\d+) y (\d+)\Z")
+    commands = []
+    for line_number, raw in enumerate(source.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = command_pattern.fullmatch(line)
+        if match is None:
+            raise ValueError(f"unsupported fixture command at line {line_number}")
+        commands.append(tuple(int(value) for value in match.groups()))
+    if not commands:
+        raise ValueError("fixture commands.txt contains no command")
+
+    preliminary = output_dir / f"{case.case_id}.pairing.java.trace.txt"
+    command = java_command(args, case, preliminary)
+    command[-2] = "1"
+    ran = subprocess.run(command, cwd=ROOT, check=False,
+                         capture_output=True, text=True)
+    if ran.returncode != 0:
+        raise RuntimeError("Java command-pairing trace failed: "
+                           + (ran.stdout + ran.stderr)[-2000:])
+    java_positions: dict[tuple[int, int, int], list[int]] = {}
+    unit_line = re.compile(r"u (\d+) \S+ p(\d+) (-?\d+) (-?\d+) hp ")
+    for line in preliminary.read_text(errors="replace").splitlines():
+        if line.startswith("cycle ") and not line.startswith("cycle 1 "):
+            break
+        match = unit_line.match(line)
+        if match:
+            ident, player, x, y = (int(value) for value in match.groups())
+            java_positions.setdefault((x, y, player), []).append(ident)
+
+    from bne_semantic_v2 import native_cycles
+    native = next(native_cycles(case.fixture))["units"]
+    native_positions: dict[int, tuple[int, int, int]] = {
+        slot: (int.from_bytes(raw[24:26], "little"),
+               int.from_bytes(raw[26:28], "little"), raw[44])
+        for slot, raw in native.items()
+    }
+    translated = ["# bne-java-command-plan-v1"]
+    for cycle, slot, x, y in commands:
+        position = native_positions.get(slot)
+        matches = [] if position is None else java_positions.get(position, [])
+        if len(matches) != 1:
+            raise ValueError(
+                f"native command slot {slot} has {len(matches)} Java pairing "
+                f"candidates at cycle one")
+        translated.append(
+            f"cycle {cycle} move unit {matches[0]} x {x} y {y}")
+    destination = output_dir / f"{case.case_id}.java.commands.txt"
+    _write_text_atomic(destination, "\n".join(translated) + "\n")
+    return destination
+
+
 def run_case(args: argparse.Namespace, case: Case) -> dict[str, object]:
     from bne_compare import validate_java_trace_cycles
 
     case_started = time.monotonic()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    scripted_commands = _translated_fixture_commands(args, case, output_dir)
     trace = output_dir / f"{case.case_id}.java.trace.txt"
     temporary: Path | None = None
     try:
@@ -523,7 +599,7 @@ def run_case(args: argparse.Namespace, case: Case) -> dict[str, object]:
                 prefix=trace.name + ".", suffix=".tmp",
                 dir=output_dir, delete=False) as handle:
             temporary = Path(handle.name)
-        command = java_command(args, case, temporary)
+        command = java_command(args, case, temporary, scripted_commands)
         java_started = time.monotonic()
         java = subprocess.run(
             command, cwd=ROOT, check=False, capture_output=True, text=True,
@@ -578,6 +654,25 @@ def run_case(args: argparse.Namespace, case: Case) -> dict[str, object]:
     else:
         state = "failed"
         first_cycle = None
+    semantic_v2_result = None
+    if getattr(args, "semantic_v2", False):
+        from bne_semantic_v2 import compare as compare_semantic_v2
+
+        semantic_v2_result = compare_semantic_v2(
+            case.fixture, trace, compared_cycles,
+            families=(set(args.semantic_v2_family)
+                      if getattr(args, "semantic_v2_family", None) else None))
+        semantic_path = output_dir / f"{case.case_id}.semantic-v2.json"
+        _write_json_atomic(semantic_path, semantic_v2_result)
+        if semantic_v2_result["status"] == "DIVERGED":
+            v2_cycle = min(item["cycle"]
+                           for item in semantic_v2_result["mismatches"])
+            if state == "clean" or first_cycle is None or v2_cycle < first_cycle:
+                state = "divergent"
+                first_cycle = v2_cycle
+        elif semantic_v2_result["status"] != "PASS":
+            state = "failed"
+            first_cycle = None
     result: dict[str, object] = {
         "id": case.case_id,
         "fixture_id": case.fixture_id,
@@ -587,7 +682,9 @@ def run_case(args: argparse.Namespace, case: Case) -> dict[str, object]:
         "compared_cycles": compared_cycles,
         "seed": case.seed,
         "state_schema": case.state_schema,
-        "comparison_tier": "semantic-v1",
+        "comparison_tier": ("semantic-v1+semantic-v2"
+                            if semantic_v2_result is not None
+                            else "semantic-v1"),
         "state": state,
         "first_divergence_cycle": first_cycle,
         "findings": parse_comparison_findings(comparison),
@@ -600,6 +697,11 @@ def run_case(args: argparse.Namespace, case: Case) -> dict[str, object]:
             "total_seconds": round(time.monotonic() - case_started, 6),
         },
     }
+    if semantic_v2_result is not None:
+        result["semantic_v2"] = semantic_v2_result
+    if scripted_commands is not None:
+        result["translated_commands"] = {
+            "path": str(scripted_commands), **file_identity(scripted_commands)}
     _write_json_atomic(
         output_dir / f"{case.case_id}.java-run.json",
         {"schema": 1, "engine": _cached_engine_identity(args),
@@ -1519,6 +1621,27 @@ def field_parity_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def semantic_v2_command(args: argparse.Namespace) -> int:
+    from bne_semantic_v2 import compare
+
+    result = compare(args.state, args.java_trace, args.through,
+                     families=(set(args.family) if args.family else None))
+    rendered = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.json_output is not None:
+        args.json_output.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
+    return 0 if result["status"] == "PASS" else 1
+
+
+def command_matrix_command(args: argparse.Namespace) -> int:
+    from bne_command_matrix import write_matrix
+
+    plan = write_matrix(args.fixture, args.output, args.cycles,
+                        args.command_cycle, args.distance)
+    print(f"commanded movement corpus: {plan}")
+    return 0
+
+
 def routes_command(args: argparse.Namespace) -> int:
     from bne_routes import render, run_routes
 
@@ -2195,6 +2318,13 @@ def add_runtime_arguments(parser: argparse.ArgumentParser,
     parser.add_argument("--maven", default="mvn")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--report-all", action="store_true")
+    parser.add_argument(
+        "--semantic-v2", action="store_true",
+        help="also enforce player, sub-tile unit, projectile and terrain state")
+    parser.add_argument(
+        "--semantic-v2-family", action="append",
+        choices=("player", "unit", "projectile", "terrain"),
+        help="limit semantic-v2 output/comparison to this family (repeatable)")
     parser.add_argument("--through", type=int,
                         help="run and compare only the first N fixture cycles")
 
@@ -2484,6 +2614,31 @@ def parser() -> argparse.ArgumentParser:
         help="where the state streams unpacked from the fixtures are kept")
     field_parity.add_argument("--json-output", type=Path)
     field_parity.set_defaults(func=field_parity_command)
+
+    semantic_v2 = subcommands.add_parser(
+        "semantic-v2",
+        help="compare player, sub-tile unit, projectile and terrain state")
+    semantic_v2.add_argument(
+        "state", type=Path,
+        help="a schema-1.1 state.bin or sealed .bnefx fixture")
+    semantic_v2.add_argument(
+        "java_trace", type=Path,
+        help="EngineTrace output made with the semantic-v2 trace flag")
+    semantic_v2.add_argument("--through", type=int)
+    semantic_v2.add_argument("--family", action="append",
+                             choices=("player", "unit", "projectile", "terrain"))
+    semantic_v2.add_argument("--json-output", type=Path)
+    semantic_v2.set_defaults(func=semantic_v2_command)
+
+    command_matrix = subcommands.add_parser(
+        "command-matrix",
+        help="compile compass and refusal cases from authenticated BNE state")
+    command_matrix.add_argument("fixture", type=Path)
+    command_matrix.add_argument("output", type=Path)
+    command_matrix.add_argument("--cycles", type=int, default=160)
+    command_matrix.add_argument("--command-cycle", type=int, default=5)
+    command_matrix.add_argument("--distance", type=int, default=4)
+    command_matrix.set_defaults(func=command_matrix_command)
 
     micro_oracle_spec = subcommands.add_parser(
         "micro-oracle-spec",

@@ -7,13 +7,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 
 /**
@@ -67,6 +70,11 @@ public final class EngineTrace {
     private static final String TRACE_PROFILE_PROPERTY = "chonkcraft.trace.profile";
     private static final String COUNTERFACTUAL_PROPERTY =
             "chonkcraft.trace.counterfactual";
+    private static final String COMMANDS_PROPERTY = "chonkcraft.trace.commands";
+    private static final String SEMANTIC_V2_PROPERTY =
+            "chonkcraft.trace.bne.semantic-v2";
+    private static final String SEMANTIC_V2_FAMILIES_PROPERTY =
+            "chonkcraft.trace.bne.semantic-v2.families";
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     private EngineTrace() {
@@ -121,6 +129,83 @@ public final class EngineTrace {
             }
             return new CounterfactualIntervention(
                     phase, cycle, unitId, operation, fields[4]);
+        }
+    }
+
+    /** One translated player command, using this engine's paired unit id. */
+    record ScriptedCommand(int cycle, int unitId, int x, int y) {
+        static ScriptedCommand parse(String line, int lineNumber) {
+            String[] fields = line.trim().split("\\s+");
+            if (fields.length != 9 || !"cycle".equals(fields[0])
+                    || !"move".equals(fields[2]) || !"unit".equals(fields[3])
+                    || !"x".equals(fields[5]) || !"y".equals(fields[7])) {
+                throw new IllegalArgumentException("command line " + lineNumber
+                        + " must be 'cycle N move unit ID x X y Y'");
+            }
+            try {
+                int cycle = Integer.parseInt(fields[1]);
+                int unit = Integer.parseInt(fields[4]);
+                int x = Integer.parseInt(fields[6]);
+                int y = Integer.parseInt(fields[8]);
+                if (cycle <= 0 || unit <= 0 || x < 0 || y < 0) {
+                    throw new NumberFormatException("non-positive command field");
+                }
+                return new ScriptedCommand(cycle, unit, x, y);
+            } catch (NumberFormatException exception) {
+                throw new IllegalArgumentException("command line " + lineNumber
+                        + " has an invalid number", exception);
+            }
+        }
+    }
+
+    static final class ScriptedCommandPlan {
+        private final List<ScriptedCommand> commands;
+
+        private ScriptedCommandPlan(List<ScriptedCommand> commands) {
+            this.commands = List.copyOf(commands);
+        }
+
+        static ScriptedCommandPlan load(Path path) throws java.io.IOException {
+            List<ScriptedCommand> commands = new ArrayList<>();
+            int previous = 0;
+            List<String> lines = Files.readAllLines(path);
+            for (int index = 0; index < lines.size(); index++) {
+                String line = lines.get(index).trim();
+                if (line.isBlank() || line.startsWith("#")) {
+                    continue;
+                }
+                ScriptedCommand command = ScriptedCommand.parse(line, index + 1);
+                if (command.cycle() < previous) {
+                    throw new IllegalArgumentException(
+                            "commands are not cycle-sorted at line " + (index + 1));
+                }
+                previous = command.cycle();
+                commands.add(command);
+            }
+            if (commands.isEmpty()) {
+                throw new IllegalArgumentException("command plan is empty");
+            }
+            return new ScriptedCommandPlan(commands);
+        }
+
+        void apply(int cycle, World world) {
+            for (ScriptedCommand command : commands) {
+                if (command.cycle() != cycle) {
+                    continue;
+                }
+                Unit unit = world.units().stream()
+                        .filter(candidate -> candidate.id() == command.unitId())
+                        .findFirst().orElseThrow(() -> new IllegalArgumentException(
+                                "scripted command unit " + command.unitId()
+                                + " is absent at cycle " + cycle));
+                boolean accepted = world.orderMove(unit, command.x(), command.y());
+                System.err.printf("JBNECOMMAND cycle=%d unit=%d x=%d y=%d accepted=%d%n",
+                        cycle, unit.id(), command.x(), command.y(), accepted ? 1 : 0);
+                if (!accepted) {
+                    throw new IllegalStateException(
+                            "scripted move was rejected at cycle " + cycle);
+                }
+            }
         }
     }
 
@@ -414,6 +499,190 @@ public final class EngineTrace {
                         unit.isOnMap() ? "" : " removed");
             }
         }
+        if (semanticV2Enabled()) {
+            dumpSemanticV2(out, world, reportedCycle);
+        }
+    }
+
+    /**
+     * The broader authenticated comparison tier.
+     *
+     * <p>These rows are additive: the semantic-v1 parser ignores their
+     * prefixes, so enabling the new tier cannot silently change the old
+     * baseline. Values are deliberately primitive and stable. A native field
+     * without a proved Java equivalent is omitted instead of being guessed;
+     * the companion scorer reports those omissions as uncovered state.</p>
+     */
+    private static void dumpSemanticV2(PrintWriter out, World world,
+            long reportedCycle) {
+        Set<String> families = semanticV2Families();
+        List<Missile> missiles = families.contains("projectile")
+                ? new ArrayList<>(world.missiles()) : new ArrayList<>();
+        missiles.sort(Comparator.comparingInt(Missile::battleNetPoolSlot)
+                .thenComparing(missile -> missile.type().ident()));
+        List<GameMap.TerrainChange> terrain = families.contains("terrain")
+                ? world.map().terrainChangedSinceLoad() : new ArrayList<>();
+        out.printf("v2w cycle=%d sync_seed=%08x async_seed=%08x async_draws=%d "
+                        + "units=%d missiles=%d terrain=%d%n",
+                reportedCycle, world.randomSeed(), world.battleNetRandomSeed(),
+                world.battleNetRandomDraws(), world.units().size(),
+                missiles.size(), terrain.size());
+
+        if (families.contains("player")) for (Player player : world.players()) {
+            if (player.type() == PudMap.PlayerType.NOBODY) {
+                continue;
+            }
+            int units = 0;
+            int buildings = 0;
+            for (Unit unit : world.units()) {
+                if (unit.player() != player.index() || unit.type() == null
+                        || unit.destroyed() || unit.type().revealer()) {
+                    continue;
+                }
+                if (unit.type().building()) {
+                    buildings++;
+                } else {
+                    units++;
+                }
+            }
+            List<String> researched = new ArrayList<>(
+                    world.upgrades(player.index()).researched());
+            researched.sort(String::compareTo);
+            out.printf("v2p cycle=%d player=%d supply=%d demand=%d units=%d "
+                            + "buildings=%d score=%d kills=%d razings=%d "
+                            + "arrows=%d swords=%d shields=%d ship_attack=%d "
+                            + "ship_armor=%d catapult_damage=%d "
+                            + "ranger_berserker=%d marksmanship=%d "
+                            + "longbow=%d scouting=%d "
+                            + "researched=%s%n",
+                    reportedCycle, player.index(), player.supply(), player.demand(),
+                    units, buildings, player.score(), player.totalKills(),
+                    player.totalRazings(),
+                    techLevel(researched, "upgrade-arrow1", "upgrade-arrow2",
+                            "upgrade-throwing-axe1", "upgrade-throwing-axe2"),
+                    techLevel(researched, "upgrade-sword1", "upgrade-sword2",
+                            "upgrade-battle-axe1", "upgrade-battle-axe2"),
+                    techLevel(researched, "upgrade-human-shield1",
+                            "upgrade-human-shield2", "upgrade-orc-shield1",
+                            "upgrade-orc-shield2"),
+                    techLevel(researched, "upgrade-human-ship-cannon1",
+                            "upgrade-human-ship-cannon2",
+                            "upgrade-orc-ship-cannon1", "upgrade-orc-ship-cannon2"),
+                    techLevel(researched, "upgrade-human-ship-armor1",
+                            "upgrade-human-ship-armor2",
+                            "upgrade-orc-ship-armor1", "upgrade-orc-ship-armor2"),
+                    techLevel(researched, "upgrade-ballista1", "upgrade-ballista2",
+                            "upgrade-catapult1", "upgrade-catapult2"),
+                    techLevel(researched, "upgrade-ranger", "upgrade-berserker"),
+                    techLevel(researched, "upgrade-ranger-marksmanship",
+                            "upgrade-berserker-regeneration"),
+                    techLevel(researched, "upgrade-longbow", "upgrade-light-axes"),
+                    techLevel(researched, "upgrade-ranger-scouting",
+                            "upgrade-berserker-scouting"),
+                    researched.isEmpty()
+                            ? "-" : String.join(",", researched));
+        }
+
+        List<Unit> units = families.contains("unit")
+                ? new ArrayList<>(world.units()) : new ArrayList<>();
+        units.sort(Comparator.comparingInt(Unit::id));
+        for (Unit unit : units) {
+            if (unit.type() == null || unit.destroyed() || unit.type().revealer()) {
+                continue;
+            }
+            Unit target = unit.target();
+            out.printf("v2u cycle=%d unit=%d type=%s player=%d x=%d y=%d "
+                            + "px=%d py=%d ox=%d oy=%d hp=%d mana=%d "
+                            + "frame=%d face=%d timer=%d seqoff=%d order=%s "
+                            + "saved=%s orderx=%d ordery=%d target=%d wait=%d "
+                            + "collision=%d refusals=%d route=%s%n",
+                    reportedCycle, unit.id(), unit.type().ident(), unit.player(),
+                    unit.tileX(), unit.tileY(), unit.pixelX(), unit.pixelY(),
+                    unit.offsetX(), unit.offsetY(), unit.hitPoints(), unit.mana(),
+                    unit.frame(), unit.direction(), unit.battleNetAnimationTimer(),
+                    unit.battleNetSequenceOffset(), unit.order(), unit.savedOrder(),
+                    unit.orderTargetX(), unit.orderTargetY(),
+                    target == null ? -1 : target.id(), unit.waitCycles(),
+                    unit.battleNetCollisionCounter(), unit.battleNetRefusals(),
+                    semanticV2Route(unit));
+        }
+
+        for (Missile missile : missiles) {
+            Missile.SavedState state = missile.savedState();
+            out.printf("v2m cycle=%d slot=%d type=%s source=%d target=%d "
+                            + "x=%d y=%d fromx=%d fromy=%d tox=%d toy=%d "
+                            + "frame=%d face=%d delay=%d ttl=%d damage=%d "
+                            + "remaining=%d flags=%d error=%d major=%d minor=%d "
+                            + "pending=%d impact_wait=%d%n",
+                    reportedCycle, missile.battleNetPoolSlot(),
+                    missile.type().ident(), id(missile.source()), id(missile.target()),
+                    rounded(state.x()), rounded(state.y()),
+                    rounded(state.fromX()), rounded(state.fromY()),
+                    rounded(state.toX()), rounded(state.toY()), state.frame(),
+                    state.direction(), state.delay(), state.timeToLive(),
+                    state.damage(), state.battleNetRemaining(),
+                    state.battleNetFlags(), state.battleNetError(),
+                    state.battleNetMajor(), state.battleNetMinor(),
+                    state.battleNetPendingImpact() ? 1 : 0,
+                    state.battleNetImpactWait());
+        }
+
+        terrain.sort(Comparator.comparingInt(GameMap.TerrainChange::y)
+                .thenComparingInt(GameMap.TerrainChange::x));
+        for (GameMap.TerrainChange change : terrain) {
+            out.printf("v2t cycle=%d x=%d y=%d tile=%d graphic=%d flags=%x value=%d%n",
+                    reportedCycle, change.x(), change.y(), change.tile(),
+                    change.graphic(), change.flags(), change.value());
+        }
+    }
+
+    private static boolean semanticV2Enabled() {
+        return System.getenv("CHONKCRAFT_TRACE_BNE_SEMANTIC_V2") != null
+                || Boolean.getBoolean(SEMANTIC_V2_PROPERTY);
+    }
+
+    private static Set<String> semanticV2Families() {
+        String configured = System.getProperty(SEMANTIC_V2_FAMILIES_PROPERTY,
+                "player,unit,projectile,terrain");
+        Set<String> families = new java.util.LinkedHashSet<>();
+        for (String value : configured.split(",")) {
+            String family = value.trim().toLowerCase(java.util.Locale.ROOT);
+            if (!family.isEmpty()) {
+                families.add(family);
+            }
+        }
+        Set<String> allowed = Set.of("player", "unit", "projectile", "terrain");
+        if (families.isEmpty() || !allowed.containsAll(families)) {
+            throw new IllegalArgumentException(
+                    "semantic-v2 families must be player, unit, projectile or terrain");
+        }
+        return Set.copyOf(families);
+    }
+
+    private static int id(Unit unit) {
+        return unit == null ? -1 : unit.id();
+    }
+
+    private static int rounded(double value) {
+        return (int) Math.round(value);
+    }
+
+    private static int techLevel(List<String> researched, String... names) {
+        int level = 0;
+        for (String name : names) {
+            if (researched.contains(name)) {
+                level++;
+            }
+        }
+        return level;
+    }
+
+    private static String semanticV2Route(Unit unit) {
+        StringBuilder route = new StringBuilder();
+        for (int depth = 0; depth < unit.pathLength(); depth++) {
+            route.append(unit.peekHeadingAtDepth(depth));
+        }
+        return route.length() == 0 ? "-" : route.toString();
     }
 
     public static void main(String[] args) throws Exception {
@@ -462,11 +731,21 @@ public final class EngineTrace {
             ticker.run();
         }
         String counterfactualPath = System.getProperty(COUNTERFACTUAL_PROPERTY);
+        String commandsPath = System.getProperty(COMMANDS_PROPERTY);
+        if (counterfactualPath != null && !counterfactualPath.isBlank()
+                && commandsPath != null && !commandsPath.isBlank()) {
+            throw new IllegalArgumentException(
+                    "counterfactual and commanded traces cannot run together");
+        }
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(outPath))) {
             if (counterfactualPath != null && !counterfactualPath.isBlank()) {
                 CounterfactualPlan plan = CounterfactualPlan.load(
                         Paths.get(counterfactualPath));
                 traceCounterfactual(out, world, ticker, cycles, plan);
+            } else if (commandsPath != null && !commandsPath.isBlank()) {
+                ScriptedCommandPlan plan = ScriptedCommandPlan.load(
+                        Paths.get(commandsPath));
+                traceCommands(out, world, ticker, cycles, plan);
             } else {
                 traceOrdinary(out, world, ticker, cycles);
             }
@@ -477,6 +756,15 @@ public final class EngineTrace {
                 + " profile=bne"
                 + (counterfactualPath == null || counterfactualPath.isBlank()
                    ? "" : " counterfactual=" + counterfactualPath));
+    }
+
+    private static void traceCommands(PrintWriter out, World world,
+            Runnable ticker, int cycles, ScriptedCommandPlan plan) {
+        for (int cycle = 1; cycle <= cycles; cycle++) {
+            plan.apply(cycle, world);
+            ticker.run();
+            dump(out, world, cycle);
+        }
     }
 
     /** The normal parity loop, kept free of intervention checks. */

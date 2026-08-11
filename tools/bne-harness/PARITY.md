@@ -102,11 +102,13 @@ Schema 1.1 retains:
 - the semantic text stream used by the current Java comparator; and
 - the complete run identity and terminal markers.
 
-The current semantic comparator covers cycle, synchronized RNG, player banks,
-unit identity/core state, and coarse order. Projectile, extended-player,
-mutable-map, and decoded raw-unit comparison remain explicit future tiers.
-Consequently, a semantically clean window can still hide a wrong asynchronous
-RNG stream or projectile state. Diagnostic evidence must close that gap.
+The semantic-v1 comparator covers cycle, synchronized RNG, player banks, unit
+identity/core state, and coarse order. The opt-in
+[semantic-v2 tier](SEMANTIC_V2.md) now also compares proved extended-player,
+sub-tile unit, projectile, and mutable-terrain state. Its family filter makes a
+full 52-case AI macro pass practical, and its commanded corpus deliberately
+exercises movement/refusal decisions absent from idle campaigns. Unsupported
+raw fields remain named as uncovered instead of being guessed into a pass.
 
 ## Reproducible environment
 
