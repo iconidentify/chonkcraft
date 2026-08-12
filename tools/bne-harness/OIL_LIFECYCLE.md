@@ -120,6 +120,40 @@ Without another command it now finishes the owed pixels, centres on that tile
 and becomes Still instead of snapping west and east forever. A subsequent
 Return with Goods reaches the saved shipyard and deposits the complete load.
 
+The mission-four platform-builder report adds the order-ownership boundary.
+Its saved human tanker carried 100 oil at `(23,4)` with native action 24 but
+Java `STILL`; the authoritative native substate and its outer resource order
+had split. Load compatibility now rejoins that orphaned action 24 to its
+resource order. When the restored anchor is outside the native doubled lattice
+or cannot produce a native route, it also selects the nearest free
+absolute-even water anchor toward the depot. Valid live platform exits are not
+relocated. An explicit player Stop destroys action 24, so compatibility repair
+cannot revive a command the player deliberately cancelled. The exact reported
+save was replayed without another player order and banked its existing load.
+
+### Subsystem-assessment rule learned here
+
+An end-state test ("oil eventually arrived") was not enough to expose this
+failure. Oil is represented across four coupled layers: the native action byte,
+the outer resource order, navigation geometry and persisted save state. The
+executable lifecycle gate now checks their contract on every simulated cycle:
+
+- native actions 24, 25 and 26 must still be owned by the resource order;
+- visible action 24 must project to a homeward leg with cargo and a depot
+  route (after docking it can be hidden in the depot with the load banked);
+- actions 25 and 26 must progress through board/inside/exit rather than merely
+  preserve their final result;
+- saves are replayed from each boundary, including deliberately contradictory
+  legacy tuples; and
+- explicit cancellation must destroy the native substate so compatibility
+  repair cannot resurrect a command the player cancelled.
+
+Use the same assessment shape for other BNE subsystems: enumerate the native
+states, name every Java projection of each state, assert the tuple after every
+tick, checkpoint every transition, and add a bounded liveness outcome. That
+finds split-brain state like this before a player discovers the eventual stuck
+unit.
+
 ## Executable gate
 
 Focused behavior and persistence:

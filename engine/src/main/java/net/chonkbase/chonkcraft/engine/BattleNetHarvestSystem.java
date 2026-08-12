@@ -3073,6 +3073,46 @@ final class BattleNetHarvestSystem {
     }
 
 
+    /**
+     * Rejoins the outer resource order to an authoritative restored oil substate.
+     *
+     * <p>One released build of the mission-four tanker reached action 24 but
+     * saved no {@code SetHarvestState} because the Java outer order had become
+     * Still. The authoritative native action and its Java order projection
+     * had split. Retail cannot own action 24 without {@code COrder_Resource};
+     * reconstruct that order once after every saved unit and reference has
+     * been restored.</p>
+     */
+    void repairRestoredOilOrders() {
+        for (Unit worker : world.units) {
+            if (worker.type() == null
+                    || !worker.type().gathering().containsKey(UnitType.Resource.OIL)
+                    || worker.battleNetOilAction() != Unit.BattleNetOilAction.TO_DEPOT
+                    || worker.carried() <= 0
+                    || worker.order() != Unit.Order.STILL
+                    || !worker.isAlive()) {
+                continue;
+            }
+            worker.clearPath();
+            worker.setReturningToDepot(true);
+            Unit depot = bestDepotByTravel(worker, UnitType.Resource.OIL, 1000);
+            world.repairRestoredOilAnchor(worker, depot);
+            // Relocating a route-dead legacy anchor can change which depot is
+            // the nearest reachable one.
+            depot = bestDepotByTravel(worker, UnitType.Resource.OIL, 1000);
+            worker.setResourceDepot(depot);
+            worker.setReturnDepotGoal(depot);
+            worker.setOrderFinished(false);
+            worker.setOrder(Unit.Order.HARVEST);
+            // A repaired anchor rejoins the normal doubled lattice. If no
+            // legal relocation was possible, retain the existing one-tile
+            // compatibility route for this leg.
+            worker.setBattleNetDoubleStep(
+                    ((worker.tileX() | worker.tileY()) & 1) == 0);
+        }
+    }
+
+
     static boolean isBattleNetOilPlatform(String ident) {
         return "unit-human-oil-platform".equals(ident)
                 || "unit-orc-oil-platform".equals(ident);

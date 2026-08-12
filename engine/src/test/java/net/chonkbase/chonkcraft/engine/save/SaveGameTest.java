@@ -364,6 +364,29 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a save cannot strand native oil action 24 outside its resource order")
+    void orphanedNativeOilReturnStateRepairsOnLoad() throws IOException {
+        Bench bench = bench();
+        Unit tanker = bench.world().createUnit(
+                bench.types().get("unit-human-oil-tanker"), 0, 10, 10);
+        tanker.setCarrying(UnitType.Resource.OIL);
+        tanker.setHeldResource(UnitType.Resource.OIL);
+        tanker.setCarried(100);
+        // Reproduce the field save exactly: a raw native return action with
+        // no Java COrder_Resource projection, so SaveGame writes no
+        // SetHarvestState line.
+        tanker.setOrder(Unit.Order.STILL);
+        tanker.setBattleNetOilAction(Unit.BattleNetOilAction.TO_DEPOT);
+        tanker.setReturningToDepot(false);
+
+        Unit loaded = find(reload(bench), "unit-human-oil-tanker");
+
+        assertEquals(Unit.Order.HARVEST, loaded.order());
+        assertEquals(Unit.BattleNetOilAction.TO_DEPOT, loaded.battleNetOilAction());
+        assertTrue(loaded.returningToDepot());
+    }
+
+    @Test
     @DisplayName("a player resumes with the score, kills and razings they had earned")
     void theScoreAndItsTalliesRoundTrip() throws IOException {
         Bench bench = bench();

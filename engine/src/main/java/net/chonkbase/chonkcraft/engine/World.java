@@ -378,6 +378,11 @@ public final class World {
                 returningToDepot, waitCycles);
     }
 
+    /** Repairs schema-three saves written with native oil action 24 but no resource order. */
+    public void repairRestoredOilOrders() {
+        harvest.repairRestoredOilOrders();
+    }
+
     /** @see BattleNetConstructionSystem#cancelConstruction */
     public boolean cancelConstruction(Unit site) {
         return construction.cancelConstruction(site);
@@ -6860,6 +6865,61 @@ public final class World {
     }
 
     /**
+     * Repairs only a restored tanker state that cannot produce a native route.
+     *
+     * <p>This is intentionally not part of live platform dropout. Valid live
+     * exits are observable BNE behavior and must keep their selected square.
+     * A historical save can, however, contain an action-24 tanker on an odd
+     * anchor from which the doubled pathfinder has no route at all. In that
+     * compatibility-only case, choose the nearest free absolute-even water
+     * anchor on the side toward the depot and resume the authoritative native
+     * substate from there.</p>
+     */
+    void repairRestoredOilAnchor(Unit tanker, Unit towards) {
+        if (tanker == null || tanker.type() == null || towards == null
+                || !tanker.type().gathering().containsKey(UnitType.Resource.OIL)) {
+            return;
+        }
+        boolean offNativeLattice = ((tanker.tileX() | tanker.tileY()) & 1) != 0;
+        boolean routeDead = construction.findBattleNetBuildingPath(tanker, towards).result()
+                == PathFinder.Result.UNREACHABLE;
+        if (!offNativeLattice && !routeDead) {
+            return;
+        }
+        int[] goal = centreOf(towards);
+        markSight(tanker, false);
+        markOccupancy(tanker, false);
+        int[] repaired = null;
+        int bestDistance = Integer.MAX_VALUE;
+        int width = Math.max(1, tanker.type().tileWidth());
+        int height = Math.max(1, tanker.type().tileHeight());
+        for (int radius = 1; radius <= 3 && repaired == null; radius++) {
+            for (int y = tanker.tileY() - radius; y <= tanker.tileY() + radius; y++) {
+                for (int x = tanker.tileX() - radius; x <= tanker.tileX() + radius; x++) {
+                    if (Math.max(Math.abs(x - tanker.tileX()),
+                            Math.abs(y - tanker.tileY())) != radius
+                            || ((x | y) & 1) != 0
+                            || !map.contains(x, y)
+                            || !map.isFootprintFree(x, y, width, height,
+                                    tanker.movementMask(), tanker.blockingFlags())) {
+                        continue;
+                    }
+                    int distance = squareDistance(goal[0], goal[1], x, y);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        repaired = new int[] {x, y};
+                    }
+                }
+            }
+        }
+        if (repaired != null) {
+            tanker.setTile(repaired[0], repaired[1]);
+        }
+        markOccupancy(tanker, true);
+        markSight(tanker, true);
+    }
+
+    /**
      * Where a passenger lands beside its transport.
      *
      * <p>{@code FindUnloadPosition}: the same
@@ -7516,6 +7576,14 @@ public final class World {
         unit.setSavedOrder(null);
         construction.abandonPendingBuild(unit);
         unit.clearPath();
+        if (unit.type() != null
+                && unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
+            unit.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
+            unit.setBattleNetOilActionTicks(0);
+            unit.setReturningToDepot(false);
+            unit.setResourceDepot(null);
+            unit.setReturnDepotGoal(null);
+        }
         unit.setOrder(Unit.Order.STILL);
     }
 

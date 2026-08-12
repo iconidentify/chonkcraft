@@ -527,6 +527,7 @@ public final class LoadGame {
         if (gameCycle != null) {
             world.setCycle((long) number(gameCycle));
         }
+        world.repairRestoredOilOrders();
         world.recalculateSupply();
     }
 
