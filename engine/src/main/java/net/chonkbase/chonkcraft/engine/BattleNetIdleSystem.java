@@ -1164,6 +1164,14 @@ final class BattleNetIdleSystem {
             if (moved) {
                 unit.setBattleNetOccupiedEmptyReWander(false);
                 unit.setBattleNetCoastEmptyExtraWait(false);
+                if (critter) {
+                    // The empty-route pause belongs to the completed wander.
+                    // Once a Still marker installs the next wander, retail
+                    // starts that action's own delay immediately; carrying the
+                    // old pause into the new Move parks an animal for another
+                    // seven cycles after it has already accepted the order.
+                    unit.setWaitCycles(0);
+                }
             }
             if (moved && critter && world.battleNetSequence != null) {
                 // Critter Still (type 57): 4718 frame, 4720 OP0, 4721 JUMP

@@ -2,8 +2,13 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.ZipFile;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -41,6 +46,23 @@ import org.junit.jupiter.api.Test;
  * fitting either rule to both builders breaks the other.
  */
 class BlockedBuildSiteTest {
+
+    private static byte[] retailScriptBin() throws IOException {
+        String packProp = System.getProperty("chonkcraft.pack");
+        Path pack = packProp != null && !packProp.isBlank()
+                ? Path.of(packProp)
+                : Path.of(System.getProperty("user.home"),
+                        ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack");
+        assumeTrue(Files.isRegularFile(pack),
+                "BNE asset pack required for the worker Still sequence");
+        try (ZipFile zip = new ZipFile(pack.toFile())) {
+            var entry = zip.getEntry("assets/archives/maindat/0278.bin");
+            assumeTrue(entry != null, "pack must contain maindat entry 278");
+            try (var in = zip.getInputStream(entry)) {
+                return in.readAllBytes();
+            }
+        }
+    }
 
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());
@@ -181,6 +203,36 @@ class BlockedBuildSiteTest {
                         || world.unitAt(8, 8).type() == null
                         || !world.unitAt(8, 8).type().building(),
                 "no foundation may go down on ground somebody is standing on");
+    }
+
+    @Test
+    @DisplayName("an AI build hand-back enters the worker's native Still program")
+    void anAiBuildHandBackStartsTheNativeStillProgram() throws Exception {
+        World world = new World(grass(20));
+        world.setBattleNetSequenceData(retailScriptBin());
+        world.setBuilders(java.util.Map.of(
+                "unit-farm", java.util.Set.of("unit-peasant")));
+        world.player(0).set(Resource.GOLD, 5000);
+        Unit worker = world.createUnit(peasant(), 0, 5, 5);
+        int before = world.player(0).get(Resource.GOLD);
+        assertTrue(world.orderBattleNetAiBuild(worker, farm(), 8, 8),
+                "the computer player's build order was refused outright");
+        assertTrue(world.createUnit(peasant(), 0, 9, 8) != null,
+                "the footprint blocker must place");
+
+        for (int cycle = 1; cycle <= 200; cycle++) {
+            world.tick();
+            if (worker.order() == Unit.Order.STILL
+                    && world.player(0).get(Resource.GOLD) == before) {
+                assertEquals(world.idle.battleNetStillSequenceStart(worker),
+                        worker.battleNetSequenceOffset(),
+                        "the hand-back cycle enters the peasant Still cursor");
+                assertEquals(3, worker.battleNetAnimationTimer(),
+                        "retail's hand-back begins its three-cycle stand-down now");
+                return;
+            }
+        }
+        assertTrue(false, "the blocked AI build never reached hand-back");
     }
 
     @Test

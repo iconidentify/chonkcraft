@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.io.IOException;
@@ -131,5 +132,48 @@ class CritterWaitBreathTest {
                         + "stop it getting there; standing frozen for the whole "
                         + "pause is what let the next animal in the shared "
                         + "stream spend the number this one was owed");
+    }
+
+    @Test
+    @DisplayName("a new critter wander replaces the completed route's pause")
+    void aNewWanderDoesNotInheritTheOldRoutePause() throws Exception {
+        GameMap map = new GameMap(24, 24, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, neutralOwner());
+        world.setBattleNetSequenceData(retailScriptBin());
+        // The first draw is choice 14 (wander); the second is direction SE.
+        Unit animal = world.createUnit(critter(), 15, 12, 12);
+        assertNotNull(animal, "the critter must place");
+        world.restoreBattleNetRandom(3, 0);
+        animal.setOrder(Unit.Order.STILL);
+        animal.setBattleNetSequenceOffset(
+                world.idle.battleNetStillSequenceStart(animal));
+        animal.setBattleNetAnimationTimer(1);
+        animal.setBattleNetIdlePhase(2);
+        animal.setWaitCycles(7);
+
+        int issuedOn = -1;
+        for (int cycle = 1; cycle <= 4 && issuedOn < 0; cycle++) {
+            world.tick();
+            if (animal.order() == Unit.Order.MOVE) {
+                issuedOn = cycle;
+            }
+        }
+        assertEquals(Unit.Order.MOVE, animal.order(),
+                "the Still marker must install the next wander");
+        assertTrue(animal.waitCycles() <= 0,
+                "the completed route's pause must not own the new Move");
+
+        for (int cycle = issuedOn; cycle < issuedOn + 4; cycle++) {
+            world.tick();
+        }
+        assertTrue(animal.tileX() != 12 || animal.tileY() != 12
+                        || animal.isMoving(),
+                "the accepted wander must begin on its own action delay, not "
+                        + "after the obsolete seven-cycle pause");
     }
 }

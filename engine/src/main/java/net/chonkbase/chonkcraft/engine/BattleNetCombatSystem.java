@@ -682,28 +682,36 @@ final class BattleNetCombatSystem {
                     // 1923); requiring onChaseMoveBody left Java on OP0 and the
                     // swing finished three cycles late so presentation collapse
                     // had to paper over fixture 46.
-                    boolean multiLeftoverDiscard = world.actionMoveWalked
-                            && unit.pathLength() >= 2
+                    int pathStepsAtSettle = unit.battleNetPathStepsTaken();
+                    // A melee unit that consumed a multi-step route into
+                    // range has already entered the attack program even when
+                    // the final heading exhausted the route. Preserve that
+                    // post-marker state instead of cold-starting Attack and
+                    // charging a second wind-up.
+                    boolean meleeResidualOpen = world.actionMoveWalked
                             && unit.type() != null
                             && unit.type().maxAttackRange() <= 1
-                            && (onBattleNetChaseMoveBody(unit)
-                                    || unit.battleNetSequenceOffset()
-                                            == world.idle.battleNetSequenceStart(
-                                                    unit,
-                                                    BattleNetSequence.ATTACK_ANIMATION));
+                            && ((unit.pathLength() >= 2
+                                    && (onBattleNetChaseMoveBody(unit)
+                                            || unit.battleNetSequenceOffset()
+                                                    == world.idle.battleNetSequenceStart(
+                                                            unit,
+                                                            BattleNetSequence.ATTACK_ANIMATION)))
+                                    || (pathStepsAtSettle >= 2
+                                            && onBattleNetChaseMoveBody(unit)));
                     boolean rangedResidualOpen = world.actionMoveWalked
                             && unit.pathLength() >= 2
                             && onBattleNetChaseMoveBody(unit)
                             && unit.type() != null
                             && unit.type().maxAttackRange() > 1
                             && (unit.pathLength() == 2
-                                    || unit.battleNetPathStepsTaken() >= 2);
+                                    || pathStepsAtSettle >= 2);
                     int pathnAtSettle = unit.pathLength();
                     unit.clearPath();
                     unit.setRouteSpent(false);
                     unit.setChasing(false);
                     unit.setFighting(true);
-                    if (multiLeftoverDiscard) {
+                    if (meleeResidualOpen) {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, true);
                     } else if (rangedResidualOpen) {

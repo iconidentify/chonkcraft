@@ -1350,6 +1350,16 @@ final class BattleNetConstructionSystem {
                 aiHandBackBuild(worker);
                 abandonPendingBuild(worker);
                 worker.setOrder(Unit.Order.STILL);
+                if (world.battleNetSequence != null) {
+                    // The hand-back enters the worker's native Still program
+                    // on this cycle. Leaving the old Build cursor detached
+                    // made the generic fallback start a cycle later and kept
+                    // an otherwise-ready computer worker idle past its
+                    // three-cycle stand-down.
+                    worker.setBattleNetSequenceOffset(
+                            world.idle.battleNetStillSequenceStart(worker));
+                    worker.setBattleNetAnimationTimer(3);
+                }
                 // Retail's peon stands for three cycles before it takes
                 // another build order, and the wait is its own rather than the
                 // AI's. XHuman 2 peon 1560 hands back on 52 with its timer at
