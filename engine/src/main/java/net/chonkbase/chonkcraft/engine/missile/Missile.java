@@ -247,6 +247,15 @@ public final class Missile {
         this.toX = toX;
         this.toY = toY;
         this.total = distance(toX - fromX, toY - fromY);
+        // BNE type 21 (the catapult/ballista impact) spends three setup visits,
+        // then holds each of its six visible frames for two projectile passes.
+        // Human 13's authenticated slot-5 lifetime is born at fixture 35,
+        // shows frames 0,0,1,1,2,2,3,3,4,4,5,5 and frees at 49. The generated
+        // media declaration says ten frames at sleep one; that is artwork
+        // metadata, not this native action-5 cadence.
+        if ("missile-impact".equals(type.ident())) {
+            this.delay = 3;
+        }
         // Taken once, from the whole flight rather than from what is left of
         // it. Upstream does the same in MissileInitMove, which passes the
         // launch point rather than the current position for a point-to-point
@@ -751,7 +760,9 @@ public final class Missile {
             delay--;
             return;
         }
-        if (type.sleep() > 1 && ++sleep % type.sleep() != 0) {
+        int actionCadence = "missile-impact".equals(type.ident())
+                ? 2 : type.sleep();
+        if (actionCadence > 1 && ++sleep % actionCadence != 0) {
             return;
         }
         if (type.missileClass() == MissileClass.CYCLE_ONCE) {
@@ -790,8 +801,10 @@ public final class Missile {
             // an explosion something a player can see. Treating it as a
             // journey meant it was launched where it landed, arrived on its
             // first step, and was gone before a single frame was drawn.
-            if (++frame >= type.animationSteps()) {
-                frame = Math.max(0, type.animationSteps() - 1);
+            int actionFrames = "missile-impact".equals(type.ident())
+                    ? 6 : type.animationSteps();
+            if (++frame >= actionFrames) {
+                frame = Math.max(0, actionFrames - 1);
                 // A missile-class-stay is an explosion sitting where it was
                 // made, and upstream's MissileStay::Action calls MissileHit
                 // when its animation runs out. Almost all of them do nothing

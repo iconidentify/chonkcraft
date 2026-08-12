@@ -537,6 +537,36 @@ class ConstructionTest {
     }
 
     @Test
+    void aFullFarmFrameWaitsForTheFinalBuiltPulseBeforeSupplyingFood() {
+        World world = richWorld(30);
+        Unit frame = world.createUnit(farm(), 0, 5, 5);
+        frame.setOrder(Unit.Order.UNDER_CONSTRUCTION);
+        frame.setProgressGoal(World.PROGRESS_PER_TIME_UNIT * 2);
+        frame.setProgress(World.PROGRESS_PER_TIME_UNIT);
+        frame.setHitPoints(frame.type().hitPoints());
+        frame.setBattleNetOrderDelay(0);
+
+        world.tick();
+        assertEquals(frame.progressGoal(), frame.progress());
+        assertEquals(Unit.Order.UNDER_CONSTRUCTION, frame.order(),
+                "filling the counter is not retail's final Built pulse");
+        assertEquals(0, world.player(0).supply());
+
+        for (int cycle = 0;
+                cycle < World.BATTLE_NET_CONSTRUCTION_BOOST_PERIOD - 1; cycle++) {
+            world.tick();
+            assertEquals(Unit.Order.UNDER_CONSTRUCTION, frame.order());
+            assertEquals(0, world.player(0).supply(),
+                    "a full frame is not a completed BNE building yet");
+        }
+
+        world.tick();
+        assertEquals(Unit.Order.STILL, frame.order());
+        assertEquals(4, world.player(0).supply(),
+                "the final Built pulse should grant the farm's food");
+    }
+
+    @Test
     void trainingIsRefusedWithoutGold() {
         World world = new World(grass(30));
         world.player(0).set(Resource.GOLD, 100);

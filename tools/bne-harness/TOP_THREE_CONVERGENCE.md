@@ -2,7 +2,7 @@
 
 Date: 2026-08-11
 
-Second-wave base control: `33b9318d`
+Third-wave base control: `5e393cd8`
 
 Implementation branch: `codex/bne-top-three-convergence-2`
 
@@ -16,8 +16,8 @@ proves the first systemic engine correction exposed by each behavioral lane.
 The oracle's sealed schema-1.1 state is now compared against additive Java
 trace rows for player economy/research, sub-tile units and animation state,
 projectile lifecycles, and changed terrain. Family filtering keeps large runs
-practical. Unit facing and raw order-point coordinates are deliberately marked
-uncovered until their unlike representations have an authenticated mapping.
+practical. Unit facing and active order-point coordinates now use the
+authenticated conditional mapping described below.
 
 The compact player lane completed all 52 fixtures through 1,800 cycles. The
 AI ranker separates casualty fallout from independent economy or research
@@ -167,12 +167,104 @@ independent executive item is Orc 9's cycle-1,236 supply decision.
 - XHuman 6 and XHuman 10 have separate exact player-state proofs; neither
   result is inferred from the aggregate survey.
 
-## Next queue
+## Third-wave closure: causal combat, Orc 9 supply, and decision state
 
-1. Mine Human 13's true cycle-97 damage/event-order mismatch from the exact
-   projectile, attack-marker and RNG ledgers; the casualty accounting layer is
-   now closed and must not be reopened.
-2. Use the AI ranker's Orc 9 cycle-1,236 supply decision to identify the next
-   independent executive branch; XHuman 6's construction timing is closed.
-3. Map unit-facing and order-point representations into semantic-v2 only after
-   native evidence proves their conversion; do not manufacture equality.
+### Causal projectile and damage pipeline
+
+Projectile creation, constructor RNG, movement, impact and destruction now
+carry stable causal ordinals in both the Java trace and projectile ledger. The
+implementation preserves retail's fixed-pool same-cycle iteration: an impact
+may occupy a freed slot and execute later in that same missile pass. Retail's
+impact animation is modeled as a six-frame, three-tick cadence rather than an
+arbitrary desktop effect lifetime.
+
+Attack OP10 now owns deterministic damage and projectile creation even when a
+presentation callback is absent. Repeated ranged attacks suppress the later
+presentation duplicate, while stand-ground shots are born during the unit
+visit and defer only their constructor/RNG debit until the cycle-end boundary.
+That distinction prevents an early constructor from stealing asynchronous RNG
+from units later in the same retail pool walk.
+
+Human 13 player-state parity improves from **8,952/9,000** to
+**8,994/9,000** comparisons through cycle 100. Its false cycle-81 projectile
+constructor is eliminated and every damage event through cycle 96 agrees. The
+remaining six comparisons are the live-unit and casualty counters at cycles
+97–99: retail's ogre began its initial continuous chase two cycles earlier and
+kills at 97, while Java kills at 100. That startup acquisition offset remains
+explicitly open; it was not hidden with a fixture-specific timer adjustment.
+
+### Orc 9 AI supply decision
+
+The cycle-1,236 Orc 9 difference was not a new build policy. Retail reaches the
+farm's full construction counter on cycle 1,236 but keeps it in Built state
+until the final twelve-cycle construction pulse at 1,248; only then does it
+grant supply. Java had treated a full counter as roof-on completion and granted
+supply immediately.
+
+Construction now separates a full progress counter from the final completion
+pulse. Orc 9 is exact for **58,500/58,500 player-state comparisons** through
+cycle 1,300, including bank, supply, totals, kills and research.
+
+### Authenticated decision-state comparison
+
+Semantic-v2 now compares the decision fields that formerly appeared only as
+diagnostics. Java's 256-direction mobile facing is normalized to retail's
+nearest eight-way direction. Order-point comparison is conditional on the
+active order and maps Attack/AttackMove, Harvest/ReturnGoods and Build to the
+native record member that owns the point. Invalid or inactive union members
+remain excluded rather than being manufactured into equality.
+
+The Human 13 unit run performs **218,554 real unit-field comparisons**. Its
+remaining disagreements are visible facing, frame and timer differences—not
+missing coverage—so future movement work can rank concrete decision-state
+evidence.
+
+### Third-wave regression proof
+
+- The full 52-case semantic-v1 survey through cycle 200 remains **4 clean,
+  48 divergent and 0 failed**, with zero regressions against `5e393cd8`.
+- Human 5 improves from first divergence cycle 57 to 61.
+- XHuman 4 remains at its pre-change cycle-54 boundary, proving that the
+  stand-ground constructor boundary did not reorder its critter RNG stream.
+- Focused Java and Python tests cover construction completion, OP10 ownership,
+  cycle-end constructor debit, impact cadence, causal projectile ledgers, and
+  conditional semantic mappings.
+
+## Fourth-wave foundation: authenticated action scheduling
+
+Semantic-v2 now authenticates the native unit action cursor at record offset
+4 against Java's `seqoff`. This compares the exact instruction stream each
+unit is executing, rather than inferring its scheduler state from order names,
+sprites, or eventual positions. The comparison exposed one dominant shared
+family: units whose Attack OP0 approach was refused by cooperative traffic
+kept the Attack cursor in Java, while retail immediately yielded to the
+type-specific Move program with timer 15 and kept Attack only as the owning
+order.
+
+The engine now transfers that action ownership at the cooperative-refusal
+boundary. It does not transfer generic hard refusals, and it does not restart
+a unit already executing Move. The latter distinction is required by XHuman
+12: restarting its Move program swapped the cycle-39 traffic order of grunt
+1503 and axethrower 1523. With cursor ownership as the predicate, XHuman 4's
+grunt 1505 and axethrower 1490 match their native Move starts and full 15-to-1
+timers, while XHuman 12 preserves its accepted traffic ordering.
+
+Measured across all 52 fixtures through cycle 20, modeled mobile action-cursor
+mismatches fall from **101 to 2**, a **98.0% reduction**. The two remaining
+mismatches are critter cadence, not combat refusal. XHuman 4 is exact through
+cycle 45; XHuman 12 advances from the rejected cycle-39 candidate to cycle 42,
+beyond its accepted cycle-41 proof.
+
+The full 52-case semantic-v1 survey through cycle 200 remains **4 clean,
+48 divergent and 0 failed**. The regression gate passes at common horizon 40
+against the authenticated pre-scheduler baseline; no regressed candidate was
+accepted.
+
+## Next measured queue
+
+1. Extend authenticated cursor ownership beyond mobile units, beginning with
+   the two remaining critter cadence mismatches.
+2. Close the remaining Human 13 initial acquisition/chase-entry offset without
+   changing already-exact damage, projectile, or RNG ownership.
+3. Rank the next independent AI-executive difference from the new exact Orc 9
+   baseline.

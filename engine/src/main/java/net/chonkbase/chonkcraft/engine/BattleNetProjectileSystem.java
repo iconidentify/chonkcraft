@@ -63,7 +63,8 @@ final class BattleNetProjectileSystem {
      * Spends queued presentation-ahead constructor draws after the unit loop.
      */
     void flushBattleNetCycleEndConstructorDebit() {
-        if (world.battleNetCycleEndConstructorDebit.isEmpty()) {
+        if (world.battleNetCycleEndConstructorDebit.isEmpty()
+                && world.battleNetCycleEndProjectileArm.isEmpty()) {
             return;
         }
         if (World.BNE_PEND_TRACE) {
@@ -91,6 +92,16 @@ final class BattleNetProjectileSystem {
             }
         }
         world.battleNetCycleEndConstructorDebit.clear();
+        // Stand-ground attack presentation is completed after HandleEachCycle
+        // has walked the unit table.  The projectile is nevertheless present
+        // in the same cycle-end pool snapshot.  Running its constructor here
+        // preserves both facts: XHuman 4's axethrower shot is born on fixture
+        // 48, while the later critter slots consume their idle draws before
+        // the shot's damage and aim draws, just as retail does.
+        for (Missile shot : world.battleNetCycleEndProjectileArm) {
+            prepareBattleNetProjectile(shot, true);
+        }
+        world.battleNetCycleEndProjectileArm.clear();
         if (World.BNE_PEND_TRACE) {
             System.err.printf("JBNEPEND flush-end cycle=%d%n", world.cycle);
         }
@@ -201,6 +212,61 @@ final class BattleNetProjectileSystem {
             }
         }
         world.battleNetProjectileStartCycles.put(shot, startCycle);
+        recordProjectileCreate(shot);
+    }
+
+    /** Numeric identities proved against BNE's type byte for corpus weapons. */
+    private static int battleNetProjectileType(MissileType type) {
+        if (type == null || type.ident() == null) {
+            return -1;
+        }
+        return switch (type.ident()) {
+            case "missile-catapult-rock" -> 13;
+            case "missile-ballista-bolt" -> 14;
+            case "missile-arrow", "missile-arrow-super" -> 15;
+            case "missile-axe" -> 16;
+            case "missile-impact" -> 21;
+            case "missile-small-cannon", "missile-small-cannon-super" -> 24;
+            default -> -1;
+        };
+    }
+
+    /** Records the native constructor boundary, never its earlier placeholder. */
+    private void recordProjectileCreate(Missile missile) {
+        long creation = world.battleNetProjectileCausalOrdinals.computeIfAbsent(
+                missile, ignored -> world.nextBattleNetProjectileCausalOrdinal++);
+        Unit source = missile.source();
+        Unit target = missile.target();
+        world.causalTrace.event(world.cycle, "projectile.create",
+                source == null ? null : source.id(),
+                "fixture_cycle", Math.max(0, world.cycle - 2),
+                "creation_ordinal", creation,
+                "pool_slot", missile.battleNetPoolSlot(),
+                "type", battleNetProjectileType(missile.type()),
+                "type_ident", missile.type() == null ? null : missile.type().ident(),
+                "source", source == null ? -1 : source.id(),
+                "target", target == null ? -1 : target.id(),
+                "remaining", missile.battleNetRemaining());
+    }
+
+    /** Records removal before the pool slot and creation identity are cleared. */
+    private void recordProjectileFree(Missile missile) {
+        Long creation = world.battleNetProjectileCausalOrdinals.remove(missile);
+        if (creation == null) {
+            return;
+        }
+        Unit source = missile.source();
+        Unit target = missile.target();
+        world.causalTrace.event(world.cycle, "projectile.free",
+                source == null ? null : source.id(),
+                "fixture_cycle", Math.max(0, world.cycle - 2),
+                "creation_ordinal", creation,
+                "pool_slot", missile.battleNetPoolSlot(),
+                "type", battleNetProjectileType(missile.type()),
+                "type_ident", missile.type() == null ? null : missile.type().ident(),
+                "source", source == null ? -1 : source.id(),
+                "target", target == null ? -1 : target.id(),
+                "remaining", missile.battleNetRemaining());
     }
 
 
@@ -429,6 +495,7 @@ final class BattleNetProjectileSystem {
         }
         world.missiles.removeAll(finishedNow);
         for (Missile missile : finishedNow) {
+            recordProjectileFree(missile);
             world.battleNetProjectileStartCycles.remove(missile);
             world.freeBattleNetProjectileSlot(missile.battleNetPoolSlot());
             missile.setBattleNetPoolSlot(-1);
@@ -871,8 +938,20 @@ final class BattleNetProjectileSystem {
         if (impact == null || impact.isNone()) {
             return;
         }
-        world.spawn(new Missile(impact, impact.declaresDamage() ? missile.source() : null, null,
+        Missile effect = world.spawn(new Missile(impact,
+                impact.declaresDamage() ? missile.source() : null, null,
                 missile.x(), missile.y(), missile.x(), missile.y()));
+        recordProjectileCreate(effect);
+        // The native fixed-pool pass is not a snapshot. If an impact takes a
+        // slot above the projectile currently being resolved, the ascending
+        // walk reaches and advances it later in this same cycle. If it reuses
+        // a lower slot the cursor has already passed it, so its first action
+        // waits for the next cycle. Human 13 proves both halves: slot 3 rock
+        // creates impact slot 5 at fixture 35 (same-pass action, free@49),
+        // while slot 4 rock creates impact slot 3 at 42 (free@57).
+        if (effect.battleNetPoolSlot() > missile.battleNetPoolSlot()) {
+            effect.step();
+        }
     }
 
 

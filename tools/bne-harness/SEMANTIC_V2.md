@@ -8,13 +8,23 @@ rows; enabling it cannot change the semantic-v1 trace.
 The currently proved comparisons are:
 
 - player supply, unit/building totals, kills, razings, and ten upgrade levels;
-- unit tile and pixel position, animation timer/frame, health, and owner;
+- unit tile and pixel position, exact authenticated script sequence cursor,
+  animation timer/frame, health, owner, mobile facing, and the active order
+  point;
 - live projectile slot, position, endpoint, animation frame, and facing; and
 - the set of mutable terrain squares changed since cycle one.
 
-Facing for units and raw order-point coordinates remain diagnostic only. The
-engines use unlike angular and sentinel/union representations there, so the
-comparator reports them as uncovered rather than manufacturing a pass.
+The comparator converts Java's 256-direction mobile facing to retail's nearest
+eight-way direction. It compares order-point coordinates only while both
+engines expose an order whose native record actually owns that coordinate:
+Attack/AttackMove use the attack goal, Harvest/ReturnGoods use the resource
+tile, and Build uses the build goal. This conditional mapping avoids treating
+an inactive union member or sentinel as gameplay state.
+
+The sequence cursor is not normalized or heuristically classified. Both
+engines execute the authenticated `script.bin`, and both records expose its
+byte offset directly. A mismatch therefore pinpoints the first scheduler visit
+where Java and retail entered, waited in, or left an action program differently.
 
 Run the complete tier with:
 

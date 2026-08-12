@@ -54,6 +54,7 @@ class EngineTraceSemanticV2Test {
         assertTrue(trace.contains("v2p cycle=0 player=0"), trace);
         assertTrue(trace.contains("v2u cycle=0 unit=" + unit.id()
                 + " type=unit-footman player=0 x=3 y=4 px=94 py=133"), trace);
+        assertTrue(trace.contains("mobile=0"), trace);
         assertTrue(trace.contains("v2t cycle=0 x=6 y=7"), trace);
     }
 

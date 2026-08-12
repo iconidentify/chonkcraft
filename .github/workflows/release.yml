@@ -12,7 +12,7 @@ on:
       version:
         description: "Public version to stamp"
         required: true
-        default: "0.1.1-beta12"
+        default: "0.1.1-beta14"
         type: string
       draft:
         description: "Keep the published GitHub release as a draft"

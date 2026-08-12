@@ -1346,6 +1346,62 @@ final class BattleNetMovementSystem {
         return refusals;
     }
 
+    /**
+     * Transfers a refused attack approach from Attack OP0 to Move's native
+     * refusal wait.
+     *
+     * <p>The order remains Attack, but the action program does not. XHuman 4
+     * grunt 1505 and axethrower 1490 both finish Attack OP0, lay a route, and
+     * find its first heading occupied. Retail records their type-specific Move
+     * starts (2482 and 830) with timer 15 in that same cycle. Leaving Java on
+     * Attack just past OP0 hid the refusal from the scheduler and accounted
+     * for 75 of the 101 early mobile sequence mismatches fleet-wide.</p>
+     */
+    private void armBattleNetAttackRefusalMove(Unit unit) {
+        if (world.battleNetSequence == null
+                || unit == null
+                || unit.target() == null
+                // A unit already executing Move must keep its current cursor;
+                // this transfer is specifically Attack OP0 yielding to Move.
+                || executingBattleNetMoveProgram(unit)
+                || !(unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE
+                        || unit.chasing())) {
+            return;
+        }
+        int moveStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart < 0) {
+            return;
+        }
+        unit.setBattleNetSequenceOffset(moveStart);
+        unit.setBattleNetAnimationTimer(15);
+        unit.setBattleNetChaseStepReady(false);
+    }
+
+    /** Native action ownership is the sequence cursor, not the UI animation. */
+    private boolean executingBattleNetMoveProgram(Unit unit) {
+        int moveStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int cursor = unit.battleNetSequenceOffset();
+        return moveStart >= 0 && cursor >= moveStart
+                && (attackStart < 0 || cursor < attackStart);
+    }
+
+    /** Mirrors a newly transferred refusal in native's offset-7 Move timer. */
+    void syncBattleNetAttackRefusalTimer(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || unit.battleNetOrderDelay() <= 0) {
+            return;
+        }
+        int moveStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart >= 0 && unit.battleNetSequenceOffset() == moveStart) {
+            unit.setBattleNetAnimationTimer(unit.battleNetOrderDelay());
+        }
+    }
 
     /**
      * @param replanOnExhaustion whether this may lay a fresh course to
@@ -2358,6 +2414,7 @@ final class BattleNetMovementSystem {
                                 quiet = Math.max(quiet, 15);
                             }
                             unit.setBattleNetOrderDelay(quiet);
+                            armBattleNetAttackRefusalMove(unit);
                             // Refused by an ally that is mid-step with nothing
                             // queued behind it: that ally stops where it lands,
                             // and native counts the wait out rather than taking

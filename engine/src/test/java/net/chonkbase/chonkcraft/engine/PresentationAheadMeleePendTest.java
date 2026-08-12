@@ -202,11 +202,46 @@ class PresentationAheadMeleePendTest {
 
         world.combat.hit(attacker, target);
 
-        assertEquals(1, attacker.battleNetAnimationTimer(),
-                "empty-route residual may collapse pre-OP10 wait so a late OP0 "
-                        + "still lands on native's process cycle");
+        assertEquals(5, attacker.battleNetAnimationTimer(),
+                "empty-route residual consumes OP10 on native's process cycle");
+        assertEquals(1941, attacker.battleNetSequenceOffset(),
+                "the collapsed blow must enter the post-OP10 wait now, not add "
+                        + "a cycle to every later swing");
         assertTrue(target.hitPoints() < hpBefore,
                 "empty-route residual collapse resolves presentation damage "
                         + "(Human 13 grunt 93 / fixture 46)");
+    }
+
+    @Test
+    @DisplayName("every settled melee op10 lands without a presentation callback")
+    void everySettledMeleeOp10LandsWithoutAPresentationCallback()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        GameMap map = grass(16);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(knight(), 0, 4, 4);
+        Unit target = world.createUnit(prey(), 1, 5, 4);
+        assumeTrue(attacker != null && target != null, "units must place");
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        // 1935 wait-one processes retail's inline OP10 marker. No presentation
+        // hit is pending: this is the repeated-swing case that used to be
+        // discarded after the first combat loop.
+        attacker.setBattleNetSequenceOffset(1935);
+        attacker.setBattleNetAnimationTimer(1);
+        int hpBefore = target.hitPoints();
+
+        world.combat.stepBattleNetAttackSequence(attacker);
+
+        assertTrue(target.hitPoints() < hpBefore,
+                "retail OP10 itself must own the melee damage");
+        assertTrue(attacker.battleNetSequenceMeleeLanded(),
+                "a later visual callback must not duplicate the OP10 blow");
     }
 }
