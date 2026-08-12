@@ -158,6 +158,65 @@ class MeleeAttackSyncLoopTest {
     }
 
     @Test
+    @DisplayName("a refused first attack heading enters the native move wait")
+    void aRefusedFirstAttackHeadingEntersTheNativeMoveWait()
+            throws Exception {
+        // XHuman 4 grunt 1505: Attack OP0 @2539/1 lays W,SW,W,W,W,
+        // refuses W on an ally, then records Move @2482/15 while the order
+        // remains Attack. The axethrower beside it does the same at 830/15.
+        byte[] script = retailScriptBin();
+        GameMap map = grass(24);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+
+        Unit attacker = world.createUnit(grunt(), 0, 10, 10);
+        Unit blocker = world.createUnit(grunt(), 0, 9, 10);
+        Unit target = world.createUnit(prey(), 1, 4, 10);
+        assertTrue(attacker != null && blocker != null && target != null,
+                "attacker, ally and quarry must place");
+        blocker.setOrder(Unit.Order.MOVE);
+        blocker.setPath(new net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Path(
+                net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Result.FOUND,
+                new int[] {net.chonkbase.chonkcraft.engine.map.Direction
+                        .fromDelta(-1, 0)}));
+        blocker.setPathGoal(8, 10);
+        blocker.animation().switchTo(
+                blocker.type().animationSet().get(AnimationSet.State.MOVE));
+        assertTrue(world.orderAttack(attacker, target), "attack accepted");
+        attacker.setBattleNetOrderDelay(0);
+        attacker.setChasing(false);
+        attacker.setFighting(false);
+        int west = net.chonkbase.chonkcraft.engine.map.Direction
+                .fromDelta(-1, 0);
+        attacker.setPath(new net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Path(
+                net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Result.FOUND,
+                new int[] {west}));
+        attacker.setPathGoal(target.tileX(), target.tileY());
+        int attackStart = world.idle.battleNetSequenceStart(attacker,
+                net.chonkbase.chonkcraft.engine.animation.BattleNetSequence
+                        .ATTACK_ANIMATION);
+        int moveStart = world.idle.battleNetSequenceStart(attacker,
+                net.chonkbase.chonkcraft.engine.animation.BattleNetSequence
+                        .MOVE_ANIMATION);
+        assumeTrue(attackStart >= 0 && moveStart >= 0,
+                "retail Move and Attack sequences must resolve");
+        attacker.setBattleNetSequenceOffset(attackStart);
+        attacker.setBattleNetAnimationTimer(1);
+
+        world.combat.stepAttack(attacker);
+
+        assertEquals(Unit.Order.ATTACK, attacker.order());
+        assertEquals(moveStart, attacker.battleNetSequenceOffset(),
+                "refusal belongs to Move even though Attack owns the order");
+        assertEquals(15, attacker.battleNetAnimationTimer());
+        assertEquals(1, attacker.battleNetCollisionCounter(),
+                "cooperative refusal raises the native collision nibble");
+    }
+
+    @Test
     @DisplayName("a residual settle in weapon range pays table-0x27 SyncRand that visit")
     void aResidualSettleInWeaponRangePaysTable0x27SyncRandThatVisit()
             throws Exception {

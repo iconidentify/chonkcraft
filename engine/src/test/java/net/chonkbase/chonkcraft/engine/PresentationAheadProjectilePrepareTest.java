@@ -38,6 +38,62 @@ import org.junit.jupiter.api.Test;
  */
 class PresentationAheadProjectilePrepareTest {
 
+    @Test
+    @DisplayName("stand-ground OP10 preserves birth but defers constructor to cycle end")
+    void standGroundOp10DefersOnlyTheConstructorToCycleEnd() throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(
+                        "unit-axethrower"),
+                BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart >= 0, "axethrower Attack sequence must exist");
+        int op10 = -1;
+        for (int off = attackStart; off < attackStart + 64; off++) {
+            if (sequence.opcodeAt(off) == 10) {
+                op10 = off;
+                break;
+            }
+        }
+        assumeTrue(op10 >= 0, "axethrower Attack must contain opcode ten");
+
+        World world = new World(grass(16));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        MissileType axe = new MissileType("missile-axe", null,
+                MissileClass.POINT_TO_POINT, 32, 32, 1, 1, 12, 1, 1,
+                0, 0, null, null, false, 0, 0, false, null, 0);
+        world.setMissileTypes(Map.of("missile-axe", axe));
+        world.restoreRandom(1, 0);
+        Unit attacker = world.createUnit(axethrower(), 0, 2, 2);
+        Unit victim = world.createUnit(destroyer(), 1, 6, 2);
+        assertTrue(attacker != null && victim != null, "units place");
+        attacker.setOrder(Unit.Order.STAND_GROUND);
+        attacker.setTarget(victim);
+        attacker.setFighting(true);
+        attacker.setBattleNetSequenceOffset(op10);
+        attacker.setBattleNetAnimationTimer(1);
+
+        int seedBefore = world.battleNetRandomSeed();
+        world.combat.stepBattleNetAttackSequence(attacker);
+        assertEquals(1, world.missiles().size(),
+                "OP10, not a presentation callback, births the standing shot");
+        Missile shot = world.missiles().get(0);
+        assertFalse(shot.battleNetConstructorDrawn(),
+                "later unit visits must precede constructor RNG");
+        assertEquals(seedBefore, world.battleNetRandomSeed(),
+                "birth itself cannot debit constructor RNG");
+        world.projectiles.flushBattleNetCycleEndConstructorDebit();
+        assertTrue(shot.battleNetConstructorDrawn(),
+                "cycle end spends damage and aim draws");
+        assertNotEquals(seedBefore, world.battleNetRandomSeed(),
+                "the cycle-end constructor owns the three async draws");
+        assertTrue(shot.battleNetMotion(),
+                "the same cycle-end boundary arms flight");
+    }
+
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());
         for (int y = 0; y < size; y++) {

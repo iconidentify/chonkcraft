@@ -35,6 +35,9 @@ from bne_packet import PLAYER_SIM_FIELDS  # noqa: E402
 SCHEMA = 1
 UNIT_FLAGS = 30
 UNIT_FREE_OR_DEAD = 0x05
+UNIT_FACE = 10
+UNIT_ORDER_X = 132
+UNIT_ORDER_Y = 134
 BULLET_FLAGS = 53
 BULLET_FREE = 0x01
 CONTROLLER_NOBODY = 3
@@ -42,6 +45,11 @@ CONTROLLER_NOBODY = 3
 UNIT_FIELDS = {
     "px": (0, 2), "py": (2, 2), "timer": (7, 1), "frame": (9, 1),
     "x": (24, 2), "y": (26, 2), "hp": (34, 2), "player": (44, 1),
+}
+SEQUENCE_FIELDS = {"sequence": (4, 2, "seqoff")}
+FACE_FIELDS = {"face": (UNIT_FACE, 1)}
+ORDER_POINT_FIELDS = {
+    "orderx": (UNIT_ORDER_X, 2), "ordery": (UNIT_ORDER_Y, 2),
 }
 BULLET_FIELDS = {
     "x": (0, 2), "y": (2, 2), "frame": (9, 1), "face": (10, 1),
@@ -192,6 +200,13 @@ def _pair_units(native: dict[int, bytes], java: dict[int, dict[str, str]]) \
             if len(slots) == 1 and len(right.get(key, ())) == 1}
 
 
+def _native_order_point(raw: bytes, map_size: int) -> tuple[int, int] | None:
+    """Decode the point arm only when both coordinates are valid map tiles."""
+    x = _uint(raw, UNIT_ORDER_X, 2)
+    y = _uint(raw, UNIT_ORDER_Y, 2)
+    return (x, y) if 0 <= x < map_size and 0 <= y < map_size else None
+
+
 def compare(state: Path, java_trace: Path, through: int | None = None,
             mismatch_limit: int = 100,
             families: set[str] | None = None) -> dict[str, Any]:
@@ -260,6 +275,32 @@ def compare(state: Path, java_trace: Path, through: int | None = None,
                 for name, (offset, size) in UNIT_FIELDS.items():
                     check("unit", cycle, f"slot:{slot}/unit:{ident}", name,
                           _uint(raw, offset, size), int(urow[name]))
+                # Both engines execute the same authenticated script.bin, so
+                # this byte offset is a direct scheduler proof rather than an
+                # animation-name or order heuristic.
+                for name, (offset, size, java_name) in SEQUENCE_FIELDS.items():
+                    check("unit", cycle, f"slot:{slot}/unit:{ident}", name,
+                          _uint(raw, offset, size), int(urow[java_name]))
+                # BNE stores one of eight headings, while Java stores a full
+                # 0..255 turn angle. Rendering rounds that angle to the nearest
+                # of the same eight compass sectors. Only genuinely mobile
+                # units participate: buildings and scenery can legally carry
+                # direction-shaped bytes which have no facing semantics.
+                java_face = int(urow["face"])
+                if int(urow.get("mobile", 0)) == 1:
+                    check("unit", cycle, f"slot:{slot}/unit:{ident}",
+                          "face", _uint(raw, UNIT_FACE, 1),
+                          ((java_face + 16) // 32) & 7)
+                # Off-map values are pointer/sentinel union arms, not points.
+                # Compare only the proved point representation.
+                native_point = _native_order_point(raw, frame["map_size"])
+                java_point = (int(urow["orderx"]), int(urow["ordery"]))
+                if native_point is not None and java_point[0] >= 0 \
+                        and java_point[1] >= 0:
+                    check("unit", cycle, f"slot:{slot}/unit:{ident}",
+                          "orderx", native_point[0], java_point[0])
+                    check("unit", cycle, f"slot:{slot}/unit:{ident}",
+                          "ordery", native_point[1], java_point[1])
         all_slots = (set(frame["missiles"]) | set(port["missiles"])) \
                 if "projectile" in families else set()
         for slot in all_slots:
@@ -285,11 +326,14 @@ def compare(state: Path, java_trace: Path, through: int | None = None,
     coverage = {
         "player": {"proved_fields": sorted(PLAYER_FIELDS),
                    "native_fields": len(PLAYER_SIM_FIELDS)},
-        "unit": {"proved_fields": sorted(UNIT_FIELDS), "native_bytes": 152,
-                 "diagnostic_only": ["face", "orderx", "ordery"],
-                 "reason": ("facing uses a different angular representation; "
-                            "native order-point sentinel/union validity is not "
-                            "yet decoded")},
+        "unit": {"proved_fields": sorted(
+                    set(UNIT_FIELDS) | set(SEQUENCE_FIELDS)
+                    | set(FACE_FIELDS) | set(ORDER_POINT_FIELDS)),
+                 "native_bytes": 152,
+                 "conditional_fields": {
+                     "face": "mobile units; Java angle rounded to an eight-way heading",
+                     "orderx,ordery": "both native and Java carry a valid map point",
+                 }},
         "projectile": {"proved_fields": sorted(BULLET_FIELDS),
                        "native_bytes": BULLET_BYTES},
         "terrain": {"proved_fields": ["changed_squares"],

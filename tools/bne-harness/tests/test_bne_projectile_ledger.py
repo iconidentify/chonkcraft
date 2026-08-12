@@ -90,6 +90,32 @@ def read(stream: bytes, through: int) -> dict:
 
 
 class ProjectileLifetimeTest(unittest.TestCase):
+    def test_structured_java_lifecycle_uses_fixture_cycle_and_creation_identity(self):
+        """The engine's JSONL can be compared directly with native cycles."""
+        records = [
+            {"schema": 1, "side": "java", "ordinal": 40, "cycle": 14,
+             "kind": "projectile.create", "subject": "unit:7",
+             "fields": {"fixture_cycle": 12, "creation_ordinal": 3,
+                        "pool_slot": 5, "type": 15,
+                        "type_ident": "missile-arrow", "source": 7,
+                        "target": 9, "remaining": 48}},
+            {"schema": 1, "side": "java", "ordinal": 91, "cycle": 18,
+             "kind": "projectile.free", "subject": "unit:7",
+             "fields": {"fixture_cycle": 16, "creation_ordinal": 3,
+                        "pool_slot": 5, "type": 15,
+                        "type_ident": "missile-arrow", "source": 7,
+                        "target": 9, "remaining": -1}},
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "causal.jsonl"
+            path.write_text("\n".join(json.dumps(row) for row in records) + "\n")
+            loaded = ledger.load_java_lifecycle(path)["lifecycle"]
+
+        self.assertEqual([row["cycle"] for row in loaded], [12, 16])
+        self.assertEqual([row["ordinal"] for row in loaded], [3, 3])
+        self.assertEqual(loaded[0]["type"], 15)
+        self.assertEqual(loaded[0]["pool_slot"], 5)
+
     def test_visual_frame_and_facing_are_named_evidence(self):
         """The renderer fields are decoded rather than read from raw hex."""
         decoded = ledger.decode_projectile(raw_bullet(

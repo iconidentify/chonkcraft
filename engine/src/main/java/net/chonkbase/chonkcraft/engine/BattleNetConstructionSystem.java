@@ -1507,6 +1507,16 @@ final class BattleNetConstructionSystem {
         if (site.progress() < site.progressGoal()) {
             return;
         }
+        // Filling the construction counter is not the roof-on event. Retail
+        // leaves a completed farm in Built for one final twelve-cycle pulse:
+        // Orc 9 farm 1474 reaches 400 HP at fixture 1236 but player food stays
+        // 46 until fixture 1248. Java used to switch to Still immediately at
+        // 1236 and granted four food twelve cycles early. Reuse the native
+        // Built delay as the explicit full-frame hold; progress is already
+        // capped so the following pulse performs only completion.
+        if (before < site.progressGoal()) {
+            return;
+        }
         // "Check if building ready" is gated on the animation letting go:
         // COrder_Built finishes only when !unit.Anim.Unbreakable holds
         // beside the filled counter, so a frame

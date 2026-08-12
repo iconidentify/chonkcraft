@@ -22,8 +22,8 @@ MAP_SIZE = 4
 
 def unit(x=3, y=4, hp=60):
     raw = bytearray(UNIT_BYTES)
-    values = {0: 96, 2: 128, 7: 5, 9: 2, 10: 3, 24: x, 26: y,
-              34: hp, 44: 0, 132: 9, 134: 10}
+    values = {0: 96, 2: 128, 4: 123, 7: 5, 9: 2, 10: 3, 24: x, 26: y,
+              34: hp, 44: 0, 132: 2, 134: 3}
     for offset, value in values.items():
         size = 1 if offset in (7, 9, 10, 44) else 2
         raw[offset:offset + size] = value.to_bytes(size, "little")
@@ -86,8 +86,8 @@ def java_trace(second_hp=60):
             "researched=-",
             f"v2u cycle={cycle} unit=100 type=unit-footman player=0 x=3 y=4 "
             f"px=96 py=128 ox=0 oy=0 hp={60 if cycle == 1 else second_hp} "
-            "mana=0 frame=2 face=3 timer=5 seqoff=0 order=STILL saved=STILL "
-            "orderx=9 ordery=10 target=-1 wait=0 collision=0 refusals=0 route=-",
+            "mana=0 frame=2 face=96 mobile=1 timer=5 seqoff=123 order=STILL saved=STILL "
+            "orderx=2 ordery=3 target=-1 wait=0 collision=0 refusals=0 route=-",
             f"v2m cycle={cycle} slot=0 type=missile-arrow source=100 target=-1 "
             "x=110 y=120 fromx=100 fromy=110 tox=140 toy=150 frame=4 face=6 "
             "delay=0 ttl=-1 damage=0 remaining=0 flags=0 error=0 major=0 "
@@ -122,6 +122,34 @@ class SemanticV2Test(unittest.TestCase):
             written(stream(), ".state.bin"), written(trace.encode(), ".txt"))
         self.assertEqual("DIVERGED", result["status"])
         self.assertEqual("px", result["mismatches"][0]["field"])
+
+    def test_mobile_facing_is_normalized_from_32_angle_steps(self):
+        trace = java_trace().decode().replace("face=96 mobile=1", "face=64 mobile=1", 1)
+        result = bne_semantic_v2.compare(
+            written(stream(), ".state.bin"), written(trace.encode(), ".txt"))
+        self.assertEqual("DIVERGED", result["status"])
+        mismatch = next(item for item in result["mismatches"]
+                        if item["field"] == "face")
+        self.assertEqual(3, mismatch["retail"])
+        self.assertEqual(2, mismatch["java"])
+
+    def test_valid_order_point_is_compared(self):
+        trace = java_trace().decode().replace("orderx=2 ordery=3", "orderx=1 ordery=3", 1)
+        result = bne_semantic_v2.compare(
+            written(stream(), ".state.bin"), written(trace.encode(), ".txt"))
+        self.assertEqual("DIVERGED", result["status"])
+        self.assertTrue(any(item["field"] == "orderx"
+                            for item in result["mismatches"]))
+
+    def test_exact_native_sequence_cursor_is_compared(self):
+        trace = java_trace().decode().replace("seqoff=123", "seqoff=124", 1)
+        result = bne_semantic_v2.compare(
+            written(stream(), ".state.bin"), written(trace.encode(), ".txt"))
+        self.assertEqual("DIVERGED", result["status"])
+        mismatch = next(item for item in result["mismatches"]
+                        if item["field"] == "sequence")
+        self.assertEqual(123, mismatch["retail"])
+        self.assertEqual(124, mismatch["java"])
 
     def test_player_only_tier_ignores_unit_and_projectile_rows(self):
         trace = java_trace().decode().replace("px=96 py=128", "px=1 py=2")

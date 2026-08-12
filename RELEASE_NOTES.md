@@ -1,10 +1,10 @@
-# ChonkCraft 0.1.1-beta13 — Construction, Combat, and Movement Fidelity
+# ChonkCraft 0.1.1-beta14 — BNE Combat and Action Scheduling
 
-- Corrected builders that entered a construction footprint too early: they now finish the exact Battle.net Edition approach to the stored build point before founding the structure.
-- Recreated the occupied-destination refusal sequence used when a unit's route ends beside a moving blocker, including the native retry cadence and solid-to-soft congestion transition.
-- Preserved long terminal flight routes so air units no longer invent an extra pause before their final diagonal step.
-- Moved kill scores, kill counts, and razing counts into the deterministic simulation event where the lethal hit occurs. Headless games and multiplayer now receive the same immediate result as the visible desktop game.
-- Removed the old render-loop score sidecar and aligned parity traces with Battle.net Edition by excluding units already in their death lifecycle from live-unit totals.
-- Added regression coverage for exact construction arrival, occupied point refusals, long flyer routes, synchronous scoring, and traversal across a destroyed building's former footprint.
-- Investigated the reported Human Mission 5 blocked-barracks area from the saved game: the destroyed footprint is clear in the saved world and ground units cross it under the real player-command path; the lifecycle is now protected by an automated regression test.
-- Completed a clean build of every Java module and passed the focused gameplay suite, documentation gate, and 52-campaign semantic regression survey with zero failed fixtures.
+- Recreated the Battle.net Edition attack-program boundaries that decide when melee damage, projectiles, and impact effects become authoritative, even when presentation callbacks arrive early or late.
+- Eliminated duplicate and delayed missiles by separating launch presentation from simulation ownership, preserving native constructor ordering, and matching the fixed-pool same-cycle impact cadence.
+- Corrected the final construction pulse: completed buildings now wait for Battle.net Edition's last completion interval before becoming available and contributing supply.
+- Recreated cooperative traffic refusal behavior so an attacking unit transfers into the native movement wait when its first heading is occupied, without restarting units already executing their movement program.
+- Reduced early mobile action-cursor mismatches by 98 percent across the authenticated campaign evidence while preserving the accepted 52-campaign frontier with zero regressions or failed fixtures.
+- Strengthened semantic parity evidence to compare exact action cursors, facing, and order points, making future scheduling differences visible instead of treating related action families as equivalent.
+- Added focused regressions for melee timing, projectile preparation and impact cadence, construction completion, movement refusal, and semantic trace fidelity.
+- Verified the full Java engine suite against the previous public baseline: the exact pre-existing failure set is unchanged, with five additional passing tests.

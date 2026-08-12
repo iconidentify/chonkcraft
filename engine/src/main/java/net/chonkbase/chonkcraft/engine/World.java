@@ -90,6 +90,11 @@ public final class World {
     /** Structured opt-in evidence for aligning Java actions with native calls. */
     CausalTrace causalTrace = CausalTrace.fromEnvironment();
 
+    /** Stable creation identities for the causal projectile lifecycle. */
+    final java.util.Map<Missile, Long> battleNetProjectileCausalOrdinals =
+            new java.util.IdentityHashMap<>();
+    long nextBattleNetProjectileCausalOrdinal;
+
     /**
      * Sends causal evidence somewhere a test can read instead of a file.
      *
@@ -208,6 +213,10 @@ public final class World {
     final java.util.Map<Unit, Missile> battleNetPendingProjectileShots =
             new java.util.IdentityHashMap<>();
 
+    /** Ranged OP10 shots already fired before presentation reached its hit. */
+    final java.util.Set<Unit> battleNetSequenceProjectileFired =
+            java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
     /**
      * Terrain squares reserved from free forest to claimed forest by
      * {@code FUN_0044dec0} (native map codes {@code -2} → {@code -4}).
@@ -250,6 +259,10 @@ public final class World {
      * keep their place in the async stream (Human 13 critter 1576).
      */
     final java.util.List<Unit> battleNetCycleEndConstructorDebit =
+            new java.util.ArrayList<>();
+
+    /** Stand-ground OP10 shots whose constructor runs after the unit table. */
+    final java.util.List<Missile> battleNetCycleEndProjectileArm =
             new java.util.ArrayList<>();
 
     /** BNE projectile animation start, keyed by Java's already-created shot. */
@@ -8074,6 +8087,9 @@ public final class World {
                 "battlenet_sequence", unit.battleNetSequenceOffset(),
                 "battlenet_idle_phase", unit.battleNetIdlePhase(),
                 "melee_sync_remaining", unit.battleNetMeleeSyncRemaining(),
+                "attack_resume_hold", unit.battleNetAttackResumeHoldActive(),
+                "ranged_scan_hold", unit.battleNetRangedFreeScanHoldActive(),
+                "ranged_scan_pending", unit.battleNetRangedFreeScanHoldPending(),
                 "target", target == null ? -1 : target.id(),
                 "removed", unit.removed());
     }

@@ -593,17 +593,19 @@ public final class EngineTrace {
                 continue;
             }
             Unit target = unit.target();
+            int[] orderPoint = semanticV2OrderPoint(unit);
             out.printf("v2u cycle=%d unit=%d type=%s player=%d x=%d y=%d "
                             + "px=%d py=%d ox=%d oy=%d hp=%d mana=%d "
-                            + "frame=%d face=%d timer=%d seqoff=%d order=%s "
+                            + "frame=%d face=%d mobile=%d timer=%d seqoff=%d order=%s "
                             + "saved=%s orderx=%d ordery=%d target=%d wait=%d "
                             + "collision=%d refusals=%d route=%s%n",
                     reportedCycle, unit.id(), unit.type().ident(), unit.player(),
                     unit.tileX(), unit.tileY(), unit.pixelX(), unit.pixelY(),
                     unit.offsetX(), unit.offsetY(), unit.hitPoints(), unit.mana(),
-                    unit.frame(), unit.direction(), unit.battleNetAnimationTimer(),
+                    unit.frame(), unit.direction(), unit.canMove() ? 1 : 0,
+                    unit.battleNetAnimationTimer(),
                     unit.battleNetSequenceOffset(), unit.order(), unit.savedOrder(),
-                    unit.orderTargetX(), unit.orderTargetY(),
+                    orderPoint[0], orderPoint[1],
                     target == null ? -1 : target.id(), unit.waitCycles(),
                     unit.battleNetCollisionCounter(), unit.battleNetRefusals(),
                     semanticV2Route(unit));
@@ -685,6 +687,26 @@ public final class EngineTrace {
             route.append(unit.peekHeadingAtDepth(depth));
         }
         return route.length() == 0 ? "-" : route.toString();
+    }
+
+    /**
+     * The point stored in BNE's order union for the active order family.
+     *
+     * <p>Move/patrol/build already keep the general order target. Attack
+     * owns a remembered goal beside its weak target pointer, and resource
+     * orders own their selected resource square. Emitting only
+     * {@code orderTarget} made those two families look uncovered even though
+     * the engine already models both native union arms.</p>
+     */
+    private static int[] semanticV2OrderPoint(Unit unit) {
+        return switch (unit.order()) {
+            case ATTACK, ATTACK_MOVE -> new int[] {
+                    unit.attackGoalX(), unit.attackGoalY()};
+            case HARVEST, RETURN_GOODS -> new int[] {
+                    unit.resourceTileX(), unit.resourceTileY()};
+            case BUILD -> new int[] {unit.buildGoalX(), unit.buildGoalY()};
+            default -> new int[] {unit.orderTargetX(), unit.orderTargetY()};
+        };
     }
 
     public static void main(String[] args) throws Exception {

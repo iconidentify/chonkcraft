@@ -106,6 +106,7 @@ final class BattleNetCombatSystem {
             return;
         }
         if (unit.battleNetOrderDelay() > 0) {
+            world.movement.syncBattleNetAttackRefusalTimer(unit);
             // One-heading chase cooperative soft-wait: re-check every visit.
             // XHuman 12 grunt 1503 holds SE while axe 1524 sits on E (32,38);
             // when that axe steps S at fixture 38, native route_index 20 and
@@ -1454,6 +1455,16 @@ final class BattleNetCombatSystem {
     void hit(Unit attacker, Unit target) {
         MissileType missile = world.projectiles.missileFor(attacker);
         if (missile != null && !missile.isNone()) {
+            // OP10 is the authoritative retail firing boundary. On repeated
+            // stationary swings the Java presentation can trail it by eight
+            // cycles (Human 13 axethrower 1506: native axe born @78 while the
+            // visual hit callback arrived @86). If OP10 already constructed
+            // that shot, this later callback is presentation only.
+            if (world.battleNetSequenceProjectileFired.contains(attacker)) {
+                world.logBattleNetPend("suppress-after-op10", attacker, target,
+                        null, "sequence-projectile-already-fired", -1);
+                return;
+            }
             // Approach-hold OP0 stall: presentation can still fire while the
             // Attack sequence is parked on attackStart with timer 63 (Human 13
             // axe 117: pend-put at world 35 with seq 887 timer 56). That queues
@@ -1600,15 +1611,42 @@ final class BattleNetCombatSystem {
             boolean allowPreOp10Collapse = onPreOp10Wait
                     && (attacker.battleNetResidualEmptyRouteSettle()
                             || buildingTarget);
+            // Once a mobile fighter has settled into an ordinary repeated
+            // swing, the presentation frame is not allowed to shorten the
+            // native program's waits.  Human 13 ogre 1510/Java 90 is the
+            // compact witness: presentation reached hit() while offset 658
+            // still held timer 2; collapsing it made OP10 and every later
+            // blow two visits early.  The only proved early-presentation
+            // bridges are a just-settled empty route and building attacks.
+            boolean allowMidProgramCollapse = attacker
+                    .battleNetResidualEmptyRouteSettle() || buildingTarget;
             if (seqOff >= 0
                     && attacker.battleNetAnimationTimer() > 1
                     && (attackStart < 0 || seqOff != attackStart)
+                    && allowMidProgramCollapse
                     && (!onPreOp10Wait || allowPreOp10Collapse)) {
                 attacker.setBattleNetAnimationTimer(1);
                 Unit pend = world.battleNetPendingMeleeHits.remove(attacker);
                 if (pend != null && pend.isAlive()) {
                     world.battleNetNativeMeleeDamage.add(attacker);
                     applyDamage(attacker, pend, 1);
+                    // This is the blow for the current sequence. OP10 still
+                    // must not strike again.
+                    attacker.setBattleNetSequenceMeleeLanded(true);
+                    // A proved presentation collapse is the native OP10
+                    // visit, not merely an early copy of its damage. Leaving
+                    // the cursor parked on OP10 added one cycle to every
+                    // later swing (Human 13 grunt 1507: 46->72 instead of
+                    // retail's 46->71). Consume that opcode now so the entire
+                    // repeated attack loop retains its retail period.
+                    if (onPreOp10Wait) {
+                        BattleNetSequence.Tick op10 = world.battleNetSequence
+                                .tick(seqOff, 1);
+                        if (op10.valid() && op10.inlineActionMarker()) {
+                            attacker.setBattleNetSequenceOffset(op10.offset());
+                            attacker.setBattleNetAnimationTimer(op10.timer());
+                        }
+                    }
                 }
             }
             return;
@@ -1658,6 +1696,16 @@ final class BattleNetCombatSystem {
         // upstream the number. This implementation turned it away before rolling and was
         // one draw behind from that cycle on.
         int damage = world.damageFor(attacker, target, falloff, missile);
+        world.causalTrace.event(world.cycle, "combat.damage", target.id(),
+                "fixture_cycle", Math.max(0, world.cycle - 2),
+                "attacker", attacker == null ? -1 : attacker.id(),
+                "target", target.id(),
+                "damage", damage,
+                "hp_before", target.hitPoints(),
+                "lethal", damage > 0 && target.hitPoints() - damage <= 0,
+                "carrier", missile == null || missile.type() == null
+                        ? "melee" : missile.type().ident(),
+                "falloff", falloff);
         if (System.getenv("CHONKCRAFT_TRACE_BNE_DAMAGE") != null
                 && target != null
                 && (System.getenv("CHONKCRAFT_TRACE_BNE_DAMAGE").isBlank()
@@ -3763,6 +3811,44 @@ final class BattleNetCombatSystem {
             unit.setBattleNetSequenceOffset(-1);
             return false;
         }
+        // A completed Attack program returns from its tail directly through
+        // OP0. Retail performs the free target scan on that transition, not
+        // one scheduler visit later after the cursor already sits at the
+        // opening offset. The pre-tick scan above covers an existing OP0;
+        // this covers tail -> OP0. Human 13 axethrower 1486 changes knight
+        // 1490 to wise-man 1496 at fixture 71, holds attackStart 3,2,1,63,
+        // and therefore does not invent a second axe at fixture 81.
+        if (tick.actionMarker()
+                && rangedOp0
+                && attackStart >= 0
+                && offset != attackStart
+                && unit.canMove()
+                && sequenceTarget != null
+                && sequenceTarget.isAlive()) {
+            int reactRange = Math.max(
+                    unit.type().reactRange(world.isPerson(unit.player())),
+                    Math.max(1, unit.type().maxAttackRange()));
+            Unit candidate = world.targets.findBattleNetHostile(
+                    unit, reactRange, null);
+            if (candidate != null && candidate != sequenceTarget
+                    && candidate.isAlive()
+                    && world.targets.inAttackRange(unit, candidate)) {
+                setAutoTarget(unit, candidate);
+                unit.setBattleNetSequenceOffset(attackStart);
+                unit.setBattleNetAnimationTimer(3);
+                world.turnToTarget(unit, candidate, 0, 0);
+                unit.setBattleNetAttackResumeFromMove(true);
+                unit.setBattleNetAttackOp0OutOfRange(true);
+                unit.setBattleNetRangedFreeScanHoldPending(true);
+                if (World.BNE_IDLE_TRACE) {
+                    System.err.printf("JBNEATTACKLOOPRETARGET cycle=%d unit=%d "
+                                    + "from=%d to=%d timer=3%n",
+                            world.cycle, unit.id(), sequenceTarget.id(),
+                            candidate.id());
+                }
+                return false;
+            }
+        }
         // Human 13 knight 1490: splash during Attack OP0 (fixture 35, hp
         // 77→6) arms a bulk hold when that OP0 would fire. Native keeps
         // sequence 1922 and sets timer bodyWaitSum-1 (23) instead of walking
@@ -3877,11 +3963,17 @@ final class BattleNetCombatSystem {
                 if (!shot.battleNetMotion()) {
                     world.prepareBattleNetProjectile(shot, true);
                 }
-            } else if (unit.battleNetMultiLeftoverMelee()) {
-                // Chase multi-leftover residual can reach OP10 before the
-                // presentation Attack frame pends a victim (Human 13 ogre
-                // 1510: native OP10+damage at fixture 37; Java had OP10 at
-                // world 39 with an empty pend and only damaged at 42).
+            } else if (!unit.battleNetSequenceMeleeLanded()
+                    && unit.type() != null
+                    && !unit.type().firesMissile()) {
+                // OP10 is the retail melee hit, whether or not Java's
+                // separate presentation animation happened to call hit()
+                // first.  The initial chase residual exposed this on Human
+                // 13 ogre 1510, but repeated settled swings have the same
+                // rule: its second and third OP10s land at fixtures 64 and
+                // 89 with no fresh presentation callback. Restricting this
+                // arm to the one-shot multi-leftover latch silently skipped
+                // those blows and kept knight 1500 alive past fixture 97.
                 unit.setBattleNetMultiLeftoverMelee(false);
                 Unit sequenceVictim = unit.target();
                 if (sequenceVictim != null && sequenceVictim.isAlive()
@@ -3889,13 +3981,42 @@ final class BattleNetCombatSystem {
                         && world.targets.inAttackRange(unit, sequenceVictim)) {
                     world.battleNetNativeMeleeDamage.add(unit);
                     applyDamage(unit, sequenceVictim, 1);
-                    // Block the later presentation hit for this same swing.
+                    // Block a later presentation hit for this same swing.
                     unit.setBattleNetSequenceMeleeLanded(true);
                 } else {
                     world.battleNetInlineAttackMarkers.add(unit);
                 }
             } else {
-                world.battleNetInlineAttackMarkers.add(unit);
+                // A repeated ranged sequence may reach OP10 before Java's
+                // separate presentation animation calls hit(). Retail does
+                // not wait for that renderer-side callback: it constructs the
+                // projectile here. Launch from the sequence target and mark
+                // the later visual callback as already paid.
+                Unit sequenceVictim = unit.target();
+                MissileType sequenceMissile = world.projectiles.missileFor(unit);
+                if (sequenceMissile != null && !sequenceMissile.isNone()
+                        && sequenceVictim != null && sequenceVictim.isAlive()
+                        && !unit.isMoving()
+                        && world.targets.inAttackRange(unit, sequenceVictim)) {
+                    Missile inlineShot = world.projectiles.launch(
+                            unit, sequenceVictim, sequenceMissile);
+                    world.logBattleNetPend("op10-without-presentation", unit,
+                            sequenceVictim, inlineShot,
+                            "authoritative-sequence-boundary", world.cycle);
+                    if (unit.order() == Unit.Order.STAND_GROUND) {
+                        // COrder_Still's standing swing reaches OP10 during
+                        // the unit visit, but retail completes its projectile
+                        // constructor after the unit table. It is still in
+                        // the same cycle-end missile snapshot. Deferring only
+                        // construction (not birth) preserves that ordering.
+                        world.battleNetCycleEndProjectileArm.add(inlineShot);
+                    } else {
+                        world.prepareBattleNetProjectile(inlineShot, true);
+                    }
+                    world.battleNetSequenceProjectileFired.add(unit);
+                } else {
+                    world.battleNetInlineAttackMarkers.add(unit);
+                }
             }
             if (shot != null) {
                 world.battleNetPendingProjectileQueuedCycle.remove(shot);
@@ -3904,6 +4025,7 @@ final class BattleNetCombatSystem {
         // Next Attack OP0 starts a new swing; clear sequence-owned melee.
         if (tick.actionMarker()) {
             unit.setBattleNetSequenceMeleeLanded(false);
+            world.battleNetSequenceProjectileFired.remove(unit);
         }
         if (!tick.actionMarker()) {
             return chaseDecision;

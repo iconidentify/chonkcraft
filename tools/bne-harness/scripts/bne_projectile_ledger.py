@@ -365,6 +365,9 @@ def read_native_pool(state_source: BinaryIO, *, through: int) \
                     movements.append({
                         "slot": slot,
                         "type": decoded["type"],
+                        "action": decoded["action"],
+                        "frame": decoded["frame"],
+                        "flags": decoded["flags"],
                         "remaining": decoded["remaining"],
                         "x": decoded["x"],
                         "y": decoded["y"],
@@ -601,11 +604,22 @@ def _first_lifecycle_disagreement(native: dict[str, Any],
     for entry in java_lifecycle:
         java_by_cycle.setdefault(int(entry["cycle"]), []).append(entry)
 
+    first_cycle = min(record["cycle"] for record in native["cycles"])
+    initial_lifetimes = {
+        (life["slot"], life["generation"])
+        for life in native["lifetimes"]
+        if life["creation_cycle"] == first_cycle
+    }
     native_births = {
-        record["cycle"]: record["births"] for record in native["cycles"]
+        record["cycle"]: ([] if record["cycle"] == first_cycle
+                          else record["births"])
+        for record in native["cycles"]
     }
     native_frees = {
-        record["cycle"]: record["frees"] for record in native["cycles"]
+        record["cycle"]: [free for free in record["frees"]
+                          if (free["slot"], free["generation"])
+                          not in initial_lifetimes]
+        for record in native["cycles"]
     }
     cycles = sorted(set(native_births) | set(java_by_cycle))
     for cycle in cycles:
@@ -628,7 +642,9 @@ def _first_lifecycle_disagreement(native: dict[str, Any],
             }
         for index, (native_birth, java_create) in enumerate(
                 zip(births, java_creates)):
-            if native_birth["type"] != java_create.get("type"):
+            java_type = java_create.get("type")
+            if isinstance(java_type, int) and java_type >= 0 \
+                    and native_birth["type"] != java_type:
                 return {
                     "class": "allocation-order",
                     "cycle": cycle,
@@ -848,23 +864,32 @@ def load_java_lifecycle(path: Path) -> dict[str, Any]:
 
     The format is deliberately the causal trace's own vocabulary rather than a
     new one: a `projectile.create` or `projectile.free` line carrying a cycle.
-    Nothing in the engine emits these yet, which is why a missing file is an
-    evidence gap rather than an error.
+    Structured causal JSONL is preferred. The older diagnostic-line parser is
+    retained so evidence captured before the recorder shipped remains usable.
     """
-    from bne_causal import parse_java_trace
+    from bne_causal import parse_causal_jsonl, parse_java_trace
 
     text = path.read_text(encoding="utf-8", errors="replace")
+    stripped = text.lstrip()
+    events = (parse_causal_jsonl(text, expected_side="java")
+              if stripped.startswith("{") else parse_java_trace(text))
     lifecycle: list[dict[str, Any]] = []
-    for event in parse_java_trace(text):
+    for event in events:
         if event.kind not in ("projectile.create", "projectile.free"):
             continue
+        cycle = event.fields.get("fixture_cycle", event.cycle)
+        if not isinstance(cycle, int):
+            continue
         lifecycle.append({
-            "cycle": event.cycle,
+            "cycle": cycle,
             "event": "create" if event.kind.endswith("create") else "free",
-            "ordinal": event.ordinal,
+            "ordinal": event.fields.get("creation_ordinal", event.ordinal),
             "type": event.fields.get("type"),
+            "type_ident": event.fields.get("type_ident"),
             "source": event.fields.get("source"),
             "target": event.fields.get("target"),
+            "pool_slot": event.fields.get("pool_slot"),
+            "remaining": event.fields.get("remaining"),
         })
     return {"lifecycle": lifecycle, "source": str(path)}
 
