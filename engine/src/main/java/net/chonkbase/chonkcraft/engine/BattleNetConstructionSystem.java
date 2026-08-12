@@ -1194,8 +1194,13 @@ final class BattleNetConstructionSystem {
         // laid one final S route and founded five cycles later.  Treating the
         // first footprint square as arrival founded immediately and made the
         // AI look as though it had issued the build early.
-        boolean exactPointArrival = !what.builderOutside()
-                && what.onTopRule() == null
+        // A fixed point is the finish only for a builder that can enter the
+        // footprint.  Shore buildings give a land worker range one -- the
+        // retail "peon won't dive" arm above -- so insisting on the stored
+        // point inside their water squares accepts the green placement, walks
+        // to the beach, and then waits there forever.  The same distinction
+        // applies to every ranged construction goal, not just shipyards.
+        boolean exactPointArrival = reach == 0
                 && worker.buildGoalX() >= 0 && worker.buildGoalY() >= 0;
         boolean atSite = exactPointArrival
                 ? worker.tileX() == worker.buildGoalX()

@@ -1,9 +1,8 @@
-# ChonkCraft 0.1.1-beta15 -- Natural Shoreline and Terrain Movement
+# ChonkCraft 0.1.1-beta16 -- Reliable Shoreline Construction
 
-- Recreated Battle.net Edition's widening move-order behavior: ships ordered onto shoreline now sail to the closest legal water instead of acknowledging the command and remaining stationary.
-- Ground units ordered toward water, trees, or other incompatible terrain now approach the nearest reachable edge, including orders issued through the minimap.
-- Preserved the native distinction for genuinely disconnected destinations, which remain safely bounded and eventually stop without crossing illegal terrain.
-- Restricted an autonomous-critter terrain guard that had accidentally cancelled ordinary player movement before the pathfinder could apply the retail rule.
-- Strengthened the authenticated movement referee from 87 to 88 checks, with explicit behavioral proof for ships approaching land, soldiers approaching water, and soldiers approaching dense forest.
-- Verified all 52 authenticated campaign fixtures with zero failures and zero regressions against the accepted h40 frontier.
-- Verified the complete engine failure set is identical before and after the change, while the new player-facing movement tests pass.
+- Fixed accepted shipyard orders that sent a peasant to the coast, acknowledged the command, and then waited forever without laying a foundation.
+- Restored Battle.net Edition's ranged construction arrival rule: a land worker raising a shore building finishes beside its legal footprint instead of being required to enter water.
+- Applied the correction to the shared construction state machine so shipyards, foundries, refineries, and future ranged construction use one coherent rule rather than building-specific exceptions.
+- Added an end-to-end behavioral referee that starts with an accepted green shoreline placement, advances the worker through the normal order stream, and requires the shipyard foundation to appear.
+- Passed 48 focused construction, production, tanker, and oil-platform checks with zero failures and zero skips.
+- Verified all 52 authenticated campaign fixtures through 200 cycles with zero failures and zero regressions against the accepted h40 frontier.

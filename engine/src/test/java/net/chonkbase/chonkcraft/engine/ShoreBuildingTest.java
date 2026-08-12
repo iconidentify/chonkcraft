@@ -9,6 +9,7 @@ import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
+import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -107,5 +108,35 @@ class ShoreBuildingTest {
         assertFalse(world.canPlaceBuilding(barracks, 5, 10),
                 "a barracks was built on the coast ribbon, which upstream blocks for"
                         + " everything that is not a shore building");
+    }
+
+    @Test
+    @DisplayName("an accepted shipyard order reaches a shoreline foundation")
+    void anAcceptedShipyardOrderReachesAFoundation() {
+        GameData data = load();
+        World world = shore(data);
+        UnitType workerType = data.unitTypes().types().get("unit-peasant");
+        UnitType yard = data.unitTypes().types().get("unit-human-shipyard");
+        assertNotNull(workerType);
+        assertNotNull(yard);
+        world.player(0).set(UnitType.Resource.GOLD, 10_000);
+        world.player(0).set(UnitType.Resource.WOOD, 10_000);
+        Unit worker = world.createUnit(workerType, 0, 5, 14);
+        int siteY = 10 - (Math.max(1, yard.tileHeight()) - 1);
+
+        assertTrue(world.orderBuild(worker, yard, 5, siteY),
+                "the green shoreline site was not accepted");
+        Unit foundation = null;
+        for (int cycle = 0; cycle < 4_000 && foundation == null; cycle++) {
+            world.tick();
+            for (Unit unit : world.units()) {
+                if (unit.type() == yard && unit.tileX() == 5 && unit.tileY() == siteY) {
+                    foundation = unit;
+                    break;
+                }
+            }
+        }
+        assertNotNull(foundation,
+                "the accepted shipyard order never laid its shoreline foundation");
     }
 }
