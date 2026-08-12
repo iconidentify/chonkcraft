@@ -265,5 +265,5 @@ separate machines. It runs between processes on one machine and the lockstep and
 sync-hash machinery is tested, but nobody has recorded a two-machine game.
 
 The test suite is **2,165 tests**. On a fully configured machine 17 skip; with
-no external inputs 702 do. Both numbers matter and the difference between them is the
+no external inputs 703 do. Both numbers matter and the difference between them is the
 subject of [ci.md](ci.md).

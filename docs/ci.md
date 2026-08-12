@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 702 of 2,165 tests skip and
+either way. With nothing configured, 703 of 2,167 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -83,12 +83,12 @@ Per module and in total:
 The asymmetry is deliberate. Adding a test that always runs raises the run count
 and needs no change here. Adding a test that skips without game data raises the
 skip count and turns CI red until somebody writes the new number down. That
-second case is the one worth catching: it is how 702 tests came to be skippable
+second case is the one worth catching: it is how 703 tests came to be skippable
 in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 702 |
+| `data-free` | none | 703 |
 | `full` | installation, pack, Opus vectors | 17 |
 
 The seventeen that skip even in `full` want nothing anyone should have to
