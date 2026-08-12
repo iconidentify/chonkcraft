@@ -485,7 +485,7 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 17 skips, so 2,126 tests actually run without exposing licensed
+It asserts 17 skips, so 2,148 tests actually run without exposing licensed
 media to public pull-request code.
 
 ## Packaging
