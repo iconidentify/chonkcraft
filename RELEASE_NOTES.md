@@ -1,10 +1,9 @@
-# ChonkCraft 0.1.1-beta14 — BNE Combat and Action Scheduling
+# ChonkCraft 0.1.1-beta15 -- Natural Shoreline and Terrain Movement
 
-- Recreated the Battle.net Edition attack-program boundaries that decide when melee damage, projectiles, and impact effects become authoritative, even when presentation callbacks arrive early or late.
-- Eliminated duplicate and delayed missiles by separating launch presentation from simulation ownership, preserving native constructor ordering, and matching the fixed-pool same-cycle impact cadence.
-- Corrected the final construction pulse: completed buildings now wait for Battle.net Edition's last completion interval before becoming available and contributing supply.
-- Recreated cooperative traffic refusal behavior so an attacking unit transfers into the native movement wait when its first heading is occupied, without restarting units already executing their movement program.
-- Reduced early mobile action-cursor mismatches by 98 percent across the authenticated campaign evidence while preserving the accepted 52-campaign frontier with zero regressions or failed fixtures.
-- Strengthened semantic parity evidence to compare exact action cursors, facing, and order points, making future scheduling differences visible instead of treating related action families as equivalent.
-- Added focused regressions for melee timing, projectile preparation and impact cadence, construction completion, movement refusal, and semantic trace fidelity.
-- Verified the full Java engine suite against the previous public baseline: the exact pre-existing failure set is unchanged, with five additional passing tests.
+- Recreated Battle.net Edition's widening move-order behavior: ships ordered onto shoreline now sail to the closest legal water instead of acknowledging the command and remaining stationary.
+- Ground units ordered toward water, trees, or other incompatible terrain now approach the nearest reachable edge, including orders issued through the minimap.
+- Preserved the native distinction for genuinely disconnected destinations, which remain safely bounded and eventually stop without crossing illegal terrain.
+- Restricted an autonomous-critter terrain guard that had accidentally cancelled ordinary player movement before the pathfinder could apply the retail rule.
+- Strengthened the authenticated movement referee from 87 to 88 checks, with explicit behavioral proof for ships approaching land, soldiers approaching water, and soldiers approaching dense forest.
+- Verified all 52 authenticated campaign fixtures with zero failures and zero regressions against the accepted h40 frontier.
+- Verified the complete engine failure set is identical before and after the change, while the new player-facing movement tests pass.

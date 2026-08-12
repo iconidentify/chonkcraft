@@ -165,22 +165,65 @@ class NavalAirTest {
         // other way round -- the order refused outright -- which reads better
         // on a click and is not what the game does.
         assertTrue(world.orderMove(ship, 5, 5), "the order is taken, as upstream takes it");
+        int shipStartDistance = Math.abs(ship.tileX() - 5);
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 20; cycle++) {
             world.tick();
             assertTrue(world.map().field(ship.tileX(), ship.tileY())
                             .hasFlag(TileFlag.WATER_ALLOWED | TileFlag.COAST_ALLOWED),
                     "a destroyer sailed up the shore to " + ship.tileX() + "," + ship.tileY());
         }
+        assertTrue(Math.abs(ship.tileX() - 5) < shipStartDistance,
+                "a destroyer ordered onto land must sail toward the closest legal water");
+        assertEquals(15, ship.tileX(),
+                "the destroyer must stop at the water edge nearest its land destination");
         assertTrue(world.orderMove(ship, 25, 20), "but should move freely at sea");
 
         assertTrue(world.orderMove(soldier, 25, 5), "the order is taken");
+        int soldierStartDistance = Math.abs(soldier.tileX() - 25);
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 20; cycle++) {
             world.tick();
             assertTrue(world.map().field(soldier.tileX(), soldier.tileY())
                             .hasFlag(TileFlag.LAND_ALLOWED | TileFlag.COAST_ALLOWED),
                     "a footman walked onto water at " + soldier.tileX() + "," + soldier.tileY());
         }
+        assertTrue(Math.abs(soldier.tileX() - 25) < soldierStartDistance,
+                "a footman ordered onto water must walk toward the closest legal shore");
+        assertEquals(14, soldier.tileX(),
+                "the footman must stop at the land edge nearest its water destination");
         assertTrue(world.orderMove(soldier, 10, 20));
+    }
+
+    @Test
+    void aMoveIntoTreesApproachesTheClosestWalkableEdge() {
+        GameMap map = new GameMap(20, 20, new Tileset());
+        for (int y = 0; y < 20; y++) {
+            for (int x = 0; x < 20; x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        for (int y = 9; y <= 11; y++) {
+            for (int x = 10; x <= 12; x++) {
+                map.field(x, y).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+            }
+        }
+        World world = new World(map, twoPlayers());
+        Unit soldier = world.createUnit(footman(), 0, 2, 10);
+
+        assertTrue(world.orderMove(soldier, 11, 10),
+                "the move into the forest must be accepted before route planning");
+        for (int cycle = 0; cycle < 600 && soldier.order() != Unit.Order.STILL; cycle++) {
+            world.tick();
+        }
+
+        assertEquals(Unit.Order.STILL, soldier.order(), "the forest approach never settled");
+        assertTrue(soldier.tileX() > 2,
+                "the footman acknowledged a forest-edge move but never approached it");
+        assertTrue(world.map().field(soldier.tileX(), soldier.tileY())
+                        .hasFlag(TileFlag.LAND_ALLOWED),
+                "the footman stopped on the forest instead of beside it");
+        assertEquals(2, Math.max(Math.abs(soldier.tileX() - 11),
+                        Math.abs(soldier.tileY() - 10)),
+                "the footman did not stop at the closest reachable edge of the tree block");
     }
 
     @Test

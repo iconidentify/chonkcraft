@@ -216,9 +216,13 @@ final class BattleNetMovementSystem {
             boolean firstConstructorResume = critter
                     && unit.battleNetConstructorBurnAfterCycle() > 0
                     && unit.battleNetIdlePhase() < 2;
-            if (!critter || (firstConstructorResume
+            // Ordinary player moves must reach the pathfinder below. It widens
+            // Range until a ship aimed at land, or a soldier aimed at trees,
+            // reaches the closest legal edge. This guard used to include every
+            // non-critter and silently finish those acknowledged orders here.
+            if (critter && firstConstructorResume
                     && !world.battleNetCritterCoastGoal(
-                            unit.orderTargetX(), unit.orderTargetY()))) {
+                            unit.orderTargetX(), unit.orderTargetY())) {
                 resetDisplacement(unit);
                 unit.clearPath();
                 world.finishOrder(unit);
