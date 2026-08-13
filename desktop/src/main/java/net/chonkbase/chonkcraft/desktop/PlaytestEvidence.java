@@ -32,7 +32,8 @@ final class PlaytestEvidence {
     record Request(World world, BufferedImage screenshot, Unit selected,
             int localPlayer, int cameraX, int cameraY, int focusX, int focusY,
             String mapPath, String campaign, int mission,
-            List<Integer> armedTriggers, Path root, Instant createdAt) {}
+            List<Integer> armedTriggers, Path root, Instant createdAt,
+            List<PlayerIntentJournal.Entry> playerIntents) {}
 
     record Result(Path directory, int units, int missiles, int terrainTiles) {}
 
@@ -125,6 +126,9 @@ final class PlaytestEvidence {
         out.append("  \"artifacts\": {\"screenshot\": \"screen.png\", \"save\": ")
                 .append(quote("state" + SaveGame.SUFFIX)).append("},\n");
 
+        appendPlayerIntents(out, request.playerIntents());
+        out.append(",\n");
+
         out.append("  \"units\": [\n");
         for (int i = 0; i < units.size(); i++) {
             appendUnit(out, world, units.get(i));
@@ -144,6 +148,35 @@ final class PlaytestEvidence {
         out.append('\n');
         Files.writeString(evidence, out, StandardCharsets.UTF_8);
         return terrainTiles;
+    }
+
+    private static void appendPlayerIntents(StringBuilder out,
+            List<PlayerIntentJournal.Entry> entries) {
+        out.append("  \"player_intents\": [\n");
+        List<PlayerIntentJournal.Entry> safe = entries == null ? List.of() : entries;
+        for (int index = 0; index < safe.size(); index++) {
+            PlayerIntentJournal.Entry entry = safe.get(index);
+            out.append("    {\"cycle\": ").append(entry.cycle())
+                    .append(", \"event\": ").append(quote(entry.event()))
+                    .append(", \"selected_unit_ids\": ").append(entry.selectedUnitIds());
+            if (entry.command() != null) {
+                var command = entry.command();
+                out.append(", \"command\": {\"kind\": ")
+                        .append(quote(command.kind().name()))
+                        .append(", \"player\": ").append(command.player())
+                        .append(", \"unit_id\": ").append(command.unitId())
+                        .append(", \"x\": ").append(command.x())
+                        .append(", \"y\": ").append(command.y())
+                        .append(", \"target_id\": ").append(command.targetId())
+                        .append(", \"type_index\": ").append(command.typeIndex())
+                        .append(", \"queued\": ").append(command.queued()).append('}');
+            }
+            if (entry.accepted() != null) {
+                out.append(", \"accepted\": ").append(entry.accepted());
+            }
+            out.append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
+        }
+        out.append("  ]");
     }
 
     private static void appendUnit(StringBuilder out, World world, Unit unit) {

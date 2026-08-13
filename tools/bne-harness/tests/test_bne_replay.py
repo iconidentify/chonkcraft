@@ -115,6 +115,68 @@ class ReplayParserTest(unittest.TestCase):
             self.assertEqual(1, inventory["replay_count"])
             self.assertEqual("match.wir", inventory["entries"][0]["path"])
 
+    def test_decodes_ordered_selection_and_command_context(self):
+        records = [
+            (bytes((0, 3, 3, 3, 3, 3, 3, 3)), 0,
+             bytes.fromhex("1801020308032a00070063001012001000ffff")),
+            (bytes((0, 3, 3, 3, 3, 3, 3, 3)), 0,
+             bytes.fromhex("18020203137d001c00ffff08")),
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.wir"
+            path.write_bytes(replay_bytes(records))
+            replay = bne_replay.parse_replay(path)
+            commands = bne_replay.decode_commands(replay)
+            self.assertEqual(["selection", "move", "attack"],
+                    [command.name for command in commands])
+            self.assertEqual((42, 7, 99), commands[0].selected_unit_ids)
+            self.assertEqual((42, 7, 99), commands[1].selected_unit_ids)
+            self.assertEqual((42, 7, 99), commands[2].selected_unit_ids)
+            self.assertEqual(2, bne_replay.command_summary(replay)[
+                    "commands_with_multi_unit_selection"])
+
+    def test_selection_limit_and_truncated_command_are_rejected(self):
+        too_many = bytes.fromhex("18010203080a") + bytes(20)
+        truncated = bytes.fromhex("18010203100102")
+        for name, packet, message in (
+                ("many", too_many, "retail limit"),
+                ("short", truncated, "truncates embedded opcode")):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / f"{name}.wir"
+                path.write_bytes(replay_bytes([
+                    (bytes((0, 3, 3, 3, 3, 3, 3, 3)), 0, packet)
+                ]))
+                replay = bne_replay.parse_replay(path)
+                with self.assertRaisesRegex(ValueError, message):
+                    bne_replay.decode_commands(replay)
+
+    def test_corpus_identity_covers_logical_name_and_compressed_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "one.wir").write_bytes(replay_bytes([
+                (bytes((0, 3, 3, 3, 3, 3, 3, 3)), 0,
+                 bytes.fromhex("1801020308012a001012001000ffff"))
+            ]))
+            args = type("Args", (), {
+                "sources": [root], "expect_corpus_sha256": None
+            })()
+            import contextlib
+            import io
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                bne_replay.corpus_command(args)
+            first = json.loads(output.getvalue())
+            self.assertEqual(1, first["replay_count"])
+            self.assertEqual(2, first["embedded_command_count"])
+            self.assertEqual(64, len(first["corpus_sha256"]))
+
+            (root / "one.wir").rename(root / "renamed.wir")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                bne_replay.corpus_command(args)
+            self.assertNotEqual(first["corpus_sha256"],
+                    json.loads(output.getvalue())["corpus_sha256"])
+
 
 if __name__ == "__main__":
     unittest.main()

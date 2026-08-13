@@ -1,5 +1,42 @@
 # BNE multiplayer replay corpus
 
+## Player-intent gate
+
+The replay lab decodes the complete embedded command stream while retaining
+every command's original bytes. Names are limited to dispatcher shapes proved
+against the pinned Battle.net Edition executable; an unmapped command remains
+`opcode-xx` rather than acquiring a guessed rule.
+
+The retained external evidence is War2.ru Replay Pack 1:
+
+- archive SHA-256:
+  `0dbccf0a82a465bad41b667ec5d25b2d49ec2ba6f162a25b7af14613ab99264b`
+- 27 `.wir` replays
+- authenticated corpus SHA-256:
+  `306f7de5d8675d828f8a086fad3494e2dc2f25d0605df5175fc75010fc773673`
+- 168,788 embedded events
+- 87,241 ordered selection updates
+- 22,518 events issued with more than one unit selected
+- 593 selections at the retail limit of nine units
+
+The copyrighted replay bytes stay outside Git. Put the extracted collection at
+`../.chonkcraft-replay-evidence/replay-pack-1`, or set `BNE_REPLAY_ROOT`, then
+run:
+
+```sh
+tools/bne-harness/scripts/check-player-intent-gate.sh
+```
+
+That command authenticates and decodes all 27 replays, proves the frozen
+aggregate, then checks Java's exact ordered fan-out, nine-unit cap, acceptance
+recording, and progress by every member of a congested 3×3 group.
+
+During play the desktop keeps a bounded 512-entry in-memory flight recorder.
+`Command/Ctrl-Shift-E` puts the ordered selections, submitted orders, targets,
+and immediate acceptance results into `player_intents` beside the screenshot
+and resumable save. Nothing is written continuously, and a long session cannot
+grow the journal without bound.
+
 War2BNE InSight `.wir` files are suitable authoritative inputs for multiplayer
 parity. They are not videos and they are not periodic state dumps. Each file
 contains a complete initial BNE game snapshot followed by the exact command
@@ -38,9 +75,10 @@ The eight slot bytes change when BNE's simulation-player controller state
 changes, such as a player leaving. `network_player_index` identifies the
 Battle.net participant whose turn packet is being dispatched. Participant
 indexes can contain gaps and do not necessarily equal map/player-color slots.
-Packet bytes are retained without interpretation. This is
-the right boundary for parity: BNE and the Java engine must consume the same
-packet stream, even while individual command opcodes are still being named.
+Packet bytes are retained even when their embedded command boundaries are
+decoded. This is the right boundary for parity: BNE and the Java engine must
+consume the same packet stream, while any command whose semantics are not yet
+proved remains named only by its opcode.
 
 The contract was reconstructed from the recorder and loader in
 `War2BNEInSight105RC2.exe`, then checked against all 27 files in War2.ru Replay

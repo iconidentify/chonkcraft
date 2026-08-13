@@ -1137,9 +1137,8 @@ final class SidePanel {
     /**
      * A row of portraits, one per selected unit.
      *
-     * <p>Nine at most, which is what the panel has room for and what the
-     * original shows. A tenth selected unit is still selected and still takes
-     * orders; it simply has nowhere to be drawn.
+     * <p>Nine at most, which is what the panel and the native selection packet
+     * both hold. The input boundary rejects a tenth before this is drawn.
      */
     private void drawGroup(Graphics2D g2, java.util.List<Unit> group) {
         // AddSelectedButton places these: three columns at 9, 65 and 121 and

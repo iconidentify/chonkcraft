@@ -17,6 +17,7 @@ import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
+import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Assumptions;
@@ -173,5 +174,73 @@ class PlayerOrderDeliveryTest {
                 "combat removed the construction site without its BNE building-death event");
         assertFalse(builder.removed(),
                 "destroying the site left its builder trapped outside the map");
+    }
+
+    @Test
+    @DisplayName("retail's ordered nine-unit selection is the command fan-out order")
+    void orderedSelectionIsBoundedAndDrivesEveryRecipient() {
+        Scene scene = scene();
+        List<Unit> made = new ArrayList<>();
+        for (int index = 0; index < 11; index++) {
+            made.add(make(scene, "unit-footman", 0,
+                    3 + index % 4, 3 + index / 4));
+        }
+        List<Unit> requested = List.of(
+                made.get(7), made.get(2), made.get(9), made.get(1), made.get(5),
+                made.get(0), made.get(8), made.get(4), made.get(6), made.get(3), made.get(10));
+        scene.screen().selectForTest(requested);
+
+        List<Integer> expected = requested.subList(0, 9).stream().map(Unit::id).toList();
+        assertEquals(expected, scene.screen().selectedIdsForTest(),
+                "selection lost insertion order or exceeded the native nine-slot packet");
+
+        scene.screen().commandSelectedForTest(24, 24, null);
+        List<Integer> recipients = scene.screen().intentEntriesForTest().stream()
+                .filter(entry -> entry.command() != null
+                        && entry.command().kind() == GameCommand.Kind.MOVE)
+                .map(entry -> entry.command().unitId()).toList();
+        assertEquals(expected, recipients,
+                "one click was not delivered in the ordered selection's exact order");
+        for (Unit unit : requested.subList(0, 9)) {
+            assertEquals(Unit.Order.MOVE, unit.order(),
+                    unit.id() + " was selected but did not receive the move");
+        }
+        for (Unit unit : requested.subList(9, requested.size())) {
+            assertFalse(unit.selected(), unit.id() + " survived beyond the nine-unit cap");
+            assertEquals(Unit.Order.STILL, unit.order(),
+                    unit.id() + " received a command outside the selection packet");
+        }
+    }
+
+    @Test
+    @DisplayName("a congested nine-unit move produces progress for every recipient")
+    void congestedGroupMoveHasNoSilentNonParticipant() {
+        Scene scene = scene();
+        List<Unit> squad = new ArrayList<>();
+        for (int row = 0; row < 3; row++) {
+            for (int column = 0; column < 3; column++) {
+                squad.add(make(scene, "unit-footman", 0,
+                        4 + column, 4 + row));
+            }
+        }
+        scene.screen().selectForTest(squad);
+        java.util.Map<Integer, String> starts = new java.util.HashMap<>();
+        for (Unit unit : squad) {
+            starts.put(unit.id(), unit.tileX() + "," + unit.tileY());
+        }
+
+        scene.screen().commandSelectedForTest(24, 24, null);
+        java.util.Set<Integer> progressed = new java.util.HashSet<>();
+        for (int cycle = 0; cycle < 240 && progressed.size() < squad.size(); cycle++) {
+            scene.world().tick();
+            for (Unit unit : squad) {
+                String now = unit.tileX() + "," + unit.tileY();
+                if (!now.equals(starts.get(unit.id()))) {
+                    progressed.add(unit.id());
+                }
+            }
+        }
+        assertEquals(squad.stream().map(Unit::id).collect(java.util.stream.Collectors.toSet()),
+                progressed, "an accepted group order left a selected unit stationary");
     }
 }
