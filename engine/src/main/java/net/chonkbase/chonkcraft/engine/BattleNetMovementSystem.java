@@ -2039,14 +2039,17 @@ final class BattleNetMovementSystem {
                     if (!(rangedCoop && rangedAllyBlocker
                             && blockerStillRouting)) {
                         // Residual pathn-3 refuse onto a melee ally that still
-                        // holds a multi-step leftover (pathn>=2): re-arm delay
-                        // 1 and keep the route until that ally is down to a
-                        // one-heading leftover or free (XHuman 10 axe 1478 NE
-                        // onto grunt 1482 residual EEE; native NE at 41).
-                        // Ally pathn 0 (1522 onto standing grunt) hard-replans.
-                        // Ally pathn 1 is the ready-to-step leftover -- still
-                        // hard-replan so the axe can take the cell the same
-                        // visit the grunt leaves after id-order (or next).
+                        // owns a multi-step route: re-arm delay 1 and keep the
+                        // route until that ally leaves. There is one ordering
+                        // bridge: Java visits axe 1478 before grunt 1482, while
+                        // retail visits the corresponding slots in the opposite
+                        // order. When Java sees that chasing grunt at a drained
+                        // Move boundary with its route already spent, retail has
+                        // already let it rebuild and vacate. Keeping the axe's
+                        // route for this visit makes the observable ownership
+                        // transition independent of pool iteration order. An
+                        // ordinary pathless ally still hard-replans (XHuman 12
+                        // axe 1522 onto a standing grunt).
                         if (unit.pathLength() == 3
                                 && unit.stepDrained()
                                 && !unit.isMoving()
@@ -2055,7 +2058,12 @@ final class BattleNetMovementSystem {
                                         rangedBlocker)
                                 && world.isAllied(unit.player(),
                                         rangedBlocker.player())
-                                && rangedBlocker.pathLength() >= 2) {
+                                && (rangedBlocker.pathLength() >= 2
+                                        || (rangedBlocker.pathLength() == 0
+                                                && rangedBlocker.chasing()
+                                                && rangedBlocker.stepDrained()
+                                                && world.battleNetMoveAnimation(
+                                                        rangedBlocker)))) {
                             unit.setBattleNetOrderDelay(1);
                             return;
                         }
@@ -3049,6 +3057,32 @@ final class BattleNetMovementSystem {
                                 || unit.order() == Unit.Order.ATTACK_MOVE
                                 || unit.chasing())) {
                     Unit hardBlocker = world.unitAt(nextX, nextY);
+                    // A chase route is allowed to end on its quarry. When
+                    // the last cached heading names the target's occupied
+                    // square and the mover is already in melee range, retail
+                    // reports arrival instead of a refused step. XHuman 9's
+                    // skeleton 1431 reaches (13,120) beside footman 1427 with
+                    // final S still cached: BNE enters Attack@1188 on fixture
+                    // 46 and strikes at 55. Treating S as an ordinary body
+                    // collision armed the 23-cycle refusal wait and postponed
+                    // the first Java blow until fixture 81.
+                    boolean reachedOccupiedQuarry = hardBlocker != null
+                            && hardBlocker == unit.target()
+                            && unit.type().maxAttackRange() <= 1
+                            && world.targets.inAttackRange(unit, hardBlocker);
+                    if (reachedOccupiedQuarry) {
+                        unit.clearPath();
+                        unit.setRouteSpent(false);
+                        unit.setBattleNetCollisionCounter(0);
+                        unit.setBattleNetChaseEmptyRouteReplan(false);
+                        unit.setChasing(false);
+                        unit.setFighting(true);
+                        unit.setBattleNetResidualEmptyRouteSettle(false);
+                        world.openBattleNetAttackAfterChaseResidual(unit, true);
+                        world.consumeBattleNetPendingMeleeSyncRand(unit);
+                        world.turnToTarget(unit, hardBlocker, 0, 0);
+                        return;
+                    }
                     boolean allyHard = hardBlocker != null
                             && hardBlocker != unit
                             && hardBlocker.isOnMap()

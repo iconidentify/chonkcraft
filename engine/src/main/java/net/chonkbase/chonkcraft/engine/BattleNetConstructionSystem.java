@@ -799,6 +799,14 @@ final class BattleNetConstructionSystem {
         // this is every build order.
         Unit.Order before = worker.order();
         worker.setPendingBuild(what);
+        // Finished belongs to the construction order being replaced, not to
+        // the worker. A blocked AI foundation hands its Build order back with
+        // Finished set, then retail may install a new Build three cycles
+        // later. XHuman 2 peon 1560 receives that replacement on fixture 55
+        // and starts walking on 58. Keeping the old Finished bit made the
+        // replacement erase itself after its two-cycle opening delay, at
+        // which point the idle callback reassigned the peon to lumber.
+        worker.setOrderFinished(false);
         worker.setBuildReached(false);
         worker.setBuildWalked(false);
         worker.setBuildTile(tileX, tileY);

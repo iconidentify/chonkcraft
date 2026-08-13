@@ -211,11 +211,12 @@ class MeleeChaseReplanResidualTest {
     }
 
     @Test
-    @DisplayName("a residual pathn-three refuse on a multi-step melee ally quiets one visit")
-    void aResidualPathnThreeRefuseOnAMultiStepMeleeAllyQuietsOneVisit() {
-        // retail-xhuman-10-idle axe 1478: pathn 3 NE onto grunt 1482 which
-        // still holds residual/soft-wait leftover pathn>=2. Hard replan found
-        // N at fixture 40; native NE at 41 after the grunt leaves.
+    @DisplayName("a residual pathn-three refuse survives the allied chase visit-order boundary")
+    void aResidualPathnThreeRefuseSurvivesTheAlliedChaseVisitOrderBoundary() {
+        // retail-xhuman-10-idle axe 1478: pathn 3 NE onto grunt 1482. Java
+        // visits the axe before the grunt at the drained route boundary;
+        // retail visits the corresponding slots in the opposite order. Hard
+        // replan found E; native retained NE and took it after the grunt left.
         GameMap map = grass(40);
         World world = new World(map);
         world.fog().revealAll(0);
@@ -265,16 +266,19 @@ class MeleeChaseReplanResidualTest {
         chaser.setBattleNetOrderDelay(0);
         chaser.animation().switchTo(
                 chaser.type().animationSet().get(AnimationSet.State.MOVE));
-        // Ally holds multi-step leftover on NE cell.
-        ally.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
-                new int[] {east, east, east}));
+        // The allied chaser has drained the previous route and is about to
+        // rebuild. Retail has already made that visit when it asks about the
+        // axe; Java has not, solely because its pool is traversed oppositely.
+        ally.clearPath();
+        ally.setChasing(true);
+        ally.setStepDrained(true);
         ally.setOffset(0, 0);
         ally.setStepDrained(true);
         ally.animation().switchTo(
                 ally.type().animationSet().get(AnimationSet.State.MOVE));
         world.movement.stepMove(chaser, false);
         assertEquals(1, chaser.battleNetOrderDelay(),
-                "pathn-3 refuse onto multi-step melee ally must quiet once; "
+                "pathn-3 refuse at the allied chase visit-order boundary must quiet once; "
                         + "delay=" + chaser.battleNetOrderDelay());
         assertEquals(3, chaser.pathLength(),
                 "must keep the NE leftover for the next visit");

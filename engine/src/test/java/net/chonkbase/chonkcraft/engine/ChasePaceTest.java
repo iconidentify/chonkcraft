@@ -218,6 +218,79 @@ class ChasePaceTest {
     }
 
     @Test
+    @DisplayName("a melee route ending on its quarry enters attack instead of refusal wait")
+    void aMeleeRouteEndingOnItsQuarryEntersAttackInsteadOfRefusalWait()
+            throws Exception {
+        // XHuman 9 skeleton 1431 arrives beside footman 1427 while its last
+        // cached S points at the occupied quarry square. Native changes from
+        // Move to Attack@1188 immediately; it does not classify the target as
+        // a movement blocker and serve the 23-cycle refusal hold.
+        byte[] script = retailScriptBin();
+        GameMap map = grass(128);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+
+        UnitType skeletonType = new UnitType("unit-skeleton");
+        skeletonType.setTileSize(1, 1);
+        skeletonType.setHitPoints(40);
+        skeletonType.setSpeed(10);
+        skeletonType.setLandUnit(true);
+        skeletonType.setCanAttack(true);
+        skeletonType.setCanTargetLand(true);
+        skeletonType.setBasicDamage(6);
+        skeletonType.setMaxAttackRange(1);
+        skeletonType.setSightRange(5);
+        skeletonType.setNumDirections(8);
+        AnimationSet animations = new AnimationSet("skeleton");
+        animations.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        animations.put(AnimationSet.State.MOVE,
+                Animation.parse("move", SKELETON_MOVE));
+        animations.put(AnimationSet.State.ATTACK,
+                Animation.parse("attack", List.of(
+                        "unbreakable begin", "frame 15", "wait 4",
+                        "frame 30", "wait 4", "frame 45", "attack", "wait 4",
+                        "unbreakable end", "wait 1")));
+        skeletonType.setAnimationSet(animations);
+        UnitType preyType = new UnitType("unit-footman");
+        preyType.setTileSize(1, 1);
+        preyType.setHitPoints(60);
+        preyType.setLandUnit(true);
+
+        Unit skeleton = world.createUnit(skeletonType, 0, 13, 120);
+        Unit prey = world.createUnit(preyType, 1, 13, 121);
+        assertTrue(skeleton != null && prey != null, "fighters must place");
+        assertTrue(world.orderAttack(skeleton, prey), "attack accepted");
+        int south = net.chonkbase.chonkcraft.engine.map.Direction.fromDelta(0, 1);
+        skeleton.setPath(new net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Path(
+                net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Result.FOUND,
+                new int[] {south}));
+        skeleton.setPathGoal(prey.tileX(), prey.tileY());
+        skeleton.setChasing(true);
+        skeleton.setStepDrained(true);
+        skeleton.setOffset(0, 0);
+        skeleton.animation().switchTo(
+                skeleton.type().animationSet().get(AnimationSet.State.MOVE));
+        int hpBefore = prey.hitPoints();
+
+        world.movement.stepMove(skeleton, false);
+
+        assertTrue(skeleton.fighting(), "occupied quarry is an attack arrival");
+        assertTrue(!skeleton.chasing(), "arrival leaves chase state");
+        assertEquals(0, skeleton.pathLength(), "target-ending route is consumed");
+        assertEquals(0, skeleton.waitCycles(), "arrival does not arm refusal wait");
+        assertEquals(1188, skeleton.battleNetSequenceOffset(),
+                "retail arrival enters the attack body at post-OP0");
+        assertEquals(1, skeleton.battleNetAnimationTimer(),
+                "the attack body opens on the arrival visit");
+        assertEquals(hpBefore, prey.hitPoints(),
+                "arrival arms the attack; it does not strike in the same visit");
+    }
+
+    @Test
     @DisplayName("a chaser crosses a square in the cycles its own move animation asks for")
     void aChaseKeepsTheAnimationsPace() {
         GameMap map = grass(40);

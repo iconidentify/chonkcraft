@@ -1,6 +1,6 @@
 # Top-three BNE convergence checkpoint
 
-Date: 2026-08-11
+Date: 2026-08-12
 
 Third-wave base control: `5e393cd8`
 
@@ -268,3 +268,60 @@ accepted.
    changing already-exact damage, projectile, or RNG ownership.
 3. Rank the next independent AI-executive difference from the new exact Orc 9
    baseline.
+
+## Fifth-wave closure: route ownership, melee arrival, and build replacement
+
+This wave closed the three highest-impact findings selected by the subsequent
+fleet audit, using the authenticated 52-campaign corpus rather than isolated
+map-specific adjustments.
+
+### Route lifecycle ownership
+
+Java and retail visit the fixed unit pools in opposite list order. At a
+residual path-length-three refusal, an allied chaser can therefore appear to
+Java as having just exhausted its route even though retail has already let the
+same ally rebuild and vacate. The route now survives this one proven ownership
+boundary when the blocker is a drained, pathless chaser still executing Move.
+Ordinary pathless blockers retain the existing hard replan.
+
+XHuman 10 advances from cycle 41 to cycle 54. The neighboring XHuman 12
+pathless-standing case remains at cycle 42, proving that the rule is not a
+blanket hold for every ally.
+
+### Combat route-to-attack handoff
+
+A melee chase route is allowed to end on the target's occupied square. The
+last cached heading is an arrival marker once the attacker is already in
+range, not a refused movement step. XHuman 9's skeleton previously armed a
+23-cycle collision wait at this boundary and first struck on cycle 81.
+
+The movement system now transfers ownership directly to the retail Attack
+program, consumes the pending melee synchronization draw, and turns to the
+quarry. The skeleton's first blow lands on retail cycle 55. The case's next
+divergence is a separate defensive reaction at cycle 56.
+
+### AI construction replacement lifecycle
+
+XHuman 2's blocked farm was correctly handed back, refunded and reissued after
+the native three-cycle stand-down. The replacement then inherited the failed
+order's `Finished` bit. Once its two-cycle opening delay expired, it erased
+itself and the idle worker callback reassigned the peon to lumber.
+
+Every fresh construction order now clears the completion state of the order it
+replaces, just as fresh harvest orders already do. The peon keeps the second
+farm and walks on retail cycle 58. XHuman 2's coarse first divergence advances
+from 58 to 82, and its player/economy state is exact through cycle 200; the
+former missing-building mismatch at cycle 105 is gone.
+
+### Fifth-wave regression proof
+
+- Four focused route, combat and construction lifecycle tests pass.
+- The full 52-case semantic-v1 survey through cycle 200 reports **19 clean,
+  33 divergent and 0 failed**, with zero regressions.
+- The authenticated regression gate passes and the accepted common horizon is
+  **41**.
+- Dense scoring compares **1,369,366 paired unit-cycles**: **1,348,183** are
+  in place (**98.453%**) and **1,331,934 / 1,338,052** comparable decisions
+  agree (**99.543%**).
+- Against the pre-wave dense score, this is **323 additional in-place
+  unit-cycles** and **410 additional agreeing route decisions**.

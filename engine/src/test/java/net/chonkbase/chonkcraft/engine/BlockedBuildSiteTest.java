@@ -236,6 +236,26 @@ class BlockedBuildSiteTest {
     }
 
     @Test
+    @DisplayName("a replacement build clears the failed order's finished latch")
+    void aReplacementBuildClearsTheFailedOrdersFinishedLatch() {
+        World world = new World(grass(20));
+        world.setBuilders(java.util.Map.of(
+                "unit-farm", java.util.Set.of("unit-peasant")));
+        world.player(0).set(Resource.GOLD, 5000);
+        Unit worker = world.createUnit(peasant(), 0, 5, 5);
+        worker.setOrder(Unit.Order.STILL);
+        worker.setOrderFinished(true);
+
+        assertTrue(world.orderBattleNetAiBuild(worker, farm(), 8, 8),
+                "the replacement construction order must be accepted");
+        assertEquals(Unit.Order.BUILD, worker.order());
+        assertTrue(!worker.orderFinished(),
+                "the replacement must not inherit the failed build's Finished bit");
+        assertEquals("unit-farm", worker.pendingBuild().ident(),
+                "the replacement site remains owned by the new build order");
+    }
+
+    @Test
     @DisplayName("with the ground clear it builds at once, so the wait is not simply a stall")
     void anUnblockedSiteIsBuiltStraightAway() {
         World world = new World(grass(20));
