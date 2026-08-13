@@ -130,10 +130,12 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 3),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        # ShoreBuildingTest's accepted-order referee deliberately needs the
-        # authenticated pack whose shipyard and worker definitions it drives.
-        # It skips in this profile and runs in the full one.
-        "engine": (1333, 419),
+        # ShoreBuildingTest's accepted-order referee and the authenticated
+        # attack-program lifecycle referees deliberately need the retail data
+        # or derived pack they drive. They skip here and run in the full
+        # profile. The August 12 convergence work added nine engine tests;
+        # five are authenticated-data referees and four are hermetic.
+        "engine": (1342, 424),
         "desktop": (287, 231),
         "matchmaker-server": (4, 0),
     },
@@ -174,7 +176,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1333, 2),
+        "engine": (1342, 2),
         "desktop": (287, 6),
         "matchmaker-server": (4, 0),
     },
