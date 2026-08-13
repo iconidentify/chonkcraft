@@ -587,6 +587,123 @@ class PresentationAheadProjectilePrepareTest {
     }
 
     @Test
+    @DisplayName("moving a siege unit cancels its pre-opcode projectile")
+    void moveOrderCancelsPresentationShotAtTheOldMuzzle() throws IOException {
+        World world = new World(grass(32));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setMissileTypes(Map.of("missile-axe", axeMissile()));
+        world.setBattleNetSequenceData(retailScriptBin());
+
+        Unit shooter = world.createUnit(axethrower(), 0, 8, 10);
+        Unit target = world.createUnit(grunt(), 1, 12, 10);
+        assertTrue(world.orderAttack(shooter, target));
+        world.hit(shooter, target);
+
+        assertEquals(1, world.missiles().size(), "one pre-opcode placeholder");
+        Missile oldMuzzle = world.missiles().get(0);
+        int oldSlot = oldMuzzle.battleNetPoolSlot();
+        assertFalse(oldMuzzle.battleNetConstructorDrawn());
+
+        assertTrue(world.orderMove(shooter, 8, 14), "move order accepted");
+
+        assertFalse(world.missiles().contains(oldMuzzle),
+                "the projectile sprite remained at the siege unit's old position");
+        assertTrue(world.battleNetPendingProjectileShots.isEmpty(),
+                "the replaced attack order still owned a projectile");
+        assertFalse(world.battleNetProjectileSlots[oldSlot],
+                "the cancelled placeholder leaked its projectile-pool slot");
+    }
+
+    @Test
+    @DisplayName("one attacker can own only one pre-opcode projectile")
+    void repeatedPresentationHitReplacesRatherThanOrphansThePlaceholder()
+            throws IOException {
+        World world = new World(grass(32));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setMissileTypes(Map.of("missile-axe", axeMissile()));
+        world.setBattleNetSequenceData(retailScriptBin());
+
+        Unit shooter = world.createUnit(axethrower(), 0, 8, 10);
+        Unit target = world.createUnit(grunt(), 1, 12, 10);
+        assertTrue(world.orderAttack(shooter, target));
+        world.hit(shooter, target);
+        Missile first = world.missiles().get(0);
+
+        world.hit(shooter, target);
+
+        assertEquals(1, world.missiles().size(),
+                "overwriting the owner map left an unowned phantom missile");
+        assertTrue(world.missiles().contains(first),
+                "a duplicate callback replaced the attack order's original shot");
+        assertEquals(first,
+                world.battleNetPendingProjectileShots.get(shooter));
+    }
+
+    @Test
+    @DisplayName("retargeting cancels the previous target's pre-opcode shot")
+    void attackRetargetCannotCarryTheOldTargetsPlaceholder() throws IOException {
+        World world = new World(grass(32));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setMissileTypes(Map.of("missile-axe", axeMissile()));
+        world.setBattleNetSequenceData(retailScriptBin());
+
+        Unit shooter = world.createUnit(axethrower(), 0, 8, 10);
+        Unit firstTarget = world.createUnit(grunt(), 1, 12, 10);
+        Unit secondTarget = world.createUnit(grunt(), 1, 12, 12);
+        assertTrue(world.orderAttack(shooter, firstTarget));
+        world.hit(shooter, firstTarget);
+        Missile oldShot = world.missiles().get(0);
+
+        assertTrue(world.orderAttack(shooter, secondTarget));
+
+        assertFalse(world.missiles().contains(oldShot),
+                "the new attack inherited the previous target's projectile");
+        assertTrue(world.battleNetPendingProjectileShots.isEmpty());
+    }
+
+    @Test
+    @DisplayName("loading a broken duplicate projectile save heals its owner list")
+    void duplicateLegacySavePlaceholdersCollapseToOne() {
+        World world = new World(grass(32));
+        MissileType axe = axeMissile();
+        world.setMissileTypes(Map.of("missile-axe", axe));
+        Unit shooter = world.createUnit(axethrower(), 0, 8, 10);
+        Unit target = world.createUnit(grunt(), 1, 12, 10);
+        shooter.setOrder(Unit.Order.ATTACK);
+        shooter.setTarget(target);
+
+        Missile overwritten = new Missile(axe, shooter, target,
+                272, 336, 400, 336);
+        overwritten.setBattleNetPoolSlot(3);
+        Missile owned = new Missile(axe, shooter, target,
+                304, 336, 400, 336);
+        owned.setBattleNetPoolSlot(4);
+
+        // This is the schema produced by the bug: the older shot was still
+        // serialized but no longer marked pending after the owner map was
+        // overwritten by the newer one.
+        world.restoreMissile("missile-axe", shooter, target,
+                overwritten.savedState(), -1, 20, false);
+        world.restoreMissile("missile-axe", shooter, target,
+                owned.savedState(), -1, 21, true);
+
+        assertEquals(1, world.missiles().size(),
+                "load retained both the orphan and the owned placeholder");
+        assertEquals(owned.savedState(), world.missiles().get(0).savedState(),
+                "load discarded the attack order's newest placeholder");
+        assertEquals(world.missiles().get(0),
+                world.battleNetPendingProjectileShots.get(shooter));
+        assertFalse(world.battleNetProjectileSlots[3],
+                "healing the old save leaked the orphan's pool slot");
+    }
+
+    @Test
     @DisplayName("a destroyer's unconstructed final shell vanishes when its target dies")
     void targetDeathCancelsTheShipsOrphanedPendingCannonball() throws IOException {
         GameMap map = grass(24);

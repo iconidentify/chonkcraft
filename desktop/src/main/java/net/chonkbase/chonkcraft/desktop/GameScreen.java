@@ -4904,7 +4904,8 @@ final class GameScreen extends JPanel {
                     missile -> missile.type().drawLevel()));
         }
         for (var missile : flying) {
-            if (missile != withheld.missile()) {
+            if (missile != withheld.missile()
+                    && world.missileVisible(missile)) {
                 drawMissile(g2, missile);
             }
         }

@@ -38,6 +38,108 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class SaveGameTest {
 
+    @Test
+    @DisplayName("the Human expansion 6 battleships can reach every saved shipyard")
+    void humanExpansionSixBattleshipsReachEverySavedShipyard() throws IOException {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
+                "human-exp-mission-6.sav.gz");
+        Assumptions.assumeTrue(Files.isRegularFile(save),
+                "the Human expansion 6 playtest save is not installed");
+
+        GameData data = new GameData(assets);
+        String script = LoadGame.read(save);
+        LoadGame.Header header = LoadGame.header(script);
+        assertNotNull(header);
+        for (int attackerId : new int[] {191, 195}) {
+            for (int targetId : new int[] {217, 239, 251}) {
+                var mission = data.loadMission(header.mapPath());
+                assertNotNull(mission);
+                for (Unit unit : new ArrayList<>(mission.world().units())) {
+                    mission.world().remove(unit);
+                }
+                LoadGame.apply(mission.world(), script, data.unitTypes().types());
+                World world = mission.world();
+                Unit attacker = world.units().stream()
+                        .filter(unit -> unit.id() == attackerId)
+                        .findFirst().orElse(null);
+                Unit target = world.units().stream()
+                        .filter(unit -> unit.id() == targetId)
+                        .findFirst().orElse(null);
+                assertNotNull(attacker, "saved battleship " + attackerId + " is missing");
+                assertNotNull(target, "saved shipyard " + targetId + " is missing");
+                world.fog().revealAll(attacker.player());
+                // Keep the route and target geometry from the exact save but
+                // remove defenders so this measures command fulfillment, not
+                // whether the lone battleship survives the whole enemy base.
+                for (Unit unit : new ArrayList<>(world.units())) {
+                    if (unit != attacker && unit != target
+                            && world.isEnemyPlayer(attacker.player(), unit.player())) {
+                        world.remove(unit);
+                    }
+                }
+                int hitPoints = target.hitPoints();
+                assertTrue(world.orderAttack(attacker, target),
+                        "saved battleship refused shipyard " + targetId);
+                for (int cycle = 0; cycle < 3_000
+                        && target.hitPoints() == hitPoints; cycle++) {
+                    world.tick();
+                }
+                assertTrue(target.hitPoints() < hitPoints,
+                        "battleship " + attackerId + " never reached shipyard "
+                                + targetId + " without a manual move order");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("the Human 6 playtest save drops its pending ballista bolt on move")
+    void humanSixPendingBallistaBoltIsCancelledByMove() throws IOException {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
+                "human-mission-6.sav.gz");
+        Assumptions.assumeTrue(Files.isRegularFile(save),
+                "the Human 6 playtest save is not installed");
+
+        GameData data = new GameData(assets);
+        String script = LoadGame.read(save);
+        LoadGame.Header header = LoadGame.header(script);
+        assertNotNull(header);
+        var mission = data.loadMission(header.mapPath());
+        assertNotNull(mission);
+        for (Unit unit : new ArrayList<>(mission.world().units())) {
+            mission.world().remove(unit);
+        }
+        LoadGame.apply(mission.world(), script, data.unitTypes().types());
+
+        Unit ballista = mission.world().units().stream()
+                .filter(unit -> unit.type() != null
+                        && "unit-ballista".equals(unit.type().ident())
+                        && unit.tileX() == 41 && unit.tileY() == 61)
+                .findFirst().orElse(null);
+        assertNotNull(ballista, "saved ballista 18 at 41,61 is missing");
+        assertEquals("unit-ballista", ballista.type().ident());
+        assertEquals(1, mission.world().missiles().size(),
+                "the save must restore its one pending ballista bolt");
+        Missile oldMuzzle = mission.world().missiles().get(0);
+        assertTrue(mission.world().savedProjectilePending(oldMuzzle));
+
+        assertTrue(mission.world().orderMove(ballista,
+                ballista.tileX() + 2, ballista.tileY()), "ballista move refused");
+
+        assertTrue(mission.world().missiles().isEmpty(),
+                "the exact save retained its old-muzzle bolt after moving");
+        for (int cycle = 0; cycle < 20; cycle++) {
+            mission.world().tick();
+        }
+        assertTrue(mission.world().missiles().isEmpty(),
+                "the cancelled saved bolt woke up and fired later");
+    }
+
     private record Fixture(GameData data, World world, PudMap source, String mapPath) {}
 
     private static Fixture load() {

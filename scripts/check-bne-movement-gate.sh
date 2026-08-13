@@ -12,7 +12,7 @@ if [[ ! -f "${asset_pack}" ]]; then
 fi
 
 CHONKCRAFT_ASSET_PACK="${asset_pack}" "${repo_root}/scripts/run-tests.sh" -pl engine -am \
-  '-Dtest=BattleNetMovementPlayabilityTest,BattleNetPathFinderTest,BattleNetWallFollowBoundsTest,BattleNetNavalLegalityRealDataTest,TransportUnloadTest,ShoreBuildingTest,NavalPatrolCoastGoalRealDataTest,NavalAirTest,RefusedStepTest,BattleNetRefusalSleepTest,BattleNetChaseRefusalTest,BattleNetSeaOccupancyTest,PathAroundUnitsTest' \
+  '-Dtest=BattleNetMovementPlayabilityTest,BattleNetPathFinderTest,BattleNetWallFollowBoundsTest,BattleNetNavalLegalityRealDataTest,TransportUnloadTest,ShoreBuildingTest,NavalPatrolCoastGoalRealDataTest,NavalAirTest,RefusedStepTest,BattleNetRefusalSleepTest,BattleNetChaseRefusalTest,BattleNetSeaOccupancyTest,BattleshipCoastalAttackTest,PathAroundUnitsTest' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${repo_root}/engine/target/surefire-reports" <<'PY'
@@ -26,7 +26,8 @@ names = {
     "BattleNetWallFollowBoundsTest", "BattleNetNavalLegalityRealDataTest",
     "TransportUnloadTest", "ShoreBuildingTest", "NavalPatrolCoastGoalRealDataTest",
     "NavalAirTest", "RefusedStepTest", "BattleNetRefusalSleepTest",
-    "BattleNetChaseRefusalTest", "BattleNetSeaOccupancyTest", "PathAroundUnitsTest",
+    "BattleNetChaseRefusalTest", "BattleNetSeaOccupancyTest",
+    "BattleshipCoastalAttackTest", "PathAroundUnitsTest",
 }
 tests = skipped = failures = errors = 0
 seen = set()
@@ -41,12 +42,12 @@ for report in root.glob("TEST-*.xml"):
     failures += int(suite.attrib.get("failures", 0))
     errors += int(suite.attrib.get("errors", 0))
 missing = names - seen
-if missing or tests != 88 or skipped or failures or errors:
+if missing or tests != 90 or skipped or failures or errors:
     raise SystemExit(
-        f"movement referee: expected 88/0/0/0 with every class present; "
+        f"movement referee: expected 90/0/0/0 with every class present; "
         f"got {tests}/{skipped}/{failures}/{errors}, missing={sorted(missing)}"
     )
-print("movement edge referee: 88 pass, 0 skipped")
+print("movement edge referee: 90 pass, 0 skipped")
 PY
 
 echo "movement gate passed: large footprints, congestion and refusal recovery"
