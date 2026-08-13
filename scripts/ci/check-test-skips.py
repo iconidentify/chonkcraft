@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2177 tests,  17 skipped
-    no external input          2177 tests, 709 skipped
+    authenticated inputs       2184 tests,  17 skipped
+    no external input          2184 tests, 714 skipped
 
 Both can be green.
 
@@ -133,9 +133,11 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # ShoreBuildingTest's accepted-order referee and the authenticated
         # attack-program lifecycle referees deliberately need the retail data
         # or derived pack they drive. They skip here and run in the full
-        # profile. The August 12 convergence work added ten engine tests;
-        # six are authenticated-data referees and four are hermetic.
-        "engine": (1343, 425),
+        # profile. The siege/naval-fire batch added seven engine tests: the
+        # two exact-save referees and three retail-program projectile tests
+        # skip here, while the duplicate-save and coast-replan tests are
+        # hermetic.
+        "engine": (1350, 430),
         "desktop": (287, 231),
         "matchmaker-server": (4, 0),
     },
@@ -176,7 +178,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        "engine": (1343, 2),
+        "engine": (1350, 2),
         "desktop": (287, 6),
         "matchmaker-server": (4, 0),
     },
