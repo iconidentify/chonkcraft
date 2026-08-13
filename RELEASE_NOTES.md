@@ -1,9 +1,7 @@
-# ChonkCraft 0.1.1-beta17 -- Deeper Battle.net Edition Convergence
+# ChonkCraft 0.1.1-beta18 -- Reliable Attack-March Combat
 
-- Corrected route ownership when allied chasers meet at a drained movement boundary, advancing XHuman 10's first divergence from cycle 41 to 54 without weakening the standing-blocker behavior.
-- Restored the retail melee route-to-attack handoff: a fighter whose final route heading reaches its occupied quarry attacks immediately instead of serving an invented 23-cycle collision wait.
-- Moved XHuman 9's first skeleton strike from cycle 81 to the Battle.net Edition cycle 55; its next difference is now a separate defensive reaction.
-- Fixed replacement AI construction orders inheriting a failed order's completion flag, preventing a correctly reissued farm from erasing itself and sending its worker back to lumber.
-- Advanced XHuman 2's first coarse divergence from cycle 58 to 82 and made its player economy exact through cycle 200.
-- Improved the 52-campaign cycle-200 survey from 4 clean fixtures to 19 clean fixtures with zero regressions and promoted the authenticated common frontier to cycle 41.
-- Reached 98.453% agreement across 1,369,366 paired unit-cycles and 99.543% agreement across 1,338,052 comparable route decisions.
+- Fixed enemy units reaching a target under an attack-march order, visibly swinging, and then dealing no damage.
+- Unified commanded attacks and attack-march combat around Battle.net Edition's native attack program while preserving the march destination.
+- Repaired the stalled orc grunt versus ballista encounter captured in the Human 6 save: the first hit now lands after 13 cycles and repeats on the retail 25-cycle cadence.
+- Added authenticated Human 6 coverage that uses the original mission data and prevents this combat deadlock from returning.
+- Preserved all 52 campaign parity results with zero regressions and retained the accepted common frontier at cycle 41.
