@@ -208,12 +208,12 @@ head2 "What a test run would exercise"
 
 if [[ "$wc2_ok" == 1 && "$pack_ok" == 1 && "$opus_ok" == 1 ]]; then
     printf '  All three external inputs are configured.\n'
-    printf '  Expect 2184 tests, 17 skipped, and about four minutes of wall time.\n'
-    printf '  Seven of the 17 need a display; five need a music fixture nobody is\n'
+    printf '  Expect 2184 tests, 19 skipped, and about four minutes of wall time.\n'
+    printf '  Seven of the 19 need a display; five need a music fixture nobody is\n'
     printf '  asked to have (-Dopus.music); four are fixture-sensitive skips in\n'
-    printf '  FacingCount, AutoAttack, AutoCastToggle and CommandSinkGuard. The\n'
-    printf '  seventeenth wants a Battle.net installation, so another release\n'
-    printf '  skips it and a Battle.net one shows 16.\n'
+    printf '  FacingCount, AutoAttack, AutoCastToggle and CommandSinkGuard; two\n'
+    printf '  need local playtest saves. The nineteenth is release-sensitive, so\n'
+    printf '  a Battle.net installation runs it and reports 18 skips.\n'
 elif [[ "$wc2_ok" == 1 ]]; then
     printf '  The game data is configured; one or more optional test inputs are not,\n'
     printf '  so more than the minimum number of tests will skip.\n'

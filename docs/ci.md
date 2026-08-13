@@ -57,10 +57,10 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **17 skips of 2,184**, re-measured after the native
+Asserts the `full` profile: **19 skips of 2,184**, re-measured after the siege
 runtime and multiplayer-service additions
-against a real 1995 installation. One of the seventeen depends on which release
-the installation is -- a Battle.net Edition sees 16, which is correct and not a
+against a real 1995 installation. One of the nineteen depends on which release
+the installation is -- a Battle.net Edition sees 18, which is correct and not a
 regression; `scripts/ci/check-test-skips.py` explains it at the profile.
 About nine minutes.
 
@@ -89,12 +89,14 @@ in the first place, one at a time, with nothing objecting.
 | Profile | Inputs | Skips |
 |---|---|---|
 | `data-free` | none | 714 |
-| `full` | installation, pack, Opus vectors | 17 |
+| `full` | installation, pack, Opus vectors | 19 |
 
-The seventeen that skip even in `full` want nothing anyone should have to
+The nineteen that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, and four are
 fixture-sensitive behaviours absent from the pinned installation and scripts.
+Two exact-save referees additionally need the operator's private playtest saves,
+and one video assertion depends on which retail release is mounted.
 
 ## The failure gate
 
