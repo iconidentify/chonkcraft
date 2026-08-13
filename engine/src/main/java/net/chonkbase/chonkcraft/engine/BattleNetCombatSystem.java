@@ -2368,6 +2368,16 @@ final class BattleNetCombatSystem {
      * changes.
      */
     void stepAttackMove(Unit unit) {
+        // Retail's commanded attack, attack-march and opportunistic march all
+        // execute the same COrder_Attack animation program.  The Java order
+        // enum separates ATTACK_MOVE so it can retain its destination, but
+        // that separation must stop at dispatch: otherwise presentation can
+        // swing while script.bin's opcode-ten cursor never advances, leaving
+        // the pending melee blow permanently unresolved.  Human 6's adjacent
+        // grunt and ballista are the player-visible witness.
+        if (stepBattleNetAttackSequence(unit)) {
+            return;
+        }
         String attackStateTrace = System.getenv("CHONKCRAFT_TRACE_ATTACKSTATE");
         if (attackStateTrace != null
                 && unit.id() == Integer.parseInt(attackStateTrace)) {
