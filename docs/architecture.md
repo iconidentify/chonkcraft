@@ -264,6 +264,6 @@ What is **unverified** rather than done: multiplayer between two physically
 separate machines. It runs between processes on one machine and the lockstep and
 sync-hash machinery is tested, but nobody has recorded a two-machine game.
 
-The test suite is **2,177 tests**. On a fully configured machine 17 skip; with
-no external inputs 709 do. Both numbers matter and the difference between them is the
+The test suite is **2,184 tests**. On a fully configured machine 17 skip; with
+no external inputs 714 do. Both numbers matter and the difference between them is the
 subject of [ci.md](ci.md).

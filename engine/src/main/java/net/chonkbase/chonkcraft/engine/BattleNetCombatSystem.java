@@ -1513,8 +1513,7 @@ final class BattleNetCombatSystem {
                 // that authoritative boundary, not at the early visual
                 // frame -- unless presentation is already mid-wait past
                 // the OP10 tick (same rule as melee below).
-                world.battleNetPendingProjectileShots.put(attacker, shot);
-                world.battleNetPendingProjectileQueuedCycle.put(shot, (long) world.cycle);
+                world.projectiles.queuePendingAttack(attacker, shot, world.cycle);
                 world.logBattleNetPend("pend-put", attacker, target, shot,
                         "presentation-hit", -1);
                 // Mobile weapons: presentation can sit mid-wait before
@@ -2291,6 +2290,7 @@ final class BattleNetCombatSystem {
             unit.rememberActionBeforeQueued(unit.order());
             return true;
         }
+        world.projectiles.interruptPendingAttack(unit);
         world.construction.abandonPendingBuild(unit);
         // offeredTarget is COrder_Attack state upstream. A fresh position
         // order starts without the candidate offered to the order it

@@ -3492,6 +3492,7 @@ public final class World {
             unit.rememberActionBeforeQueued(unit.order());
             return true;
         }
+        projectiles.interruptPendingAttack(unit);
         construction.abandonPendingBuild(unit);
         unit.setPendingAttack(null, null, -1, -1);
         unit.setTarget(target);
@@ -5089,6 +5090,46 @@ public final class World {
                             && y >= targetTop - 1
                             && y <= targetBottom + 1,
                     true);
+            // A coastal building can have no reachable one-square target
+            // skirt for a doubled naval anchor even though the weapon can
+            // fire from open water. COrder_Attack::UpdatePathFinderData gives
+            // retail's path input the weapon's min/max range as well as the
+            // target footprint. Preserve the tightly captured one-square
+            // marker when it produces a route; when it cannot produce even
+            // one heading, retry with reachable in-range water anchors. This
+            // is the missing half of that input and prevents a battleship
+            // from acknowledging an attack, reaching the coast, then
+            // replanning an empty route forever until the player manually
+            // moves it closer.
+            if (path.length() == 0
+                    && path.result() == PathFinder.Result.FOUND
+                    && unit.battleNetDoubleStep()
+                    && unit.type().seaUnit()
+                    && target.type().building()
+                    && !targets.inAttackRange(unit, target)) {
+                int minRange = Math.max(0, unit.type().minAttackRange());
+                int maxRange = Math.max(1, unit.type().maxAttackRange());
+                PathFinder.Path ranged = BattleNetPathFinder.find(
+                        unit.tileX(), unit.tileY(), goalX, goalY,
+                        battleNetMovementStride(unit), traversalPassability,
+                        optimizationPassability,
+                        (x, y) -> {
+                            if (!traversalPassability.canEnter(x, y)) {
+                                return false;
+                            }
+                            int nearX = battleNetNearFootprintCoordinate(
+                                    x, targetLeft, targetWidth);
+                            int nearY = battleNetNearFootprintCoordinate(
+                                    y, targetTop, targetHeight);
+                            int distance = Math.max(Math.abs(nearX - x),
+                                    Math.abs(nearY - y));
+                            return distance >= minRange && distance <= maxRange;
+                        },
+                        true);
+                if (ranged.length() > 0) {
+                    path = ranged;
+                }
+            }
             traceBattleNetPath(unit, goalX, goalY, path);
             return path;
         } finally {
@@ -7571,6 +7612,7 @@ public final class World {
             construction.cancelConstruction(unit);
             return;
         }
+        projectiles.interruptPendingAttack(unit);
         unit.setPendingHarvest(-1, -1);
         unit.clearQueuedOrders();
         unit.setSavedOrder(null);
@@ -8053,6 +8095,11 @@ public final class World {
             }
             releaseUnreferencedDestroyedUnits();
         }
+        // Player and AI commands may replace an attack between its early
+        // presentation frame and BNE opcode ten. Cancel that order-owned
+        // placeholder before cycle-end constructor debits can turn it into a
+        // real shot. stepMissiles repeats the check for direct/test callers.
+        projectiles.discardInterruptedPlaceholders();
         projectiles.flushBattleNetCycleEndConstructorDebit();
         projectiles.stepMissiles();
         regenerateMana();
@@ -8971,6 +9018,21 @@ public final class World {
         return battleNetPendingProjectileShots.containsValue(missile);
     }
 
+    /**
+     * Whether a missile has crossed the retail constructor boundary and may
+     * be drawn.
+     *
+     * <p>Mobile attack presentation can allocate a bookkeeping placeholder
+     * before BNE reaches opcode ten. It belongs to no retail frame yet. The
+     * renderer used to draw that placeholder at the muzzle, leaving a
+     * fireball apparently stuck on a battleship for several seconds before
+     * the real launch. Keep the object private to simulation until its owner
+     * reaches the authoritative firing opcode.</p>
+     */
+    public boolean missileVisible(Missile missile) {
+        return missile != null && !savedProjectilePending(missile);
+    }
+
     /** Resolves a saved missile type and restores it without a launch sound. */
     public void restoreMissile(String typeIdent, Unit source, Unit target,
             Missile.SavedState state, long startCycle, long queuedCycle,
@@ -8992,7 +9054,7 @@ public final class World {
                 battleNetPendingProjectileQueuedCycle.put(missile, queuedCycle);
             }
             if (pending && source != null) {
-                battleNetPendingProjectileShots.put(source, missile);
+                projectiles.queuePendingAttack(source, missile, queuedCycle);
             }
         }
     }
@@ -11628,6 +11690,7 @@ public final class World {
         if ((missile == null || missile.isNone()) && !map.field(toX, toY).isWall()) {
             return false;
         }
+        projectiles.interruptPendingAttack(unit);
         unit.clearPath();
         unit.setOrderTarget(toX, toY);
         unit.setSavedOrder(null);
@@ -12514,6 +12577,7 @@ public final class World {
         if (unit == null || !unit.isAlive()) {
             return;
         }
+        projectiles.interruptPendingAttack(unit);
         unit.clearPath();
         unit.setTarget(null);
         unit.setFighting(false);

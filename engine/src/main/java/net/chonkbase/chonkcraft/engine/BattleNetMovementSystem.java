@@ -136,6 +136,11 @@ final class BattleNetMovementSystem {
         // Two hundred units ordered onto one square are two hundred accepted
         // orders upstream and were a hundred and seventy-nine here.
         world.construction.abandonPendingBuild(unit);
+        // The presentation animation may have allocated a weapon sprite
+        // before retail attack opcode ten. A move replaces that attack order,
+        // so the pre-retail placeholder must go with it instead of remaining
+        // at the old muzzle and waking up beside a later shot.
+        world.projectiles.interruptPendingAttack(unit);
         // Retail tankers select the absolute even-anchor route. A legacy save
         // can contain a 2x2 tanker on an odd anchor, where a doubled step can
         // never repair parity and crosses an odd order point forever. Keep
@@ -1988,7 +1993,21 @@ final class BattleNetMovementSystem {
                 // cell freed (fixture 51) -- two cycles early and without
                 // the full fifteen-count.
                 if (unit.battleNetDoubleStep()) {
-                    if (unit.stepDrained() && !unit.isMoving()
+                    // That hold belongs only to a live body which may vacate
+                    // the anchor. A route can also end with a heading onto
+                    // permanent coast or a building after its bounded prefix
+                    // has carried a capital ship across the map. Treating
+                    // that terrain refusal like the submarine witness above
+                    // preserves the impossible heading forever: every wake
+                    // retries it, rearms fifteen, and an acknowledged attack
+                    // order appears to have been ignored. Drop permanent
+                    // refusals so the still-live move/attack order asks the
+                    // pathfinder for the next route leg around the coast.
+                    Unit blocker = world.blockerOnLayer(unit, nextX, nextY);
+                    boolean temporaryBody = blocker != null
+                            && blocker != unit
+                            && !blocker.type().building();
+                    if (temporaryBody && unit.stepDrained() && !unit.isMoving()
                             && unit.pathLength() > 0) {
                         unit.setBattleNetOrderDelay(14);
                         unit.setWaitCycles(0);

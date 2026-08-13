@@ -49,13 +49,87 @@ final class BattleNetProjectileSystem {
         if (pending.battleNetConstructorDrawn()) {
             prepareBattleNetProjectile(pending, attacker.canMove());
         } else {
-            world.missiles.remove(pending);
-            world.battleNetProjectileStartCycles.remove(pending);
-            world.freeBattleNetProjectileSlot(pending.battleNetPoolSlot());
-            pending.setBattleNetPoolSlot(-1);
+            discardPresentationPlaceholder(pending);
         }
         world.battleNetPendingProjectileQueuedCycle.remove(pending);
         world.missileSnapshot = List.copyOf(world.missiles);
+    }
+
+    /**
+     * Installs the sole presentation-ahead shot owned by an attack order.
+     *
+     * <p>Retail has no projectile before attack opcode ten. ChonkCraft creates
+     * one early solely so its independent presentation animation has
+     * something to draw. Replacing the owner-map entry without removing its
+     * old value turns that old sprite into an ordinary global missile: it
+     * remains at the abandoned muzzle until a later missile pass makes it
+     * fly. This is the only insertion path and also repairs duplicate records
+     * restored from saves written while that bug existed.</p>
+     */
+    void queuePendingAttack(Unit attacker, Missile shot, long queuedCycle) {
+        if (attacker == null || shot == null) {
+            return;
+        }
+        Missile previous = world.battleNetPendingProjectileShots.get(attacker);
+        if (previous != null && previous != shot) {
+            // A second presentation callback for the same swing is not a
+            // second retail shot. Keep the order's original placeholder and
+            // erase the just-allocated duplicate. This is especially
+            // important after an early constructor debit: arming the first
+            // and retaining the second would manufacture two live missiles.
+            discardPresentationPlaceholder(shot);
+            world.battleNetPendingProjectileQueuedCycle.remove(shot);
+            world.missileSnapshot = List.copyOf(world.missiles);
+            return;
+        }
+
+        // A broken save records an overwritten placeholder as pending=false,
+        // because only the newer value remains in the owner map. It is still
+        // recognizable: same source, no constructor, no motion and no start.
+        for (Missile candidate : new ArrayList<>(world.missiles)) {
+            if (candidate == shot || candidate.source() != attacker
+                    || candidate.battleNetConstructorDrawn()
+                    || candidate.battleNetMotion()
+                    || world.battleNetProjectileStartCycles.containsKey(candidate)
+                    || !world.battleNetPendingProjectileQueuedCycle.containsKey(candidate)) {
+                continue;
+            }
+            discardPresentationPlaceholder(candidate);
+            world.battleNetPendingProjectileQueuedCycle.remove(candidate);
+        }
+
+        world.battleNetPendingProjectileShots.put(attacker, shot);
+        if (queuedCycle >= 0) {
+            world.battleNetPendingProjectileQueuedCycle.put(shot, queuedCycle);
+        }
+        world.missileSnapshot = List.copyOf(world.missiles);
+    }
+
+    /** Removes an object that never crossed BNE's projectile constructor. */
+    private void discardPresentationPlaceholder(Missile pending) {
+        world.missiles.remove(pending);
+        world.battleNetProjectileStartCycles.remove(pending);
+        world.battleNetProjectileCausalOrdinals.remove(pending);
+        world.freeBattleNetProjectileSlot(pending.battleNetPoolSlot());
+        pending.setBattleNetPoolSlot(-1);
+    }
+
+    /** Cancels placeholders whose owning attack order was replaced directly. */
+    void discardInterruptedPlaceholders() {
+        for (Unit attacker : new ArrayList<>(world.battleNetPendingProjectileShots.keySet())) {
+            Missile pending = world.battleNetPendingProjectileShots.get(attacker);
+            Unit.Order order = attacker.order();
+            boolean ownsAttack = order == Unit.Order.ATTACK
+                    || order == Unit.Order.ATTACK_MOVE
+                    || order == Unit.Order.STAND_GROUND
+                    || order == Unit.Order.ATTACK_GROUND
+                    || (order == Unit.Order.STILL && !attacker.canMove());
+            boolean ownsTarget = pending == null || pending.target() == null
+                    || pending.target() == attacker.target();
+            if (!attacker.isAlive() || !ownsAttack || !ownsTarget) {
+                interruptPendingAttack(attacker);
+            }
+        }
     }
 
 
@@ -416,6 +490,7 @@ final class BattleNetProjectileSystem {
      * fault that only shows up once an explosion has an explosion.
      */
     void stepMissiles() {
+        discardInterruptedPlaceholders();
         if (world.missiles.isEmpty()) {
             return;
         }
