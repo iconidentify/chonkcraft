@@ -460,6 +460,13 @@ class BattleNetMovementPlayabilityTest {
                         + zeppelin.order() + " toward "
                         + zeppelin.orderTargetX() + "," + zeppelin.orderTargetY());
 
+        assertEquals(84, oddDest.tileX(),
+                "retail is already on 84,10 at fixture 63, not "
+                        + oddDest.tileX() + "," + oddDest.tileY());
+        assertEquals(Unit.Order.PATROL, oddDest.order(),
+                "retail stays Patrol on 84,10 at fixture 63; Java is "
+                        + oddDest.order());
+
         for (int cycle = 64; cycle <= 80; cycle++) {
             mission.tick();
         }
@@ -467,6 +474,9 @@ class BattleNetMovementPlayabilityTest {
                 "retail is still standing on 50,4 at fixture 80; Java left for "
                         + zeppelin.order() + " at "
                         + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(Unit.Order.PATROL, oddDest.order(),
+                "retail is still Patrol on 84,10 at fixture 80; Java is "
+                        + oddDest.order());
         assertEquals(50, zeppelin.tileX(),
                 "retail is still on 50,4 at fixture 80, not "
                         + zeppelin.tileX() + "," + zeppelin.tileY());
@@ -474,13 +484,16 @@ class BattleNetMovementPlayabilityTest {
                 "retail is still on 50,4 at fixture 80, not "
                         + zeppelin.tileX() + "," + zeppelin.tileY());
 
-        for (int cycle = 81; cycle <= 83; cycle++) {
-            mission.tick();
-        }
-        // dest 83,10 is off the even flight lattice. Retail residual-settles
-        // on 84,10 and is Still at fixture 82. Java needs one more residual
-        // tick and stands down at 83 -- same square, not the leftover west
-        // step onto 82,10.
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, oddDest.order(),
+                "retail is still Patrol on 84,10 at fixture 81; Java is "
+                        + oddDest.order());
+        mission.tick();
+        // dest 83,10 is off the even flight lattice. The hull lands on
+        // 84,10 at 62; retail stays Patrol through 81 and is Still at 82.
+        // Java used to wait residual zero and stand down at 83, or stand
+        // down at 63 the moment residual settled. Exact even dests (50,4)
+        // still stand down when residual settles.
         assertEquals(84, oddDest.tileX(),
                 "retail stands on 84,10 beside dest 83,10, not "
                         + oddDest.tileX() + "," + oddDest.tileY());
@@ -488,7 +501,7 @@ class BattleNetMovementPlayabilityTest {
                 "retail stands on 84,10 beside dest 83,10, not "
                         + oddDest.tileX() + "," + oddDest.tileY());
         assertEquals(Unit.Order.STILL, oddDest.order(),
-                "retail stands down beside the odd scout dest; Java is still "
+                "retail is Still on 84,10 at fixture 82; Java is still "
                         + oddDest.order() + " at "
                         + oddDest.tileX() + "," + oddDest.tileY());
     }

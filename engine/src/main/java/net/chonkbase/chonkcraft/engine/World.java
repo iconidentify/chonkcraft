@@ -4461,6 +4461,36 @@ public final class World {
     }
 
     /**
+     * Whether an unarmed scout flyer is already on the even-lattice stop
+     * beside an odd dest.
+     *
+     * <p>Human 12 zeppelin 1559 lands on 84,10 at fixture 62. Native stays
+     * Patrol through 81 and is Still at 82. Exact even dests (1570 on 50,4)
+     * stand down when residual settles.</p>
+     */
+    boolean battleNetScoutOddDestEvenStop(Unit unit) {
+        if (unit == null || !unit.battleNetScoutPatrol()
+                || unit.type() == null || unit.type().canAttack()
+                || unit.type().moveType() != UnitType.Movement.FLY
+                || unit.pathLength() != 0) {
+            return false;
+        }
+        int destX = unit.orderTargetX();
+        int destY = unit.orderTargetY();
+        if (destX < 0 || destY < 0) {
+            return false;
+        }
+        if (destX % 2 == 0 && destY % 2 == 0) {
+            return false;
+        }
+        if ((unit.tileX() & 1) != 0 || (unit.tileY() & 1) != 0) {
+            return false;
+        }
+        return Math.max(Math.abs(unit.tileX() - destX),
+                Math.abs(unit.tileY() - destY)) == 1;
+    }
+
+    /**
      * Repacks a free wood-ray prefix as diagonal-preferring steps toward a
      * blocked order point.
      *
@@ -10337,6 +10367,9 @@ public final class World {
                 if (unit.offsetX() == 0 && unit.offsetY() == 0
                         && unit.residualX() == 0 && unit.residualY() == 0) {
                     unit.setWalkHolding(false);
+                } else if (battleNetScoutOddDestEvenStop(unit)) {
+                    // Fall through so the dest arm can count residual
+                    // visits on the even stop (Human 12 1559).
                 } else {
                     return;
                 }
@@ -10382,11 +10415,23 @@ public final class World {
             // back toward 46,10 used to put it on Patrol at the survey's
             // first disagreement. 1559's dest 83,10 is off the even flight
             // lattice, so the hull stops on 84,10. A leftover west heading
-            // used to walk it on to 82,10; drop the route on arrival and
-            // wait out residual before standing down.
+            // used to walk it on to 82,10. Residual settles at 63; native
+            // stays Patrol through 81 and is Still at 82. Immediate Still
+            // at settle is nineteen cycles early and the 1800-cycle
+            // survey disagrees there. Exact even dests (1570 on 50,4)
+            // still stand down on residual settle.
             unit.clearPath();
-            if (unit.isMoving()) {
+            if (unit.isMoving() && !battleNetScoutOddDestEvenStop(unit)) {
                 return;
+            }
+            if (battleNetScoutOddDestEvenStop(unit)) {
+                int holds = unit.battleNetSelfPatrolHolds() + 1;
+                unit.setBattleNetSelfPatrolHolds(holds);
+                // Residual settle 63, native Still 82: twenty dest-arm
+                // visits. Counting from the landing visit Still'd at 81.
+                if (holds < 20) {
+                    return;
+                }
             }
             unit.setBattleNetScoutPatrol(false);
             unit.setOrder(Unit.Order.STILL);
