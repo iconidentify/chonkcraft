@@ -215,6 +215,7 @@ public final class LoadGame {
                 UnitType.Resource resource = resourceOf(string(args[1]));
                 if (resource != null) {
                     current[0].setCarrying(resource);
+                    current[0].setHeldResource(resource);
                     current[0].setCarried(integer(args[2]));
                 }
             }
@@ -568,6 +569,25 @@ public final class LoadGame {
         if (state.rawGet("attackMoveX") != null) {
             unit.setAttackMove(integer(state.rawGet("attackMoveX")),
                     integer(state.rawGet("attackMoveY")));
+        }
+        if (state.rawGet("aiBehavior") != null) {
+            unit.setBattleNetAiBehavior(integer(state.rawGet("aiBehavior")));
+        }
+        if (state.rawGet("aiHomeX") != null) {
+            unit.setBattleNetAiHome(integer(state.rawGet("aiHomeX")),
+                    integer(state.rawGet("aiHomeY")));
+        }
+        if (state.rawGet("carrying") != null) {
+            UnitType.Resource carrying = resourceOf(string(state.rawGet("carrying")));
+            if (carrying != null) {
+                unit.setCarrying(carrying);
+            }
+        }
+        if (state.rawGet("heldResource") != null) {
+            UnitType.Resource held = resourceOf(string(state.rawGet("heldResource")));
+            if (held != null) {
+                unit.setHeldResource(held);
+            }
         }
         if (state.rawGet("savedOrder") != null) {
             try {

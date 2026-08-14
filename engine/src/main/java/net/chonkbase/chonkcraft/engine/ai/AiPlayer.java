@@ -194,6 +194,7 @@ public final class AiPlayer {
      * native AI and terminate the construction scan for this ready call.</p>
      */
     public void setBattleNetBuildProfile(byte[] data, int profile) {
+        battleNetProfileAttached = true;
         battleNetBuildProfileId = profile;
         battleNetBuildPriorities = List.of();
         battleNetWantedBasicSoldiers = 0;
@@ -746,6 +747,17 @@ public final class AiPlayer {
         return battleNetBuildProfileId;
     }
 
+    /** Whether this player is driven by an installed retail ai.bin program. */
+    public boolean hasBattleNetProfile() {
+        // Attachment, not interpreter completeness, owns this decision. Some
+        // retail profiles still contain bytecode shapes the Java interpreter
+        // deliberately refuses. Falling through to the generic AI in that
+        // case runs an invented second personality inside a BNE campaign and
+        // can move units on fixture cycle one. The partial retail callbacks
+        // remain the only authority whenever entry 277 was attached.
+        return battleNetProfileAttached;
+    }
+
     /** The engine-owned portion of a live retail {@code ai.bin} program. */
     public record BattleNetSavedState(int profileId, int pc, byte[] state,
             int buildPriorityLimit, int wantedBasicSoldiers, int wantedTankers,
@@ -803,6 +815,9 @@ public final class AiPlayer {
 
     /** Whether the built-in plan drives this AI. */
     private boolean usePlan = true;
+
+    /** Entry 277 was attached, even when its program is only partly decoded. */
+    private boolean battleNetProfileAttached;
 
     /** Legacy save fields retained so old saves remain readable. */
     private int scriptIndex = 1;
@@ -1402,7 +1417,13 @@ public final class AiPlayer {
 
         // Keep about four workers per resource-storing building.
         long depots = owned.stream().filter(u -> !u.type().stores().isEmpty()).count();
-        if (workerType != null && workers < depots * 4) {
+        // Retail's ready-worker path treats a bank below 500 gold as poor and
+        // will not spend its last 400 on another worker.  The generic plan is
+        // only the no-profile fallback, but it must preserve that same safety
+        // floor or a skirmish AI can consume its entire recovery bank on its
+        // first newly-restored thought.
+        if (workerType != null && workers < depots * 4
+                && player.get(UnitType.Resource.GOLD) >= 500) {
             need(workerType, 1);
         }
 

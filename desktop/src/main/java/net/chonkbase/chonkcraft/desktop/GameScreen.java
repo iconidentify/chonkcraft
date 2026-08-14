@@ -42,6 +42,8 @@ final class GameScreen extends JPanel {
 
     private static final int SCROLL_PIXELS_PER_TICK = 8;
     private static final int TILE = 32;
+    /** The native selection packet stores at most nine ordered unit slots. */
+    private static final int MAX_SELECTED_UNITS = 9;
 
     private final World world;
     private final GameData data;
@@ -81,6 +83,13 @@ final class GameScreen extends JPanel {
      * are how a player came to click a town hall and be shown nothing at all.
      */
     private volatile Unit selected;
+
+    /** The order in which the current units entered retail's selection list. */
+    private final java.util.List<Integer> selectionOrder = new java.util.ArrayList<>(
+            MAX_SELECTED_UNITS);
+
+    /** Recent causal input included when the player captures evidence. */
+    private final PlayerIntentJournal intents = new PlayerIntentJournal();
 
     private volatile String status = "";
 
@@ -385,10 +394,14 @@ final class GameScreen extends JPanel {
                         || (head != null && head.type() != null && head.type().building())) {
                     return true;
                 }
-                for (Unit unit : world.unitsSnapshot()) {
-                    if (unit.isAlive() && !unit.selected() && ids.contains(unit.id())
-                            && unit.type() != null && !unit.type().building()) {
+                java.util.Map<Integer, Unit> byId = unitsById();
+                for (int id : ids) {
+                    Unit unit = byId.get(id);
+                    if (unit != null && unit.isAlive() && !unit.selected()
+                            && unit.type() != null && !unit.type().building()
+                            && selectionOrder.size() < MAX_SELECTED_UNITS) {
                         unit.setSelected(true);
+                        selectionOrder.add(unit.id());
                     }
                 }
                 selectionChanged(selected == null ? firstSelected() : selected);
@@ -425,14 +438,20 @@ final class GameScreen extends JPanel {
         java.util.List<Integer> ids = groups.get(digit);
         Unit first = null;
         int found = 0;
+        selectionOrder.clear();
         for (Unit unit : world.unitsSnapshot()) {
             boolean inGroup = unit.isAlive() && ids.contains(unit.id());
             unit.setSelected(inGroup);
-            if (inGroup) {
+        }
+        java.util.Map<Integer, Unit> byId = unitsById();
+        for (int id : ids) {
+            Unit unit = byId.get(id);
+            if (unit != null && unit.selected() && found < MAX_SELECTED_UNITS) {
+                selectionOrder.add(id);
                 found++;
-                if (first == null) {
-                    first = unit;
-                }
+                first = first == null ? unit : first;
+            } else if (unit != null) {
+                unit.setSelected(false);
             }
         }
         selectionChanged(first);
@@ -446,14 +465,7 @@ final class GameScreen extends JPanel {
 
     /** The identifiers of everything of the local player's that is selected. */
     private java.util.List<Integer> selectedIds() {
-        java.util.List<Integer> ids = new java.util.ArrayList<>();
-        for (Unit unit : world.unitsSnapshot()) {
-            if (unit.selected() && world.canControl(localPlayer, unit.player())
-                    && unit.isAlive()) {
-                ids.add(unit.id());
-            }
-        }
-        return ids;
+        return selectedUnits().stream().map(Unit::id).toList();
     }
 
     /** The command slot the pointer is resting on, or {@code -1}. */
@@ -902,7 +914,7 @@ final class GameScreen extends JPanel {
         this.cyclingTerrain = terrain;
         this.commandPanel = commandPanel;
         this.applier = applier;
-        this.commands = commands;
+        this.commands = intents.wrap(commands, world::cycle, this::selectedIds, world);
         this.audio = audio;
         this.panel = panel;
         this.world = world;
@@ -1614,16 +1626,20 @@ final class GameScreen extends JPanel {
      * buttons are available by intersecting across the whole group, and draws
      * the {@code <race>-group} icon set when the selection is mixed. It was
      * only the carrying out that thought in single units, so pressing Stop
-     * with twelve footmen selected stopped one of them. Upstream's
-     * DoClicked_Stop, _StandGround, _Explore, _Return and _SpellCast all
-     * iterate Selected; so does the right-click path in this file, which is
-     * why the two input routes disagreed.
+     * with a group selected stopped one of them. The native command paths all
+     * iterate the ordered selection; so does the right-click path here.
      */
     private java.util.List<Unit> selectedUnits() {
+        reconcileSelectionOrder();
         java.util.List<Unit> mine = new java.util.ArrayList<>();
+        java.util.Map<Integer, Unit> byId = new java.util.HashMap<>();
         for (Unit unit : world.unitsSnapshot()) {
-            if (unit.selected() && world.canControl(localPlayer, unit.player())
-                    && unit.isAlive()) {
+            byId.put(unit.id(), unit);
+        }
+        for (int id : selectionOrder) {
+            Unit unit = byId.get(id);
+            if (unit != null && unit.selected()
+                    && world.canControl(localPlayer, unit.player()) && unit.isAlive()) {
                 mine.add(unit);
             }
         }
@@ -1633,6 +1649,36 @@ final class GameScreen extends JPanel {
             mine.add(selected);
         }
         return mine;
+    }
+
+    /** Reconciles per-unit flags with the native ordered nine-slot selection. */
+    private void reconcileSelectionOrder() {
+        java.util.Map<Integer, Unit> byId = unitsById();
+        selectionOrder.removeIf(id -> {
+            Unit unit = byId.get(id);
+            return unit == null || !unit.selected() || !unit.isAlive()
+                    || !world.canControl(localPlayer, unit.player());
+        });
+        for (Unit unit : byId.values()) {
+            if (!unit.selected() || !unit.isAlive()
+                    || !world.canControl(localPlayer, unit.player())
+                    || selectionOrder.contains(unit.id())) {
+                continue;
+            }
+            if (selectionOrder.size() < MAX_SELECTED_UNITS) {
+                selectionOrder.add(unit.id());
+            } else {
+                unit.setSelected(false);
+            }
+        }
+    }
+
+    private java.util.Map<Integer, Unit> unitsById() {
+        java.util.Map<Integer, Unit> byId = new java.util.LinkedHashMap<>();
+        for (Unit unit : world.unitsSnapshot()) {
+            byId.put(unit.id(), unit);
+        }
+        return byId;
     }
 
     private void press(net.chonkbase.chonkcraft.engine.ui.UnitButton button) {
@@ -2345,6 +2391,15 @@ final class GameScreen extends JPanel {
     }
 
     private Unit firstSelected() {
+        reconcileSelectionOrder();
+        if (!selectionOrder.isEmpty()) {
+            int wanted = selectionOrder.get(0);
+            for (Unit unit : world.unitsSnapshot()) {
+                if (unit.id() == wanted) {
+                    return unit;
+                }
+            }
+        }
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.selected()) {
                 return unit;
@@ -2401,6 +2456,7 @@ final class GameScreen extends JPanel {
      *                 here on, or {@code null} for nothing selected
      */
     private void selectionChanged(Unit nowShown) {
+        reconcileSelectionOrder();
         selected = nowShown;
         // CursorBuilding = nullptr; CursorState = CursorStates::Point.
         placing = null;
@@ -2413,6 +2469,7 @@ final class GameScreen extends JPanel {
         if (commandPanel != null) {
             commandPanel.resetLevel();
         }
+        intents.selection(world.cycle(), java.util.List.copyOf(selectionOrder));
     }
 
     /**
@@ -2899,11 +2956,7 @@ final class GameScreen extends JPanel {
         // assigned, not accumulated.
         blink(under);
         boolean acknowledged = false;
-        for (Unit unit : world.unitsSnapshot()) {
-            if (!unit.selected() || !world.canControl(localPlayer, unit.player())
-                    || !unit.isAlive()) {
-                continue;
-            }
+        for (Unit unit : selectedUnits()) {
             // A building that makes units cannot be told to walk anywhere, so
             // a right click on the map is the one thing it can mean: where
             // what it makes should go. World.setRallyPoint has worked and been
@@ -3331,6 +3384,38 @@ final class GameScreen extends JPanel {
             other.setSelected(other == unit);
         }
         selectionChanged(unit);
+    }
+
+    /** Installs a selection in a deliberate order for command-delivery gates. */
+    void selectForTest(java.util.List<Unit> units) {
+        selectionOrder.clear();
+        for (Unit other : world.unitsSnapshot()) {
+            other.setSelected(false);
+        }
+        for (Unit unit : units) {
+            unit.setSelected(true);
+            if (selectionOrder.size() < MAX_SELECTED_UNITS) {
+                selectionOrder.add(unit.id());
+            }
+        }
+        selectionChanged(units.isEmpty() ? null : units.get(0));
+    }
+
+    java.util.List<Integer> selectedIdsForTest() {
+        return java.util.List.copyOf(selectedIds());
+    }
+
+    java.util.List<PlayerIntentJournal.Entry> intentEntriesForTest() {
+        return intents.snapshot();
+    }
+
+    java.util.List<PlayerIntentJournal.Outcome> intentOutcomesForTest() {
+        return intents.outcomeSnapshot();
+    }
+
+    /** Samples the causal result of every command after the world advances. */
+    void observePlayerIntents() {
+        intents.observe(world.cycle(), world);
     }
 
     /**
@@ -3809,7 +3894,8 @@ final class GameScreen extends JPanel {
                     world, captureFrame(), selected, localPlayer, cameraX, cameraY,
                     focusX, focusY, saveMapPath, saveCampaign, saveMission,
                     triggers == null ? null : triggers.armedTriggers(),
-                    evidenceDirectory(), java.time.Instant.now()));
+                    evidenceDirectory(), java.time.Instant.now(), intents.snapshot(),
+                    intents.outcomeSnapshot()));
             return "evidence saved " + result.directory().getFileName()
                     + " (" + result.units() + " units, " + result.missiles() + " missiles)";
         } catch (java.io.IOException | RuntimeException failed) {

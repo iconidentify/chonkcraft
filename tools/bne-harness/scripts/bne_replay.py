@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Validate and inventory War2BNE InSight ``.wir`` replay files.
+"""Validate, inventory and decode War2BNE InSight ``.wir`` replay files.
 
-The parser intentionally preserves the BNE command packets as opaque bytes.
-Those bytes are the authoritative multiplayer input; assigning gameplay
-meaning to individual opcodes belongs at the engine comparison boundary.
+The outer recorder packets and every embedded command are retained byte for
+byte.  Only command shapes proved against the pinned Battle.net Edition
+dispatcher receive names; unknown commands remain named by opcode instead of
+being guessed.  This makes the output useful as player-intent evidence without
+silently turning an incomplete protocol transcription into game rules.
 """
 
 from __future__ import annotations
@@ -34,6 +36,10 @@ PLAYER_LIMIT = 8
 PLAYER_RACES_OFFSET = 0x1E2
 GAME_TYPE_OFFSET = 0x1EA
 PLAYER_CONTROLLERS_OFFSET = 0x1EB
+RESOURCES_OFFSET = 0x1F3
+GAME_SPEED_OFFSET = 0x1F4
+STARTING_UNITS_OFFSET = 0x1F5
+FIXED_ORDER_OFFSET = 0x1F6
 RECORD_COUNT_OFFSET = 0x1F7
 SNAPSHOT_OFFSET_OFFSET = 0x1FB
 COMMAND_STREAM_OFFSET_OFFSET = 0x1FF
@@ -60,6 +66,61 @@ class Replay(NamedTuple):
     command_stream: bytes
     records: tuple[ReplayRecord, ...]
     metadata: dict[str, object]
+
+
+class ReplayCommand(NamedTuple):
+    """One command inside a recorded 0x18 turn packet."""
+
+    record_index: int
+    network_player: int
+    packet_offset: int
+    opcode: int
+    name: str
+    raw: bytes
+    selected_unit_ids: tuple[int, ...]
+
+
+# Sizes include the opcode.  The table is the direct transcription of the
+# retail dispatcher used by the recorded command stream.  Opcodes 0x06 and
+# 0x07 are nul-terminated and 0x08 carries a count followed by that many words.
+EMBEDDED_FIXED_BYTES = {
+    0x05: 1,
+    0x09: 6,
+    0x0A: 6,
+    0x0B: 2,
+    0x0C: 1,
+    0x0D: 1,
+    0x0E: 5,
+    0x0F: 3,
+    0x10: 7,
+    0x11: 1,
+    0x12: 1,
+    0x13: 8,
+    0x14: 1,
+    0x15: 3,
+    0x16: 1,
+    0x17: 3,
+    0x18: 4,
+    0x2D: 2,
+}
+EMBEDDED_NAMES = {
+    0x08: "selection",
+    0x09: "build",
+    0x0A: "player-state",
+    0x0C: "stop",
+    0x0D: "stand-ground",
+    0x10: "move",
+    # Construction preflight.  Retail 0x00475dd0 toggles the selected
+    # builder's 0x0800/0x1000 state, and the 0x09 dispatcher repeats the same
+    # transition before installing the authoritative building order.
+    0x12: "build-preflight",
+    0x13: "attack",
+    # Retail's synchronized production packet. Byte one names either a unit,
+    # technology, or building transformation; byte two selects the matching
+    # native table (0=train, 1/2=research, 3=transform).
+    0x15: "production",
+}
+SELECTION_LIMIT = 9
 
 
 def _sha256(data: bytes) -> str:
@@ -214,6 +275,10 @@ def parse_replay(path: Path) -> Replay:
         "players": [slot["name"] for slot in active_slots],
         "participant_slots": participant_slots,
         "game_type": header[GAME_TYPE_OFFSET],
+        "resources": header[RESOURCES_OFFSET],
+        "game_speed": header[GAME_SPEED_OFFSET],
+        "starting_units": header[STARTING_UNITS_OFFSET],
+        "fixed_order": header[FIXED_ORDER_OFFSET],
         "record_count": record_count,
         "snapshot_offset": snapshot_offset,
         "snapshot_bytes": command_offset - snapshot_offset,
@@ -264,6 +329,94 @@ def replay_summary(replay: Replay) -> dict[str, object]:
     return result
 
 
+def _embedded_length(body: bytes, position: int) -> int:
+    opcode = body[position]
+    if opcode in (0x06, 0x07):
+        end = body.find(b"\0", position + 1)
+        if end < 0:
+            raise ValueError(
+                f"embedded opcode 0x{opcode:02x} has no string terminator")
+        return end - position + 1
+    if opcode == 0x08:
+        if position + 2 > len(body):
+            raise ValueError("truncated embedded selection count")
+        count = body[position + 1]
+        if count > SELECTION_LIMIT:
+            raise ValueError(
+                f"embedded selection has {count} units; retail limit is "
+                f"{SELECTION_LIMIT}")
+        return 2 + count * 2
+    size = EMBEDDED_FIXED_BYTES.get(opcode)
+    if size is None:
+        raise ValueError(f"unsupported embedded opcode 0x{opcode:02x}")
+    return size
+
+
+def decode_commands(replay: Replay) -> tuple[ReplayCommand, ...]:
+    """Decode command boundaries and attach each player's ordered selection."""
+
+    selections: dict[int, tuple[int, ...]] = {}
+    decoded: list[ReplayCommand] = []
+    for record_index, record in enumerate(replay.records):
+        if record.packet == b"\x05":
+            continue
+        if len(record.packet) < 4 or record.packet[0] != 0x18:
+            raise ValueError(
+                f"record {record_index} has unsupported outer packet "
+                f"0x{record.packet[0]:02x}")
+        body = record.packet[4:]
+        position = 0
+        while position < len(body):
+            size = _embedded_length(body, position)
+            end = position + size
+            if end > len(body):
+                raise ValueError(
+                    f"record {record_index} truncates embedded opcode "
+                    f"0x{body[position]:02x}")
+            opcode = body[position]
+            raw = body[position:end]
+            selected = selections.get(record.network_player, ())
+            if opcode == 0x08:
+                selected = tuple(
+                    struct.unpack_from("<H", raw, 2 + index * 2)[0]
+                    for index in range(raw[1])
+                )
+                selections[record.network_player] = selected
+            decoded.append(ReplayCommand(
+                record_index=record_index,
+                network_player=record.network_player,
+                packet_offset=position + 4,
+                opcode=opcode,
+                name=EMBEDDED_NAMES.get(opcode, f"opcode-{opcode:02x}"),
+                raw=raw,
+                selected_unit_ids=selected,
+            ))
+            position = end
+    return tuple(decoded)
+
+
+def command_summary(replay: Replay) -> dict[str, object]:
+    commands = decode_commands(replay)
+    by_opcode = Counter(command.opcode for command in commands)
+    selection_sizes = Counter(
+        len(command.selected_unit_ids)
+        for command in commands if command.opcode == 0x08)
+    commands_with_group = sum(
+        1 for command in commands
+        if command.opcode != 0x08 and len(command.selected_unit_ids) > 1
+    )
+    return {
+        "embedded_command_count": len(commands),
+        "commands_by_opcode": {
+            f"{opcode:02x}": by_opcode[opcode] for opcode in sorted(by_opcode)
+        },
+        "selection_sizes": {
+            str(size): selection_sizes[size] for size in sorted(selection_sizes)
+        },
+        "commands_with_multi_unit_selection": commands_with_group,
+    }
+
+
 def _json_bytes(value: object) -> bytes:
     return (json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -285,6 +438,77 @@ def inspect_command(args: argparse.Namespace) -> int:
             }
             for index, record in enumerate(replay.records[:args.records])
         ]
+    print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0
+
+
+def commands_command(args: argparse.Namespace) -> int:
+    replay = parse_replay(args.replay)
+    commands = decode_commands(replay)
+    result = replay_summary(replay)
+    result.update(command_summary(replay))
+    result["file"] = args.replay.name
+    if args.limit:
+        result["commands"] = [
+            {
+                "record": command.record_index,
+                "network_player": command.network_player,
+                "packet_offset": command.packet_offset,
+                "opcode": f"{command.opcode:02x}",
+                "name": command.name,
+                "raw": command.raw.hex(),
+                "selected_unit_ids": list(command.selected_unit_ids),
+            }
+            for command in commands[:args.limit]
+        ]
+    print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0
+
+
+def corpus_command(args: argparse.Namespace) -> int:
+    entries = []
+    by_opcode: Counter[int] = Counter()
+    selection_sizes: Counter[int] = Counter()
+    embedded_commands = 0
+    multi_selection_commands = 0
+    identity = hashlib.sha256()
+    for logical_path, path in _replay_paths(args.sources):
+        replay = parse_replay(path)
+        summary = command_summary(replay)
+        entries.append({
+            "path": logical_path,
+            "compressed_sha256": _sha256(replay.compressed),
+            **summary,
+        })
+        identity.update(logical_path.encode("utf-8"))
+        identity.update(b"\0")
+        identity.update(hashlib.sha256(replay.compressed).digest())
+        embedded_commands += int(summary["embedded_command_count"])
+        multi_selection_commands += int(
+            summary["commands_with_multi_unit_selection"])
+        for opcode, count in summary["commands_by_opcode"].items():
+            by_opcode[int(opcode, 16)] += int(count)
+        for size, count in summary["selection_sizes"].items():
+            selection_sizes[int(size)] += int(count)
+    result = {
+        "schema": "chonkcraft-bne-replay-commands-1",
+        "corpus_sha256": identity.hexdigest(),
+        "replay_count": len(entries),
+        "embedded_command_count": embedded_commands,
+        "commands_with_multi_unit_selection": multi_selection_commands,
+        "commands_by_opcode": {
+            f"{opcode:02x}": by_opcode[opcode] for opcode in sorted(by_opcode)
+        },
+        "selection_sizes": {
+            str(size): selection_sizes[size] for size in sorted(selection_sizes)
+        },
+        "entries": entries,
+    }
+    if args.expect_corpus_sha256:
+        expected = args.expect_corpus_sha256.lower()
+        if result["corpus_sha256"] != expected:
+            raise ValueError(
+                f"replay corpus is {result['corpus_sha256']}; expected {expected}")
     print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
     return 0
 
@@ -360,6 +584,21 @@ def parser() -> argparse.ArgumentParser:
         help="include the first N opaque command records")
     inspect_parser.set_defaults(func=inspect_command)
 
+    commands_parser = subcommands.add_parser(
+        "commands",
+        help="decode retail command boundaries and ordered selection context")
+    commands_parser.add_argument("replay", type=Path)
+    commands_parser.add_argument(
+        "--limit", type=int, default=0,
+        help="include the first N decoded commands")
+    commands_parser.set_defaults(func=commands_command)
+
+    corpus_parser = subcommands.add_parser(
+        "corpus", help="decode and aggregate an authenticated replay collection")
+    corpus_parser.add_argument("sources", nargs="+", type=Path)
+    corpus_parser.add_argument("--expect-corpus-sha256")
+    corpus_parser.set_defaults(func=corpus_command)
+
     inventory_parser = subcommands.add_parser(
         "inventory", help="validate a replay collection and write stable metadata")
     inventory_parser.add_argument("sources", nargs="+", type=Path)
@@ -374,8 +613,8 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     try:
-        if getattr(args, "records", 0) < 0:
-            raise ValueError("--records cannot be negative")
+        if getattr(args, "records", 0) < 0 or getattr(args, "limit", 0) < 0:
+            raise ValueError("record/command limits cannot be negative")
         return args.func(args)
     except (OSError, ValueError, zlib.error) as error:
         print(f"bne-replay: {error}", file=sys.stderr)

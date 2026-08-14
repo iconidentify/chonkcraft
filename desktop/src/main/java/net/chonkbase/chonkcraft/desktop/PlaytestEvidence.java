@@ -32,7 +32,9 @@ final class PlaytestEvidence {
     record Request(World world, BufferedImage screenshot, Unit selected,
             int localPlayer, int cameraX, int cameraY, int focusX, int focusY,
             String mapPath, String campaign, int mission,
-            List<Integer> armedTriggers, Path root, Instant createdAt) {}
+            List<Integer> armedTriggers, Path root, Instant createdAt,
+            List<PlayerIntentJournal.Entry> playerIntents,
+            List<PlayerIntentJournal.Outcome> playerOutcomes) {}
 
     record Result(Path directory, int units, int missiles, int terrainTiles) {}
 
@@ -102,7 +104,7 @@ final class PlaytestEvidence {
         StringBuilder out = new StringBuilder(32_768);
         World world = request.world();
         out.append("{\n");
-        out.append("  \"schema\": 1,\n");
+        out.append("  \"schema\": 2,\n");
         string(out, "created_at", request.createdAt().toString(), 2, true);
         out.append("  \"cycle\": ").append(world.cycle()).append(",\n");
         string(out, "map_path", request.mapPath(), 2, true);
@@ -125,6 +127,11 @@ final class PlaytestEvidence {
         out.append("  \"artifacts\": {\"screenshot\": \"screen.png\", \"save\": ")
                 .append(quote("state" + SaveGame.SUFFIX)).append("},\n");
 
+        appendPlayerIntents(out, request.playerIntents());
+        out.append(",\n");
+        appendPlayerOutcomes(out, request.playerOutcomes());
+        out.append(",\n");
+
         out.append("  \"units\": [\n");
         for (int i = 0; i < units.size(); i++) {
             appendUnit(out, world, units.get(i));
@@ -144,6 +151,65 @@ final class PlaytestEvidence {
         out.append('\n');
         Files.writeString(evidence, out, StandardCharsets.UTF_8);
         return terrainTiles;
+    }
+
+    private static void appendPlayerIntents(StringBuilder out,
+            List<PlayerIntentJournal.Entry> entries) {
+        out.append("  \"player_intents\": [\n");
+        List<PlayerIntentJournal.Entry> safe = entries == null ? List.of() : entries;
+        for (int index = 0; index < safe.size(); index++) {
+            PlayerIntentJournal.Entry entry = safe.get(index);
+            out.append("    {\"intent_id\": ").append(entry.id())
+                    .append(", \"cycle\": ").append(entry.cycle())
+                    .append(", \"event\": ").append(quote(entry.event()))
+                    .append(", \"selected_unit_ids\": ").append(entry.selectedUnitIds());
+            if (entry.command() != null) {
+                var command = entry.command();
+                out.append(", \"command\": {\"kind\": ")
+                        .append(quote(command.kind().name()))
+                        .append(", \"player\": ").append(command.player())
+                        .append(", \"unit_id\": ").append(command.unitId())
+                        .append(", \"x\": ").append(command.x())
+                        .append(", \"y\": ").append(command.y())
+                        .append(", \"target_id\": ").append(command.targetId())
+                        .append(", \"type_index\": ").append(command.typeIndex())
+                        .append(", \"queued\": ").append(command.queued()).append('}');
+            }
+            if (entry.accepted() != null) {
+                out.append(", \"accepted\": ").append(entry.accepted());
+            }
+            out.append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
+        }
+        out.append("  ]");
+    }
+
+    private static void appendPlayerOutcomes(StringBuilder out,
+            List<PlayerIntentJournal.Outcome> outcomes) {
+        out.append("  \"player_outcomes\": [\n");
+        List<PlayerIntentJournal.Outcome> safe = outcomes == null ? List.of() : outcomes;
+        for (int index = 0; index < safe.size(); index++) {
+            PlayerIntentJournal.Outcome outcome = safe.get(index);
+            out.append("    {\"intent_id\": ").append(outcome.intentId())
+                    .append(", \"submitted_cycle\": ").append(outcome.submittedCycle())
+                    .append(", \"unit_id\": ").append(outcome.unitId())
+                    .append(", \"command\": ").append(quote(outcome.command()))
+                    .append(", \"accepted\": ").append(outcome.accepted())
+                    .append(", \"first_progress_cycle\": ")
+                    .append(outcome.firstProgressCycle())
+                    .append(", \"terminal_cycle\": ").append(outcome.terminalCycle())
+                    .append(", \"terminal_reason\": ")
+                    .append(quote(outcome.terminalReason()))
+                    .append(", \"tile_x\": ").append(outcome.tileX())
+                    .append(", \"tile_y\": ").append(outcome.tileY())
+                    .append(", \"order\": ").append(quote(outcome.order()))
+                    .append(", \"target_id\": ").append(outcome.targetId())
+                    .append(", \"hit_points\": ").append(outcome.hitPoints())
+                    .append(", \"carried\": ").append(outcome.carried())
+                    .append(", \"alive\": ").append(outcome.alive())
+                    .append(", \"on_map\": ").append(outcome.onMap())
+                    .append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
+        }
+        out.append("  ]");
     }
 
     private static void appendUnit(StringBuilder out, World world, Unit unit) {

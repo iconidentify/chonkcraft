@@ -1033,6 +1033,51 @@ class LockstepTest {
     }
 
     @Test
+    void aRefusedReplacementDoesNotEraseTheExistingOrderLifecycle() {
+        World world = new World(grass(40), twoPlayers());
+        UnitType type = soldier();
+        Unit unit = world.createUnit(type, 0, 5, 5);
+        Unit friend = world.createUnit(type, 0, 7, 5);
+        CommandApplier applier = new CommandApplier(world, List.of(type));
+
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 25, 5)));
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 5, 25).withQueued(true)));
+        unit.setSavedOrder(Unit.Order.ATTACK_MOVE);
+        unit.setSavedAttackMove(31, 29);
+        unit.setSavedMoveRange(3);
+        unit.setSavedAttackScanSleep(4);
+        unit.setSavedAttackMoveOpening(false);
+        Unit.PendingOrderState before = unit.snapshotPendingOrders();
+
+        assertFalse(applier.apply(GameCommand.repair(0, unit.id(), friend.id())),
+                "a soldier must refuse a worker-only repair command");
+
+        assertEquals(Unit.Order.MOVE, unit.order(),
+                "the refused replacement interrupted the active march");
+        assertEquals(before, unit.snapshotPendingOrders(),
+                "the refused replacement ate a waypoint or resume state");
+    }
+
+    @Test
+    void anAcceptedReplacementFlushesTheOldGroupWaypoint() {
+        World world = new World(grass(40), twoPlayers());
+        UnitType type = soldier();
+        Unit unit = world.createUnit(type, 0, 5, 5);
+        CommandApplier applier = new CommandApplier(world, List.of(type));
+
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 25, 5)));
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 5, 25).withQueued(true)));
+        assertTrue(unit.hasQueuedOrders());
+
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 30, 30)));
+
+        assertFalse(unit.hasQueuedOrders(),
+                "an accepted fresh click left an obsolete group waypoint behind it");
+        assertEquals(30, unit.orderTargetX());
+        assertEquals(30, unit.orderTargetY());
+    }
+
+    @Test
     void unitTypesTravelAsStableIndices() {
         World world = battlefield();
         UnitType type = soldier();

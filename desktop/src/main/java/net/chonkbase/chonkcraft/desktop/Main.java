@@ -2288,6 +2288,7 @@ public final class Main {
             } else {
                 world.tick();
             }
+            screen.observePlayerIntents();
             if (mission != null) {
                 // The mission's own victory and defeat conditions, run once a
                 // second by the trigger system rather than every cycle.

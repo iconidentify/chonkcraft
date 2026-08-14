@@ -2737,6 +2737,23 @@ public final class World {
                     == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.NOBODY) {
                 return null;
             }
+            java.util.Map<String, String> equivalents = switch (owner.race()) {
+                case HUMAN -> toHumanEquivalent;
+                case ORC -> toOrcEquivalent;
+                case NEUTRAL -> java.util.Map.of();
+            };
+            String converted = equivalents.get(type.ident());
+            if (converted != null) {
+                UnitType convertedType = unitTypes.get(converted);
+                if (convertedType == null) {
+                    // A configured equivalence is part of the deterministic
+                    // roster contract. Silently retaining the other race here
+                    // produces a valid-looking but irreconcilable game.
+                    throw new IllegalStateException(
+                            "missing map-load race equivalent " + converted);
+                }
+                type = convertedType;
+            }
         }
         int width = Math.max(1, type.tileWidth());
         int height = Math.max(1, type.tileHeight());
@@ -7640,7 +7657,7 @@ public final class World {
             // remaining behind it were explicitly shifted by the caller.
             unit.setQueuedReplacementPending(false);
             boolean accepted = switch (queued.kind()) {
-                case MOVE -> movement.orderMove(unit, queued.x(), queued.y());
+                case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
                 case ATTACK -> orderAttack(unit, queued.target());
                 case HARVEST -> harvest.orderHarvest(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());
@@ -7683,6 +7700,19 @@ public final class World {
         // transcribed and covered against the pinned BNE executable.
         for (net.chonkbase.chonkcraft.engine.ai.AiPlayer ai : ais.values()) {
             ai.battleNetTickBytecode(this);
+            // Maps without a retail ai.bin personality use the standing
+            // skirmish plan. Its AiEachSecond pass is separate from the
+            // per-cycle interpreter above: player zero thinks on cycle seven,
+            // each later player on the following cycle, then every thirty
+            // cycles. Losing this call left an ordinary skirmish computer with
+            // all of its resource, construction and force managers present but
+            // unreachable. Retail-profile campaign AIs deliberately stay on
+            // the specialized ai.bin/ready/action-33 paths instead; running the
+            // generic manager beside them would spend their bank twice.
+            if (!ai.hasBattleNetProfile() && cycle % CYCLES_PER_SECOND
+                    == AiPlayer.FIRST_THINK_CYCLE + ai.playerIndex()) {
+                ai.think(this);
+            }
             // FUN_0044c260 consumes ai.bin's pending ground/naval/air launch
             // bytes on the same fifty-cycle cadence as retail (49, 99...).
             if (cycle > 2 && (cycle - 2) % 50 == 49) {

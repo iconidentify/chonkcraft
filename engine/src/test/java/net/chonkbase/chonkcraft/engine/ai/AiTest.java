@@ -224,7 +224,7 @@ class AiTest {
     }
 
     @Test
-    void battleNetProfileDoesNotRunTheChonkCraftLuaAiScheduler() {
+    void battleNetProfileDoesNotRunTheGenericAiScheduler() {
         World world = new World(grass(40), twoComputers());
         world.player(0).set(Resource.GOLD, 5000);
         Unit hall = world.createUnit(townHall(), 0, 2, 2);
@@ -233,6 +233,14 @@ class AiTest {
         AiPlayer ai = world.enableAi(0);
         ai.setUsePlan(false);
         ai.need(footman(), 1);
+        byte[] profile = new byte[128];
+        profile[0] = 100;
+        profile[100] = 120;
+        profile[102] = 122;
+        profile[104] = 2; // WAIT 100: a live, quiescent retail program.
+        profile[105] = 100;
+        profile[120] = (byte) 0xff;
+        ai.setBattleNetBuildProfile(profile, 0);
 
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 2; cycle++) {
             world.tick();
@@ -241,6 +249,27 @@ class AiTest {
         assertEquals(5000, world.player(0).get(Resource.GOLD));
         assertEquals(null, hall.producing(),
                 "retail BNE is driven by ai.bin, not ChonkCraft's AiEachSecond queue");
+    }
+
+    @Test
+    void incompleteBattleNetProfileStillOwnsTheAiScheduler() {
+        World world = new World(grass(40), twoComputers());
+        world.player(0).set(Resource.GOLD, 5000);
+        Unit hall = world.createUnit(townHall(), 0, 2, 2);
+        world.recalculateSupply();
+
+        AiPlayer ai = world.enableAi(0);
+        ai.setUsePlan(false);
+        ai.need(footman(), 1);
+        ai.setBattleNetBuildProfile(null, 9);
+
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 2; cycle++) {
+            world.tick();
+        }
+
+        assertEquals(5000, world.player(0).get(Resource.GOLD));
+        assertEquals(null, hall.producing(),
+                "an undecoded retail profile must not fall through to a second AI personality");
     }
 
     @Test

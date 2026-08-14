@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2184 tests,  19 skipped
-    no external input          2184 tests, 714 skipped
+    authenticated inputs       2202 tests,  20 skipped
+    no external input          2202 tests, 718 skipped
 
 Both can be green.
 
@@ -94,8 +94,8 @@ MODULES = (
 # Measured on macOS 27 aarch64, JBR 25.0.2, against chonkcraft at
 # v3.3.2-145-gcde1a071 and a 1995 DOS install of Tides of Darkness.
 #
-# Nineteen skip even in `full`. Eighteen of them want something other than
-# game data; the nineteenth wants a different release of it, and is described
+# Twenty skip even in `full`. Nineteen of them want something other than
+# game data; the twentieth wants a different release of it, and is described
 # at the `full` profile below.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
@@ -136,9 +136,11 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # profile. The siege/naval-fire batch added seven engine tests: the
         # two exact-save referees and three retail-program projectile tests
         # skip here, while the duplicate-save and coast-replan tests are
-        # hermetic.
-        "engine": (1350, 430),
-        "desktop": (287, 231),
+        # hermetic. The player-intent batch adds two more authenticated save
+        # assertions and two authenticated desktop order-delivery assertions;
+        # all four correctly join the data-free skip inventory.
+        "engine": (1357, 432),
+        "desktop": (298, 233),
         "matchmaker-server": (4, 0),
     },
     # Everything configured. What a developer with the game data should see on
@@ -154,21 +156,21 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # Re-measured 7 August 2026 against a real 1995 installation, the first
     # time this profile has been measured since the suite grew past 1,694
     # tests. It had expected 893 engine tests where there are 1,274. The
-    # nineteen that skip are: five CELT encoder tests wanting a music fixture
+    # twenty that skip are: five CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
     # tests in runtime and desktop, four fixture-sensitive ones in
     # FacingCountTest, AutoAttackTest, AutoCastToggleTest and
-    # CommandSinkGuardTest, two local playtest-save regression referees, and
+    # CommandSinkGuardTest, three local playtest-save regression referees, and
     # one release-dependent test described below.
     #
-    # ONE OF THE NINETEEN DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
+    # ONE OF THE TWENTY DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
     # is the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
     # baseline was measured on a Tides of Darkness installation, so it counts
     # that skip and `data` reads (130, 1). On a Battle.net Edition
     # installation -- which is this port's parity oracle -- the test runs
-    # instead, `data` reads (130, 0), and the total is 18. That is a correct
+    # instead, `data` reads (130, 0), and the total is 19. That is a correct
     # run reporting one fewer skip, not a regression. Nothing here can tell
     # the two apart, because the profile is a pair of numbers per module and
     # the release is not an input the profile knows about.
@@ -179,11 +181,11 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        # Two exact-save regressions need the operator's local Human 6 saves.
+        # Three exact-save regressions need the operator's local Human 6 saves.
         # They are intentionally additional authenticated playtest coverage,
         # not artifacts derived from the mounted retail installation.
-        "engine": (1350, 4),
-        "desktop": (287, 6),
+        "engine": (1357, 5),
+        "desktop": (298, 6),
         "matchmaker-server": (4, 0),
     },
 }
