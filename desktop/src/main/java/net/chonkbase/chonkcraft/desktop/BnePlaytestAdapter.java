@@ -169,6 +169,8 @@ public final class BnePlaytestAdapter {
             case "unload" -> GameCommand.unload(player, javaId, x, y);
             case "repair" -> GameCommand.repair(player, javaId, targetJava);
             case "build" -> GameCommand.build(player, javaId, typeIndex, x, y);
+            case "train" -> GameCommand.train(player, javaId, typeIndex);
+            case "research" -> GameCommand.research(player, javaId, typeIndex);
             case "cast" -> targetJava == 0
                     ? GameCommand.castAt(player, javaId, x, y, typeIndex)
                     : GameCommand.cast(player, javaId, targetJava, typeIndex);

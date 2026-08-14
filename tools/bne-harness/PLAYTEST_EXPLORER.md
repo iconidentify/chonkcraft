@@ -6,8 +6,10 @@ waiting for a manual save:
 
 1. An authenticated seed declares actors, targets, terrain points, movement
    domains and legal command capabilities. It contains facts, not Java rules.
-2. The generator emits single, repeated and replacement order sequences at
-   boundaries around the retail 15-cycle synchronized turn.
+2. The generator emits single, repeated, replacement, group, congestion,
+   refusal and named turn-boundary order sequences around the retail
+   15-cycle synchronized turn. Production families include train and
+   research; an unpaid bill is a refusal, not a silent pass.
 3. Separate native and Java commands execute the exact same content-addressed
    scenario. Each must identify its build, prove the scenario identity and
    report acceptance, first physical progress, terminal outcome and final

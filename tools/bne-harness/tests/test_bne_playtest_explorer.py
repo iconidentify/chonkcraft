@@ -95,15 +95,23 @@ class PlaytestExplorerTest(unittest.TestCase):
     def test_generates_legal_timing_repeat_and_replacement_scenarios(self):
         scenarios = explorer.generate_scenarios(self.seed(), max_scenarios=500)
         self.assertGreater(len(scenarios), 40)
-        self.assertEqual({"single", "refuse", "repeat", "replace"},
-                         {item["pattern"] for item in scenarios})
+        self.assertEqual(
+            {"single", "refuse", "repeat", "replace", "turn-boundary"},
+            {item["pattern"] for item in scenarios})
         attack_cycles = {
             item["commands"][0]["issue_cycle"]
             for item in scenarios
-            if item["pattern"] == "single"
+            if item["pattern"] in {"single", "turn-boundary"}
             and item["commands"][0]["kind"] == "attack"
         }
         self.assertEqual({30, 31, 34, 35, 39, 40, 44, 45}, attack_cycles)
+        turn_cycles = {
+            item["commands"][0]["issue_cycle"]
+            for item in scenarios if item["pattern"] == "turn-boundary"
+        }
+        self.assertTrue(turn_cycles)
+        self.assertTrue(all(cycle % 15 in (0, 14) for cycle in turn_cycles),
+                        "turn-boundary orders sit on the retail 15-cycle edge")
         for scenario in scenarios:
             explorer.validate_scenario(scenario)
             self.assertEqual("synthetic.pud", scenario["setup"]["scenario"])
@@ -244,18 +252,79 @@ class PlaytestExplorerTest(unittest.TestCase):
                                  for command in group["commands"]}))
         congested = next(item for item in scenarios
                          if item["pattern"] == "congestion")
-        self.assertEqual("move", congested["commands"][0]["kind"])
-        self.assertEqual("move", congested["commands"][1]["kind"])
-        self.assertEqual(
-            (congested["commands"][0]["x"], congested["commands"][0]["y"]),
-            (congested["commands"][1]["x"], congested["commands"][1]["y"]))
+        self.assertEqual(congested["commands"][0]["kind"],
+                         congested["commands"][1]["kind"])
+        first, second = congested["commands"]
+        if "x" in first:
+            self.assertEqual((first["x"], first["y"]), (second["x"], second["y"]))
+        else:
+            self.assertEqual(first["target_id"], second["target_id"])
 
     def test_blocked_destinations_are_generated_as_refusals(self):
         scenarios = explorer.generate_scenarios(self.seed(), max_scenarios=80)
         refused = [item for item in scenarios if item["pattern"] == "refuse"]
         self.assertTrue(refused)
-        self.assertTrue(all(command.get("point_kind") in {"blocked", "occupied"}
+        self.assertTrue(all(command.get("point_kind") in explorer.REFUSED_POINTS
                             for item in refused for command in item["commands"]))
+
+    def test_production_families_cover_unaffordable_and_shared_targets(self):
+        seed = self.seed()
+        seed["actors"] = [
+            {
+                "id": 300, "player": 0, "domain": "land",
+                "capabilities": ["train", "research", "attack-move"],
+                "type_index": 2, "afford": False, "target_ids": [],
+            },
+            {
+                "id": 301, "player": 0, "domain": "land",
+                "capabilities": ["train", "attack-move", "harvest"],
+                "type_index": 2, "target_ids": [400],
+            },
+            {
+                "id": 302, "player": 0, "domain": "land",
+                "capabilities": ["harvest", "attack-move"],
+                "target_ids": [400],
+            },
+        ]
+        seed["targets"] = [
+            {"id": 400, "player": 0, "domain": "land", "x": 8, "y": 8},
+        ]
+        scenarios = explorer.generate_scenarios(seed, max_scenarios=1200)
+        kinds = {command["kind"] for item in scenarios for command in item["commands"]}
+        self.assertTrue({"train", "research", "attack-move", "harvest"} <= kinds,
+                        "production and harvest must appear in the generated set")
+        unaffordable = [
+            item for item in scenarios if item["pattern"] == "refuse"
+            and item["commands"][0].get("point_kind") == "unaffordable"
+        ]
+        self.assertTrue(unaffordable,
+                        "an unpaid train or research is a refusal, not a pass")
+        self.assertTrue(any(item["commands"][0]["kind"] in {"train", "research"}
+                            for item in unaffordable))
+        harvest_jams = [
+            item for item in scenarios if item["pattern"] == "congestion"
+            and item["commands"][0]["kind"] == "harvest"
+        ]
+        self.assertTrue(harvest_jams,
+                        "two harvesters on one depot are a congestion case")
+        attack_moves = [
+            item for item in scenarios if item["pattern"] == "congestion"
+            and item["commands"][0]["kind"] == "attack-move"
+        ]
+        self.assertTrue(attack_moves,
+                        "two attack-moves onto one square are a congestion case")
+        train_replaces = [
+            item for item in scenarios if item["pattern"] == "replace"
+            and any(command["kind"] == "train" for command in item["commands"])
+        ]
+        self.assertTrue(train_replaces,
+                        "a hall that can train and attack-move must replace")
+        train_jams = [
+            item for item in scenarios if item["pattern"] == "congestion"
+            and item["commands"][0]["kind"] == "train"
+        ]
+        self.assertTrue(train_jams,
+                        "two halls training the same unit are a congestion case")
 
 
 if __name__ == "__main__":

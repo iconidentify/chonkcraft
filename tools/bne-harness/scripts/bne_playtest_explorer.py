@@ -38,15 +38,30 @@ PINNED_BNE_EXECUTABLE_SHA256 = (
 )
 SIDES = ("native", "java")
 TIMING_OFFSETS = (0, 1, 4, 5, 9, 10, 14, 15)
+TURN_BOUNDARY_OFFSETS = {14, 15}
 COMMAND_FAMILIES = {
     "move", "attack", "attack-ground", "attack-move", "stop",
     "stand-ground", "patrol", "follow", "harvest", "return-goods",
-    "board", "unload", "repair", "build", "cast",
+    "board", "unload", "repair", "build", "cast", "train", "research",
+}
+POINT_CONGESTION_FAMILIES = {
+    "move", "attack-move", "patrol", "attack-ground", "build", "unload",
+}
+TARGET_CONGESTION_FAMILIES = {
+    "attack", "follow", "harvest", "board", "repair",
+}
+TYPE_CONGESTION_FAMILIES = {"train", "research"}
+# Replace is n-squared. Emit rare production and stance orders first so a
+# large move/patrol point cloud cannot starve train, research or stop.
+REPLACE_FAMILY_RANK = {
+    "train": 0, "research": 0, "stop": 1, "stand-ground": 1,
+    "return-goods": 1, "unload": 2, "follow": 2, "repair": 2, "board": 2,
+    "harvest": 3, "cast": 3, "build": 4,
 }
 INJECTOR_MOVE = re.compile(
     r"cycle (\d+) move unit (\d+) x (\d+) y (\d+)\Z")
 MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
-REFUSED_POINTS = {"occupied", "blocked"}
+REFUSED_POINTS = {"occupied", "blocked", "unaffordable"}
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -321,6 +336,12 @@ def legal_commands(seed: dict[str, Any]) -> list[dict[str, Any]]:
             if family in {"stop", "stand-ground", "return-goods", "unload"}:
                 commands.append(base)
                 continue
+            if family in {"train", "research"}:
+                command = {**base, "type_index": int(actor.get("type_index") or 0)}
+                if actor.get("afford") is False:
+                    command["point_kind"] = "unaffordable"
+                commands.append(command)
+                continue
             if family in {"move", "attack-move", "patrol", "attack-ground",
                           "build", "cast"}:
                 for point in points:
@@ -333,6 +354,8 @@ def legal_commands(seed: dict[str, Any]) -> list[dict[str, Any]]:
                                "point_kind": point.get("kind", "open")}
                     if family in {"build", "cast"} and actor.get("type_index") is not None:
                         command["type_index"] = actor["type_index"]
+                    if family in {"build", "cast"} and actor.get("afford") is False:
+                        command["point_kind"] = "unaffordable"
                     commands.append(command)
                 continue
             if family in {"attack", "follow", "harvest", "board", "repair"}:
@@ -369,10 +392,16 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
     candidates: list[tuple[str, list[dict[str, Any]]]] = []
 
     # Single orders establish ordinary semantics at cadence boundaries.
-    # Occupied or blocked destinations are the authenticated refusal surface.
+    # Occupied, blocked or unaffordable destinations are the refusal surface.
+    # Offsets 14 and 15 sit on the retail 15-cycle turn edge; those singles
+    # are named turn-boundary so a coverage sweep cannot hide an empty set.
     for command in commands:
-        pattern = "refuse" if command.get("point_kind") in REFUSED_POINTS else "single"
+        base_pattern = (
+            "refuse" if command.get("point_kind") in REFUSED_POINTS else "single")
         for offset in offsets:
+            pattern = (
+                "turn-boundary" if base_pattern == "single"
+                and offset in TURN_BOUNDARY_OFFSETS else base_pattern)
             candidates.append((pattern, [_scheduled(command, start + offset)]))
 
     # Repeating an order exposes cooldown, duplicate projectile and stale-order bugs.
@@ -396,18 +425,27 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
                 _scheduled(command, start + offset) for command in chosen
             ]))
 
-    # Congestion is two movers told to occupy the same square on one turn.
-    movers_by_point: dict[tuple[object, object], dict[int, dict[str, Any]]] = {}
+    # Congestion is two actors told to occupy the same square, or to work
+    # the same live target, on one turn. Harvest, board and attack share
+    # that surface; move is only the land-walk case.
+    movers_by_goal: dict[tuple[object, ...], dict[int, dict[str, Any]]] = {}
     for command in commands:
-        if command["kind"] != "move" or "x" not in command or "y" not in command:
+        if command["kind"] in POINT_CONGESTION_FAMILIES \
+                and "x" in command and "y" in command:
+            key: tuple[object, ...] = (
+                command["kind"], "point", command["x"], command["y"])
+        elif command["kind"] in TARGET_CONGESTION_FAMILIES \
+                and command.get("target_id") is not None:
+            key = (command["kind"], "target", command["target_id"])
+        elif command["kind"] in TYPE_CONGESTION_FAMILIES:
+            key = (command["kind"], "type", command.get("type_index"))
+        else:
             continue
-        movers_by_point.setdefault(
-            (command["x"], command["y"]), {}).setdefault(
-                command["unit_id"], command)
-    for point_commands in movers_by_point.values():
-        if len(point_commands) < 2:
+        movers_by_goal.setdefault(key, {}).setdefault(command["unit_id"], command)
+    for goal_commands in movers_by_goal.values():
+        if len(goal_commands) < 2:
             continue
-        chosen = [point_commands[unit_id] for unit_id in sorted(point_commands)]
+        chosen = [goal_commands[unit_id] for unit_id in sorted(goal_commands)]
         for delay in (0, 1, 15):
             candidates.append(("congestion", [
                 _scheduled(chosen[0], start),
@@ -422,6 +460,11 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
     for command in commands:
         by_actor.setdefault(command["unit_id"], []).append(command)
     for actor_commands in by_actor.values():
+        actor_commands.sort(key=lambda command: (
+            REPLACE_FAMILY_RANK.get(command["kind"], 9),
+            command["kind"], command.get("x", -1), command.get("y", -1),
+            command.get("target_id", -1), command.get("type_index", -1),
+        ))
         for first in actor_commands:
             for second in actor_commands:
                 if first["kind"] == second["kind"] and first == second:
@@ -601,6 +644,9 @@ def coverage_tokens(result: dict[str, Any], scenario: dict[str, Any]) -> list[st
     normalized = normalize_result(result, scenario)
     tokens: set[str] = set()
     tokens.add(f"pattern:{scenario['pattern']}")
+    if any(int(command["issue_cycle"]) % 15 in (0, 14)
+           for command in scenario["commands"]):
+        tokens.add("timing:turn-boundary")
     for command, observation in zip(
             scenario["commands"], normalized["observations"], strict=True):
         kind = command["kind"]
