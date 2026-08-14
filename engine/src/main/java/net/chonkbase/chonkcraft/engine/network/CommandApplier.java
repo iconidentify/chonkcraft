@@ -193,7 +193,10 @@ public final class CommandApplier {
                     accepted = target != null && world.orderCast(unit, ident, target);
                 }
             }
-            case PATROL -> accepted = world.orderPatrol(unit, command.x(), command.y());
+            case PATROL -> {
+                unit.setBattleNetScoutPatrol(false);
+                accepted = world.orderPatrol(unit, command.x(), command.y());
+            }
             case REPAIR -> {
                 Unit target = findUnit(command.targetId());
                 if (target != null) {

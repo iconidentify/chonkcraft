@@ -10375,6 +10375,25 @@ public final class World {
         }
         if (unit.pathLength() == 0 && !unit.isMoving()
                 && unit.tileX() == unit.orderTargetX() && unit.tileY() == unit.orderTargetY()) {
+            // Unarmed scout dests are one-shot. Human 12 zeppelin 1570
+            // residual-settles on 50,4 at fixture 63 and goes Still; swapping
+            // back toward 46,10 used to put it on Patrol at the survey's
+            // first disagreement.
+            if (unit.battleNetScoutPatrol() && !unit.type().canAttack()
+                    && unit.type().moveType() == UnitType.Movement.FLY) {
+                unit.clearPath();
+                unit.setBattleNetScoutPatrol(false);
+                unit.setOrder(Unit.Order.STILL);
+                unit.setActionBeforeQueued(null);
+                if (battleNetSequence != null) {
+                    int stillStart = idle.battleNetStillSequenceStart(unit);
+                    if (stillStart >= 0) {
+                        unit.setBattleNetSequenceOffset(stillStart);
+                        unit.setBattleNetAnimationTimer(3);
+                    }
+                }
+                return;
+            }
             // Reached this end: swap the two and walk back.
             int backX = unit.patrolX();
             int backY = unit.patrolY();

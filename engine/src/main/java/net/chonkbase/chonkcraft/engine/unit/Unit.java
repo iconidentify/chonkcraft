@@ -344,6 +344,7 @@ public final class Unit {
      * order on the first Still OP0 (which used to show Patrol at fixture 44).
      */
     private boolean battleNetFlyerScoutExhausted;
+    private boolean battleNetScoutPatrol;
 
     /**
      * Whether retail BNE currently uses its doubled movement-delta table.
@@ -2755,6 +2756,23 @@ public final class Unit {
 
     public void setBattleNetFlyerScoutExhausted(boolean exhausted) {
         battleNetFlyerScoutExhausted = exhausted;
+    }
+
+    /**
+     * Whether the live Patrol is a one-shot scout dest, not a player beat.
+     *
+     * <p>Human 12's balloon-class flyers receive a half-map point from the
+     * ready/scout pass. Native goes Still when residual settles on that
+     * square (zeppelin 1570: 50,4 Still at fixture 63). Treating it as an
+     * ordinary two-point Patrol used to swap back toward 46,10 and leave
+     * at 66.</p>
+     */
+    public boolean battleNetScoutPatrol() {
+        return battleNetScoutPatrol;
+    }
+
+    public void setBattleNetScoutPatrol(boolean scoutPatrol) {
+        battleNetScoutPatrol = scoutPatrol;
     }
 
     public boolean battleNetDoubleStep() {

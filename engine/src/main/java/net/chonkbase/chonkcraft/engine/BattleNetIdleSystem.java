@@ -304,6 +304,7 @@ final class BattleNetIdleSystem {
         x = Math.max(0, Math.min(world.map.width() - 1, x));
         y = Math.max(0, Math.min(world.map.height() - 1, y));
         unit.setBattleNetPendingPatrol(x, y);
+        unit.setBattleNetScoutPatrol(true);
         if (World.BNE_IDLE_TRACE) {
             System.err.printf("JBNEPATROLPASS cycle=%d unit=%d at=%d,%d"
                             + " target=%d,%d seed=%s%n",
@@ -507,6 +508,7 @@ final class BattleNetIdleSystem {
             // constructor Still action remains current. It becomes visible
             // only when that animation reaches its first action marker.
             unit.setBattleNetPendingPatrol(x, y);
+            unit.setBattleNetScoutPatrol(true);
         }
     }
 

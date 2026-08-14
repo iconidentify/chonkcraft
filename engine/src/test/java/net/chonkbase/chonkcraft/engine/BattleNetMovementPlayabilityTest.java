@@ -411,4 +411,61 @@ class BattleNetMovementPlayabilityTest {
                 "retail is back on Patrol toward 107,51; Java is still "
                         + zeppelin.order());
     }
+
+    @Test
+    @DisplayName("a human-12 scout zeppelin stands down at 50,4")
+    void aHuman12ScoutZeppelinStandsDownAtItsFirstScoutPoint() {
+        // i9beef retail-human-12-idle, pinned 2.02b. The zeppelin that
+        // starts on 46,10 is sent to 50,4. Native is on that square from
+        // fixture 43 and becomes Still at 63 -- it does not turn around
+        // for the start tile. Java used to swap endpoints and leave at
+        // 66, which is why the 1800-cycle survey first disagrees here
+        // (native Still vs Java Patrol).
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level12h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "Human 12 is not in the pack");
+        World world = mission.world();
+
+        Unit zeppelin = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 46 && unit.tileY() == 10
+                    && "unit-zeppelin".equals(unit.type().ident())) {
+                zeppelin = unit;
+                break;
+            }
+        }
+        assertNotNull(zeppelin, "Human 12 has no zeppelin on 46,10");
+
+        mission.tick();
+        mission.tick();
+        for (int cycle = 1; cycle <= 63; cycle++) {
+            mission.tick();
+        }
+
+        assertEquals(50, zeppelin.tileX(),
+                "retail is standing on 50,4 at fixture 63, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(4, zeppelin.tileY(),
+                "retail is standing on 50,4 at fixture 63, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(Unit.Order.STILL, zeppelin.order(),
+                "retail stands down at the scout point; Java is still "
+                        + zeppelin.order() + " toward "
+                        + zeppelin.orderTargetX() + "," + zeppelin.orderTargetY());
+
+        for (int cycle = 64; cycle <= 80; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, zeppelin.order(),
+                "retail is still standing on 50,4 at fixture 80; Java left for "
+                        + zeppelin.order() + " at "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(50, zeppelin.tileX(),
+                "retail is still on 50,4 at fixture 80, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(4, zeppelin.tileY(),
+                "retail is still on 50,4 at fixture 80, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+    }
 }
