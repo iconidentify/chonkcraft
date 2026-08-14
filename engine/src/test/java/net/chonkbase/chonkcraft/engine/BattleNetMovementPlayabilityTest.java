@@ -160,4 +160,38 @@ class BattleNetMovementPlayabilityTest {
                 "the peon should take the forest wall-follow onto 27,17: "
                         + peon.tileX() + "," + peon.tileY());
     }
+
+    @Test
+    @DisplayName("a player move into water stores the first water square")
+    void aPlayerMoveIntoWaterStoresTheFirstWaterSquare() {
+        // The same BNE line that projects a forest click also projects a
+        // shoreline click. A footman at 25,18 told to walk to 30,18 across
+        // a water wall that begins at 28,18 keeps order point 28,18 -- the
+        // first square it cannot enter -- and stays on land.
+        GameMap shore = map(32, 32, TileFlag.LAND_ALLOWED);
+        for (int y = 16; y <= 19; y++) {
+            for (int x = 28; x <= 31; x++) {
+                shore.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+        Fixture fixture = fixture(shore);
+        Unit footman = place(fixture, "unit-footman", 25, 18);
+
+        assertTrue(fixture.commands().apply(GameCommand.move(0, footman.id(), 30, 18)),
+                "the footman refused a point move into the water");
+        assertEquals(28, footman.orderTargetX(),
+                "retail projects a water click onto the first blocked square");
+        assertEquals(18, footman.orderTargetY(),
+                "retail projects a water click onto the first blocked square");
+        runToRest(fixture.world(), footman, 80);
+
+        assertTrue(fixture.world().map.field(footman.tileX(), footman.tileY())
+                        .isLandPassable(),
+                "the soldier should stand on the shore, not keep walking into water: "
+                        + footman.tileX() + "," + footman.tileY());
+        assertTrue(Math.max(Math.abs(footman.tileX() - 28),
+                Math.abs(footman.tileY() - 18)) <= 1,
+                "the soldier should stop beside the first water square: "
+                        + footman.tileX() + "," + footman.tileY());
+    }
 }
