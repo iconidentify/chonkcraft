@@ -402,6 +402,30 @@ class PlaytestExplorerTest(unittest.TestCase):
             report.get("complete", True),
             "generated inventory is not the 100 dual-adapter requirement")
 
+    def test_a_commanded_seed_becomes_the_exact_captured_scenario(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/traces/bne-fixture-v1.1-orc-01.txt.bnefx"
+        )
+        if not fixture.is_file():
+            self.skipTest("authenticated Orc 1 move fixture is missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        explorer.validate_scenario(scenario)
+        command = scenario["commands"][0]
+        self.assertEqual("move", command["kind"])
+        self.assertEqual(1594, command["unit_id"])
+        self.assertEqual((30, 18), (command["x"], command["y"]))
+        self.assertEqual(5, command["issue_cycle"])
+        self.assertEqual(
+            explorer.command_content_identity(scenario),
+            explorer.command_content_identity(scenario))
+
+    def test_an_empty_execution_ledger_is_not_complete(self):
+        report = explorer.execution_ledger([])
+        self.assertEqual(0, report["dual_adapter_executed_scenarios"])
+        self.assertFalse(report["complete"])
+
 
 if __name__ == "__main__":
     unittest.main()

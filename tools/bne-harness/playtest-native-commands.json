@@ -1,0 +1,94 @@
+{
+  "schema": "chonkcraft-bne-native-command-registry-1",
+  "authority_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+  "families": {
+    "move": {
+      "evidence_authority": "pinned-bne-2.02b-command-injector",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "injector_grammar": "cycle N move unit SLOT x X y Y"
+      },
+      "encoding": "GiveOrder through the guarded campaign injector; script line cycle N move unit SLOT x X y Y",
+      "arguments": ["issue_cycle", "unit_id", "x", "y"],
+      "supported_variants": ["open-ground", "occupied-refusal", "terrain-edge"],
+      "unsupported_variants": ["queued-follow-up", "group-selection-fanout"],
+      "positive_witnesses": [
+        "tools/bne-harness/work/traces/bne-fixture-v1.1-orc-01.txt.bnefx"
+      ],
+      "negative_witnesses": [
+        "occupied destination remains a refusal surface in the command matrix"
+      ],
+      "native_execution_works": true,
+      "java_execution_works": true,
+      "dual_adapter_executed": 21
+    },
+    "stop": {
+      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "opcode": "0x0c",
+        "fixed_bytes": 1
+      },
+      "encoding": "InSight embedded opcode 0x0C, one byte, applies to the current selection",
+      "arguments": ["issue_cycle", "unit_id"],
+      "supported_variants": [],
+      "unsupported_variants": ["native-injector-script"],
+      "positive_witnesses": [],
+      "negative_witnesses": [],
+      "native_execution_works": false,
+      "java_execution_works": true,
+      "dual_adapter_executed": 0
+    },
+    "stand-ground": {
+      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "opcode": "0x0d",
+        "fixed_bytes": 1
+      },
+      "encoding": "InSight embedded opcode 0x0D, one byte, applies to the current selection",
+      "arguments": ["issue_cycle", "unit_id"],
+      "supported_variants": [],
+      "unsupported_variants": ["native-injector-script"],
+      "positive_witnesses": [],
+      "negative_witnesses": [],
+      "native_execution_works": false,
+      "java_execution_works": true,
+      "dual_adapter_executed": 0
+    },
+    "attack": {
+      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "opcode": "0x13",
+        "fixed_bytes": 8
+      },
+      "encoding": "InSight embedded opcode 0x13, eight bytes; target unit id at bytes 5-6",
+      "arguments": ["issue_cycle", "unit_id", "target_id"],
+      "supported_variants": [],
+      "unsupported_variants": ["native-injector-script", "ground-click-without-target"],
+      "positive_witnesses": [],
+      "negative_witnesses": [],
+      "native_execution_works": false,
+      "java_execution_works": true,
+      "dual_adapter_executed": 0
+    },
+    "production": {
+      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "opcode": "0x15",
+        "fixed_bytes": 3
+      },
+      "encoding": "InSight embedded opcode 0x15; byte 1 names the unit/tech/building, byte 2 selects 0=train 1/2=research 3=transform",
+      "arguments": ["issue_cycle", "unit_id", "type_index"],
+      "supported_variants": [],
+      "unsupported_variants": ["native-injector-script", "family-2-research-until-garden-of-war-3477-unblocked"],
+      "positive_witnesses": [],
+      "negative_witnesses": [],
+      "native_execution_works": false,
+      "java_execution_works": true,
+      "dual_adapter_executed": 0
+    }
+  }
+}

@@ -160,6 +160,13 @@ class PlaytestAdapterTest(unittest.TestCase):
         explorer.validate_result(java_result, scenario, "java")
         self.assertTrue(native_result["observations"][0]["accepted"])
         self.assertTrue(java_result["observations"][0]["accepted"])
+        row = explorer.execution_ledger_row(
+            scenario, native_result, java_result, source=str(COMMANDED))
+        ledger = explorer.execution_ledger([row])
+        self.assertEqual(1, ledger["dual_adapter_executed_scenarios"])
+        self.assertEqual(["move"], ledger["families"])
+        self.assertFalse(ledger["complete"],
+                         "one MOVE is not the 100-scenario threshold")
 
 
 if __name__ == "__main__":

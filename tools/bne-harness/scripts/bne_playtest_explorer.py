@@ -555,6 +555,88 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
     return seed
 
 
+def scenario_from_commanded_seed(seed: dict[str, Any]) -> dict[str, Any]:
+    """Turn a commanded seed into the exact scenario those captured orders proved."""
+    validate_seed(seed)
+    commands = seed.get("authenticated_commands")
+    if not isinstance(commands, list) or not commands:
+        raise ValueError("commanded seed has no authenticated commands")
+    for command in commands:
+        if not isinstance(command, dict) or command.get("kind") not in COMMAND_FAMILIES:
+            raise ValueError("commanded seed contains an invalid authenticated command")
+    setup = dict(seed.get("setup") or {})
+    scenario = {
+        "schema": SCENARIO_SCHEMA,
+        "identity": dict(seed["identity"]),
+        "setup": setup,
+        "pattern": "single" if len(commands) == 1 else "sequence",
+        "actors": copy.deepcopy(seed["actors"]),
+        "start_cycle": int(seed.get("start_cycle", commands[0]["issue_cycle"])),
+        "settle_cycles": int(seed.get("settle_cycles", 600)),
+        "commands": copy.deepcopy(commands),
+    }
+    scenario["scenario_sha256"] = digest({
+        key: value for key, value in scenario.items() if key != "scenario_sha256"
+    })
+    validate_scenario(scenario)
+    return scenario
+
+
+def command_content_identity(scenario: dict[str, Any]) -> str:
+    """Identity of the orders themselves, ignoring fixture path wrappers."""
+    validate_scenario(scenario)
+    return digest([
+        {
+            "kind": command["kind"],
+            "unit_id": command["unit_id"],
+            "x": command.get("x"),
+            "y": command.get("y"),
+            "target_id": command.get("target_id"),
+            "issue_cycle": command["issue_cycle"],
+            "queued": bool(command.get("queued")),
+        }
+        for command in scenario["commands"]
+    ])
+
+
+def execution_ledger_row(scenario: dict[str, Any], native: dict[str, Any],
+        java: dict[str, Any], *, source: str) -> dict[str, Any]:
+    validate_result(native, scenario, "native")
+    validate_result(java, scenario, "java")
+    if native["scenario_sha256"] != java["scenario_sha256"]:
+        raise ValueError("native and Java ran different scenario identities")
+    families = sorted({command["kind"] for command in scenario["commands"]})
+    return {
+        "scenario_sha256": scenario["scenario_sha256"],
+        "command_content_sha256": command_content_identity(scenario),
+        "families": families,
+        "commands": copy.deepcopy(scenario["commands"]),
+        "source": source,
+        "native_producer": native["producer"],
+        "java_producer": java["producer"],
+        "native_observations": native["observations"],
+        "java_observations": java["observations"],
+        "qualifies": True,
+    }
+
+
+def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    qualified = [row for row in rows if row.get("qualifies")]
+    contents = {row["command_content_sha256"] for row in qualified}
+    families: set[str] = set()
+    for row in qualified:
+        families.update(row.get("families") or [])
+    return {
+        "schema": "chonkcraft-bne-playtest-execution-ledger-1",
+        "dual_adapter_executed_scenarios": len(contents),
+        "distinct_command_contents": len(contents),
+        "families": sorted(families),
+        "family_count": len(families),
+        "complete": len(contents) >= 100 and len(families) >= 5,
+        "rows": qualified,
+    }
+
+
 def _target(seed: dict[str, Any], target_id: int) -> dict[str, Any] | None:
     for actor in seed["actors"]:
         if actor["id"] == target_id:
@@ -1168,6 +1250,58 @@ def seed_commanded_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def execute_commanded_command(args: argparse.Namespace) -> int:
+    """Execute each commanded fixture through both production adapters."""
+    native_mod = _load_sibling("bne_playtest_native_adapter")
+    java_script = Path(__file__).resolve().with_name("bne_playtest_java_adapter.py")
+    pack = args.asset_pack.expanduser().resolve() if args.asset_pack else (
+        Path.home() / ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    with tempfile.TemporaryDirectory() as directory:
+        work = Path(directory)
+        java = Adapter("java", [
+            sys.executable, str(java_script),
+            "--scenario", "{scenario}", "--output", "{output}",
+            "--asset-pack", str(pack), "--skip-build",
+        ], timeout=args.timeout)
+        for fixture in args.fixtures:
+            seed = seed_from_commanded_fixture(fixture)
+            scenario = scenario_from_commanded_seed(seed)
+            content = command_content_identity(scenario)
+            if content in seen:
+                continue
+            seen.add(content)
+            native_result = native_mod.run_from_fixture(
+                scenario, fixture.expanduser().resolve(),
+                PINNED_BNE_EXECUTABLE_SHA256, "a" * 64)
+            validate_result(native_result, scenario, "native")
+            java_result = java.run(scenario, work / scenario["scenario_sha256"])
+            rows.append(execution_ledger_row(
+                scenario, native_result, java_result,
+                source=str(fixture.expanduser().resolve())))
+    report = execution_ledger(rows)
+    write_json(args.output, report)
+    print(json.dumps({
+        "dual_adapter_executed_scenarios": report["dual_adapter_executed_scenarios"],
+        "distinct_command_contents": report["distinct_command_contents"],
+        "families": report["families"],
+        "complete": report["complete"],
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+def _load_sibling(name: str) -> Any:
+    import importlib.util
+    path = Path(__file__).resolve().with_name(f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"cannot load {name} from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def command_script_command(args: argparse.Namespace) -> int:
     scenario = load_json(args.scenario, "scenario")
     destination = args.output.expanduser().resolve()
@@ -1243,6 +1377,15 @@ def parser() -> argparse.ArgumentParser:
     commanded.add_argument("fixture", type=Path)
     commanded.add_argument("--output", required=True, type=Path)
     commanded.set_defaults(func=seed_commanded_command)
+
+    execute = commands.add_parser(
+        "execute-commanded",
+        help="run commanded fixtures through both production adapters")
+    execute.add_argument("fixtures", nargs="+", type=Path)
+    execute.add_argument("--output", required=True, type=Path)
+    execute.add_argument("--asset-pack", type=Path)
+    execute.add_argument("--timeout", type=float, default=180.0)
+    execute.set_defaults(func=execute_commanded_command)
 
     script = commands.add_parser(
         "command-script",
