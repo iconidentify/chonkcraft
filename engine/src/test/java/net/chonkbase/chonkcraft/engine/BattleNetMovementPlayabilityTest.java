@@ -595,4 +595,58 @@ class BattleNetMovementPlayabilityTest {
                 "retail holds 30,39 at fixture 46; Java left for "
                         + grunt.tileX() + "," + grunt.tileY());
     }
+
+    @Test
+    @DisplayName("a human-12 peon holds 103,1 through the last wood step")
+    void aHuman12PeonHoldsTheLastWoodRingSquare() {
+        // i9beef retail-human-12-idle. Native peon 1565 walks the same
+        // 16-cycle NE legs onto 103,1 at fixture 211 and stays there
+        // through 229, stepping onto the 104,0 ring of the 105,0 corner
+        // tree only at 230. Java used to take that last step at 227.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level12h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "Human 12 is not in the pack");
+
+        Unit peon = null;
+        for (Unit unit : mission.world().units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 90 && unit.tileY() == 13
+                    && "unit-peon".equals(unit.type().ident())) {
+                peon = unit;
+                break;
+            }
+        }
+        assertNotNull(peon, "Human 12 has no peon on 90,13");
+
+        mission.tick();
+        mission.tick();
+        for (int cycle = 1; cycle <= 227; cycle++) {
+            mission.tick();
+        }
+        assertEquals(103, peon.tileX(),
+                "retail is still on 103,1 at fixture 227, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(1, peon.tileY(),
+                "retail is still on 103,1 at fixture 227, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(Unit.Order.HARVEST, peon.order(),
+                "retail is still harvesting toward 105,0; Java is " + peon.order());
+
+        mission.tick();
+        mission.tick();
+        assertEquals(103, peon.tileX(),
+                "retail is still on 103,1 at fixture 229, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(1, peon.tileY(),
+                "retail is still on 103,1 at fixture 229, not "
+                        + peon.tileX() + "," + peon.tileY());
+
+        mission.tick();
+        assertEquals(104, peon.tileX(),
+                "retail steps onto the 104,0 wood ring at fixture 230, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(0, peon.tileY(),
+                "retail steps onto the 104,0 wood ring at fixture 230, not "
+                        + peon.tileX() + "," + peon.tileY());
+    }
 }

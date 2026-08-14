@@ -1532,10 +1532,28 @@ final class BattleNetHarvestSystem {
         // residual, fall through so the spent-route action-23 delay arms on
         // the settle cycle (XHuman 7 slot1545: timer 3/2/1 on c19-c21, east
         // heading at c22 -- returning one cycle late pushed the replan to 25).
-        if (worker.pathLength() == 0 && worker.isMoving()) {
+        // Mid-route leftovers drain here too so a last heading onto the tree
+        // ring cannot be consumed on the same visit. Human 12 peon 1565
+        // residual-settles on 103,1 with leftover NE onto 104,0 (ring of
+        // 105,0). Same-visit consume landed at 227; native holds through
+        // 229 and steps at 230. Action 23's three-call start owns that
+        // leftover, the same way it owns a spent short tip.
+        if (worker.isMoving()) {
             world.movement.walkPixels(worker);
             if (worker.isMoving()) {
                 return;
+            }
+            if (worker.pathLength() > 0
+                    && worker.resourceTileX() >= 0
+                    && worker.resourceTileY() >= 0) {
+                int heading = worker.peekHeading();
+                int nextX = worker.tileX() + Direction.deltaX(heading);
+                int nextY = worker.tileY() + Direction.deltaY(heading);
+                if (Math.max(Math.abs(nextX - worker.resourceTileX()),
+                        Math.abs(nextY - worker.resourceTileY())) <= 1) {
+                    worker.setBattleNetOrderDelay(2);
+                    return;
+                }
             }
         }
         if (worker.pathLength() == 0 && !worker.isMoving()) {
