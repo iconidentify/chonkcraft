@@ -427,15 +427,21 @@ class BattleNetMovementPlayabilityTest {
         World world = mission.world();
 
         Unit zeppelin = null;
+        Unit oddDest = null;
         for (Unit unit : world.units()) {
-            if (unit.isAlive() && unit.isOnMap()
-                    && unit.tileX() == 46 && unit.tileY() == 10
-                    && "unit-zeppelin".equals(unit.type().ident())) {
+            if (!unit.isAlive() || !unit.isOnMap()
+                    || !"unit-zeppelin".equals(unit.type().ident())) {
+                continue;
+            }
+            if (unit.tileX() == 46 && unit.tileY() == 10) {
                 zeppelin = unit;
-                break;
+            }
+            if (unit.tileX() == 92 && unit.tileY() == 14) {
+                oddDest = unit;
             }
         }
         assertNotNull(zeppelin, "Human 12 has no zeppelin on 46,10");
+        assertNotNull(oddDest, "Human 12 has no zeppelin on 92,14");
 
         mission.tick();
         mission.tick();
@@ -467,5 +473,23 @@ class BattleNetMovementPlayabilityTest {
         assertEquals(4, zeppelin.tileY(),
                 "retail is still on 50,4 at fixture 80, not "
                         + zeppelin.tileX() + "," + zeppelin.tileY());
+
+        for (int cycle = 81; cycle <= 83; cycle++) {
+            mission.tick();
+        }
+        // dest 83,10 is off the even flight lattice. Retail residual-settles
+        // on 84,10 and is Still at fixture 82. Java needs one more residual
+        // tick and stands down at 83 -- same square, not the leftover west
+        // step onto 82,10.
+        assertEquals(84, oddDest.tileX(),
+                "retail stands on 84,10 beside dest 83,10, not "
+                        + oddDest.tileX() + "," + oddDest.tileY());
+        assertEquals(10, oddDest.tileY(),
+                "retail stands on 84,10 beside dest 83,10, not "
+                        + oddDest.tileX() + "," + oddDest.tileY());
+        assertEquals(Unit.Order.STILL, oddDest.order(),
+                "retail stands down beside the odd scout dest; Java is still "
+                        + oddDest.order() + " at "
+                        + oddDest.tileX() + "," + oddDest.tileY());
     }
 }
