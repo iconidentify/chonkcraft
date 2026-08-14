@@ -208,6 +208,141 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
     return seed
 
 
+# Neutral owner 15 is the retail gold-mine / critter / oil-patch bank in
+# campaign PUDs. Buildings occupy type ids 58 and above in the same table
+# seed_from_fixture already uses to reject halls as movers.
+NEUTRAL_OWNER = 15
+BUILDING_TYPE_FLOOR = 58
+
+
+def _frame_units(fixture: Path) -> list[tuple[int, bytes]]:
+    frame = bne_command_matrix._first_frame(fixture)
+    return sorted(frame["units"].items())
+
+
+def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
+    """Declare extra player families from authenticated cycle-one records.
+
+    The native injector still proves only move. These capabilities exist so
+    generation covers attack, harvest, stance and production refusal. The
+    native adapter stays fail-closed unless a commanded or replay packet
+    matches the emitted scenario.
+    """
+    validate_seed(seed)
+    records = _frame_units(fixture)
+    by_slot = dict(records)
+    hostiles: list[int] = []
+    resources: list[int] = []
+    halls: list[int] = []
+    workers: list[int] = []
+    for slot, raw in records:
+        owner = raw[bne_command_matrix.UNIT_OWNER]
+        hidden = raw[bne_command_matrix.UNIT_FLAGS] & bne_command_matrix.UNIT_HIDDEN
+        if hidden:
+            continue
+        type_id = raw[39]
+        if owner not in {0, NEUTRAL_OWNER} and type_id < BUILDING_TYPE_FLOOR:
+            hostiles.append(slot)
+        if owner == NEUTRAL_OWNER and type_id >= BUILDING_TYPE_FLOOR:
+            resources.append(slot)
+        if owner == 0 and type_id >= BUILDING_TYPE_FLOOR:
+            halls.append(slot)
+        if owner == 0 and type_id < BUILDING_TYPE_FLOOR:
+            workers.append(slot)
+    targets = {target["id"]: target for target in seed.get("targets", [])}
+    actors = {actor["id"]: actor for actor in seed["actors"]}
+    for slot in workers:
+        if slot in actors:
+            continue
+        raw = by_slot[slot]
+        movement = raw[bne_command_matrix.UNIT_MOVEMENT]
+        actors[slot] = {
+            "id": slot,
+            "player": 0,
+            "domain": "land" if movement == 0
+            else "air" if movement == 1 else "water",
+            "capabilities": ["move", "stop"],
+            "target_ids": [],
+        }
+    for slot in hostiles + resources:
+        raw = by_slot.get(slot)
+        if raw is None:
+            continue
+        targets.setdefault(slot, {
+            "id": slot,
+            "player": raw[bne_command_matrix.UNIT_OWNER],
+            "domain": "land",
+            "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
+            "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
+        })
+    for actor in actors.values():
+        caps = set(actor["capabilities"])
+        caps.update({"stop", "stand-ground", "attack-move"})
+        if hostiles:
+            caps.add("attack")
+            actor["target_ids"] = sorted(set(actor.get("target_ids", []) + hostiles))
+        if resources and actor["id"] in workers:
+            caps.add("harvest")
+            actor["target_ids"] = sorted(set(actor.get("target_ids", []) + resources))
+        actor["capabilities"] = sorted(caps)
+    for slot in halls[:2]:
+        actors.setdefault(slot, {
+            "id": slot,
+            "player": 0,
+            "domain": "land",
+            "capabilities": ["train", "research"],
+            "target_ids": [],
+            "type_index": 0,
+            "afford": False,
+        })
+    seed["actors"] = [actors[key] for key in sorted(actors)]
+    seed["targets"] = [targets[key] for key in sorted(targets)]
+    validate_seed(seed)
+    return seed
+
+
+def seed_from_idle_fixture(fixture: Path, **kwargs: Any) -> dict[str, Any]:
+    """Movement-matrix seed plus the extra families the first frame names."""
+    seed = seed_from_fixture(fixture, **kwargs)
+    return enrich_seed_families(seed, fixture)
+
+
+def coverage_inventory(seeds: list[dict[str, Any]], *,
+        max_scenarios: int = 256) -> dict[str, Any]:
+    """Generate without executing. Counts families, patterns and tokens."""
+    if len(seeds) < 1:
+        raise ValueError("coverage inventory needs at least one seed")
+    families: set[str] = set()
+    patterns: set[str] = set()
+    generated = 0
+    per_seed: list[dict[str, Any]] = []
+    for seed in seeds:
+        validate_seed(seed)
+        scenarios = generate_scenarios(seed, max_scenarios=max_scenarios)
+        seed_families = {
+            command["kind"] for item in scenarios for command in item["commands"]
+        }
+        seed_patterns = {item["pattern"] for item in scenarios}
+        families.update(seed_families)
+        patterns.update(seed_patterns)
+        generated += len(scenarios)
+        per_seed.append({
+            "identity": seed.get("identity"),
+            "generated_scenarios": len(scenarios),
+            "families": sorted(seed_families),
+            "patterns": sorted(seed_patterns),
+        })
+    return {
+        "schema": "chonkcraft-bne-playtest-coverage-inventory-1",
+        "seed_count": len(seeds),
+        "generated_scenarios": generated,
+        "command_family_count": len(families),
+        "families": sorted(families),
+        "patterns": sorted(patterns),
+        "seeds": per_seed,
+    }
+
+
 def parse_injector_script(text: str) -> list[dict[str, Any]]:
     """Parse the guarded native move-injector script used by commanded fixtures."""
     commands: list[dict[str, Any]] = []
@@ -477,7 +612,18 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
 
     scenarios: list[dict[str, Any]] = []
     seen: set[str] = set()
+    by_pattern: dict[str, list[list[dict[str, Any]]]] = {}
     for pattern, scheduled in candidates:
+        by_pattern.setdefault(pattern, []).append(scheduled)
+    # Singles used to fill the cap before group, replace and congestion
+    # were reached. Round-robin so each pattern the seed can emit is
+    # present in a bounded inventory.
+    queues = [(pattern, list(items)) for pattern, items in by_pattern.items()]
+    while queues and len(scenarios) < max_scenarios:
+        pattern, items = queues.pop(0)
+        if not items:
+            continue
+        scheduled = items.pop(0)
         scenario: dict[str, Any] = {
             "schema": SCENARIO_SCHEMA,
             "seed_identity": seed["identity"],
@@ -493,12 +639,11 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
             key: value for key, value in scenario.items()
             if key != "scenario_sha256"
         })
-        if scenario["scenario_sha256"] in seen:
-            continue
-        seen.add(scenario["scenario_sha256"])
-        scenarios.append(scenario)
-        if len(scenarios) >= max_scenarios:
-            break
+        if scenario["scenario_sha256"] not in seen:
+            seen.add(scenario["scenario_sha256"])
+            scenarios.append(scenario)
+        if items:
+            queues.append((pattern, items))
     if not scenarios:
         raise ValueError("playtest generation produced no scenarios")
     return scenarios
@@ -860,6 +1005,20 @@ def _command_tokens(value: str) -> list[str]:
     return tokens
 
 
+def coverage_inventory_command(args: argparse.Namespace) -> int:
+    seeds = [seed_from_idle_fixture(path) for path in args.fixtures]
+    report = coverage_inventory(seeds, max_scenarios=args.max_scenarios)
+    write_json(args.output, report)
+    print(json.dumps({
+        "seed_count": report["seed_count"],
+        "generated_scenarios": report["generated_scenarios"],
+        "command_family_count": report["command_family_count"],
+        "families": report["families"],
+        "patterns": report["patterns"],
+    }, indent=2, sort_keys=True))
+    return 0
+
+
 def generate_command(args: argparse.Namespace) -> int:
     seed = load_json(args.seed, "playtest seed")
     scenarios = generate_scenarios(
@@ -942,6 +1101,14 @@ def parser() -> argparse.ArgumentParser:
     generate.add_argument("--timing-offsets", type=int, nargs="+",
                           default=list(TIMING_OFFSETS))
     generate.set_defaults(func=generate_command)
+
+    inventory = commands.add_parser(
+        "coverage-inventory",
+        help="generate from one or more idle fixtures without executing engines")
+    inventory.add_argument("fixtures", nargs="+", type=Path)
+    inventory.add_argument("--output", required=True, type=Path)
+    inventory.add_argument("--max-scenarios", type=int, default=1200)
+    inventory.set_defaults(func=coverage_inventory_command)
 
     fixture = commands.add_parser(
         "seed-fixture",

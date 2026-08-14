@@ -326,6 +326,34 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertTrue(train_jams,
                         "two halls training the same unit are a congestion case")
 
+    def test_three_idle_fixtures_cover_five_families_and_one_hundred_scenarios(self):
+        corpus = (
+            Path(__file__).resolve().parents[1]
+            / "work/corpus/campaign-1800/cases"
+        )
+        fixtures = [
+            corpus / "retail-human-01-idle.bnefx",
+            corpus / "retail-orc-01-idle.bnefx",
+            corpus / "retail-xhuman-12-idle.bnefx",
+        ]
+        if not all(path.is_file() for path in fixtures):
+            self.skipTest("authenticated campaign-1800 idle fixtures are missing")
+        seeds = [explorer.seed_from_idle_fixture(path) for path in fixtures]
+        report = explorer.coverage_inventory(seeds, max_scenarios=1200)
+        self.assertGreaterEqual(report["seed_count"], 3)
+        self.assertGreaterEqual(report["generated_scenarios"], 100)
+        required = {"move", "attack", "attack-move", "stop", "harvest"}
+        self.assertTrue(
+            required <= set(report["families"]),
+            f"coverage inventory families {report['families']} miss {required}")
+        required_patterns = {
+            "single", "repeat", "replace", "group", "refuse", "turn-boundary",
+        }
+        self.assertTrue(
+            required_patterns <= set(report["patterns"]),
+            f"coverage inventory patterns {report['patterns']} miss "
+            f"{required_patterns}")
+
 
 if __name__ == "__main__":
     unittest.main()
