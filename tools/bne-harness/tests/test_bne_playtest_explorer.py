@@ -154,7 +154,7 @@ class PlaytestExplorerTest(unittest.TestCase):
         scenario = next(item for item in explorer.generate_scenarios(
             self.seed(), max_scenarios=500)
             if item["commands"][0]["kind"] == "attack")
-        with self.assertRaisesRegex(ValueError, "only move"):
+        with self.assertRaisesRegex(ValueError, "does not prove"):
             explorer.native_command_script(scenario)
 
     def test_comparison_uses_relative_cadence_and_observable_state(self):

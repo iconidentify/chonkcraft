@@ -64,6 +64,19 @@ class OracleIdentityTest(unittest.TestCase):
         self.assertEqual(1594, commands[0]["unit"])
         self.assertEqual(20, commands[-1]["cycle"])
 
+    def test_parses_stop_and_stand_ground_command_scripts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text(
+                "cycle 5 stop unit 1594\n"
+                "cycle 10 stand-ground unit 1594\n",
+                encoding="ascii",
+            )
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual(["stop", "stand-ground"],
+                         [command["action"] for command in commands])
+        self.assertEqual(1594, commands[0]["unit"])
+
     def test_rejects_an_unsorted_command_script(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.txt"

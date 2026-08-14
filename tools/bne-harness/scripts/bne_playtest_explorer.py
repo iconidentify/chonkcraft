@@ -60,6 +60,8 @@ REPLACE_FAMILY_RANK = {
 }
 INJECTOR_MOVE = re.compile(
     r"cycle (\d+) move unit (\d+) x (\d+) y (\d+)\Z")
+INJECTOR_STANCE = re.compile(
+    r"cycle (\d+) (stop|stand-ground) unit (\d+)\Z")
 MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
 REFUSED_POINTS = {"occupied", "blocked", "unaffordable"}
 
@@ -465,18 +467,29 @@ def parse_injector_script(text: str) -> list[dict[str, Any]]:
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        match = INJECTOR_MOVE.fullmatch(line)
-        if match is None:
-            raise ValueError(f"unsupported injector command at line {line_number}")
-        cycle, unit_id, x, y = (int(value) for value in match.groups())
-        commands.append({
-            "kind": "move",
-            "unit_id": unit_id,
-            "x": x,
-            "y": y,
-            "queued": False,
-            "issue_cycle": cycle,
-        })
+        move = INJECTOR_MOVE.fullmatch(line)
+        stance = INJECTOR_STANCE.fullmatch(line)
+        if move is not None:
+            cycle, unit_id, x, y = (int(value) for value in move.groups())
+            commands.append({
+                "kind": "move",
+                "unit_id": unit_id,
+                "x": x,
+                "y": y,
+                "queued": False,
+                "issue_cycle": cycle,
+            })
+            continue
+        if stance is not None:
+            cycle = int(stance.group(1))
+            commands.append({
+                "kind": stance.group(2),
+                "unit_id": int(stance.group(3)),
+                "queued": False,
+                "issue_cycle": cycle,
+            })
+            continue
+        raise ValueError(f"unsupported injector command at line {line_number}")
     if not commands:
         raise ValueError("injector script contains no command")
     return commands
@@ -524,7 +537,10 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         if domain not in point["domains"]:
             point["domains"].append(domain)
             point["domains"].sort()
-    if not actors or not points:
+    if not actors:
+        raise ValueError("commanded fixture produced an empty seed")
+    if not points and any(command["kind"] not in {"stop", "stand-ground"}
+                          for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
     cycle_limit = int(run.get("cycle_limit") or 160)
@@ -875,15 +891,21 @@ def native_command_script(scenario: dict[str, Any]) -> str:
         f"# scenario-sha256 {scenario['scenario_sha256']}",
     ]
     for command in scenario["commands"]:
-        if command["kind"] != "move":
-            raise ValueError(
-                "native direct command injector currently proves only move; "
-                "use the authenticated replay-packet adapter for other commands")
-        if not all(isinstance(command.get(key), int) for key in ("x", "y")):
-            raise ValueError("move command has no integer destination")
-        lines.append(
-            f"cycle {command['issue_cycle']} move unit {command['unit_id']} "
-            f"x {command['x']} y {command['y']}")
+        if command["kind"] == "move":
+            if not all(isinstance(command.get(key), int) for key in ("x", "y")):
+                raise ValueError("move command has no integer destination")
+            lines.append(
+                f"cycle {command['issue_cycle']} move unit {command['unit_id']} "
+                f"x {command['x']} y {command['y']}")
+            continue
+        if command["kind"] in {"stop", "stand-ground"}:
+            lines.append(
+                f"cycle {command['issue_cycle']} {command['kind']} "
+                f"unit {command['unit_id']}")
+            continue
+        raise ValueError(
+            "native direct command injector does not prove "
+            f"{command['kind']}; use the authenticated replay-packet adapter")
     return "\n".join(lines) + "\n"
 
 

@@ -19,7 +19,6 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from bne_fixture import seal_fixture, validate_fixture, validate_state_stream
-import bne_replay_outcome
 
 TARGET_EXE = "Warcraft II BNE.exe"
 EXPECTED_TARGET_SHA256 = "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
@@ -38,8 +37,11 @@ CAMPAIGN_SCENARIO = re.compile(
     r"(\d{1,2})\.pud$",
     re.IGNORECASE,
 )
-SCRIPT_COMMAND = re.compile(
+SCRIPT_COMMAND_MOVE = re.compile(
     r"^cycle ([1-9]\d*) move unit (\d+) x (\d+) y (\d+)$"
+)
+SCRIPT_COMMAND_STANCE = re.compile(
+    r"^cycle ([1-9]\d*) (stop|stand-ground) unit (\d+)$"
 )
 
 
@@ -74,13 +76,23 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
             line = raw_line.strip()
             if not line or line.startswith("#"):
                 continue
-            match = SCRIPT_COMMAND.fullmatch(line)
-            if match is None:
+            move = SCRIPT_COMMAND_MOVE.fullmatch(line)
+            stance = SCRIPT_COMMAND_STANCE.fullmatch(line)
+            if move is not None:
+                cycle, slot, x, y = (int(value) for value in move.groups())
+                action = "move"
+            elif stance is not None:
+                cycle = int(stance.group(1))
+                action = stance.group(2)
+                slot = int(stance.group(3))
+                x = 0
+                y = 0
+            else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
-                    "'cycle N move unit SLOT x X y Y'"
+                    "'cycle N move unit SLOT x X y Y' or "
+                    "'cycle N stop|stand-ground unit SLOT'"
                 )
-            cycle, slot, x, y = (int(value) for value in match.groups())
             if cycle < previous_cycle:
                 raise ValueError(f"commands are not cycle-sorted at {path}:{line_number}")
             if slot >= 1600:
@@ -89,7 +101,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 raise ValueError(f"tile is outside BNE's map bounds at {path}:{line_number}")
             commands.append({
                 "cycle": cycle,
-                "action": "move",
+                "action": action,
                 "unit": slot,
                 "x": x,
                 "y": y,
@@ -283,6 +295,7 @@ def identity(path: Path) -> dict[str, int | str]:
 def validate_replay_inputs(plan_path: Path, schedule_path: Path) -> dict:
     """Bind a native schedule byte-for-byte to its authenticated plan."""
 
+    import bne_replay_outcome
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     bne_replay_outcome._validate_plan(plan, require_startup=True)
     expected = bne_replay_outcome.native_schedule_bytes(plan)
@@ -592,6 +605,7 @@ def run(args: argparse.Namespace) -> int:
         state_validation = validate_state_stream(state, args.cycles)
         cross_validate_trace_state(validation, state_validation)
         if args.replay_plan_data is not None:
+            import bne_replay_outcome
             args.replay_dispatch_proof = \
                 bne_replay_outcome.verify_native_dispatch_trace(
                     args.replay_plan_data,
