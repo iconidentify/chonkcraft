@@ -15,6 +15,8 @@ import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.network.CommandApplier;
+import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecode;
 import net.chonkbase.chonkcraft.engine.ai.AiForce;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -147,49 +149,59 @@ class SaveGameTest {
     }
 
     @Test
-    @DisplayName("the Human 6 playtest save drops its pending ballista bolt on move")
-    void humanSixPendingBallistaBoltIsCancelledByMove() throws IOException {
-        AssetSource assets = AssetSource.fromEnvironment();
-        Assumptions.assumeTrue(assets != null,
-                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
-        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
-                "human-mission-6.sav.gz");
-        Assumptions.assumeTrue(Files.isRegularFile(save),
-                "the Human 6 playtest save is not installed");
-
-        GameData data = new GameData(assets);
-        String script = LoadGame.read(save);
-        LoadGame.Header header = LoadGame.header(script);
-        assertNotNull(header);
-        var mission = data.loadMission(header.mapPath());
-        assertNotNull(mission);
-        for (Unit unit : new ArrayList<>(mission.world().units())) {
-            mission.world().remove(unit);
+    @DisplayName("a restored pending ballista bolt is cancelled when the player moves")
+    void aRestoredPendingBallistaBoltIsCancelledWhenThePlayerMoves() {
+        // Used to read ~/.chonkcraft/saves/human-mission-6.sav.gz and skip
+        // when that rolling playtest file no longer held the bolt. The
+        // player-visible rule is independent of that file: a presentation-
+        // ahead bolt restored from a native save must vanish when the
+        // ballista is given a move, or the old muzzle shot fires later.
+        Fixture fixture = load();
+        GameMap map = new GameMap(24, 24, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
         }
-        LoadGame.apply(mission.world(), script, data.unitTypes().types());
+        map.recordLoadedTerrain();
+        World world = new World(map);
+        fixture.data().configureWorld(world, PudMap.Tileset.FOREST);
+        CommandApplier commands = new CommandApplier(world,
+                new ArrayList<>(fixture.data().unitTypes().types().values()));
+        fixture.data().configureCommands(commands);
+        UnitType ballistaType = fixture.data().unitTypes().types().get("unit-ballista");
+        UnitType gruntType = fixture.data().unitTypes().types().get("unit-grunt");
+        MissileType boltType = fixture.data().missiles().types().get("missile-ballista-bolt");
+        assertNotNull(ballistaType, "the retail roster has a ballista");
+        assertNotNull(gruntType, "the retail roster has a grunt");
+        assertNotNull(boltType, "the retail catalog has a ballista bolt");
+        Unit ballista = world.createUnit(ballistaType, 0, 4, 8);
+        Unit target = world.createUnit(gruntType, 1, 12, 8);
+        assertNotNull(ballista, "could not place the ballista");
+        assertNotNull(target, "could not place the bolt's target");
+        world.setAllied(0, 1, false);
+        world.fog().revealAll(0);
+        Missile placeholder = new Missile(boltType, ballista, target,
+                ballista.pixelX(), ballista.pixelY(),
+                target.pixelX(), target.pixelY());
+        world.restoreMissile("missile-ballista-bolt", ballista, target,
+                placeholder.savedState(), world.cycle(), world.cycle(), true);
+        assertEquals(1, world.missiles().size(),
+                "the restored save must keep one pending ballista bolt");
+        Missile oldMuzzle = world.missiles().get(0);
+        assertTrue(world.savedProjectilePending(oldMuzzle),
+                "the restored bolt must still be waiting for opcode ten");
 
-        Unit ballista = mission.world().units().stream()
-                .filter(unit -> unit.type() != null
-                        && "unit-ballista".equals(unit.type().ident())
-                        && unit.tileX() == 41 && unit.tileY() == 61)
-                .findFirst().orElse(null);
-        Assumptions.assumeTrue(ballista != null && mission.world().missiles().size() == 1,
-                "the rolling Human 6 playtest save no longer contains the ballista-bolt fixture");
-        assertEquals("unit-ballista", ballista.type().ident());
-        assertEquals(1, mission.world().missiles().size(),
-                "the save must restore its one pending ballista bolt");
-        Missile oldMuzzle = mission.world().missiles().get(0);
-        assertTrue(mission.world().savedProjectilePending(oldMuzzle));
+        assertTrue(commands.apply(GameCommand.move(0, ballista.id(),
+                ballista.tileX() + 2, ballista.tileY())),
+                "the player move was refused");
 
-        assertTrue(mission.world().orderMove(ballista,
-                ballista.tileX() + 2, ballista.tileY()), "ballista move refused");
-
-        assertTrue(mission.world().missiles().isEmpty(),
-                "the exact save retained its old-muzzle bolt after moving");
+        assertTrue(world.missiles().isEmpty(),
+                "the restored pending bolt stayed at the old muzzle after the move");
         for (int cycle = 0; cycle < 20; cycle++) {
-            mission.world().tick();
+            world.tick();
         }
-        assertTrue(mission.world().missiles().isEmpty(),
+        assertTrue(world.missiles().isEmpty(),
                 "the cancelled saved bolt woke up and fired later");
     }
 

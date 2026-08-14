@@ -9,6 +9,23 @@ if [[ ! -f "${asset_pack}" ]]; then
   echo "CHONKCRAFT_ASSET_PACK must name the authenticated BNE pack" >&2
   exit 2
 fi
+
+# The production OTA secret is a publish credential. This lane certifies that
+# the release builder can emit a signed catalog and that the game JAR boots;
+# it does not publish. An ephemeral Ed25519 key is enough when the secret is
+# not in the environment.
+if [[ -z "${CHONKCRAFT_OTA_ED25519_PRIVATE_KEY_BASE64:-}" ]]; then
+  ephemeral="$(mktemp)"
+  openssl genpkey -algorithm ED25519 -outform DER -out "${ephemeral}"
+  export CHONKCRAFT_OTA_ED25519_PRIVATE_KEY_BASE64
+  CHONKCRAFT_OTA_ED25519_PRIVATE_KEY_BASE64="$(base64 < "${ephemeral}" | tr -d '\r\n')"
+  rm -f "${ephemeral}"
+fi
+
+if [[ ! -f "${repo_root}/desktop/target/chonkcraft-desktop-0.1.0-SNAPSHOT-app.jar" ]]; then
+  "${repo_root}/scripts/jbr/with-jbr-25.sh" mvn -q -pl desktop -am -DskipTests package
+fi
+
 CHONKCRAFT_SKIP_BUILD=0 \
   "${repo_root}/scripts/release/build-update-assets.sh" >/dev/null
 

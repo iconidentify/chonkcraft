@@ -11,6 +11,19 @@ if [[ ! -f "${asset_pack}" ]]; then
   exit 1
 fi
 
+# Stale Surefire XML from an earlier pack or older test count used to make
+# this referee report 3 skipped MissileRenderingTest methods after a clean
+# 4-pass run. Delete the suites this gate reads before asking Maven again.
+rm -f \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*Missile*.xml \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*Projectile*.xml \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*CombatFeedback*.xml \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*ClickMarker*.xml \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*PresentationAhead*.xml \
+  "${repo_root}/engine/target/surefire-reports/TEST-"*RareSpell*.xml \
+  "${repo_root}/desktop/target/surefire-reports/TEST-"*Missile*.xml \
+  "${repo_root}/desktop/target/surefire-reports/TEST-"*ImpactRendering*.xml
+
 CHONKCRAFT_ASSET_PACK="${asset_pack}" "${repo_root}/scripts/run-tests.sh" \
   -pl engine,desktop -am \
   '-Dtest=BattleNetProjectilePoolOrderTest,BattleNetMissileMotionTest,CombatFeedbackTest,MissileRenderingTest,ImpactRenderingTest,NativeMissileRealDataTest,ClickMarkerTest,PresentationAheadProjectilePrepareTest,RareSpellBehaviorTest' \
