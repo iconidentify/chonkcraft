@@ -162,7 +162,7 @@ Automated checks:
 Retail evidence:
 
 - The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.
-- The movement gate runs 87 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
+- The movement gate runs 91 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
 - Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes.
 
 Known blockers:
