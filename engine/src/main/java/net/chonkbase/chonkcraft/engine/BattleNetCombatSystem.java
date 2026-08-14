@@ -37,6 +37,33 @@ final class BattleNetCombatSystem {
         this.world = world;
     }
 
+    /**
+     * Whether the first free compass neighbour is the reverse of the last
+     * real step heading.
+     *
+     * <p>XHuman 12 grunt 1496 residual-settles on 30,39 facing south. First
+     * free is north -- the tile it just left -- and taking it walks back to
+     * 30,38. Native holds 30,39. Grunt 1514's last step was east, so its
+     * first-free north at fixture 42 is not a reverse.</p>
+     */
+    private boolean firstFreeIsReverseOfLastStep(Unit unit) {
+        int last = unit.lastStepHeading();
+        if (last < 0 || last >= Direction.COUNT) {
+            return false;
+        }
+        int stride = world.battleNetMovementStride(unit);
+        for (int dir = 0; dir < Direction.COUNT; dir++) {
+            int freeX = unit.tileX() + Direction.deltaX(dir) * stride;
+            int freeY = unit.tileY() + Direction.deltaY(dir) * stride;
+            if (!world.canEnter(unit, freeX, freeY)) {
+                continue;
+            }
+            return Direction.deltaX(dir) == -Direction.deltaX(last)
+                    && Direction.deltaY(dir) == -Direction.deltaY(last);
+        }
+        return false;
+    }
+
 
     /**
      * Whether a chase soft-wait may treat {@code x,y} as enterable.
@@ -930,6 +957,16 @@ final class BattleNetCombatSystem {
                                     break;
                                 }
                             }
+                            // First free compass that walks back onto the
+                            // tile this residual just left is not a detour.
+                            // XHuman 12 grunt 1496 faces south after the step
+                            // onto 30,39; first free is north and native
+                            // holds. Grunt 1514's last step was east, so its
+                            // first-free north at fixture 42 still fires.
+                            if (freeHeading >= 0
+                                    && firstFreeIsReverseOfLastStep(unit)) {
+                                return;
+                            }
                             if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
                                     != null) {
                                 String resEnv = System.getenv(
@@ -1010,6 +1047,19 @@ final class BattleNetCombatSystem {
                     // step on the next boundary.
                 } else {
                 Unit candidate = world.targets.findBattleNetHostile(unit, reactRange, null);
+                // Boxed residual: current quarry still live, first free
+                // walks back onto the tile just left. Retargeting the
+                // knight at 30,44 then pathfinding around the pocket
+                // walked XHuman 12 grunt 1496 north to 30,38. Native
+                // keeps the footman at 32,43 and holds 30,39. Mobile
+                // equal-score wipe (Human 13 ogre 1482) is a multi-step
+                // leftover, not this one-heading reverse.
+                if (candidate != null && candidate != previous
+                        && unit.pathLength() == 1
+                        && previous != null && previous.isAlive()
+                        && firstFreeIsReverseOfLastStep(unit)) {
+                    candidate = previous;
+                }
                 if (candidate != null && candidate != previous) {
                     // Decide keep before setAutoTarget: the default arm clears
                     // the multi-step cache as soon as the target changes, which

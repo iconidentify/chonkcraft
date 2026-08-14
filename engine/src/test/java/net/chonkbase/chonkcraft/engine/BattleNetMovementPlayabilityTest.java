@@ -492,4 +492,44 @@ class BattleNetMovementPlayabilityTest {
                         + oddDest.order() + " at "
                         + oddDest.tileX() + "," + oddDest.tileY());
     }
+
+    @Test
+    @DisplayName("an xhuman-12 grunt holds the south tile of the opening line")
+    void anXHuman12GruntHoldsTheSouthTileOfTheOpeningLine() {
+        // i9beef retail-xhuman-12-idle, pinned 2.02b. Native grunt 1496
+        // starts Still on 30,38, is Stand Ground at fixture 6, first-steps
+        // south onto 30,39 at 25 and holds that tile through 42. Java used
+        // to rewrite leftover SE to first-free north -- the tile it just
+        // left -- then retarget the knight at 30,44 and walk back to 30,38,
+        // which is why the opening line looked one tile thin.
+        GameData data = data();
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx12h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit grunt = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 30 && unit.tileY() == 38
+                    && "unit-grunt".equals(unit.type().ident())) {
+                grunt = unit;
+                break;
+            }
+        }
+        assertNotNull(grunt, "XHuman 12 has no grunt on 30,38");
+
+        mission.tick();
+        mission.tick();
+        for (int cycle = 1; cycle <= 42; cycle++) {
+            mission.tick();
+        }
+
+        assertEquals(30, grunt.tileX(),
+                "retail holds 30,39 at fixture 42, not "
+                        + grunt.tileX() + "," + grunt.tileY());
+        assertEquals(39, grunt.tileY(),
+                "retail holds 30,39 at fixture 42; Java walked back to "
+                        + grunt.tileX() + "," + grunt.tileY());
+    }
 }

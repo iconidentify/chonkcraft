@@ -42,12 +42,12 @@ for report in root.glob("TEST-*.xml"):
     failures += int(suite.attrib.get("failures", 0))
     errors += int(suite.attrib.get("errors", 0))
 missing = names - seen
-if missing or tests != 98 or skipped or failures or errors:
+if missing or tests != 99 or skipped or failures or errors:
     raise SystemExit(
-        f"movement referee: expected 98/0/0/0 with every class present; "
+        f"movement referee: expected 99/0/0/0 with every class present; "
         f"got {tests}/{skipped}/{failures}/{errors}, missing={sorted(missing)}"
     )
-print("movement edge referee: 98 pass, 0 skipped")
+print("movement edge referee: 99 pass, 0 skipped")
 PY
 
 echo "movement gate passed: large footprints, congestion and refusal recovery"
