@@ -1,9 +1,9 @@
-# ChonkCraft 0.1.1-beta19 -- Reliable Siege and Naval Fire
+# ChonkCraft 0.1.1-beta20 -- Responsive Orders and Smarter Opposition
 
-- Fixed ballistae and other ranged units leaving phantom projectiles behind when they move, stop, retarget, die, or resume from an older save.
-- Kept pre-launch fireballs, cannonballs, arrows, and axes invisible until Battle.net Edition's authoritative firing moment, eliminating missiles that appeared stuck on their owner before launch.
-- Prevented duplicate presentation callbacks and legacy save data from manufacturing multiple live shots for one attack.
-- Removed abandoned ship cannonballs when their target dies instead of leaving a projectile stranded in the water or reviving it during a later attack.
-- Fixed battleships acknowledging an attack on a coastal building but remaining idle when the final shoreline route step was permanently blocked.
-- Added an in-range water approach for capital ships attacking coastal buildings when no reachable one-tile target skirt exists.
-- Added exact-save regression coverage for the Human 6 ballista and Human expansion 6 battleship reports, plus expanded projectile and movement lifecycle gates.
+- Fixed rejected commands erasing a unit's valid movement queue, group waypoint, or attack-move resume state. Units now keep following their prior orders when an incompatible or stale replacement command is refused.
+- Restored the ordinary skirmish computer's resource, construction, force-formation, and attack scheduler, closing forty known AI behavior failures.
+- Kept retail campaign opponents exclusively controlled by their Battle.net Edition `ai.bin` personalities, including profiles whose bytecode is only partially decoded, so a second generic AI cannot spend their resources or move their units.
+- Restored Human mission 6 assault movement when a bounded patrol route reaches an empty prefix, preventing computer attackers from freezing beside valid targets.
+- Preserved AI assault behavior, home coordinates, and carried-resource state across saves so loaded opponents and workers resume the job they had before saving.
+- Added authenticated player-intent capture and replay-outcome certification across 27 retail multiplayer replays, covering 168,788 commands and 22,518 multi-unit selections.
+- Added exact regression coverage for refused command transactions, queued replacements, retail-AI isolation, Human 6 assault recovery, and save/load cargo continuity.
