@@ -102,6 +102,13 @@ class GameDiscoveryTest {
             List<GameDiscovery.Game> games = hear(host, listener);
             Assumptions.assumeFalse(games.isEmpty(), "no broadcast on this machine");
 
+            // Stop the host and drain the listener before ageing. A packet
+            // still sitting on the socket used to resurrect the listing after
+            // the timestamps were pushed past STALE -- the test failed only
+            // when the rest of the class had already been shouting.
+            host.close();
+            listener.games();
+
             // Age the heard announcement past its welcome rather than waiting
             // several seconds for real.
             java.lang.reflect.Field field = GameDiscovery.class.getDeclaredField("found");
