@@ -64,7 +64,6 @@ final class BattleNetCombatSystem {
         return false;
     }
 
-
     /**
      * Whether a chase soft-wait may treat {@code x,y} as enterable.
      *
@@ -967,12 +966,16 @@ final class BattleNetCombatSystem {
                                     && pathn1Cur > 2
                                     && firstFreeIsReverseOfLastStep(unit);
                             if (reverseWalkBack) {
-                                // Far leftover: do not walk back onto the
-                                // tile just left. Returning keeps the rest
-                                // of this Attack visit from stepping the
-                                // leftover. Close leftovers (XHuman 10
-                                // grunt 1500, two tiles off) still replace
-                                // the heading and step on this visit.
+                                // Far leftover: first free walks back onto
+                                // the tile just left. Keep leftover and
+                                // return so this visit cannot step it.
+                                // Clearing the leftover let the next empty-
+                                // route rebuild step south onto 30,40 at 46
+                                // (native holds 30,39 through 80). Close
+                                // leftovers (XHuman 10 1500) still replace
+                                // and step on this visit.
+                                unit.clearPath();
+                                unit.setBattleNetOrderDelay(39);
                                 return;
                             }
                             if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
