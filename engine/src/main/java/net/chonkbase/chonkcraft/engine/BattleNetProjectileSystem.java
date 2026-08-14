@@ -200,7 +200,7 @@ final class BattleNetProjectileSystem {
                 .getOrDefault(shot, -1L);
         world.logBattleNetPend("ctor-debit", attacker, target, shot,
                 mobileShot ? "mobile" : "fixed", queued);
-        if (attacker != null && target != null) {
+        if (attacker != null && (target != null || shot.type().splashes())) {
             shot.setDamage(battleNetProjectileDamage(attacker, target,
                     shot.type()));
         }
@@ -391,14 +391,16 @@ final class BattleNetProjectileSystem {
     int battleNetProjectileDamage(Unit attacker, Unit target,
             MissileType missile) {
         UpgradeState attackerUpgrades = world.upgrades(attacker.player());
-        UpgradeState targetUpgrades = world.upgrades(target.player());
-        int basic = attackerUpgrades.basicDamage(attacker.type());
-        int piercing = attackerUpgrades.piercingDamage(attacker.type());
+        int basic = attackerUpgrades == null
+                ? attacker.type().basicDamage()
+                : attackerUpgrades.basicDamage(attacker.type());
+        int piercing = attackerUpgrades == null
+                ? attacker.type().piercingDamage()
+                : attackerUpgrades.piercingDamage(attacker.type());
         if (attacker.hasBuff(Unit.Buff.BLOODLUST)) {
             basic *= 2;
             piercing *= 2;
         }
-        int armor = targetUpgrades.armor(target.type());
         // BNE projectile constructors floor basic-armor at 0 (not the melee
         // floor of 1). Equal-armor tower vs ogre is therefore piercing only
         // (12). With the half-band below, native seed result 8100 stores 7
@@ -413,6 +415,13 @@ final class BattleNetProjectileSystem {
             // basic/piercing already include bloodlust doubling above.
             return Math.min(0xff, Math.max(0, basic) + piercing);
         }
+        if (target == null) {
+            return 0;
+        }
+        UpgradeState targetUpgrades = world.upgrades(target.player());
+        int armor = targetUpgrades == null
+                ? target.type().armor()
+                : targetUpgrades.armor(target.type());
         int maximum = Math.max(basic - armor, 0) + piercing;
         // 0x004182b0/0x00418370: half + async remainder in [0, half].
         int half = (maximum + 1) / 2;
@@ -479,6 +488,25 @@ final class BattleNetProjectileSystem {
                 attacker.pixelY() + attacker.residualY()
                         + World.battleNetCentreOffset(attacker.type(), false),
                 toX, toY));
+    }
+
+    /**
+     * Launches a retail projectile at a map square rather than a unit.
+     *
+     * <p>Attack-ground is native order 17, but it crosses the same opcode-ten
+     * projectile constructor as an ordinary attack.  Keeping this beside the
+     * unit-target constructor prevents the coordinate form from quietly
+     * losing the live muzzle position, native centre offset, fixed projectile
+     * pool slot, asynchronous constructor draws, or BNE flight model.</p>
+     */
+    Missile launchGround(Unit attacker, int tileX, int tileY, MissileType type) {
+        return world.spawn(new Missile(type, attacker, null,
+                attacker.pixelX() + attacker.residualX()
+                        + World.battleNetCentreOffset(attacker.type(), true),
+                attacker.pixelY() + attacker.residualY()
+                        + World.battleNetCentreOffset(attacker.type(), false),
+                tileX * World.TILE_SIZE + World.TILE_SIZE / 2,
+                tileY * World.TILE_SIZE + World.TILE_SIZE / 2));
     }
 
 

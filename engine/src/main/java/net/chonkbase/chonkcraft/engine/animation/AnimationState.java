@@ -154,4 +154,27 @@ public final class AnimationState {
         }
         return true;
     }
+
+    /**
+     * Restores the live instruction cursor written by a ChonkCraft save.
+     *
+     * <p>Switching to the named animation is not enough for combat: reopening
+     * a save in the middle of a siege reload must not replay the attack marker
+     * or discard the unbreakable part of the volley.  The index is clamped so
+     * an older save remains loadable if a later graphics pack shortens the
+     * presentation program.</p>
+     */
+    public void restore(Animation animation, int index, int wait,
+            boolean unbreakable) {
+        current = animation;
+        this.index = animation == null || animation.size() == 0
+                ? 0 : Math.max(0, Math.min(index, animation.size() - 1));
+        this.wait = Math.max(0, wait);
+        this.unbreakable = unbreakable;
+        waiting = false;
+        restCurrent = null;
+        restIndex = 0;
+        restWait = 0;
+        restUnbreakable = false;
+    }
 }

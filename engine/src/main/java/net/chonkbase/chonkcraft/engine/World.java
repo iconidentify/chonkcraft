@@ -11720,10 +11720,32 @@ public final class World {
         if ((missile == null || missile.isNone()) && !map.field(toX, toY).isWall()) {
             return false;
         }
-        projectiles.interruptPendingAttack(unit);
-        unit.clearPath();
-        unit.setOrderTarget(toX, toY);
         unit.setSavedOrder(null);
+        if (unit.animation().unbreakable()) {
+            // The same flush-on command boundary as unit and position
+            // attacks: BNE finishes a committed shot/reload before promoting
+            // the replacement. Immediate replacement reset script.bin while
+            // the old Java attack animation kept running, which let repeated
+            // clicks restart or overlap a siege volley.
+            unit.clearQueuedOrders();
+            unit.setPendingAttack(null, null, -1, -1);
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.ATTACK_GROUND,
+                    toX, toY, null, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.rememberActionBeforeQueued(unit.order());
+            return true;
+        }
+        projectiles.interruptPendingAttack(unit);
+        construction.abandonPendingBuild(unit);
+        unit.clearPath();
+        unit.setTarget(null);
+        unit.setAttackGoal(toX, toY);
+        unit.setOrderTarget(toX, toY);
+        unit.setChasing(false);
+        unit.setFighting(false);
+        unit.setSwingAtAir(false);
+        unit.setAutoTargeting(false);
         unit.setOrder(Unit.Order.ATTACK_GROUND);
         return true;
     }

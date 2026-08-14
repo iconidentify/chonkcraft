@@ -631,6 +631,28 @@ public final class LoadGame {
         if (state.rawGet("wait") != null) {
             unit.setWaitCycles(integer(state.rawGet("wait")));
         }
+        if (state.rawGet("battleNetSequenceOffset") != null) {
+            unit.setBattleNetSequenceOffset(
+                    integer(state.rawGet("battleNetSequenceOffset")));
+            unit.setBattleNetAnimationTimer(
+                    integer(state.rawGet("battleNetAnimationTimer")));
+        }
+        if (state.rawGet("animationState") != null
+                && unit.type().animationSet() != null) {
+            try {
+                net.chonkbase.chonkcraft.engine.animation.AnimationSet.State animationState =
+                        net.chonkbase.chonkcraft.engine.animation.AnimationSet.State.valueOf(
+                                string(state.rawGet("animationState")));
+                unit.animation().restore(
+                        unit.type().animationSet().get(animationState),
+                        integer(state.rawGet("animationIndex")),
+                        integer(state.rawGet("animationWait")),
+                        truthy(state.rawGet("animationUnbreakable")));
+            } catch (IllegalArgumentException ignored) {
+                // A later version may add an animation state. The order still
+                // survives and will select its normal presentation next tick.
+            }
+        }
         if (state.rawGet("battleNetOrderDelay") != null) {
             unit.setBattleNetOrderDelay(
                     integer(state.rawGet("battleNetOrderDelay")));
@@ -753,6 +775,8 @@ public final class LoadGame {
                             string(order2.rawGet("value"))));
                 }
             }
+            unit.setQueuedReplacementPending(
+                    truthy(state.rawGet("queuedReplacementPending")));
         }
     }
 

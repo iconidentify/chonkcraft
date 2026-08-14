@@ -581,6 +581,30 @@ public final class SaveGame {
         state.append(" progress = ").append(unit.progress()).append(",");
         state.append(" progressGoal = ").append(unit.progressGoal()).append(",");
         state.append(" wait = ").append(unit.waitCycles()).append(",");
+        if (unit.battleNetSequenceOffset() >= 0) {
+            state.append(" battleNetSequenceOffset = ")
+                    .append(unit.battleNetSequenceOffset()).append(",");
+            state.append(" battleNetAnimationTimer = ")
+                    .append(unit.battleNetAnimationTimer()).append(",");
+        }
+        if (unit.animation().current() != null
+                && unit.type().animationSet() != null) {
+            for (net.chonkbase.chonkcraft.engine.animation.AnimationSet.State animationState
+                    : unit.type().animationSet().states()) {
+                if (unit.type().animationSet().get(animationState)
+                        == unit.animation().current()) {
+                    state.append(" animationState = ")
+                            .append(quote(animationState.name())).append(",");
+                    state.append(" animationIndex = ")
+                            .append(unit.animation().index()).append(",");
+                    state.append(" animationWait = ")
+                            .append(unit.animation().waitCycles()).append(",");
+                    state.append(" animationUnbreakable = ")
+                            .append(unit.animation().unbreakable()).append(",");
+                    break;
+                }
+            }
+        }
         if (unit.battleNetOrderDelay() != 0) {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
@@ -676,6 +700,9 @@ public final class SaveGame {
             state.append(" buildGoalY = ").append(unit.buildGoalY()).append(",");
         }
         if (!unit.queuedOrders().isEmpty()) {
+            if (unit.queuedReplacementPending()) {
+                state.append(" queuedReplacementPending = true,");
+            }
             state.append(" queuedOrders = {");
             for (Unit.QueuedOrder queued : unit.queuedOrders()) {
                 state.append("{ kind = ").append(quote(queued.kind().name()))

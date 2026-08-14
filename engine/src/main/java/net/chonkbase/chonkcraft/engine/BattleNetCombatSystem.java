@@ -2207,13 +2207,127 @@ final class BattleNetCombatSystem {
             }
             return;
         }
-        if (world.cycle % World.CYCLES_PER_SECOND != 0) {
+        stepProjectileAttackGround(unit, missile, toX, toY);
+    }
+
+    /**
+     * Runs native order 17 through the same attack program as unit combat.
+     *
+     * <p>The removed implementation fired whenever the <em>global</em> world
+     * cycle was divisible by thirty.  A newly ordered catapult could therefore
+     * wait anywhere from zero to twenty-nine cycles and then fire every thirty
+     * cycles, while its ordinary attack uses its 200-cycle retail program.
+     * Besides the 6.7x fire-rate error, that path bypassed turning, the visible
+     * attack animation, Haste/Slow, projectile-constructor state, and the
+     * command's unbreakable reload.</p>
+     *
+     * <p>The pinned BNE dispatch table maps order 17 to the shared 0x0040b010
+     * handler and script.bin opcode ten remains the projectile boundary.  The
+     * presentation animation is advanced in parallel, but its {@code attack}
+     * instruction is deliberately not allowed to manufacture a second shot.</p>
+     */
+    private void stepProjectileAttackGround(Unit unit, MissileType missile,
+            int toX, int toY) {
+        AnimationSet set = unit.type().animationSet();
+        Animation attack = set == null ? null : set.get(AnimationSet.State.ATTACK);
+        if (attack == null) {
+            // Minimal hand-built worlds used by engine tests may deliberately
+            // omit presentation data. Keep their attack-ground functional on
+            // a per-unit delay; production BNE units always take the retail
+            // script/animation path below.
+            if (unit.battleNetAnimationTimer() > 0) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return;
+            }
+            world.projectiles.launchGround(unit, toX, toY, missile);
+            unit.setBattleNetAnimationTimer(World.CYCLES_PER_SECOND);
             return;
         }
-        world.spawn(new Missile(missile, unit, null,
-                unit.pixelX() + World.centreOffset(unit.type(), true),
-                unit.pixelY() + World.centreOffset(unit.type(), false),
-                toX * World.TILE_SIZE + World.TILE_SIZE / 2, toY * World.TILE_SIZE + World.TILE_SIZE / 2));
+
+        // A fresh coordinate attack turns before entering the firing program.
+        // A slow siege turn is itself an unbreakable animation; leave the
+        // native cursor unopened until that branch releases, or opcode ten
+        // would throw the rock while the catapult was still facing away.
+        AnimationRunner.Step presentation = null;
+        if (unit.battleNetSequenceOffset() < 0) {
+            if (unit.animation().current() != attack) {
+                world.turnToTarget(unit, null, toX, toY);
+                int afterOneTurnBeat = Math.max(0,
+                        Math.abs(unit.pendingRotation())
+                                - Math.max(0, unit.type().rotationSpeed()));
+                boolean turnBranch = afterOneTurnBeat >= 30;
+                if (!turnBranch) {
+                    openBattleNetGroundAttack(unit);
+                }
+                unit.animation().switchTo(attack);
+                presentation = world.advance(unit);
+                if (turnBranch) {
+                    return;
+                }
+            }
+            int attackBody = attack.labelIndex("go");
+            boolean stillInTurnBranch = unit.animation().unbreakable()
+                    && attackBody >= 0
+                    && unit.animation().index() < attackBody;
+            if (presentation == null && stillInTurnBranch) {
+                world.advance(unit);
+                return;
+            }
+            if (unit.battleNetSequenceOffset() < 0) {
+                openBattleNetGroundAttack(unit);
+            }
+        }
+
+        boolean fired = false;
+        if (world.battleNetSequence != null
+                && unit.battleNetSequenceOffset() >= 0) {
+            BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer());
+            if (!tick.valid()) {
+                unit.setBattleNetSequenceOffset(-1);
+                return;
+            }
+            unit.setBattleNetSequenceOffset(tick.offset());
+            unit.setBattleNetAnimationTimer(tick.timer());
+            fired = tick.inlineActionMarker();
+        }
+
+        if (unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
+        if (presentation == null) {
+            presentation = world.advance(unit);
+        }
+
+        if (world.battleNetSequence == null) {
+            // Hand-built/test worlds have no retail script.bin.  The attack
+            // instruction is still a real cadence; unlike the deleted global
+            // modulo it follows this unit's animation and spell speed.
+            fired = presentation.attacked();
+        }
+        if (!fired) {
+            return;
+        }
+        Missile shot = world.projectiles.launchGround(unit, toX, toY, missile);
+        if (world.battleNetSequence != null) {
+            world.prepareBattleNetProjectile(shot, true);
+        }
+    }
+
+    /** Opens this unit type's retail Attack program with the native three-call delay. */
+    private void openBattleNetGroundAttack(Unit unit) {
+        if (world.battleNetSequence == null) {
+            return;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return;
+        }
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
     }
 
 
