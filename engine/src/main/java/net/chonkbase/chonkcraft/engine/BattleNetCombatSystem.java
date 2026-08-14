@@ -969,11 +969,12 @@ final class BattleNetCombatSystem {
                                 // Far leftover: first free walks back onto
                                 // the tile just left. Keep leftover and
                                 // return so this visit cannot step it.
-                                // Clearing the leftover let the next empty-
-                                // route rebuild step south onto 30,40 at 46
-                                // (native holds 30,39 through 80). Close
-                                // leftovers (XHuman 10 1500) still replace
-                                // and step on this visit.
+                                // Close leftovers (XHuman 10 1500) still
+                                // replace and step on this visit.
+                                // UNPROVED: delay 39 is not a native counter.
+                                // It is the only hold that has kept XHuman 12
+                                // grunt 1496 on 30,39. Do not add more
+                                // mission-specific delays beside it.
                                 unit.clearPath();
                                 unit.setBattleNetOrderDelay(39);
                                 return;

@@ -649,4 +649,54 @@ class BattleNetMovementPlayabilityTest {
                 "retail steps onto the 104,0 wood ring at fixture 230, not "
                         + peon.tileX() + "," + peon.tileY());
     }
+
+    @Test
+    @DisplayName("a human-11 zeppelin waits twenty cycles on the even tile")
+    void aHuman11ZeppelinWaitsTwentyCyclesOnTheEvenTile() {
+        // i9beef retail-human-11-idle. Computer zeppelin 1516 lands on
+        // 86,52 at fixture 103 and is Still at 123 -- twenty cycles, the
+        // same land-to-Still hold as Human 12 1559 (62 to 82) and Human 5
+        // 1541 (129 to 149). This is a second campaign, not the next
+        // Human 12 slot.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level11h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "Human 11 is not in the pack");
+
+        Unit zeppelin = null;
+        for (Unit unit : mission.world().units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 88 && unit.tileY() == 40
+                    && "unit-zeppelin".equals(unit.type().ident())) {
+                zeppelin = unit;
+                break;
+            }
+        }
+        assertNotNull(zeppelin, "Human 11 has no zeppelin on 88,40");
+
+        mission.tick();
+        mission.tick();
+        for (int cycle = 1; cycle <= 122; cycle++) {
+            mission.tick();
+        }
+        assertEquals(86, zeppelin.tileX(),
+                "retail is on 86,52 at fixture 122, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(52, zeppelin.tileY(),
+                "retail is on 86,52 at fixture 122, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(Unit.Order.PATROL, zeppelin.order(),
+                "retail is still Patrol through the dest-arm hold; Java is "
+                        + zeppelin.order());
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, zeppelin.order(),
+                "retail stands down at fixture 123 after twenty dest-arm "
+                        + "visits; Java is " + zeppelin.order());
+        assertEquals(86, zeppelin.tileX(),
+                "retail stands on 86,52, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(52, zeppelin.tileY(),
+                "retail stands on 86,52, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+    }
 }
