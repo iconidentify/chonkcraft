@@ -18,7 +18,10 @@ if [ ! -f "$PACK" ]; then
 fi
 
 REPORT=$(mktemp "${TMPDIR:-/tmp}/chonkcraft-player-intent.XXXXXX.json")
-trap 'rm -f "$REPORT"' EXIT HUP INT TERM
+OUTCOME=$(mktemp "${TMPDIR:-/tmp}/chonkcraft-replay-outcome.XXXXXX.json")
+PLAN=$(mktemp "${TMPDIR:-/tmp}/chonkcraft-replay-plan.XXXXXX.json")
+SMOKE=$(mktemp "${TMPDIR:-/tmp}/chonkcraft-replay-smoke.XXXXXX.json")
+trap 'rm -f "$REPORT" "$OUTCOME" "$PLAN" "$SMOKE"' EXIT HUP INT TERM
 
 python3 "$ROOT/tools/bne-harness/scripts/bne_replay.py" corpus \
     --expect-corpus-sha256 "$CORPUS_SHA256" "$REPLAY_ROOT" > "$REPORT"
@@ -41,9 +44,79 @@ if report.get("selection_sizes", {}).get("9") != 593:
 print("retail replay corpus: PASS — 27 replays, 168788 events, 22518 group events")
 PY
 
+python3 "$ROOT/tools/bne-harness/scripts/bne_replay_outcome.py" corpus \
+    --expect-corpus-sha256 "$CORPUS_SHA256" \
+    --asset-pack "$PACK" \
+    --output "$OUTCOME" "$REPLAY_ROOT" >/dev/null
+python3 - "$OUTCOME" <<'PY'
+import json
+import sys
+
+report = json.load(open(sys.argv[1], encoding="utf-8"))
+expected = {
+    "replay_count": 27,
+    "snapshot_bytes": 1025260,
+    "record_count": 764756,
+    "command_count": 168788,
+    "outcome_corpus_sha256":
+        "d809845e539e1a660d928105b51e09878af3233dbbed04f87a120830b639d123",
+}
+for name, wanted in expected.items():
+    if report.get(name) != wanted:
+        raise SystemExit(
+            f"replay-outcome gate: {name}={report.get(name)!r}; expected {wanted}")
+print("retail outcome schedules: PASS — 764756 exact dispatcher records")
+PY
+
+python3 -m unittest \
+    "$ROOT/tools/bne-harness/tests/test_bne_replay.py" \
+    "$ROOT/tools/bne-harness/tests/test_bne_replay_outcome.py"
+
 cd "$ROOT"
 mvn -q -pl desktop -am \
     -Dchonkcraft.pack="$PACK" \
     -Dtest=PlayerIntentJournalTest,PlayerOrderDeliveryTest \
     -Dsurefire.failIfNoSpecifiedTests=false test
 echo "Java ordered-selection and fulfillment gates: PASS"
+
+REPLAY="$REPLAY_ROOT/NerzyvsHTOSGOW.wir"
+if [ ! -f "$REPLAY" ]; then
+    echo "player-intent gate: certified replay not found: $REPLAY" >&2
+    exit 1
+fi
+python3 "$ROOT/tools/bne-harness/scripts/bne_replay_outcome.py" plan \
+    "$REPLAY" --asset-pack "$PACK" --output "$PLAN" >/dev/null
+mvn -q -pl desktop -am -DskipTests package
+CHONKCRAFT_ASSET_PACK="$PACK" java \
+    -cp "$ROOT/desktop/target/chonkcraft-desktop-0.1.0-SNAPSHOT-app.jar" \
+    net.chonkbase.chonkcraft.desktop.BneReplaySmokeCertification \
+    "$PLAN" > "$SMOKE"
+python3 - "$SMOKE" <<'PY'
+import json
+import sys
+
+report = json.load(open(sys.argv[1], encoding="utf-8"))
+minimums = {
+    "processed_records": 2451,
+    "processed_commands": 288,
+    "submitted_orders": 100,
+    "accepted_orders": 80,
+    "progressed_orders": 80,
+    "bound_native_units": 16,
+}
+for name, floor in minimums.items():
+    if report.get(name, -1) < floor:
+        raise SystemExit(
+            f"replay smoke gate: {name}={report.get(name)!r}; floor {floor}")
+if report.get("progressed_orders") != report.get("accepted_orders"):
+    raise SystemExit("replay smoke gate: an accepted order made no progress")
+stop = report.get("stopped_at") or {}
+if (stop.get("name") != "unit-identity-unresolved"
+        or stop.get("record") < 2451
+        or stop.get("native_unit") != 1569):
+    raise SystemExit(f"replay smoke gate: unexpected stop boundary {stop!r}")
+production = stop.get("production_state") or []
+if any(unit.get("type") == "unit-orc-barracks" for unit in production):
+    raise SystemExit("replay smoke gate: the retained boundary unexpectedly has a barracks")
+print("real BNE replay execution: PASS — 2451+ records, 80 accepted orders progressed")
+PY

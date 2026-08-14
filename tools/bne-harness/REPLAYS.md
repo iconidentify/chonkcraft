@@ -28,20 +28,33 @@ tools/bne-harness/scripts/check-player-intent-gate.sh
 ```
 
 That command authenticates and decodes all 27 replays, proves the frozen
-aggregate, then checks Java's exact ordered fan-out, nine-unit cap, acceptance
-recording, and progress by every member of a congested 3×3 group.
+aggregate, compiles all 764,756 native dispatcher records, then checks Java's
+exact ordered fan-out, nine-unit cap, acceptance recording, and progress by
+every member of a congested 3×3 group. It also reconstructs the authenticated
+Garden of War startup and executes the proved command subset in the Java
+engine. The current certified floor is 2,451 dispatcher records, 288 decoded
+commands, and 80 accepted orders with observable progress. Execution stops
+fail-closed at native unit 1569's first grunt-production command because the
+corresponding Java player has no Orc barracks; moving that proved boundary
+forward is an improvement, while any earlier stop fails the gate.
 
-During play the desktop keeps a bounded 512-entry in-memory flight recorder.
-`Command/Ctrl-Shift-E` puts the ordered selections, submitted orders, targets,
-and immediate acceptance results into `player_intents` beside the screenshot
-and resumable save. Nothing is written continuously, and a long session cannot
-grow the journal without bound.
+During play the desktop keeps bounded 512-entry in-memory intent and outcome
+recorders. `Command/Ctrl-Shift-E` puts ordered selections, submitted orders,
+targets and immediate acceptance into `player_intents`; `player_outcomes`
+links each unit order by `intent_id` to its first visible progress and terminal
+result. The result distinguishes rejection, supersession, settlement,
+unit/target loss, window completion and an accepted order that produced no progress for 600
+cycles. Both are written beside the screenshot and resumable save. Nothing is
+written continuously, and a long session cannot grow either journal without
+bound.
 
 War2BNE InSight `.wir` files are suitable authoritative inputs for multiplayer
-parity. They are not videos and they are not periodic state dumps. Each file
-contains a complete initial BNE game snapshot followed by the exact command
+parity. They are not videos, periodic state dumps, or mid-game saves. Each file
+contains InSight's initial-game reference state followed by the exact command
 packet delivered for every participating player on each recorded network
-turn.
+turn. InSight itself requires the operator to start the named map with matching
+players/settings first; it then verifies that live state against the reference,
+feeds the packet stream, and aborts if the game diverges.
 
 ## Proven container contract
 
@@ -115,16 +128,95 @@ capture begins.
 A replay fixture will contain four independent identities:
 
 1. the original `.wir` bytes and collection provenance;
-2. the validated initial BNE snapshot and command stream;
+2. the validated initial-game reference state and command stream;
 3. the exact 2.02b oracle executable/data/harness identities; and
 4. the cycle-by-cycle BNE state produced while dispatching those packets.
 
-Playback will replace the guarded call at `0x0047800b` immediately before
-BNE's original `0x004782a0` synchronized packet dispatcher. InSight's 2.02b
-address table and playback routine prove the exact player-slot, controller,
-packet-pointer, and packet-length handoff; [`LAYOUT.md`](LAYOUT.md) records the
-addresses and byte signature. Automating InSight's UI is deliberately
-excluded: it would add timing and focus ambiguity and would not prove which
-bytes BNE consumed. The remaining work is to restore the replay's initial BNE
-snapshot, add the guarded in-process packet wrapper, and seal the resulting
-cycle trace with all replay identities.
+The guarded wrapper is installed at `0x0047800b` immediately before BNE's
+original `0x004782a0` synchronized packet dispatcher. For each synchronized
+turn it verifies the expected participant index and eight-byte controller
+vector, then calls the unchanged retail dispatcher with the plan's exact
+recorded packet bytes. This is a headless packet injector, so it does not race
+or overlap InSight's own callsite hook. The hook is opt-in through
+`CHONK_BNE_REPLAY_SCHEDULE`; ordinary campaign captures do not install it.
+Both the callsite bytes and target entry bytes are pinned, and a trace from any
+executable other than the authenticated 2.02b binary is rejected.
+
+Compile one replay into a stable plan and its compact native schedule:
+
+```sh
+python3 scripts/bne_replay_outcome.py plan /path/to/match.wir \
+  --asset-pack "$HOME/.chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack" \
+  --output work/replays/match.plan.json
+python3 scripts/bne_replay_outcome.py native-schedule \
+  work/replays/match.plan.json --output work/replays/match.schedule.bin
+```
+
+After a native playback, authenticate that every packet was injected in order:
+
+```sh
+python3 scripts/bne_replay_outcome.py verify-native \
+  work/replays/match.plan.json --trace work/replays/match.trace.txt \
+  --output work/replays/match.native-proof.json
+```
+
+The normal oracle runner performs that authentication automatically when given
+the paired plan and schedule:
+
+```sh
+python3 scripts/bne_oracle.py run --game-dir /path/to/verified/BNE \
+  --scenario human:1 --cycles 1800 --output work/replays/native \
+  --replay-plan work/replays/match.plan.json \
+  --replay-schedule work/replays/match.schedule.bin
+```
+
+The example's campaign scenario is only illustrative: a replay capture is
+valid only when the running map and lobby satisfy the plan's authenticated
+startup recipe. A mismatched map, participant order or controller vector is a
+failed proof, never a partial replay result.
+
+The outcome comparator additionally requires native and Java traces to prove
+the same initial-state identity, the full packet schedule, and authenticated
+producer builds. It then compares each `(record, command, selected unit)`
+through submission, acceptance, first progress, and terminal outcome, grouping
+differences into fan-out, no-progress, cadence, destination/congestion,
+attack/chase, boarding, harvesting, and placement families.
+
+The active boundary is deterministic initial-game reconstruction. Static
+analysis of InSight's playback routine proves it does not restore a mid-game
+world: it validates map name/checksum, game type, fixed start order, controller
+vector and computer count against the already-running match, then uses its
+serialized reference state to detect drift during playback. Plans now compile
+that header state into an explicit startup recipe.
+
+The recipe also applies the retail lobby resource bank before record zero.
+Pinned BNE 2.02b function `0x004338d0` establishes the exact table: low is
+2,100 gold / 1,100 lumber / 1,000 oil, medium is 5,000 / 2,000 / 2,000,
+and high is 10,000 / 5,000 / 5,000. Map-default keeps PUD values above the
+retail multiplayer floor and raises lower active banks to 2,100 / 1,100 /
+1,000. Treating every replay as map-default caused later worker production to
+vanish even though every decoded command was correct. Applying the proved
+high-resource bank advanced the certified Garden of War opening from 1,637 to
+2,451 dispatcher records, from 62 to 100 submitted orders, and from 8 to 16
+bound native units; all 80 accepted orders show observable progress.
+
+The retained boundary is now structural rather than opaque: native unit 1569
+submits the first Orc-grunt production order at record 2,451, while Java has no
+Orc barracks for that player. The earlier barracks command targeted a peon
+that Java had kept inside a pig-farm construction. The smoke receipt retains
+the complete player production state so this boundary cannot be mistaken for
+an arbitrary unit-identity failure.
+
+Java currently calibrates one synchronized replay turn from the authenticated
+lobby-speed byte. Values one through six all stop at record 1,637 because the
+45-time-unit peon used by retail does not yet exist; speed seven is the first
+cadence that satisfies that observed production boundary. This is deliberately
+recorded as calibration evidence, not mislabelled as a disassembled network
+interval. The native packet injector remains the authority that will replace
+this calibration once deterministic skirmish startup is wired into the oracle.
+
+The native dispatcher path
+is exact and guarded; comparison remains deliberately fail-closed until both
+native and Java adapters prove the running match satisfies that recipe and
+reference identity. Automating InSight's UI remains excluded because focus and
+timing do not prove which bytes the game consumed.

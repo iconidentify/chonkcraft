@@ -2737,6 +2737,23 @@ public final class World {
                     == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.NOBODY) {
                 return null;
             }
+            java.util.Map<String, String> equivalents = switch (owner.race()) {
+                case HUMAN -> toHumanEquivalent;
+                case ORC -> toOrcEquivalent;
+                case NEUTRAL -> java.util.Map.of();
+            };
+            String converted = equivalents.get(type.ident());
+            if (converted != null) {
+                UnitType convertedType = unitTypes.get(converted);
+                if (convertedType == null) {
+                    // A configured equivalence is part of the deterministic
+                    // roster contract. Silently retaining the other race here
+                    // produces a valid-looking but irreconcilable game.
+                    throw new IllegalStateException(
+                            "missing map-load race equivalent " + converted);
+                }
+                type = convertedType;
+            }
         }
         int width = Math.max(1, type.tileWidth());
         int height = Math.max(1, type.tileHeight());
@@ -7640,7 +7657,7 @@ public final class World {
             // remaining behind it were explicitly shifted by the caller.
             unit.setQueuedReplacementPending(false);
             boolean accepted = switch (queued.kind()) {
-                case MOVE -> movement.orderMove(unit, queued.x(), queued.y());
+                case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
                 case ATTACK -> orderAttack(unit, queued.target());
                 case HARVEST -> harvest.orderHarvest(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());

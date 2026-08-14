@@ -15,6 +15,7 @@ typedef WORD (__cdecl *main_state_function)(void);
 typedef int (__cdecl *new_game_function)(int, int, int);
 typedef int (__cdecl *load_scenario_function)(int, int);
 typedef void (__cdecl *master_seed_function)(DWORD);
+typedef int (__cdecl *sync_dispatch_function)(BYTE *, DWORD);
 typedef int (__cdecl *sync_random_function)(void);
 typedef int (__cdecl *async_random_function)(void);
 typedef void (__cdecl *idle_function)(BYTE *);
@@ -50,11 +51,19 @@ static char branch_resume_path[MAX_PATH];
 static BOOL wine_cd_fallback = FALSE;
 static BOOL disable_startup_tips = FALSE;
 static BOOL match_ready = FALSE;
+/* The synchronized dispatcher runs immediately before the first timed game
+ * tick.  match_ready is intentionally not raised until that tick proves the
+ * unit pool, so it is one dispatcher call too late to gate replay record zero.
+ * The successful retail scenario loader is the earlier exact boundary: lobby
+ * traffic is over, the PUD and unit pool exist, and no simulation cycle has
+ * run. */
+static BOOL replay_game_ready = FALSE;
 static game_tick_function original_game_tick = NULL;
 static main_state_function original_main_state = NULL;
 static new_game_function original_new_game = NULL;
 static load_scenario_function original_load_scenario = NULL;
 static master_seed_function original_master_seed = NULL;
+static sync_dispatch_function original_sync_dispatch = NULL;
 static BOOL trace_sync_random_calls = FALSE;
 static BOOL trace_async_random_calls = FALSE;
 static BOOL trace_ai_build_state = FALSE;
@@ -96,6 +105,13 @@ static DWORD bullet_generations[BNE_BULLET_LIMIT];
 static WORD previous_map_cells[BNE_MAP_TILE_LIMIT];
 static WORD previous_map_squares[BNE_MAP_TILE_LIMIT];
 static WORD previous_map_size = 0;
+static BYTE *replay_schedule_data = NULL;
+static BYTE *replay_schedule_cursor = NULL;
+static BYTE *replay_schedule_end = NULL;
+static DWORD replay_schedule_records = 0;
+static DWORD replay_schedule_consumed = 0;
+static BOOL replay_schedule_requested = FALSE;
+static BOOL replay_schedule_valid = FALSE;
 
 #pragma pack(push, 1)
 typedef struct state_file_header {
@@ -179,6 +195,21 @@ typedef struct state_map_delta {
     WORD cell;
     WORD square;
 } state_map_delta;
+
+typedef struct replay_schedule_header {
+    BYTE magic[8];
+    DWORD version;
+    DWORD record_count;
+    BYTE schedule_sha256[32];
+    BYTE snapshot_sha256[32];
+} replay_schedule_header;
+
+typedef struct replay_schedule_record {
+    DWORD index;
+    DWORD network_player;
+    BYTE slot_status[8];
+    DWORD packet_bytes;
+} replay_schedule_record;
 #pragma pack(pop)
 
 _Static_assert(sizeof(state_file_header) == 32,
@@ -199,6 +230,10 @@ _Static_assert(sizeof(state_bullet_delta) == 72,
         "state bullet delta must remain 72 bytes");
 _Static_assert(sizeof(state_map_delta) == 8,
         "state map delta must remain 8 bytes");
+_Static_assert(sizeof(replay_schedule_header) == 80,
+        "replay schedule header must remain 80 bytes");
+_Static_assert(sizeof(replay_schedule_record) == 20,
+        "replay schedule record must remain 20 bytes");
 
 #define MAX_SCRIPT_COMMANDS 1024
 #define SCRIPT_COMMAND_MOVE 1
@@ -268,6 +303,126 @@ static void trace_write(const char *format, ...) {
     EnterCriticalSection(&trace_lock);
     WriteFile(trace_file, line, (DWORD) length, &written, NULL);
     LeaveCriticalSection(&trace_lock);
+}
+
+static void digest_hex(const BYTE digest[32], char output[65]) {
+    static const char digits[] = "0123456789abcdef";
+    DWORD index;
+    for (index = 0; index < 32; index++) {
+        output[index * 2] = digits[digest[index] >> 4];
+        output[index * 2 + 1] = digits[digest[index] & 0x0f];
+    }
+    output[64] = '\0';
+}
+
+static BOOL read_replay_schedule(void) {
+    static const BYTE magic[8] = {'B', 'N', 'E', 'R', 'P', 'L', 'N', '1'};
+    char path[MAX_PATH];
+    DWORD path_length = GetEnvironmentVariableA(
+            "CHONK_BNE_REPLAY_SCHEDULE", path, sizeof(path));
+    HANDLE source;
+    DWORD file_high = 0;
+    DWORD file_bytes;
+    DWORD total = 0;
+    replay_schedule_header *header;
+    BYTE *cursor;
+    DWORD record_index;
+    char schedule_sha256[65];
+    char snapshot_sha256[65];
+
+    if (path_length == 0) {
+        replay_schedule_valid = TRUE;
+        return TRUE;
+    }
+    replay_schedule_requested = TRUE;
+    if (path_length >= sizeof(path)) {
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=path-too-long");
+        return FALSE;
+    }
+    source = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, NULL,
+            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (source == INVALID_HANDLE_VALUE) {
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=open-failed error=%lu",
+                (unsigned long) GetLastError());
+        return FALSE;
+    }
+    file_bytes = GetFileSize(source, &file_high);
+    if (file_bytes == INVALID_FILE_SIZE || file_high != 0
+            || file_bytes < sizeof(replay_schedule_header)
+            || file_bytes > 256UL * 1024UL * 1024UL) {
+        CloseHandle(source);
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=invalid-size bytes=%lu high=%lu",
+                (unsigned long) file_bytes, (unsigned long) file_high);
+        return FALSE;
+    }
+    replay_schedule_data = (BYTE *) HeapAlloc(
+            GetProcessHeap(), 0, file_bytes);
+    if (replay_schedule_data == NULL) {
+        CloseHandle(source);
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=allocation-failed");
+        return FALSE;
+    }
+    while (total < file_bytes) {
+        DWORD bytes_read = 0;
+        if (!ReadFile(source, replay_schedule_data + total,
+                file_bytes - total, &bytes_read, NULL) || bytes_read == 0) {
+            CloseHandle(source);
+            trace_write("# bne-trace event=replay-schedule-rejected "
+                    "reason=read-failed error=%lu",
+                    (unsigned long) GetLastError());
+            return FALSE;
+        }
+        total += bytes_read;
+    }
+    CloseHandle(source);
+    header = (replay_schedule_header *) (void *) replay_schedule_data;
+    if (memcmp(header->magic, magic, sizeof(magic)) != 0
+            || header->version != 1) {
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=identity");
+        return FALSE;
+    }
+    cursor = replay_schedule_data + sizeof(*header);
+    replay_schedule_end = replay_schedule_data + file_bytes;
+    for (record_index = 0; record_index < header->record_count;
+            record_index++) {
+        replay_schedule_record *record;
+        if ((size_t) (replay_schedule_end - cursor) < sizeof(*record)) {
+            trace_write("# bne-trace event=replay-schedule-rejected "
+                    "reason=truncated-record index=%lu",
+                    (unsigned long) record_index);
+            return FALSE;
+        }
+        record = (replay_schedule_record *) (void *) cursor;
+        cursor += sizeof(*record);
+        if (record->index != record_index
+                || record->packet_bytes > (DWORD) (replay_schedule_end - cursor)) {
+            trace_write("# bne-trace event=replay-schedule-rejected "
+                    "reason=record-shape index=%lu",
+                    (unsigned long) record_index);
+            return FALSE;
+        }
+        cursor += record->packet_bytes;
+    }
+    if (cursor != replay_schedule_end) {
+        trace_write("# bne-trace event=replay-schedule-rejected "
+                "reason=trailing-bytes");
+        return FALSE;
+    }
+    replay_schedule_cursor = replay_schedule_data + sizeof(*header);
+    replay_schedule_records = header->record_count;
+    replay_schedule_valid = TRUE;
+    digest_hex(header->schedule_sha256, schedule_sha256);
+    digest_hex(header->snapshot_sha256, snapshot_sha256);
+    trace_write("# bne-trace event=replay-schedule-loaded records=%lu "
+            "schedule-sha256=%s snapshot-sha256=%s",
+            (unsigned long) replay_schedule_records,
+            schedule_sha256, snapshot_sha256);
+    return TRUE;
 }
 
 static BOOL state_write_all(const void *data, DWORD bytes) {
@@ -611,6 +766,16 @@ static void trace_close(void) {
     if (trace_file == INVALID_HANDLE_VALUE) {
         return;
     }
+    if (replay_schedule_requested) {
+        trace_write("# bne-trace event=replay-schedule-closed complete=%s "
+                "valid=%s consumed=%lu records=%lu",
+                replay_schedule_valid
+                        && replay_schedule_consumed == replay_schedule_records
+                        ? "true" : "false",
+                replay_schedule_valid ? "true" : "false",
+                (unsigned long) replay_schedule_consumed,
+                (unsigned long) replay_schedule_records);
+    }
     trace_write("# bne-trace protocol=%d event=detach cycles=%ld screens=%ld",
             CHONK_BNE_TRACE_PROTOCOL, traced_cycles, screen_callbacks);
     state_complete = state_close();
@@ -624,6 +789,12 @@ static void trace_close(void) {
     if (trace_lock_ready) {
         DeleteCriticalSection(&trace_lock);
         trace_lock_ready = FALSE;
+    }
+    if (replay_schedule_data != NULL) {
+        HeapFree(GetProcessHeap(), 0, replay_schedule_data);
+        replay_schedule_data = NULL;
+        replay_schedule_cursor = NULL;
+        replay_schedule_end = NULL;
     }
 }
 
@@ -1246,9 +1417,18 @@ static int __cdecl traced_load_scenario(int scenario_file, int scenario_size) {
     pool = *BNE_202_UNIT_POOL_POINTER;
     pool_count = *BNE_202_UNIT_POOL_COUNT;
 
+    /* The populated pool is the stable success boundary.  Do not depend on
+     * this old loader's undocumented integer return convention. */
+    replay_game_ready = pool != NULL && pool_count != 0;
+
     trace_write("# bne-trace event=scenario-loaded result=%d slots=%lu "
             "async-seed=%lu", result, (unsigned long) pool_count,
             (unsigned long) *BNE_202_ASYNC_RANDOM_SEED);
+    if (replay_schedule_valid) {
+        trace_write("# bne-trace event=replay-game-boundary ready=%s "
+                "records=%lu", replay_game_ready ? "true" : "false",
+                (unsigned long) replay_schedule_records);
+    }
     trace_critter_scheduler_state(pool, pool_count);
     trace_initialization_semantics("scenario", 0, pool, pool_count);
     trace_command_unit_state(0, pool, pool_count);
@@ -1938,6 +2118,130 @@ static BOOL executable_page_contains(const void *address) {
         return FALSE;
     }
     return info.State == MEM_COMMIT && info.AllocationBase == target;
+}
+
+static int __cdecl traced_sync_dispatch(BYTE *packet, DWORD packet_bytes) {
+    replay_schedule_record *record = NULL;
+    BYTE *expected_packet = NULL;
+    DWORD live_player = *BNE_202_NETWORK_PLAYER_INDEX;
+    BOOL status_matches = FALSE;
+    BOOL identity_matches = FALSE;
+
+    /* Multiplayer setup uses this same dispatcher before the timed game loop
+     * exists.  InSight starts replay delivery only after the map and lobby
+     * have entered the game.  Preserve those setup packets verbatim; consuming
+     * record zero here makes an otherwise exact replay fail on lobby traffic. */
+    if (!replay_game_ready) {
+        return original_sync_dispatch(packet, packet_bytes);
+    }
+
+    if (replay_schedule_valid
+            && replay_schedule_consumed < replay_schedule_records
+            && replay_schedule_cursor != NULL
+            && (size_t) (replay_schedule_end - replay_schedule_cursor)
+                    >= sizeof(*record)) {
+        record = (replay_schedule_record *) (void *) replay_schedule_cursor;
+        expected_packet = replay_schedule_cursor + sizeof(*record);
+        status_matches = memcmp(record->slot_status,
+                BNE_202_PLAYER_CONTROLLERS, sizeof(record->slot_status)) == 0;
+        identity_matches = record->index == replay_schedule_consumed
+                && record->network_player == live_player
+                && status_matches;
+        if (identity_matches) {
+            /* The schedule is the input, not an observation.  Feed the exact
+             * recorded bytes through retail's unchanged dispatcher.  This is
+             * the headless equivalent of InSight playback and deliberately
+             * ignores packets generated by the local UI. */
+            trace_write("# bne-trace event=replay-dispatch-injected "
+                    "record=%lu player=%lu bytes=%lu live-bytes=%lu "
+                    "trace-cycle=%ld",
+                    (unsigned long) record->index,
+                    (unsigned long) live_player,
+                    (unsigned long) record->packet_bytes,
+                    (unsigned long) packet_bytes, traced_cycles);
+        } else {
+            replay_schedule_valid = FALSE;
+            trace_write("# bne-trace event=replay-dispatch-mismatch "
+                    "record=%lu expected-player=%lu live-player=%lu "
+                    "expected-bytes=%lu live-bytes=%lu "
+                    "slot-status=%s",
+                    (unsigned long) replay_schedule_consumed,
+                    (unsigned long) record->network_player,
+                    (unsigned long) live_player,
+                    (unsigned long) record->packet_bytes,
+                    (unsigned long) packet_bytes,
+                    status_matches ? "match" : "mismatch");
+        }
+        replay_schedule_cursor = expected_packet + record->packet_bytes;
+        replay_schedule_consumed++;
+        if (replay_schedule_valid
+                && replay_schedule_consumed == replay_schedule_records) {
+            trace_write("# bne-trace event=replay-schedule-complete "
+                    "records=%lu",
+                    (unsigned long) replay_schedule_records);
+        }
+    } else {
+        replay_schedule_valid = FALSE;
+        trace_write("# bne-trace event=replay-dispatch-mismatch "
+                "record=%lu reason=unexpected-dispatch player=%lu bytes=%lu",
+                (unsigned long) replay_schedule_consumed,
+                (unsigned long) live_player,
+                (unsigned long) packet_bytes);
+    }
+    if (identity_matches) {
+        return original_sync_dispatch(expected_packet, record->packet_bytes);
+    }
+    return original_sync_dispatch(packet, packet_bytes);
+}
+
+static BOOL install_sync_dispatch_hook(void) {
+    static const BYTE expected[] = {0xe8, 0x90, 0x02, 0x00, 0x00};
+    BYTE replacement[sizeof(expected)];
+    int32_t old_relative;
+    int32_t new_relative;
+    DWORD old_protection;
+
+    if (!replay_schedule_requested) {
+        return TRUE;
+    }
+    if (!executable_page_contains(BNE_202_SYNC_DISPATCH_CALL)
+            || memcmp(BNE_202_SYNC_DISPATCH_CALL, expected,
+                    sizeof(expected)) != 0) {
+        trace_write("# bne-trace event=replay-dispatch-hook-rejected "
+                "reason=signature");
+        return FALSE;
+    }
+    memcpy(&old_relative, BNE_202_SYNC_DISPATCH_CALL + 1,
+            sizeof(old_relative));
+    original_sync_dispatch = (sync_dispatch_function) (void *)
+            (BNE_202_SYNC_DISPATCH_CALL + sizeof(expected) + old_relative);
+    if ((BYTE *) (void *) original_sync_dispatch
+            != BNE_202_SYNC_DISPATCH_TARGET) {
+        original_sync_dispatch = NULL;
+        trace_write("# bne-trace event=replay-dispatch-hook-rejected "
+                "reason=target");
+        return FALSE;
+    }
+    replacement[0] = 0xe8;
+    new_relative = (int32_t) ((BYTE *) (void *) traced_sync_dispatch
+            - (BNE_202_SYNC_DISPATCH_CALL + sizeof(replacement)));
+    memcpy(replacement + 1, &new_relative, sizeof(new_relative));
+    if (!VirtualProtect(BNE_202_SYNC_DISPATCH_CALL, sizeof(replacement),
+            PAGE_EXECUTE_READWRITE, &old_protection)) {
+        trace_write("# bne-trace event=replay-dispatch-hook-rejected "
+                "reason=virtual-protect error=%lu",
+                (unsigned long) GetLastError());
+        original_sync_dispatch = NULL;
+        return FALSE;
+    }
+    memcpy(BNE_202_SYNC_DISPATCH_CALL, replacement, sizeof(replacement));
+    FlushInstructionCache(GetCurrentProcess(), BNE_202_SYNC_DISPATCH_CALL,
+            sizeof(replacement));
+    VirtualProtect(BNE_202_SYNC_DISPATCH_CALL, sizeof(replacement),
+            old_protection, &old_protection);
+    trace_write("# bne-trace event=replay-dispatch-hook-installed "
+            "site=0x0047800b target=0x004782a0");
+    return TRUE;
 }
 
 static BOOL install_tick_hook(void) {
@@ -2791,6 +3095,7 @@ static void install_storm_trace_hooks(void) {
 __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
     BOOL hooked;
     BOOL bootstrap_hooked = TRUE;
+    BOOL replay_hooked = TRUE;
     char cycles[32];
     DWORD cycles_length;
     char cd_fallback[8];
@@ -2814,6 +3119,10 @@ __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
         return 0;
     }
     if (!state_open()) {
+        trace_close();
+        return 0;
+    }
+    if (!read_replay_schedule()) {
         trace_close();
         return 0;
     }
@@ -2896,6 +3205,7 @@ __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
     install_check_build_site_hook();
     install_find_ai_wood_hook();
     install_no_build_hooks();
+    replay_hooked = install_sync_dispatch_hook();
     hooked = install_tick_hook();
     install_warmup_tick_hooks();
     if (bootstrap_pending != 0) {
@@ -2911,12 +3221,15 @@ __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
         }
     }
     trace_write("# bne-trace event=initialized tick-hook=%s cycle-limit=%ld "
-            "wine-cd-fallback=%s disable-startup-tips=%s bootstrap-hook=%s",
+            "wine-cd-fallback=%s disable-startup-tips=%s bootstrap-hook=%s "
+            "replay-dispatch-hook=%s",
             hooked ? "true" : "false", trace_cycle_limit,
             wine_cd_fallback ? "true" : "false",
             disable_startup_tips ? "true" : "false",
-            bootstrap_hooked ? "true" : "false");
-    return hooked && bootstrap_hooked && command_file_valid ? 3 : 1;
+            bootstrap_hooked ? "true" : "false",
+            replay_hooked ? "true" : "false");
+    return hooked && bootstrap_hooked && replay_hooked
+            && command_file_valid ? 3 : 1;
 }
 
 __declspec(dllexport) void w2p_init(void) {

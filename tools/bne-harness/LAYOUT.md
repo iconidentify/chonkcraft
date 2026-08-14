@@ -257,6 +257,12 @@ writes that buffer address into the pointer argument, and resumes BNE. BNE
 then executes the unmodified `0x004782a0` dispatcher. This proves both the
 packet format boundary and an injection design that needs no UI timing.
 
+The same dispatcher also carries lobby setup traffic. The replay wrapper does
+not consume a schedule record until the guarded game-tick hook has observed a
+live unit pool and emitted `match-ready`. Pre-game packets always pass through
+unchanged. Without that boundary record zero could be spent on a harmless
+lobby packet, making a correct playback fail before the first simulation turn.
+
 ## Raw fixture capture
 
 After the original `0x00452110` unit pass returns, the tracer copies every
@@ -883,8 +889,13 @@ Their fixture ID was
 `b8003a04edafaf8b68e38a77ad4946de1375938977b131aff371b7c9bfe52e80`;
 the projectile, map, and extended-player digests also matched independently.
 
-The next extensions are arbitrary custom-PUD handles, more of BNE's command
-vocabulary, replay snapshot restoration, and guarded packet injection at the
-now-identified synchronized dispatch call.
+The synchronized dispatch call now has an opt-in, byte-guarded replay wrapper.
+It verifies the participant and controller vector, then injects each recorded
+packet into the original retail dispatcher. The replay gate rejects missing,
+reordered, incomplete, or mismatched receipts; see
+[`REPLAYS.md`](REPLAYS.md). The active replay boundary is reconstructing the
+same named map, slots, races, and initial deterministic state on both producers.
+Arbitrary custom-PUD handles and
+the unnamed parts of BNE's command vocabulary remain separate extensions.
 Determinism is measured over the canonical simulation stream; diagnostic trace
 comments intentionally retain process-local handles.

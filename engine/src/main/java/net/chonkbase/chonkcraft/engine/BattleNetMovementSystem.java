@@ -60,6 +60,16 @@ final class BattleNetMovementSystem {
         return orderMove(unit, toX, toY, 2);
     }
 
+    /** Installs a move whose queued predecessor was popped this cycle. */
+    boolean orderPoppedMove(Unit unit, int toX, int toY) {
+        // HandleUnitAction erases the finished head, clears unit.Wait, and
+        // executes the replacement immediately. Reusing the ordinary
+        // autonomous-order entry point added its separate two-visit startup
+        // delay after the old wait had correctly been cleared, making every
+        // shifted move visibly hesitate.
+        return orderMove(unit, toX, toY, 0);
+    }
+
     /** Applies a serialized player/network move at the retail command boundary. */
     boolean orderCommandMove(Unit unit, int toX, int toY) {
         Unit.Order before = unit.currentAction();
@@ -737,6 +747,35 @@ final class BattleNetMovementSystem {
                 worker.setOrder(Unit.Order.STILL);
                 world.idle.stepStill(worker);
                 return;
+            }
+            // An AI assault uses Patrol as its travelling order. The compact
+            // route builder may legitimately return an empty FOUND prefix
+            // when neither bounded wall face rejoins the direct ray. A plain
+            // Move finishes at that boundary; keeping Patrol alive instead
+            // asks the same empty question forever. The AI's long-route
+            // recovery supplies the next bounded segment, while player patrol
+            // orders retain their original route semantics.
+            if (path.result() == PathFinder.Result.FOUND && path.length() == 0
+                    && worker.order() == Unit.Order.PATROL
+                    && (worker.battleNetAiBehavior() == 2
+                        || world.ais.containsKey(worker.player()))) {
+                // Saves written before aiBehavior became durable can only
+                // express an AI assault through this live Patrol order. Repair
+                // that old representation as it is first exercised.
+                worker.setBattleNetAiBehavior(2);
+                if (!worker.hasBattleNetAiHome()) {
+                    worker.setBattleNetAiHome(tileX, tileY);
+                }
+                PathFinder.Path recovered = world.findMovementPath(worker,
+                        new PathFinder.Goal(tileX, tileY, 1, 1, 0, 1));
+                if (recovered.result() == PathFinder.Result.FOUND
+                        && recovered.length() > 0) {
+                    path = recovered;
+                } else {
+                    worker.clearPath();
+                    world.finishOrder(worker);
+                    return;
+                }
             }
             worker.setPath(path);
             // No path goal: this order does its own re-planning, every time

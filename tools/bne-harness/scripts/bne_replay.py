@@ -36,6 +36,10 @@ PLAYER_LIMIT = 8
 PLAYER_RACES_OFFSET = 0x1E2
 GAME_TYPE_OFFSET = 0x1EA
 PLAYER_CONTROLLERS_OFFSET = 0x1EB
+RESOURCES_OFFSET = 0x1F3
+GAME_SPEED_OFFSET = 0x1F4
+STARTING_UNITS_OFFSET = 0x1F5
+FIXED_ORDER_OFFSET = 0x1F6
 RECORD_COUNT_OFFSET = 0x1F7
 SNAPSHOT_OFFSET_OFFSET = 0x1FB
 COMMAND_STREAM_OFFSET_OFFSET = 0x1FF
@@ -101,10 +105,20 @@ EMBEDDED_FIXED_BYTES = {
 }
 EMBEDDED_NAMES = {
     0x08: "selection",
+    0x09: "build",
+    0x0A: "player-state",
     0x0C: "stop",
     0x0D: "stand-ground",
     0x10: "move",
+    # Construction preflight.  Retail 0x00475dd0 toggles the selected
+    # builder's 0x0800/0x1000 state, and the 0x09 dispatcher repeats the same
+    # transition before installing the authoritative building order.
+    0x12: "build-preflight",
     0x13: "attack",
+    # Retail's synchronized production packet. Byte one names either a unit,
+    # technology, or building transformation; byte two selects the matching
+    # native table (0=train, 1/2=research, 3=transform).
+    0x15: "production",
 }
 SELECTION_LIMIT = 9
 
@@ -261,6 +275,10 @@ def parse_replay(path: Path) -> Replay:
         "players": [slot["name"] for slot in active_slots],
         "participant_slots": participant_slots,
         "game_type": header[GAME_TYPE_OFFSET],
+        "resources": header[RESOURCES_OFFSET],
+        "game_speed": header[GAME_SPEED_OFFSET],
+        "starting_units": header[STARTING_UNITS_OFFSET],
+        "fixed_order": header[FIXED_ORDER_OFFSET],
         "record_count": record_count,
         "snapshot_offset": snapshot_offset,
         "snapshot_bytes": command_offset - snapshot_offset,

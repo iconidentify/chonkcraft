@@ -105,6 +105,9 @@ public final class Player {
             players[i] = new Player(i, types[i], races[i]);
             if (types[i] != PudMap.PlayerType.NOBODY) {
                 giveStartingResources(players[i], map, i);
+                if (players[i].isActive()) {
+                    applyBattleNetNetworkMinimums(players[i]);
+                }
             }
         }
         return players;
@@ -156,6 +159,24 @@ public final class Player {
         player.set(UnitType.Resource.GOLD, map.startGold()[index]);
         player.set(UnitType.Resource.WOOD, map.startLumber()[index]);
         player.set(UnitType.Resource.OIL, map.startOil()[index]);
+    }
+
+    /**
+     * Applies retail BNE's multiplayer floor to a map-defined starting bank.
+     *
+     * <p>The map-default arm of native {@code 0x004338d0} first copies the
+     * PUD banks and then, only for a network game, raises each active slot to
+     * at least 2,100 gold, 1,100 lumber and 1,000 oil. This is deliberately a
+     * floor rather than the Low preset: maps that start above it keep their
+     * authored values.</p>
+     */
+    private static void applyBattleNetNetworkMinimums(Player player) {
+        player.set(UnitType.Resource.GOLD,
+                Math.max(2100, player.get(UnitType.Resource.GOLD)));
+        player.set(UnitType.Resource.WOOD,
+                Math.max(1100, player.get(UnitType.Resource.WOOD)));
+        player.set(UnitType.Resource.OIL,
+                Math.max(1000, player.get(UnitType.Resource.OIL)));
     }
 
     public int index() {

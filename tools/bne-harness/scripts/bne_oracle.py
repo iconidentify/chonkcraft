@@ -19,6 +19,7 @@ if str(SCRIPT_DIRECTORY) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIRECTORY))
 
 from bne_fixture import seal_fixture, validate_fixture, validate_state_stream
+import bne_replay_outcome
 
 TARGET_EXE = "Warcraft II BNE.exe"
 EXPECTED_TARGET_SHA256 = "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
@@ -279,6 +280,17 @@ def identity(path: Path) -> dict[str, int | str]:
     return {"bytes": path.stat().st_size, "sha256": hash_file(path)}
 
 
+def validate_replay_inputs(plan_path: Path, schedule_path: Path) -> dict:
+    """Bind a native schedule byte-for-byte to its authenticated plan."""
+
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    bne_replay_outcome._validate_plan(plan, require_startup=True)
+    expected = bne_replay_outcome.native_schedule_bytes(plan)
+    if schedule_path.read_bytes() != expected:
+        raise ValueError("native replay schedule does not match its plan")
+    return plan
+
+
 def write_run_manifest(args: argparse.Namespace, wine: Path, injector: Path,
         tracer: Path, trace: Path, state: Path,
         validation: dict[str, int | str],
@@ -309,6 +321,16 @@ def write_run_manifest(args: argparse.Namespace, wine: Path, injector: Path,
     command_identity = (
         None if args.commands is None else identity(args.commands)
     )
+    replay_identity = None
+    if args.replay_plan is not None:
+        replay_identity = {
+            "plan": identity(args.replay_plan),
+            "schedule": identity(args.replay_schedule),
+            "startup_sha256": args.replay_plan_data["startup_sha256"],
+            "packet_schedule_sha256":
+                args.replay_plan_data["schedule_sha256"],
+            "native_dispatch_proof": args.replay_dispatch_proof,
+        }
     fixture_key = {
         "schema": 1,
         "state_schema": state_validation["schema"],
@@ -322,6 +344,11 @@ def write_run_manifest(args: argparse.Namespace, wine: Path, injector: Path,
         "initialization_seed": args.seed,
         "commands": None if command_identity is None
                     else command_identity["sha256"],
+        "replay": None if replay_identity is None else {
+            "startup_sha256": replay_identity["startup_sha256"],
+            "packet_schedule_sha256":
+                replay_identity["packet_schedule_sha256"],
+        },
         "simulation": validation["simulation_sha256"],
     }
     fixture_id = hashlib.sha256(json.dumps(
@@ -377,6 +404,7 @@ def write_run_manifest(args: argparse.Namespace, wine: Path, injector: Path,
                     "file": command_identity,
                 }
             ),
+            "replay": replay_identity,
             "trace": {"name": trace.name, **identity(trace)},
             "state": {
                 "name": state.name,
@@ -466,6 +494,17 @@ def run(args: argparse.Namespace) -> int:
     if args.scenario is not None:
         args.scenario = canonical_campaign_scenario(args.scenario)
     args.command_count = 0
+    args.replay_plan_data = None
+    args.replay_dispatch_proof = None
+    if (args.replay_plan is None) != (args.replay_schedule is None):
+        raise ValueError("--replay-plan and --replay-schedule are required together")
+    if args.replay_plan is not None:
+        args.replay_plan = args.replay_plan.resolve()
+        args.replay_schedule = args.replay_schedule.resolve()
+        if not args.replay_plan.is_file() or not args.replay_schedule.is_file():
+            raise ValueError("replay plan or native schedule does not exist")
+        args.replay_plan_data = validate_replay_inputs(
+            args.replay_plan, args.replay_schedule)
     if args.commands is not None:
         args.commands = args.commands.resolve()
         if not args.commands.is_file():
@@ -521,6 +560,9 @@ def run(args: argparse.Namespace) -> int:
     # bounded oracle run cannot stall between its first and second ticks.
     environment["CHONK_BNE_DISABLE_STARTUP_TIPS"] = "1"
     environment["CHONK_BNE_SEED"] = str(args.seed)
+    if args.replay_schedule is not None:
+        environment["CHONK_BNE_REPLAY_SCHEDULE"] = wine_path(
+            args.replay_schedule)
     if args.branch_pause_cycle is not None:
         environment["CHONK_BNE_BRANCH_PAUSE_CYCLE"] = str(
             args.branch_pause_cycle)
@@ -549,6 +591,11 @@ def run(args: argparse.Namespace) -> int:
             args.seed)
         state_validation = validate_state_stream(state, args.cycles)
         cross_validate_trace_state(validation, state_validation)
+        if args.replay_plan_data is not None:
+            args.replay_dispatch_proof = \
+                bne_replay_outcome.verify_native_dispatch_trace(
+                    args.replay_plan_data,
+                    trace.read_text(encoding="utf-8", errors="replace").splitlines())
         manifest_path, fixture_id = write_run_manifest(
             args, wine, injector, tracer, trace, state,
             validation, state_validation)
@@ -612,6 +659,14 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--commands", type=Path,
         help="cycle-sorted deterministic command script",
+    )
+    run_parser.add_argument(
+        "--replay-plan", type=Path,
+        help="authenticated replay plan whose startup recipe is already running",
+    )
+    run_parser.add_argument(
+        "--replay-schedule", type=Path,
+        help="exact native packet schedule compiled from --replay-plan",
     )
     run_parser.add_argument(
         "--branch-pause-cycle", type=int,

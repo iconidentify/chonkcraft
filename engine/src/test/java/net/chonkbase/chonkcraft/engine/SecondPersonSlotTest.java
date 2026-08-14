@@ -92,5 +92,30 @@ class SecondPersonSlotTest {
                 "the joining player's slot must not be disabled as an extra local seat");
         assertEquals(PudMap.Race.ORC, players[2].race(),
                 "the host's lobby race choice must define the network world");
+        assertEquals(2100, players[0].get(UnitType.Resource.GOLD),
+                "retail map-default network games clamp low PUD gold");
+        assertEquals(1100, players[0].get(UnitType.Resource.WOOD));
+        assertEquals(1000, players[0].get(UnitType.Resource.OIL));
+    }
+
+    @Test
+    @DisplayName("network resource floors preserve richer map-defined banks")
+    void networkResourceFloorDoesNotReplaceHigherMapValues() {
+        PudMap base = pud();
+        int[] gold = new int[PudMap.PLAYER_MAX];
+        int[] wood = new int[PudMap.PLAYER_MAX];
+        int[] oil = new int[PudMap.PLAYER_MAX];
+        gold[0] = 7500;
+        wood[0] = 4200;
+        oil[0] = 1800;
+        PudMap rich = new PudMap(base.description(), base.tileset(), base.width(),
+                base.height(), base.tiles(), base.players(), base.races(), gold,
+                wood, oil, new int[PudMap.PLAYER_MAX], null, base.units());
+
+        Player[] players = Player.forNetworkGame(rich, rich.players(), rich.races());
+
+        assertEquals(7500, players[0].get(UnitType.Resource.GOLD));
+        assertEquals(4200, players[0].get(UnitType.Resource.WOOD));
+        assertEquals(1800, players[0].get(UnitType.Resource.OIL));
     }
 }

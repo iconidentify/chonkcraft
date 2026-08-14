@@ -759,19 +759,24 @@ final class BattleNetConstructionSystem {
      */
     boolean orderBuild(Unit worker, UnitType what, int tileX, int tileY) {
         if (worker.type().building() || !what.building() || !worker.isAlive()) {
+            traceBattleNetBuildRejection(worker, what, tileX, tileY,
+                    "invalid-builder-or-type");
             return false;
         }
         if (!mayBuild(worker.type(), what)) {
+            traceBattleNetBuildRejection(worker, what, tileX, tileY,
+                    "builder-permission");
             return false;
         }
-        // On behalf of this worker, not of nobody. An on-top rule refuses a
-        // site with anything of the parent's own movement kind standing on it,
-        // and a tanker sent to an oil patch is usually standing on the patch by
-        // the time the order is given -- upstream skips the builder for exactly
-        // that reason.
-        if (!canPlaceBuilding(worker, what, tileX, tileY)) {
-            return false;
-        }
+        // The placement cursor asks canPlaceBuilding before it emits this
+        // command, but retail's synchronized CommandBuildBuilding path does
+        // not ask again. It installs the order and COrder_Build validates the
+        // footprint only after the worker arrives. This is observable in a
+        // real Garden of War replay: a Great Hall order at 83,0 initially
+        // overlaps a farm at 86,1 and is nevertheless accepted by BNE. An
+        // eager engine-side veto made valid queued commands disappear whenever
+        // a moving unit, temporary obstruction, or soon-to-clear structure
+        // occupied the site at submission time.
         // The order is given, not bought. {@code CommandBuildBuilding} makes
         // the order and takes nothing; the cost is subtracted by
         // {@code COrder_Build::StartBuilding} -- "unit.Player->SubUnitType
@@ -788,6 +793,8 @@ final class BattleNetConstructionSystem {
         // {@code player.CheckUnitType(type)} on the same path
 
         if (!world.players[worker.player()].canAfford(what.costs())) {
+            traceBattleNetBuildRejection(worker, what, tileX, tileY,
+                    "affordability");
             return false;
         }
         // Counted as doing what it was doing until the queue is popped. The
@@ -1016,6 +1023,10 @@ final class BattleNetConstructionSystem {
     boolean canPlaceBuilding(Unit builder, UnitType what, int tileX, int tileY) {
         BuildSite site = canBuildHere(builder, what, tileX, tileY);
         if (!site.allowed()) {
+            if (builder != null) {
+                traceBattleNetBuildRejection(builder, what, tileX, tileY,
+                        "building-rule");
+            }
             return false;
         }
         if (site.onTop() != null) {
@@ -1039,7 +1050,12 @@ final class BattleNetConstructionSystem {
             world.markOccupancy(builder, false);
         }
         try {
-            return footprintIsClear(what, tileX, tileY);
+            boolean clear = footprintIsClear(what, tileX, tileY);
+            if (!clear && builder != null) {
+                traceBattleNetBuildRejection(builder, what, tileX, tileY,
+                        "footprint");
+            }
+            return clear;
         } finally {
             if (marked) {
                 world.markOccupancy(builder, true);
@@ -1452,6 +1468,12 @@ final class BattleNetConstructionSystem {
         // without same-cycle process left Java at 40 on c33.
         site.setBattleNetOrderDelay(10);
         site.setWorksite(worker);
+        if (World.BNE_IDLE_TRACE) {
+            System.err.printf(
+                    "JBNBUILDFOUND cycle=%d worker=%d site=%d at=%d,%d type=%s goal=%d%n",
+                    world.cycle, worker.id(), site.id(), site.tileX(), site.tileY(),
+                    site.type().ident(), site.progressGoal());
+        }
 
         // One last breath on the doorstep. StartBuilding plays a step of the
         // still animation right before it removes the worker --
@@ -1559,6 +1581,12 @@ final class BattleNetConstructionSystem {
         // one-cycle report convention carries both.
         site.setOrder(Unit.Order.STILL);
         site.rememberActionBeforeQueued(Unit.Order.UNDER_CONSTRUCTION);
+        if (World.BNE_IDLE_TRACE) {
+            System.err.printf(
+                    "JBNBUILDDONE cycle=%d worker=%d site=%d at=%d,%d type=%s%n",
+                    world.cycle, site.worksite() == null ? -1 : site.worksite().id(),
+                    site.id(), site.tileX(), site.tileY(), site.type().ident());
+        }
         // AiWorkComplete -> AiRemoveFromBuilt: the roof
         // is on, and the queue entry that held the job lets go.
         net.chonkbase.chonkcraft.engine.ai.AiPlayer siteAi = world.ais().get(site.player());

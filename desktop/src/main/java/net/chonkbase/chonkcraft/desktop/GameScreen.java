@@ -914,7 +914,7 @@ final class GameScreen extends JPanel {
         this.cyclingTerrain = terrain;
         this.commandPanel = commandPanel;
         this.applier = applier;
-        this.commands = intents.wrap(commands, world::cycle, this::selectedIds);
+        this.commands = intents.wrap(commands, world::cycle, this::selectedIds, world);
         this.audio = audio;
         this.panel = panel;
         this.world = world;
@@ -3409,6 +3409,15 @@ final class GameScreen extends JPanel {
         return intents.snapshot();
     }
 
+    java.util.List<PlayerIntentJournal.Outcome> intentOutcomesForTest() {
+        return intents.outcomeSnapshot();
+    }
+
+    /** Samples the causal result of every command after the world advances. */
+    void observePlayerIntents() {
+        intents.observe(world.cycle(), world);
+    }
+
     /**
      * Abandons a pending command or building placement.
      *
@@ -3885,7 +3894,8 @@ final class GameScreen extends JPanel {
                     world, captureFrame(), selected, localPlayer, cameraX, cameraY,
                     focusX, focusY, saveMapPath, saveCampaign, saveMission,
                     triggers == null ? null : triggers.armedTriggers(),
-                    evidenceDirectory(), java.time.Instant.now(), intents.snapshot()));
+                    evidenceDirectory(), java.time.Instant.now(), intents.snapshot(),
+                    intents.outcomeSnapshot()));
             return "evidence saved " + result.directory().getFileName()
                     + " (" + result.units() + " units, " + result.missiles() + " missiles)";
         } catch (java.io.IOException | RuntimeException failed) {

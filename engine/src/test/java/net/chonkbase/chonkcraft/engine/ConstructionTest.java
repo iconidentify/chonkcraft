@@ -297,14 +297,16 @@ class ConstructionTest {
     }
 
     @Test
-    void aSiteMustBeClearGround() {
+    void aBlockedSiteIsRejectedByPlacementButLatchedByTheRetailCommand() {
         World world = richWorld(30);
         world.createUnit(barracks(), 0, 10, 10);
         Unit worker = world.createUnit(peasant(), 0, 3, 3);
 
         // The barracks occupies 10..12; a farm at 11,11 would overlap it.
         assertFalse(world.canPlaceBuilding(farm(), 11, 11));
-        assertFalse(world.orderBuild(worker, farm(), 11, 11));
+        assertTrue(world.orderBuild(worker, farm(), 11, 11),
+                "retail queues the synchronized build command and checks the site on arrival");
+        assertEquals(Unit.Order.BUILD, worker.order());
         // Clear ground beside it is fine.
         assertTrue(world.canPlaceBuilding(farm(), 15, 15));
     }

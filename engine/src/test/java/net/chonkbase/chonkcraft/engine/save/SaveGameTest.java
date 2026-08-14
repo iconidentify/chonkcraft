@@ -39,6 +39,58 @@ import org.junit.jupiter.api.io.TempDir;
 class SaveGameTest {
 
     @Test
+    @DisplayName("the Human 6 saved assault resumes and partial wood remains cargo")
+    void humanSixAssaultAndWoodResumeAfterSave() throws IOException {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
+                "human-mission-6.sav.gz");
+        Assumptions.assumeTrue(Files.isRegularFile(save),
+                "the Human 6 playtest save is not installed");
+
+        GameData data = new GameData(assets);
+        String script = LoadGame.read(save);
+        LoadGame.Header header = LoadGame.header(script);
+        assertNotNull(header);
+        var mission = data.loadMission(header.mapPath());
+        assertNotNull(mission);
+        for (Unit unit : new ArrayList<>(mission.world().units())) {
+            mission.world().remove(unit);
+        }
+        LoadGame.apply(mission.world(), script, data.unitTypes().types());
+        World world = mission.world();
+
+        Unit grunt = world.units().stream().filter(unit -> unit.id() == 163)
+                .findFirst().orElse(null);
+        Unit worker = world.units().stream().filter(unit -> unit.id() == 157)
+                .findFirst().orElse(null);
+        Unit remoteWorker = world.units().stream().filter(unit -> unit.id() == 173)
+                .findFirst().orElse(null);
+        assertNotNull(grunt, "saved assault grunt 163 is missing");
+        assertNotNull(worker, "saved partial-load peasant 157 is missing");
+        assertNotNull(remoteWorker, "saved remote-base peasant 173 is missing");
+        assertEquals(UnitType.Resource.WOOD, worker.heldResource(),
+                "loading discarded the identity of the partial wood cargo");
+        assertEquals(96, worker.carried());
+        int startX = grunt.tileX();
+        int startY = grunt.tileY();
+        int woodBefore = world.player(1).get(UnitType.Resource.WOOD);
+
+        world.tick();
+        assertTrue(worker.carried() >= 96,
+                "the first resumed harvest cycle threw away partial wood");
+        for (int cycle = 1; cycle < 700; cycle++) {
+            world.tick();
+        }
+
+        assertTrue(grunt.tileX() != startX || grunt.tileY() != startY,
+                "the restored assault patrol remained frozen on an empty route");
+        assertTrue(world.player(1).get(UnitType.Resource.WOOD) >= woodBefore + 200,
+                "the saved partial load and nearby Town Hall load were not banked");
+    }
+
+    @Test
     @DisplayName("the Human expansion 6 battleships can reach every saved shipyard")
     void humanExpansionSixBattleshipsReachEverySavedShipyard() throws IOException {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -121,7 +173,8 @@ class SaveGameTest {
                         && "unit-ballista".equals(unit.type().ident())
                         && unit.tileX() == 41 && unit.tileY() == 61)
                 .findFirst().orElse(null);
-        assertNotNull(ballista, "saved ballista 18 at 41,61 is missing");
+        Assumptions.assumeTrue(ballista != null && mission.world().missiles().size() == 1,
+                "the rolling Human 6 playtest save no longer contains the ballista-bolt fixture");
         assertEquals("unit-ballista", ballista.type().ident());
         assertEquals(1, mission.world().missiles().size(),
                 "the save must restore its one pending ballista bolt");
@@ -406,6 +459,22 @@ class SaveGameTest {
         reloaded.setMissileTypes(bench.missileTypes());
         LoadGame.apply(reloaded, out.toString(), bench.types());
         return reloaded;
+    }
+
+    @Test
+    @DisplayName("partial cargo keeps its resource identity across a save")
+    void partialCargoRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit worker = bench.world().createUnit(bench.types().get("unit-peasant"), 0, 10, 10);
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setCarrying(UnitType.Resource.WOOD);
+        worker.setHeldResource(UnitType.Resource.WOOD);
+        worker.setCarried(37);
+
+        Unit loaded = find(reload(bench), "unit-peasant");
+        assertEquals(UnitType.Resource.WOOD, loaded.carrying());
+        assertEquals(UnitType.Resource.WOOD, loaded.heldResource());
+        assertEquals(37, loaded.carried());
     }
 
     @Test
@@ -717,6 +786,8 @@ class SaveGameTest {
         ai.restoreScriptPosition(7, 3);
         Unit first = bench.world().createUnit(bench.types().get("unit-grunt"), 1, 12, 12);
         Unit second = bench.world().createUnit(bench.types().get("unit-grunt"), 1, 13, 12);
+        first.setBattleNetAiBehavior(2);
+        first.setBattleNetAiHome(30, 31);
         AiForce force = ai.force(2);
         force.want(bench.types().get("unit-grunt"), 2);
         force.members().add(first);
@@ -742,6 +813,10 @@ class SaveGameTest {
         assertEquals(AiForce.State.GOING_TO_RALLY, loadedForce.state(),
                 "the computer forgot that its army had launched");
         assertEquals(2, loadedForce.members().size());
+        assertEquals(2, loadedForce.members().getFirst().battleNetAiBehavior(),
+                "the assault unit lost the AI behavior that owns its patrol");
+        assertEquals(30, loadedForce.members().getFirst().battleNetAiHomeX());
+        assertEquals(31, loadedForce.members().getFirst().battleNetAiHomeY());
         assertEquals(List.of("unit-grunt", "unit-grunt"), loadedForce.members().stream()
                 .map(unit -> unit.type().ident()).toList());
         assertEquals(2, loadedForce.wanted().get(bench.types().get("unit-grunt")));

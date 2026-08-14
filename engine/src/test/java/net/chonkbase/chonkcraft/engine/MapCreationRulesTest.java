@@ -48,15 +48,17 @@ class MapCreationRulesTest {
         return made;
     }
 
-    /** A world whose slot 0 is a human computer and slot 2 is nobody. */
+    /** A world whose slot 0 is human, slot 1 orc, and slot 2 nobody. */
     private static World world(UnitType... types) {
         PudMap.PlayerType[] slots = new PudMap.PlayerType[16];
         java.util.Arrays.fill(slots, PudMap.PlayerType.NOBODY);
         slots[0] = PudMap.PlayerType.COMPUTER;
+        slots[1] = PudMap.PlayerType.COMPUTER;
         slots[15] = PudMap.PlayerType.NEUTRAL;
         PudMap.Race[] races = new PudMap.Race[16];
         java.util.Arrays.fill(races, PudMap.Race.NEUTRAL);
         races[0] = PudMap.Race.HUMAN;
+        races[1] = PudMap.Race.ORC;
         Player[] players = new Player[16];
         for (int i = 0; i < 16; i++) {
             players[i] = new Player(i, slots[i], races[i]);
@@ -68,8 +70,12 @@ class MapCreationRulesTest {
         }
         world.setUnitTypes(byIdent);
         world.setRaceEquivalents(
-                Map.of("unit-skeleton", "unit-attack-peasant"),
-                Map.of("unit-attack-peasant", "unit-skeleton"));
+                Map.of(
+                        "unit-skeleton", "unit-attack-peasant",
+                        "unit-peon", "unit-peasant"),
+                Map.of(
+                        "unit-attack-peasant", "unit-skeleton",
+                        "unit-peasant", "unit-peon"));
         return world;
     }
 
@@ -87,6 +93,24 @@ class MapCreationRulesTest {
                         + " load-time creation goes through wc2.legacy-declaration's wrapper, which"
                         + " converts to the owner's race -- levelx09o's fifty-two"
                         + " skeletons are fifty-two militia in the real game");
+    }
+
+    @Test
+    @DisplayName("a fixed-order melee worker follows the lobby slot race")
+    void mapDefaultWorkerIsConvertedInBothDirections() {
+        UnitType peasant = type("unit-peasant");
+        UnitType peon = type("unit-peon");
+        World world = world(peasant, peon);
+
+        Unit human = world.createUnitForMap(peon, 0, 5, 5);
+        Unit orc = world.createUnitForMap(peasant, 1, 8, 5);
+
+        assertNotNull(human);
+        assertNotNull(orc);
+        assertEquals("unit-peasant", human.type().ident(),
+                "a human lobby seat retained the map's orc worker");
+        assertEquals("unit-peon", orc.type().ident(),
+                "an orc lobby seat retained the map's human worker");
     }
 
     @Test

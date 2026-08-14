@@ -464,9 +464,11 @@ public final class SaveGame {
             if (unit.isCaster()) {
                 out.write("SetMana(unit, " + unit.mana() + ")\n");
             }
-            if (unit.carrying() != null && unit.carried() > 0) {
+            UnitType.Resource held = unit.heldResource() != null
+                    ? unit.heldResource() : unit.carrying();
+            if (held != null && unit.carried() > 0) {
                 out.write("SetResourcesHeld(unit, "
-                        + quote(unit.carrying().name().toLowerCase(Locale.ROOT)) + ", "
+                        + quote(held.name().toLowerCase(Locale.ROOT)) + ", "
                         + unit.carried() + ")\n");
             }
             if (unit.order() == Unit.Order.UNDER_CONSTRUCTION) {
@@ -539,6 +541,22 @@ public final class SaveGame {
         state.append(" orderTargetY = ").append(unit.orderTargetY()).append(",");
         state.append(" attackMoveX = ").append(unit.attackMoveX()).append(",");
         state.append(" attackMoveY = ").append(unit.attackMoveY()).append(",");
+        if (unit.battleNetAiBehavior() != 0) {
+            state.append(" aiBehavior = ")
+                    .append(unit.battleNetAiBehavior()).append(",");
+        }
+        if (unit.hasBattleNetAiHome()) {
+            state.append(" aiHomeX = ").append(unit.battleNetAiHomeX()).append(",");
+            state.append(" aiHomeY = ").append(unit.battleNetAiHomeY()).append(",");
+        }
+        if (unit.carrying() != null) {
+            state.append(" carrying = ")
+                    .append(quote(unit.carrying().name())).append(",");
+        }
+        if (unit.heldResource() != null) {
+            state.append(" heldResource = ")
+                    .append(quote(unit.heldResource().name())).append(",");
+        }
         if (unit.savedOrder() != null) {
             state.append(" savedOrder = ").append(quote(unit.savedOrder().name())).append(",");
             if (unit.savedOrder() == Unit.Order.ATTACK_MOVE) {
