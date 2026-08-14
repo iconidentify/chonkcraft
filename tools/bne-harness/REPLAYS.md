@@ -219,7 +219,11 @@ The retained boundary is structural rather than opaque: native unit 1554
 submits a family-two production command at record 3,477, after the guarded
 native-high-slot/Java-low-ID birth-order bridge can no longer identify one
 compatible Java producer without guessing. The smoke receipt retains the
-complete player production state.
+complete player production state. It also structurally indexes every retained
+record after that boundary—command-family counts, selected native identities,
+and unsupported packets—while clearly labeling those records as unexecuted.
+That keeps the certified prefix fail-closed without making the rest of the
+match invisible or requiring a throwaway parser to choose the next adapter.
 
 Replay packets are player inputs, not native success receipts. Retail opcode
 `0x09` acknowledges a build packet in `0x00475e50`, then `0x0043afe0` begins

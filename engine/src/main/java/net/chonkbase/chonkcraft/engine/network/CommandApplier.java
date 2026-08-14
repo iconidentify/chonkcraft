@@ -129,7 +129,14 @@ public final class CommandApplier {
             }
             return queued != null;
         }
+        Unit.PendingOrderState pendingBefore = null;
         if (!command.queued() && isQueueable(command.kind())) {
+            // ReleaseOrders flushes the old queue before it installs a fresh
+            // replacement.  Some replacements can still be refused (wrong
+            // capability, stale target, illegal site).  A refusal is not an
+            // order in BNE and therefore must not eat the valid waypoints or
+            // autonomous order that were already banked behind this unit.
+            pendingBefore = unit.snapshotPendingOrders();
             unit.clearQueuedOrders();
             unit.setSavedOrder(null);
         }
@@ -280,6 +287,9 @@ public final class CommandApplier {
                 world.kill(unit);
             }
             case NONE, QUIT -> accepted = false;
+        }
+        if (!accepted && pendingBefore != null) {
+            unit.restorePendingOrders(pendingBefore);
         }
         return accepted;
     }

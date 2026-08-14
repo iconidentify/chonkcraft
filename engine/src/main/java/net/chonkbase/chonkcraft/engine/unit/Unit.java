@@ -1794,6 +1794,39 @@ public final class Unit {
         return java.util.List.copyOf(queuedOrders);
     }
 
+    /**
+     * The part of an order lifecycle which a fresh player command may flush.
+     *
+     * <p>The command boundary has to clear this state before installing a
+     * replacement because an unbreakable animation can put that replacement
+     * back into the same queue.  A refused command, however, must be a true
+     * no-op.  Keeping the snapshot here makes that transaction exact instead
+     * of asking the network layer to reconstruct the private resume fields.
+     */
+    public record PendingOrderState(java.util.List<QueuedOrder> queuedOrders,
+            boolean queuedReplacementPending, Order savedOrder,
+            int savedAttackMoveX, int savedAttackMoveY, int savedMoveRange,
+            int savedAttackScanSleep, boolean savedAttackMoveOpening) { }
+
+    public PendingOrderState snapshotPendingOrders() {
+        return new PendingOrderState(java.util.List.copyOf(queuedOrders),
+                queuedReplacementPending, savedOrder, savedAttackMoveX,
+                savedAttackMoveY, savedMoveRange, savedAttackScanSleep,
+                savedAttackMoveOpening);
+    }
+
+    public void restorePendingOrders(PendingOrderState state) {
+        queuedOrders.clear();
+        queuedOrders.addAll(state.queuedOrders());
+        queuedReplacementPending = state.queuedReplacementPending();
+        savedOrder = state.savedOrder();
+        savedAttackMoveX = state.savedAttackMoveX();
+        savedAttackMoveY = state.savedAttackMoveY();
+        savedMoveRange = state.savedMoveRange();
+        savedAttackScanSleep = state.savedAttackScanSleep();
+        savedAttackMoveOpening = state.savedAttackMoveOpening();
+    }
+
     public boolean hasQueuedOrders() {
         return !queuedOrders.isEmpty();
     }

@@ -111,6 +111,14 @@ for name, floor in minimums.items():
             f"replay smoke gate: {name}={report.get(name)!r}; floor {floor}")
 if report.get("cycles_per_synchronized_turn") != 15:
     raise SystemExit("replay smoke gate: retail 500-ms turn is not fifteen cycles")
+if report.get("analyzed_records", 0) <= report.get("processed_records", 0):
+    raise SystemExit("replay smoke gate: the schedule beyond the certified prefix is hidden")
+remaining = report.get("remaining_schedule") or {}
+if (remaining.get("status") != "structurally-indexed-not-executed"
+        or remaining.get("first_record") != report.get("processed_records")
+        or remaining.get("record_count", 0) <= 0
+        or remaining.get("command_count", 0) <= 0):
+    raise SystemExit(f"replay smoke gate: incomplete remainder inventory {remaining!r}")
 if report.get("unclassified_orders") != 0:
     raise SystemExit("replay smoke gate: an order has no terminal classification")
 if report.get("silent_failures") != 0:

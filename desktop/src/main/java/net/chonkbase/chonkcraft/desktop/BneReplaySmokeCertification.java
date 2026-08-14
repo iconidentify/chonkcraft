@@ -108,7 +108,10 @@ public final class BneReplaySmokeCertification {
             report.put("placed_units", placed);
             report.put("cycles_per_synchronized_turn",
                     BNE_SYNCHRONIZED_TURN_CYCLES);
+            report.put("analyzed_records",
+                    array(plan.get("records"), "records").size());
             report.put("processed_records", result.processedRecords);
+            report.put("certified_prefix_records", result.processedRecords);
             report.put("processed_commands", result.processedCommands);
             report.put("submitted_orders", result.submittedOrders);
             report.put("accepted_orders", result.acceptedOrders);
@@ -119,6 +122,8 @@ public final class BneReplaySmokeCertification {
             report.put("unclassified_orders", result.unclassifiedOrders);
             report.put("bound_native_units", result.boundUnits);
             report.put("stopped_at", result.stoppedAt);
+            report.put("remaining_schedule", analyzeRemainingSchedule(
+                    plan, result.processedRecords));
             report.put("final_cycle", world.cycle());
             report.put("outcomes", result.outcomes);
             System.out.print(Json.write(report));
@@ -128,6 +133,54 @@ public final class BneReplaySmokeCertification {
             require(result.unclassifiedOrders == 0,
                     "a replay order has no terminal classification");
         }
+    }
+
+    /**
+     * Indexes the whole authenticated match even when execution fails closed.
+     *
+     * <p>The certified prefix is intentionally not extended past an unproved
+     * native unit identity.  Previously that honest stop also hid everything
+     * later in the match from the report, making the next adapter impossible
+     * to prioritize without another one-off script.  This structural pass
+     * reads no simulation outcome and claims none: it inventories the exact
+     * retained packets after the boundary while the executable prefix remains
+     * the only certified outcome evidence.
+     */
+    private static Map<String, Object> analyzeRemainingSchedule(
+            Map<String, Object> plan, int certifiedRecords) {
+        List<Object> records = array(plan.get("records"), "records");
+        Map<String, Integer> commandFamilies = new java.util.TreeMap<>();
+        Set<Integer> selectedNativeUnits = new HashSet<>();
+        int commands = 0;
+        int unsupported = 0;
+        for (int index = Math.max(0, certifiedRecords); index < records.size(); index++) {
+            Map<String, Object> record = object(records.get(index), "record");
+            for (Object value : array(record.get("commands"), "commands")) {
+                Map<String, Object> command = object(value, "command");
+                String name = string(command.get("name"), "command name");
+                commandFamilies.merge(name, 1, Integer::sum);
+                commands++;
+                if (!SUPPORTED.contains(name)) {
+                    unsupported++;
+                }
+                selectedNativeUnits.addAll(integers(command.get("selected_unit_ids")));
+            }
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", certifiedRecords >= records.size()
+                ? "fully-certified" : "structurally-indexed-not-executed");
+        result.put("first_record", certifiedRecords < records.size()
+                ? certifiedRecords : null);
+        result.put("record_count", Math.max(0, records.size() - certifiedRecords));
+        result.put("command_count", commands);
+        result.put("command_families", commandFamilies);
+        result.put("unsupported_command_count", unsupported);
+        result.put("selected_native_unit_count", selectedNativeUnits.size());
+        result.put("meaning", certifiedRecords >= records.size()
+                ? "every authenticated packet was outcome-certified"
+                : "packets are indexed for the next adapter; no native or Java "
+                        + "outcome is claimed beyond the certified prefix");
+        return result;
     }
 
     /** Applies the exact BNE lobby bank transcribed into the replay plan. */
