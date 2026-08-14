@@ -963,8 +963,16 @@ final class BattleNetCombatSystem {
                             // onto 30,39; first free is north and native
                             // holds. Grunt 1514's last step was east, so its
                             // first-free north at fixture 42 still fires.
-                            if (freeHeading >= 0
-                                    && firstFreeIsReverseOfLastStep(unit)) {
+                            boolean reverseWalkBack = freeHeading >= 0
+                                    && pathn1Cur > 2
+                                    && firstFreeIsReverseOfLastStep(unit);
+                            if (reverseWalkBack) {
+                                // Far leftover: do not walk back onto the
+                                // tile just left. Returning keeps the rest
+                                // of this Attack visit from stepping the
+                                // leftover. Close leftovers (XHuman 10
+                                // grunt 1500, two tiles off) still replace
+                                // the heading and step on this visit.
                                 return;
                             }
                             if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
