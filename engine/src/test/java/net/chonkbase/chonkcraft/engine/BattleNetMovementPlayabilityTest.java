@@ -194,4 +194,38 @@ class BattleNetMovementPlayabilityTest {
                 "the soldier should stop beside the first water square: "
                         + footman.tileX() + "," + footman.tileY());
     }
+
+    @Test
+    @DisplayName("a player ship move onto land stores the first land square")
+    void aPlayerShipMoveOntoLandStoresTheFirstLandSquare() {
+        // Domain projection is not only land-into-trees. A destroyer at
+        // 25,18 told to sail to 30,18 across a land wall that begins at
+        // 28,18 keeps order point 28,18 -- the first square the hull cannot
+        // enter -- and stays on water.
+        GameMap sea = map(32, 32, TileFlag.WATER_ALLOWED);
+        for (int y = 16; y <= 19; y++) {
+            for (int x = 28; x <= 31; x++) {
+                sea.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        Fixture fixture = fixture(sea);
+        Unit destroyer = place(fixture, "unit-human-destroyer", 25, 18);
+
+        assertTrue(fixture.commands().apply(GameCommand.move(0, destroyer.id(), 30, 18)),
+                "the destroyer refused a point move onto land");
+        assertEquals(28, destroyer.orderTargetX(),
+                "retail projects a land click onto the first blocked square");
+        assertEquals(18, destroyer.orderTargetY(),
+                "retail projects a land click onto the first blocked square");
+        runToRest(fixture.world(), destroyer, 80);
+
+        assertTrue(fixture.world().map.field(destroyer.tileX(), destroyer.tileY())
+                        .isWaterPassable(),
+                "the ship should stand on the water, not keep sailing onto land: "
+                        + destroyer.tileX() + "," + destroyer.tileY());
+        assertTrue(Math.max(Math.abs(destroyer.tileX() - 28),
+                Math.abs(destroyer.tileY() - 18)) <= 1,
+                "the ship should stop beside the first land square: "
+                        + destroyer.tileX() + "," + destroyer.tileY());
+    }
 }
