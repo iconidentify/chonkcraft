@@ -10445,6 +10445,16 @@ public final class World {
                     return;
                 }
             }
+            // Dest-arm counts those twenty visits while the hull is still
+            // two pixels off 84,10. Leaving that slide on the unit used to
+            // spend the first free visit after the next scout dest draining
+            // it -- Human 12 1559 stayed on 84,10 through fixture 102 and
+            // only stepped east at 103. Even dests (1570 on 50,4) already
+            // wait for residual settle, so they resume on time. Park the
+            // hull the same way when the dest-arm stand-down fires.
+            unit.setBattleNetSelfPatrolHolds(0);
+            unit.setWalkHolding(false);
+            movement.resetDisplacement(unit);
             unit.setBattleNetScoutPatrol(false);
             unit.setOrder(Unit.Order.STILL);
             unit.setActionBeforeQueued(null);

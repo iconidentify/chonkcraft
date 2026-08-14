@@ -532,6 +532,28 @@ class BattleNetMovementPlayabilityTest {
         assertEquals(Unit.Order.PATROL, oddDest.order(),
                 "retail sends the 84,10 scout out again at fixture 99; Java is "
                         + oddDest.order());
+
+        for (int cycle = 100; cycle <= 102; cycle++) {
+            mission.tick();
+        }
+        // i9beef retail-human-12-idle. After the fixture-99 scout pass,
+        // native 1559 first-steps east onto 86,10 at 102. Java used to
+        // stand down from dest 83,10 still two pixels off 84,10, spend
+        // fixture 102 draining that slide, and only step at 103.
+        assertEquals(86, oddDest.tileX(),
+                "retail is on 86,10 at fixture 102 after the scout resume, not "
+                        + oddDest.tileX() + "," + oddDest.tileY());
+        assertEquals(10, oddDest.tileY(),
+                "retail is on 86,10 at fixture 102 after the scout resume, not "
+                        + oddDest.tileX() + "," + oddDest.tileY());
+        assertEquals(Unit.Order.PATROL, oddDest.order(),
+                "retail is still on Patrol at 86,10; Java is " + oddDest.order());
+        assertEquals(48, zeppelin.tileX(),
+                "retail's even-dest scout is on 48,6 at fixture 102, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(6, zeppelin.tileY(),
+                "retail's even-dest scout is on 48,6 at fixture 102, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
     }
 
     @Test
