@@ -975,6 +975,33 @@ public final class BattleNetPathFinder {
     private record Candidate(List<Integer> headings, int distance) {
     }
 
+    /**
+     * The first square on the BNE line that the mover cannot enter.
+     *
+     * <p>A player move clicked into forest or water is stored as that first
+     * blocked cell, not the clicked one. The Orc 1 commanded peon at 25,18
+     * told to walk to 30,18 keeps order point 28,18 -- the first tree on the
+     * east ray -- and then approaches that tree.
+     */
+    public static int[] firstBlockedToward(int fromX, int fromY, int toX, int toY,
+            Passability passability) {
+        if (fromX == toX && fromY == toY) {
+            return new int[] {toX, toY};
+        }
+        Line line = new Line(fromX, fromY, toX, toY);
+        int x = fromX;
+        int y = fromY;
+        while (x != toX || y != toY) {
+            int heading = line.next();
+            x += Direction.deltaX(heading);
+            y += Direction.deltaY(heading);
+            if (!passability.canEnter(x, y)) {
+                return new int[] {x, y};
+            }
+        }
+        return new int[] {toX, toY};
+    }
+
     /** Exact transcription of {@code 0x429f10}/{@code 0x429fa0}. */
     private static final class Line {
         private final int major;

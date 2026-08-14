@@ -71,12 +71,13 @@ PY
 python3 -m unittest \
     "$ROOT/tools/bne-harness/tests/test_bne_replay.py" \
     "$ROOT/tools/bne-harness/tests/test_bne_replay_outcome.py" \
-    "$ROOT/tools/bne-harness/tests/test_bne_playtest_explorer.py"
+    "$ROOT/tools/bne-harness/tests/test_bne_playtest_explorer.py" \
+    "$ROOT/tools/bne-harness/tests/test_bne_playtest_adapters.py"
 
 cd "$ROOT"
 mvn -q -pl desktop -am \
     -Dchonkcraft.pack="$PACK" \
-    -Dtest=PlayerIntentJournalTest,PlayerOrderDeliveryTest \
+    -Dtest=PlayerIntentJournalTest,PlayerOrderDeliveryTest,BnePlaytestAdapterTest \
     -Dsurefire.failIfNoSpecifiedTests=false test
 echo "Java ordered-selection and fulfillment gates: PASS"
 

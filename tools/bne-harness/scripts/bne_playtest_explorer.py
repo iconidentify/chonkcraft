@@ -16,11 +16,13 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
 import tempfile
 from typing import Any, Iterable
+import zipfile
 
 import bne_minimize
 import bne_command_matrix
@@ -41,6 +43,10 @@ COMMAND_FAMILIES = {
     "stand-ground", "patrol", "follow", "harvest", "return-goods",
     "board", "unload", "repair", "build", "cast",
 }
+INJECTOR_MOVE = re.compile(
+    r"cycle (\d+) move unit (\d+) x (\d+) y (\d+)\Z")
+MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
+REFUSED_POINTS = {"occupied", "blocked"}
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -187,6 +193,103 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
     return seed
 
 
+def parse_injector_script(text: str) -> list[dict[str, Any]]:
+    """Parse the guarded native move-injector script used by commanded fixtures."""
+    commands: list[dict[str, Any]] = []
+    for line_number, raw in enumerate(text.splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = INJECTOR_MOVE.fullmatch(line)
+        if match is None:
+            raise ValueError(f"unsupported injector command at line {line_number}")
+        cycle, unit_id, x, y = (int(value) for value in match.groups())
+        commands.append({
+            "kind": "move",
+            "unit_id": unit_id,
+            "x": x,
+            "y": y,
+            "queued": False,
+            "issue_cycle": cycle,
+        })
+    if not commands:
+        raise ValueError("injector script contains no command")
+    return commands
+
+
+def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
+    """Promote an authenticated commanded capture into an exact playtest seed."""
+    source = fixture.expanduser().resolve()
+    with zipfile.ZipFile(source) as archive:
+        names = archive.namelist()
+        if "commands.txt" not in names or "manifest.json" not in names:
+            raise ValueError("fixture is not a commanded BNE capture")
+        script = archive.read("commands.txt").decode("ascii")
+        manifest = json.loads(archive.read("manifest.json"))
+    oracle = ((manifest.get("oracle") or {}).get("executable") or {})
+    if oracle.get("sha256") != PINNED_BNE_EXECUTABLE_SHA256:
+        raise ValueError("commanded fixture is not backed by pinned BNE 2.02b")
+    commands = parse_injector_script(script)
+    frame = bne_command_matrix._first_frame(source)
+    run = manifest.get("run") or {}
+    actors: dict[int, dict[str, Any]] = {}
+    points: dict[tuple[int, int], dict[str, Any]] = {}
+    for command in commands:
+        slot = command["unit_id"]
+        raw = frame["units"].get(slot)
+        if raw is None:
+            raise ValueError(f"commanded fixture has no live unit {slot} at cycle one")
+        domain = MOVEMENT_DOMAIN.get(raw[bne_command_matrix.UNIT_MOVEMENT], "land")
+        actor = actors.setdefault(slot, {
+            "id": slot,
+            "player": raw[bne_command_matrix.UNIT_OWNER],
+            "domain": domain,
+            "capabilities": [],
+            "target_ids": [],
+            "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
+            "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
+        })
+        if command["kind"] not in actor["capabilities"]:
+            actor["capabilities"].append(command["kind"])
+            actor["capabilities"].sort()
+        point = points.setdefault((command["x"], command["y"]), {
+            "x": command["x"], "y": command["y"], "kind": "open",
+            "domains": [],
+        })
+        if domain not in point["domains"]:
+            point["domains"].append(domain)
+            point["domains"].sort()
+    if not actors or not points:
+        raise ValueError("commanded fixture produced an empty seed")
+    start_cycle = min(command["issue_cycle"] for command in commands)
+    cycle_limit = int(run.get("cycle_limit") or 160)
+    seed: dict[str, Any] = {
+        "schema": SEED_SCHEMA,
+        "identity": {
+            "fixture_id": (manifest.get("fixture") or {}).get("id"),
+            "fixture_sha256": file_sha256(source),
+            "compiler": "bne-commanded-fixture-v1",
+            "authority_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+        },
+        "setup": {
+            "kind": "sealed-fixture",
+            "fixture": str(source),
+            "fixture_id": (manifest.get("fixture") or {}).get("id"),
+            "scenario": run.get("requested_scenario"),
+            "seed": run.get("initialization_seed", 1),
+            "cycle_limit": cycle_limit,
+        },
+        "start_cycle": start_cycle,
+        "settle_cycles": max(1, cycle_limit - start_cycle),
+        "actors": [actors[key] for key in sorted(actors)],
+        "targets": [],
+        "points": [points[key] for key in sorted(points)],
+        "authenticated_commands": commands,
+    }
+    validate_seed(seed)
+    return seed
+
+
 def _target(seed: dict[str, Any], target_id: int) -> dict[str, Any] | None:
     for actor in seed["actors"]:
         if actor["id"] == target_id:
@@ -266,9 +369,11 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
     candidates: list[tuple[str, list[dict[str, Any]]]] = []
 
     # Single orders establish ordinary semantics at cadence boundaries.
+    # Occupied or blocked destinations are the authenticated refusal surface.
     for command in commands:
+        pattern = "refuse" if command.get("point_kind") in REFUSED_POINTS else "single"
         for offset in offsets:
-            candidates.append(("single", [_scheduled(command, start + offset)]))
+            candidates.append((pattern, [_scheduled(command, start + offset)]))
 
     # Repeating an order exposes cooldown, duplicate projectile and stale-order bugs.
     for command in commands:
@@ -277,8 +382,42 @@ def generate_scenarios(seed: dict[str, Any], *, max_scenarios: int = 256,
                 _scheduled(command, start), _scheduled(command, start + delay),
             ]))
 
+    # A group order is the same family issued to every capable actor together.
+    by_family: dict[str, dict[int, dict[str, Any]]] = {}
+    for command in commands:
+        by_family.setdefault(command["kind"], {}).setdefault(
+            command["unit_id"], command)
+    for family_commands in by_family.values():
+        if len(family_commands) < 2:
+            continue
+        chosen = [family_commands[unit_id] for unit_id in sorted(family_commands)]
+        for offset in offsets:
+            candidates.append(("group", [
+                _scheduled(command, start + offset) for command in chosen
+            ]))
+
+    # Congestion is two movers told to occupy the same square on one turn.
+    movers_by_point: dict[tuple[object, object], dict[int, dict[str, Any]]] = {}
+    for command in commands:
+        if command["kind"] != "move" or "x" not in command or "y" not in command:
+            continue
+        movers_by_point.setdefault(
+            (command["x"], command["y"]), {}).setdefault(
+                command["unit_id"], command)
+    for point_commands in movers_by_point.values():
+        if len(point_commands) < 2:
+            continue
+        chosen = [point_commands[unit_id] for unit_id in sorted(point_commands)]
+        for delay in (0, 1, 15):
+            candidates.append(("congestion", [
+                _scheduled(chosen[0], start),
+                _scheduled(chosen[1], start + delay),
+            ]))
+
     # Replacing an active order is the most common real-play race: move/attack,
-    # attack/move, harvest/move, board/move and stop/reissue.
+    # attack/move, harvest/move, board/move and stop/reissue. Generated last
+    # so the group and congestion surfaces are not starved by the n-squared
+    # replacement fan-out.
     by_actor: dict[int, list[dict[str, Any]]] = {}
     for command in commands:
         by_actor.setdefault(command["unit_id"], []).append(command)
@@ -700,6 +839,13 @@ def seed_fixture_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def seed_commanded_command(args: argparse.Namespace) -> int:
+    seed = seed_from_commanded_fixture(args.fixture)
+    write_json(args.output, seed)
+    print(args.output.expanduser().resolve())
+    return 0
+
+
 def command_script_command(args: argparse.Namespace) -> int:
     scenario = load_json(args.scenario, "scenario")
     destination = args.output.expanduser().resolve()
@@ -760,6 +906,13 @@ def parser() -> argparse.ArgumentParser:
     fixture.add_argument("--command-cycle", type=int, default=5)
     fixture.add_argument("--distance", type=int, default=4)
     fixture.set_defaults(func=seed_fixture_command)
+
+    commanded = commands.add_parser(
+        "seed-commanded",
+        help="turn an authenticated commanded fixture into an exact playtest seed")
+    commanded.add_argument("fixture", type=Path)
+    commanded.add_argument("--output", required=True, type=Path)
+    commanded.set_defaults(func=seed_commanded_command)
 
     script = commands.add_parser(
         "command-script",

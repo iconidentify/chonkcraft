@@ -162,8 +162,33 @@ final class BattleNetMovementSystem {
             unit.setBattleNetDoubleStep(
                     ((unit.tileX() | unit.tileY()) & 1) == 0);
         }
-        unit.setPathGoal(toX, toY);
-        unit.setOrderTarget(toX, toY);
+        // A click that lands in forest or water is not the stored point.
+        // Retail walks the same line the pathfinder uses and keeps the first
+        // blocked square: Orc 1 peon 1594 commanded to 30,18 stores 28,18
+        // and is Still on the tree's approach by fixture cycle 40. Leaving
+        // the deep forest click in place kept Java on Move at 27,18.
+        int goalX = toX;
+        int goalY = toY;
+        if (world.map.contains(toX, toY)
+                && !unit.type().airUnit()
+                && !world.battleNetTerrainPassable(unit, toX, toY)) {
+            int[] projected = BattleNetPathFinder.firstBlockedToward(
+                    unit.tileX(), unit.tileY(), toX, toY,
+                    (x, y) -> world.map.contains(x, y)
+                            && world.battleNetTerrainPassable(unit, x, y));
+            // A click that is already the neighbouring tree is left as the
+            // deep point. Projecting it used to REACHED-finish the order
+            // without a step and dropped the replay smoke progress floor
+            // from 138 to 137. Distant forest clicks still collapse to the
+            // first tree (Orc 1: 30,18 -> 28,18).
+            if (Math.max(Math.abs(unit.tileX() - projected[0]),
+                    Math.abs(unit.tileY() - projected[1])) > 1) {
+                goalX = projected[0];
+                goalY = projected[1];
+            }
+        }
+        unit.setPathGoal(goalX, goalY);
+        unit.setOrderTarget(goalX, goalY);
         unit.setMoveRange(0);
         unit.clearPath();
         unit.setBattleNetPlayerCommandMove(false);
@@ -314,6 +339,22 @@ final class BattleNetMovementSystem {
                     : world.pathFinder.find(unit.tileX(), unit.tileY(),
                             new PathFinder.Goal(toX, toY, 1, 1, 0,
                                     unit.moveRange()), world.moverFor(unit));
+            MapField goalField = world.map.fieldOrNull(toX, toY);
+            if (unit.moveRange() == 0
+                    && path.result() == PathFinder.Result.FOUND
+                    && path.length() > 0
+                    && goalField != null && goalField.isForest()) {
+                // Harvest already prefers a forest wall-follow that lands on
+                // a different skirt cell. Player moves into trees use the
+                // same choice: the Orc 1 commanded peon stores NE,E onto
+                // 27,17 beside tree 28,18 instead of the free east prefix.
+                PathFinder.Path wall = world.findBattleNetPointPath(
+                        unit, toX, toY, null, false, false, false);
+                if (world.battleNetPreferForestWallOverFree(
+                        path, wall, unit, toX, toY)) {
+                    path = wall;
+                }
+            }
             switch (path.result()) {
                 case REACHED -> {
                     resetDisplacement(unit);
@@ -502,6 +543,13 @@ final class BattleNetMovementSystem {
     private boolean battleNetCommandPointReached(Unit unit) {
         if (unit.tileX() == unit.orderTargetX()
                 && unit.tileY() == unit.orderTargetY()) {
+            return true;
+        }
+        if (Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
+                Math.abs(unit.tileY() - unit.orderTargetY())) <= 1
+                && world.map.contains(unit.orderTargetX(), unit.orderTargetY())
+                && !world.battleNetTerrainPassable(
+                        unit, unit.orderTargetX(), unit.orderTargetY())) {
             return true;
         }
         if (!unit.battleNetPlayerCommandMove()

@@ -71,16 +71,29 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py generate seed.json \
   --output scenarios.json
 ```
 
+Turn a sealed commanded fixture into the exact seed those captured orders
+already proved:
+
+```sh
+python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-commanded \
+  capture.bnefx --output seed.json
+```
+
 Run the closed loop. Adapter commands are parsed as argument lists and never
 run through a shell. They must contain literal `{scenario}` and `{output}`
-placeholders.
+placeholders. The production adapters are:
 
 ```sh
 python3 tools/bne-harness/scripts/bne_playtest_explorer.py explore seed.json \
-  --native-command 'native-adapter --scenario {scenario} --output {output}' \
-  --java-command 'java-adapter --scenario {scenario} --output {output}' \
+  --native-command 'python3 tools/bne-harness/scripts/bne_playtest_native_adapter.py --scenario {scenario} --output {output}' \
+  --java-command 'python3 tools/bne-harness/scripts/bne_playtest_java_adapter.py --scenario {scenario} --output {output}' \
   --output work/playtest-explorer
 ```
+
+The Java adapter issues every order through `CommandApplier` and reports
+`PlayerIntentJournal` outcomes. The native adapter reports only from an
+authenticated commanded fixture or a live pinned-2.02b capture; empty,
+mismatched, truncated, or unauthenticated output is refused.
 
 The stable entry point is `work/playtest-explorer/report.json`. Every retained
 failure is content-addressed below `divergences/<packet-sha256>/packet.json`.

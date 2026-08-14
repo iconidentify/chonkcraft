@@ -95,7 +95,7 @@ class PlaytestExplorerTest(unittest.TestCase):
     def test_generates_legal_timing_repeat_and_replacement_scenarios(self):
         scenarios = explorer.generate_scenarios(self.seed(), max_scenarios=500)
         self.assertGreater(len(scenarios), 40)
-        self.assertEqual({"single", "repeat", "replace"},
+        self.assertEqual({"single", "refuse", "repeat", "replace"},
                          {item["pattern"] for item in scenarios})
         attack_cycles = {
             item["commands"][0]["issue_cycle"]
@@ -227,6 +227,35 @@ class PlaytestExplorerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity changed"):
             explorer.compare_results(self.result(scenario, "native"),
                                      self.result(scenario, "java"), tampered)
+
+    def test_group_and_congestion_cover_shared_movers(self):
+        seed = self.seed()
+        seed["actors"].append({
+            "id": 120, "player": 0, "domain": "land",
+            "capabilities": ["move"], "target_ids": [],
+        })
+        scenarios = explorer.generate_scenarios(seed, max_scenarios=800)
+        patterns = {item["pattern"] for item in scenarios}
+        self.assertIn("group", patterns)
+        self.assertIn("congestion", patterns)
+        group = next(item for item in scenarios if item["pattern"] == "group")
+        self.assertGreaterEqual(len(group["commands"]), 2)
+        self.assertEqual(1, len({command["issue_cycle"]
+                                 for command in group["commands"]}))
+        congested = next(item for item in scenarios
+                         if item["pattern"] == "congestion")
+        self.assertEqual("move", congested["commands"][0]["kind"])
+        self.assertEqual("move", congested["commands"][1]["kind"])
+        self.assertEqual(
+            (congested["commands"][0]["x"], congested["commands"][0]["y"]),
+            (congested["commands"][1]["x"], congested["commands"][1]["y"]))
+
+    def test_blocked_destinations_are_generated_as_refusals(self):
+        scenarios = explorer.generate_scenarios(self.seed(), max_scenarios=80)
+        refused = [item for item in scenarios if item["pattern"] == "refuse"]
+        self.assertTrue(refused)
+        self.assertTrue(all(command.get("point_kind") in {"blocked", "occupied"}
+                            for item in refused for command in item["commands"]))
 
 
 if __name__ == "__main__":

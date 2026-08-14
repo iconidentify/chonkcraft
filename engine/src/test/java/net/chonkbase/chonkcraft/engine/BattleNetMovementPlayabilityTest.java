@@ -126,4 +126,38 @@ class BattleNetMovementPlayabilityTest {
                 "the aircraft treated an impassable ground wall as flight terrain: "
                         + gryphon.tileX() + "," + gryphon.tileY());
     }
+
+    @Test
+    @DisplayName("a player move into forest settles on the first tree's approach")
+    void aPlayerMoveIntoForestSettlesOnTheFirstTreesApproach() {
+        // Authenticated Orc 1 commanded fixture: peon 1594 at 25,18 is told
+        // to walk to 30,18. That click is forest. Retail stores order point
+        // 28,18 -- the first tree on the ray -- packs NE,E, and is Still on
+        // 27,17 by cycle 40. Java used to keep walking east on y=18 and stay
+        // on Move at the window's end.
+        GameMap woods = map(32, 32, TileFlag.LAND_ALLOWED);
+        for (int y = 16; y <= 19; y++) {
+            for (int x = 28; x <= 31; x++) {
+                woods.field(x, y).setFlags(
+                        TileFlag.LAND_ALLOWED | TileFlag.FOREST | TileFlag.UNPASSABLE);
+            }
+        }
+        Fixture fixture = fixture(woods);
+        Unit peon = place(fixture, "unit-peon", 25, 18);
+
+        assertTrue(fixture.commands().apply(GameCommand.move(0, peon.id(), 30, 18)),
+                "the peon refused a point move into the trees");
+        assertEquals(28, peon.orderTargetX(),
+                "retail projects a forest click onto the first tree on the ray");
+        assertEquals(18, peon.orderTargetY(),
+                "retail projects a forest click onto the first tree on the ray");
+        runToRest(fixture.world(), peon, 80);
+
+        assertEquals(27, peon.tileX(),
+                "the peon should stand on the tree's approach, not keep walking: "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(17, peon.tileY(),
+                "the peon should take the forest wall-follow onto 27,17: "
+                        + peon.tileX() + "," + peon.tileY());
+    }
 }
