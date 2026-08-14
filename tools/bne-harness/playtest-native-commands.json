@@ -64,21 +64,75 @@
       "dual_adapter_executed": 0
     },
     "attack": {
-      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
       "evidence_hashes": {
         "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
-        "opcode": "0x13",
-        "fixed_bytes": 8
+        "order_function_index": 8,
+        "give_order": "0x00451070",
+        "dispatcher": "0x00475f80"
       },
-      "encoding": "InSight embedded opcode 0x13, eight bytes; target unit id at bytes 5-6",
+      "encoding": "GiveOrder through the guarded campaign injector; script line cycle N attack unit SLOT target T. Retail 0x13 packets carry function index 8 and a live target id.",
       "arguments": ["issue_cycle", "unit_id", "target_id"],
-      "supported_variants": [],
-      "unsupported_variants": ["native-injector-script", "ground-click-without-target"],
-      "positive_witnesses": [],
-      "negative_witnesses": [],
-      "native_execution_works": false,
+      "supported_variants": ["unit-target"],
+      "unsupported_variants": ["ground-click-without-target"],
+      "positive_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/attack-1/00.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/attack-1/01.bnefx"
+      ],
+      "negative_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/attack-1/02.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/attack-1/03.bnefx"
+      ],
+      "native_execution_works": true,
       "java_execution_works": true,
-      "dual_adapter_executed": 0
+      "dual_adapter_executed": 4
+    },
+    "harvest": {
+      "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "order_function_index": 23,
+        "give_order": "0x00451070",
+        "dispatcher": "0x00475f80",
+        "worker_flags": "0x0300"
+      },
+      "encoding": "GiveOrder through the guarded campaign injector; script line cycle N harvest unit SLOT target T. Retail 0x13 index 0x17 tests worker type flags 0x0300 before applying.",
+      "arguments": ["issue_cycle", "unit_id", "target_id"],
+      "supported_variants": ["gold-mine"],
+      "unsupported_variants": ["combat-unit-as-harvester"],
+      "positive_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/harvest-1/00.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/harvest-1/01.bnefx"
+      ],
+      "negative_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/harvest-1/02.bnefx"
+      ],
+      "native_execution_works": true,
+      "java_execution_works": true,
+      "dual_adapter_executed": 3
+    },
+    "patrol": {
+      "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+      "evidence_hashes": {
+        "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+        "order_function_index": 5,
+        "give_order": "0x00451070",
+        "dispatcher": "0x00475f80"
+      },
+      "encoding": "GiveOrder through the guarded campaign injector; script line cycle N patrol unit SLOT x X y Y. Retail 0x13 packets carry function index 5.",
+      "arguments": ["issue_cycle", "unit_id", "x", "y"],
+      "supported_variants": ["open-ground"],
+      "unsupported_variants": ["queued-follow-up"],
+      "positive_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/patrol-1/00.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/patrol-1/01.bnefx"
+      ],
+      "negative_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/patrol-1/02.bnefx"
+      ],
+      "native_execution_works": true,
+      "java_execution_works": true,
+      "dual_adapter_executed": 3
     },
     "production": {
       "evidence_authority": "retail-replay-dispatcher",

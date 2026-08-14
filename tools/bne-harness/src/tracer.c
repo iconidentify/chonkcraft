@@ -238,10 +238,16 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define MAX_SCRIPT_COMMANDS 1024
 #define SCRIPT_COMMAND_MOVE 1
 #define SCRIPT_COMMAND_STOP 2
+#define SCRIPT_COMMAND_ATTACK 3
+#define SCRIPT_COMMAND_HARVEST 4
+#define SCRIPT_COMMAND_PATROL 5
+#define SCRIPT_NO_TARGET 0xffffffffUL
+#define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
 typedef struct script_command {
     LONG cycle;
     DWORD unit_slot;
+    DWORD target_slot;
     BYTE action;
     BYTE x;
     BYTE y;
@@ -835,32 +841,56 @@ static BOOL read_command_file(void) {
         if (*cursor == '\0' || *cursor == '#') {
             continue;
         }
+        unsigned long target = SCRIPT_NO_TARGET;
+        BYTE action = 0;
+
+        extra = '\0';
         fields = sscanf(cursor,
                 "cycle %lu move unit %lu x %lu y %lu %c",
                 &cycle, &slot, &x, &y, &extra);
         if (fields == 4) {
-            script_commands[script_command_count].action = SCRIPT_COMMAND_MOVE;
+            action = SCRIPT_COMMAND_MOVE;
         } else {
-            char action_name[16];
-
             extra = '\0';
-            fields = sscanf(cursor, "cycle %lu %15s unit %lu %c",
-                    &cycle, action_name, &slot, &extra);
-            if (fields != 3 || strcmp(action_name, "stop") != 0) {
-                trace_write("# bne-trace event=command-file-rejected "
-                        "reason=invalid-command line=%lu", line_number);
-                fclose(source);
-                script_command_count = 0;
-                return FALSE;
+            fields = sscanf(cursor,
+                    "cycle %lu patrol unit %lu x %lu y %lu %c",
+                    &cycle, &slot, &x, &y, &extra);
+            if (fields == 4) {
+                action = SCRIPT_COMMAND_PATROL;
+            } else {
+                char action_name[16];
+
+                extra = '\0';
+                fields = sscanf(cursor,
+                        "cycle %lu %15s unit %lu target %lu %c",
+                        &cycle, action_name, &slot, &target, &extra);
+                if (fields == 4 && strcmp(action_name, "attack") == 0) {
+                    action = SCRIPT_COMMAND_ATTACK;
+                    x = 0;
+                    y = 0;
+                } else if (fields == 4 && strcmp(action_name, "harvest") == 0) {
+                    action = SCRIPT_COMMAND_HARVEST;
+                    x = 0;
+                    y = 0;
+                } else {
+                    extra = '\0';
+                    fields = sscanf(cursor, "cycle %lu %15s unit %lu %c",
+                            &cycle, action_name, &slot, &extra);
+                    if (fields == 3 && strcmp(action_name, "stop") == 0) {
+                        /* Stop packets in the authenticated replay corpus carry
+                         * dest 0,0 and no unit target. The 0x0C UI thunk is
+                         * not this path. */
+                        action = SCRIPT_COMMAND_STOP;
+                        x = 0;
+                        y = 0;
+                        target = SCRIPT_NO_TARGET;
+                    }
+                }
             }
-            /* Stop packets in the authenticated replay corpus carry dest
-             * 0,0 and no unit target. The 0x0C UI thunk is not this path. */
-            x = 0;
-            y = 0;
-            script_commands[script_command_count].action = SCRIPT_COMMAND_STOP;
         }
-        if (cycle == 0 || cycle > 0x7fffffffUL
+        if (action == 0 || cycle == 0 || cycle > 0x7fffffffUL
                 || slot >= BNE_UNIT_LIMIT || x > 127 || y > 127
+                || (target != SCRIPT_NO_TARGET && target >= BNE_UNIT_LIMIT)
                 || script_command_count >= MAX_SCRIPT_COMMANDS
                 || (script_command_count > 0
                     && cycle < (unsigned long) script_commands[
@@ -873,6 +903,8 @@ static BOOL read_command_file(void) {
         }
         script_commands[script_command_count].cycle = (LONG) cycle;
         script_commands[script_command_count].unit_slot = (DWORD) slot;
+        script_commands[script_command_count].target_slot = (DWORD) target;
+        script_commands[script_command_count].action = action;
         script_commands[script_command_count].x = (BYTE) x;
         script_commands[script_command_count].y = (BYTE) y;
         script_command_count++;
@@ -1325,21 +1357,40 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_STOP) {
         return "stop";
     }
+    if (action == SCRIPT_COMMAND_ATTACK) {
+        return "attack";
+    }
+    if (action == SCRIPT_COMMAND_HARVEST) {
+        return "harvest";
+    }
+    if (action == SCRIPT_COMMAND_PATROL) {
+        return "patrol";
+    }
     return "unknown";
 }
 
 static unsigned int script_order_function_index(BYTE action) {
-    /* Both indices are the 0x13 packet's function byte as executed by
+    /* These indices are the 0x13 packet's function byte as executed by
      * 0x00475f80, which loads ORDER_FUNCTIONS[packet[7]] and calls
-     * GiveOrder at 0x00451070. MOVE is table[3]. STOP is table[2]:
-     * replay-pack-1 has 88 0x13 packets with that index, dest 0,0 and
-     * target -1. The one-byte 0x0C dispatcher only jumps to the UI
-     * speech thunk at 0x00436ee0 and is not used here. */
+     * GiveOrder at 0x00451070 / 0x0047617f. Replay-pack-1 counts:
+     * table[3] move, table[2] stop (88 packets, dest 0,0, target -1),
+     * table[8] attack (221 packets with a live target), table[23]
+     * harvest (dispatcher special-cases 0x17 as the worker flag test).
+     * The one-byte 0x0C thunk at 0x00436ee0 is UI/speech and is unused. */
     if (action == SCRIPT_COMMAND_MOVE) {
         return 3;
     }
     if (action == SCRIPT_COMMAND_STOP) {
         return 2;
+    }
+    if (action == SCRIPT_COMMAND_ATTACK) {
+        return 8;
+    }
+    if (action == SCRIPT_COMMAND_HARVEST) {
+        return 23;
+    }
+    if (action == SCRIPT_COMMAND_PATROL) {
+        return 5;
     }
     return 0xff;
 }
@@ -1364,8 +1415,11 @@ static void apply_commands(LONG cycle) {
         const script_command *command =
                 &script_commands[next_script_command++];
         BYTE *unit;
+        BYTE *target = NULL;
         void *order_function;
         unsigned int function_index;
+        unsigned int dest_x = command->x;
+        unsigned int dest_y = command->y;
 
         if (command->cycle < cycle) {
             reject_command(command, "missed-cycle");
@@ -1382,6 +1436,36 @@ static void apply_commands(LONG cycle) {
         }
         if (unit[BNE_UNIT_OWNER] != *BNE_202_LOCAL_PLAYER) {
             reject_command(command, "unit-not-local");
+            continue;
+        }
+        if (command->action == SCRIPT_COMMAND_HARVEST
+                && (BNE_202_UNIT_TYPE_FLAGS[unit[BNE_UNIT_TYPE]]
+                    & SCRIPT_WORKER_TYPE_FLAGS) == 0) {
+            /* 0x00475f80 special-cases index 0x17 with this same mask.
+             * A grunt must not become a harvester. */
+            reject_command(command, "not-a-worker");
+            continue;
+        }
+        if (command->target_slot != SCRIPT_NO_TARGET) {
+            if (command->target_slot >= pool_count) {
+                reject_command(command, "target-slot-out-of-range");
+                continue;
+            }
+            target = pool + command->target_slot * BNE_UNIT_BYTES;
+            if ((target[BNE_UNIT_FLAGS3]
+                    & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
+                reject_command(command, "target-not-live");
+                continue;
+            }
+            if (target == unit) {
+                reject_command(command, "target-is-self");
+                continue;
+            }
+            dest_x = read_word(target, BNE_UNIT_X);
+            dest_y = read_word(target, BNE_UNIT_Y);
+        } else if (command->action == SCRIPT_COMMAND_ATTACK
+                || command->action == SCRIPT_COMMAND_HARVEST) {
+            reject_command(command, "target-required");
             continue;
         }
         if (!executable_page_contains(BNE_202_GIVE_ORDER)
@@ -1401,13 +1485,13 @@ static void apply_commands(LONG cycle) {
             continue;
         }
         ((give_order_function) (void *) BNE_202_GIVE_ORDER)(
-                unit, command->x, command->y, NULL, order_function);
+                unit, (int) dest_x, (int) dest_y, target, order_function);
         trace_write("# bne-trace event=command-applied cycle=%ld action=%s "
-                "unit=%lu x=%u y=%u function-index=%u", command->cycle,
-                script_action_name(command->action),
+                "unit=%lu target=%lu x=%u y=%u function-index=%u",
+                command->cycle, script_action_name(command->action),
                 (unsigned long) command->unit_slot,
-                (unsigned int) command->x, (unsigned int) command->y,
-                function_index);
+                (unsigned long) command->target_slot,
+                dest_x, dest_y, function_index);
     }
 }
 

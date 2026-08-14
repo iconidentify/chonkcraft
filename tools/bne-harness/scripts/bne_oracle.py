@@ -38,15 +38,23 @@ CAMPAIGN_SCENARIO = re.compile(
     re.IGNORECASE,
 )
 SCRIPT_COMMAND_MOVE = re.compile(
-    r"^cycle ([1-9]\d*) move unit (\d+) x (\d+) y (\d+)$"
+    r"^cycle ([1-9]\d*) (move|patrol) unit (\d+) x (\d+) y (\d+)$"
 )
 SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground) unit (\d+)$"
+)
+SCRIPT_COMMAND_TARGETED = re.compile(
+    r"^cycle ([1-9]\d*) (attack|harvest) unit (\d+) target (\d+)$"
 )
 GAME_RULE_REJECT_REASONS = {
     "unit-not-local",
     "unit-not-live",
     "unit-slot-out-of-range",
+    "target-not-live",
+    "target-slot-out-of-range",
+    "target-is-self",
+    "target-required",
+    "not-a-worker",
 }
 COMMAND_REJECT_REASON = re.compile(r"\breason=([a-z0-9-]+)\b")
 
@@ -84,34 +92,52 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 continue
             move = SCRIPT_COMMAND_MOVE.fullmatch(line)
             stance = SCRIPT_COMMAND_STANCE.fullmatch(line)
+            targeted = SCRIPT_COMMAND_TARGETED.fullmatch(line)
+            target = None
             if move is not None:
-                cycle, slot, x, y = (int(value) for value in move.groups())
-                action = "move"
+                cycle = int(move.group(1))
+                action = move.group(2)
+                slot = int(move.group(3))
+                x = int(move.group(4))
+                y = int(move.group(5))
             elif stance is not None:
                 cycle = int(stance.group(1))
                 action = stance.group(2)
                 slot = int(stance.group(3))
                 x = 0
                 y = 0
+            elif targeted is not None:
+                cycle = int(targeted.group(1))
+                action = targeted.group(2)
+                slot = int(targeted.group(3))
+                target = int(targeted.group(4))
+                x = 0
+                y = 0
             else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
-                    "'cycle N move unit SLOT x X y Y' or "
-                    "'cycle N stop|stand-ground unit SLOT'"
+                    "'cycle N move unit SLOT x X y Y', "
+                    "'cycle N stop|stand-ground unit SLOT', or "
+                    "'cycle N attack|harvest unit SLOT target T'"
                 )
             if cycle < previous_cycle:
                 raise ValueError(f"commands are not cycle-sorted at {path}:{line_number}")
             if slot >= 1600:
                 raise ValueError(f"unit slot is outside BNE's pool at {path}:{line_number}")
+            if target is not None and target >= 1600:
+                raise ValueError(f"target slot is outside BNE's pool at {path}:{line_number}")
             if x > 127 or y > 127:
                 raise ValueError(f"tile is outside BNE's map bounds at {path}:{line_number}")
-            commands.append({
+            parsed = {
                 "cycle": cycle,
                 "action": action,
                 "unit": slot,
                 "x": x,
                 "y": y,
-            })
+            }
+            if target is not None:
+                parsed["target"] = target
+            commands.append(parsed)
             previous_cycle = cycle
     if len(commands) > 1024:
         raise ValueError("command file exceeds the 1,024-command harness limit")

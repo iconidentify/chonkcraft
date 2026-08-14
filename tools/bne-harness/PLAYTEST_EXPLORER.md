@@ -56,12 +56,12 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-fixture \
   capture.bnefx --output seed.json
 ```
 
-Each generated movement or stop scenario can be encoded directly for the
-guarded native command injector. Stop uses the same `GiveOrder` entry as move
-with order-function table index 2, the index carried by authenticated `0x13`
-stop packets. Other command families fail closed here and must use the
-authenticated replay-packet adapter; they are never guessed into native
-order-function calls.
+Each generated movement, stop, patrol, attack or harvest scenario can be
+encoded directly for the guarded native command injector. Those families use
+the same `GiveOrder` entry as the authenticated `0x13` dispatcher, with table
+indices 3, 2, 5, 8 and 23. Other command families fail closed here and must
+use the authenticated replay-packet adapter; they are never guessed into
+native order-function calls.
 
 ```sh
 python3 tools/bne-harness/scripts/bne_playtest_explorer.py command-script \

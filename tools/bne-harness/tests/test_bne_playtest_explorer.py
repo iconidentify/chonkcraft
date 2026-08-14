@@ -153,9 +153,19 @@ class PlaytestExplorerTest(unittest.TestCase):
     def test_native_direct_injector_refuses_an_unproved_command_family(self):
         scenario = next(item for item in explorer.generate_scenarios(
             self.seed(), max_scenarios=500)
-            if item["commands"][0]["kind"] == "attack")
+            if item["commands"][0]["kind"] == "follow")
         with self.assertRaisesRegex(ValueError, "does not prove"):
             explorer.native_command_script(scenario)
+
+    def test_native_direct_injector_emits_attack(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if all(command["kind"] == "attack" for command in item["commands"])
+            and isinstance(item["commands"][0].get("target_id"), int))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("attack unit", script)
+        self.assertIn("target", script)
 
     def test_native_direct_injector_emits_stop(self):
         scenario = next(
@@ -165,6 +175,37 @@ class PlaytestExplorerTest(unittest.TestCase):
         script = explorer.native_command_script(scenario)
         self.assertIn("stop unit", script)
         self.assertNotIn("0x436ee0", script)
+
+    def test_comparison_catches_a_mutated_harvest_result(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["harvest"]
+        seed["actors"][0]["target_ids"] = [200]
+        seed["targets"][0]["type_ident"] = "unit-gold-mine"
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "harvest" for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
+
+    def test_comparison_catches_a_mutated_attack_result(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if all(command["kind"] == "attack" for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
 
     def test_comparison_catches_a_mutated_stop_result(self):
         scenario = next(

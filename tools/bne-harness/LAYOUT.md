@@ -216,12 +216,15 @@ recorded as their named cycle. Both supported actions use the 2.02b routine at
 and the selected handler's executable mapping are checked at the moment of use.
 
 `move` reads entry 3 of the stock order-function table at `0x00495fcc`. `stop`
-reads entry 2. That stop index is the same byte the synchronized `0x13`
-dispatcher at `0x00475f80` loads as `ORDER_FUNCTIONS[packet[7]]` before it
-calls `GiveOrder` at `0x0047617f`. The authenticated war2.ru replay pack
-contains 88 such packets with dest `0,0` and target `-1`. The one-byte `0x0C`
-dispatcher only jumps to the UI/speech thunk at `0x00436ee0` and is not the
-scripted stop path.
+reads entry 2, `patrol` entry 5, `attack` entry 8, and `harvest` entry 23.
+Those indices are the same byte the synchronized `0x13` dispatcher at
+`0x00475f80` loads as `ORDER_FUNCTIONS[packet[7]]` before it calls `GiveOrder`
+at `0x0047617f`. Replay-pack-1 has 88 stop packets (dest `0,0`, target `-1`),
+1,627 patrol packets at index 5, 221 attack packets with a live target, and a
+harvest special-case at index `0x17` that tests worker type flags `0x0300`.
+The one-byte `0x0C` dispatcher only jumps to the UI/speech thunk at
+`0x00436ee0` and is not the scripted stop path. Harvest refuses a non-worker
+actor with that same flag test so a grunt cannot become a harvester.
 
 The harness does not write the order, target, or path fields directly. It
 passes BNE the live unit pointer, tile coordinates, null unit target, and BNE's

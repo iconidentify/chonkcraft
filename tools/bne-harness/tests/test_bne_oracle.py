@@ -64,6 +64,29 @@ class OracleIdentityTest(unittest.TestCase):
         self.assertEqual(1594, commands[0]["unit"])
         self.assertEqual(20, commands[-1]["cycle"])
 
+    def test_parses_a_patrol_command_script(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text("cycle 5 patrol unit 1592 x 22 y 18\n",
+                            encoding="ascii")
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual("patrol", commands[0]["action"])
+        self.assertEqual((22, 18), (commands[0]["x"], commands[0]["y"]))
+
+    def test_parses_attack_and_harvest_command_scripts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text(
+                "cycle 5 attack unit 1592 target 1595\n"
+                "cycle 10 harvest unit 1594 target 1596\n",
+                encoding="ascii",
+            )
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual(["attack", "harvest"],
+                         [command["action"] for command in commands])
+        self.assertEqual(1595, commands[0]["target"])
+        self.assertEqual(1596, commands[1]["target"])
+
     def test_parses_stop_and_stand_ground_command_scripts(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.txt"

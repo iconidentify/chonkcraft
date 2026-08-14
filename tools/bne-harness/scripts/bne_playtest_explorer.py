@@ -59,9 +59,11 @@ REPLACE_FAMILY_RANK = {
     "harvest": 3, "cast": 3, "build": 4,
 }
 INJECTOR_MOVE = re.compile(
-    r"cycle (\d+) move unit (\d+) x (\d+) y (\d+)\Z")
+    r"cycle (\d+) (move|patrol) unit (\d+) x (\d+) y (\d+)\Z")
 INJECTOR_STANCE = re.compile(
     r"cycle (\d+) (stop|stand-ground) unit (\d+)\Z")
+INJECTOR_TARGETED = re.compile(
+    r"cycle (\d+) (attack|harvest) unit (\d+) target (\d+)\Z")
 MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
 REFUSED_POINTS = {"occupied", "blocked", "unaffordable"}
 
@@ -469,13 +471,14 @@ def parse_injector_script(text: str) -> list[dict[str, Any]]:
             continue
         move = INJECTOR_MOVE.fullmatch(line)
         stance = INJECTOR_STANCE.fullmatch(line)
+        targeted = INJECTOR_TARGETED.fullmatch(line)
         if move is not None:
-            cycle, unit_id, x, y = (int(value) for value in move.groups())
+            cycle = int(move.group(1))
             commands.append({
-                "kind": "move",
-                "unit_id": unit_id,
-                "x": x,
-                "y": y,
+                "kind": move.group(2),
+                "unit_id": int(move.group(3)),
+                "x": int(move.group(4)),
+                "y": int(move.group(5)),
                 "queued": False,
                 "issue_cycle": cycle,
             })
@@ -485,6 +488,16 @@ def parse_injector_script(text: str) -> list[dict[str, Any]]:
             commands.append({
                 "kind": stance.group(2),
                 "unit_id": int(stance.group(3)),
+                "queued": False,
+                "issue_cycle": cycle,
+            })
+            continue
+        if targeted is not None:
+            cycle = int(targeted.group(1))
+            commands.append({
+                "kind": targeted.group(2),
+                "unit_id": int(targeted.group(3)),
+                "target_id": int(targeted.group(4)),
                 "queued": False,
                 "issue_cycle": cycle,
             })
@@ -530,7 +543,12 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         if command["kind"] not in actor["capabilities"]:
             actor["capabilities"].append(command["kind"])
             actor["capabilities"].sort()
-        if command["kind"] in {"stop", "stand-ground"}:
+        if command["kind"] in {"attack", "harvest"} and isinstance(
+                command.get("target_id"), int):
+            if command["target_id"] not in actor["target_ids"]:
+                actor["target_ids"].append(command["target_id"])
+                actor["target_ids"].sort()
+        if command["kind"] in {"stop", "stand-ground", "attack", "harvest"}:
             continue
         if not all(isinstance(command.get(key), int) for key in ("x", "y")):
             raise ValueError("commanded fixture move has no integer destination")
@@ -543,11 +561,30 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             point["domains"].sort()
     if not actors:
         raise ValueError("commanded fixture produced an empty seed")
-    if not points and any(command["kind"] not in {"stop", "stand-ground"}
-                          for command in commands):
+    if not points and any(command["kind"] not in {
+            "stop", "stand-ground", "attack", "harvest"}
+            for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
     cycle_limit = int(run.get("cycle_limit") or 160)
+    targets: dict[int, dict[str, Any]] = {}
+    for command in commands:
+        target_id = command.get("target_id")
+        if not isinstance(target_id, int):
+            continue
+        raw = frame["units"].get(target_id)
+        if raw is None:
+            continue
+        dest_x = bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X)
+        dest_y = bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y)
+        targets[target_id] = {
+            "id": target_id,
+            "player": raw[bne_command_matrix.UNIT_OWNER],
+            "domain": MOVEMENT_DOMAIN.get(
+                raw[bne_command_matrix.UNIT_MOVEMENT], "land"),
+            "x": dest_x,
+            "y": dest_y,
+        }
     seed: dict[str, Any] = {
         "schema": SEED_SCHEMA,
         "identity": {
@@ -567,7 +604,7 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         "start_cycle": start_cycle,
         "settle_cycles": max(1, cycle_limit - start_cycle),
         "actors": [actors[key] for key in sorted(actors)],
-        "targets": [],
+        "targets": [targets[key] for key in sorted(targets)],
         "points": [points[key] for key in sorted(points)],
         "authenticated_commands": commands,
     }
@@ -591,6 +628,7 @@ def scenario_from_commanded_seed(seed: dict[str, Any]) -> dict[str, Any]:
         "setup": setup,
         "pattern": "single" if len(commands) == 1 else "sequence",
         "actors": copy.deepcopy(seed["actors"]),
+        "targets": copy.deepcopy(seed.get("targets") or []),
         "start_cycle": int(seed.get("start_cycle", commands[0]["issue_cycle"])),
         "settle_cycles": int(seed.get("settle_cycles", 600)),
         "commands": copy.deepcopy(commands),
@@ -895,17 +933,24 @@ def native_command_script(scenario: dict[str, Any]) -> str:
         f"# scenario-sha256 {scenario['scenario_sha256']}",
     ]
     for command in scenario["commands"]:
-        if command["kind"] == "move":
+        if command["kind"] in {"move", "patrol"}:
             if not all(isinstance(command.get(key), int) for key in ("x", "y")):
-                raise ValueError("move command has no integer destination")
+                raise ValueError(f"{command['kind']} command has no integer destination")
             lines.append(
-                f"cycle {command['issue_cycle']} move unit {command['unit_id']} "
-                f"x {command['x']} y {command['y']}")
+                f"cycle {command['issue_cycle']} {command['kind']} "
+                f"unit {command['unit_id']} x {command['x']} y {command['y']}")
             continue
         if command["kind"] in {"stop", "stand-ground"}:
             lines.append(
                 f"cycle {command['issue_cycle']} {command['kind']} "
                 f"unit {command['unit_id']}")
+            continue
+        if command["kind"] in {"attack", "harvest"}:
+            if not isinstance(command.get("target_id"), int):
+                raise ValueError(f"{command['kind']} command has no target")
+            lines.append(
+                f"cycle {command['issue_cycle']} {command['kind']} "
+                f"unit {command['unit_id']} target {command['target_id']}")
             continue
         raise ValueError(
             "native direct command injector does not prove "
