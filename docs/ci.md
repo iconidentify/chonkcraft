@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 714 of 2,184 tests skip and
+either way. With nothing configured, 718 of 2,202 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,10 +57,9 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **19 skips of 2,184**, re-measured after the siege
-runtime and multiplayer-service additions
-against a real 1995 installation. One of the nineteen depends on which release
-the installation is -- a Battle.net Edition sees 18, which is correct and not a
+Asserts the `full` profile: **20 skips of 2,202**, updated after the player-intent
+coverage additions against a real 1995 installation. One of the twenty depends
+on which release the installation is -- a Battle.net Edition sees 19, which is correct and not a
 regression; `scripts/ci/check-test-skips.py` explains it at the profile.
 About nine minutes.
 
@@ -83,19 +82,19 @@ Per module and in total:
 The asymmetry is deliberate. Adding a test that always runs raises the run count
 and needs no change here. Adding a test that skips without game data raises the
 skip count and turns CI red until somebody writes the new number down. That
-second case is the one worth catching: it is how 714 tests came to be skippable
+second case is the one worth catching: it is how 718 tests came to be skippable
 in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 714 |
-| `full` | installation, pack, Opus vectors | 19 |
+| `data-free` | none | 718 |
+| `full` | installation, pack, Opus vectors | 20 |
 
-The nineteen that skip even in `full` want nothing anyone should have to
+The twenty that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, and four are
 fixture-sensitive behaviours absent from the pinned installation and scripts.
-Two exact-save referees additionally need the operator's private playtest saves,
+Three exact-save referees additionally need the operator's private playtest saves,
 and one video assertion depends on which retail release is mounted.
 
 ## The failure gate
