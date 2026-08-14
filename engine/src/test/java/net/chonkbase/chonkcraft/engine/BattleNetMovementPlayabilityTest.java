@@ -10,6 +10,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -227,5 +228,187 @@ class BattleNetMovementPlayabilityTest {
                 Math.abs(destroyer.tileY() - 18)) <= 1,
                 "the ship should stop beside the first land square: "
                         + destroyer.tileX() + "," + destroyer.tileY());
+    }
+
+    @Test
+    @DisplayName("a human-1 grunt commanded east stands on the clicked square")
+    void aHuman1GruntCommandedEastStandsOnTheClickedSquare() {
+        // i9beef commanded fixture command-campaign-human-human01-pud-ground-e:
+        // cycle 5 move unit 1588 x 24 y 31. Native starts at 20,31, first
+        // steps on cycle 8, and is Still on 24,31 at cycle 72. The exe sha256
+        // is the pinned 2.02b digest.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level01h", 0);
+        Assumptions.assumeTrue(mission != null, "Human 1 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+
+        Unit walker = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 20 && unit.tileY() == 31
+                    && unit.player() == 0) {
+                walker = unit;
+                break;
+            }
+        }
+        assertNotNull(walker, "Human 1 has no player unit on 20,31");
+
+        assertTrue(commands.apply(GameCommand.move(0, walker.id(), 24, 31)),
+                "the Human 1 walker refused the commanded east move");
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+        }
+        assertEquals(24, walker.tileX(),
+                "retail stands on the clicked square 24,31, not "
+                        + walker.tileX() + "," + walker.tileY());
+        assertEquals(31, walker.tileY(),
+                "retail stands on the clicked square 24,31, not "
+                        + walker.tileX() + "," + walker.tileY());
+        assertEquals(Unit.Order.STILL, walker.order(),
+                "retail is Still on 24,31 by cycle 72; Java is still "
+                        + walker.order());
+    }
+
+    @Test
+    @DisplayName("an orc-1 peon commanded onto open ground stands on the click")
+    void anOrc1PeonCommandedOntoOpenGroundStandsOnTheClick() {
+        // Fresh i9beef capture, pinned 2.02b. Cycle 5 move peon 1594 to
+        // 22,18 -- west, off the trees. Native first steps on cycle 8 and
+        // is Still on 22,18 at cycle 56.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/orc/level01o", 0);
+        Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+
+        Unit peon = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 25 && unit.tileY() == 18
+                    && unit.player() == 0) {
+                peon = unit;
+                break;
+            }
+        }
+        assertNotNull(peon, "Orc 1 has no player peon on 25,18");
+
+        assertTrue(commands.apply(GameCommand.move(0, peon.id(), 22, 18)),
+                "the Orc 1 peon refused the open-ground move");
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+        }
+        assertEquals(22, peon.tileX(),
+                "retail stands on the clicked open square 22,18, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(18, peon.tileY(),
+                "retail stands on the clicked open square 22,18, not "
+                        + peon.tileX() + "," + peon.tileY());
+        assertEquals(Unit.Order.STILL, peon.order(),
+                "retail is Still on 22,18 by cycle 56; Java is still "
+                        + peon.order());
+    }
+
+    @Test
+    @DisplayName("a human-2 click onto an occupied square stays put")
+    void aHuman2ClickOntoAnOccupiedSquareStaysPut() {
+        // i9beef command-matrix Human 2 occupied: cycle 5 move unit 1579
+        // x 7 y 34. The walker starts at 8,35, flickers to Move at cycle 10,
+        // and is Still back on 8,35 for the rest of the 160-cycle fixture.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level02h", 0);
+        Assumptions.assumeTrue(mission != null, "Human 2 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+
+        Unit walker = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 8 && unit.tileY() == 35
+                    && unit.player() == 0) {
+                walker = unit;
+                break;
+            }
+        }
+        assertNotNull(walker, "Human 2 has no player unit on 8,35");
+
+        assertTrue(commands.apply(GameCommand.move(0, walker.id(), 7, 34)),
+                "retail accepted the occupied click; Java refused it outright");
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+        }
+        assertEquals(8, walker.tileX(),
+                "retail never left 8,35 after the occupied click; Java is at "
+                        + walker.tileX() + "," + walker.tileY());
+        assertEquals(35, walker.tileY(),
+                "retail never left 8,35 after the occupied click; Java is at "
+                        + walker.tileX() + "," + walker.tileY());
+        assertEquals(Unit.Order.STILL, walker.order(),
+                "retail is Still on 8,35; Java is still " + walker.order());
+    }
+
+    @Test
+    @DisplayName("a human-12 zeppelin click resumes east toward 107,51")
+    void aHuman12ZeppelinClickResumesEastTowardTheRetailScoutPoint() {
+        // i9beef command-campaign-human-human12-pud-air-e, pinned 2.02b.
+        // Cycle 5 move the player zeppelin on 82,52 to 86,52. Native
+        // writes patrol dest 59,44 at fixture 2, Still on 86,52 at 48,
+        // dest 107,51 at 49/51, 88,52 at 54 and 90,52 at 80. The
+        // fixture forces initialization seed 1. Two HandleEachCycle
+        // warmup ticks precede fixture cycle 1 -- the same boundary
+        // EngineTrace uses -- because the resume point is two
+        // asynchronous draws from the seed at that beat.
+        GameData data = data();
+        Mission mission = data.loadMission("campaigns/human/level12h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 12 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+
+        Unit zeppelin = null;
+        for (Unit unit : world.units()) {
+            if (unit.isAlive() && unit.isOnMap()
+                    && unit.tileX() == 82 && unit.tileY() == 52
+                    && unit.player() == 0
+                    && "unit-zeppelin".equals(unit.type().ident())) {
+                zeppelin = unit;
+                break;
+            }
+        }
+        assertNotNull(zeppelin, "Human 12 has no player zeppelin on 82,52");
+
+        mission.tick();
+        mission.tick();
+        for (int cycle = 1; cycle <= 80; cycle++) {
+            if (cycle == 5) {
+                assertTrue(commands.apply(GameCommand.move(
+                                0, zeppelin.id(), 86, 52)),
+                        "the Human 12 zeppelin refused the commanded east click");
+            }
+            mission.tick();
+        }
+
+        assertEquals(107, zeppelin.orderTargetX(),
+                "retail resumes the scout toward 107,51, not "
+                        + zeppelin.orderTargetX() + "," + zeppelin.orderTargetY());
+        assertEquals(51, zeppelin.orderTargetY(),
+                "retail resumes the scout toward 107,51, not "
+                        + zeppelin.orderTargetX() + "," + zeppelin.orderTargetY());
+        assertEquals(90, zeppelin.tileX(),
+                "retail is on 90,52 by fixture 80, flying east, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(52, zeppelin.tileY(),
+                "retail is on 90,52 by fixture 80, flying east, not "
+                        + zeppelin.tileX() + "," + zeppelin.tileY());
+        assertEquals(Unit.Order.PATROL, zeppelin.order(),
+                "retail is back on Patrol toward 107,51; Java is still "
+                        + zeppelin.order());
     }
 }
