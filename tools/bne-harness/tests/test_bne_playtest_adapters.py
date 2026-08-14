@@ -139,6 +139,28 @@ class PlaytestAdapterTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "missing"):
                 java.resolve_pack(missing)
 
+    def test_both_production_adapters_execute_the_sealed_orc_one_move(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        if not COMMANDED.is_file() or not pack.is_file():
+            self.skipTest("commanded Orc 1 fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        native_result = native.run_from_fixture(
+            scenario, COMMANDED, PINNED, "a" * 64)
+        explorer.validate_result(native_result, scenario, "native")
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertTrue(native_result["observations"][0]["accepted"])
+        self.assertTrue(java_result["observations"][0]["accepted"])
+
 
 if __name__ == "__main__":
     unittest.main()

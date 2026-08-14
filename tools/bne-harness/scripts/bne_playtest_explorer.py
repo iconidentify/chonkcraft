@@ -208,11 +208,99 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
     return seed
 
 
-# Neutral owner 15 is the retail gold-mine / critter / oil-patch bank in
-# campaign PUDs. Buildings occupy type ids 58 and above in the same table
-# seed_from_fixture already uses to reject halls as movers.
-NEUTRAL_OWNER = 15
-BUILDING_TYPE_FLOOR = 58
+# BNE 2.02b unit-type names at record byte 39 -- bne_202_layout.h.
+BNE_UNIT_TYPE_NAMES = (
+    "unit-footman", "unit-grunt", "unit-peasant", "unit-peon",
+    "unit-ballista", "unit-catapult", "unit-knight", "unit-ogre",
+    "unit-archer", "unit-axethrower", "unit-mage", "unit-death-knight",
+    "unit-paladin", "unit-ogre-mage", "unit-dwarves", "unit-goblin-sappers",
+    "unit-attack-peasant", "unit-attack-peon", "unit-ranger", "unit-berserker",
+    "unit-female-hero", "unit-evil-knight", "unit-flying-angel", "unit-fad-man",
+    "unit-white-mage", "unit-beast-cry", "unit-human-oil-tanker",
+    "unit-orc-oil-tanker", "unit-human-transport", "unit-orc-transport",
+    "unit-human-destroyer", "unit-orc-destroyer", "unit-battleship",
+    "unit-ogre-juggernaught", "unit-unused-34", "unit-fire-breeze",
+    "unit-unused-36", "unit-unused-37", "unit-human-submarine",
+    "unit-orc-submarine", "unit-balloon", "unit-zeppelin",
+    "unit-gryphon-rider", "unit-dragon", "unit-knight-rider",
+    "unit-eye-of-vision", "unit-arthor-literios", "unit-quick-blade",
+    "unit-unused-48", "unit-double-head", "unit-wise-man", "unit-ice-bringer",
+    "unit-man-of-light", "unit-sharp-axe", "unit-unused-54", "unit-skeleton",
+    "unit-daemon", "unit-critter", "unit-farm", "unit-pig-farm",
+    "unit-human-barracks", "unit-orc-barracks", "unit-church",
+    "unit-altar-of-storms", "unit-human-watch-tower", "unit-orc-watch-tower",
+    "unit-stables", "unit-ogre-mound", "unit-inventor", "unit-alchemist",
+    "unit-gryphon-aviary", "unit-dragon-roost", "unit-human-shipyard",
+    "unit-orc-shipyard", "unit-town-hall", "unit-great-hall",
+    "unit-elven-lumber-mill", "unit-troll-lumber-mill", "unit-human-foundry",
+    "unit-orc-foundry", "unit-mage-tower", "unit-temple-of-the-damned",
+    "unit-human-blacksmith", "unit-orc-blacksmith", "unit-human-refinery",
+    "unit-orc-refinery", "unit-human-oil-platform", "unit-orc-oil-platform",
+    "unit-keep", "unit-stronghold", "unit-castle", "unit-fortress",
+    "unit-gold-mine", "unit-oil-patch", "unit-human-start-location",
+    "unit-orc-start-location", "unit-human-guard-tower", "unit-orc-guard-tower",
+    "unit-human-cannon-tower", "unit-orc-cannon-tower", "unit-circle-of-power",
+    "unit-dark-portal", "unit-runestone", "unit-human-wall", "unit-orc-wall",
+)
+BUTTON_ACTION_FAMILY = {
+    "move": "move",
+    "stop": "stop",
+    "attack": "attack",
+    "attack-ground": "attack-ground",
+    "stand-ground": "stand-ground",
+    "patrol": "patrol",
+    "harvest": "harvest",
+    "return-goods": "return-goods",
+    "repair": "repair",
+    "build": "build",
+    "train-unit": "train",
+    "research": "research",
+    "unload": "unload",
+    "cast-spell": "cast",
+}
+RESOURCE_TYPE_IDENTS = {"unit-gold-mine", "unit-oil-patch", "unit-oil-platform",
+                        "unit-human-oil-platform", "unit-orc-oil-platform"}
+GENERATED_BUTTONS = (
+    Path(__file__).resolve().parents[3]
+    / "engine/src/main/java/net/chonkbase/chonkcraft/engine/generated"
+    / "GeneratedButtons.java"
+)
+_BUTTON_ROW = re.compile(
+    r'new Row\(\s*\d+\s*,\s*\d+\s*,\s*"[^"]+"\s*,\s*"(?P<action>[^"]+)"'
+    r'.*java\.util\.List\.of\((?P<units>[^)]*)\)\s*\)\s*,?\s*$'
+)
+_UNIT_IDENT = re.compile(r'"(unit-[a-z0-9-]+)"')
+
+
+def bne_type_ident(type_id: int) -> str:
+    if 0 <= type_id < len(BNE_UNIT_TYPE_NAMES):
+        return BNE_UNIT_TYPE_NAMES[type_id]
+    return "unit-unknown"
+
+
+def load_typed_command_capabilities(path: Path | None = None) -> dict[str, set[str]]:
+    """Map unit ident -> command families from the typed button catalog."""
+    source = path or GENERATED_BUTTONS
+    text = source.read_text(encoding="utf-8")
+    capabilities: dict[str, set[str]] = {}
+    for line in text.splitlines():
+        match = _BUTTON_ROW.search(line.strip())
+        if match is None:
+            continue
+        family = BUTTON_ACTION_FAMILY.get(match.group("action"))
+        if family is None:
+            continue
+        for ident in _UNIT_IDENT.findall(match.group("units")):
+            capabilities.setdefault(ident, set()).add(family)
+    if not capabilities:
+        raise ValueError(f"typed button catalog produced no capabilities: {source}")
+    return capabilities
+
+
+def typed_capabilities_for_type(type_id: int,
+        catalog: dict[str, set[str]] | None = None) -> set[str]:
+    table = catalog if catalog is not None else load_typed_command_capabilities()
+    return set(table.get(bne_type_ident(type_id), ()))
 
 
 def _frame_units(fixture: Path) -> list[tuple[int, bytes]]:
@@ -221,49 +309,44 @@ def _frame_units(fixture: Path) -> list[tuple[int, bytes]]:
 
 
 def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
-    """Declare extra player families from authenticated cycle-one records.
+    """Attach only the command families the typed button catalog names.
 
-    The native injector still proves only move. These capabilities exist so
-    generation covers attack, harvest, stance and production refusal. The
-    native adapter stays fail-closed unless a commanded or replay packet
-    matches the emitted scenario.
+    Cycle-one records supply slot, owner and type id. Harvest, train and
+    research come from GeneratedButtons for that ident -- not from owner
+    or a type-id range. A grunt never harvests. A farm never trains.
     """
     validate_seed(seed)
+    catalog = load_typed_command_capabilities()
     records = _frame_units(fixture)
     by_slot = dict(records)
+    actors = {actor["id"]: actor for actor in seed["actors"]}
+    targets = {target["id"]: target for target in seed.get("targets", [])}
     hostiles: list[int] = []
     resources: list[int] = []
-    halls: list[int] = []
-    workers: list[int] = []
+    trainers: list[int] = []
+    harvesters: list[int] = []
     for slot, raw in records:
+        if raw[bne_command_matrix.UNIT_FLAGS] & bne_command_matrix.UNIT_HIDDEN:
+            continue
+        ident = bne_type_ident(raw[39])
         owner = raw[bne_command_matrix.UNIT_OWNER]
-        hidden = raw[bne_command_matrix.UNIT_FLAGS] & bne_command_matrix.UNIT_HIDDEN
-        if hidden:
-            continue
-        type_id = raw[39]
-        if owner not in {0, NEUTRAL_OWNER} and type_id < BUILDING_TYPE_FLOOR:
+        caps = typed_capabilities_for_type(raw[39], catalog)
+        if owner != 0 and ident not in RESOURCE_TYPE_IDENTS:
             hostiles.append(slot)
-        if owner == NEUTRAL_OWNER and type_id >= BUILDING_TYPE_FLOOR:
+        if ident in RESOURCE_TYPE_IDENTS:
             resources.append(slot)
-        if owner == 0 and type_id >= BUILDING_TYPE_FLOOR:
-            halls.append(slot)
-        if owner == 0 and type_id < BUILDING_TYPE_FLOOR:
-            workers.append(slot)
-    targets = {target["id"]: target for target in seed.get("targets", [])}
-    actors = {actor["id"]: actor for actor in seed["actors"]}
-    for slot in workers:
+        if owner == 0 and ({"train", "research"} & caps):
+            trainers.append(slot)
+        if owner == 0 and "harvest" in caps:
+            harvesters.append(slot)
         if slot in actors:
-            continue
-        raw = by_slot[slot]
-        movement = raw[bne_command_matrix.UNIT_MOVEMENT]
-        actors[slot] = {
-            "id": slot,
-            "player": 0,
-            "domain": "land" if movement == 0
-            else "air" if movement == 1 else "water",
-            "capabilities": ["move", "stop"],
-            "target_ids": [],
-        }
+            allowed = set(actors[slot]["capabilities"]) | caps
+            # Attack on ground is attack-move only for types that can both
+            # walk and attack. That is the retail control rule, not a range.
+            if "attack" in allowed and "move" in allowed:
+                allowed.add("attack-move")
+            actors[slot]["capabilities"] = sorted(allowed)
+            actors[slot]["type_ident"] = ident
     for slot in hostiles + resources:
         raw = by_slot.get(slot)
         if raw is None:
@@ -274,27 +357,52 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             "domain": "land",
             "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
             "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
+            "type_ident": bne_type_ident(raw[39]),
         })
     for actor in actors.values():
         caps = set(actor["capabilities"])
-        caps.update({"stop", "stand-ground", "attack-move"})
-        if hostiles:
-            caps.add("attack")
-            actor["target_ids"] = sorted(set(actor.get("target_ids", []) + hostiles))
-        if resources and actor["id"] in workers:
-            caps.add("harvest")
-            actor["target_ids"] = sorted(set(actor.get("target_ids", []) + resources))
-        actor["capabilities"] = sorted(caps)
-    for slot in halls[:2]:
-        actors.setdefault(slot, {
+        ids = list(actor.get("target_ids", []))
+        if "attack" in caps:
+            ids.extend(hostiles)
+        if "harvest" in caps:
+            ids.extend(resources)
+        actor["target_ids"] = sorted(set(ids))
+    for slot in harvesters[:2]:
+        if slot in actors:
+            continue
+        raw = by_slot[slot]
+        caps = typed_capabilities_for_type(raw[39], catalog)
+        movement = raw[bne_command_matrix.UNIT_MOVEMENT]
+        allowed = set(caps)
+        if "attack" in allowed and "move" in allowed:
+            allowed.add("attack-move")
+        actors[slot] = {
+            "id": slot,
+            "player": 0,
+            "domain": "land" if movement == 0
+            else "air" if movement == 1 else "water",
+            "capabilities": sorted(allowed),
+            "target_ids": list(resources) if "harvest" in allowed else [],
+            "type_ident": bne_type_ident(raw[39]),
+        }
+    for slot in trainers[:2]:
+        if slot in actors:
+            continue
+        raw = by_slot[slot]
+        caps = typed_capabilities_for_type(raw[39], catalog)
+        production = sorted(caps & {"train", "research"})
+        if not production:
+            continue
+        actors[slot] = {
             "id": slot,
             "player": 0,
             "domain": "land",
-            "capabilities": ["train", "research"],
+            "capabilities": production,
             "target_ids": [],
             "type_index": 0,
             "afford": False,
-        })
+            "type_ident": bne_type_ident(raw[39]),
+        }
     seed["actors"] = [actors[key] for key in sorted(actors)]
     seed["targets"] = [targets[key] for key in sorted(targets)]
     validate_seed(seed)
@@ -302,14 +410,19 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
 
 
 def seed_from_idle_fixture(fixture: Path, **kwargs: Any) -> dict[str, Any]:
-    """Movement-matrix seed plus the extra families the first frame names."""
+    """Movement-matrix seed plus typed families for those same actors."""
     seed = seed_from_fixture(fixture, **kwargs)
     return enrich_seed_families(seed, fixture)
 
 
 def coverage_inventory(seeds: list[dict[str, Any]], *,
         max_scenarios: int = 256) -> dict[str, Any]:
-    """Generate without executing. Counts families, patterns and tokens."""
+    """Generate without executing. Counts families, patterns and tokens.
+
+    Generated rows never satisfy the 100-scenario dual-adapter requirement.
+    ``dual_adapter_executed_scenarios`` stays 0 here; only a run that both
+    production adapters actually execute can raise that count.
+    """
     if len(seeds) < 1:
         raise ValueError("coverage inventory needs at least one seed")
     families: set[str] = set()
@@ -336,10 +449,12 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
         "schema": "chonkcraft-bne-playtest-coverage-inventory-1",
         "seed_count": len(seeds),
         "generated_scenarios": generated,
+        "dual_adapter_executed_scenarios": 0,
         "command_family_count": len(families),
         "families": sorted(families),
         "patterns": sorted(patterns),
         "seeds": per_seed,
+        "complete": False,
     }
 
 
@@ -1012,6 +1127,8 @@ def coverage_inventory_command(args: argparse.Namespace) -> int:
     print(json.dumps({
         "seed_count": report["seed_count"],
         "generated_scenarios": report["generated_scenarios"],
+        "dual_adapter_executed_scenarios": report["dual_adapter_executed_scenarios"],
+        "complete": report["complete"],
         "command_family_count": report["command_family_count"],
         "families": report["families"],
         "patterns": report["patterns"],

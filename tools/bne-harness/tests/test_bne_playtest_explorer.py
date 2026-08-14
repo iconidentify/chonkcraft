@@ -326,7 +326,61 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertTrue(train_jams,
                         "two halls training the same unit are a congestion case")
 
-    def test_three_idle_fixtures_cover_five_families_and_one_hundred_scenarios(self):
+    def test_typed_buttons_do_not_make_grunts_harvest_or_farms_train(self):
+        caps = explorer.load_typed_command_capabilities()
+        self.assertGreaterEqual(len(caps), 20,
+                                "typed catalog must parse real button rows")
+        self.assertIn("harvest", caps["unit-peon"])
+        self.assertIn("harvest", caps["unit-peasant"])
+        self.assertNotIn("harvest", caps.get("unit-grunt", set()),
+                         "a grunt has no harvest button")
+        self.assertNotIn("harvest", caps.get("unit-footman", set()),
+                         "a footman has no harvest button")
+        self.assertNotIn("train", caps.get("unit-pig-farm", set()),
+                         "a pig farm has no train button")
+        self.assertNotIn("train", caps.get("unit-farm", set()),
+                         "a farm has no train button")
+        self.assertNotIn("research", caps.get("unit-pig-farm", set()),
+                         "a pig farm has no research button")
+        self.assertNotIn("research", caps.get("unit-farm", set()),
+                         "a farm has no research button")
+        self.assertIn("train", caps["unit-great-hall"])
+        self.assertIn("research", caps["unit-orc-blacksmith"])
+
+    def test_idle_seed_uses_typed_capabilities_not_type_ranges(self):
+        corpus = (
+            Path(__file__).resolve().parents[1]
+            / "work/corpus/campaign-1800/cases"
+        )
+        orc = corpus / "retail-orc-01-idle.bnefx"
+        if not orc.is_file():
+            self.skipTest("authenticated Orc 1 idle fixture is missing")
+        seed = explorer.seed_from_idle_fixture(orc)
+        by_ident = {}
+        for actor in seed["actors"]:
+            ident = actor.get("type_ident")
+            if ident:
+                by_ident.setdefault(ident, set()).update(actor["capabilities"])
+        grunt_actors = [
+            actor for actor in seed["actors"]
+            if actor.get("type_ident") == "unit-grunt"
+        ]
+        self.assertTrue(grunt_actors, "Orc 1 has opening-line grunts")
+        for actor in grunt_actors:
+            self.assertNotIn("harvest", actor["capabilities"],
+                             "a grunt must not become a harvester")
+        self.assertIn("harvest", by_ident.get("unit-peon", set()),
+                      "Orc 1 must declare a typed peon harvest")
+        for actor in seed["actors"]:
+            if actor.get("type_ident") in {"unit-pig-farm", "unit-farm"}:
+                self.assertNotIn("train", actor["capabilities"],
+                                 "a farm must not become a trainer")
+                self.assertNotIn("research", actor["capabilities"],
+                                 "a farm must not become a researcher")
+        if "unit-great-hall" in by_ident:
+            self.assertIn("train", by_ident["unit-great-hall"])
+
+    def test_generated_inventory_is_not_dual_adapter_execution(self):
         corpus = (
             Path(__file__).resolve().parents[1]
             / "work/corpus/campaign-1800/cases"
@@ -339,20 +393,14 @@ class PlaytestExplorerTest(unittest.TestCase):
         if not all(path.is_file() for path in fixtures):
             self.skipTest("authenticated campaign-1800 idle fixtures are missing")
         seeds = [explorer.seed_from_idle_fixture(path) for path in fixtures]
-        report = explorer.coverage_inventory(seeds, max_scenarios=1200)
-        self.assertGreaterEqual(report["seed_count"], 3)
-        self.assertGreaterEqual(report["generated_scenarios"], 100)
-        required = {"move", "attack", "attack-move", "stop", "harvest"}
-        self.assertTrue(
-            required <= set(report["families"]),
-            f"coverage inventory families {report['families']} miss {required}")
-        required_patterns = {
-            "single", "repeat", "replace", "group", "refuse", "turn-boundary",
-        }
-        self.assertTrue(
-            required_patterns <= set(report["patterns"]),
-            f"coverage inventory patterns {report['patterns']} miss "
-            f"{required_patterns}")
+        report = explorer.coverage_inventory(seeds, max_scenarios=80)
+        self.assertGreaterEqual(report["generated_scenarios"], 1)
+        self.assertEqual(
+            report.get("dual_adapter_executed_scenarios", 0), 0,
+            "generation without adapters is not dual-adapter execution")
+        self.assertFalse(
+            report.get("complete", True),
+            "generated inventory is not the 100 dual-adapter requirement")
 
 
 if __name__ == "__main__":
