@@ -18,6 +18,9 @@ executable lifecycle gate, read [`OIL_LIFECYCLE.md`](OIL_LIFECYCLE.md).
 For the low-context causal/experiment layer and composed one-command loop,
 read [`PARITY_LAB.md`](PARITY_LAB.md). Its machine policy is
 [`parity-lab-policy.json`](parity-lab-policy.json).
+For automatically generating player orders, comparing their physical outcomes
+in both engines, shrinking failures and sealing handoff packets, read
+[`PLAYTEST_EXPLORER.md`](PLAYTEST_EXPLORER.md).
 
 For authenticated native writer localization, clean/failing branch contrast,
 and bounded predicate capture, read

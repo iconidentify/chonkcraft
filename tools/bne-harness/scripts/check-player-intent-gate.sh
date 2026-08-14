@@ -70,7 +70,8 @@ PY
 
 python3 -m unittest \
     "$ROOT/tools/bne-harness/tests/test_bne_replay.py" \
-    "$ROOT/tools/bne-harness/tests/test_bne_replay_outcome.py"
+    "$ROOT/tools/bne-harness/tests/test_bne_replay_outcome.py" \
+    "$ROOT/tools/bne-harness/tests/test_bne_playtest_explorer.py"
 
 cd "$ROOT"
 mvn -q -pl desktop -am \
