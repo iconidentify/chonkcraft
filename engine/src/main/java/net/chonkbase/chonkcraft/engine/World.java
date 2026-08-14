@@ -7778,7 +7778,19 @@ public final class World {
         snapshot = List.copyOf(units);
         // Retail's scout pass is not only run at game creation; it walks the
         // aircraft it has given behaviour four again on a fifty-cycle beat.
-        if (cycle % 50 == 49) {
+        // The first beat stays on world.cycle 49 -- ScoutPassTest and the
+        // early-mission dests that moving the first beat REG'd. Later beats
+        // use the same fixture numbering as naval (49, 99, 149). Human 12
+        // zeppelins 1559/1570 are Still at fixture 82/63; world.cycle % 50
+        // == 49 sent them out at fixture 97 while native stays Still
+        // through 98 and Patrols at 99.
+        boolean firstAircraftBeat = cycle <= 50 && cycle % 50 == 49;
+        // cycle 51 is (cycle-2)%50==49 but two ticks after the first
+        // beat; that extra pass rewrote Human 12's commanded dest from
+        // 107,51 to 69,30. The next native fixture beat is 99, world 101.
+        boolean laterAircraftBeat = cycle >= 101
+                && (cycle - 2) % 50 == 49;
+        if (firstAircraftBeat || laterAircraftBeat) {
             idle.fireBattleNetScoutPass();
         }
         // The ships it has given behaviour six are walked on the same beat but
@@ -7788,8 +7800,8 @@ public final class World {
         // patrol after its marker on fixture 48, and is on that patrol at 53
         // and standing again at 56. Queueing it two ticks earlier let the
         // fixture-48 marker promote it and put the ship out five cycles early,
-        // and moving the aircraft beat to match cost four other missions their
-        // proven horizon.
+        // and moving the first aircraft beat to match cost four other missions
+        // their proven horizon.
         if (cycle > 2 && (cycle - 2) % 50 == 49) {
             idle.fireBattleNetNavalPatrolPass();
         }

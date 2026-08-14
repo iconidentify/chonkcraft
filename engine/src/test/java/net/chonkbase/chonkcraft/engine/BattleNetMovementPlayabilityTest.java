@@ -504,6 +504,34 @@ class BattleNetMovementPlayabilityTest {
                 "retail is Still on 84,10 at fixture 82; Java is still "
                         + oddDest.order() + " at "
                         + oddDest.tileX() + "," + oddDest.tileY());
+
+        for (int cycle = 83; cycle <= 97; cycle++) {
+            mission.tick();
+        }
+        // i9beef retail-human-12-idle. Native 1559/1570 stay Still through
+        // fixture 98 and go Patrol at 99. Java's aircraft beat is
+        // world.cycle % 50 == 49, which is fixture 97 after two warmup
+        // ticks, so both balloons left two cycles early.
+        assertEquals(Unit.Order.STILL, zeppelin.order(),
+                "retail is still Still on 50,4 at fixture 97; Java is "
+                        + zeppelin.order() + " toward "
+                        + zeppelin.orderTargetX() + "," + zeppelin.orderTargetY());
+        assertEquals(Unit.Order.STILL, oddDest.order(),
+                "retail is still Still on 84,10 at fixture 97; Java is "
+                        + oddDest.order() + " toward "
+                        + oddDest.orderTargetX() + "," + oddDest.orderTargetY());
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, oddDest.order(),
+                "retail is still Still on 84,10 at fixture 98; Java is "
+                        + oddDest.order());
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, zeppelin.order(),
+                "retail sends the 50,4 scout out again at fixture 99; Java is "
+                        + zeppelin.order());
+        assertEquals(Unit.Order.PATROL, oddDest.order(),
+                "retail sends the 84,10 scout out again at fixture 99; Java is "
+                        + oddDest.order());
     }
 
     @Test
