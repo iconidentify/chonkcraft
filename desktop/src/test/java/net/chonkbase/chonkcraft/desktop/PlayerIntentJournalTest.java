@@ -106,7 +106,28 @@ class PlayerIntentJournalTest {
     }
 
     @Test
-    void capturesTheStateBeforeImmediateLocalDelivery() {
+    void alreadyTouchingABlockedMoveGoalIsARealSettlement() {
+        World world = world();
+        UnitType workerType = movable("unit-peon");
+        UnitType mineType = building("unit-gold-mine", 3, 3);
+        Unit worker = world.createUnit(workerType, 0, 5, 6);
+        world.createUnit(mineType, 15, 6, 6);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> { }, world::cycle,
+                () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.move(0, worker.id(), 7, 7));
+        journal.observe(1, world);
+
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals(null, outcome.firstProgressCycle(),
+                "the worker was already at the valid edge");
+        assertEquals("settled", outcome.terminalReason(),
+                "BNE accepts a point inside the mine and settles at its edge");
+    }
+
+    @Test
+    void commandLabelAloneIsNotPhysicalProgress() {
         World world = world();
         UnitType type = new UnitType("unit-footman");
         type.setTileSize(1, 1);
@@ -122,9 +143,66 @@ class PlayerIntentJournalTest {
         assertTrue(sink.issueAccepted(GameCommand.move(0, unit.id(), 4, 2)));
         journal.observe(world.cycle(), world);
 
-        assertEquals(Long.valueOf(0),
-                journal.outcomeSnapshot().getFirst().firstProgressCycle(),
-                "the order transition itself is the first causal progress");
+        assertEquals(null, journal.outcomeSnapshot().getFirst().firstProgressCycle(),
+                "accepting a MOVE label is not proof the unit moved");
+        for (int tick = 0; tick < 20
+                && journal.outcomeSnapshot().getFirst().firstProgressCycle() == null;
+                tick++) {
+            world.tick();
+            journal.observe(world.cycle(), world);
+        }
+        assertTrue(journal.outcomeSnapshot().getFirst().firstProgressCycle() != null,
+                "the first changed pixel is physical progress");
+    }
+
+    @Test
+    void acceptedBuildLabelWithoutAFoundationIsReportedAsNoProgress() {
+        World world = world();
+        UnitType workerType = movable("unit-peasant");
+        UnitType farm = building("unit-farm", 2, 2);
+        Unit worker = world.createUnit(workerType, 0, 2, 2);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> {
+            worker.setOrder(Unit.Order.BUILD);
+            worker.setPendingBuild(farm);
+            worker.setBuildTile(command.x(), command.y());
+        }, world::cycle, () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.build(0, worker.id(), 1, 6, 6));
+        journal.observe(PlayerIntentJournal.OUTCOME_WINDOW, world);
+
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals(null, outcome.firstProgressCycle(),
+                "a Java order label must not masquerade as a visible build");
+        assertEquals("acknowledged-no-progress", outcome.terminalReason());
+    }
+
+    @Test
+    void buildIsFulfilledOnlyByItsRequestedFoundation() {
+        World world = world();
+        UnitType workerType = movable("unit-peasant");
+        UnitType farm = building("unit-farm", 2, 2);
+        Unit worker = world.createUnit(workerType, 0, 2, 2);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> {
+            worker.setOrder(Unit.Order.BUILD);
+            worker.setPendingBuild(farm);
+            worker.setBuildTile(command.x(), command.y());
+        }, world::cycle, () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.build(0, worker.id(), 1, 6, 6));
+        Unit unrelated = world.createUnit(farm, 0, 8, 8);
+        worker.setWorksite(unrelated);
+        journal.observe(1, world);
+        assertEquals(null, journal.outcomeSnapshot().getFirst().terminalReason(),
+                "a different foundation cannot fulfill this click");
+
+        Unit requested = world.createUnit(farm, 0, 6, 6);
+        worker.setWorksite(requested);
+        journal.observe(2, world);
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals("fulfilled", outcome.terminalReason());
+        assertEquals(Long.valueOf(2), outcome.firstProgressCycle());
     }
 
     @Test
@@ -162,5 +240,21 @@ class PlayerIntentJournalTest {
             }
         }
         return new World(map);
+    }
+
+    private static UnitType movable(String ident) {
+        UnitType type = new UnitType(ident);
+        type.setTileSize(1, 1);
+        type.setHitPoints(60);
+        type.setSpeed(10);
+        return type;
+    }
+
+    private static UnitType building(String ident, int width, int height) {
+        UnitType type = new UnitType(ident);
+        type.setTileSize(width, height);
+        type.setHitPoints(400);
+        type.setBuilding(true);
+        return type;
     }
 }

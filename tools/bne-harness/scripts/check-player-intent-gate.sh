@@ -97,26 +97,31 @@ import sys
 
 report = json.load(open(sys.argv[1], encoding="utf-8"))
 minimums = {
-    "processed_records": 2451,
-    "processed_commands": 288,
-    "submitted_orders": 100,
-    "accepted_orders": 80,
-    "progressed_orders": 80,
-    "bound_native_units": 16,
+    "processed_records": 3477,
+    "processed_commands": 472,
+    "submitted_orders": 166,
+    "accepted_orders": 142,
+    "progressed_orders": 138,
+    "fulfilled_orders": 136,
+    "bound_native_units": 32,
 }
 for name, floor in minimums.items():
     if report.get(name, -1) < floor:
         raise SystemExit(
             f"replay smoke gate: {name}={report.get(name)!r}; floor {floor}")
-if report.get("progressed_orders") != report.get("accepted_orders"):
-    raise SystemExit("replay smoke gate: an accepted order made no progress")
+if report.get("cycles_per_synchronized_turn") != 15:
+    raise SystemExit("replay smoke gate: retail 500-ms turn is not fifteen cycles")
+if report.get("unclassified_orders") != 0:
+    raise SystemExit("replay smoke gate: an order has no terminal classification")
+if report.get("silent_failures") != 0:
+    raise SystemExit(
+        "replay smoke gate: acknowledged orders with no physical effect increased")
 stop = report.get("stopped_at") or {}
-if (stop.get("name") != "unit-identity-unresolved"
-        or stop.get("record") < 2451
-        or stop.get("native_unit") != 1569):
+if stop.get("record", 0) < 3477:
     raise SystemExit(f"replay smoke gate: unexpected stop boundary {stop!r}")
-production = stop.get("production_state") or []
-if any(unit.get("type") == "unit-orc-barracks" for unit in production):
-    raise SystemExit("replay smoke gate: the retained boundary unexpectedly has a barracks")
-print("real BNE replay execution: PASS — 2451+ records, 80 accepted orders progressed")
+if stop.get("record") == 3477 and (
+        stop.get("name") != "unit-identity-unresolved"
+        or stop.get("native_unit") != 1554):
+    raise SystemExit(f"replay smoke gate: changed h3477 identity boundary {stop!r}")
+print("real BNE replay execution: PASS — 3477+ records, 136 objectives fulfilled")
 PY

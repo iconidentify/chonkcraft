@@ -29,8 +29,19 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
 public final class BneReplaySmokeCertification {
 
     private static final Set<String> SUPPORTED = Set.of(
-            "selection", "move", "stop", "stand-ground",
+            "selection", "move", "attack", "stop", "stand-ground",
             "build-preflight", "build", "player-state", "production");
+    /**
+     * Retail dispatches one synchronized command turn every 500 ms.
+     *
+     * <p>The pinned 2.02b game loop compares the dispatcher interval with
+     * {@code 0x1f4} at {@code 0x00420e9a..0x00420eb5}; the synchronized
+     * network manager is called at {@code 0x00420fbb}. At the engine's
+     * 30-Hz simulation rate that interval is exactly fifteen cycles. The
+     * replay header's game-speed byte is a lobby pacing-table index and must
+     * not be used as a cycle count.
+     */
+    private static final int BNE_SYNCHRONIZED_TURN_CYCLES = 15;
     private static final int SETTLE_CYCLES = 180;
 
     private BneReplaySmokeCertification() {
@@ -95,12 +106,17 @@ public final class BneReplaySmokeCertification {
             report.put("resolved_map", resolvedMap);
             report.put("map_sha256", mapAsset.get("asset_sha256"));
             report.put("placed_units", placed);
+            report.put("cycles_per_synchronized_turn",
+                    BNE_SYNCHRONIZED_TURN_CYCLES);
             report.put("processed_records", result.processedRecords);
             report.put("processed_commands", result.processedCommands);
             report.put("submitted_orders", result.submittedOrders);
             report.put("accepted_orders", result.acceptedOrders);
             report.put("rejected_orders", result.rejectedOrders);
             report.put("progressed_orders", result.progressedOrders);
+            report.put("fulfilled_orders", result.fulfilledOrders);
+            report.put("silent_failures", result.silentFailures);
+            report.put("unclassified_orders", result.unclassifiedOrders);
             report.put("bound_native_units", result.boundUnits);
             report.put("stopped_at", result.stoppedAt);
             report.put("final_cycle", world.cycle());
@@ -109,8 +125,8 @@ public final class BneReplaySmokeCertification {
             require(result.acceptedOrders > 0, "replay opening submitted no supported orders");
             require(result.acceptedOrders + result.rejectedOrders == result.submittedOrders,
                     "a decoded replay order has no acceptance result");
-            require(result.progressedOrders == result.acceptedOrders,
-                    "an accepted replay order made no observable progress");
+            require(result.unclassifiedOrders == 0,
+                    "a replay order has no terminal classification");
         }
     }
 
@@ -150,11 +166,13 @@ public final class BneReplaySmokeCertification {
         Map<String, Object> replay = object(plan.get("replay"), "replay");
         Map<String, Object> startup = object(replay.get("startup"), "startup");
         int gameSpeed = number(startup.get("game_speed"), "game speed");
-        require(gameSpeed >= 0 && gameSpeed <= 7,
+        require(gameSpeed >= 0 && gameSpeed <= 8,
                 "replay game speed is outside the retail lobby range");
         Map<Integer, List<Integer>> selections = new HashMap<>();
         Map<Integer, Unit> nativeToJava = new HashMap<>();
         Set<Integer> boundJava = new HashSet<>();
+        int initialJavaCeiling = world.unitsSnapshot().stream()
+                .mapToInt(Unit::id).max().orElse(0);
         List<OrderOutcome> orders = new ArrayList<>();
         int processedRecords = 0;
         int processedCommands = 0;
@@ -173,14 +191,8 @@ public final class BneReplaySmokeCertification {
             // A simulation turn begins when the participant sequence wraps,
             // not when the mapped color number happens to rise.
             if (lastNetworkPlayer >= 0 && networkPlayer >= lastNetworkPlayer) {
-                // Use InSight's authenticated lobby-speed value as the
-                // adapter cadence. A sweep through all smaller values stops
-                // at record 1637 because Java cannot finish the 45-time-unit
-                // peon the retail stream uses there; seven is the first value
-                // that satisfies that observed production boundary. This is
-                // a calibrated replay rule, not a claim that the network
-                // participant counters in 0x0047a800 encode simulation time.
-                for (int cycle = 0; cycle < gameSpeed; cycle++) {
+                for (int cycle = 0; cycle < BNE_SYNCHRONIZED_TURN_CYCLES;
+                        cycle++) {
                     world.tick();
                     observe(orders, world);
                 }
@@ -215,6 +227,7 @@ public final class BneReplaySmokeCertification {
                 }
                 byte[] raw = bytes(string(command.get("raw"), "command bytes"));
                 if ("production".equals(name) && (raw[2] & 0xff) != 0
+                        && (raw[2] & 0xff) != 2
                         && (raw[2] & 0xff) != 3) {
                     stoppedAt = Map.of(
                             "record", recordIndex,
@@ -224,13 +237,28 @@ public final class BneReplaySmokeCertification {
                             "code", raw[1] & 0xff);
                     break outer;
                 }
+                if ("attack".equals(name)) {
+                    require(raw.length == 8,
+                            "retail attack packet is not eight bytes");
+                    int target = u16(raw, 5);
+                    if (target != 0xffff && !nativeToJava.containsKey(target)) {
+                        stoppedAt = Map.of(
+                                "record", recordIndex,
+                                "player", player,
+                                "name", "attack-target-identity-unresolved",
+                                "opcode", number(command.get("opcode"), "opcode"),
+                                "native_target", target);
+                        break outer;
+                    }
+                }
                 List<Integer> active = selected.isEmpty()
                         ? selections.getOrDefault(player, List.of()) : selected;
                 for (int nativeId : active) {
                     Unit unit;
                     try {
                         unit = bind(nativeId, player, name, raw, world,
-                                applier, wireTypes, nativeToJava, boundJava);
+                                applier, wireTypes, nativeToJava, boundJava,
+                                initialJavaCeiling);
                     } catch (UnresolvedUnitIdentity unresolved) {
                         Map<String, Object> stop = new LinkedHashMap<>();
                         stop.put("record", recordIndex);
@@ -256,6 +284,8 @@ public final class BneReplaySmokeCertification {
                     boolean accepted = switch (name) {
                         case "move" -> applier.apply(GameCommand.move(player, unit.id(),
                                 u16(raw, 1), u16(raw, 3)));
+                        case "attack" -> applyAttack(applier, player, unit, raw,
+                                nativeToJava);
                         case "stop" -> applier.apply(GameCommand.stop(player, unit.id()));
                         case "stand-ground" -> applier.apply(
                                 GameCommand.standGround(player, unit.id()));
@@ -266,11 +296,24 @@ public final class BneReplaySmokeCertification {
                                 raw, wireTypes);
                         default -> false;
                     };
+                    for (OrderOutcome earlier : orders) {
+                        if (earlier.accepted && earlier.javaUnit == unit.id()
+                                && earlier.terminalReason == null
+                                && earlier.objectiveCycle == null) {
+                            earlier.terminalCycle = world.cycle();
+                            earlier.terminalReason = "superseded";
+                        }
+                    }
+                    String requestedType = requestedType(name, raw, applier, wireTypes);
+                    Integer requestedX = orderX(name, raw);
+                    Integer requestedY = orderY(name, raw);
                     orders.add(new OrderOutcome(recordIndex, player, nativeId, unit.id(),
                             name, world.cycle(), beforeX, beforeY, beforeOrder,
                             unit.isOnMap(), unit.isAlive(), unit.type().ident(),
                             beforeProducing, beforeTrainingJobs, beforeResearching,
-                            beforeUpgrading, accepted));
+                            beforeUpgrading, requestedType,
+                            requestedX, requestedY,
+                            destinationState(world, requestedX, requestedY), accepted));
                 }
             }
             processedRecords++;
@@ -279,13 +322,23 @@ public final class BneReplaySmokeCertification {
             world.tick();
             observe(orders, world);
         }
+        for (OrderOutcome order : orders) {
+            order.finish(world);
+        }
         List<Map<String, Object>> outcomes = orders.stream().map(OrderOutcome::report).toList();
         int accepted = (int) orders.stream().filter(order -> order.accepted).count();
         int rejected = orders.size() - accepted;
         int progressed = (int) orders.stream()
                 .filter(order -> order.accepted && order.progressCycle != null).count();
+        int fulfilled = (int) orders.stream()
+                .filter(order -> order.accepted && order.objectiveCycle != null).count();
+        int silentFailures = (int) orders.stream()
+                .filter(OrderOutcome::silentFailure).count();
+        int unclassified = (int) orders.stream()
+                .filter(order -> order.terminalReason == null).count();
         return new Result(processedRecords, processedCommands, orders.size(), accepted,
-                rejected, progressed, nativeToJava.size(), stoppedAt, outcomes);
+                rejected, progressed, fulfilled, silentFailures, unclassified,
+                nativeToJava.size(), stoppedAt, outcomes);
     }
 
     /** Applies the per-player diplomacy table carried by retail opcode 0x0A. */
@@ -306,30 +359,84 @@ public final class BneReplaySmokeCertification {
 
     private static void observe(List<OrderOutcome> orders, World world) {
         for (OrderOutcome order : orders) {
-            if (!order.accepted || order.progressCycle != null) {
+            if (!order.accepted || order.terminalReason != null) {
                 continue;
             }
             Unit unit = unit(world, order.javaUnit);
-            if (unit != null && (unit.tileX() != order.beforeX
-                    || unit.tileY() != order.beforeY
-                    || unit.order() != order.beforeOrder
-                    || unit.offsetX() != 0 || unit.offsetY() != 0)) {
-                order.progressCycle = world.cycle();
-            } else if (unit != null && (!java.util.Objects.equals(
-                    ident(unit.producing()), order.beforeProducing)
-                    || unit.trainingJobCount() != order.beforeTrainingJobs
-                    || !java.util.Objects.equals(
-                            unit.researching(), order.beforeResearching)
-                    || !java.util.Objects.equals(
-                            ident(unit.upgradingTo()), order.beforeUpgrading))) {
-                order.progressCycle = world.cycle();
-            }
+            order.observe(world, unit);
         }
+    }
+
+    private static String requestedType(String name, byte[] raw,
+            CommandApplier applier, Map<Integer, Integer> wireTypes) {
+        if ("build".equals(name)) {
+            return applier.typeAt(requiredWireType(wireTypes, raw[1] & 0xff)).ident();
+        }
+        if (!"production".equals(name)) {
+            return null;
+        }
+        int code = raw[1] & 0xff;
+        return switch (raw[2] & 0xff) {
+            case 0, 3 -> applier.typeAt(requiredWireType(wireTypes, code)).ident();
+            case 2 -> retailUpgrade(code);
+            default -> null;
+        };
+    }
+
+    private static Integer orderX(String name, byte[] raw) {
+        return switch (name) {
+            case "move", "attack" -> u16(raw, 1);
+            case "build" -> u16(raw, 2);
+            default -> null;
+        };
+    }
+
+    private static Integer orderY(String name, byte[] raw) {
+        return switch (name) {
+            case "move", "attack" -> u16(raw, 3);
+            case "build" -> u16(raw, 4);
+            default -> null;
+        };
+    }
+
+    /** Retains the clicked terrain and occupancy at packet-delivery time. */
+    private static Map<String, Object> destinationState(World world,
+            Integer x, Integer y) {
+        if (x == null || y == null) {
+            return Map.of();
+        }
+        var field = world.map().fieldOrNull(x, y);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("x", x);
+        result.put("y", y);
+        result.put("on_map", field != null);
+        if (field != null) {
+            result.put("visual_tile", field.tile());
+            result.put("flags", "0x" + Long.toHexString(field.flags()));
+        }
+        result.put("occupants", world.unitsSnapshot().stream()
+                .filter(Unit::isAlive)
+                .filter(Unit::isOnMap)
+                .filter(unit -> x >= unit.tileX()
+                        && x < unit.tileX() + unit.type().tileWidth()
+                        && y >= unit.tileY()
+                        && y < unit.tileY() + unit.type().tileHeight())
+                .map(unit -> Map.of(
+                        "id", (Object) unit.id(),
+                        "player", unit.player(),
+                        "type", unit.type().ident(),
+                        "tile_x", unit.tileX(),
+                        "tile_y", unit.tileY(),
+                        "tile_width", unit.type().tileWidth(),
+                        "tile_height", unit.type().tileHeight()))
+                .toList());
+        return result;
     }
 
     private static Unit bind(int nativeId, int player, String command, byte[] raw,
             World world, CommandApplier applier, Map<Integer, Integer> wireTypes,
-            Map<Integer, Unit> nativeToJava, Set<Integer> boundJava) {
+            Map<Integer, Unit> nativeToJava, Set<Integer> boundJava,
+            int initialJavaCeiling) {
         Unit existing = nativeToJava.get(nativeId);
         if (existing != null) {
             return existing;
@@ -339,10 +446,41 @@ public final class BneReplaySmokeCertification {
                 .filter(Unit::isOnMap)
                 .filter(unit -> !boundJava.contains(unit.id()))
                 .filter(unit -> !"move".equals(command) || unit.canMove())
+                .filter(unit -> !"attack".equals(command)
+                        || attackCandidate(unit, raw))
                 .filter(unit -> productionCandidate(
                         unit, command, raw, world, applier, wireTypes))
                 .toList();
-        if (candidates.size() != 1) {
+        Unit chosen = null;
+        if (candidates.size() == 1) {
+            chosen = candidates.getFirst();
+        } else if (candidates.stream()
+                .filter(unit -> unit.id() <= initialJavaCeiling).count() == 1) {
+            // An initial map unit keeps its native pool slot for the match.
+            // When a later construction has produced a second building of
+            // the same kind, the sole pre-game candidate is the only one
+            // that can answer an initial slot's first command.
+            chosen = candidates.stream()
+                    .filter(unit -> unit.id() <= initialJavaCeiling)
+                    .findFirst().orElseThrow();
+        } else if (!candidates.isEmpty()
+                && candidates.stream().allMatch(unit -> unit.id() > initialJavaCeiling)
+                && (candidates.stream().map(unit -> unit.type().ident())
+                        .distinct().count() == 1
+                    || continuesUnrecycledBirthOrder(nativeId, player,
+                            nativeToJava, initialJavaCeiling))) {
+            // BNE takes new objects from the high end of its fixed unit pool;
+            // Java assigns increasing IDs. Before any early-match slot reuse,
+            // the oldest unbound product is therefore the smallest Java ID.
+            // One exact type preserves the already-proved product ordering.
+            // Across mixed types, require the new native slot to continue
+            // descending below every already-bound post-startup slot for this
+            // player. A recycled native slot breaks that invariant and
+            // therefore fails closed.
+            chosen = candidates.stream().min(java.util.Comparator.comparingInt(Unit::id))
+                    .orElseThrow();
+        }
+        if (chosen == null) {
             throw new UnresolvedUnitIdentity(
                     "native unit " + nativeId + " for player " + player
                             + " has " + candidates.size() + " compatible Java units "
@@ -350,13 +488,40 @@ public final class BneReplaySmokeCertification {
                                     + unit.type().ident() + "@" + unit.tileX() + ","
                                     + unit.tileY()).toList());
         }
-        Unit chosen = candidates.getFirst();
         nativeToJava.put(nativeId, chosen);
         boundJava.add(chosen.id());
         return chosen;
     }
 
-    /** Applies the two production families whose BNE identities are proved. */
+    private static boolean continuesUnrecycledBirthOrder(int nativeId, int player,
+            Map<Integer, Unit> nativeToJava, int initialJavaCeiling) {
+        return nativeToJava.entrySet().stream()
+                .filter(entry -> entry.getValue().player() == player)
+                .filter(entry -> entry.getValue().id() > initialJavaCeiling)
+                .allMatch(entry -> nativeId < entry.getKey());
+    }
+
+    /** Applies BNE opcode 0x13 without guessing an unmapped target identity. */
+    private static boolean applyAttack(CommandApplier applier, int player,
+            Unit attacker, byte[] raw, Map<Integer, Unit> nativeToJava) {
+        require(raw.length == 8, "retail attack packet is not eight bytes");
+        int nativeTarget = u16(raw, 5);
+        if (nativeTarget == 0xffff) {
+            return applier.apply(GameCommand.attackMove(player, attacker.id(),
+                    u16(raw, 1), u16(raw, 3)));
+        }
+        Unit target = nativeToJava.get(nativeTarget);
+        require(target != null, "retail attack target is not bound");
+        return applier.apply(GameCommand.attack(player, attacker.id(), target.id()));
+    }
+
+    private static boolean attackCandidate(Unit unit, byte[] raw) {
+        require(raw.length == 8, "retail attack packet is not eight bytes");
+        return unit.type().canAttack()
+                && (u16(raw, 5) != 0xffff || unit.canMove());
+    }
+
+    /** Applies the production families whose BNE identities are proved. */
     private static boolean applyProduction(CommandApplier applier, int player,
             Unit building, byte[] raw, Map<Integer, Integer> wireTypes) {
         require(raw.length == 3, "retail production packet is not three bytes");
@@ -364,11 +529,16 @@ public final class BneReplaySmokeCertification {
         return switch (raw[2] & 0xff) {
             case 0 -> applier.apply(GameCommand.train(player, building.id(),
                     requiredWireType(wireTypes, code)));
+            case 2 -> {
+                require(code <= 0x17,
+                        "retail family-two code is outside its proved table");
+                yield applier.apply(GameCommand.research(player, building.id(),
+                        requiredUpgrade(applier, retailUpgrade(code))));
+            }
             case 3 -> applier.apply(GameCommand.upgradeTo(player, building.id(),
                     requiredWireType(wireTypes, code)));
-            // Families one and two index retail technology tables rather than
-            // the unit table. They remain fail-closed until those two tables
-            // are transcribed from the pinned executable.
+            // Family one indexes the retail spell table. It remains
+            // fail-closed until that table is transcribed.
             default -> throw new UnsupportedProductionFamily(raw[2] & 0xff, code);
         };
     }
@@ -381,12 +551,19 @@ public final class BneReplaySmokeCertification {
         require(raw.length == 3, "retail production packet is not three bytes");
         int code = raw[1] & 0xff;
         int family = raw[2] & 0xff;
-        UnitType product = applier.typeAt(requiredWireType(wireTypes, code));
         return switch (family) {
-            case 0 -> unit.order() == Unit.Order.STILL
+            case 0 -> {
+                UnitType product = applier.typeAt(requiredWireType(wireTypes, code));
+                yield unit.order() == Unit.Order.STILL
                     && unit.researching() == null
                     && unit.upgradingTo() == null
                     && world.mayTrain(unit.type(), product);
+            }
+            case 2 -> code <= 0x17
+                    && unit.order() == Unit.Order.STILL
+                    && unit.producing() == null
+                    && unit.upgradingTo() == null
+                    && world.mayResearch(unit.type(), retailUpgrade(code));
             case 3 -> unit.order() == Unit.Order.STILL
                     && unit.producing() == null
                     && unit.upgradingTo() == null
@@ -399,7 +576,10 @@ public final class BneReplaySmokeCertification {
     private static List<Map<String, Object>> productionState(int player, byte[] raw,
             World world, CommandApplier applier, Map<Integer, Integer> wireTypes,
             Set<Integer> boundJava) {
-        UnitType product = applier.typeAt(requiredWireType(wireTypes, raw[1] & 0xff));
+        int family = raw[2] & 0xff;
+        String product = family == 2 ? retailUpgrade(raw[1] & 0xff) : null;
+        UnitType productType = family == 2 ? null
+                : applier.typeAt(requiredWireType(wireTypes, raw[1] & 0xff));
         List<Map<String, Object>> state = new ArrayList<>();
         for (Unit unit : world.playerUnits(player)) {
             Map<String, Object> entry = new LinkedHashMap<>();
@@ -411,7 +591,9 @@ public final class BneReplaySmokeCertification {
             entry.put("on_map", unit.isOnMap());
             entry.put("alive", unit.isAlive());
             entry.put("bound", boundJava.contains(unit.id()));
-            entry.put("may_produce", world.mayTrain(unit.type(), product));
+            entry.put("may_produce", family == 2
+                    ? world.mayResearch(unit.type(), product)
+                    : world.mayTrain(unit.type(), productType));
             state.add(entry);
         }
         return state;
@@ -428,6 +610,56 @@ public final class BneReplaySmokeCertification {
             case 0x61, 0x63 -> "unit-orc-watch-tower";
             default -> "";
         };
+    }
+
+    /** Retail UGRD table indexes 0x00..0x21, in their on-disk order. */
+    private static String retailUpgrade(int code) {
+        return switch (code) {
+            case 0x00 -> "upgrade-sword1";
+            case 0x01 -> "upgrade-sword2";
+            case 0x02 -> "upgrade-battle-axe1";
+            case 0x03 -> "upgrade-battle-axe2";
+            case 0x04 -> "upgrade-arrow1";
+            case 0x05 -> "upgrade-arrow2";
+            case 0x06 -> "upgrade-throwing-axe1";
+            case 0x07 -> "upgrade-throwing-axe2";
+            case 0x08 -> "upgrade-human-shield1";
+            case 0x09 -> "upgrade-human-shield2";
+            case 0x0a -> "upgrade-orc-shield1";
+            case 0x0b -> "upgrade-orc-shield2";
+            case 0x0c -> "upgrade-human-ship-cannon1";
+            case 0x0d -> "upgrade-human-ship-cannon2";
+            case 0x0e -> "upgrade-orc-ship-cannon1";
+            case 0x0f -> "upgrade-orc-ship-cannon2";
+            case 0x10 -> "upgrade-human-ship-armor1";
+            case 0x11 -> "upgrade-human-ship-armor2";
+            case 0x12 -> "upgrade-orc-ship-armor1";
+            case 0x13 -> "upgrade-orc-ship-armor2";
+            case 0x14 -> "upgrade-catapult1";
+            case 0x15 -> "upgrade-catapult2";
+            case 0x16 -> "upgrade-ballista1";
+            case 0x17 -> "upgrade-ballista2";
+            case 0x18 -> "upgrade-ranger";
+            case 0x19 -> "upgrade-longbow";
+            case 0x1a -> "upgrade-ranger-scouting";
+            case 0x1b -> "upgrade-ranger-marksmanship";
+            case 0x1c -> "upgrade-berserker";
+            case 0x1d -> "upgrade-light-axes";
+            case 0x1e -> "upgrade-berserker-scouting";
+            case 0x1f -> "upgrade-berserker-regeneration";
+            case 0x20 -> "upgrade-paladin";
+            case 0x21 -> "upgrade-ogre-mage";
+            default -> throw new IllegalStateException(
+                    "retail upgrade code 0x" + Integer.toHexString(code)
+                            + " is outside the transcribed UGRD table");
+        };
+    }
+
+    private static int requiredUpgrade(CommandApplier applier, String ident) {
+        int index = applier.indexOfUpgrade(ident);
+        require(index >= 0, "replay upgrade " + ident
+                + " is absent from the command roster");
+        return index;
     }
 
     private static String ident(UnitType type) {
@@ -572,7 +804,8 @@ public final class BneReplaySmokeCertification {
 
     private record Result(int processedRecords, int processedCommands,
             int submittedOrders, int acceptedOrders, int rejectedOrders,
-            int progressedOrders, int boundUnits,
+            int progressedOrders, int fulfilledOrders, int silentFailures,
+            int unclassifiedOrders, int boundUnits,
             Map<String, Object> stoppedAt, List<Map<String, Object>> outcomes) {
     }
 
@@ -607,14 +840,24 @@ public final class BneReplaySmokeCertification {
         private final int beforeTrainingJobs;
         private final String beforeResearching;
         private final String beforeUpgrading;
+        private final String requestedType;
+        private final Integer orderX;
+        private final Integer orderY;
+        private final Map<String, Object> destination;
         private final boolean accepted;
         private Long progressCycle;
+        private Long objectiveCycle;
+        private Long terminalCycle;
+        private String terminalReason;
 
         private OrderOutcome(int record, int player, int nativeUnit, int javaUnit,
                 String command, long submittedCycle, int beforeX, int beforeY,
                 Unit.Order beforeOrder, boolean beforeOnMap, boolean beforeAlive,
                 String beforeType, String beforeProducing, int beforeTrainingJobs,
-                String beforeResearching, String beforeUpgrading, boolean accepted) {
+                String beforeResearching, String beforeUpgrading,
+                String requestedType, Integer orderX, Integer orderY,
+                Map<String, Object> destination,
+                boolean accepted) {
             this.record = record;
             this.player = player;
             this.nativeUnit = nativeUnit;
@@ -631,7 +874,118 @@ public final class BneReplaySmokeCertification {
             this.beforeTrainingJobs = beforeTrainingJobs;
             this.beforeResearching = beforeResearching;
             this.beforeUpgrading = beforeUpgrading;
+            this.requestedType = requestedType;
+            this.orderX = orderX;
+            this.orderY = orderY;
+            this.destination = destination;
             this.accepted = accepted;
+            if (!accepted) {
+                terminalCycle = submittedCycle;
+                terminalReason = "rejected";
+            }
+        }
+
+        private void observe(World world, Unit unit) {
+            long cycle = world.cycle();
+            boolean moved = unit != null && (unit.tileX() != beforeX
+                    || unit.tileY() != beforeY
+                    || unit.offsetX() != 0 || unit.offsetY() != 0);
+            boolean productionChanged = unit != null
+                    && (!java.util.Objects.equals(ident(unit.producing()), beforeProducing)
+                        || unit.trainingJobCount() != beforeTrainingJobs
+                        || !java.util.Objects.equals(unit.researching(), beforeResearching)
+                        || !java.util.Objects.equals(
+                                ident(unit.upgradingTo()), beforeUpgrading));
+            if (progressCycle == null && (moved || productionChanged)) {
+                progressCycle = cycle;
+            }
+
+            boolean fulfilled = switch (command) {
+                case "move" -> moved || settledAtBlockedDestination(unit);
+                case "attack" -> moved;
+                case "stop" -> unit != null && unit.order() == Unit.Order.STILL;
+                case "stand-ground" -> unit != null
+                        && unit.order() == Unit.Order.STAND_GROUND;
+                case "build" -> world.playerUnits(player).stream().anyMatch(candidate ->
+                        candidate.isAlive() && requestedType.equals(candidate.type().ident())
+                                && candidate.tileX() == orderX
+                                && candidate.tileY() == orderY);
+                case "production" -> productionChanged;
+                default -> false;
+            };
+            if (fulfilled && objectiveCycle == null) {
+                if (progressCycle == null) {
+                    progressCycle = cycle;
+                }
+                objectiveCycle = cycle;
+                terminalCycle = cycle;
+                terminalReason = "fulfilled";
+            }
+        }
+
+        private void finish(World world) {
+            if (terminalReason != null || !accepted) {
+                return;
+            }
+            observe(world, unit(world, javaUnit));
+            if (terminalReason == null) {
+                terminalCycle = world.cycle();
+                terminalReason = progressCycle == null
+                        ? "acknowledged-no-progress" : "incomplete-after-settle";
+            }
+        }
+
+        private boolean silentFailure() {
+            return accepted && "acknowledged-no-progress".equals(terminalReason);
+        }
+
+        @SuppressWarnings("unchecked")
+        private boolean settledAtBlockedDestination(Unit unit) {
+            if (unit == null || unit.order() != Unit.Order.STILL
+                    || destination.isEmpty()
+                    || !Boolean.TRUE.equals(destination.get("on_map"))) {
+                return false;
+            }
+            int minX = orderX;
+            int minY = orderY;
+            int maxX = orderX;
+            int maxY = orderY;
+            List<Map<String, Object>> occupants = (List<Map<String, Object>>)
+                    destination.getOrDefault("occupants", List.of());
+            boolean blocked = !occupants.isEmpty();
+            if (blocked) {
+                Map<String, Object> occupant = occupants.getFirst();
+                minX = ((Number) occupant.get("tile_x")).intValue();
+                minY = ((Number) occupant.get("tile_y")).intValue();
+                maxX = minX + ((Number) occupant.get("tile_width")).intValue() - 1;
+                maxY = minY + ((Number) occupant.get("tile_height")).intValue() - 1;
+            } else {
+                String encoded = String.valueOf(destination.get("flags"));
+                long flags = encoded.startsWith("0x")
+                        ? Long.parseUnsignedLong(encoded.substring(2), 16) : 0;
+                blocked = (flags & (net.chonkbase.chonkcraft.engine.map.TileFlag.UNPASSABLE
+                        | net.chonkbase.chonkcraft.engine.map.TileFlag.WALL
+                        | net.chonkbase.chonkcraft.engine.map.TileFlag.ROCKS
+                        | net.chonkbase.chonkcraft.engine.map.TileFlag.FOREST
+                        | net.chonkbase.chonkcraft.engine.map.TileFlag.BUILDING)) != 0;
+            }
+            if (!blocked) {
+                return false;
+            }
+            int unitMaxX = unit.tileX() + Math.max(1, unit.type().tileWidth()) - 1;
+            int unitMaxY = unit.tileY() + Math.max(1, unit.type().tileHeight()) - 1;
+            return Math.max(rectangleGap(unit.tileX(), unitMaxX, minX, maxX),
+                    rectangleGap(unit.tileY(), unitMaxY, minY, maxY)) <= 1;
+        }
+
+        private static int rectangleGap(int aMin, int aMax, int bMin, int bMax) {
+            if (aMax < bMin) {
+                return bMin - aMax;
+            }
+            if (bMax < aMin) {
+                return aMin - bMax;
+            }
+            return 0;
         }
 
         private Map<String, Object> report() {
@@ -652,8 +1006,15 @@ public final class BneReplaySmokeCertification {
             value.put("before_training_jobs", beforeTrainingJobs);
             value.put("before_researching", beforeResearching);
             value.put("before_upgrading", beforeUpgrading);
+            value.put("requested_type", requestedType);
+            value.put("order_x", orderX);
+            value.put("order_y", orderY);
+            value.put("destination", destination);
             value.put("accepted", accepted);
             value.put("progress_cycle", progressCycle);
+            value.put("objective_cycle", objectiveCycle);
+            value.put("terminal_cycle", terminalCycle);
+            value.put("terminal_reason", terminalReason);
             return value;
         }
     }
