@@ -107,6 +107,23 @@ final class BattleNetMovementSystem {
                 actionWait = scriptedWait + 1;
             }
         }
+        // Player/network clicks into forest are stored as the first tree on
+        // the BNE line. Orc 1 peon 1594 commanded to 30,18 keeps 28,18.
+        // Autonomous AI walks stay on orderMove so idle campaigns do not
+        // inherit a click projection they never issued.
+        if (world.map.contains(toX, toY)
+                && !unit.type().airUnit()
+                && !world.battleNetTerrainPassable(unit, toX, toY)) {
+            int[] projected = BattleNetPathFinder.firstBlockedToward(
+                    unit.tileX(), unit.tileY(), toX, toY,
+                    (x, y) -> world.map.contains(x, y)
+                            && world.battleNetTerrainPassable(unit, x, y));
+            if (Math.max(Math.abs(unit.tileX() - projected[0]),
+                    Math.abs(unit.tileY() - projected[1])) > 1) {
+                toX = projected[0];
+                toY = projected[1];
+            }
+        }
         boolean accepted = orderMove(unit, toX, toY,
                 actionWait + queueWait);
         if (accepted) {
@@ -162,33 +179,8 @@ final class BattleNetMovementSystem {
             unit.setBattleNetDoubleStep(
                     ((unit.tileX() | unit.tileY()) & 1) == 0);
         }
-        // A click that lands in forest or water is not the stored point.
-        // Retail walks the same line the pathfinder uses and keeps the first
-        // blocked square: Orc 1 peon 1594 commanded to 30,18 stores 28,18
-        // and is Still on the tree's approach by fixture cycle 40. Leaving
-        // the deep forest click in place kept Java on Move at 27,18.
-        int goalX = toX;
-        int goalY = toY;
-        if (world.map.contains(toX, toY)
-                && !unit.type().airUnit()
-                && !world.battleNetTerrainPassable(unit, toX, toY)) {
-            int[] projected = BattleNetPathFinder.firstBlockedToward(
-                    unit.tileX(), unit.tileY(), toX, toY,
-                    (x, y) -> world.map.contains(x, y)
-                            && world.battleNetTerrainPassable(unit, x, y));
-            // A click that is already the neighbouring tree is left as the
-            // deep point. Projecting it used to REACHED-finish the order
-            // without a step and dropped the replay smoke progress floor
-            // from 138 to 137. Distant forest clicks still collapse to the
-            // first tree (Orc 1: 30,18 -> 28,18).
-            if (Math.max(Math.abs(unit.tileX() - projected[0]),
-                    Math.abs(unit.tileY() - projected[1])) > 1) {
-                goalX = projected[0];
-                goalY = projected[1];
-            }
-        }
-        unit.setPathGoal(goalX, goalY);
-        unit.setOrderTarget(goalX, goalY);
+        unit.setPathGoal(toX, toY);
+        unit.setOrderTarget(toX, toY);
         unit.setMoveRange(0);
         unit.clearPath();
         unit.setBattleNetPlayerCommandMove(false);
