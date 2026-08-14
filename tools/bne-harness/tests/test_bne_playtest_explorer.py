@@ -157,6 +157,49 @@ class PlaytestExplorerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not prove"):
             explorer.native_command_script(scenario)
 
+    def test_native_direct_injector_emits_stop(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if all(command["kind"] == "stop" for command in item["commands"]))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("stop unit", script)
+        self.assertNotIn("0x436ee0", script)
+
+    def test_comparison_catches_a_mutated_stop_result(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if all(command["kind"] == "stop" for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
+
+    def test_one_hundred_move_rows_are_not_five_families(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if {command["kind"] for command in item["commands"]} == {"move"})
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        rows = []
+        for index in range(100):
+            row = explorer.execution_ledger_row(
+                scenario, native, java, source=f"synthetic-{index}")
+            row["command_content_sha256"] = f"{index:064x}"
+            rows.append(row)
+        report = explorer.execution_ledger(rows)
+        self.assertEqual(100, report["distinct_command_contents"])
+        self.assertEqual(["move"], report["families"])
+        self.assertFalse(
+            report["complete"],
+            "100 move-only executions are not the five-family requirement")
+
     def test_comparison_uses_relative_cadence_and_observable_state(self):
         scenario = explorer.generate_scenarios(
             self.seed(), max_scenarios=1)[0]
@@ -401,6 +444,20 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             report.get("complete", True),
             "generated inventory is not the 100 dual-adapter requirement")
+
+    def test_a_commanded_move_then_stop_fixture_keeps_both_orders(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/stop-1/00.bnefx"
+        )
+        if not fixture.is_file():
+            self.skipTest("authenticated Orc 1 move-then-stop fixture is missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        kinds = [command["kind"] for command in scenario["commands"]]
+        self.assertEqual(["move", "stop"], kinds)
+        self.assertEqual(1594, scenario["commands"][1]["unit_id"])
+        self.assertEqual(20, scenario["commands"][1]["issue_cycle"])
 
     def test_a_commanded_seed_becomes_the_exact_captured_scenario(self):
         fixture = (

@@ -237,6 +237,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 
 #define MAX_SCRIPT_COMMANDS 1024
 #define SCRIPT_COMMAND_MOVE 1
+#define SCRIPT_COMMAND_STOP 2
 
 typedef struct script_command {
     LONG cycle;
@@ -837,7 +838,28 @@ static BOOL read_command_file(void) {
         fields = sscanf(cursor,
                 "cycle %lu move unit %lu x %lu y %lu %c",
                 &cycle, &slot, &x, &y, &extra);
-        if (fields != 4 || cycle == 0 || cycle > 0x7fffffffUL
+        if (fields == 4) {
+            script_commands[script_command_count].action = SCRIPT_COMMAND_MOVE;
+        } else {
+            char action_name[16];
+
+            extra = '\0';
+            fields = sscanf(cursor, "cycle %lu %15s unit %lu %c",
+                    &cycle, action_name, &slot, &extra);
+            if (fields != 3 || strcmp(action_name, "stop") != 0) {
+                trace_write("# bne-trace event=command-file-rejected "
+                        "reason=invalid-command line=%lu", line_number);
+                fclose(source);
+                script_command_count = 0;
+                return FALSE;
+            }
+            /* Stop packets in the authenticated replay corpus carry dest
+             * 0,0 and no unit target. The 0x0C UI thunk is not this path. */
+            x = 0;
+            y = 0;
+            script_commands[script_command_count].action = SCRIPT_COMMAND_STOP;
+        }
+        if (cycle == 0 || cycle > 0x7fffffffUL
                 || slot >= BNE_UNIT_LIMIT || x > 127 || y > 127
                 || script_command_count >= MAX_SCRIPT_COMMANDS
                 || (script_command_count > 0
@@ -851,7 +873,6 @@ static BOOL read_command_file(void) {
         }
         script_commands[script_command_count].cycle = (LONG) cycle;
         script_commands[script_command_count].unit_slot = (DWORD) slot;
-        script_commands[script_command_count].action = SCRIPT_COMMAND_MOVE;
         script_commands[script_command_count].x = (BYTE) x;
         script_commands[script_command_count].y = (BYTE) y;
         script_command_count++;
@@ -1297,9 +1318,36 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
             (unsigned int) read_word(unit, BNE_UNIT_ORDER_Y));
 }
 
+static const char *script_action_name(BYTE action) {
+    if (action == SCRIPT_COMMAND_MOVE) {
+        return "move";
+    }
+    if (action == SCRIPT_COMMAND_STOP) {
+        return "stop";
+    }
+    return "unknown";
+}
+
+static unsigned int script_order_function_index(BYTE action) {
+    /* Both indices are the 0x13 packet's function byte as executed by
+     * 0x00475f80, which loads ORDER_FUNCTIONS[packet[7]] and calls
+     * GiveOrder at 0x00451070. MOVE is table[3]. STOP is table[2]:
+     * replay-pack-1 has 88 0x13 packets with that index, dest 0,0 and
+     * target -1. The one-byte 0x0C dispatcher only jumps to the UI
+     * speech thunk at 0x00436ee0 and is not used here. */
+    if (action == SCRIPT_COMMAND_MOVE) {
+        return 3;
+    }
+    if (action == SCRIPT_COMMAND_STOP) {
+        return 2;
+    }
+    return 0xff;
+}
+
 static void reject_command(const script_command *command, const char *reason) {
-    trace_write("# bne-trace event=command-rejected cycle=%ld action=move "
+    trace_write("# bne-trace event=command-rejected cycle=%ld action=%s "
             "unit=%lu x=%u y=%u reason=%s", command->cycle,
+            script_action_name(command->action),
             (unsigned long) command->unit_slot,
             (unsigned int) command->x, (unsigned int) command->y, reason);
 }
@@ -1317,6 +1365,7 @@ static void apply_commands(LONG cycle) {
                 &script_commands[next_script_command++];
         BYTE *unit;
         void *order_function;
+        unsigned int function_index;
 
         if (command->cycle < cycle) {
             reject_command(command, "missed-cycle");
@@ -1341,17 +1390,24 @@ static void apply_commands(LONG cycle) {
             reject_command(command, "give-order-signature");
             continue;
         }
-        order_function = BNE_202_ORDER_FUNCTIONS[3];
+        function_index = script_order_function_index(command->action);
+        if (function_index > 60) {
+            reject_command(command, "unsupported-action");
+            continue;
+        }
+        order_function = BNE_202_ORDER_FUNCTIONS[function_index];
         if (!executable_page_contains(order_function)) {
-            reject_command(command, "move-order-function");
+            reject_command(command, "order-function");
             continue;
         }
         ((give_order_function) (void *) BNE_202_GIVE_ORDER)(
                 unit, command->x, command->y, NULL, order_function);
-        trace_write("# bne-trace event=command-applied cycle=%ld action=move "
-                "unit=%lu x=%u y=%u", command->cycle,
+        trace_write("# bne-trace event=command-applied cycle=%ld action=%s "
+                "unit=%lu x=%u y=%u function-index=%u", command->cycle,
+                script_action_name(command->action),
                 (unsigned long) command->unit_slot,
-                (unsigned int) command->x, (unsigned int) command->y);
+                (unsigned int) command->x, (unsigned int) command->y,
+                function_index);
     }
 }
 

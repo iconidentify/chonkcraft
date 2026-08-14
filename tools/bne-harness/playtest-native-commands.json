@@ -20,24 +20,31 @@
       ],
       "native_execution_works": true,
       "java_execution_works": true,
-      "dual_adapter_executed": 21
+      "dual_adapter_executed": 101
     },
     "stop": {
-      "evidence_authority": "retail-replay-dispatcher",
+      "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
       "evidence_hashes": {
         "executable_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
-        "opcode": "0x0c",
-        "fixed_bytes": 1
+        "order_function_index": 2,
+        "give_order": "0x00451070",
+        "dispatcher": "0x00475f80"
       },
-      "encoding": "InSight embedded opcode 0x0C, one byte, applies to the current selection",
+      "encoding": "GiveOrder through the guarded campaign injector; script line cycle N stop unit SLOT. Retail 0x13 packets carry function index 2 with dest 0,0 and target -1. The 0x0C UI thunk is not used.",
       "arguments": ["issue_cycle", "unit_id"],
-      "supported_variants": [],
-      "unsupported_variants": ["native-injector-script"],
-      "positive_witnesses": [],
-      "negative_witnesses": [],
-      "native_execution_works": false,
+      "supported_variants": ["move-then-stop"],
+      "unsupported_variants": ["0x0c-ui-thunk"],
+      "positive_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/stop-1/00.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/stop-1/01.bnefx",
+        "tools/bne-harness/work/playtest-explorer/commanded/stop-1/02.bnefx"
+      ],
+      "negative_witnesses": [
+        "tools/bne-harness/work/playtest-explorer/commanded/stop-1/03.bnefx"
+      ],
+      "native_execution_works": true,
       "java_execution_works": true,
-      "dual_adapter_executed": 0
+      "dual_adapter_executed": 5
     },
     "stand-ground": {
       "evidence_authority": "retail-replay-dispatcher",

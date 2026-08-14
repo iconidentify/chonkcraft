@@ -211,15 +211,21 @@ scenario.
 ## Scripted command boundary
 
 Commands are applied immediately before the original update that will be
-recorded as their named cycle. The first supported action is `move`. It uses
-the 2.02b routine at `0x00451070` with the move handler read from entry 3 of the
-stock order-function table at `0x00495fcc`. The routine's first six bytes
-(`8b 44 24 04 33 c9`) and the selected handler's executable mapping are checked
-at the moment of use.
+recorded as their named cycle. Both supported actions use the 2.02b routine at
+`0x00451070` (`GiveOrder`). The routine's first six bytes (`8b 44 24 04 33 c9`)
+and the selected handler's executable mapping are checked at the moment of use.
+
+`move` reads entry 3 of the stock order-function table at `0x00495fcc`. `stop`
+reads entry 2. That stop index is the same byte the synchronized `0x13`
+dispatcher at `0x00475f80` loads as `ORDER_FUNCTIONS[packet[7]]` before it
+calls `GiveOrder` at `0x0047617f`. The authenticated war2.ru replay pack
+contains 88 such packets with dest `0,0` and target `-1`. The one-byte `0x0C`
+dispatcher only jumps to the UI/speech thunk at `0x00436ee0` and is not the
+scripted stop path.
 
 The harness does not write the order, target, or path fields directly. It
 passes BNE the live unit pointer, tile coordinates, null unit target, and BNE's
-move handler. Before that call it requires the trace slot to exist, be live,
+selected handler. Before that call it requires the trace slot to exist, be live,
 and belong to the local player at `0x004abf8c`. BNE therefore retains its own
 order-transition delay, animation locks, pathfinder, and movement timing.
 

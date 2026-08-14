@@ -530,6 +530,10 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         if command["kind"] not in actor["capabilities"]:
             actor["capabilities"].append(command["kind"])
             actor["capabilities"].sort()
+        if command["kind"] in {"stop", "stand-ground"}:
+            continue
+        if not all(isinstance(command.get(key), int) for key in ("x", "y")):
+            raise ValueError("commanded fixture move has no integer destination")
         point = points.setdefault((command["x"], command["y"]), {
             "x": command["x"], "y": command["y"], "kind": "open",
             "domains": [],

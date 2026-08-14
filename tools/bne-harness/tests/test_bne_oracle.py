@@ -150,6 +150,44 @@ u 1 unit-footman p0 10 10 hp 60 o STILL
                 bne_oracle.validate_trace(
                     trace, 1, r"Campaign\Orc\Orc01.pud")
 
+    def test_allows_a_game_rule_command_rejection(self):
+        trace_text = """\
+# bne-trace event=storm-open-file archive=00000000 path="Campaign\\\\Orc\\\\Orc01.pud" scope=1 result=1 handle=1 error=0
+# bne-trace event=match-ready slots=1600
+cycle 1 seed 00000001
+p 0 gold 1000 wood 1000 oil 0
+u 1594 unit-peon p0 25 18 hp 30 o STILL
+# bne-trace event=command-rejected cycle=5 action=stop unit=1588 x=0 y=0 reason=unit-not-local
+cycle 2 seed 00000001
+p 0 gold 1000 wood 1000 oil 0
+u 1594 unit-peon p0 25 18 hp 30 o STILL
+# bne-trace event=cycle-limit cycle=2
+# bne-trace protocol=2 event=detach cycles=2 screens=0
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace.txt"
+            trace.write_text(trace_text)
+            result = bne_oracle.validate_trace(trace, 2, expected_commands=1)
+        self.assertEqual(0, result["commands_applied"])
+        self.assertEqual(1, result["commands_rejected"])
+
+    def test_still_rejects_a_harness_failure_command_rejection(self):
+        trace_text = """\
+# bne-trace event=storm-open-file archive=00000000 path="Campaign\\\\Orc\\\\Orc01.pud" scope=1 result=1 handle=1 error=0
+# bne-trace event=match-ready slots=1600
+cycle 1 seed 00000001
+p 0 gold 1000 wood 1000 oil 0
+u 1594 unit-peon p0 25 18 hp 30 o STILL
+# bne-trace event=command-rejected cycle=5 action=stop unit=1594 x=0 y=0 reason=give-order-signature
+# bne-trace event=cycle-limit cycle=1
+# bne-trace protocol=2 event=detach cycles=1 screens=0
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace.txt"
+            trace.write_text(trace_text)
+            with self.assertRaisesRegex(ValueError, "harness failures"):
+                bne_oracle.validate_trace(trace, 1, expected_commands=1)
+
     def test_rejects_loading_calls_as_a_trace(self):
         trace_text = """\
 cycle 1 seed 00000001

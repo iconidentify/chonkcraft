@@ -43,6 +43,12 @@ SCRIPT_COMMAND_MOVE = re.compile(
 SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground) unit (\d+)$"
 )
+GAME_RULE_REJECT_REASONS = {
+    "unit-not-local",
+    "unit-not-live",
+    "unit-slot-out-of-range",
+}
+COMMAND_REJECT_REASON = re.compile(r"\breason=([a-z0-9-]+)\b")
 
 
 def canonical_campaign_scenario(value: str) -> str:
@@ -162,6 +168,7 @@ def validate_trace(trace: Path, expected_cycles: int | None,
     scenarios: list[str] = []
     commands_applied = 0
     commands_rejected = 0
+    rejected_reasons: list[str] = []
     initialization_seeds: list[int] = []
     simulation_digest = hashlib.sha256()
     simulation_records = 0
@@ -212,6 +219,9 @@ def validate_trace(trace: Path, expected_cycles: int | None,
                 commands_applied += 1
             elif "event=command-rejected" in line:
                 commands_rejected += 1
+                reason_match = COMMAND_REJECT_REASON.search(line)
+                rejected_reasons.append(
+                    reason_match.group(1) if reason_match else "unspecified")
             seed_match = initialization_seed_pattern.match(line)
             if seed_match:
                 initialization_seeds.append(int(seed_match.group(1)))
@@ -240,12 +250,22 @@ def validate_trace(trace: Path, expected_cycles: int | None,
         raise ValueError(
             f"trace loaded {scenarios[-1]!r}; expected {expected_scenario!r}"
         )
-    if expected_commands is not None and commands_applied != expected_commands:
+    processed = commands_applied + commands_rejected
+    if expected_commands is not None and processed != expected_commands:
         raise ValueError(
-            f"trace applied {commands_applied} commands; expected {expected_commands}"
+            f"trace processed {processed} commands "
+            f"({commands_applied} applied, {commands_rejected} rejected); "
+            f"expected {expected_commands}"
         )
-    if commands_rejected != 0:
-        raise ValueError(f"trace rejected {commands_rejected} scripted commands")
+    illegal_rejects = [
+        reason for reason in rejected_reasons
+        if reason not in GAME_RULE_REJECT_REASONS
+    ]
+    if illegal_rejects:
+        raise ValueError(
+            "trace rejected scripted commands for harness failures "
+            f"{illegal_rejects!r}"
+        )
     if expected_initialization_seed is not None:
         if initialization_seeds != [expected_initialization_seed]:
             raise ValueError(
@@ -259,6 +279,7 @@ def validate_trace(trace: Path, expected_cycles: int | None,
         "unit_records": unit_records,
         "scenario": scenarios[-1],
         "commands_applied": commands_applied,
+        "commands_rejected": commands_rejected,
         "initialization_seed": (
             initialization_seeds[-1] if initialization_seeds else "uncontrolled"
         ),
