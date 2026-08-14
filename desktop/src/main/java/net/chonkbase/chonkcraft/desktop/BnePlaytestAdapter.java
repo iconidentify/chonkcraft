@@ -67,6 +67,13 @@ public final class BnePlaytestAdapter {
             }
             Map<Integer, Integer> nativeToJava = pairActors(
                     array(scenario.get("actors"), "actors"), world);
+            if (scenario.get("targets") instanceof List<?> listed && !listed.isEmpty()) {
+                // Attack and harvest name a native slot that is not an actor.
+                // Pairing only the clicker used to send target id 0 and the
+                // journal then looked like a rejected attack.
+                nativeToJava.putAll(pairActors(
+                        array(scenario.get("targets"), "targets"), world));
+            }
 
             List<Object> commands = array(scenario.get("commands"), "commands");
             int settle = optionalNumber(scenario.get("settle_cycles"), DEFAULT_SETTLE);
