@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.graphic.IndexedImage;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
@@ -60,10 +60,10 @@ class RallyPointAndGroupsTest {
     private record Scene(GameScreen screen, World world, GameData data) {}
 
     private static GameData data() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II retail assets configured.");
+        return new GameData(assets);
     }
 
     private static Scene scene() {
