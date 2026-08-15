@@ -3907,25 +3907,18 @@ public final class Unit {
     public long occupancyFlag() {
         if (type.building()) {
             // A building with no hit points at all is ground you walk on, not
-            // a wall. {@code UpdateUnitStats}
-            // makes exactly this distinction, and labels it: "A little chaos,
-            // buildings without HP can be entered. The oil-patch is a very
-            // special case." A maximum of nought hit points gives
-            // MapFieldNoBuilding, which reserves the ground against being
-            // built on and stops nothing that walks; anything else gives
-            // MapFieldBuilding.
-            //
-            // This implementation marked all three of the shipped no-hit-point types the
-            // same way as a keep. The circle of power on the second human
-            // mission is a two-by-two square of ground the mission exists to
-            // walk a rescued archer onto, and the move order was refused
-            // outright -- not a slow route, no route: the objective could not
-            // be stood on, so the mission could not be won the way it is
-            // played. The hundred and five oil patches spread over
-            // twenty-nine of the fifty-two campaign maps were reefs in the
-            // middle of the sea for the same reason, none of them sailable by
-            // any ship.
-            return type.hitPoints() == 0 ? TileFlag.NO_BUILDING : TileFlag.BUILDING;
+            // a wall. UpdateUnitStats labels it: "A little chaos, buildings
+            // without HP can be entered. The oil-patch is a very special
+            // case." Catalog nought hit points give MapFieldNoBuilding.
+            // Overlay copies raise oil-patch and circle-of-power to 1 so
+            // they survive isAlive, which used to mark them BUILDING and
+            // turn every patch into a reef. Native batch-2/03 dest-arms a
+            // destroyer onto 112,118 on the patch. Used to swallow that
+            // click as already-touching occupied dest.
+            return type.hitPoints() == 0
+                    || "unit-oil-patch".equals(type.ident())
+                    || "unit-circle-of-power".equals(type.ident())
+                    ? TileFlag.NO_BUILDING : TileFlag.BUILDING;
         }
         if (type.airUnit()) {
             return TileFlag.AIR_UNIT;
