@@ -71,10 +71,18 @@ class UgrdProfileRealDataTest {
                     "Great Wall stores its own research prices");
             assertTrue(stock.upgradeData().useDefaults(),
                     "Icewall keeps the stock table");
-            assertTrue(wall.upgradeData().gold(2) < stock.upgradeData().gold(2),
-                    "Great Wall's custom gold is not cheaper than the stock table");
-            assertEquals(stock.upgradeData().gold(2), 1500,
-                    "the stock gold column drifted");
+            assertEquals(200, stock.upgradeData().time(2),
+                    "Icewall's unused table still stores catalog battle-axe1 time");
+            assertEquals(500, stock.upgradeData().gold(2),
+                    "Icewall's unused table still stores catalog battle-axe1 gold");
+            assertEquals(50, wall.upgradeData().time(2),
+                    "Great Wall's battle-axe1 time is not the stored 50");
+            assertEquals(500, wall.upgradeData().gold(3),
+                    "Great Wall's battle-axe2 gold is not the stored 500");
+            assertEquals(1500, stock.upgradeData().gold(3),
+                    "the stock battle-axe2 gold column drifted");
+            assertTrue(wall.upgradeData().gold(3) < stock.upgradeData().gold(3),
+                    "Great Wall's custom battle-axe2 gold is not cheaper");
         }
     }
 
@@ -87,12 +95,12 @@ class UgrdProfileRealDataTest {
             Assumptions.assumeTrue(wallName != null && iceName != null,
                     "Great Wall or Icewall is missing");
             PudMap first = PudReader.read(assets.map(iceName));
-            int stockGold = first.upgradeData().gold(2);
+            int stockGold = first.upgradeData().gold(3);
             PudMap second = PudReader.read(assets.map(wallName));
-            assertTrue(second.upgradeData().gold(2) < stockGold,
+            assertTrue(second.upgradeData().gold(3) < stockGold,
                     "the second map did not keep its own table");
             PudMap third = PudReader.read(assets.map(iceName));
-            assertEquals(stockGold, third.upgradeData().gold(2),
+            assertEquals(stockGold, third.upgradeData().gold(3),
                     "re-reading the default map picked up Great Wall's prices");
         }
     }

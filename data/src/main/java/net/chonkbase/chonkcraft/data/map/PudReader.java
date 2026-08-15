@@ -138,6 +138,7 @@ public final class PudReader {
                     int[] times = new int[UDTA_UNIT_COUNT];
                     int[] goldTens = new int[UDTA_UNIT_COUNT];
                     int[] lumberTens = new int[UDTA_UNIT_COUNT];
+                    int[] oilTens = new int[UDTA_UNIT_COUNT];
                     int[] armor = new int[UDTA_UNIT_COUNT];
                     int[] basicDamage = new int[UDTA_UNIT_COUNT];
                     int[] piercingDamage = new int[UDTA_UNIT_COUNT];
@@ -154,6 +155,8 @@ public final class PudReader {
                                 PudUnitData.GOLD_TENS_OFFSET, i);
                         lumberTens[i] = udtaByte(data, body, section.length(),
                                 PudUnitData.LUMBER_TENS_OFFSET, i);
+                        oilTens[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.OIL_TENS_OFFSET, i);
                         armor[i] = udtaByte(data, body, section.length(),
                                 PudUnitData.ARMOR_OFFSET, i);
                         basicDamage[i] = udtaByte(data, body, section.length(),
@@ -167,8 +170,8 @@ public final class PudReader {
                     }
                     builder.unitData = new PudUnitData(
                             readLe16(data, body) != 0, hitPoints, priorities,
-                            times, goldTens, lumberTens, armor, basicDamage,
-                            piercingDamage, attackRange, sight);
+                            times, goldTens, lumberTens, oilTens, armor,
+                            basicDamage, piercingDamage, attackRange, sight);
                 }
             }
 
@@ -196,11 +199,14 @@ public final class PudReader {
         int[] lumber = new int[count];
         int[] oil = new int[count];
         boolean useDefaults = readLe16(data, body) != 0;
+        // Authenticated Icewall matches the catalog only when time is one
+        // byte per upgrade at offset 2 and gold/lumber/oil are words at
+        // 54/158/262. Reading time as words produced 64,200 for sword1.
         for (int i = 0; i < count; i++) {
-            time[i] = readLe16(data, body + 2 + i * 2);
-            gold[i] = readLe16(data, body + 2 + count * 2 + i * 2);
-            lumber[i] = readLe16(data, body + 2 + count * 4 + i * 2);
-            oil[i] = readLe16(data, body + 2 + count * 6 + i * 2);
+            time[i] = data[body + PudUpgradeData.TIME_OFFSET + i] & 0xff;
+            gold[i] = readLe16(data, body + PudUpgradeData.GOLD_OFFSET + i * 2);
+            lumber[i] = readLe16(data, body + PudUpgradeData.LUMBER_OFFSET + i * 2);
+            oil[i] = readLe16(data, body + PudUpgradeData.OIL_OFFSET + i * 2);
         }
         return new PudUpgradeData(useDefaults, time, gold, lumber, oil);
     }

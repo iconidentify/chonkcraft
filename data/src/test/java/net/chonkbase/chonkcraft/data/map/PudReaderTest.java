@@ -271,6 +271,7 @@ class PudReaderTest {
         unitData[2118] = 60;       // footman gold tens
         unitData[2118 + 2] = 40;   // peasant gold tens
         unitData[2228 + 58] = 25;  // farm lumber tens
+        unitData[2338 + 30] = 70;  // destroyer oil tens
         unitData[3658] = 2;        // footman armor
         unitData[3328] = 1;        // footman range
         unitData[3548] = 4;        // footman sight
@@ -289,6 +290,10 @@ class PudReaderTest {
                 "peasant gold is stored as tens at UDTA 2118");
         assertEquals(250, map.unitData().lumber(58),
                 "farm lumber is stored as tens at UDTA 2228");
+        assertEquals(0, map.unitData().oil(0),
+                "a land unit stores no oil tens");
+        assertEquals(700, map.unitData().oil(30),
+                "destroyer oil is stored as tens at UDTA 2338");
         assertEquals(2, map.unitData().armor(0),
                 "footman armor sits at UDTA 3658");
         assertEquals(1, map.unitData().attackRange(0),
@@ -305,12 +310,11 @@ class PudReaderTest {
         minimalBody();
         byte[] upgrades = new byte[782];
         upgrades[0] = 0;
-        // time[2] at offset 2 + 2*2 = 6
-        upgrades[6] = 100;
-        upgrades[7] = 0;
-        // gold[2] at offset 2 + 52*2 + 2*2 = 110
-        upgrades[110] = (byte) 500;
-        upgrades[111] = 1;
+        // time[2] is one byte at offset 2 + 2
+        upgrades[4] = 100;
+        // gold[2] is a word at offset 54 + 2*2
+        upgrades[58] = (byte) 500;
+        upgrades[59] = 1;
         section("UGRD", upgrades);
 
         PudMap map = read();

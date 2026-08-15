@@ -41,7 +41,7 @@ public record PudMap(
     /** Unit statistics embedded in the PUD's optional {@code UDTA} section. */
     public record PudUnitData(boolean useDefaults, int[] hitPoints,
             int[] priorities, int[] times, int[] goldTens, int[] lumberTens,
-            int[] armor, int[] basicDamage, int[] piercingDamage,
+            int[] oilTens, int[] armor, int[] basicDamage, int[] piercingDamage,
             int[] attackRange, int[] sight) {
 
         public static final int UNIT_COUNT = 110;
@@ -49,6 +49,7 @@ public record PudMap(
         public static final int TIME_OFFSET = 2008;
         public static final int GOLD_TENS_OFFSET = 2118;
         public static final int LUMBER_TENS_OFFSET = 2228;
+        public static final int OIL_TENS_OFFSET = 2338;
         public static final int ATTACK_RANGE_OFFSET = 3328;
         public static final int SIGHT_OFFSET = 3548;
         public static final int ARMOR_OFFSET = 3658;
@@ -79,6 +80,11 @@ public record PudMap(
         /** Lumber cost in whole logs. The on-disk table stores tens. */
         public int lumber(int type) {
             return at(lumberTens, type) * 10;
+        }
+
+        /** Oil cost in whole units. The on-disk table stores tens. */
+        public int oil(int type) {
+            return at(oilTens, type) * 10;
         }
 
         public int armor(int type) {
@@ -121,6 +127,12 @@ public record PudMap(
 
         public static final int UPGRADE_COUNT = 52;
         public static final int SECTION_BYTES = 782;
+        /** Time is one byte per upgrade after the use-defaults word. */
+        public static final int TIME_OFFSET = 2;
+        /** Gold words begin immediately after the 52 time bytes. */
+        public static final int GOLD_OFFSET = 54;
+        public static final int LUMBER_OFFSET = 158;
+        public static final int OIL_OFFSET = 262;
 
         public int time(int index) {
             return inRange(index) ? time[index] : 0;

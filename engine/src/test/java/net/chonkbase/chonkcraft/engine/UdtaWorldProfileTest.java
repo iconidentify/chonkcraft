@@ -40,7 +40,7 @@ class UdtaWorldProfileTest {
         times[0] = 20;
         world.setBattleNetUnitProfile(new PudMap.PudUnitData(
                 false, empty, empty, times, goldTens, empty, empty, empty,
-                empty, empty, empty));
+                empty, empty, empty, empty));
 
         Unit hall = world.createUnit(hallType, 0, 4, 4);
         world.player(0).set(Resource.GOLD, 400);
@@ -77,7 +77,7 @@ class UdtaWorldProfileTest {
         goldTens[0] = 20;
         world.setBattleNetUnitProfile(new PudMap.PudUnitData(
                 true, empty, empty, empty, goldTens, empty, empty, empty,
-                empty, empty, empty));
+                empty, empty, empty, empty));
 
         Unit hall = world.createUnit(hallType, 0, 4, 4);
         world.player(0).set(Resource.GOLD, 600);
@@ -111,7 +111,7 @@ class UdtaWorldProfileTest {
         goldTens[58] = 10;
         world.setBattleNetUnitProfile(new PudMap.PudUnitData(
                 false, empty, empty, empty, goldTens, empty, empty, empty,
-                empty, empty, empty));
+                empty, empty, empty, empty));
 
         Unit worker = world.createUnit(peasant, 0, 2, 2);
         world.player(0).set(Resource.GOLD, 200);
@@ -147,8 +147,8 @@ class UdtaWorldProfileTest {
         basic[0] = 18;
         piercing[0] = 9;
         world.setBattleNetUnitProfile(new PudMap.PudUnitData(
-                false, hitPoints, empty, empty, empty, empty, armor, basic,
-                piercing, empty, empty));
+                false, hitPoints, empty, empty, empty, empty, empty, armor,
+                basic, piercing, empty, empty));
 
         UnitType local = world.registeredUnitType("unit-footman");
         assertEquals(900, local.hitPoints(),

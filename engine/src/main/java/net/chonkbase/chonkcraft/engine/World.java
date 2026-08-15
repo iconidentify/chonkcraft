@@ -559,12 +559,16 @@ public final class World {
         }
         int gold = profile.gold(code);
         int lumber = profile.lumber(code);
+        int oil = profile.oil(code);
         int time = profile.time(code);
         if (gold > 0) {
             costs.put(UnitType.Resource.GOLD, gold);
         }
         if (lumber > 0) {
             costs.put(UnitType.Resource.WOOD, lumber);
+        }
+        if (oil > 0) {
+            costs.put(UnitType.Resource.OIL, oil);
         }
         if (time > 0) {
             costs.put(UnitType.Resource.TIME, time);
@@ -2304,6 +2308,7 @@ public final class World {
         int piercing = type.piercingDamage();
         int range = type.maxAttackRange();
         int sight = type.sightRange();
+        int priority = type.priority();
         var profile = battleNetUnitProfile;
         int code = PudUnitTypes.code(type.ident());
         if (profile != null && !profile.useDefaults() && code >= 0
@@ -2318,6 +2323,9 @@ public final class World {
             if (profile.sight(code) > 0) {
                 sight = profile.sight(code);
             }
+            if (profile.priority(code) > 0) {
+                priority = profile.priority(code);
+            }
         }
         if ("unit-oil-patch".equals(type.ident())
                 || "unit-circle-of-power".equals(type.ident())) {
@@ -2328,7 +2336,8 @@ public final class World {
         }
         if (hitPoints == type.hitPoints() && armor == type.armor()
                 && basic == type.basicDamage() && piercing == type.piercingDamage()
-                && range == type.maxAttackRange() && sight == type.sightRange()) {
+                && range == type.maxAttackRange() && sight == type.sightRange()
+                && priority == type.priority()) {
             return type;
         }
         UnitType copy = type.copyForMapProfile();
@@ -2338,6 +2347,7 @@ public final class World {
         copy.setPiercingDamage(piercing);
         copy.setMaxAttackRange(range);
         copy.setSightRange(sight);
+        copy.setPriority(priority);
         return copy;
     }
 

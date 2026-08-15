@@ -57,7 +57,11 @@ class UgrdWorldProfileTest {
                 "the cheaper Great Wall price was refused");
         assertEquals(400, world.player(0).get(Resource.GOLD),
                 "the player was charged the catalog 1500 instead of the map 500");
+        assertEquals(80 * World.PROGRESS_PER_TIME_UNIT, smith.progressGoal(),
+                "research used the catalog 200 instead of the map 80");
         assertEquals(1500, upgrade.costs().get(Resource.GOLD),
                 "applying Great Wall mutated the shared upgrade catalog");
+        assertEquals(200, upgrade.costs().get(Resource.TIME),
+                "applying Great Wall mutated the catalog research time");
     }
 }
