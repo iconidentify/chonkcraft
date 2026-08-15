@@ -227,7 +227,8 @@ final class PlayerIntentJournal {
                 && now.worksiteTileY == command.y();
         return switch (command.kind()) {
             case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW, DEFEND -> moved;
-            case ATTACK, ATTACK_GROUND, CAST -> moved || targetChanged;
+            case ATTACK, ATTACK_GROUND, CAST -> moved || targetChanged
+                    || !java.util.Objects.equals(before.order, now.order);
             case HARVEST, RETURN_GOODS -> moved || before.carried != now.carried
                     || !java.util.Objects.equals(before.order, now.order);
             case BUILD -> moved || foundationCreated;

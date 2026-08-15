@@ -8075,7 +8075,8 @@ public final class World {
                     orderStandGround(unit);
                     yield unit.order() == Unit.Order.STAND_GROUND;
                 }
-                case ATTACK_GROUND -> orderAttackGround(unit, queued.x(), queued.y());
+                case ATTACK_GROUND -> orderAttackGround(
+                        unit, queued.x(), queued.y(), false);
                 case ATTACK_MOVE -> combat.orderAttackMove(unit, queued.x(), queued.y());
                 case BOARD -> orderBoard(unit, queued.target());
                 case FOLLOW -> orderFollow(unit, queued.target());
@@ -8320,7 +8321,8 @@ public final class World {
                     && !(unit.order() == Unit.Order.HARVEST && unit.worksite() != null)) {
                 continue;
             }
-            if (unit.order() == Unit.Order.STILL && unit.hasQueuedOrders()) {
+            if (unit.order() == Unit.Order.STILL && unit.hasQueuedOrders()
+                    && unit.battleNetOrderDelay() == 0) {
                 beginNextQueuedOrder(unit);
             }
             if (unit.order() == Unit.Order.STILL
@@ -8538,7 +8540,14 @@ public final class World {
             combat.finishBattleNetAttackSequenceMarker(unit);
             if (unit.order() == Unit.Order.STILL && unit.hasQueuedOrders()
                     && unit.isOnMap()) {
-                beginNextQueuedOrder(unit);
+                if (unit.battleNetOrderDelay() > 0) {
+                    unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                    if (unit.battleNetOrderDelay() == 0) {
+                        beginNextQueuedOrder(unit);
+                    }
+                } else {
+                    beginNextQueuedOrder(unit);
+                }
             }
             releaseUnreferencedDestroyedUnits();
         }
@@ -12431,6 +12440,14 @@ public final class World {
      * 17 actor.
      */
     public boolean orderAttackGround(Unit unit, int toX, int toY) {
+        return orderAttackGround(unit, toX, toY, false);
+    }
+
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder click: Still keeps the
+     *     current order and writes next_order 17 for the remaining Still wait
+     */
+    public boolean orderAttackGround(Unit unit, int toX, int toY, boolean fromPlayer) {
         if (unit == null || !unit.isAlive() || unit.type().building()
                 || !map.contains(toX, toY)) {
             return false;
@@ -12461,6 +12478,25 @@ public final class World {
         unit.setFighting(false);
         unit.setSwingAtAir(false);
         unit.setAutoTargeting(false);
+        // Native GiveOrder 17 from Still writes next_order and keeps Still
+        // for the remaining Still wait: Human 7 catapult 1519 wait 4 through
+        // fixture 8, AttackGround at 9; Orc 8 1576 wait 3, AttackGround at 8.
+        // Installing the label on the issue cycle made first progress 5.
+        // The wait is the Still program's remaining quiet ticks, or the
+        // Still restart when that program is already on its marker -- not
+        // Move's extra three-visit action start.
+        if (fromPlayer && unit.order() == Unit.Order.STILL) {
+            int[] waits = movement.playerCommandWaits(unit);
+            int stillWait = waits[1] > 0 ? waits[1] : waits[0];
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.ATTACK_GROUND,
+                    toX, toY, null, null, null));
+            unit.setQueuedReplacementPending(true);
+            // The issue visit still decrements this delay, so add the beat
+            // native spends writing next_order instead of counting down.
+            unit.setBattleNetOrderDelay(stillWait + 1);
+            return true;
+        }
         unit.setOrder(Unit.Order.ATTACK_GROUND);
         return true;
     }

@@ -216,7 +216,7 @@ public final class CommandApplier {
             case RETURN_GOODS -> accepted = world.orderReturnGoods(unit);
             case STAND_GROUND -> world.orderStandGround(unit);
             case ATTACK_GROUND -> accepted = world.orderAttackGround(
-                    unit, command.x(), command.y());
+                    unit, command.x(), command.y(), true);
             case ATTACK_MOVE -> accepted = world.orderAttackMove(
                     unit, command.x(), command.y());
             // The position is where the player pointed; zero means "here",
