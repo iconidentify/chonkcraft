@@ -1532,16 +1532,13 @@ final class BattleNetHarvestSystem {
         // residual, fall through so the spent-route action-23 delay arms on
         // the settle cycle (XHuman 7 slot1545: timer 3/2/1 on c19-c21, east
         // heading at c22 -- returning one cycle late pushed the replan to 25).
-        // The last leftover onto the tree ring must not dest-arm on the
-        // settle visit. Human 12 peon 1565 residual-settles on 103,1 with
-        // leftover NE onto 104,0 (ring of 105,0). Same-visit consume landed
-        // at 227; native holds through 229 and steps at 230. Action 23's
-        // three-call start owns that leftover, the same way it owns a spent
-        // short tip. A continued heading with more path left is not that
-        // leftover: XHuman 2's north-west walker dest-arms the next square
-        // the cycle the pixels land, sixteen visits after the previous
-        // dest-arm. Treating any leftover near the tree as action 23 used
-        // to park that dest-arm for three extra visits.
+        // A leftover that still walks closer to the stored order point
+        // dest-arms the cycle the pixels land. Treating every leftover
+        // beside the tree as action 23 used to park those dest-arms for
+        // three extra visits. A leftover that misses the order point
+        // parks for action 23's three-call start -- Human 12 peon 1565
+        // residual-settles on 103,1 with leftover NE onto 104,0 while the
+        // order point is still 104,1, then dest-arms 104,0 at 230.
         if (worker.isMoving()) {
             world.movement.walkPixels(worker);
             if (worker.isMoving()) {
@@ -1553,8 +1550,23 @@ final class BattleNetHarvestSystem {
                 int heading = worker.peekHeading();
                 int nextX = worker.tileX() + Direction.deltaX(heading);
                 int nextY = worker.tileY() + Direction.deltaY(heading);
-                if (Math.max(Math.abs(nextX - worker.resourceTileX()),
-                        Math.abs(nextY - worker.resourceTileY())) <= 1) {
+                int orderX = worker.battleNetWoodOrderX();
+                int orderY = worker.battleNetWoodOrderY();
+                if (orderX < 0 || orderY < 0) {
+                    orderX = worker.resourceTileX();
+                    orderY = worker.resourceTileY();
+                }
+                // Leftover dest-arm compares to the stored order point
+                // (native unit+0x84). A leftover that still walks closer
+                // dest-arms immediately. A leftover that misses it parks
+                // for action 23.
+                int now = Math.max(
+                        Math.abs(worker.tileX() - orderX),
+                        Math.abs(worker.tileY() - orderY));
+                int then = Math.max(
+                        Math.abs(nextX - orderX),
+                        Math.abs(nextY - orderY));
+                if (then <= 1 && then >= now) {
                     worker.setBattleNetOrderDelay(2);
                     return;
                 }
@@ -1733,6 +1745,7 @@ final class BattleNetHarvestSystem {
                 return;
             }
             worker.setPath(path);
+            worker.setBattleNetWoodOrder(goalX, goalY);
             // Mark free-prefix so residual settle of a mid-journey tip
             // (length 3+) replans immediately, while short tips keep the
             // action-23 delay (XHuman 2 peon 1530 vs XHuman 7 slot1545).

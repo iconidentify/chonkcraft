@@ -2138,6 +2138,26 @@ public final class Unit {
         this.resourceTileY = y;
     }
 
+    /**
+     * The wood order point last written for this harvest walk -- native
+     * unit+0x84, which leftover dest-arm compares against.
+     */
+    public int battleNetWoodOrderX() {
+        return battleNetWoodOrderX;
+    }
+
+    public int battleNetWoodOrderY() {
+        return battleNetWoodOrderY;
+    }
+
+    public void setBattleNetWoodOrder(int x, int y) {
+        battleNetWoodOrderX = x;
+        battleNetWoodOrderY = y;
+    }
+
+    private int battleNetWoodOrderX = -1;
+    private int battleNetWoodOrderY = -1;
+
     /** Whether the worker is heading back to unload. */
     public boolean returningToDepot() {
         return returningToDepot;

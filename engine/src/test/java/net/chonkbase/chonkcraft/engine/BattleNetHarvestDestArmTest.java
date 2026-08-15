@@ -100,6 +100,63 @@ class BattleNetHarvestDestArmTest {
     }
 
     @Test
+    @DisplayName("a leftover that still walks closer dest-arms when the pixels land")
+    void aLeftoverThatStillWalksCloserDestArmsWhenThePixelsLand() {
+        GameData data = EngineTrace.data();
+        assumeTrue(data != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        World west = EngineTrace.world(data, "campaigns/human-exp/levelx02h");
+        assumeTrue(west != null, "the second human expansion map must load");
+        Unit southEast = workerAt(west, 94, 105);
+        assertNotNull(southEast, "the south-east harvest peon must stand at 94,105");
+        List<int[]> eastArms = destArms(west, southEast, 70);
+        assertTrue(eastArms.size() >= 5,
+                "the south-east harvest peon must dest-arm through 99,110");
+        int[] ontoRing = eastArms.get(eastArms.size() - 1);
+        assertEquals(99, ontoRing[1],
+                "the last dest-arm must name 99,110");
+        assertEquals(110, ontoRing[2],
+                "the last dest-arm must name 99,110");
+        assertEquals(16, ontoRing[0] - eastArms.get(eastArms.size() - 2)[0],
+                "a leftover that still walks closer used to wait three extra "
+                        + "action-23 visits, so the tile lagged the pixels");
+        assertTrue(ontoRing[3] == ontoRing[5] * Unit.TILE_PIXELS
+                        && ontoRing[4] == ontoRing[6] * Unit.TILE_PIXELS,
+                "the leftover dest-arm must leave the pixels on the old square");
+
+        World north = EngineTrace.world(data, "campaigns/human-exp/levelx02h");
+        assumeTrue(north != null, "the second human expansion map must load");
+        Unit northWest = workerAt(north, 92, 101);
+        assertNotNull(northWest, "the north-west harvest peon must stand at 92,101");
+        List<int[]> westArms = destArms(north, northWest, 70);
+        assertTrue(westArms.size() >= 5,
+                "the north-west harvest peon must dest-arm through 87,96");
+        int[] otherRing = westArms.get(westArms.size() - 1);
+        assertEquals(87, otherRing[1],
+                "the independent leftover dest-arm must name 87,96");
+        assertEquals(96, otherRing[2],
+                "the independent leftover dest-arm must name 87,96");
+        assertEquals(16, otherRing[0] - westArms.get(westArms.size() - 2)[0],
+                "a second independent leftover that still walks closer must "
+                        + "dest-arm on the same beat");
+
+        World south = EngineTrace.world(data, "campaigns/human/level05h");
+        assumeTrue(south != null, "the fifth human map must load");
+        Unit peasant = workerAt(south, 34, 105);
+        assertNotNull(peasant, "the southern harvest peasant must stand at 34,105");
+        List<int[]> southArms = destArms(south, peasant, 60);
+        assertTrue(southArms.size() >= 4,
+                "the southern harvest peasant must dest-arm through 30,108");
+        int[] westFace = southArms.get(southArms.size() - 1);
+        assertEquals(30, westFace[1],
+                "the southern leftover dest-arm must name 30,108");
+        assertEquals(108, westFace[2],
+                "the southern leftover dest-arm must name 30,108");
+        assertEquals(16, westFace[0] - southArms.get(southArms.size() - 2)[0],
+                "a leftover west onto 30,108 must dest-arm when the pixels land");
+    }
+
+    @Test
     @DisplayName("a harvest walk that turns does not keep the sixteen-cycle beat")
     void aHarvestWalkThatTurnsDoesNotKeepTheSixteenCycleBeat() {
         GameData data = EngineTrace.data();
