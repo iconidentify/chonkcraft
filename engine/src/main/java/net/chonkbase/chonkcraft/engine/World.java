@@ -4658,6 +4658,47 @@ public final class World {
         return new int[] {left, top};
     }
 
+    /**
+     * GiveOrder 27's stand point: project the mover onto the building's
+     * one-tile ring, then slide a north approach to the north-east corner
+     * and an east approach to the south-east corner.
+     *
+     * <p>Walking the connected origin used to park Orc 1's peon on 22,21
+     * while native stood on 26,21, the east-side peon on 45,55 while
+     * native stood on 45,59, and grunt 1592 on 22,21 while native stood
+     * on 21,23. A bottom-right dest then walked the grunt past 21,23.
+     */
+    int[] battleNetRepairApproachPoint(Unit worker, Unit target) {
+        int left = target.tileX();
+        int top = target.tileY();
+        int width = Math.max(1, target.type().tileWidth());
+        int height = Math.max(1, target.type().tileHeight());
+        int right = left + width - 1;
+        int bottom = top + height - 1;
+        int x = Math.max(left - 1, Math.min(right + 1, worker.tileX()));
+        int y = Math.max(top - 1, Math.min(bottom + 1, worker.tileY()));
+        if (x >= left && x <= right && y >= top && y <= bottom) {
+            if (worker.tileX() < left) {
+                x = left - 1;
+            } else if (worker.tileX() > right) {
+                x = right + 1;
+            } else if (worker.tileY() < top) {
+                y = top - 1;
+            } else {
+                y = bottom + 1;
+            }
+        }
+        if (y == top - 1) {
+            x = right + 1;
+        } else if (x == right + 1) {
+            y = bottom;
+        }
+        if (!map.contains(x, y) || !canEnter(worker, x, y)) {
+            return new int[] {right, bottom};
+        }
+        return new int[] {x, y};
+    }
+
     /** Returns the live native {@code unit+0x1c & 2} movement-grid state. */
     /**
      * How long a worker stands down after handing a build job back.

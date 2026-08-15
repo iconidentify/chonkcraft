@@ -326,8 +326,8 @@ class ConstructionTest {
 
         assertTrue(world.orderRepair(soldier, hall),
                 "GiveOrder 27 on a grunt mending a hall was refused");
-        assertEquals(Unit.Order.MOVE, soldier.order(),
-                "a soldier with no repair range must walk, not stand and mend");
+        assertEquals(Unit.Order.REPAIR, soldier.order(),
+                "GiveOrder 27 keeps Repair even when the actor cannot mend");
         int startX = soldier.tileX();
         for (int cycle = 0; cycle < 200 && soldier.tileX() == startX; cycle++) {
             world.tick();
