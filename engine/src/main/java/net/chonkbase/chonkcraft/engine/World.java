@@ -12710,6 +12710,40 @@ public final class World {
     }
 
     /**
+     * Lets Still neighbours scan after a unit steps onto a new tile.
+     *
+     * <p>Retail walks the fixed pool low-slot to high, so a mover is often
+     * visited before the idle defender that will open on it. Java visits
+     * reverse creation order, and a Still marker that already fired this
+     * cycle cannot see the arrival until the next five-cycle beat. XHuman
+     * 10's person archer at 84,94 must open the cycle the grunt first
+     * stands at 80,91 -- otherwise the type-15 arrow is still in the air
+     * at fixture 52, where retail has already stored the first HP drop.
+     */
+    void battleNetIdleAcquireAround(Unit mover) {
+        if (mover == null || !mover.isAlive() || !mover.isOnMap() || cycle <= 1) {
+            return;
+        }
+        List<Unit> pool = snapshot != null ? snapshot : units;
+        for (Unit other : pool) {
+            if (other == mover || other.order() != Unit.Order.STILL
+                    || other.type() == null || !other.type().canAttack()
+                    || !other.isAggressive() || other.isDying()
+                    || !other.isOnMap()
+                    || !isEnemyPlayer(other.player(), mover.player())) {
+                continue;
+            }
+            int band = Math.max(1,
+                    other.type().reactRange(isPerson(other.player())));
+            if (Math.max(Math.abs(other.tileX() - mover.tileX()),
+                    Math.abs(other.tileY() - mover.tileY())) > band) {
+                continue;
+            }
+            battleNetAutoAttack(other);
+        }
+    }
+
+    /**
      * Runs BNE's hostile-unit scan at a movable unit's native action marker.
      *
      * <p>{@code HandleEachCycle} calls {@code FUN_0040a830} after the idle
