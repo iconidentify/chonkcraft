@@ -68,6 +68,32 @@ u 2 unit-footman p0 1 1 hp 60 o STILL
         self.assertIn("action-table order", strict.stdout)
         self.assertEqual(0, relaxed.returncode, relaxed.stdout + relaxed.stderr)
 
+    def test_cycle_one_pairs_by_owner_and_tile_not_type_name(self):
+        native = """\
+cycle 1 seed 00000001
+u 1550 unit-skeleton p6 10 10 hp 40 o STILL
+u 1551 unit-footman p0 1 1 hp 60 o STILL
+"""
+        java = """\
+cycle 1 seed 00000001
+u 20 unit-attack-peasant p6 10 10 hp 40 o STILL
+u 2 unit-footman p0 1 1 hp 60 o STILL
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            left = Path(directory, "native.txt")
+            right = Path(directory, "java.txt")
+            left.write_text(native)
+            right.write_text(java)
+            result = subprocess.run(
+                [sys.executable, str(DIFFER), str(left), str(right),
+                 "--ignore-action-order"],
+                check=False, capture_output=True, text=True)
+
+        self.assertEqual(1, result.returncode, result.stdout + result.stderr)
+        self.assertIn("paired 2 of 2 units", result.stdout)
+        self.assertIn("type", result.stdout)
+        self.assertNotIn("unmatched", result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

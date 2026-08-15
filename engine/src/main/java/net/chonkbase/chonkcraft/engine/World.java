@@ -2718,19 +2718,13 @@ public final class World {
         if (type == null || !map.contains(tileX, tileY)) {
             return null;
         }
-        // ChonkCraft wraps CreateUnit itself, and every load-time creation goes
-        // through the wrapper (scripts/wc2.legacy-declaration:117-140). Three of its rules
-        // land here, where every map path converges. A slot nobody plays
-        // gets no units, however many the map asks for -- the wrapper
-        // returns nil and CclCreateUnit behind it refuses too
-        // The neutral slot's units are left
-        // exactly as written, which is what keeps a gold mine a gold mine.
-        // And everybody else's units are converted to the owner's own race
-        // -- ConvertUnitType over the table at scripts/wc2.legacy-declaration:47-89 -- so a
-        // map drawn with orc pieces plays them as their human equivalents
-        // when a human slot owns them. levelx09o is the measurement: it asks
-        // for fifty-two skeletons on a slot whose race is human, upstream
-        // fields fifty-two militia, and this implementation fielded the skeletons.
+        // BNE still rewrites ordinary racial counterparts to the owner's
+        // race at map load -- Garden of War's halls and workers will not
+        // accept the other race's production packets without it. It does
+        // not rewrite undead or summoned types. XOrc 9 stores fifty-two
+        // skeletons on a human-race slot; the sealed cycle-one capture
+        // keeps those skeletons, and converting them to militia used to
+        // invent fifty-two unmatched identities before any unit moved.
         Player owner = player(player);
         if (owner != null && player != NEUTRAL_PLAYER) {
             if (owner.type()
@@ -2743,7 +2737,7 @@ public final class World {
                 case NEUTRAL -> java.util.Map.of();
             };
             String converted = equivalents.get(type.ident());
-            if (converted != null) {
+            if (converted != null && !isNonRacialMapType(type.ident())) {
                 UnitType convertedType = unitTypes.get(converted);
                 if (convertedType == null) {
                     // A configured equivalence is part of the deterministic
@@ -2799,6 +2793,21 @@ public final class World {
         // on 55,73 upstream and 55,74 here, because its displacement heading
         // was read six draws apart.
         return placed;
+    }
+
+    /**
+     * Types BNE leaves as stored even when the owner is the other race.
+     *
+     * <p>Ordinary racial counterparts still convert so a melee hall can
+     * train. Skeletons, daemons and critters are not racial units; rewriting
+     * them is what turned XOrc 9's opening army into militia.
+     */
+    private static boolean isNonRacialMapType(String ident) {
+        return "unit-skeleton".equals(ident)
+                || "unit-attack-peasant".equals(ident)
+                || "unit-attack-peon".equals(ident)
+                || "unit-daemon".equals(ident)
+                || "unit-critter".equals(ident);
     }
 
     /**

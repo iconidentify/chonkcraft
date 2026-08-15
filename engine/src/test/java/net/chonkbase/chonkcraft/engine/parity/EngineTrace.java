@@ -379,8 +379,9 @@ public final class EngineTrace {
         world.setUpgrades(data.upgrades().upgrades());
         world.setSpells(data.spells().spells());
         world.setMissileTypes(data.missiles().types());
-        // wc2.legacy-declaration's CreateUnit wrapper converts every load-time unit to its
-        // owner's race, on bare maps as much as on missions.
+        // Race equivalents still feed upgrade-time ConvertUnitType. Map
+        // placement itself keeps the stored PUD type so XOrc 9's skeletons
+        // stay skeletons.
         data.applyRaceEquivalents(world);
         data.applyAiEquivalents(world);
         // The button relations hold on bare maps too -- upstream loads

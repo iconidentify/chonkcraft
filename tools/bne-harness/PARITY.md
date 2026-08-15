@@ -44,6 +44,26 @@ Java internal cycle = fixture cycle + 2
 
 Always state which numbering system a note uses.
 
+## Current checkpoint — 2026-08-14 XOrc 9 identity and honest command counts
+
+Branch `grok/bne-experience-top3`. Remote native capture is incomplete
+(`oracle-host` unreachable). Offline doctor is READY against the pinned
+2.02b executable and the USA ChonkPack.
+
+XOrc 9's fifty-two opening skeletons stay skeletons on the human-race
+slot. The historical CreateUnit race rewrite turned them into militia, so
+the cycle-one differ reported unmatched identities before anyone moved.
+The differ now pairs by owner and tile; type is a compared field. Ordinary
+racial counterparts still convert, because Garden of War halls will not
+train without that load step.
+
+Command reporting is split. The current commanded ledger is 240 generated,
+131 executed by both adapters, 131 comparable, 52 exact, 79 materially
+divergent, 0 infrastructure failures. Both adapters executed is not
+complete and is not parity. Garden of War replay execution still stops at
+dispatcher record 3,477: native 1554 researches orc-shield1 and Java has
+not founded the blacksmith accepted at record 2,151.
+
 ## Current integration checkpoint — 2026-08-08 visual/spatial round
 
 The retired scripting language-free playable product is certified on `codex/bne-retired-interpreter-free-pack` through

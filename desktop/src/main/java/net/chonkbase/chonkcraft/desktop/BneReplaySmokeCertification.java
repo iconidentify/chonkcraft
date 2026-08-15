@@ -494,9 +494,10 @@ public final class BneReplaySmokeCertification {
         if (existing != null) {
             return existing;
         }
+        boolean containedOk = "unload".equals(command) || "stop".equals(command);
         List<Unit> candidates = world.playerUnits(player).stream()
                 .filter(Unit::isAlive)
-                .filter(Unit::isOnMap)
+                .filter(unit -> containedOk || unit.isOnMap())
                 .filter(unit -> !boundJava.contains(unit.id()))
                 .filter(unit -> !"move".equals(command) || unit.canMove())
                 .filter(unit -> !"attack".equals(command)
@@ -544,6 +545,21 @@ public final class BneReplaySmokeCertification {
         nativeToJava.put(nativeId, chosen);
         boundJava.add(chosen.id());
         return chosen;
+    }
+
+    /**
+     * Releases a native slot when its Java lifetime has died so a later
+     * occupant can bind. Called only when the next command names that slot
+     * and the previous unit is no longer alive -- never speculatively.
+     */
+    static void releaseIfDead(Map<Integer, Unit> nativeToJava,
+            Set<Integer> boundJava, int nativeId) {
+        Unit existing = nativeToJava.get(nativeId);
+        if (existing == null || existing.isAlive()) {
+            return;
+        }
+        nativeToJava.remove(nativeId);
+        boundJava.remove(existing.id());
     }
 
     private static boolean continuesUnrecycledBirthOrder(int nativeId, int player,

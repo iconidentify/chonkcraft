@@ -112,8 +112,15 @@ def coarse_order(raw):
 
 
 def shape(unit):
-    """What a unit is and where it stands, which is how the two are matched."""
-    return (unit["type"], unit["player"], unit["x"], unit["y"])
+    """Where a unit stands after mission load, which is how the two are matched.
+
+    Identity is the native pool slot paired to the unique Java unit at that
+    owner and tile. Type is a compared field, not part of the key: XOrc 9's
+    fifty-two skeletons sit on the same tiles Java used to report as militia,
+    and requiring the names to match manufactured fifty-two unmatched
+    identities before any unit had moved.
+    """
+    return (unit["player"], unit["x"], unit["y"])
 
 
 def align(left, right, shared):

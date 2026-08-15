@@ -909,14 +909,125 @@ def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
     families: set[str] = set()
     for row in qualified:
         families.update(row.get("families") or [])
+    # Crossing the execution threshold is not parity. The split report
+    # is the only document that may say exact or divergent.
     return {
         "schema": "chonkcraft-bne-playtest-execution-ledger-1",
         "dual_adapter_executed_scenarios": len(contents),
         "distinct_command_contents": len(contents),
         "families": sorted(families),
         "family_count": len(families),
-        "complete": len(contents) >= 100 and len(families) >= 5,
+        "complete": False,
+        "executed_threshold_met": len(contents) >= 100 and len(families) >= 5,
         "rows": qualified,
+    }
+
+
+def split_command_report(ledger: dict[str, Any], *,
+        generated_scenarios: int = 0) -> dict[str, Any]:
+    """Split dual-adapter execution from exact parity.
+
+    Both adapters having run a scenario is never treated as complete or as
+    parity. Representational fields stay in the observation; only proved
+    relative delays are compared, the same way compare_results does.
+    """
+    if ledger.get("schema") != "chonkcraft-bne-playtest-execution-ledger-1":
+        raise ValueError("split command report needs an execution ledger")
+    generated = int(generated_scenarios)
+    executed_native = 0
+    executed_java = 0
+    comparable = 0
+    exact_parity = 0
+    materially_divergent = 0
+    infrastructure_failure = 0
+    divergent_sources: list[str] = []
+    failures: list[str] = []
+    for row in ledger.get("rows") or []:
+        source = _repo_relative(str(row.get("source") or ""))
+        native = row.get("native_observations")
+        java = row.get("java_observations")
+        native_ok = isinstance(native, list) and native
+        java_ok = isinstance(java, list) and java
+        if native_ok:
+            executed_native += 1
+        if java_ok:
+            executed_java += 1
+        if not row.get("qualifies") or not native_ok or not java_ok:
+            infrastructure_failure += 1
+            failures.append(source)
+            continue
+        if len(native) != len(java) or not row.get("commands"):
+            infrastructure_failure += 1
+            failures.append(source)
+            continue
+        comparable += 1
+        try:
+            scenario = {
+                "schema": SCENARIO_SCHEMA,
+                "identity": {"fixture": source or "ledger",
+                             "source_sha256": "0" * 64, "seed": 1},
+                "setup": {"kind": "campaign", "scenario": source or "ledger"},
+                "pattern": "sequence",
+                "actors": [],
+                "targets": [],
+                "start_cycle": int(row["commands"][0]["issue_cycle"]),
+                "settle_cycles": 1,
+                "commands": row["commands"],
+            }
+            native_result = {
+                "schema": RESULT_SCHEMA,
+                "side": "native",
+                "scenario_sha256": row.get("scenario_sha256"),
+                "producer": row.get("native_producer") or {
+                    "name": "native",
+                    "build_sha256": "0" * 64,
+                    "authority_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+                },
+                "observations": native,
+                "events": [],
+            }
+            java_result = {
+                "schema": RESULT_SCHEMA,
+                "side": "java",
+                "scenario_sha256": row.get("scenario_sha256"),
+                "producer": row.get("java_producer") or {
+                    "name": "java",
+                    "build_sha256": "1" * 64,
+                    "authority_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+                },
+                "observations": java,
+                "events": [],
+            }
+            # Ledger rows already passed adapter validation when they were
+            # written. Compare the stored observations only.
+            left = normalize_result(native_result, scenario)
+            right = normalize_result(java_result, scenario)
+            same = left["observations"] == right["observations"]
+        except (KeyError, TypeError, ValueError):
+            infrastructure_failure += 1
+            failures.append(source)
+            continue
+        if same:
+            exact_parity += 1
+        else:
+            materially_divergent += 1
+            divergent_sources.append(source)
+    return {
+        "schema": "chonkcraft-bne-command-split-report-1",
+        "generated": generated,
+        "executed_native": executed_native,
+        "executed_java": executed_java,
+        "comparable": comparable,
+        "exact_parity": exact_parity,
+        "materially_divergent": materially_divergent,
+        "infrastructure_failure": infrastructure_failure,
+        "complete": False,
+        "parity": False,
+        "meaning": (
+            "both adapters executed is not complete and is not parity"
+        ),
+        "divergent_sources": divergent_sources,
+        "infrastructure_sources": failures,
     }
 
 
@@ -1703,12 +1814,42 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
     registry_path = args.registry if args.registry is not None else (
         args.output.with_name("playtest-native-commands.json"))
     write_json(registry_path, registry)
+    inventory_path = getattr(args, "inventory", None)
+    inventory = load_json(inventory_path, "coverage inventory") \
+        if inventory_path is not None else None
+    generated = int((inventory or {}).get("generated_scenarios") or 0)
+    split = split_command_report(report, generated_scenarios=generated)
+    split_path = args.output.with_name("command-split-report.json")
+    write_json(split_path, split)
     print(json.dumps({
         "dual_adapter_executed_scenarios": report["dual_adapter_executed_scenarios"],
         "distinct_command_contents": report["distinct_command_contents"],
         "families": report["families"],
         "complete": report["complete"],
+        "executed_threshold_met": report["executed_threshold_met"],
+        "exact_parity": split["exact_parity"],
+        "materially_divergent": split["materially_divergent"],
+        "comparable": split["comparable"],
         "registry": str(registry_path.expanduser().resolve()),
+        "split_report": str(split_path.expanduser().resolve()),
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+def split_report_command(args: argparse.Namespace) -> int:
+    ledger = load_json(args.ledger, "execution ledger")
+    report = split_command_report(ledger, generated_scenarios=args.generated)
+    write_json(args.output, report)
+    print(json.dumps({
+        "generated": report["generated"],
+        "executed_native": report["executed_native"],
+        "executed_java": report["executed_java"],
+        "comparable": report["comparable"],
+        "exact_parity": report["exact_parity"],
+        "materially_divergent": report["materially_divergent"],
+        "infrastructure_failure": report["infrastructure_failure"],
+        "complete": report["complete"],
+        "parity": report["parity"],
     }, indent=2, sort_keys=True))
     return 0
 
@@ -1829,7 +1970,17 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--timeout", type=float, default=180.0)
     execute.add_argument("--registry", type=Path,
                         help="write the native-command registry next to the ledger")
+    execute.add_argument("--inventory", type=Path,
+                        help="generated coverage inventory used only for the split generated count")
     execute.set_defaults(func=execute_commanded_command)
+
+    split = commands.add_parser(
+        "split-report",
+        help="classify a ledger into generated/executed/comparable/exact/divergent")
+    split.add_argument("ledger", type=Path)
+    split.add_argument("--output", required=True, type=Path)
+    split.add_argument("--generated", type=int, default=0)
+    split.set_defaults(func=split_report_command)
 
     registry = commands.add_parser(
         "registry",

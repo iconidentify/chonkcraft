@@ -682,6 +682,51 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertEqual(0, report["dual_adapter_executed_scenarios"])
         self.assertFalse(report["complete"])
 
+    def test_five_families_and_a_hundred_rows_are_still_not_parity(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if {command["kind"] for command in item["commands"]} == {"move"})
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        rows = []
+        families = ["move", "attack", "stop", "patrol", "harvest"]
+        for index in range(100):
+            row = explorer.execution_ledger_row(
+                scenario, native, java, source=f"synthetic-{index}")
+            row["command_content_sha256"] = f"{index:064x}"
+            row["families"] = [families[index % len(families)]]
+            rows.append(row)
+        report = explorer.execution_ledger(rows)
+        self.assertTrue(report["executed_threshold_met"])
+        self.assertFalse(
+            report["complete"],
+            "both adapters executed is not complete and is not parity")
+        split = explorer.split_command_report(
+            report, generated_scenarios=240)
+        self.assertEqual(240, split["generated"])
+        self.assertEqual(split["executed_native"], split["executed_java"])
+        self.assertGreaterEqual(split["comparable"], 100)
+        self.assertEqual(split["exact_parity"], split["comparable"])
+        self.assertEqual(0, split["materially_divergent"])
+        self.assertFalse(split["complete"])
+        self.assertFalse(split["parity"])
+
+    def test_split_report_separates_an_accepted_mismatch(self):
+        scenario = explorer.generate_scenarios(
+            self.seed(), max_scenarios=1)[0]
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        java["observations"][0]["accepted"] = False
+        row = explorer.execution_ledger_row(
+            scenario, native, java, source="mismatch.bnefx")
+        split = explorer.split_command_report(
+            explorer.execution_ledger([row]), generated_scenarios=10)
+        self.assertEqual(1, split["comparable"])
+        self.assertEqual(0, split["exact_parity"])
+        self.assertEqual(1, split["materially_divergent"])
+        self.assertFalse(split["parity"])
+
 
 if __name__ == "__main__":
     unittest.main()

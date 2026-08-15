@@ -110,6 +110,18 @@ mismatched, truncated, or unauthenticated output is refused.
 The stable entry point is `work/playtest-explorer/report.json`. Every retained
 failure is content-addressed below `divergences/<packet-sha256>/packet.json`.
 
+`split-report` classifies a ledger without claiming parity from dual-adapter
+execution. The counts are generated, executed-native, executed-java,
+comparable, exact parity, materially divergent, and infrastructure failure.
+`complete` and `parity` stay false on that document until the observations
+themselves agree.
+
+```sh
+python3 tools/bne-harness/scripts/bne_playtest_explorer.py split-report \
+  tools/bne-harness/work/playtest-explorer/execution-ledger.json \
+  --generated 240 --output work/playtest-explorer/command-split-report.json
+```
+
 ## Adapter contract
 
 An adapter writes `chonkcraft-bne-playtest-result-1` JSON. It must report one

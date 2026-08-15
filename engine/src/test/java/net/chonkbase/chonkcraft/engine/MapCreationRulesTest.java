@@ -17,14 +17,11 @@ import org.junit.jupiter.api.Test;
 /**
  * What a map's own units become when the world takes them in.
  *
- * <p>ChonkCraft wraps {@code CreateUnit} itself ({@code scripts/wc2.legacy-declaration:117-140})
- * and every load-time creation goes through the wrapper: a slot nobody plays
- * gets no units at all, the neutral slot's are left exactly as written, and
- * everybody else's are converted to the owner's own race by the equivalence
- * table the same file builds. {@code campaigns/orc-exp/levelx09o} is why this
- * matters: it asks for fifty-two skeletons on a slot whose race is human, the
- * real game fields fifty-two militia, and this implementation fielded a skeleton army
- * standing where upstream has other troops entirely.
+ * <p>A slot nobody plays gets no units, and the neutral slot is left
+ * exactly as written. Ordinary racial counterparts still convert to the
+ * owner's race so a melee hall can train. Undead and summoned types do
+ * not: authenticated XOrc 9 cycle one keeps fifty-two skeletons on a
+ * human-race slot that Java used to rewrite as militia.
  */
 class MapCreationRulesTest {
 
@@ -80,19 +77,18 @@ class MapCreationRulesTest {
     }
 
     @Test
-    @DisplayName("a human slot's skeletons come into the world as militia")
-    void aUnitIsConvertedToItsOwnersRace() {
+    @DisplayName("a human slot's skeletons stay skeletons")
+    void aMapSkeletonKeepsTheStoredTypeOnAHumanSlot() {
         UnitType skeleton = type("unit-skeleton");
         UnitType militia = type("unit-attack-peasant");
         World world = world(skeleton, militia);
 
         Unit made = world.createUnitForMap(skeleton, 0, 5, 5);
         assertNotNull(made, "the unit was refused outright");
-        assertEquals("unit-attack-peasant", made.type().ident(),
-                "the map asked for a skeleton on a human slot and got one. Every"
-                        + " load-time creation goes through wc2.legacy-declaration's wrapper, which"
-                        + " converts to the owner's race -- levelx09o's fifty-two"
-                        + " skeletons are fifty-two militia in the real game");
+        assertEquals("unit-skeleton", made.type().ident(),
+                "the map asked for a skeleton on a human slot and Java rewrote"
+                        + " it to militia. Retail XOrc 9 cycle one keeps the"
+                        + " fifty-two skeletons the PUD stored");
     }
 
     @Test
