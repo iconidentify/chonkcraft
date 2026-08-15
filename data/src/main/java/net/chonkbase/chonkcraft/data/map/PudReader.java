@@ -24,9 +24,9 @@ public final class PudReader {
 
     private static final int SECTION_HEADER_BYTES = 8;
     private static final String MAGIC = "WAR2 MAP";
-    private static final int UDTA_HIT_POINTS_OFFSET = 1678;
-    private static final int UDTA_PRIORITY_OFFSET = 3878;
-    private static final int UDTA_UNIT_COUNT = 110;
+    private static final int UDTA_HIT_POINTS_OFFSET = PudUnitData.HIT_POINTS_OFFSET;
+    private static final int UDTA_PRIORITY_OFFSET = PudUnitData.PRIORITY_OFFSET;
+    private static final int UDTA_UNIT_COUNT = PudUnitData.UNIT_COUNT;
 
     private PudReader() {
     }
@@ -135,14 +135,40 @@ public final class PudReader {
                 if (section.length() >= required) {
                     int[] hitPoints = new int[UDTA_UNIT_COUNT];
                     int[] priorities = new int[UDTA_UNIT_COUNT];
+                    int[] times = new int[UDTA_UNIT_COUNT];
+                    int[] goldTens = new int[UDTA_UNIT_COUNT];
+                    int[] lumberTens = new int[UDTA_UNIT_COUNT];
+                    int[] armor = new int[UDTA_UNIT_COUNT];
+                    int[] basicDamage = new int[UDTA_UNIT_COUNT];
+                    int[] piercingDamage = new int[UDTA_UNIT_COUNT];
+                    int[] attackRange = new int[UDTA_UNIT_COUNT];
+                    int[] sight = new int[UDTA_UNIT_COUNT];
                     for (int i = 0; i < hitPoints.length; i++) {
                         hitPoints[i] = readLe16(data,
                                 body + UDTA_HIT_POINTS_OFFSET + i * 2);
                         priorities[i] = data[
                                 body + UDTA_PRIORITY_OFFSET + i] & 0xff;
+                        times[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.TIME_OFFSET, i);
+                        goldTens[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.GOLD_TENS_OFFSET, i);
+                        lumberTens[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.LUMBER_TENS_OFFSET, i);
+                        armor[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.ARMOR_OFFSET, i);
+                        basicDamage[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.BASIC_DAMAGE_OFFSET, i);
+                        piercingDamage[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.PIERCING_DAMAGE_OFFSET, i);
+                        attackRange[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.ATTACK_RANGE_OFFSET, i);
+                        sight[i] = udtaByte(data, body, section.length(),
+                                PudUnitData.SIGHT_OFFSET, i);
                     }
                     builder.unitData = new PudUnitData(
-                            readLe16(data, body) != 0, hitPoints, priorities);
+                            readLe16(data, body) != 0, hitPoints, priorities,
+                            times, goldTens, lumberTens, armor, basicDamage,
+                            piercingDamage, attackRange, sight);
                 }
             }
 
@@ -205,6 +231,14 @@ public final class PudReader {
             end++;
         }
         return new String(data, offset, end - offset, StandardCharsets.ISO_8859_1);
+    }
+
+    private static int udtaByte(byte[] data, int body, int length, int table, int index) {
+        int at = table + index;
+        if (at < 0 || at >= length) {
+            return 0;
+        }
+        return data[body + at] & 0xff;
     }
 
     private static int readLe16(byte[] data, int offset) {

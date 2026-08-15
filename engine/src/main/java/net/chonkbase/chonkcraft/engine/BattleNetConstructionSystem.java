@@ -72,7 +72,7 @@ final class BattleNetConstructionSystem {
             }
             worker.setOrder(Unit.Order.STILL);
         }
-        world.refund(site.player(), site.type().costs(), World.CANCEL_BUILDING_REFUND);
+        world.refund(site.player(), world.unitCosts(site.type()), World.CANCEL_BUILDING_REFUND);
         world.kill(site);
         world.recalculateSupply();
         return true;
@@ -792,7 +792,7 @@ final class BattleNetConstructionSystem {
         // bank cannot cover is refused rather than begun: that is
         // {@code player.CheckUnitType(type)} on the same path
 
-        if (!world.players[worker.player()].canAfford(what.costs())) {
+        if (!world.players[worker.player()].canAfford(world.unitCosts(what))) {
             traceBattleNetBuildRejection(worker, what, tileX, tileY,
                     "affordability");
             return false;
@@ -884,7 +884,7 @@ final class BattleNetConstructionSystem {
         // no other actor can alter this single-threaded world between the two
         // calls. Keep a defensive rollback for hand-built test Players whose
         // resource implementation may be replaced later.
-        if (!world.players[worker.player()].pay(what.costs())) {
+        if (!world.players[worker.player()].pay(world.unitCosts(what))) {
             abandonPendingBuild(worker);
             worker.setActionBeforeQueued(null);
             worker.setOrder(Unit.Order.STILL);
@@ -963,7 +963,7 @@ final class BattleNetConstructionSystem {
         // out in StartBuilding, so an order abandoned on the way there never
         // cost anything.
         if (worker.buildPaid()) {
-            world.refund(worker.player(), what.costs(), 100);
+            world.refund(worker.player(), world.unitCosts(what), 100);
         }
         worker.setBuildPaid(false);
         worker.setBuildReached(false);
@@ -1479,7 +1479,7 @@ final class BattleNetConstructionSystem {
         // giving up: "To keep the load low, retry each 10 cycles" with
         // unit.Wait = 10.
         if (!worker.buildPaid()) {
-            if (!world.players[worker.player()].pay(what.costs())) {
+            if (!world.players[worker.player()].pay(world.unitCosts(what))) {
                 world.markOccupancy(worker, true);
                 worker.setWaitCycles(Math.max(worker.waitCycles(), World.UNREACHABLE_WAIT));
                 return;
@@ -1514,7 +1514,8 @@ final class BattleNetConstructionSystem {
         }
         site.setOrder(Unit.Order.UNDER_CONSTRUCTION);
         site.setProgress(0);
-        site.setProgressGoal(what.costs().getOrDefault(UnitType.Resource.TIME, 1) * World.PROGRESS_PER_TIME_UNIT);
+        site.setProgressGoal(world.unitCosts(what).getOrDefault(UnitType.Resource.TIME, 1)
+                * World.PROGRESS_PER_TIME_UNIT);
         // A building starts as a frame and gains its hit points as it goes up.
         // Retail BNE gives a fresh foundation one tenth of the completed
         // type's hit points (XOrc 10 farm: 40 of 400 at its founding cycle),
@@ -1594,7 +1595,7 @@ final class BattleNetConstructionSystem {
         // cycle construction cadence. Progress still advances one time
         // unit per boost so the roof lands after buildTime boosts.
         int foundation = Math.max(1, full / 10);
-        int buildTime = Math.max(1, site.type().costs()
+        int buildTime = Math.max(1, world.unitCosts(site.type())
                 .getOrDefault(UnitType.Resource.TIME, 1));
         int pool = site.battleNetConstructionHpPool()
                 + (full - foundation);

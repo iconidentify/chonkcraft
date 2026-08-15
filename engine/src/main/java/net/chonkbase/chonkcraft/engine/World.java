@@ -190,6 +190,9 @@ public final class World {
     /** Native UDTA byte priorities, kept separate from ChonkCraft unit types. */
     int[] battleNetUnitPriorities;
 
+    /** World-local UDTA combat and cost tables. Null or useDefaults leaves the catalog alone. */
+    private net.chonkbase.chonkcraft.data.map.PudMap.PudUnitData battleNetUnitProfile;
+
     /** World-local UGRD costs. Null or useDefaults leaves the catalog alone. */
     private net.chonkbase.chonkcraft.data.map.PudMap.PudUpgradeData battleNetUpgradeProfile;
 
@@ -503,6 +506,51 @@ public final class World {
     /** Supplies the PUD/default UDTA priorities used by BNE target scoring. */
     public void setBattleNetUnitPriorities(int[] priorities) {
         battleNetUnitPriorities = priorities == null ? null : priorities.clone();
+    }
+
+    /**
+     * Installs this map's UDTA table. The shared unit catalog is not
+     * rewritten, which is why Rescue cannot cheapen the next mission's
+     * footman.
+     */
+    public void setBattleNetUnitProfile(
+            net.chonkbase.chonkcraft.data.map.PudMap.PudUnitData profile) {
+        battleNetUnitProfile = profile;
+    }
+
+    /**
+     * Training and build costs for a type, with this map's UDTA overlay.
+     *
+     * <p>Authenticated Rescue and Garden of War store time as a raw byte
+     * at UDTA 2008 (peasant 45, ballista 250) and gold/lumber as tens at
+     * 2118/2228 (footman 60, farm lumber 25). When the map clears
+     * useDefaults those values replace the catalog without mutating it.
+     */
+    java.util.Map<UnitType.Resource, Integer> unitCosts(UnitType type) {
+        java.util.Map<UnitType.Resource, Integer> costs =
+                type == null ? new java.util.EnumMap<>(UnitType.Resource.class)
+                        : new java.util.EnumMap<>(type.costs());
+        var profile = battleNetUnitProfile;
+        if (type == null || profile == null || profile.useDefaults()) {
+            return costs;
+        }
+        int code = PudUnitTypes.code(type.ident());
+        if (code < 0) {
+            return costs;
+        }
+        int gold = profile.gold(code);
+        int lumber = profile.lumber(code);
+        int time = profile.time(code);
+        if (gold > 0) {
+            costs.put(UnitType.Resource.GOLD, gold);
+        }
+        if (lumber > 0) {
+            costs.put(UnitType.Resource.WOOD, lumber);
+        }
+        if (time > 0) {
+            costs.put(UnitType.Resource.TIME, time);
+        }
+        return costs;
     }
 
     /**
@@ -2590,10 +2638,10 @@ public final class World {
             return false;
         }
         if (what != null) {
-            refund(building.player(), what.costs(), CANCEL_TRAINING_REFUND);
+            refund(building.player(), unitCosts(what), CANCEL_TRAINING_REFUND);
         }
         for (UnitType queued : building.trainingQueue()) {
-            refund(building.player(), queued.costs(), CANCEL_TRAINING_REFUND);
+            refund(building.player(), unitCosts(queued), CANCEL_TRAINING_REFUND);
         }
         building.setProducing(null);
         building.clearTrainingQueue();
@@ -6522,17 +6570,18 @@ public final class World {
             }
             return false;
         }
-        if (!player.pay(what.costs())) {
+        java.util.Map<UnitType.Resource, Integer> costs = unitCosts(what);
+        if (!player.pay(costs)) {
             if (traceTraining) {
                 System.err.println("JTRAIN reject-cost cycle=" + cycle
-                        + " building=" + building.id() + " costs=" + what.costs());
+                        + " building=" + building.id() + " costs=" + costs);
             }
             return false;
         }
         if (traceTraining) {
             System.err.println("JTRAIN paid cycle=" + cycle + " p=" + building.player()
                     + " building=" + building.id() + " what=" + what.ident()
-                    + " costs=" + what.costs());
+                    + " costs=" + costs);
         }
         if (building.producing() != null) {
             building.enqueueTraining(what);
@@ -6560,11 +6609,11 @@ public final class World {
     }
 
     /** Makes one already-paid job the building's active training work. */
-    private static void startTraining(Unit building, UnitType what) {
+    private void startTraining(Unit building, UnitType what) {
         building.setProducing(what);
         building.setProgress(0);
         building.setProgressGoal(
-                what.costs().getOrDefault(UnitType.Resource.TIME, 1) * PROGRESS_PER_TIME_UNIT);
+                unitCosts(what).getOrDefault(UnitType.Resource.TIME, 1) * PROGRESS_PER_TIME_UNIT);
     }
 
     /**
@@ -6588,7 +6637,8 @@ public final class World {
             return false;
         }
         Player player = players[building.player()];
-        if (!player.pay(what.costs())) {
+        java.util.Map<UnitType.Resource, Integer> costs = unitCosts(what);
+        if (!player.pay(costs)) {
             return false;
         }
         // The same one-cycle label convention as training and research.
@@ -6597,7 +6647,7 @@ public final class World {
         building.setOrderFinished(false);
         building.setProgress(0);
         building.setProgressGoal(
-                what.costs().getOrDefault(UnitType.Resource.TIME, 1) * PROGRESS_PER_TIME_UNIT);
+                costs.getOrDefault(UnitType.Resource.TIME, 1) * PROGRESS_PER_TIME_UNIT);
         return true;
     }
 
@@ -6610,7 +6660,7 @@ public final class World {
         building.setUpgradingTo(null);
         building.setOrderFinished(false);
         building.setProgress(0);
-        refund(building.player(), what.costs(), CANCEL_TRAINING_REFUND);
+        refund(building.player(), unitCosts(what), CANCEL_TRAINING_REFUND);
         return true;
     }
 

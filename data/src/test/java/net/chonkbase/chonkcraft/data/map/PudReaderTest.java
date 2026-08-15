@@ -256,6 +256,47 @@ class PudReaderTest {
         assertEquals(0, map.unitData().hitPoints(110));
         assertEquals(40, map.unitData().priority(98));
         assertEquals(0, map.unitData().priority(110));
+        assertEquals(0, map.unitData().gold(0),
+                "a table shorter than the gold column must not invent a cost");
+    }
+
+    @Test
+    void readsGoldAndLumberCostsFromUnitData() {
+        type();
+        minimalBody();
+        byte[] unitData = new byte[3988];
+        unitData[0] = 0;
+        unitData[2008] = 60;       // footman time
+        unitData[2008 + 4] = (byte) 250; // ballista time
+        unitData[2118] = 60;       // footman gold tens
+        unitData[2118 + 2] = 40;   // peasant gold tens
+        unitData[2228 + 58] = 25;  // farm lumber tens
+        unitData[3658] = 2;        // footman armor
+        unitData[3328] = 1;        // footman range
+        unitData[3548] = 4;        // footman sight
+        section("UDTA", unitData);
+
+        PudMap map = read();
+        assertTrue(!map.unitData().useDefaults(),
+                "clearing the leading word marks a custom unit table");
+        assertEquals(60, map.unitData().time(0),
+                "footman time is the raw byte at UDTA 2008");
+        assertEquals(250, map.unitData().time(4),
+                "ballista time is the raw byte at UDTA 2008");
+        assertEquals(600, map.unitData().gold(0),
+                "footman gold is stored as tens at UDTA 2118");
+        assertEquals(400, map.unitData().gold(2),
+                "peasant gold is stored as tens at UDTA 2118");
+        assertEquals(250, map.unitData().lumber(58),
+                "farm lumber is stored as tens at UDTA 2228");
+        assertEquals(2, map.unitData().armor(0),
+                "footman armor sits at UDTA 3658");
+        assertEquals(1, map.unitData().attackRange(0),
+                "footman range sits at UDTA 3328");
+        assertEquals(4, map.unitData().sight(0),
+                "footman sight sits at UDTA 3548");
+        assertEquals(0, map.unitData().basicDamage(0),
+                "a 3988-byte table ends before the basic-damage column");
     }
 
     @Test

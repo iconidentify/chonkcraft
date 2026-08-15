@@ -1347,6 +1347,7 @@ public final class GameData {
     public void configureWorld(World world, PudMap source) {
         if (source.unitData() != null) {
             world.setBattleNetUnitPriorities(source.unitData().priorities());
+            world.setBattleNetUnitProfile(source.unitData());
         }
         world.setBattleNetUpgradeProfile(source.upgradeData());
         configureWorld(world, source.tileset());

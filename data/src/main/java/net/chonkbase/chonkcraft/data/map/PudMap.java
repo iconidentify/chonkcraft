@@ -40,16 +40,69 @@ public record PudMap(
 
     /** Unit statistics embedded in the PUD's optional {@code UDTA} section. */
     public record PudUnitData(boolean useDefaults, int[] hitPoints,
-            int[] priorities) {
+            int[] priorities, int[] times, int[] goldTens, int[] lumberTens,
+            int[] armor, int[] basicDamage, int[] piercingDamage,
+            int[] attackRange, int[] sight) {
+
+        public static final int UNIT_COUNT = 110;
+        public static final int HIT_POINTS_OFFSET = 1678;
+        public static final int TIME_OFFSET = 2008;
+        public static final int GOLD_TENS_OFFSET = 2118;
+        public static final int LUMBER_TENS_OFFSET = 2228;
+        public static final int ATTACK_RANGE_OFFSET = 3328;
+        public static final int SIGHT_OFFSET = 3548;
+        public static final int ARMOR_OFFSET = 3658;
+        public static final int PRIORITY_OFFSET = 3878;
+        public static final int BASIC_DAMAGE_OFFSET = 3988;
+        public static final int PIERCING_DAMAGE_OFFSET = 4098;
 
         /** Hit points for a PUD unit type, or zero when it has no entry. */
         public int hitPoints(int type) {
-            return type >= 0 && type < hitPoints.length ? hitPoints[type] : 0;
+            return at(hitPoints, type);
         }
 
         /** Native target-selection priority for a PUD unit type. */
         public int priority(int type) {
-            return type >= 0 && type < priorities.length ? priorities[type] : 0;
+            return at(priorities, type);
+        }
+
+        /** Build or train time in retail time units. */
+        public int time(int type) {
+            return at(times, type);
+        }
+
+        /** Gold cost in whole coins. The on-disk table stores tens. */
+        public int gold(int type) {
+            return at(goldTens, type) * 10;
+        }
+
+        /** Lumber cost in whole logs. The on-disk table stores tens. */
+        public int lumber(int type) {
+            return at(lumberTens, type) * 10;
+        }
+
+        public int armor(int type) {
+            return at(armor, type);
+        }
+
+        public int basicDamage(int type) {
+            return at(basicDamage, type);
+        }
+
+        public int piercingDamage(int type) {
+            return at(piercingDamage, type);
+        }
+
+        public int attackRange(int type) {
+            return at(attackRange, type);
+        }
+
+        public int sight(int type) {
+            return at(sight, type);
+        }
+
+        private static int at(int[] table, int type) {
+            return table != null && type >= 0 && type < table.length ? table[type] : 0;
         }
     }
 
