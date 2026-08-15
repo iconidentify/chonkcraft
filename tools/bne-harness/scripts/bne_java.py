@@ -1532,6 +1532,14 @@ def evidence_index_command(args: argparse.Namespace) -> int:
     return status
 
 
+def ai_decision_ledger_command(args: argparse.Namespace) -> int:
+    from bne_ai_decision_ledger import compare_command
+
+    report = compare_command(args.left, args.right)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["identical"] else 1
+
+
 def projectile_ledger_command(args: argparse.Namespace) -> int:
     from bne_projectile_ledger import run_projectile_ledger
 
@@ -2507,6 +2515,14 @@ def parser() -> argparse.ArgumentParser:
     evidence_index.add_argument(
         "--artifact-root", type=Path, default=ROOT / ".bne-evidence-catalog")
     evidence_index.set_defaults(func=evidence_index_command)
+
+    ai_decision_ledger = subcommands.add_parser(
+        "ai-decision-ledger",
+        help="compare normalized ai.bin decision ledgers",
+    )
+    ai_decision_ledger.add_argument("left", type=Path)
+    ai_decision_ledger.add_argument("right", type=Path)
+    ai_decision_ledger.set_defaults(func=ai_decision_ledger_command)
 
     projectile_ledger = subcommands.add_parser(
         "projectile-ledger",

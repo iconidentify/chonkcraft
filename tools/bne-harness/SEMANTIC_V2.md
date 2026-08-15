@@ -78,3 +78,7 @@ campaign-specific anecdote with a repeatable native decision matrix.
 
 The completed measurement and engine results are recorded in
 [`TOP_THREE_CONVERGENCE.md`](TOP_THREE_CONVERGENCE.md).
+
+The `ai.bin` interpreter comparison is the [AI decision ledger](AI_DECISION_LEDGER.md).
+It normalizes the 48-byte `AIPlayerState` and refuses raw process pointers.
+A green player-family survey is not that ledger.
