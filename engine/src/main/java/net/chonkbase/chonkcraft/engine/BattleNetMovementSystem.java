@@ -41,8 +41,13 @@ final class BattleNetMovementSystem {
      */
     private static final int BNE_MELEE_REFUSAL_HOLD = 23;
 
-
-
+    /**
+     * Same-visit move-order reentry. The empty-path residual arm may
+     * ask once for a replacement route (Human 5 peasant 1512 leftover
+     * harvest to Move). A second ask used to recurse until replay smoke
+     * overflowed on NerzyvsHTOSGOW after two-short leftover dest-arm.
+     */
+    private int moveOrderDepth;
 
     private final World world;
 
@@ -360,6 +365,15 @@ final class BattleNetMovementSystem {
      * walks to the shore and stops there instead of refusing to set off.
      */
     void stepMoveOrder(Unit unit) {
+        moveOrderDepth++;
+        try {
+            stepMoveOrderVisit(unit);
+        } finally {
+            moveOrderDepth--;
+        }
+    }
+
+    private void stepMoveOrderVisit(Unit unit) {
         if (unit.battleNetOrderDelay() > 0) {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             return;
@@ -2087,6 +2101,12 @@ final class BattleNetMovementSystem {
                     // promoting Still. Human 5 peasant 1512 is clicked away
                     // from its harvest at fixture five and continues to
                     // 34,103 after completing the old stride.
+                    if (moveOrderDepth > 1) {
+                        // Already asked once this visit. Asking again used
+                        // to recurse until the stack died on NerzyvsHTOSGOW
+                        // after a two-short leftover dest-arm.
+                        return;
+                    }
                     stepMoveOrder(unit);
                     return;
                 }
