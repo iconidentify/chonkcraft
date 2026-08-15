@@ -190,6 +190,9 @@ public final class World {
     /** Native UDTA byte priorities, kept separate from ChonkCraft unit types. */
     int[] battleNetUnitPriorities;
 
+    /** World-local UGRD costs. Null or useDefaults leaves the catalog alone. */
+    private net.chonkbase.chonkcraft.data.map.PudMap.PudUpgradeData battleNetUpgradeProfile;
+
     /**
      * Retail BNE's mutable map-square {@code 0x400} construction exclusion.
      *
@@ -500,6 +503,45 @@ public final class World {
     /** Supplies the PUD/default UDTA priorities used by BNE target scoring. */
     public void setBattleNetUnitPriorities(int[] priorities) {
         battleNetUnitPriorities = priorities == null ? null : priorities.clone();
+    }
+
+    /**
+     * Installs this map's UGRD table. The shared upgrade catalog is not
+     * rewritten, which is why Great Wall cannot cheapen the next mission.
+     */
+    public void setBattleNetUpgradeProfile(
+            net.chonkbase.chonkcraft.data.map.PudMap.PudUpgradeData profile) {
+        battleNetUpgradeProfile = profile;
+    }
+
+    java.util.Map<UnitType.Resource, Integer> researchCosts(Upgrade upgrade) {
+        java.util.Map<UnitType.Resource, Integer> costs =
+                new java.util.EnumMap<>(upgrade.costs());
+        var profile = battleNetUpgradeProfile;
+        if (upgrade == null || profile == null || profile.useDefaults()) {
+            return costs;
+        }
+        int index = net.chonkbase.chonkcraft.data.map.PudUpgradeIds.indexOf(upgrade.ident());
+        if (index < 0) {
+            return costs;
+        }
+        int gold = profile.gold(index);
+        int lumber = profile.lumber(index);
+        int oil = profile.oil(index);
+        int time = profile.time(index);
+        if (gold > 0 && gold < 0xF000) {
+            costs.put(UnitType.Resource.GOLD, gold);
+        }
+        if (lumber > 0 && lumber < 0xF000) {
+            costs.put(UnitType.Resource.WOOD, lumber);
+        }
+        if (oil > 0 && oil < 0xF000) {
+            costs.put(UnitType.Resource.OIL, oil);
+        }
+        if (time > 0 && time < 0xF000) {
+            costs.put(UnitType.Resource.TIME, time);
+        }
+        return costs;
     }
 
     /**
@@ -2380,7 +2422,7 @@ public final class World {
             }
             return false;
         }
-        if (!players[building.player()].pay(upgrade.costs())) {
+        if (!players[building.player()].pay(researchCosts(upgrade))) {
             if (traceResearch) {
                 System.err.println("JRESEARCH reject-cost cycle=" + cycle
                         + " building=" + building.id() + " what=" + upgradeIdent
@@ -2405,7 +2447,7 @@ public final class World {
         building.setOrderFinished(false);
         building.setProgress(0);
         building.setProgressGoal(
-                Math.max(1, upgrade.costs().getOrDefault(UnitType.Resource.TIME, 1))
+                Math.max(1, researchCosts(upgrade).getOrDefault(UnitType.Resource.TIME, 1))
                         * PROGRESS_PER_TIME_UNIT);
         return true;
     }

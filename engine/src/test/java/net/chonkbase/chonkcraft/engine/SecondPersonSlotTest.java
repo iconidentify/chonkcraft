@@ -32,7 +32,7 @@ class SecondPersonSlotTest {
         races[2] = PudMap.Race.HUMAN;
         int[] nothing = new int[PudMap.PLAYER_MAX];
         return new PudMap("two seats", PudMap.Tileset.FOREST, 8, 8, new int[64],
-                slots, races, nothing, nothing, nothing, nothing, null, List.of());
+                slots, races, nothing, nothing, nothing, nothing, null, null, List.of());
     }
 
     @Test
@@ -57,7 +57,7 @@ class SecondPersonSlotTest {
         oil[15] = 1000;
         PudMap withBank = new PudMap(base.description(), base.tileset(),
                 base.width(), base.height(), base.tiles(), base.players(), base.races(),
-                gold, wood, oil, new int[PudMap.PLAYER_MAX], null, base.units());
+                gold, wood, oil, new int[PudMap.PLAYER_MAX], null, null, base.units());
 
         Player[] players = Player.from(withBank);
         assertEquals(1000, players[15].get(UnitType.Resource.GOLD),
@@ -110,7 +110,7 @@ class SecondPersonSlotTest {
         oil[0] = 1800;
         PudMap rich = new PudMap(base.description(), base.tileset(), base.width(),
                 base.height(), base.tiles(), base.players(), base.races(), gold,
-                wood, oil, new int[PudMap.PLAYER_MAX], null, base.units());
+                wood, oil, new int[PudMap.PLAYER_MAX], null, null, base.units());
 
         Player[] players = Player.forNetworkGame(rich, rich.players(), rich.races());
 

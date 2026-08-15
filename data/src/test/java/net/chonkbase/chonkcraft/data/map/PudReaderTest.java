@@ -258,6 +258,30 @@ class PudReaderTest {
         assertEquals(0, map.unitData().priority(110));
     }
 
+    @Test
+    void readsCustomUpgradeGoldAndTimeFromUgrd() {
+        type();
+        minimalBody();
+        byte[] upgrades = new byte[782];
+        upgrades[0] = 0;
+        // time[2] at offset 2 + 2*2 = 6
+        upgrades[6] = 100;
+        upgrades[7] = 0;
+        // gold[2] at offset 2 + 52*2 + 2*2 = 110
+        upgrades[110] = (byte) 500;
+        upgrades[111] = 1;
+        section("UGRD", upgrades);
+
+        PudMap map = read();
+        assertTrue(map.upgradeData() != null, "a 782-byte UGRD must be kept");
+        assertTrue(!map.upgradeData().useDefaults(),
+                "Great Wall-style maps clear the use-defaults word");
+        assertEquals(100, map.upgradeData().time(2),
+                "custom research time must come from the UGRD time column");
+        assertEquals(500, map.upgradeData().gold(2),
+                "custom research gold must come from the UGRD gold column");
+    }
+
     // ----------------------------------------------------------------- walls
 
     @Test

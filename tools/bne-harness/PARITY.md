@@ -57,6 +57,10 @@ The differ now pairs by owner and tile; type is a compared field. Ordinary
 racial counterparts still convert, because Garden of War halls will not
 train without that load step.
 
+Per-map UGRD is parsed as a 782-byte profile and applied as a world-local
+overlay. Great Wall and Rescue keep their own gold and time; the shared
+upgrade catalog is not rewritten.
+
 Command reporting is split. The current commanded ledger is 240 generated,
 131 executed by both adapters, 131 comparable, 52 exact, 79 materially
 divergent, 0 infrastructure failures. Both adapters executed is not

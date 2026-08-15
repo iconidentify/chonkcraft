@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.map.PudMap.PlayerType;
 import net.chonkbase.chonkcraft.data.map.PudMap.PudUnitData;
+import net.chonkbase.chonkcraft.data.map.PudMap.PudUpgradeData;
 import net.chonkbase.chonkcraft.data.map.PudMap.PudUnit;
 import net.chonkbase.chonkcraft.data.map.PudMap.Race;
 import net.chonkbase.chonkcraft.data.map.PudMap.Tileset;
@@ -145,14 +146,37 @@ public final class PudReader {
                 }
             }
 
-            // Sections the original parser accepts and ignores. UGRD holds
-            // per-map upgrade costs, which ChonkCraft has never implemented; the
-            // rest are unused or derived data the engine recomputes.
-            case "ALOW", "UGRD", "SQM ", "OILM", "REGM", "SIGN" -> { }
+            case "UGRD" -> {
+                // Every authenticated BNE map stores exactly 782 bytes. Any
+                // other length is not a layout we have read, so the profile
+                // stays absent rather than applying a guessed table.
+                if (section.length() == PudUpgradeData.SECTION_BYTES) {
+                    builder.upgradeData = readUpgradeData(data, body);
+                }
+            }
+
+            // Sections the original parser accepts and ignores.
+            case "ALOW", "SQM ", "OILM", "REGM", "SIGN" -> { }
 
             default -> throw new PudFormatException(
                     "unknown section '" + section.tag() + "' of " + section.length() + " bytes");
         }
+    }
+
+    private static PudUpgradeData readUpgradeData(byte[] data, int body) {
+        int count = PudUpgradeData.UPGRADE_COUNT;
+        int[] time = new int[count];
+        int[] gold = new int[count];
+        int[] lumber = new int[count];
+        int[] oil = new int[count];
+        boolean useDefaults = readLe16(data, body) != 0;
+        for (int i = 0; i < count; i++) {
+            time[i] = readLe16(data, body + 2 + i * 2);
+            gold[i] = readLe16(data, body + 2 + count * 2 + i * 2);
+            lumber[i] = readLe16(data, body + 2 + count * 4 + i * 2);
+            oil[i] = readLe16(data, body + 2 + count * 6 + i * 2);
+        }
+        return new PudUpgradeData(useDefaults, time, gold, lumber, oil);
     }
 
     private static void readPlayerWords(byte[] data, int body, int[] target) {
@@ -208,6 +232,7 @@ public final class PudReader {
         final int[] startOil = new int[PudMap.PLAYER_MAX];
         final int[] aiTypes = new int[PudMap.PLAYER_MAX];
         PudUnitData unitData;
+        PudUpgradeData upgradeData;
         List<PudUnit> units = List.of();
 
         Builder() {
@@ -224,7 +249,7 @@ public final class PudReader {
             }
             return new PudMap(description, tileset, width, height, tiles,
                     players, races, startGold, startLumber, startOil, aiTypes,
-                    unitData, List.copyOf(units));
+                    unitData, upgradeData, List.copyOf(units));
         }
     }
 }

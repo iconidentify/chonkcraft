@@ -1348,6 +1348,7 @@ public final class GameData {
         if (source.unitData() != null) {
             world.setBattleNetUnitPriorities(source.unitData().priorities());
         }
+        world.setBattleNetUpgradeProfile(source.upgradeData());
         configureWorld(world, source.tileset());
     }
 

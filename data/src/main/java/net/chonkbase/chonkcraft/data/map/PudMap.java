@@ -32,6 +32,7 @@ public record PudMap(
         int[] startOil,
         int[] aiTypes,
         PudUnitData unitData,
+        PudUpgradeData upgradeData,
         List<PudUnit> units) {
 
     /** Player slots in every Warcraft II map. */
@@ -49,6 +50,43 @@ public record PudMap(
         /** Native target-selection priority for a PUD unit type. */
         public int priority(int type) {
             return type >= 0 && type < priorities.length ? priorities[type] : 0;
+        }
+    }
+
+    /**
+     * Per-map upgrade costs and times from the 782-byte BNE {@code UGRD}
+     * section.
+     *
+     * <p>Every authenticated retail map carries this exact size. The first
+     * word is {@code useDefaults}: when it is set the arrays are the stock
+     * table and must not overwrite the catalog. When it is clear, Great Wall
+     * and Rescue store different gold and time values that the simulation
+     * has to honour without mutating the shared upgrade list.
+     */
+    public record PudUpgradeData(boolean useDefaults, int[] time, int[] gold,
+            int[] lumber, int[] oil) {
+
+        public static final int UPGRADE_COUNT = 52;
+        public static final int SECTION_BYTES = 782;
+
+        public int time(int index) {
+            return inRange(index) ? time[index] : 0;
+        }
+
+        public int gold(int index) {
+            return inRange(index) ? gold[index] : 0;
+        }
+
+        public int lumber(int index) {
+            return inRange(index) ? lumber[index] : 0;
+        }
+
+        public int oil(int index) {
+            return inRange(index) ? oil[index] : 0;
+        }
+
+        private boolean inRange(int index) {
+            return index >= 0 && index < time.length;
         }
     }
 

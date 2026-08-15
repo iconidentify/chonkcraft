@@ -45,7 +45,7 @@ class LobbyMapSetupTest {
         }
         int[] nothing = new int[PudMap.PLAYER_MAX];
         return new PudMap("network seats", PudMap.Tileset.FOREST, 8, 8, new int[64],
-                slots, races, nothing, nothing, nothing, nothing, null, List.of());
+                slots, races, nothing, nothing, nothing, nothing, null, null, List.of());
     }
 
     @Test
