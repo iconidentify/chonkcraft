@@ -1170,6 +1170,43 @@ class BattleNetIdleAttackTest {
     }
 
     @Test
+    @DisplayName("a neighbour's step does not pull an armed tower onto Attack")
+    void aNeighboursStepDoesNotPullAnArmedTowerOntoAttack() {
+        // Retail towers acquire only through action 14. A mover's tile
+        // change used to run the mobile idle scanner on the emplacement
+        // and orderAttack, which parked it on the presentation Attack
+        // wait-59 and delayed the next binary volley.
+        GameMap map = new GameMap(16, 16, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        world.setBattleNetSequenceData(towerSequence());
+        UnitType towerType = fighter("unit-human-guard-tower", 50);
+        towerType.setBuilding(true);
+        towerType.setTileSize(2, 2);
+        towerType.setSpeed(0);
+        towerType.setCanTargetLand(true);
+        UnitType gruntType = fighter("unit-grunt", 50);
+        gruntType.setCanTargetLand(true);
+        gruntType.setSpeed(10);
+        Unit tower = world.createUnit(towerType, 0, 4, 4);
+        Unit grunt = world.createUnit(gruntType, 1, 8, 5);
+        tower.setBattleNetAnimationTimer(8);
+        world.tick();
+        world.tick();
+        assertEquals(Unit.Order.STILL, tower.order(),
+                "the tower is still idle before the neighbour steps");
+        world.battleNetIdleAcquireAround(grunt);
+        assertEquals(Unit.Order.STILL, tower.order(),
+                "a neighbour's step must not orderAttack an armed tower");
+        assertFalse(tower.battleNetTowerActive(),
+                "action 14 is armed only by the tower's own Still marker");
+    }
+
+    @Test
     @DisplayName("stationary action 16 defers still one visit after the last recovery tick")
     void stationaryAction16DefersStillOneVisitAfterLastRecoveryTick() {
         // XHuman 2 footman 1548: post-swing recovery leaves timer==1 on the

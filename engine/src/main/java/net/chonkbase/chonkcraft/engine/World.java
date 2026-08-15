@@ -12730,6 +12730,7 @@ public final class World {
                     || other.type() == null || !other.type().canAttack()
                     || !other.isAggressive() || other.isDying()
                     || !other.isOnMap()
+                    || isBattleNetArmedTower(other)
                     || !isEnemyPlayer(other.player(), mover.player())) {
                 continue;
             }
@@ -12766,7 +12767,12 @@ public final class World {
         // (XHuman 7 sub) keeps the ordinary reaction-range scan.
         if (unit.order() != Unit.Order.STILL || !unit.type().canAttack()
                 || !unit.isAggressive()
-                || unit.isDying() || !unit.isOnMap()) {
+                || unit.isDying() || !unit.isOnMap()
+                || isBattleNetArmedTower(unit)) {
+            // Armed towers acquire only through action 14. A neighbour's
+            // step used to call this scanner and orderAttack, which parked
+            // the emplacement on the presentation Attack wait-59 and pushed
+            // XHuman 2's second volley past fixture 82.
             return;
         }
         boolean person = isPerson(unit.player());
