@@ -44,7 +44,7 @@ SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground|return-goods) unit (\d+)$"
 )
 SCRIPT_COMMAND_TARGETED = re.compile(
-    r"^cycle ([1-9]\d*) (attack|harvest) unit (\d+) target (\d+)$"
+    r"^cycle ([1-9]\d*) (attack|harvest|repair) unit (\d+) target (\d+)$"
 )
 GAME_RULE_REJECT_REASONS = {
     "unit-not-local",
@@ -118,7 +118,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                     f"invalid command at {path}:{line_number}; expected "
                     "'cycle N move unit SLOT x X y Y', "
                     "'cycle N stop|stand-ground|return-goods unit SLOT', or "
-                    "'cycle N attack|harvest unit SLOT target T'"
+                    "'cycle N attack|harvest|repair unit SLOT target T'"
                 )
             if cycle < previous_cycle:
                 raise ValueError(f"commands are not cycle-sorted at {path}:{line_number}")

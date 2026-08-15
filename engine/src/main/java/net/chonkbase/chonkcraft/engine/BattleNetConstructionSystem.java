@@ -1725,14 +1725,21 @@ final class BattleNetConstructionSystem {
 
     void stepRepair(Unit unit) {
         Unit target = unit.target();
-        if (target == null || !target.isAlive()
-                || target.hitPoints() >= target.type().hitPoints()) {
+        if (target == null || !target.isAlive()) {
             unit.setTarget(null);
             unit.setOrder(Unit.Order.STILL);
             return;
         }
         if (unit.distanceTo(target) > 1) {
+            // Used to stand still the moment the hall was already whole,
+            // which is why a mend click on a standing town hall never
+            // became a walk.
             world.movement.walkTowards(unit, target.tileX(), target.tileY());
+            return;
+        }
+        if (target.hitPoints() >= target.type().hitPoints()) {
+            unit.setTarget(null);
+            unit.setOrder(Unit.Order.STILL);
             return;
         }
         world.stepWorkAnimation(unit, AnimationSet.State.REPAIR);
@@ -1762,6 +1769,12 @@ final class BattleNetConstructionSystem {
      * own player, so the right click on an allied building was issued by the
      * interface -- RightClickTableTest pins the command -- and dropped here,
      * and a campaign ally's burning hall could not be helped.
+     *
+     * <p>A standing hall is still a repair. GiveOrder table 27 installs
+     * the mend and the hull walks there; the stepper stands still only
+     * once it is adjacent and there is nothing to restore. A click on a
+     * soldier is a walk, not a repair -- the constructor falls through
+     * to MOVE when the target is neither a building nor a transport.
      */
     boolean orderRepair(Unit unit, Unit target) {
         if (unit == null || target == null || !unit.isAlive() || !target.isAlive()) {
@@ -1772,8 +1785,12 @@ final class BattleNetConstructionSystem {
                         && !world.isAllied(unit.player(), target.player()))) {
             return false;
         }
-        if (target.hitPoints() >= target.type().hitPoints()) {
-            return false;
+        // GiveOrder table 27 installs REPAIR only when the target type
+        // flags carry 0x20 (building) or 0x0400 (transport). Anything
+        // else becomes a walk to that hull. Used to refuse a standing
+        // hall, which is why the peon never left the square.
+        if (!target.type().building() && !target.type().canTransport()) {
+            return world.orderMove(unit, target.tileX(), target.tileY());
         }
         unit.clearPath();
         unit.setTarget(target);

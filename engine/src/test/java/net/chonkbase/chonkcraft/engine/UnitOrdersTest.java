@@ -248,17 +248,43 @@ class UnitOrdersTest {
     }
 
     @Test
-    @DisplayName("a repair order is refused for an undamaged or hostile building")
-    void repairIsRefusedWhenPointless() {
+    @DisplayName("a mend click on a standing hall is still a repair")
+    void repairOnAWholeHallIsStillAnOrder() {
         Fixture fixture = load();
         World world = world(fixture.data());
         Unit worker = world.createUnit(fixture.types().get("unit-peasant"), 0,
                 fixture.x(), fixture.y());
         Unit whole = world.createUnit(fixture.types().get("unit-town-hall"), 0,
                 fixture.x() + 6, fixture.y());
-        assertTrue(!world.orderRepair(worker, whole), "nothing to mend");
+        assertTrue(world.orderRepair(worker, whole),
+                "a click to mend a standing hall used to be refused before the peon left the square");
+        assertEquals(Unit.Order.REPAIR, worker.order(),
+                "the peasant must walk to the whole hall, not stay put");
+    }
 
-        // Not merely foreign: the rule is ownership or alliance,,
+    @Test
+    @DisplayName("a mend click on a soldier is a walk, not a repair")
+    void repairOnASoldierBecomesAWalk() {
+        Fixture fixture = load();
+        World world = world(fixture.data());
+        Unit worker = world.createUnit(fixture.types().get("unit-peasant"), 0,
+                fixture.x(), fixture.y());
+        Unit soldier = world.createUnit(fixture.types().get("unit-footman"), 0,
+                fixture.x() + 4, fixture.y());
+        assertTrue(world.orderRepair(worker, soldier),
+                "the click still applies when the target is not a building");
+        assertEquals(Unit.Order.MOVE, worker.order(),
+                "a peasant sent to mend a footman walks there instead");
+    }
+
+    @Test
+    @DisplayName("a repair order is refused for a hostile building")
+    void repairIsRefusedWhenHostile() {
+        Fixture fixture = load();
+        World world = world(fixture.data());
+        Unit worker = world.createUnit(fixture.types().get("unit-peasant"), 0,
+                fixture.x(), fixture.y());
+        // Not merely foreign: the rule is ownership or alliance,
         // so what stays refused is a building whose owner is no ally of ours.
         Unit theirs = world.createUnit(fixture.types().get("unit-farm"), 1,
                 fixture.x() + 10, fixture.y());

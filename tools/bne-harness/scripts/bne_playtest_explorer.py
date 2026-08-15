@@ -197,6 +197,29 @@ NATIVE_FAMILY_EVIDENCE = {
         "supported_variants": ["laden-worker"],
         "unsupported_variants": ["empty-worker-java-refuses"],
     },
+    "repair": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 27,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "constructor": "0x00436a20",
+            "target_type_flags": "0x20|0x0400",
+            "replay_pack_1_0x13_count": 225,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N repair unit SLOT target T. Retail 0x13 packets carry "
+            "function index 27 and a live target. The constructor at "
+            "0x00436a20 installs order 27 when the target type flags carry "
+            "0x20 (building) or 0x0400 (transport), otherwise MOVE. The "
+            "0x13 dispatcher does not special-case this index."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "target_id"],
+        "supported_variants": ["building"],
+        "unsupported_variants": ["combat-unit-target-becomes-move"],
+    },
     "production": {
         "evidence_authority": "retail-replay-dispatcher",
         "evidence_hashes": {
@@ -217,7 +240,7 @@ NATIVE_FAMILY_EVIDENCE = {
     },
 }
 INJECTOR_TARGETED = re.compile(
-    r"cycle (\d+) (attack|harvest) unit (\d+) target (\d+)\Z")
+    r"cycle (\d+) (attack|harvest|repair) unit (\d+) target (\d+)\Z")
 MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
 REFUSED_POINTS = {"occupied", "blocked", "unaffordable"}
 
@@ -418,6 +441,14 @@ BUTTON_ACTION_FAMILY = {
 }
 RESOURCE_TYPE_IDENTS = {"unit-gold-mine", "unit-oil-patch", "unit-oil-platform",
                         "unit-human-oil-platform", "unit-orc-oil-platform"}
+# GiveOrder[27] installs REPAIR when the target type flags carry 0x20
+# (buildings, including halls and farms) or 0x0400 (transports). Mines
+# also carry 0x20 but they are harvest targets, not generated repair
+# destinations.
+REPAIR_TARGET_IDENTS = {
+    name for name in BNE_UNIT_TYPE_NAMES[58:]
+    if "start-location" not in name and name not in RESOURCE_TYPE_IDENTS
+} | {"unit-human-transport", "unit-orc-transport"}
 GENERATED_BUTTONS = (
     Path(__file__).resolve().parents[3]
     / "engine/src/main/java/net/chonkbase/chonkcraft/engine/generated"
@@ -483,6 +514,7 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
     resources: list[int] = []
     trainers: list[int] = []
     harvesters: list[int] = []
+    repairables: list[int] = []
     for slot, raw in records:
         if raw[bne_command_matrix.UNIT_FLAGS] & bne_command_matrix.UNIT_HIDDEN:
             continue
@@ -493,6 +525,8 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             hostiles.append(slot)
         if ident in RESOURCE_TYPE_IDENTS:
             resources.append(slot)
+        if owner == 0 and ident in REPAIR_TARGET_IDENTS:
+            repairables.append(slot)
         if owner == 0 and ({"train", "research"} & caps):
             trainers.append(slot)
         if owner == 0 and "harvest" in caps:
@@ -505,7 +539,7 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
                 allowed.add("attack-move")
             actors[slot]["capabilities"] = sorted(allowed)
             actors[slot]["type_ident"] = ident
-    for slot in hostiles + resources:
+    for slot in hostiles + resources + repairables:
         raw = by_slot.get(slot)
         if raw is None:
             continue
@@ -524,6 +558,8 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             ids.extend(hostiles)
         if "harvest" in caps:
             ids.extend(resources)
+        if "repair" in caps:
+            ids.extend(repairables)
         actor["target_ids"] = sorted(set(ids))
     for slot in harvesters[:2]:
         if slot in actors:
@@ -697,13 +733,14 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         if command["kind"] not in actor["capabilities"]:
             actor["capabilities"].append(command["kind"])
             actor["capabilities"].sort()
-        if command["kind"] in {"attack", "harvest"} and isinstance(
+        if command["kind"] in {"attack", "harvest", "repair"} and isinstance(
                 command.get("target_id"), int):
             if command["target_id"] not in actor["target_ids"]:
                 actor["target_ids"].append(command["target_id"])
                 actor["target_ids"].sort()
         if command["kind"] in {
-                "stop", "stand-ground", "attack", "harvest", "return-goods"}:
+                "stop", "stand-ground", "attack", "harvest", "return-goods",
+                "repair"}:
             continue
         if not all(isinstance(command.get(key), int) for key in ("x", "y")):
             raise ValueError("commanded fixture move has no integer destination")
@@ -717,7 +754,8 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
     if not actors:
         raise ValueError("commanded fixture produced an empty seed")
     if not points and any(command["kind"] not in {
-            "stop", "stand-ground", "attack", "harvest", "return-goods"}
+            "stop", "stand-ground", "attack", "harvest", "return-goods",
+            "repair"}
             for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
@@ -901,6 +939,7 @@ def native_command_registry(ledger: dict[str, Any] | None = None) -> dict[str, A
         dual = counts.get(name, 0)
         injector = name in {
             "move", "stop", "attack", "harvest", "patrol", "return-goods",
+            "repair",
         }
         families[name] = {
             "evidence_authority": evidence["evidence_authority"],
@@ -1214,7 +1253,7 @@ def native_command_script(scenario: dict[str, Any]) -> str:
                 f"cycle {command['issue_cycle']} {command['kind']} "
                 f"unit {command['unit_id']}")
             continue
-        if command["kind"] in {"attack", "harvest"}:
+        if command["kind"] in {"attack", "harvest", "repair"}:
             if not isinstance(command.get("target_id"), int):
                 raise ValueError(f"{command['kind']} command has no target")
             lines.append(

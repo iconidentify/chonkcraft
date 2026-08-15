@@ -339,6 +339,105 @@ class PlaytestAdapterTest(unittest.TestCase):
             java_result["observations"][0]["state"]["tile_y"]),
             "no friendly depot means the hull stays put")
 
+    def test_both_adapters_accept_a_commanded_orc_one_repair(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/repair-1/00.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded Orc 1 repair fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        explorer.validate_result(native_result, scenario, "native")
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertEqual(5, scenario["commands"][0]["issue_cycle"],
+                         "the mend is issued on the commanded cycle")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 27 applied the peon mend")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must mend the paired hall, not refuse a standing building")
+        self.assertIsNotNone(
+            java_result["observations"][0]["first_progress_cycle"],
+            "the peon must leave the square toward the hall")
+        self.assertNotEqual((25, 18), (
+            java_result["observations"][0]["state"]["tile_x"],
+            java_result["observations"][0]["state"]["tile_y"]),
+            "the peon must walk off 25,18 toward the great hall")
+
+    def test_both_adapters_turn_a_soldier_mend_into_a_walk(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/repair-1/02.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded peon-mends-grunt fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 27 still applies when the target is a grunt")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must not refuse the click; the constructor walks")
+        self.assertIsNotNone(
+            native_result["observations"][0]["first_progress_cycle"],
+            "the peon must walk toward the grunt")
+        self.assertIsNotNone(
+            java_result["observations"][0]["first_progress_cycle"],
+            "Java must walk, not stay put on a refused repair")
+
+    def test_java_refuses_a_grunt_mend_the_buttons_do_not_offer(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/repair-1/03.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded grunt-repairs-hall fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 27 does not test the actor's worker flags")
+        self.assertFalse(java_result["observations"][0]["accepted"],
+                         "a grunt has no repair button, so Java must not issue the mend")
+
 
 if __name__ == "__main__":
     unittest.main()

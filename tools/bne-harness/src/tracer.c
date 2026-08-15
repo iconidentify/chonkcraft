@@ -242,6 +242,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_HARVEST 4
 #define SCRIPT_COMMAND_PATROL 5
 #define SCRIPT_COMMAND_RETURN_GOODS 6
+#define SCRIPT_COMMAND_REPAIR 7
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -873,6 +874,16 @@ static BOOL read_command_file(void) {
                     action = SCRIPT_COMMAND_HARVEST;
                     x = 0;
                     y = 0;
+                } else if (fields == 4 && strcmp(action_name, "repair") == 0) {
+                    /* Replay-pack-1 has 225 0x13 packets at function index
+                     * 27, almost all with a live target. The constructor at
+                     * 0x00436a20 installs order 27 when the target type
+                     * flags carry 0x20 (building) or 0x0400 (transport),
+                     * otherwise MOVE. The dispatcher does not special-case
+                     * this index. */
+                    action = SCRIPT_COMMAND_REPAIR;
+                    x = 0;
+                    y = 0;
                 } else {
                     extra = '\0';
                     fields = sscanf(cursor, "cycle %lu %15s unit %lu %c",
@@ -1380,6 +1391,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_RETURN_GOODS) {
         return "return-goods";
     }
+    if (action == SCRIPT_COMMAND_REPAIR) {
+        return "repair";
+    }
     return "unknown";
 }
 
@@ -1390,7 +1404,8 @@ static unsigned int script_order_function_index(BYTE action) {
      * table[3] move, table[2] stop (88 packets, dest 0,0, target -1),
      * table[8] attack (221 packets with a live target), table[23]
      * harvest (dispatcher special-cases 0x17 as the worker flag test),
-     * table[24] return-goods (382 packets, dest 0,0, target -1).
+     * table[24] return-goods (382 packets, dest 0,0, target -1),
+     * table[27] repair (225 packets, live building or transport target).
      * The one-byte 0x0C thunk at 0x00436ee0 is UI/speech and is unused. */
     if (action == SCRIPT_COMMAND_MOVE) {
         return 3;
@@ -1409,6 +1424,9 @@ static unsigned int script_order_function_index(BYTE action) {
     }
     if (action == SCRIPT_COMMAND_RETURN_GOODS) {
         return 24;
+    }
+    if (action == SCRIPT_COMMAND_REPAIR) {
+        return 27;
     }
     return 0xff;
 }
@@ -1482,7 +1500,8 @@ static void apply_commands(LONG cycle) {
             dest_x = read_word(target, BNE_UNIT_X);
             dest_y = read_word(target, BNE_UNIT_Y);
         } else if (command->action == SCRIPT_COMMAND_ATTACK
-                || command->action == SCRIPT_COMMAND_HARVEST) {
+                || command->action == SCRIPT_COMMAND_HARVEST
+                || command->action == SCRIPT_COMMAND_REPAIR) {
             reject_command(command, "target-required");
             continue;
         }

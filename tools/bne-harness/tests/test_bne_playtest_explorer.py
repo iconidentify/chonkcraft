@@ -167,6 +167,21 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertIn("attack unit", script)
         self.assertIn("target", script)
 
+    def test_native_direct_injector_emits_repair(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["repair"]
+        seed["actors"][0]["target_ids"] = [100]
+        seed["targets"] = [
+            {"id": 100, "player": 0, "domain": "land", "x": 22, "y": 22},
+        ]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "repair" for command in item["commands"])
+            and isinstance(item["commands"][0].get("target_id"), int))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("repair unit", script)
+        self.assertIn("target", script)
+
     def test_native_direct_injector_emits_stop(self):
         scenario = next(
             item for item in explorer.generate_scenarios(
@@ -202,6 +217,12 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             registry["families"]["production"]["native_execution_works"],
             "production 0x15 stays fail-closed")
+        self.assertEqual(27, registry["families"]["repair"]["evidence_hashes"][
+            "order_function_index"])
+        self.assertEqual(0, registry["families"]["repair"]["dual_adapter_executed"])
+        self.assertFalse(
+            registry["families"]["repair"]["native_execution_works"],
+            "repair stays fail-closed until both adapters execute it")
 
     def test_native_command_registry_counts_only_ledger_executions(self):
         ledger = {
@@ -229,6 +250,25 @@ class PlaytestExplorerTest(unittest.TestCase):
         scenario = next(
             item for item in explorer.generate_scenarios(seed, max_scenarios=80)
             if all(command["kind"] == "harvest" for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
+
+    def test_comparison_catches_a_mutated_repair_result(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["repair"]
+        seed["actors"][0]["target_ids"] = [100]
+        seed["targets"] = [
+            {"id": 100, "player": 0, "domain": "land", "x": 22, "y": 22},
+        ]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "repair" for command in item["commands"]))
         native = self.result(scenario, "native")
         java = self.result(scenario, "java")
         self.assertEqual(0, explorer.compare_results(
@@ -461,10 +501,16 @@ class PlaytestExplorerTest(unittest.TestCase):
                                 "typed catalog must parse real button rows")
         self.assertIn("harvest", caps["unit-peon"])
         self.assertIn("harvest", caps["unit-peasant"])
+        self.assertIn("repair", caps["unit-peon"])
+        self.assertIn("repair", caps["unit-peasant"])
         self.assertNotIn("harvest", caps.get("unit-grunt", set()),
                          "a grunt has no harvest button")
         self.assertNotIn("harvest", caps.get("unit-footman", set()),
                          "a footman has no harvest button")
+        self.assertNotIn("repair", caps.get("unit-grunt", set()),
+                         "a grunt has no repair button")
+        self.assertNotIn("repair", caps.get("unit-footman", set()),
+                         "a footman has no repair button")
         self.assertNotIn("train", caps.get("unit-pig-farm", set()),
                          "a pig farm has no train button")
         self.assertNotIn("train", caps.get("unit-farm", set()),
@@ -498,8 +544,12 @@ class PlaytestExplorerTest(unittest.TestCase):
         for actor in grunt_actors:
             self.assertNotIn("harvest", actor["capabilities"],
                              "a grunt must not become a harvester")
+            self.assertNotIn("repair", actor["capabilities"],
+                             "a grunt must not become a repairer")
         self.assertIn("harvest", by_ident.get("unit-peon", set()),
                       "Orc 1 must declare a typed peon harvest")
+        self.assertIn("repair", by_ident.get("unit-peon", set()),
+                      "Orc 1 must declare a typed peon repair")
         for actor in seed["actors"]:
             if actor.get("type_ident") in {"unit-pig-farm", "unit-farm"}:
                 self.assertNotIn("train", actor["capabilities"],
