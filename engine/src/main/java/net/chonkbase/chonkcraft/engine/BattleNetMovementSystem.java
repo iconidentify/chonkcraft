@@ -236,15 +236,13 @@ final class BattleNetMovementSystem {
     /** Applies a serialized player/network move at the retail command boundary. */
     boolean orderCommandMove(Unit unit, int toX, int toY) {
         Unit.Order before = unit.currentAction();
-        if (alreadyTouchingBlockedDest(unit, toX, toY)) {
-            return true;
-        }
         // A dest-arm leftover already owns a heading. Native writes
         // next_order=MOVE and the new order point, then keeps draining that
         // leftover -- Human 5 peasant 1512 first walks at fixture 6 still on
         // Harvest; Orc 6 flyer 1553 first walks at fixture 5 still on Patrol.
-        // Installing MOVE and Still's three-visit queue here used to freeze
-        // those leftovers, so first progress landed three cycles late.
+        // A 2x2 scout's odd click overlaps its own hull, so the occupied
+        // neighbour test used to swallow that click and leave Patrol walking
+        // to 18,51 / 83,10. Ask leftover first.
         if (leftoverWalkBearing(before, unit)) {
             int[] dest = projectPlayerMovePoint(unit, toX, toY);
             unit.setPathGoal(dest[0], dest[1]);
@@ -259,6 +257,9 @@ final class BattleNetMovementSystem {
             if (before == Unit.Order.PATROL && unit.savedOrder() == null) {
                 unit.setSavedOrder(Unit.Order.PATROL);
             }
+            return true;
+        }
+        if (alreadyTouchingBlockedDest(unit, toX, toY)) {
             return true;
         }
         int[] waits = playerCommandWaits(unit);
