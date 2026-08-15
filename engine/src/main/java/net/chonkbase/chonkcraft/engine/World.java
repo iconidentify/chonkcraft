@@ -12455,8 +12455,28 @@ public final class World {
         // levelx04o keeps exactly that load from cycle 1838 through the long
         // build ending at 2507 and delivers it at 2714.
         unit.setCarrying(cargo);
+        // Native GiveOrder 24 from Still on a no-gather actor writes
+        // next_order 24 and keeps Still: Orc 1 grunt 1592 timer 4 through
+        // fixture 8, Return-Goods at 9, inside at 79. Installing the walk
+        // on the issue cycle first-progressed at 5 and never left 18,23.
+        if (fromPlayer && before == Unit.Order.STILL && !unit.type().canGather()) {
+            int[] waits = movement.playerCommandWaits(unit);
+            int stillWait = waits[1] > 0 ? waits[1] : waits[0];
+            unit.setOrderTarget(depot.tileX(), depot.tileY());
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.RETURN_GOODS,
+                    depot.tileX(), depot.tileY(), depot, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.setBattleNetOrderDelay(stillWait + 1);
+            return true;
+        }
         unit.clearPath();
         unit.setOrder(Unit.Order.RETURN_GOODS);
+        // Native pops 24 at fixture 9 with timer 3, dest-arms at 12.
+        // The pop visit already spent one beat, so delay 2 dest-arms at 12.
+        if (!fromPlayer && before == Unit.Order.STILL && !unit.type().canGather()) {
+            unit.setBattleNetOrderDelay(2);
+        }
         // A send-home is a fresh COrder_Resource -- NewActionReturnGoods,
         // so its wait ladder starts at nought
         // and its Resource union is value-initialized. In particular it does

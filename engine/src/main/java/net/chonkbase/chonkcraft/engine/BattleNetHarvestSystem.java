@@ -304,8 +304,15 @@ final class BattleNetHarvestSystem {
                     world.movement.isStepping(worker) ? 1 : 0);
         }
         if (info == null) {
-            worker.setOrder(Unit.Order.STILL);
-            return;
+            // GiveOrder 24 on a soldier still walks FindDeposit. Native
+            // grunt 1592 enters the hall at 79; treating a missing gather
+            // table as Still left it on 18,23.
+            if (worker.returningToDepot()) {
+                info = emptySendHomeGoldWait();
+            } else {
+                worker.setOrder(Unit.Order.STILL);
+                return;
+            }
         }
 
         // HandleUnitAction removes a finished COrder_Resource before its
@@ -3187,6 +3194,17 @@ final class BattleNetHarvestSystem {
                 || "unit-orc-oil-platform".equals(ident);
     }
 
+
+    /**
+     * Gold wait-at-depot for an empty send-home that has no gather table.
+     * Native grunt 1592 reads timer 150 inside the hall -- the same stay
+     * GeneratedUnitRoster writes for peasant gold.
+     */
+    private static ResourceInfo emptySendHomeGoldWait() {
+        ResourceInfo gold = new ResourceInfo(UnitType.Resource.GOLD);
+        gold.setWaitAtDepot(150);
+        return gold;
+    }
 
     /** Carries whatever is held back to the nearest depot. */
     void stepReturnGoods(Unit unit) {
