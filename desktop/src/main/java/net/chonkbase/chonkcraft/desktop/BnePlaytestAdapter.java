@@ -241,7 +241,12 @@ public final class BnePlaytestAdapter {
         if (unit != null) {
             state.put("cargo_count", unit.cargo().size());
         }
-        state.put("missile_count", world.missiles().size());
+        // Native snapshots the projectile pool on the terminal cycle.
+        // Reading the live list after extra settle ticks dropped the
+        // landed rock and left one later axe, so batch-1/24 counted 1
+        // while the Still visit still had the two live shots native
+        // holds at 40.
+        state.put("missile_count", outcome.missileCount());
         row.put("state", state);
         return row;
     }

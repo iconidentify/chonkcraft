@@ -80,4 +80,57 @@ class BnePlaytestAdapterTest {
         assertTrue(state.get("tile_x") instanceof Number,
                 "the peon's final tile is part of the observation");
     }
+
+    @Test
+    @DisplayName("a human 13 north click reports two live shots at the still visit")
+    void aHuman13NorthClickReportsTwoLiveShotsAtTheStillVisit() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-playtest-missiles-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        String scenarioSha = "c".repeat(64);
+        String scenario = """
+                {
+                  "schema": "chonkcraft-bne-playtest-scenario-1",
+                  "scenario_sha256": "%s",
+                  "seed_identity": {"fixture": "batch-1-24"},
+                  "setup": {
+                    "kind": "sealed-fixture",
+                    "scenario": "Campaign\\\\Human\\\\Human13.pud",
+                    "seed": 1
+                  },
+                  "pattern": "single",
+                  "settle_cycles": 80,
+                  "actors": [
+                    {"id": 1449, "player": 0, "domain": "land",
+                     "capabilities": ["move"], "x": 98, "y": 57}
+                  ],
+                  "targets": [],
+                  "commands": [
+                    {"kind": "move", "unit_id": 1449, "x": 98, "y": 55,
+                     "queued": false, "issue_cycle": 5}
+                  ]
+                }
+                """.formatted(scenarioSha);
+        Map<String, Object> parsed = Json.parseObject(scenario);
+        parsed.put("scenario_sha256", scenarioSha);
+        Files.writeString(scenarioPath, Json.write(parsed), StandardCharsets.UTF_8);
+
+        BnePlaytestAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "b".repeat(64),
+        });
+
+        Map<String, Object> result = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        Map<?, ?> observation = (Map<?, ?>) ((List<?>) result.get("observations"))
+                .getFirst();
+        Map<?, ?> state = (Map<?, ?>) observation.get("state");
+        assertEquals(40, ((Number) observation.get("terminal_cycle")).intValue(),
+                "the axethrower is Still on 98,55 at fixture 40");
+        assertEquals(2, ((Number) state.get("missile_count")).intValue(),
+                "the Still visit still has the landed rock and its impact, not later axe throws");
+    }
 }

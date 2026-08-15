@@ -25,7 +25,7 @@ final class PlayerIntentJournal {
             String terminalReason, int tileX, int tileY, int offsetX, int offsetY,
             String order,
             Integer targetId, int hitPoints, int carried, boolean alive,
-            boolean onMap) {}
+            boolean onMap, int missileCount) {}
 
     private record State(int tileX, int tileY, int offsetX, int offsetY,
             String order, Integer targetId, int hitPoints, int carried,
@@ -33,7 +33,7 @@ final class PlayerIntentJournal {
             int buildTileX, int buildTileY, Integer worksiteId,
             String worksiteType, int worksiteTileX, int worksiteTileY,
             String producing, int trainingJobs,
-            String researching, String upgrading) {}
+            String researching, String upgrading, int missileCount) {}
 
     /** The physical obstacle represented by a clicked movement point. */
     private record Goal(boolean blocked, int minX, int minY, int maxX, int maxY) {
@@ -182,10 +182,10 @@ final class PlayerIntentJournal {
                 continue;
             }
             Unit unit = find(world, tracking.command.unitId());
-            State now = unit == null ? absent() : state(unit);
+            State now = unit == null ? absent() : state(unit, world);
             tracking.latest = now;
             Unit target = find(world, tracking.command.targetId());
-            State targetNow = target == null ? null : state(target);
+            State targetNow = target == null ? null : state(target, world);
             if (tracking.firstProgressCycle == null
                     && progressed(tracking.command, tracking.submitted, now,
                             tracking.targetSubmitted, targetNow)) {
@@ -379,7 +379,7 @@ final class PlayerIntentJournal {
         };
     }
 
-    private static State state(Unit unit) {
+    private static State state(Unit unit, World world) {
         Unit worksite = unit.worksite();
         return new State(unit.tileX(), unit.tileY(), unit.offsetX(), unit.offsetY(),
                 unit.order() == null ? null : unit.order().name(),
@@ -393,7 +393,8 @@ final class PlayerIntentJournal {
                 worksite == null ? -1 : worksite.tileY(),
                 unit.producing() == null ? null : unit.producing().ident(),
                 unit.trainingJobCount(), unit.researching(),
-                unit.upgradingTo() == null ? null : unit.upgradingTo().ident());
+                unit.upgradingTo() == null ? null : unit.upgradingTo().ident(),
+                world.missiles().size());
     }
 
     /**
@@ -407,12 +408,12 @@ final class PlayerIntentJournal {
 
     private static State stateOf(World world, int id) {
         Unit unit = find(world, id);
-        return unit == null ? null : state(unit);
+        return unit == null ? null : state(unit, world);
     }
 
     private static State absent() {
         return new State(-1, -1, 0, 0, null, null, 0, 0, false, false,
-                null, -1, -1, null, null, -1, -1, null, 0, null, null);
+                null, -1, -1, null, null, -1, -1, null, 0, null, null, 0);
     }
 
     private void add(Entry entry) {
@@ -436,7 +437,8 @@ final class PlayerIntentJournal {
                     tracking.terminalCycle, tracking.terminalReason,
                     latest.tileX, latest.tileY, latest.offsetX, latest.offsetY,
                     latest.order, latest.targetId,
-                    latest.hitPoints, latest.carried, latest.alive, latest.onMap));
+                    latest.hitPoints, latest.carried, latest.alive, latest.onMap,
+                    latest.missileCount));
         }
         return List.copyOf(result);
     }

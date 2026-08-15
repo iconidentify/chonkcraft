@@ -18,9 +18,14 @@ from pathlib import Path
 import sys
 import tempfile
 from typing import Any
+import io
 import zipfile
 
 import bne_playtest_explorer as explorer
+from bne_fixture import (
+    AUX_HEADER, BULLET_BYTES, BULLET_DELTA_HEADER, BULLET_FLAGS, BULLET_FREE,
+    CHUNK_HEADER, CYCLE_HEADER, PLAYER_SIM_RECORD, STATE_HEADER,
+)
 from bne_routes import UNIT_FLAGS, UNIT_FREE_OR_DEAD, UNIT_ORDER, read_state_stream
 
 
@@ -213,6 +218,58 @@ def resolve_fixture(scenario: dict[str, Any], explicit: Path | None) -> Path:
         "native adapter has no authenticated commanded fixture for this scenario")
 
 
+def active_projectile_count(raw: bytes) -> bool:
+    """Whether this 64-byte slot is an in-flight shot or impact sprite.
+
+    Remaining distance lives at projectile +0x20. Flag 0x04 is set on a
+    detonating rock and on type-21 impact. Three Human 13 pool occupants
+    stay allocated from cycle 1 with remaining 0 and flags 0x00/0x02;
+    they are not live shots. Counting them made the sealed pool look
+    like five missiles at fixture 40 while Java held the two shots
+    native still has in slots 4 and 5.
+    """
+    if raw[BULLET_FLAGS] & BULLET_FREE:
+        return False
+    remaining = int.from_bytes(raw[0x20:0x22], "little", signed=True)
+    return remaining != 0 or (raw[BULLET_FLAGS] & 0x04) != 0
+
+
+def projectile_counts_by_cycle(fixture: Path) -> dict[int, int]:
+    """Live in-flight/impact count for each AUXL cycle in a sealed fixture."""
+    with zipfile.ZipFile(fixture) as archive:
+        payload = archive.read("state.bin")
+    cursor = io.BytesIO(payload)
+    header = STATE_HEADER.unpack(cursor.read(STATE_HEADER.size))
+    players = header[6]
+    live: dict[int, bytes] = {}
+    cycle = 0
+    counts: dict[int, int] = {}
+    player_sim = PLAYER_SIM_RECORD.size
+    while True:
+        header = cursor.read(CHUNK_HEADER.size)
+        if len(header) != CHUNK_HEADER.size:
+            break
+        tag, payload_bytes = CHUNK_HEADER.unpack(header)
+        chunk = cursor.read(payload_bytes)
+        body = io.BytesIO(chunk)
+        if tag == b"CYCL":
+            cycle = CYCLE_HEADER.unpack(body.read(CYCLE_HEADER.size))[0]
+        elif tag == b"AUXL":
+            _aux, bullet_count, changed, _map, _tiles = AUX_HEADER.unpack(
+                body.read(AUX_HEADER.size))
+            body.read(players * player_sim)
+            for _ in range(changed):
+                slot, _generation = BULLET_DELTA_HEADER.unpack(
+                    body.read(BULLET_DELTA_HEADER.size))
+                live[slot] = body.read(BULLET_BYTES)
+            active = 0
+            for slot, raw in live.items():
+                if slot < bullet_count and active_projectile_count(raw):
+                    active += 1
+            counts[cycle] = active
+    return counts
+
+
 def load_frames(fixture: Path) -> list[dict[str, Any]]:
     with zipfile.ZipFile(fixture) as archive:
         payload = archive.read("state.bin")
@@ -225,6 +282,9 @@ def load_frames(fixture: Path) -> list[dict[str, Any]]:
         temporary.unlink(missing_ok=True)
     if not frames:
         raise ValueError("native fixture state stream is empty")
+    counts = projectile_counts_by_cycle(fixture)
+    for frame in frames:
+        frame["missile_count"] = counts.get(int(frame["cycle"]), 0)
     return frames
 
 
@@ -266,7 +326,9 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
         if issued not in by_cycle:
             raise ValueError(
                 f"native fixture is truncated before issue cycle {issued}")
-        baseline = snapshot(None if pre is None else pre["units"].get(slot), 0)
+        baseline = snapshot(
+            None if pre is None else pre["units"].get(slot),
+            int((pre or {}).get("missile_count") or 0))
         first_progress = None
         terminal_cycle = None
         terminal_reason = None
@@ -301,7 +363,8 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
             frame = by_cycle.get(cycle)
             if frame is None:
                 raise ValueError(f"native fixture skipped cycle {cycle}")
-            now = snapshot(frame["units"].get(slot), 0)
+            now = snapshot(frame["units"].get(slot),
+                           int(frame.get("missile_count") or 0))
             latest = now
             if cycle == issued and now.get("order") not in {None, baseline.get("order")}:
                 accepted = True

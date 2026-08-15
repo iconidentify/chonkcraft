@@ -74,6 +74,24 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertEqual(17, observation["state"]["tile_y"])
         self.assertEqual("STILL", observation["state"]["order"])
 
+    def test_native_adapter_counts_in_flight_shots_on_the_terminal_cycle(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/batch-1/24.bnefx"
+        )
+        self.assertTrue(fixture.is_file(), "authenticated Human 13 north click")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        explorer.validate_result(result, scenario, "native")
+        observation = result["observations"][0]
+        self.assertEqual(40, observation["terminal_cycle"],
+                         "the axethrower is Still on 98,55 at retail 40")
+        self.assertEqual(2, observation["state"]["missile_count"],
+                         "retail still has the landed rock and its impact "
+                         "sprite at that Still visit, not an empty pool")
+
     def test_native_adapter_refuses_a_mismatched_command_stream(self):
         self.assertTrue(COMMANDED.is_file(), "authenticated Orc 1 move fixture")
         seed = explorer.seed_from_commanded_fixture(COMMANDED)
