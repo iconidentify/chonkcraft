@@ -323,6 +323,35 @@ class PlayerIntentJournalTest {
     }
 
     @Test
+    @DisplayName("a stop click on a standing unit is acknowledged without progress")
+    void aStopClickOnAStandingUnitIsAcknowledgedWithoutProgress() {
+        World world = world();
+        UnitType type = movable("unit-peon");
+        Unit unit = world.createUnit(type, 0, 2, 2);
+        assertEquals(Unit.Order.STILL, unit.order(),
+                "the peon must already be standing");
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(CommandSink.local(
+                new net.chonkbase.chonkcraft.engine.network.CommandApplier(
+                        world, List.of(type))), world::cycle,
+                () -> List.of(unit.id()), world);
+
+        assertTrue(sink.issueAccepted(GameCommand.stop(0, unit.id())),
+                "GiveOrder Stop on a standing peon must be accepted");
+        journal.observe(0, world);
+        assertEquals(null, journal.outcomeSnapshot().getFirst().terminalReason(),
+                "retail does not fulfill a Still-on-Still Stop on the issue cycle");
+
+        journal.observe(PlayerIntentJournal.OUTCOME_WINDOW, world);
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals("acknowledged-no-progress", outcome.terminalReason(),
+                "a Stop that never leaves Still is acknowledged without progress, not "
+                        + outcome.terminalReason());
+        assertEquals(null, outcome.firstProgressCycle(),
+                "Still-on-Still has no order change to count as progress");
+    }
+
+    @Test
     @DisplayName("a leftover stop settles the walk when the leftover lands")
     void aLeftoverStopSettlesTheWalkWhenTheLeftoverLands() {
         World world = world();

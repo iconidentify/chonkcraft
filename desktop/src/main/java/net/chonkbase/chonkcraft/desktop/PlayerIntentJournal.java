@@ -276,7 +276,11 @@ final class PlayerIntentJournal {
         return switch (command.kind()) {
             case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW ->
                     movementSettled(tracking, now, unit);
-            case STOP -> "STILL".equals(now.order);
+            // Still-on-Still is not a completed Stop. Native stop-1/04 stays
+            // Still with no first progress and finishes the window as
+            // acknowledged-no-progress. Used to fulfill on the issue cycle.
+            case STOP -> "STILL".equals(now.order)
+                    && tracking.firstProgressCycle != null;
             case STAND_GROUND -> "STAND_GROUND".equals(now.order);
             case DEFEND -> "DEFEND".equals(now.order);
             case BUILD -> now.worksiteId != null
