@@ -8027,7 +8027,6 @@ public final class World {
         unit.clearQueuedOrders();
         unit.setSavedOrder(null);
         construction.abandonPendingBuild(unit);
-        unit.clearPath();
         if (unit.type() != null
                 && unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             unit.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
@@ -8036,6 +8035,17 @@ public final class World {
             unit.setResourceDepot(null);
             unit.setReturnDepotGoal(null);
         }
+        // Dest-arm leftover outlives Stop the same way it outlives a Move
+        // click. Native stop-1/00 keeps Move after fixture 20 and is Still
+        // only when leftover lands at 24. Clearing the leftover here used
+        // to freeze offsets and Still immediately.
+        if (movement.leftoverWalkBearing(unit.currentAction(), unit)
+                || (unit.order() == Unit.Order.MOVE && unit.isMoving())) {
+            unit.clearPath();
+            unit.setBattleNetStopAfterLeftover(true);
+            return;
+        }
+        unit.clearPath();
         unit.setOrder(Unit.Order.STILL);
     }
 
@@ -10772,7 +10782,7 @@ public final class World {
                 unit.setWaitCycles(0);
             }
             residualSettledThisVisit = true;
-            if (movement.promoteQueuedPlayerMoveAfterLeftover(unit)) {
+            if (movement.finishLeftoverReplacement(unit)) {
                 return;
             }
         }

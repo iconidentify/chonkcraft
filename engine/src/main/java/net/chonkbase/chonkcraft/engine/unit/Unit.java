@@ -330,6 +330,12 @@ public final class Unit {
     private boolean battleNetPlayerCommandMove;
 
     /**
+     * A Stop click arrived while dest-arm leftover pixels were still
+     * draining. Native keeps Move until those pixels land.
+     */
+    private boolean battleNetStopAfterLeftover;
+
+    /**
      * How many free stepPatrol visits a self-patrol combat flyer has spent
      * at its start tile. XOrc 8 gryphon 1550 first-steps after eight holds
      * (ready c5, step c13).
@@ -2752,6 +2758,14 @@ public final class Unit {
 
     public void setBattleNetPlayerCommandMove(boolean playerCommandMove) {
         battleNetPlayerCommandMove = playerCommandMove;
+    }
+
+    public boolean battleNetStopAfterLeftover() {
+        return battleNetStopAfterLeftover;
+    }
+
+    public void setBattleNetStopAfterLeftover(boolean stopAfterLeftover) {
+        battleNetStopAfterLeftover = stopAfterLeftover;
     }
 
     /**

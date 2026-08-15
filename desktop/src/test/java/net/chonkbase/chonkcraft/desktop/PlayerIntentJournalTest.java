@@ -322,6 +322,47 @@ class PlayerIntentJournalTest {
         assertTrue(outcomes.get(1).firstProgressCycle() != null);
     }
 
+    @Test
+    @DisplayName("a leftover stop settles the walk when the leftover lands")
+    void aLeftoverStopSettlesTheWalkWhenTheLeftoverLands() {
+        World world = world();
+        UnitType type = movable("unit-footman");
+        Unit unit = world.createUnit(type, 0, 2, 2);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(CommandSink.local(
+                new net.chonkbase.chonkcraft.engine.network.CommandApplier(
+                        world, List.of(type))), world::cycle,
+                () -> List.of(unit.id()), world);
+
+        assertTrue(sink.issueAccepted(GameCommand.move(0, unit.id(), 8, 2)));
+        boolean leftover = false;
+        for (int cycle = 0; cycle < 40; cycle++) {
+            world.tick();
+            journal.observe(world.cycle(), world);
+            if (unit.isMoving() || unit.offsetX() != 0 || unit.offsetY() != 0) {
+                leftover = true;
+                break;
+            }
+        }
+        assertTrue(leftover,
+                "the walk must still have leftover pixels when Stop lands");
+        assertTrue(sink.issueAccepted(GameCommand.stop(0, unit.id())));
+        for (int cycle = 0; cycle < 40; cycle++) {
+            world.tick();
+            journal.observe(world.cycle(), world);
+        }
+
+        List<PlayerIntentJournal.Outcome> outcomes = journal.outcomeSnapshot();
+        assertEquals("settled", outcomes.get(0).terminalReason(),
+                "retail leftover Stop settles the walk when leftover lands, not "
+                        + outcomes.get(0).terminalReason());
+        assertEquals("fulfilled", outcomes.get(1).terminalReason(),
+                "the Stop itself fulfills when leftover lands, not "
+                        + outcomes.get(1).terminalReason());
+        assertEquals(outcomes.get(0).terminalCycle(), outcomes.get(1).terminalCycle(),
+                "the walk and the Stop finish together when leftover lands");
+    }
+
     private static World world() {
         GameMap map = new GameMap(12, 12, new Tileset());
         for (int y = 0; y < map.height(); y++) {

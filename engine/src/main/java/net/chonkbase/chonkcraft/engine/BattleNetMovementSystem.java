@@ -125,7 +125,7 @@ final class BattleNetMovementSystem {
         return new int[] {toX, toY};
     }
 
-    private static boolean leftoverWalkBearing(Unit.Order action, Unit unit) {
+    boolean leftoverWalkBearing(Unit.Order action, Unit unit) {
         if (action == null || unit == null) {
             return false;
         }
@@ -142,6 +142,19 @@ final class BattleNetMovementSystem {
      * pays wait 3 -- Human 5 peasant 1512 Harvest to Move at fixture 19,
      * Orc 6 flyer 1553 Patrol to Move at fixture 23.
      */
+    boolean finishLeftoverReplacement(Unit unit) {
+        if (unit == null || unit.isMoving()
+                || unit.residualX() != 0 || unit.residualY() != 0) {
+            return false;
+        }
+        if (unit.battleNetStopAfterLeftover()) {
+            unit.setBattleNetStopAfterLeftover(false);
+            unit.setOrder(Unit.Order.STILL);
+            return true;
+        }
+        return promoteQueuedPlayerMoveAfterLeftover(unit);
+    }
+
     boolean promoteQueuedPlayerMoveAfterLeftover(Unit unit) {
         if (unit == null || !unit.battleNetPlayerCommandMove()
                 || unit.order() == Unit.Order.MOVE || unit.isMoving()) {
@@ -337,6 +350,9 @@ final class BattleNetMovementSystem {
     void stepMoveOrder(Unit unit) {
         if (unit.battleNetOrderDelay() > 0) {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            return;
+        }
+        if (finishLeftoverReplacement(unit)) {
             return;
         }
         if (world.battleNetStrideOddDestEvenStop(unit)) {
@@ -3871,6 +3887,9 @@ final class BattleNetMovementSystem {
         } else if (!stepped && !walkedThisCycle) {
             walkPixels(unit);
         }
+        if (finishLeftoverReplacement(unit)) {
+            return;
+        }
 
         // And not on the cycle the step was taken. Upstream ends a walk on
         // the answer NextPathElement gives, and the call that takes a step
@@ -3878,6 +3897,9 @@ final class BattleNetMovementSystem {
         // whose animation carries it a whole tile in a single cycle would
         // otherwise arrive and finish in the same breath.
         if (mayDecide && !stepped && !unit.isMoving() && unit.pathLength() == 0) {
+            if (finishLeftoverReplacement(unit)) {
+                return;
+            }
             // The path has run out. If this was only as far as the search
             // could see -- it returns the best it reached rather than nothing
             // -- then look again from here. Each attempt starts closer, and

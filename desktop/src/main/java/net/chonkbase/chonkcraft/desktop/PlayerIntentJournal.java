@@ -137,11 +137,19 @@ final class PlayerIntentJournal {
         if (submitted == null || command.unitId() == 0) {
             return;
         }
-        for (Tracking previous : outcomes) {
-            if (previous.terminalCycle == null
-                    && previous.command.unitId() == command.unitId()) {
-                previous.terminalCycle = cycle;
-                previous.terminalReason = "superseded";
+        Unit unit = find(world, command.unitId());
+        // Stop behind dest-arm leftover is next_order, not a replacement.
+        // Native stop-1/00 keeps the Move settled when leftover lands.
+        boolean leftoverStop = command.kind() == GameCommand.Kind.STOP
+                && unit != null
+                && (unit.battleNetStopAfterLeftover() || unit.isMoving());
+        if (!leftoverStop) {
+            for (Tracking previous : outcomes) {
+                if (previous.terminalCycle == null
+                        && previous.command.unitId() == command.unitId()) {
+                    previous.terminalCycle = cycle;
+                    previous.terminalReason = "superseded";
+                }
             }
         }
         Tracking tracking = new Tracking(id, cycle, command, accepted,
@@ -151,7 +159,6 @@ final class PlayerIntentJournal {
             tracking.terminalCycle = cycle;
             tracking.terminalReason = "rejected";
         } else {
-            Unit unit = find(world, command.unitId());
             State targetNow = stateOf(world, command.targetId());
             String terminal = terminalReason(tracking, tracking.latest, targetNow,
                     cycle, world, unit);

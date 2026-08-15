@@ -673,6 +673,10 @@ public final class LoadGame {
             unit.setBattleNetPlayerCommandMove(
                     truthy(state.rawGet("playerCommandMove")));
         }
+        if (state.rawGet("stopAfterLeftover") != null) {
+            unit.setBattleNetStopAfterLeftover(
+                    truthy(state.rawGet("stopAfterLeftover")));
+        }
         if (state.rawGet("oilAction") != null) {
             try {
                 unit.setBattleNetOilAction(Unit.BattleNetOilAction.valueOf(
