@@ -222,8 +222,8 @@ def _mutate_int_field(ledger: dict[str, Any], cycle: int, player: int,
 
 
 def compare_command(left: Path, right: Path) -> dict[str, Any]:
-    a = json.loads(left.read_text(encoding="utf-8"))
-    b = json.loads(right.read_text(encoding="utf-8"))
+    a = load_ledger(left)
+    b = load_ledger(right)
     difference = first_difference(a, b)
     return {
         "identical": difference is None,
@@ -233,6 +233,64 @@ def compare_command(left: Path, right: Path) -> dict[str, Any]:
     }
 
 
+def load_ledger(path: Path) -> dict[str, Any]:
+    text = path.read_text(encoding="utf-8")
+    stripped = text.lstrip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        return json.loads(text)
+    raise ValueError(f"AI decision ledger is not JSON: {path}")
+
+
+def parse_state_hex(text: str) -> bytes:
+    parts = [part for part in text.strip().split(",") if part]
+    if len(parts) != STATE_BYTES:
+        raise ValueError(
+            f"AIPlayerState dump is {len(parts)} bytes, not {STATE_BYTES}")
+    return bytes(int(part, 16) for part in parts)
+
+
+def parse_trace_fields(line: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    for token in line.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        fields[key] = value
+    return fields
+
+
+def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
+        phase: str = "game-before") -> dict[str, Any]:
+    """Build a compared ledger from tracer ai-build-boundary 48-byte dumps.
+
+    Native CHONK_BNE_TRACE_AI_BUILD_STATE writes the live AIPlayerState
+    as 48 comma-separated hex bytes. Pointers at +0x04 / +0x23 / +0x27
+    are process addresses; they become ai.bin file offsets here.
+    """
+    rows: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        if "event=ai-build-boundary" not in line:
+            continue
+        fields = parse_trace_fields(line)
+        if fields.get("phase") != phase:
+            continue
+        if "state" not in fields or "player" not in fields:
+            raise ValueError("ai-build-boundary is missing player or state")
+        raw = parse_state_hex(fields["state"])
+        rows.append(row(
+            cycle=int(fields.get("index") or 0),
+            player=int(fields["player"]),
+            profile=int(fields.get("profile") or 0),
+            raw_state=raw,
+            ai_base=ai_base,
+            ai_size=ai_size,
+            classification="fallout",
+        ))
+    if not rows:
+        raise ValueError("native trace has no ai-build-boundary dumps")
+    return build_ledger(rows)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Compare normalized BNE 2.02b AI decision ledgers")
@@ -240,11 +298,28 @@ def main(argv: list[str] | None = None) -> int:
     compare = sub.add_parser("compare")
     compare.add_argument("left", type=Path)
     compare.add_argument("right", type=Path)
+    from_trace = sub.add_parser("from-trace")
+    from_trace.add_argument("trace", type=Path)
+    from_trace.add_argument("--ai-base", type=lambda value: int(value, 0),
+                            required=True)
+    from_trace.add_argument("--ai-size", type=lambda value: int(value, 0),
+                            required=True)
+    from_trace.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     if args.command == "compare":
         report = compare_command(args.left, args.right)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["identical"] else 1
+    if args.command == "from-trace":
+        built = ledger_from_native_trace(
+            args.trace.read_text(encoding="utf-8"),
+            ai_base=args.ai_base, ai_size=args.ai_size)
+        args.output.write_text(
+            json.dumps(built, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        print(json.dumps({"rows": len(built["rows"]),
+                          "output": str(args.output)}, indent=2))
+        return 0
     return 2
 
 

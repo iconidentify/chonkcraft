@@ -23,9 +23,15 @@ fails closed.
 ```sh
 python3 tools/bne-harness/scripts/bne_java.py ai-decision-ledger \
   native-a.json native-b.json
+
+python3 tools/bne-harness/scripts/bne_ai_decision_ledger.py from-trace \
+  trace.txt --ai-base 0xB00000 --ai-size 0x4000 --output native.json
 ```
 
-Two identical native captures must compare equal after normalization.
+`from-trace` reads tracer `ai-build-boundary` 48-byte dumps
+(`CHONK_BNE_TRACE_AI_BUILD_STATE=1`). Pointers at `+0x04` / `+0x23` /
+`+0x27` become `ai.bin` file offsets. Two identical native dumps must
+compare equal after normalization.
 Mutation tests shift one PC transition, one predicate result, and one
 state byte and fail at that cycle and field. A retail micro-oracle replay
 is only required after the ledger localizes an unresolved decision.

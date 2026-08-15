@@ -63,6 +63,27 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("a shifted program counter fails at that cycle and field")
+    void aShiftedProgramCounterFailsAtThatCycleAndField() {
+        List<AiDecisionLedger.Row> rows = emit("campaigns/orc/level01o", 8);
+        assertFalse(rows.isEmpty(),
+                "Orc 1 must emit compared computer-player rows");
+        AiDecisionLedger.Row first = rows.getFirst();
+        AiDecisionLedger.Row shifted = new AiDecisionLedger.Row(
+                first.cycle(), first.player(), first.profile(), first.waitCount(),
+                first.pcOffset() + 8, first.listOffset(), first.thresholdOffset(),
+                first.nonPointerHex(), first.classification());
+        List<AiDecisionLedger.Row> mutated = new ArrayList<>(rows);
+        mutated.set(0, shifted);
+        String left = AiDecisionLedger.toJson(rows);
+        String right = AiDecisionLedger.toJson(mutated);
+        assertFalse(left.equals(right),
+                "a shifted ai.bin program counter must not compare equal");
+        assertTrue(right.contains("\"pc_offset\":" + (first.pcOffset() + 8)),
+                "the first difference must be the shifted program counter");
+    }
+
+    @Test
     @DisplayName("a person-only map does not invent a computer instruction")
     void aPersonOnlyMapDoesNotInventAComputerInstruction() {
         World world = new World(new GameMap(16, 16, new Tileset()));

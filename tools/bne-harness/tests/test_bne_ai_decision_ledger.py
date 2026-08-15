@@ -119,6 +119,70 @@ class AiDecisionLedgerTest(unittest.TestCase):
                         "compare equal to native process pointers after "
                         "normalization")
 
+    def test_two_identical_native_trace_dumps_compare_equal(self):
+        text = tracer_dump(cycle=12, player=6, profile=29,
+                           raw=raw_state(process_pc=True))
+        first = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE)
+        second = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE)
+        self.assertTrue(ledger.ledgers_identical(first, second),
+                        "two identical native AIPlayerState dumps must "
+                        "compare equal after pointer normalization")
+        self.assertEqual(1, len(first["rows"]))
+        self.assertEqual(0x120, first["rows"][0]["pc_offset"])
+        self.assertEqual(0x40, first["rows"][0]["list_offset"])
+        self.assertEqual(0x80, first["rows"][0]["threshold_offset"])
+
+    def test_native_trace_pc_mutation_fails_at_that_cycle_and_field(self):
+        text = tracer_dump(cycle=12, player=6, profile=29,
+                           raw=raw_state(process_pc=True))
+        baseline = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE)
+        mutated = ledger.mutate_pc(baseline, 12, 6, 8)
+        difference = ledger.first_difference(baseline, mutated)
+        self.assertEqual(12, difference["cycle"])
+        self.assertEqual("pc_offset", difference["field"])
+        self.assertEqual(0x120, difference["left"])
+        self.assertEqual(0x128, difference["right"])
+
+    def test_native_trace_predicate_mutation_fails_at_that_cycle_and_field(self):
+        text = tracer_dump(cycle=12, player=6, profile=29,
+                           raw=raw_state(process_pc=True))
+        baseline = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE)
+        baseline["rows"][0]["predicates"] = [{"id": 4, "result": True}]
+        mutated = ledger.mutate_predicate_result(baseline, 12, 6)
+        difference = ledger.first_difference(baseline, mutated)
+        self.assertEqual(12, difference["cycle"])
+        self.assertEqual("predicates", difference["field"])
+
+    def test_native_trace_state_byte_mutation_fails_at_that_cycle_and_field(self):
+        text = tracer_dump(cycle=12, player=6, profile=29,
+                           raw=raw_state(process_pc=True))
+        baseline = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE)
+        mutated = ledger.mutate_state_byte(baseline, 12, 6, nibble=0)
+        difference = ledger.first_difference(baseline, mutated)
+        self.assertEqual(12, difference["cycle"])
+        self.assertEqual("non_pointer_hex", difference["field"])
+        self.assertNotEqual(difference["left"], difference["right"])
+
+    def test_native_trace_without_boundary_dumps_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "no ai-build-boundary"):
+            ledger.ledger_from_native_trace(
+                "# bne-trace event=cycle cycle=1\n",
+                ai_base=AI_BASE, ai_size=AI_SIZE)
+
+
+def tracer_dump(*, cycle: int, player: int, profile: int, raw: bytes) -> str:
+    hex_state = ",".join(f"{byte:02x}" for byte in raw)
+    return (
+        f"# bne-trace event=ai-build-boundary phase=game-before "
+        f"index={cycle} player={player} profile={profile} "
+        f"length=12 state={hex_state}\n"
+    )
+
 
 if __name__ == "__main__":
     unittest.main()
