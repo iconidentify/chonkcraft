@@ -198,8 +198,14 @@ final class PlayerIntentJournal {
         if (before == null || now == null) {
             return before != now;
         }
-        boolean moved = before.tileX != now.tileX || before.tileY != now.tileY
-                || before.offsetX != now.offsetX || before.offsetY != now.offsetY;
+        boolean tileMoved = before.tileX != now.tileX || before.tileY != now.tileY;
+        // Still leftover bobs every cycle. Native first_progress is the first
+        // walk pixel, not that bob -- counting it made every attack and patrol
+        // look several cycles early.
+        boolean leftoverMoved = (before.offsetX != now.offsetX
+                || before.offsetY != now.offsetY)
+                && !"STILL".equals(now.order);
+        boolean moved = tileMoved || leftoverMoved;
         boolean targetChanged = targetBefore != null && targetNow != null
                 && (targetBefore.hitPoints != targetNow.hitPoints
                         || targetBefore.alive != targetNow.alive
@@ -215,7 +221,8 @@ final class PlayerIntentJournal {
         return switch (command.kind()) {
             case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW, DEFEND -> moved;
             case ATTACK, ATTACK_GROUND, CAST -> moved || targetChanged;
-            case HARVEST, RETURN_GOODS -> moved || before.carried != now.carried;
+            case HARVEST, RETURN_GOODS -> moved || before.carried != now.carried
+                    || !java.util.Objects.equals(before.order, now.order);
             case BUILD -> moved || foundationCreated;
             case TRAIN, RESEARCH, UPGRADE_TO -> productionChanged;
             case BOARD, UNLOAD, UNLOAD_ONE -> moved
@@ -365,7 +372,7 @@ final class PlayerIntentJournal {
         return new State(unit.tileX(), unit.tileY(), unit.offsetX(), unit.offsetY(),
                 unit.order() == null ? null : unit.order().name(),
                 unit.target() == null ? null : unit.target().id(),
-                unit.hitPoints(), unit.carried(), unit.isAlive(), unit.isOnMap(),
+                unit.hitPoints(), unit.carried(), living(unit), unit.isOnMap(),
                 unit.pendingBuild() == null ? null : unit.pendingBuild().ident(),
                 unit.buildTileX(), unit.buildTileY(),
                 worksite == null ? null : worksite.id(),
@@ -375,6 +382,15 @@ final class PlayerIntentJournal {
                 unit.producing() == null ? null : unit.producing().ident(),
                 unit.trainingJobCount(), unit.researching(),
                 unit.upgradingTo() == null ? null : unit.upgradingTo().ident());
+    }
+
+    /**
+     * Whether the hull is still a living unit. {@link Unit#isAlive()} treats
+     * a worker who walked into a mine as dead because the unit is removed;
+     * native still reports that peon alive and only off the map.
+     */
+    private static boolean living(Unit unit) {
+        return unit.hitPoints() > 0 && unit.order() != Unit.Order.DYING;
     }
 
     private static State stateOf(World world, int id) {

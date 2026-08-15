@@ -226,9 +226,6 @@ public final class BnePlaytestAdapter {
         state.put("tile_x", outcome.tileX());
         state.put("tile_y", outcome.tileY());
         state.put("order", outcome.order());
-        if (outcome.targetId() != null) {
-            state.put("target_id", outcome.targetId());
-        }
         state.put("hit_points", outcome.hitPoints());
         state.put("carried", outcome.carried());
         state.put("alive", outcome.alive());
@@ -269,7 +266,9 @@ public final class BnePlaytestAdapter {
         state.put("offset_x", Math.floorMod(unit.offsetX(), Unit.TILE_PIXELS));
         state.put("offset_y", Math.floorMod(unit.offsetY(), Unit.TILE_PIXELS));
         state.put("order", unit.order() == null ? null : unit.order().name());
-        state.put("target_id", unit.target() == null ? null : unit.target().id());
+        if (unit.target() != null) {
+            state.put("target_id", unit.target().id());
+        }
         state.put("hit_points", unit.hitPoints());
         state.put("carried", unit.carried());
         state.put("alive", unit.isAlive());

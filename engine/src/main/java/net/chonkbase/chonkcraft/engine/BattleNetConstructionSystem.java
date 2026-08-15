@@ -1795,8 +1795,11 @@ final class BattleNetConstructionSystem {
         if (unit.distanceTo(target) > 1) {
             // Used to stand still the moment the hall was already whole,
             // which is why a mend click on a standing town hall never
-            // became a walk.
-            world.movement.walkTowards(unit, target.tileX(), target.tileY());
+            // became a walk. The dest is the same building approach a gold
+            // or build job uses; walking the origin parked Orc 1's peon
+            // north of the hall at 22,21 while native stood on 26,21.
+            int[] dest = world.battleNetApproachPoint(unit, target);
+            world.movement.walkTowards(unit, dest[0], dest[1]);
             return;
         }
         if (target.hitPoints() >= target.type().hitPoints()) {
@@ -1850,7 +1853,8 @@ final class BattleNetConstructionSystem {
             return false;
         }
         if (unit.type().repairRange() <= 0) {
-            return world.orderMove(unit, target.tileX(), target.tileY());
+            int[] dest = world.battleNetApproachPoint(unit, target);
+            return world.orderMove(unit, dest[0], dest[1]);
         }
         if (target.player() != unit.player()
                 && !world.isAllied(unit.player(), target.player())) {

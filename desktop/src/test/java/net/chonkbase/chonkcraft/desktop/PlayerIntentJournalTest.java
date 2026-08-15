@@ -253,6 +253,49 @@ class PlayerIntentJournalTest {
     }
 
     @Test
+    @DisplayName("still leftover bob is not a walk")
+    void stillLeftoverBobIsNotAWalk() {
+        World world = world();
+        UnitType type = movable("unit-footman");
+        Unit unit = world.createUnit(type, 0, 2, 2);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> { }, world::cycle,
+                () -> List.of(unit.id()), world);
+
+        sink.issueAccepted(GameCommand.move(0, unit.id(), 6, 2));
+        unit.setOffset(4, 0);
+        journal.observe(1, world);
+
+        assertEquals(null, journal.outcomeSnapshot().getFirst().firstProgressCycle(),
+                "a Still leftover bob must not count as the first walk pixel");
+    }
+
+    @Test
+    @DisplayName("a worker inside a mine is still alive")
+    void aWorkerInsideAMineIsStillAlive() {
+        World world = world();
+        UnitType workerType = movable("unit-peon");
+        UnitType mineType = building("unit-gold-mine", 3, 3);
+        Unit worker = world.createUnit(workerType, 0, 5, 6);
+        Unit mine = world.createUnit(mineType, 15, 6, 6);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> {
+            worker.setOrder(Unit.Order.HARVEST);
+            worker.setWorksite(mine);
+            worker.setRemoved(true);
+        }, world::cycle, () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.harvest(0, worker.id(), 7, 7));
+        journal.observe(1, world);
+
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertTrue(outcome.alive(),
+                "a peon who walked into the mine is off the map, not dead");
+        assertTrue(!outcome.onMap(),
+                "going inside a mine must take the hull off the map");
+    }
+
+    @Test
     void aReplacementOrderCannotDonateItsProgressToTheOldOne() {
         World world = world();
         UnitType type = new UnitType("unit-footman");

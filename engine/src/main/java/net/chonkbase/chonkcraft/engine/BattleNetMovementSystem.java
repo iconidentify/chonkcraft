@@ -70,14 +70,14 @@ final class BattleNetMovementSystem {
         return orderMove(unit, toX, toY, 0);
     }
 
-    /** Applies a serialized player/network move at the retail command boundary. */
-    boolean orderCommandMove(Unit unit, int toX, int toY) {
-        Unit.Order before = unit.currentAction();
-        // A command is appended behind the action currently serving its
-        // animation program. Opcode zero is the pop boundary. The timer by
-        // itself cannot predict it: at timer one a frame opcode may arm a new
-        // wait before the program reaches OP0 (ground NW and an occupied
-        // daemon do exactly that in the authenticated command corpus).
+    /**
+     * Quiet visits a player click waits behind the Still program that issued
+     * it, plus the type's next cold Still OP0. Harvest used to skip this and
+     * walk into the mine three cycles early.
+     *
+     * @return {@code {actionWait, queueWait}}
+     */
+    int[] playerCommandWaits(Unit unit) {
         int queueWait = -1;
         if (world.battleNetSequence != null
                 && unit.battleNetSequenceOffset() >= 0) {
@@ -86,27 +86,88 @@ final class BattleNetMovementSystem {
                     unit.battleNetAnimationTimer());
         }
         if (queueWait < 0) {
-            // Packs without script.bin retain the conservative timer-shaped
-            // approximation used by the native-data fallback.
             queueWait = Math.max(0, unit.battleNetAnimationTimer() - 1);
         }
-        // Once the queue pops, the replacement is serviced at this unit
-        // type's next cold Still OP0. Most walkers and ordinary flyers take
-        // three quiet visits; daemon Still has two frame/wait stretches and
-        // takes six. Reading the type's program replaces the old universal
-        // three-cycle approximation.
         int actionWait = 3;
         if (world.battleNetSequence != null) {
             int stillStart = world.idle.battleNetStillSequenceStart(unit);
             int scriptedWait = world.battleNetSequence
                     .quietTicksUntilActionMarker(stillStart, 3);
             if (scriptedWait >= 0) {
-                // SetOrder arms the newly selected Still sequence at three.
-                // Include the marker visit itself: the dry-run count is only
-                // the quiet visits that precede it.
                 actionWait = scriptedWait + 1;
             }
         }
+        return new int[] {actionWait, queueWait};
+    }
+
+    int playerCommandDelay(Unit unit) {
+        int[] waits = playerCommandWaits(unit);
+        return waits[0] + waits[1];
+    }
+
+    /**
+     * A click on occupied ground the hull already stands beside is not a
+     * walk. Human 2's occupied dest used to flip to Move and settle at
+     * cycle 12; native stayed Still on 8,35 from the issue cycle.
+     */
+    boolean alreadyTouchingBlockedDest(Unit unit, int toX, int toY) {
+        if (unit == null || unit.type() == null
+                || !world.map.contains(toX, toY)) {
+            return false;
+        }
+        int width = Math.max(1, unit.type().tileWidth());
+        int height = Math.max(1, unit.type().tileHeight());
+        if (world.map.isFootprintFree(toX, toY, width, height,
+                unit.movementMask(), unit.blockingFlags())) {
+            return false;
+        }
+        int reach = unit.type().airUnit() ? 2 : 1;
+        int destMinX = toX;
+        int destMinY = toY;
+        int destMaxX = toX;
+        int destMaxY = toY;
+        for (Unit occupant : world.unitsSnapshot()) {
+            if (occupant == unit || !occupant.isAlive() || !occupant.isOnMap()
+                    || occupant.type() == null) {
+                continue;
+            }
+            int maxX = occupant.tileX() + Math.max(1, occupant.type().tileWidth()) - 1;
+            int maxY = occupant.tileY() + Math.max(1, occupant.type().tileHeight()) - 1;
+            if (toX >= occupant.tileX() && toX <= maxX
+                    && toY >= occupant.tileY() && toY <= maxY) {
+                destMinX = occupant.tileX();
+                destMinY = occupant.tileY();
+                destMaxX = maxX;
+                destMaxY = maxY;
+                break;
+            }
+        }
+        int unitMaxX = unit.tileX() + width - 1;
+        int unitMaxY = unit.tileY() + height - 1;
+        int gapX = rectangleGap(unit.tileX(), unitMaxX, destMinX, destMaxX);
+        int gapY = rectangleGap(unit.tileY(), unitMaxY, destMinY, destMaxY);
+        return Math.max(gapX, gapY) <= reach;
+    }
+
+    private static int rectangleGap(int aMin, int aMax, int bMin, int bMax) {
+        if (aMax < bMin) {
+            return bMin - aMax;
+        }
+        if (bMax < aMin) {
+            return aMin - bMax;
+        }
+        return 0;
+    }
+
+    /** Applies a serialized player/network move at the retail command boundary. */
+    boolean orderCommandMove(Unit unit, int toX, int toY) {
+        Unit.Order before = unit.currentAction();
+        if (alreadyTouchingBlockedDest(unit, toX, toY)) {
+            return true;
+        }
+        int[] waits = playerCommandWaits(unit);
+        int actionWait = waits[0];
+        int queueWait = waits[1];
         // Player/network clicks into forest are stored as the first tree on
         // the BNE line. Orc 1 peon 1594 commanded to 30,18 keeps 28,18.
         // Autonomous AI walks stay on orderMove so idle campaigns do not

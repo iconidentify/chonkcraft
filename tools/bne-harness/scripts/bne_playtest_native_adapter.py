@@ -127,12 +127,19 @@ def snapshot(raw: bytes | None, missiles: int) -> dict[str, Any]:
 def progressed(before: dict[str, Any], now: dict[str, Any], kind: str) -> bool:
     if not before.get("alive") or not now.get("alive"):
         return before.get("alive") != now.get("alive")
-    moved = (
+    tile_moved = (
         before.get("tile_x") != now.get("tile_x")
         or before.get("tile_y") != now.get("tile_y")
-        or before.get("px") != now.get("px")
-        or before.get("py") != now.get("py")
     )
+    # Still leftover bobs on the standing square. The first walk pixel is
+    # progress; the idle bob is not. Counting it made every attack and
+    # patrol look several cycles earlier than the sealed fixture.
+    leftover_moved = (
+        now.get("order") != "STILL"
+        and (before.get("px") != now.get("px")
+             or before.get("py") != now.get("py"))
+    )
+    moved = tile_moved or leftover_moved
     if kind in {"move", "attack-move", "patrol", "follow"}:
         return moved
     if kind in {"stop", "stand-ground"}:
@@ -268,9 +275,28 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
         if any(event_names_command(line, command)
                for line in (applied_events or ())):
             accepted = True
-        if any(event_names_command(line, command)
-               for line in (rejected_events or ())):
-            accepted = False
+        rejected = any(event_names_command(line, command)
+                       for line in (rejected_events or ()))
+        if rejected:
+            issue_frame = by_cycle.get(issued)
+            now = snapshot(
+                None if issue_frame is None else issue_frame["units"].get(slot),
+                0)
+            observations.append({
+                "command_index": index,
+                "accepted": False,
+                "first_progress_cycle": None,
+                "terminal_cycle": issued,
+                "terminal_reason": "rejected",
+                "state": {
+                    key: now[key] for key in (
+                        "tile_x", "tile_y", "offset_x", "offset_y", "order",
+                        "hit_points", "carried", "alive", "on_map",
+                        "missile_count", "cargo_count",
+                    )
+                },
+            })
+            continue
         for cycle in range(issued, min(last_cycle, window) + 1):
             frame = by_cycle.get(cycle)
             if frame is None:

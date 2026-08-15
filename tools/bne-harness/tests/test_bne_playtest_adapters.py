@@ -209,8 +209,12 @@ class PlaytestAdapterTest(unittest.TestCase):
         explorer.validate_result(java_result, scenario, "java")
         self.assertFalse(native_result["observations"][0]["accepted"],
                          "native GiveOrder refuses a unit that is not local")
+        self.assertEqual("rejected", native_result["observations"][0]["terminal_reason"],
+                         "a refused GiveOrder is rejected, not acknowledged-no-progress")
         self.assertFalse(java_result["observations"][0]["accepted"],
                          "Java must not issue the enemy's patrol")
+        self.assertEqual("rejected", java_result["observations"][0]["terminal_reason"],
+                         "Java must label the enemy patrol rejected")
 
     def test_both_adapters_accept_a_commanded_orc_one_attack(self):
         pack = Path.home() / (

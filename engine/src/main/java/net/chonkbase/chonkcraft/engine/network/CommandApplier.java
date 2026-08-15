@@ -146,7 +146,14 @@ public final class CommandApplier {
             case MOVE -> accepted = world.orderCommandMove(
                     unit, command.x(), command.y());
             case STOP -> world.orderStop(unit);
-            case HARVEST -> accepted = world.orderHarvest(unit, command.x(), command.y());
+            case HARVEST -> {
+                accepted = world.orderHarvest(unit, command.x(), command.y());
+                if (accepted && unit.battleNetOrderDelay() == 0) {
+                    // Player harvest used to walk on the issue cycle and
+                    // vanish into the mine three cycles early.
+                    unit.setBattleNetOrderDelay(world.playerCommandDelay(unit));
+                }
+            }
             case ATTACK -> {
                 Unit target = findUnit(command.targetId());
                 if (target != null && target.isAlive()) {

@@ -341,6 +341,11 @@ public final class World {
         return harvest.orderHarvest(worker, tileX, tileY);
     }
 
+    /** Quiet visits a player harvest or move click waits before the walk. */
+    public int playerCommandDelay(Unit unit) {
+        return movement.playerCommandDelay(unit);
+    }
+
     /** @see BattleNetHarvestSystem#orderHarvest */
     public boolean orderHarvest(Unit worker, Unit resourceBuilding) {
         return harvest.orderHarvest(worker, resourceBuilding);
