@@ -63,7 +63,10 @@ upgrade catalog is not rewritten.
 
 Command reporting is split. The current commanded ledger is 240 generated,
 131 executed by both adapters, 131 comparable, 52 exact, 79 materially
-divergent, 0 infrastructure failures. Both adapters executed is not
+divergent, 0 infrastructure failures, 0 accept mismatches. GiveOrder 17
+and 27 now take peon/grunt attack-ground and a grunt told to mend a hall
+(the last accept miss). Remaining diffs are leftover pixels, settle
+cadence, and terminal classification. Both adapters executed is not
 complete and is not parity. Garden of War replay execution now certifies
 through dispatcher record 3,935: the blacksmith packet at 2,151 founds at
 90,6 on the hall body, native 1554's orc-shield1 research fulfills, and

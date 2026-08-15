@@ -410,7 +410,7 @@ class PlaytestAdapterTest(unittest.TestCase):
             java_result["observations"][0]["first_progress_cycle"],
             "Java must walk, not stay put on a refused repair")
 
-    def test_java_refuses_a_grunt_mend_the_buttons_do_not_offer(self):
+    def test_both_adapters_walk_a_grunt_told_to_mend_a_hall(self):
         pack = Path.home() / (
             ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
         fixture = (
@@ -435,8 +435,12 @@ class PlaytestAdapterTest(unittest.TestCase):
         explorer.validate_result(java_result, scenario, "java")
         self.assertTrue(native_result["observations"][0]["accepted"],
                         "GiveOrder table 27 does not test the actor's worker flags")
-        self.assertFalse(java_result["observations"][0]["accepted"],
-                         "a grunt has no repair button, so Java must not issue the mend")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must walk the grunt, not refuse a button the injector still sends")
+        self.assertNotEqual((18, 23), (
+            java_result["observations"][0]["state"]["tile_x"],
+            java_result["observations"][0]["state"]["tile_y"]),
+            "the grunt must leave 18,23 toward the hall")
 
     def test_both_adapters_accept_a_commanded_catapult_attack_ground(self):
         pack = Path.home() / (

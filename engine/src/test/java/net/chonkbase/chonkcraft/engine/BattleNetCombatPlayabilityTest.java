@@ -65,9 +65,11 @@ class BattleNetCombatPlayabilityTest {
         Unit footman = place(fixture, "unit-footman", 0, 8, 8);
         Unit friend = place(fixture, "unit-footman", 0, 10, 8);
 
-        assertFalse(fixture.commands().apply(
+        assertTrue(fixture.commands().apply(
                         GameCommand.repair(0, footman.id(), friend.id())),
-                "a footman falsely accepted a worker-only repair order");
+                "GiveOrder 27 on a footman was refused instead of becoming a walk");
+        assertEquals(Unit.Order.MOVE, footman.order(),
+                "a footman told to mend must walk, not repair");
         // Empty send-home and GiveOrder 17 are not refusals. Native
         // NewActionReturnGoods walks an empty hull to the gold depot, and
         // commanded Orc 1 grunt 1592 takes attack-ground on grass.

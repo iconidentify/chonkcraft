@@ -317,6 +317,27 @@ class ConstructionTest {
     }
 
     @Test
+    @DisplayName("a soldier told to mend a hall walks there")
+    void aSoldierToldToMendAHallWalksThere() {
+        World world = richWorld(30);
+        Unit hall = world.createUnit(barracks(), 0, 14, 10);
+        Unit soldier = world.createUnit(peasant(), 0, 3, 10);
+        soldier.type().setRepairRange(0);
+
+        assertTrue(world.orderRepair(soldier, hall),
+                "GiveOrder 27 on a grunt mending a hall was refused");
+        assertEquals(Unit.Order.MOVE, soldier.order(),
+                "a soldier with no repair range must walk, not stand and mend");
+        int startX = soldier.tileX();
+        for (int cycle = 0; cycle < 200 && soldier.tileX() == startX; cycle++) {
+            world.tick();
+        }
+        assertTrue(soldier.tileX() > startX,
+                "the soldier stayed at " + soldier.tileX() + "," + soldier.tileY()
+                        + " instead of walking toward the hall at 14,10");
+    }
+
+    @Test
     @DisplayName("a builder walks onto a barracks body and founds there")
     void aBuilderWalksOntoABarracksBodyAndFoundsThere() {
         World world = richWorld(30);

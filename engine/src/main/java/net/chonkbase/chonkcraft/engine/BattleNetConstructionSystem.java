@@ -1835,14 +1835,23 @@ final class BattleNetConstructionSystem {
      * once it is adjacent and there is nothing to restore. A click on a
      * soldier is a walk, not a repair -- the constructor falls through
      * to MOVE when the target is neither a building nor a transport.
+     *
+     * <p>The actor's worker flag is the same kind of button-table gate.
+     * Commanded fixture {@code repair-1/03} is Orc 1 grunt 1592 told to
+     * mend hall 1593: native GiveOrder 27 walks the grunt to 21,23.
+     * Java used to refuse because a grunt's repair range is nought, so
+     * the explorer recorded the last accept miss on the 131-fixture
+     * ledger.
      */
     boolean orderRepair(Unit unit, Unit target) {
         if (unit == null || target == null || !unit.isAlive() || !target.isAlive()) {
             return false;
         }
-        if (unit.type().repairRange() <= 0
-                || (target.player() != unit.player()
-                        && !world.isAllied(unit.player(), target.player()))) {
+        if (unit.type().repairRange() <= 0) {
+            return world.orderMove(unit, target.tileX(), target.tileY());
+        }
+        if (target.player() != unit.player()
+                && !world.isAllied(unit.player(), target.player())) {
             return false;
         }
         // GiveOrder table 27 installs REPAIR only when the target type

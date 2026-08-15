@@ -236,8 +236,13 @@ public final class BnePlaytestAdapter {
         Integer javaId = nativeToJava.get(number(command.get("unit_id"), "unit id"));
         Unit unit = javaId == null ? null : unit(world, javaId);
         if (unit != null) {
-            state.put("offset_x", unit.offsetX());
-            state.put("offset_y", unit.offsetY());
+            // Native CUnit+0/+2 is a 16-bit pixel field. The native adapter
+            // reports unsigned(px) % 32. Java stores a signed leftover after
+            // the tile has already jumped, so -32 is the same visual remainder
+            // as native 0. Reporting the raw leftover made 51 move rows look
+            // like material drift.
+            state.put("offset_x", Math.floorMod(unit.offsetX(), Unit.TILE_PIXELS));
+            state.put("offset_y", Math.floorMod(unit.offsetY(), Unit.TILE_PIXELS));
             state.put("cargo_count", unit.cargo().size());
         }
         state.put("missile_count", world.missiles().size());
@@ -262,8 +267,8 @@ public final class BnePlaytestAdapter {
         }
         state.put("tile_x", unit.tileX());
         state.put("tile_y", unit.tileY());
-        state.put("offset_x", unit.offsetX());
-        state.put("offset_y", unit.offsetY());
+        state.put("offset_x", Math.floorMod(unit.offsetX(), Unit.TILE_PIXELS));
+        state.put("offset_y", Math.floorMod(unit.offsetY(), Unit.TILE_PIXELS));
         state.put("order", unit.order() == null ? null : unit.order().name());
         state.put("target_id", unit.target() == null ? null : unit.target().id());
         state.put("hit_points", unit.hitPoints());
