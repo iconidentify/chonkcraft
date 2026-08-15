@@ -241,6 +241,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_ATTACK 3
 #define SCRIPT_COMMAND_HARVEST 4
 #define SCRIPT_COMMAND_PATROL 5
+#define SCRIPT_COMMAND_RETURN_GOODS 6
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -884,6 +885,16 @@ static BOOL read_command_file(void) {
                         x = 0;
                         y = 0;
                         target = SCRIPT_NO_TARGET;
+                    } else if (fields == 3
+                            && strcmp(action_name, "return-goods") == 0) {
+                        /* Replay-pack-1 has 382 0x13 packets with function
+                         * index 24, dest 0,0 and target -1. Same shape as
+                         * stop; the harvest 0x17 worker-flag test does not
+                         * apply to this index. */
+                        action = SCRIPT_COMMAND_RETURN_GOODS;
+                        x = 0;
+                        y = 0;
+                        target = SCRIPT_NO_TARGET;
                     }
                 }
             }
@@ -1366,6 +1377,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_PATROL) {
         return "patrol";
     }
+    if (action == SCRIPT_COMMAND_RETURN_GOODS) {
+        return "return-goods";
+    }
     return "unknown";
 }
 
@@ -1375,7 +1389,8 @@ static unsigned int script_order_function_index(BYTE action) {
      * GiveOrder at 0x00451070 / 0x0047617f. Replay-pack-1 counts:
      * table[3] move, table[2] stop (88 packets, dest 0,0, target -1),
      * table[8] attack (221 packets with a live target), table[23]
-     * harvest (dispatcher special-cases 0x17 as the worker flag test).
+     * harvest (dispatcher special-cases 0x17 as the worker flag test),
+     * table[24] return-goods (382 packets, dest 0,0, target -1).
      * The one-byte 0x0C thunk at 0x00436ee0 is UI/speech and is unused. */
     if (action == SCRIPT_COMMAND_MOVE) {
         return 3;
@@ -1391,6 +1406,9 @@ static unsigned int script_order_function_index(BYTE action) {
     }
     if (action == SCRIPT_COMMAND_PATROL) {
         return 5;
+    }
+    if (action == SCRIPT_COMMAND_RETURN_GOODS) {
+        return 24;
     }
     return 0xff;
 }

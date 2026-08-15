@@ -61,7 +61,161 @@ REPLACE_FAMILY_RANK = {
 INJECTOR_MOVE = re.compile(
     r"cycle (\d+) (move|patrol) unit (\d+) x (\d+) y (\d+)\Z")
 INJECTOR_STANCE = re.compile(
-    r"cycle (\d+) (stop|stand-ground) unit (\d+)\Z")
+    r"cycle (\d+) (stop|stand-ground|return-goods) unit (\d+)\Z")
+REGISTRY_SCHEMA = "chonkcraft-bne-native-command-registry-1"
+DEFAULT_NATIVE_COMMAND_REGISTRY = (
+    Path(__file__).resolve().parents[1] / "playtest-native-commands.json"
+)
+# Evidence is the 0x13 dispatcher at 0x00475f80 loading
+# ORDER_FUNCTIONS[packet[7]] and calling GiveOrder at 0x00451070.
+# Replay-pack-1 histograms are the packet counts, not dual-adapter executions.
+NATIVE_FAMILY_EVIDENCE = {
+    "move": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 3,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "replay_pack_1_0x13_count": 218,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N move unit SLOT x X y Y. Retail 0x13 packets carry "
+            "function index 3."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "x", "y"],
+        "supported_variants": ["open-ground", "occupied-click", "terrain-edge"],
+        "unsupported_variants": ["queued-follow-up", "group-selection-fanout"],
+    },
+    "stop": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 2,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "replay_pack_1_0x13_count": 88,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N stop unit SLOT. Retail 0x13 packets carry function "
+            "index 2 with dest 0,0 and target -1. The 0x0C UI thunk is unused."
+        ),
+        "arguments": ["issue_cycle", "unit_id"],
+        "supported_variants": ["move-then-stop"],
+        "unsupported_variants": ["0x0c-ui-thunk"],
+    },
+    "stand-ground": {
+        "evidence_authority": "retail-replay-dispatcher",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "opcode": "0x0d",
+            "fixed_bytes": 1,
+        },
+        "encoding": (
+            "InSight embedded opcode 0x0D, one byte, applies to the current "
+            "selection. No proved non-UI GiveOrder apply."
+        ),
+        "arguments": ["issue_cycle", "unit_id"],
+        "supported_variants": [],
+        "unsupported_variants": ["native-injector-script"],
+    },
+    "attack": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 8,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "replay_pack_1_0x13_count": 2355,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N attack unit SLOT target T. Retail 0x13 packets carry "
+            "function index 8 and a live target id."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "target_id"],
+        "supported_variants": ["unit-target"],
+        "unsupported_variants": ["ground-click-without-target"],
+    },
+    "harvest": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 23,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "worker_flags": "0x0300",
+            "replay_pack_1_0x13_count": 221,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N harvest unit SLOT target T. Retail 0x13 index 0x17 "
+            "tests worker type flags 0x0300 before applying."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "target_id"],
+        "supported_variants": ["gold-mine"],
+        "unsupported_variants": ["combat-unit-as-harvester"],
+    },
+    "patrol": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 5,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "replay_pack_1_0x13_count": 1627,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N patrol unit SLOT x X y Y. Retail 0x13 packets carry "
+            "function index 5."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "x", "y"],
+        "supported_variants": ["open-ground"],
+        "unsupported_variants": ["queued-follow-up"],
+    },
+    "return-goods": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 24,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "replay_pack_1_0x13_count": 382,
+            "replay_pack_1_shape": "1300000000ffff18",
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N return-goods unit SLOT. Retail 0x13 packets carry "
+            "function index 24 with dest 0,0 and target -1, the same shape "
+            "as stop. The dispatcher does not apply the harvest 0x17 worker "
+            "flag test to this index."
+        ),
+        "arguments": ["issue_cycle", "unit_id"],
+        "supported_variants": ["laden-worker"],
+        "unsupported_variants": ["empty-worker-java-refuses"],
+    },
+    "production": {
+        "evidence_authority": "retail-replay-dispatcher",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "opcode": "0x15",
+            "fixed_bytes": 3,
+        },
+        "encoding": (
+            "InSight embedded opcode 0x15; byte 1 names the unit/tech/"
+            "building, byte 2 selects 0=train 1/2=research 3=transform."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "type_index"],
+        "supported_variants": [],
+        "unsupported_variants": [
+            "native-injector-script",
+            "family-2-research-until-garden-of-war-3477-unblocked",
+        ],
+    },
+}
 INJECTOR_TARGETED = re.compile(
     r"cycle (\d+) (attack|harvest) unit (\d+) target (\d+)\Z")
 MOVEMENT_DOMAIN = {0: "land", 1: "air", 2: "water"}
@@ -548,7 +702,8 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             if command["target_id"] not in actor["target_ids"]:
                 actor["target_ids"].append(command["target_id"])
                 actor["target_ids"].sort()
-        if command["kind"] in {"stop", "stand-ground", "attack", "harvest"}:
+        if command["kind"] in {
+                "stop", "stand-ground", "attack", "harvest", "return-goods"}:
             continue
         if not all(isinstance(command.get(key), int) for key in ("x", "y")):
             raise ValueError("commanded fixture move has no integer destination")
@@ -562,7 +717,7 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
     if not actors:
         raise ValueError("commanded fixture produced an empty seed")
     if not points and any(command["kind"] not in {
-            "stop", "stand-ground", "attack", "harvest"}
+            "stop", "stand-ground", "attack", "harvest", "return-goods"}
             for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
@@ -693,6 +848,120 @@ def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "complete": len(contents) >= 100 and len(families) >= 5,
         "rows": qualified,
     }
+
+
+def _repo_relative(source: str) -> str:
+    try:
+        return str(Path(source).resolve().relative_to(Path(__file__).resolve().parents[3]))
+    except ValueError:
+        return source
+
+
+def _family_witnesses(ledger: dict[str, Any], family: str) \
+        -> tuple[list[str], list[str]]:
+    accepted: list[str] = []
+    rejected: list[str] = []
+    for row in ledger.get("rows") or []:
+        if family not in (row.get("families") or []):
+            continue
+        source = row.get("source")
+        if not isinstance(source, str) or not source:
+            continue
+        source = _repo_relative(source)
+        native = row.get("native_observations") or []
+        java = row.get("java_observations") or []
+        if not native or not java:
+            continue
+        native_ok = all(observation.get("accepted") for observation in native)
+        java_ok = all(observation.get("accepted") for observation in java)
+        if native_ok and java_ok:
+            accepted.append(source)
+        else:
+            rejected.append(source)
+    return accepted, rejected
+
+
+def native_command_registry(ledger: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Name each family from authenticated encodings, not from generated inventory.
+
+    Dual-adapter counts come from the execution ledger. A family with only
+    packet evidence and no commanded dual-adapter run stays
+    native_execution_works false. Generated inventory never writes this
+    document.
+    """
+    counts: dict[str, int] = {}
+    for row in (ledger or {}).get("rows") or []:
+        if not row.get("qualifies"):
+            continue
+        for family in row.get("families") or []:
+            counts[family] = counts.get(family, 0) + 1
+    families: dict[str, Any] = {}
+    for name, evidence in NATIVE_FAMILY_EVIDENCE.items():
+        accepted, rejected = _family_witnesses(ledger or {}, name)
+        dual = counts.get(name, 0)
+        injector = name in {
+            "move", "stop", "attack", "harvest", "patrol", "return-goods",
+        }
+        families[name] = {
+            "evidence_authority": evidence["evidence_authority"],
+            "evidence_hashes": copy.deepcopy(evidence["evidence_hashes"]),
+            "encoding": evidence["encoding"],
+            "arguments": list(evidence["arguments"]),
+            "supported_variants": list(evidence["supported_variants"]),
+            "unsupported_variants": list(evidence["unsupported_variants"]),
+            "positive_witnesses": accepted,
+            "negative_witnesses": rejected,
+            "native_execution_works": injector and dual > 0,
+            "java_execution_works": dual > 0 or name in {
+                "stand-ground", "production",
+            },
+            "dual_adapter_executed": dual,
+        }
+    return {
+        "schema": REGISTRY_SCHEMA,
+        "authority_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+        "families": families,
+    }
+
+
+def validate_native_command_registry(registry: dict[str, Any]) -> None:
+    if registry.get("schema") != REGISTRY_SCHEMA:
+        raise ValueError("native command registry has the wrong schema")
+    if registry.get("authority_sha256") != PINNED_BNE_EXECUTABLE_SHA256:
+        raise ValueError("native command registry is not pinned BNE 2.02b")
+    families = registry.get("families")
+    if not isinstance(families, dict) or not families:
+        raise ValueError("native command registry names no families")
+    for name, row in families.items():
+        if not isinstance(row, dict):
+            raise ValueError(f"registry family {name} is not an object")
+        required = (
+            "evidence_authority", "evidence_hashes", "encoding", "arguments",
+            "supported_variants", "unsupported_variants", "positive_witnesses",
+            "negative_witnesses", "native_execution_works",
+            "java_execution_works", "dual_adapter_executed",
+        )
+        missing = [key for key in required if key not in row]
+        if missing:
+            raise ValueError(f"registry family {name} omits {missing}")
+        if not isinstance(row["dual_adapter_executed"], int) \
+                or row["dual_adapter_executed"] < 0:
+            raise ValueError(f"registry family {name} has no execution count")
+        if row["native_execution_works"] and row["dual_adapter_executed"] < 1:
+            raise ValueError(
+                f"registry family {name} claims native execution without a "
+                "dual-adapter run")
+        if name == "return-goods" and row["dual_adapter_executed"] == 0 \
+                and row["native_execution_works"]:
+            raise ValueError(
+                "return-goods stays fail-closed until both adapters execute it")
+
+
+def load_native_command_registry(path: Path | None = None) -> dict[str, Any]:
+    source = path or DEFAULT_NATIVE_COMMAND_REGISTRY
+    registry = load_json(source, "native command registry")
+    validate_native_command_registry(registry)
+    return registry
 
 
 def _target(seed: dict[str, Any], target_id: int) -> dict[str, Any] | None:
@@ -940,7 +1209,7 @@ def native_command_script(scenario: dict[str, Any]) -> str:
                 f"cycle {command['issue_cycle']} {command['kind']} "
                 f"unit {command['unit_id']} x {command['x']} y {command['y']}")
             continue
-        if command["kind"] in {"stop", "stand-ground"}:
+        if command["kind"] in {"stop", "stand-ground", "return-goods"}:
             lines.append(
                 f"cycle {command['issue_cycle']} {command['kind']} "
                 f"unit {command['unit_id']}")
@@ -1353,11 +1622,33 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
                 source=str(fixture.expanduser().resolve())))
     report = execution_ledger(rows)
     write_json(args.output, report)
+    registry = native_command_registry(report)
+    validate_native_command_registry(registry)
+    registry_path = args.registry if args.registry is not None else (
+        args.output.with_name("playtest-native-commands.json"))
+    write_json(registry_path, registry)
     print(json.dumps({
         "dual_adapter_executed_scenarios": report["dual_adapter_executed_scenarios"],
         "distinct_command_contents": report["distinct_command_contents"],
         "families": report["families"],
         "complete": report["complete"],
+        "registry": str(registry_path.expanduser().resolve()),
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+def registry_command(args: argparse.Namespace) -> int:
+    ledger = load_json(args.ledger, "execution ledger")
+    registry = native_command_registry(ledger)
+    validate_native_command_registry(registry)
+    write_json(args.output, registry)
+    print(json.dumps({
+        "schema": registry["schema"],
+        "families": sorted(registry["families"]),
+        "dual_adapter_executed": {
+            name: row["dual_adapter_executed"]
+            for name, row in registry["families"].items()
+        },
     }, indent=2, sort_keys=True))
     return 0
 
@@ -1456,7 +1747,16 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--output", required=True, type=Path)
     execute.add_argument("--asset-pack", type=Path)
     execute.add_argument("--timeout", type=float, default=180.0)
+    execute.add_argument("--registry", type=Path,
+                        help="write the native-command registry next to the ledger")
     execute.set_defaults(func=execute_commanded_command)
+
+    registry = commands.add_parser(
+        "registry",
+        help="publish authenticated native-command capability from a ledger")
+    registry.add_argument("ledger", type=Path)
+    registry.add_argument("--output", required=True, type=Path)
+    registry.set_defaults(func=registry_command)
 
     script = commands.add_parser(
         "command-script",

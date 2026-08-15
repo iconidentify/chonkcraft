@@ -241,6 +241,63 @@ class PlaytestAdapterTest(unittest.TestCase):
                         "Java must attack the paired enemy, not target id 0")
         self.assertEqual("ATTACK", java_result["observations"][0]["state"]["order"])
 
+    def test_both_adapters_accept_a_laden_return_goods(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/return-goods-1/02.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("laden return-goods fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        kinds = [command["kind"] for command in scenario["commands"]]
+        self.assertEqual(["harvest", "return-goods"], kinds)
+        self.assertTrue(native_result["observations"][1]["accepted"],
+                        "GiveOrder table 24 applied after the peon mined")
+        self.assertTrue(java_result["observations"][1]["accepted"],
+                        "Java must send the laden peon home")
+        self.assertEqual((22, 22), (
+            java_result["observations"][1]["state"]["tile_x"],
+            java_result["observations"][1]["state"]["tile_y"]),
+            "both engines bank at the great hall")
+
+    def test_java_refuses_an_empty_return_goods_the_button_hides(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/return-goods-1/00.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("empty return-goods fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertFalse(java_result["observations"][0]["accepted"],
+                         "an empty peon has nothing to return")
+
 
 if __name__ == "__main__":
     unittest.main()

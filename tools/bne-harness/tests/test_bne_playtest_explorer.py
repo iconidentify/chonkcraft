@@ -176,6 +176,51 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertIn("stop unit", script)
         self.assertNotIn("0x436ee0", script)
 
+    def test_native_direct_injector_emits_return_goods(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["return-goods"]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "return-goods"
+                   for command in item["commands"]))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("return-goods unit", script)
+        self.assertNotIn("target", script)
+
+    def test_native_command_registry_stays_fail_closed_without_dual_runs(self):
+        registry = explorer.native_command_registry({"rows": []})
+        explorer.validate_native_command_registry(registry)
+        self.assertEqual(
+            explorer.PINNED_BNE_EXECUTABLE_SHA256,
+            registry["authority_sha256"])
+        goods = registry["families"]["return-goods"]
+        self.assertEqual(24, goods["evidence_hashes"]["order_function_index"])
+        self.assertEqual(0, goods["dual_adapter_executed"])
+        self.assertFalse(
+            goods["native_execution_works"],
+            "return-goods stays fail-closed until both adapters execute it")
+        self.assertFalse(
+            registry["families"]["production"]["native_execution_works"],
+            "production 0x15 stays fail-closed")
+
+    def test_native_command_registry_counts_only_ledger_executions(self):
+        ledger = {
+            "schema": "chonkcraft-bne-playtest-execution-ledger-1",
+            "rows": [{
+                "qualifies": True,
+                "families": ["move"],
+                "source": "tools/bne-harness/work/playtest-explorer/commanded/x.bnefx",
+                "native_observations": [{"accepted": True}],
+            }],
+        }
+        registry = explorer.native_command_registry(ledger)
+        explorer.validate_native_command_registry(registry)
+        self.assertEqual(1, registry["families"]["move"]["dual_adapter_executed"])
+        self.assertTrue(registry["families"]["move"]["native_execution_works"])
+        self.assertEqual(
+            0, registry["families"]["return-goods"]["dual_adapter_executed"],
+            "a move ledger is not a return-goods execution")
+
     def test_comparison_catches_a_mutated_harvest_result(self):
         seed = self.seed()
         seed["actors"][0]["capabilities"] = ["harvest"]

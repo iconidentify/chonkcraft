@@ -161,6 +161,14 @@ def run(args: argparse.Namespace) -> int:
         "--cycles",
         str(args.cycles),
     ]
+    if getattr(args, "commands", None) is not None:
+        host_commands = args.commands.expanduser().resolve()
+        if not host_commands.is_relative_to(root):
+            raise ValueError("--commands must remain below the oracle root")
+        command.extend([
+            "--commands",
+            str(Path("/oracle") / host_commands.relative_to(root)),
+        ])
     if getattr(args, "branch_pause_cycle", None) is not None:
         ready = container_output / f"{args.case_id}.branch-ready"
         resume = container_output / f"{args.case_id}.branch-resume"
@@ -733,6 +741,10 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--harness-name", default="harness",
         help="isolated harness directory below the oracle root",
+    )
+    run_parser.add_argument(
+        "--commands", type=Path,
+        help="cycle-sorted command script that must stay below --oracle-root",
     )
     run_parser.add_argument("--trace-internal-orders", action="store_true")
     run_parser.add_argument("--trace-unit", type=int)

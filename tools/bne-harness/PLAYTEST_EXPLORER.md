@@ -56,12 +56,18 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-fixture \
   capture.bnefx --output seed.json
 ```
 
-Each generated movement, stop, patrol, attack or harvest scenario can be
-encoded directly for the guarded native command injector. Those families use
-the same `GiveOrder` entry as the authenticated `0x13` dispatcher, with table
-indices 3, 2, 5, 8 and 23. Other command families fail closed here and must
-use the authenticated replay-packet adapter; they are never guessed into
-native order-function calls.
+Each generated movement, stop, patrol, attack, harvest or return-goods
+scenario can be encoded directly for the guarded native command injector.
+Those families use the same `GiveOrder` entry as the authenticated `0x13`
+dispatcher, with table indices 3, 2, 5, 8, 23 and 24. Return-goods packets
+carry dest `0,0` and target `-1`. Other command families fail closed here
+and must use the authenticated replay-packet adapter; they are never guessed
+into native order-function calls.
+
+`playtest-native-commands.json` is the machine-readable registry. It is built
+from the execution ledger plus the pinned encodings above. Dual-adapter
+counts come only from commanded fixtures both adapters actually ran.
+Generated inventory never writes that file.
 
 ```sh
 python3 tools/bne-harness/scripts/bne_playtest_explorer.py command-script \

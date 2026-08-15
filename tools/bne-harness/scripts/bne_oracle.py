@@ -41,7 +41,7 @@ SCRIPT_COMMAND_MOVE = re.compile(
     r"^cycle ([1-9]\d*) (move|patrol) unit (\d+) x (\d+) y (\d+)$"
 )
 SCRIPT_COMMAND_STANCE = re.compile(
-    r"^cycle ([1-9]\d*) (stop|stand-ground) unit (\d+)$"
+    r"^cycle ([1-9]\d*) (stop|stand-ground|return-goods) unit (\d+)$"
 )
 SCRIPT_COMMAND_TARGETED = re.compile(
     r"^cycle ([1-9]\d*) (attack|harvest) unit (\d+) target (\d+)$"
@@ -117,7 +117,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
                     "'cycle N move unit SLOT x X y Y', "
-                    "'cycle N stop|stand-ground unit SLOT', or "
+                    "'cycle N stop|stand-ground|return-goods unit SLOT', or "
                     "'cycle N attack|harvest unit SLOT target T'"
                 )
             if cycle < previous_cycle:
