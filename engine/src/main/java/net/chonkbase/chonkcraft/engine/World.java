@@ -10772,6 +10772,9 @@ public final class World {
                 unit.setWaitCycles(0);
             }
             residualSettledThisVisit = true;
+            if (movement.promoteQueuedPlayerMoveAfterLeftover(unit)) {
+                return;
+            }
         }
         // Large BNE ships on a fresh patrol must take their first even-grid
         // step under Patrol before acquisition may replace the order. XOrc 11

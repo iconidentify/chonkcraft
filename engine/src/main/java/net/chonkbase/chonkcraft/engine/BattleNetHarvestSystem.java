@@ -1544,6 +1544,9 @@ final class BattleNetHarvestSystem {
             if (worker.isMoving()) {
                 return;
             }
+            if (world.movement.promoteQueuedPlayerMoveAfterLeftover(worker)) {
+                return;
+            }
             if (worker.pathLength() == 1
                     && worker.resourceTileX() >= 0
                     && worker.resourceTileY() >= 0) {

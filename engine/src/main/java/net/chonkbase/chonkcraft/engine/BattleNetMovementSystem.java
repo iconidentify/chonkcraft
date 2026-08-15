@@ -106,6 +106,62 @@ final class BattleNetMovementSystem {
     }
 
     /**
+     * Player/network clicks into forest are stored as the first tree on the
+     * BNE line. Orc 1 peon 1594 commanded to 30,18 keeps 28,18.
+     */
+    private int[] projectPlayerMovePoint(Unit unit, int toX, int toY) {
+        if (world.map.contains(toX, toY)
+                && !unit.type().airUnit()
+                && !world.battleNetTerrainPassable(unit, toX, toY)) {
+            int[] projected = BattleNetPathFinder.firstBlockedToward(
+                    unit.tileX(), unit.tileY(), toX, toY,
+                    (x, y) -> world.map.contains(x, y)
+                            && world.battleNetTerrainPassable(unit, x, y));
+            if (Math.max(Math.abs(unit.tileX() - projected[0]),
+                    Math.abs(unit.tileY() - projected[1])) > 1) {
+                return projected;
+            }
+        }
+        return new int[] {toX, toY};
+    }
+
+    private static boolean leftoverWalkBearing(Unit.Order action, Unit unit) {
+        if (action == null || unit == null) {
+            return false;
+        }
+        return switch (action) {
+            case HARVEST, PATROL, MOVE, RETURN_GOODS, REPAIR,
+                    ATTACK_MOVE, FOLLOW, EXPLORE ->
+                    unit.isMoving() || unit.residualX() != 0 || unit.residualY() != 0;
+            default -> false;
+        };
+    }
+
+    /**
+     * After leftover dest-arm pixels land, native pops the queued Move and
+     * pays wait 3 -- Human 5 peasant 1512 Harvest to Move at fixture 19,
+     * Orc 6 flyer 1553 Patrol to Move at fixture 23.
+     */
+    boolean promoteQueuedPlayerMoveAfterLeftover(Unit unit) {
+        if (unit == null || !unit.battleNetPlayerCommandMove()
+                || unit.order() == Unit.Order.MOVE || unit.isMoving()) {
+            return false;
+        }
+        if (unit.residualX() != 0 || unit.residualY() != 0) {
+            return false;
+        }
+        unit.setOrder(Unit.Order.MOVE);
+        // Native pops Move at the leftover-land visit and pays wait 3
+        // on that same snapshot (1512 Harvest to Move at 19, dest-arm at
+        // 22). This visit already executed the walk-bearing leftover, so
+        // two remaining quiet Move visits match that three-visit start.
+        // Delay 3 dest-armed at 23 and settled a cycle late.
+        unit.setBattleNetOrderDelay(2);
+        unit.setActionBeforeQueued(null);
+        return true;
+    }
+
+    /**
      * A click on occupied ground the hull already stands beside is not a
      * walk. Human 2's occupied dest used to flip to Move and settle at
      * cycle 12; native stayed Still on 8,35 from the issue cycle.
@@ -165,27 +221,33 @@ final class BattleNetMovementSystem {
         if (alreadyTouchingBlockedDest(unit, toX, toY)) {
             return true;
         }
+        // A dest-arm leftover already owns a heading. Native writes
+        // next_order=MOVE and the new order point, then keeps draining that
+        // leftover -- Human 5 peasant 1512 first walks at fixture 6 still on
+        // Harvest; Orc 6 flyer 1553 first walks at fixture 5 still on Patrol.
+        // Installing MOVE and Still's three-visit queue here used to freeze
+        // those leftovers, so first progress landed three cycles late.
+        if (leftoverWalkBearing(before, unit)) {
+            int[] dest = projectPlayerMovePoint(unit, toX, toY);
+            unit.setPathGoal(dest[0], dest[1]);
+            unit.setOrderTarget(dest[0], dest[1]);
+            unit.setMoveRange(0);
+            // Keep dest-arm residual pixels. Remaining harvest/patrol
+            // headings belong to the old order point and must not keep
+            // walking after the click -- native 1512 only drains the
+            // already dest-armed leftover onto 33,106, then pops Move.
+            unit.clearPath();
+            unit.setBattleNetPlayerCommandMove(true);
+            if (before == Unit.Order.PATROL && unit.savedOrder() == null) {
+                unit.setSavedOrder(Unit.Order.PATROL);
+            }
+            return true;
+        }
         int[] waits = playerCommandWaits(unit);
         int actionWait = waits[0];
         int queueWait = waits[1];
-        // Player/network clicks into forest are stored as the first tree on
-        // the BNE line. Orc 1 peon 1594 commanded to 30,18 keeps 28,18.
-        // Autonomous AI walks stay on orderMove so idle campaigns do not
-        // inherit a click projection they never issued.
-        if (world.map.contains(toX, toY)
-                && !unit.type().airUnit()
-                && !world.battleNetTerrainPassable(unit, toX, toY)) {
-            int[] projected = BattleNetPathFinder.firstBlockedToward(
-                    unit.tileX(), unit.tileY(), toX, toY,
-                    (x, y) -> world.map.contains(x, y)
-                            && world.battleNetTerrainPassable(unit, x, y));
-            if (Math.max(Math.abs(unit.tileX() - projected[0]),
-                    Math.abs(unit.tileY() - projected[1])) > 1) {
-                toX = projected[0];
-                toY = projected[1];
-            }
-        }
-        boolean accepted = orderMove(unit, toX, toY,
+        int[] dest = projectPlayerMovePoint(unit, toX, toY);
+        boolean accepted = orderMove(unit, dest[0], dest[1],
                 actionWait + queueWait);
         if (accepted) {
             unit.setBattleNetPlayerCommandMove(true);
