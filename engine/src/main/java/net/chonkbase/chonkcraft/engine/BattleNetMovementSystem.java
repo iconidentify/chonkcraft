@@ -1683,15 +1683,27 @@ final class BattleNetMovementSystem {
         return !world.battleNetTerrainPassable(unit, destX, destY);
     }
 
+    /**
+     * An Attack leftover borrows MOVE with attackGoal on the enemy and
+     * orderTarget unset. Promoting that used to steal attack-1/00 into
+     * Attack Ground at leftover-land. Only a player Move dest that is
+     * still short of a different attackGoal is GiveOrder 17.
+     */
     boolean promoteGiveOrderAttackGroundAfterLeftover(Unit unit) {
-        if (unit == null || unit.order() != Unit.Order.MOVE
+        if (unit == null || !unit.battleNetPlayerCommandMove()
+                || unit.order() != Unit.Order.MOVE
                 || unit.pathLength() != 1) {
+            return false;
+        }
+        int destX = unit.orderTargetX();
+        int destY = unit.orderTargetY();
+        if (destX < 0 || destY < 0) {
             return false;
         }
         int goalX = unit.attackGoalX();
         int goalY = unit.attackGoalY();
         if (goalX < 0 || goalY < 0
-                || (goalX == unit.orderTargetX() && goalY == unit.orderTargetY())) {
+                || (goalX == destX && goalY == destY)) {
             return false;
         }
         unit.setOrder(Unit.Order.ATTACK_GROUND);

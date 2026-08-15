@@ -157,7 +157,7 @@ public final class CommandApplier {
             case ATTACK -> {
                 Unit target = findUnit(command.targetId());
                 if (target != null && target.isAlive()) {
-                    accepted = world.orderAttack(unit, target);
+                    accepted = world.orderAttack(unit, target, true);
                 } else {
                     accepted = false;
                 }

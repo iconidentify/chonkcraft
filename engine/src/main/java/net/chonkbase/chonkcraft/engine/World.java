@@ -3703,10 +3703,19 @@ public final class World {
      * @return whether the order was accepted
      */
     public boolean orderAttack(Unit unit, Unit target) {
-        return orderAttack(unit, target, true);
+        return orderAttack(unit, target, true, false);
     }
 
-    private boolean orderAttack(Unit unit, Unit target, boolean clearOfferedTarget) {
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder click: Still keeps the
+     *     current order and writes next_order 8 for the remaining Still wait
+     */
+    public boolean orderAttack(Unit unit, Unit target, boolean fromPlayer) {
+        return orderAttack(unit, target, true, fromPlayer);
+    }
+
+    private boolean orderAttack(Unit unit, Unit target, boolean clearOfferedTarget,
+            boolean fromPlayer) {
         if (unit == null || target == null || unit == target
                 || unit.type() == null || !unit.type().canAttack()
                 || !unit.isAlive() || !target.isAlive()) {
@@ -3738,6 +3747,27 @@ public final class World {
         projectiles.interruptPendingAttack(unit);
         construction.abandonPendingBuild(unit);
         unit.setPendingAttack(null, null, -1, -1);
+        // Native GiveOrder 8 from Still with remaining Still wait writes
+        // next_order 9 and keeps Still: Orc 1 grunt 1592 queueWait 4
+        // through fixture 8, Attack at 9. Installing Attack on the issue
+        // cycle first-progressed at 5; leftover then stole the chase into
+        // Attack Ground. attack-1/01 is already on the Still marker
+        // (queueWait 0) and installs Attack at 5.
+        if (fromPlayer && unit.order() == Unit.Order.STILL) {
+            int[] waits = movement.playerCommandWaits(unit);
+            if (waits[1] > 0) {
+                unit.setOrderTarget(target.tileX(), target.tileY());
+                unit.enqueueOrder(new Unit.QueuedOrder(
+                        Unit.QueuedOrderKind.ATTACK,
+                        target.tileX(), target.tileY(), target, null, null));
+                unit.setQueuedReplacementPending(true);
+                // The issue visit still decrements this delay, so add the
+                // beat native spends writing next_order instead of counting
+                // down.
+                unit.setBattleNetOrderDelay(waits[1] + 1);
+                return true;
+            }
+        }
         unit.setTarget(target);
         unit.setAttackGoal(target.tileX(), target.tileY());
         // A real click or automatic choice can only name something currently
@@ -8117,6 +8147,14 @@ public final class World {
                 // the ten cycles a spent route costs, and then told to go
                 // somewhere else, goes at once.
                 unit.setWaitCycles(0);
+                // Native pops 8 at fixture 9 with timer 3, dest-arms at 12.
+                // The pop visit already spent one beat, so delay 2 dest-arms
+                // at 12. attack-1/00 without it dest-armed at 10 and finished
+                // two pixels early. An issue-visit Attack (queueWait 0)
+                // dest-arms on that visit.
+                if (queued.kind() == Unit.QueuedOrderKind.ATTACK) {
+                    unit.setBattleNetOrderDelay(2);
+                }
                 return;
             }
         }
@@ -12302,7 +12340,7 @@ public final class World {
         }
         Unit target = targets.findBattleNetHostile(unit, range,
                 unit.offeredTarget());
-        return target != null && orderAttack(unit, target, false);
+        return target != null && orderAttack(unit, target, false, false);
     }
 
     /**
@@ -13135,7 +13173,7 @@ public final class World {
                     && !targets.inAttackRange(unit, target)) {
                 return;
             }
-            if (orderAttack(unit, target, false)) {
+            if (orderAttack(unit, target, false, false)) {
                 // Action 16 (stationary) for person idle scans and for any
                 // auto-scan onto air (Human 9 destroyers vs balloon). Computer
                 // land-vs-land idle acquisition is action 12 and chases

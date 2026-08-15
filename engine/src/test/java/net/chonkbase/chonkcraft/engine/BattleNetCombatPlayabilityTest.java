@@ -112,13 +112,20 @@ class BattleNetCombatPlayabilityTest {
         grunt.setHitPoints(Math.min(12, grunt.hitPoints()));
         int before = grunt.hitPoints();
 
-        fixture.commands().apply(GameCommand.attack(0, footman.id(), grunt.id()));
-        assertEquals(Unit.Order.ATTACK, footman.order(), "the wire command was refused");
+        assertTrue(fixture.commands().apply(
+                        GameCommand.attack(0, footman.id(), grunt.id())),
+                "the wire command was refused");
+        // Native GiveOrder 8 from Still with remaining wait keeps Still
+        // until the marker. A freshly placed footman's Still timer is
+        // 1..8, so the order may still be queued on the issue visit.
+        boolean sawAttack = footman.order() == Unit.Order.ATTACK;
         boolean damaged = false;
         for (int cycle = 0; cycle < 2_000 && grunt.isAlive(); cycle++) {
             fixture.world().tick();
+            sawAttack |= footman.order() == Unit.Order.ATTACK;
             damaged |= grunt.hitPoints() < before;
         }
+        assertTrue(sawAttack, "the queued Attack never left Still");
         assertTrue(damaged, "the retail footman never landed a committed swing");
         assertFalse(grunt.isAlive(), "the melee fight never produced a death");
         assertTrue(footman.isAlive(), "the commanded attacker died before the fixture spoke");

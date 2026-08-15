@@ -1407,7 +1407,10 @@ final class BattleNetCombatSystem {
         int offsetAfter = unit.battleNetSequenceOffset();
         int timerAfter = unit.battleNetAnimationTimer();
         boolean readyAfter = unit.battleNetChaseStepReady();
-        if (unit.order() == Unit.Order.MOVE || unit.order() == Unit.Order.STILL) {
+        // Borrowed MOVE leftover used to promote Attack Ground and leave
+        // it stuck, because only MOVE/STILL were restored. Attack-1/00
+        // stayed Attack Ground from leftover-land through the window.
+        if (unit.order() != Unit.Order.DYING) {
             unit.setOrder(saved);
         }
         unit.setBattleNetSequenceOffset(offsetAfter);
