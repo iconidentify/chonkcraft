@@ -235,14 +235,13 @@ public final class BnePlaytestAdapter {
         state.put("on_map", outcome.onMap());
         Integer javaId = nativeToJava.get(number(command.get("unit_id"), "unit id"));
         Unit unit = javaId == null ? null : unit(world, javaId);
+        // Native snapshots displacement on the terminal cycle. Reading the
+        // live unit after extra settle ticks picked up Still-animation bob
+        // (Human 1 footman leftover 5, Human 12 gryphon leftover 20) and
+        // made five compass rows look like material drift.
+        state.put("offset_x", Math.floorMod(outcome.offsetX(), Unit.TILE_PIXELS));
+        state.put("offset_y", Math.floorMod(outcome.offsetY(), Unit.TILE_PIXELS));
         if (unit != null) {
-            // Native CUnit+0/+2 is a 16-bit pixel field. The native adapter
-            // reports unsigned(px) % 32. Java stores a signed leftover after
-            // the tile has already jumped, so -32 is the same visual remainder
-            // as native 0. Reporting the raw leftover made 51 move rows look
-            // like material drift.
-            state.put("offset_x", Math.floorMod(unit.offsetX(), Unit.TILE_PIXELS));
-            state.put("offset_y", Math.floorMod(unit.offsetY(), Unit.TILE_PIXELS));
             state.put("cargo_count", unit.cargo().size());
         }
         state.put("missile_count", world.missiles().size());

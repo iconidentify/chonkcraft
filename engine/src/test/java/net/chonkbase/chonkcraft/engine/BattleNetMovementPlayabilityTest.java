@@ -129,6 +129,38 @@ class BattleNetMovementPlayabilityTest {
     }
 
     @Test
+    @DisplayName("a completed compass walk leaves no leftover pixels")
+    void aCompletedCompassWalkLeavesNoLeftoverPixels() {
+        // Commanded Human 1 footman 1592 and Human 12 gryphon 1500 both
+        // go Still on the dest tile the same cycle as native, but Java
+        // used to keep a 5- or 20-pixel leftover. Retail PF_REACHED
+        // wipes the displacement.
+        Fixture land = fixture(map(32, 32, TileFlag.LAND_ALLOWED));
+        Unit footman = place(land, "unit-footman", 20, 16);
+        assertTrue(land.commands().apply(GameCommand.move(0, footman.id(), 16, 12)),
+                "the footman refused a north-west walk");
+        runToRest(land.world(), footman, 4_000);
+        assertEquals(0, footman.offsetX(),
+                "the footman stood still with leftover pixels "
+                        + footman.offsetX() + "," + footman.offsetY());
+        assertEquals(0, footman.offsetY(),
+                "the footman stood still with leftover pixels "
+                        + footman.offsetX() + "," + footman.offsetY());
+
+        Fixture air = fixture(map(32, 32, TileFlag.LAND_ALLOWED));
+        Unit gryphon = place(air, "unit-gryphon-rider", 12, 16);
+        assertTrue(air.commands().apply(GameCommand.move(0, gryphon.id(), 20, 16)),
+                "the gryphon refused an east walk");
+        runToRest(air.world(), gryphon, 4_000);
+        assertEquals(0, gryphon.offsetX(),
+                "the gryphon stood still with leftover pixels "
+                        + gryphon.offsetX() + "," + gryphon.offsetY());
+        assertEquals(0, gryphon.offsetY(),
+                "the gryphon stood still with leftover pixels "
+                        + gryphon.offsetX() + "," + gryphon.offsetY());
+    }
+
+    @Test
     @DisplayName("a player move into forest settles on the first tree's approach")
     void aPlayerMoveIntoForestSettlesOnTheFirstTreesApproach() {
         // Authenticated Orc 1 commanded fixture: peon 1594 at 25,18 is told

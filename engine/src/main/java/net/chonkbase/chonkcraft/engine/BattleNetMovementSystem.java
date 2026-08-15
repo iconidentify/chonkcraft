@@ -3709,6 +3709,14 @@ final class BattleNetMovementSystem {
             // finished on this cycle put the label a cycle early everywhere --
             // four clean maps picked up a finding apiece and demo02 went from
             // cycle 54 to 27 -- so only the two arms above say Finished.
+            //
+            // PF_REACHED also wipes IX/IY. Combat and harvest already call
+            // resetDisplacement on that answer; this exhaust arm did not.
+            // Commanded Human 1 footman 1592 and Human 12 gryphon 1500
+            // therefore went Still on the same cycle as native but kept a
+            // 5- or 20-pixel leftover, which is why five compass rows
+            // compared as material drift.
+            resetDisplacement(unit);
             unit.setOrder(Unit.Order.STILL);
             unit.setRandomMoveSleep(0);
             unit.setAttackScanSleep(0);

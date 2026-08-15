@@ -22,7 +22,8 @@ final class PlayerIntentJournal {
     /** The causal result of one submitted unit command at the latest observed cycle. */
     record Outcome(long intentId, long submittedCycle, int unitId, String command,
             Boolean accepted, Long firstProgressCycle, Long terminalCycle,
-            String terminalReason, int tileX, int tileY, String order,
+            String terminalReason, int tileX, int tileY, int offsetX, int offsetY,
+            String order,
             Integer targetId, int hitPoints, int carried, boolean alive,
             boolean onMap) {}
 
@@ -373,7 +374,8 @@ final class PlayerIntentJournal {
                     tracking.command.unitId(), tracking.command.kind().name(),
                     tracking.accepted, tracking.firstProgressCycle,
                     tracking.terminalCycle, tracking.terminalReason,
-                    latest.tileX, latest.tileY, latest.order, latest.targetId,
+                    latest.tileX, latest.tileY, latest.offsetX, latest.offsetY,
+                    latest.order, latest.targetId,
                     latest.hitPoints, latest.carried, latest.alive, latest.onMap));
         }
         return List.copyOf(result);

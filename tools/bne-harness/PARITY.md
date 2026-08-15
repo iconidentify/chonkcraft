@@ -62,8 +62,10 @@ overlay. Great Wall and Rescue keep their own gold and time; the shared
 upgrade catalog is not rewritten.
 
 Command reporting is split. The current commanded ledger is 240 generated,
-131 executed by both adapters, 131 comparable, 52 exact, 79 materially
-divergent, 0 infrastructure failures, 0 accept mismatches. GiveOrder 17
+131 executed by both adapters, 131 comparable, 57 exact, 74 materially
+divergent, 0 infrastructure failures, 0 accept mismatches. Five compass
+move rows that differed only by leftover pixels now match: Java reports
+the terminal-cycle remainder, the same cycle native snapshots. GiveOrder 17
 and 27 now take peon/grunt attack-ground and a grunt told to mend a hall
 (the last accept miss). Remaining diffs are leftover pixels, settle
 cadence, and terminal classification. The generator now emits defend,
