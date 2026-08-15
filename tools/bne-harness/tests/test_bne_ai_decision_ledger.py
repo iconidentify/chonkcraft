@@ -109,6 +109,16 @@ class AiDecisionLedgerTest(unittest.TestCase):
         self.assertEqual("non_pointer_hex", difference["field"])
         self.assertNotEqual(difference["left"], difference["right"])
 
+    def test_java_file_offsets_compare_equal_to_normalized_native_pointers(self):
+        native_shaped = sample_row(raw_state=raw_state(process_pc=True))
+        java_shaped = sample_row(raw_state=raw_state(process_pc=False))
+        left = ledger.build_ledger([native_shaped])
+        right = ledger.build_ledger([java_shaped])
+        self.assertTrue(ledger.ledgers_identical(left, right),
+                        "Java already stores ai.bin file offsets; they must "
+                        "compare equal to native process pointers after "
+                        "normalization")
+
 
 if __name__ == "__main__":
     unittest.main()

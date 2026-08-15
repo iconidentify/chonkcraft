@@ -131,6 +131,15 @@ public final class AiPlayer {
     /** Absolute file offset of the next bytecode instruction. */
     private int battleNetAiPc = -1;
 
+    /** Entry-277 ordered-list offset (native AIPlayerState+0x23). */
+    private int battleNetListOffset = -1;
+
+    /**
+     * Whether the last {@link #battleNetTickBytecode} dispatched opcodes
+     * rather than only decrementing a wait.
+     */
+    private boolean battleNetLastTickIndependent;
+
     /**
      * Entry-277 word1 offset of the per-PUD-type action-33 threshold table
      * (native {@code AIState.profilePointer2}). Limits are read as
@@ -201,7 +210,9 @@ public final class AiPlayer {
         battleNetWantedTankers = 0;
         battleNetAiState = null;
         battleNetAiPc = -1;
+        battleNetListOffset = -1;
         battleNetAction33TableOffset = -1;
+        battleNetLastTickIndependent = false;
         battleNetAiProfileData = data;
         battleNetAction33Candidates.clear();
         battleNetAction33ResolvedHigh.clear();
@@ -220,6 +231,7 @@ public final class AiPlayer {
             return;
         }
         int listOffset = unsignedShort(data, profileOffset);
+        battleNetListOffset = listOffset;
         // Word1 is the action-33 threshold table pointer (native pointer2).
         // Synthetic unit-test profiles reuse the list offset for both words;
         // real entry-277 records use two distinct pointers.
@@ -341,8 +353,11 @@ public final class AiPlayer {
     public void battleNetTickBytecode(World world) {
         if (battleNetAiState == null || battleNetAiProfileData == null
                 || battleNetAiPc < 0 || world == null) {
+            battleNetLastTickIndependent = false;
             return;
         }
+        battleNetLastTickIndependent =
+                BattleNetAiBytecode.waitCounter(battleNetAiState) == 0;
         battleNetAiPc = BattleNetAiBytecode.tick(
                 battleNetAiProfileData, battleNetAiState, battleNetAiPc,
                 (predicate, state) -> battleNetPredicate(world, predicate, state));
@@ -747,6 +762,47 @@ public final class AiPlayer {
         return battleNetBuildProfileId;
     }
 
+    /**
+     * 48-byte AIPlayerState with file-offset pointers at +0x04 / +0x23 /
+     * +0x27, or {@code null} when no retail program is live.
+     *
+     * <p>Native stores process addresses in those slots. The comparison
+     * program maps them onto {@code ai.bin}. Java already holds file
+     * offsets, which is why the packed copy writes those offsets rather
+     * than inventing a load address.
+     */
+    public byte[] packDecisionState() {
+        if (battleNetAiState == null || battleNetAiState.length
+                != BattleNetAiBytecode.STATE_BYTES) {
+            return null;
+        }
+        byte[] packed = battleNetAiState.clone();
+        writeU32(packed, 0x04, Math.max(0, battleNetAiPc));
+        writeU32(packed, 0x23, Math.max(0, battleNetListOffset));
+        writeU32(packed, 0x27, Math.max(0, battleNetAction33TableOffset));
+        return packed;
+    }
+
+    public int battleNetListOffset() {
+        return battleNetListOffset;
+    }
+
+    public int battleNetAiPc() {
+        return battleNetAiPc;
+    }
+
+    public int battleNetAction33TableOffset() {
+        return battleNetAction33TableOffset;
+    }
+
+    public boolean battleNetLastTickIndependent() {
+        return battleNetLastTickIndependent;
+    }
+
+    public byte[] battleNetAiProfileData() {
+        return battleNetAiProfileData;
+    }
+
     /** Whether this player is driven by an installed retail ai.bin program. */
     public boolean hasBattleNetProfile() {
         // Attachment, not interpreter completeness, owns this decision. Some
@@ -809,6 +865,13 @@ public final class AiPlayer {
     private static int unsignedShort(byte[] data, int offset) {
         return offset < 0 || offset + 1 >= data.length ? -1
                 : (data[offset] & 0xff) | ((data[offset + 1] & 0xff) << 8);
+    }
+
+    private static void writeU32(byte[] data, int offset, int value) {
+        data[offset] = (byte) value;
+        data[offset + 1] = (byte) (value >>> 8);
+        data[offset + 2] = (byte) (value >>> 16);
+        data[offset + 3] = (byte) (value >>> 24);
     }
 
     private final List<AiForce> forces = new ArrayList<>();

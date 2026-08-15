@@ -30,5 +30,8 @@ Mutation tests shift one PC transition, one predicate result, and one
 state byte and fail at that cycle and field. A retail micro-oracle replay
 is only required after the ledger localizes an unresolved decision.
 
-This document does not claim Java and native AI decisions are exact.
-It is the comparison program that later rows must satisfy.
+Java emit packs the live 48-byte `AIPlayerState` with file-offset
+pointers at `+0x04` / `+0x23` / `+0x27` (`AiDecisionLedger`). Those
+offsets already compare equal to native process pointers after
+normalization. Dual identical Java ticks write the same JSON. This
+document still does not claim Java and native AI decisions are exact.
