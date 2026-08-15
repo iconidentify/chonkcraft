@@ -62,6 +62,37 @@ scripts/run-launcher.sh     # prepare a graphics pack, update, and play
 `scripts/run-game.sh ALAMO.PUD` remains the developer shortcut that goes
 straight into a map instead of the launcher.
 
+### Massive battle showcase
+
+For video capture or a repeatable stress run, the showcase replaces Garden of
+War's opening with two mixed armies and immediately sends them toward one
+another. It uses the normal BNE movement, targeting, combat, projectile,
+animation, sound and death paths; it is not a pre-rendered scene.
+
+```bash
+scripts/run-battle-showcase.sh                 # visual, 240 combatants
+scripts/run-battle-showcase.sh 400             # visual, heavier battle
+scripts/run-battle-showcase.sh --benchmark     # 400 units, 1,800 headless cycles
+scripts/run-battle-showcase.sh --benchmark 600 3600
+```
+
+The visual run opens on the clash for capture. The benchmark reports simulation
+throughput, casualties and damaged survivors, and fails if the armies never
+engage or the map cannot hold at least 75% of the requested force. Once the
+opening formations cross, a small showcase director periodically gives idle
+survivors another normal attack-move toward the opposing army. It does not move
+units or deal damage itself; it prevents a capture from ending in a silent
+ceasefire merely because there is no human or AI issuing the next command. The
+status line reports the remaining forces and clearly names the winner when one
+side is eliminated.
+
+The number is the combined force size and is clamped to 40–800. For a clean
+capture, close any other running ChonkCraft game first, then launch the visual
+mode and record the window. Press Escape and choose **End Scenario**, or close
+the window, when the capture is finished. The deterministic benchmark is the
+quick verification path: the same pack, map, deployment and combat simulation
+run without drawing frames or playing audio.
+
 ### Two things that will otherwise cost you a day
 
 **The JDK bootstrap is not macOS-only.** `scripts/jbr/with-jbr-25.sh` resolves

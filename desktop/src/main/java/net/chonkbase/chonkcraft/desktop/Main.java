@@ -134,6 +134,15 @@ public final class Main {
         // mission's rules are half of what it is.
         Mission mission = resolveMission(data);
         Path mapFile = mission != null ? null : resolveMap(assets);
+        if (mission == null && mapFile == null && BattleShowcase.requested()) {
+            String showcaseMap = BattleShowcase.defaultMapName(assets);
+            if (showcaseMap == null) {
+                System.err.println("The battle showcase needs at least one skirmish map.");
+                System.exit(2);
+                return;
+            }
+            mapFile = Paths.get(showcaseMap);
+        }
 
         // Nothing named on the command line, so ask. The menu is the normal
         // way in; the flags are for getting straight to a particular game.
@@ -1474,6 +1483,7 @@ public final class Main {
         PudMap source;
         World world;
         int placed;
+        BattleShowcase.Result showcase = null;
         if (mission != null) {
             source = mission.source();
             world = mission.world();
@@ -1518,6 +1528,13 @@ public final class Main {
             }
         }
 
+        if (BattleShowcase.requested() && mission == null
+                && network == null && savedScript == null) {
+            showcase = BattleShowcase.deploy(
+                    world, data.unitTypes().types(), BattleShowcase.requestedUnits());
+            placed = showcase.deployed();
+        }
+
         GameData.LoadedTileset tileset = data.loadTileset(source.tileset());
         GameMap map = world.map();
 
@@ -1529,12 +1546,14 @@ public final class Main {
         BufferedImage terrain = scene.toIndexedBufferedImage(tileset.palette());
 
         world.recalculateSupply();
-        int computers = world.enableAiForComputerPlayers();
+        int computers = showcase == null ? world.enableAiForComputerPlayers() : 0;
         // Retail computer behavior comes from main archive entry 277 and the
         // PUD's per-slot AIPL profile byte. Campaign labels are retained only
         // as diagnostics; no community personality is executed or overrideable.
         List<net.chonkbase.chonkcraft.engine.ai.AiAssignment> aiSlots;
-        if (mission != null) {
+        if (showcase != null) {
+            aiSlots = java.util.List.of();
+        } else if (mission != null) {
             // Already settled while the mission was constructed.
             aiSlots = mission.ai();
         } else {
@@ -1559,9 +1578,16 @@ public final class Main {
             }
         }
         long scripted = aiSlots.stream().filter(slot -> slot.attached() != null).count();
-        System.out.printf("Placed %d of %d units; commanding player %d against %d computer players "
-                        + "(%d running the game's own AI script)%n",
-                placed, source.units().size(), localPlayer, computers, scripted);
+        if (showcase != null) {
+            System.out.printf("Massive battle showcase: %d units (%d human, %d orc), "
+                            + "camera %d,%d%n",
+                    showcase.deployed(), showcase.humanUnits(), showcase.orcUnits(),
+                    showcase.centreX(), showcase.centreY());
+        } else {
+            System.out.printf("Placed %d of %d units; commanding player %d against %d computer players "
+                            + "(%d running the game's own AI script)%n",
+                    placed, source.units().size(), localPlayer, computers, scripted);
+        }
         if (!aiSlots.isEmpty()) {
             System.out.println("Computer players: " + aiSlots);
         }
@@ -1627,9 +1653,11 @@ public final class Main {
 
         String tilesetName = tilesetSpriteKey(source.tileset());
         Mission running = mission;
-        String title = mission != null || mapFile == null
-                ? missionLabel()
-                : mapFile.getFileName().toString();
+        String title = showcase != null
+                ? "Massive Battle Showcase"
+                : mission != null || mapFile == null
+                    ? missionLabel()
+                    : mapFile.getFileName().toString();
         // The mission is over when its outcome is decided, and the campaign
         // moves on from there. Skirmish games have nowhere to move on to.
         java.util.function.BiConsumer<JFrame, Boolean> onFinished = campaignName == null
@@ -1663,13 +1691,17 @@ public final class Main {
         } else {
             savePath = null;
         }
+        BattleShowcase.Result openingShowcase = showcase;
         SwingUtilities.invokeLater(() -> show(
                 title, world, data, terrain,
                 tileset.palette(), tilesetName, localPlayer, source, audio, server, settings,
                 running, onFinished,
                 savePath, campaignName, missionNumber, network, tileset.cyclingRanges(),
                 assets, pipeline,
-                FogTiles.from(tileset.sheet(), data.fogOfWar().levels())));
+                FogTiles.from(tileset.sheet(), data.fogOfWar().levels()),
+                openingShowcase,
+                openingShowcase == null ? null
+                        : new int[] {openingShowcase.centreX(), openingShowcase.centreY()}));
     }
 
     /**
@@ -1815,7 +1847,7 @@ public final class Main {
             net.chonkbase.chonkcraft.engine.network.NetworkGame network,
             java.util.List<int[]> cyclingRanges,
             AssetSource assets, Java2DPipeline.Choice pipeline,
-            FogTiles fogTiles) {
+            FogTiles fogTiles, BattleShowcase.Result openingShowcase, int[] openingView) {
 
         AppWindow shell = window();
         shell.setTitle("chonkcraft - " + title);
@@ -1920,7 +1952,7 @@ public final class Main {
         frame.requestFocusInWindow();
 
         // Open looking at the local player's start position, as the game does.
-        int[] start = source.startLocation(localPlayer);
+        int[] start = openingView != null ? openingView : source.startLocation(localPlayer);
         if (start != null) {
             screen.centreOn(start[0], start[1]);
         }
@@ -2212,6 +2244,8 @@ public final class Main {
         };
         screen.setSession(session);
         screen.setMenu(new GameMenu(data, race, session));
+        BattleShowcase.Director showcaseDirector = openingShowcase == null
+                ? null : new BattleShowcase.Director(world, openingShowcase);
 
         // A departure deserves enough screen time to be read. The ordinary
         // WAITING message is updated every frame and would otherwise erase it
@@ -2323,6 +2357,12 @@ public final class Main {
                 }
             }
             screen.playAnnouncements();
+            if (showcaseDirector != null) {
+                BattleShowcase.Status status = showcaseDirector.update();
+                if (status.message() != null) {
+                    screen.setStatus(status.message());
+                }
+            }
             screen.scrollStep();
             screen.cycleStep();
             screen.repaint();
