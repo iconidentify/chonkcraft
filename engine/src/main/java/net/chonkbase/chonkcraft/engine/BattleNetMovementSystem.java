@@ -905,11 +905,17 @@ final class BattleNetMovementSystem {
         }
         Unit.Order saved = worker.order();
         worker.setBattleNetBorrowedMoveForStep(true);
+        // GiveOrder 27 walks under borrowed Move. Arming script.bin pace
+        // only for that stride keeps player Move on its existing cadence
+        // and stops a peon mending a hall from Still'ing at 38 while
+        // native holds Repair through the last Move body to 56.
+        worker.setBattleNetRepairStride(saved == Unit.Order.REPAIR);
         worker.setOrder(Unit.Order.MOVE);
         try {
             stepMove(worker);
         } finally {
             worker.setBattleNetBorrowedMoveForStep(false);
+            worker.setBattleNetRepairStride(false);
         }
         if (worker.order() != Unit.Order.DYING) {
             worker.setOrder(saved);
@@ -3747,6 +3753,7 @@ final class BattleNetMovementSystem {
             // stretches that skip two native holds.
             if (world.battleNetSequence != null
                     && (unit.battleNetDoubleStep()
+                            || unit.battleNetRepairStride()
                             || "unit-critter".equals(
                                     unit.type().ident()))) {
                 armBattleNetMovePace(unit);

@@ -1807,6 +1807,15 @@ final class BattleNetConstructionSystem {
             }
             return;
         }
+        // Native 1594 lands 26,21 at fixture 42 still on Repair and only
+        // stands down at 56, after the last Move body. Still'ing the
+        // arrival visit cut that body off (Java fulfilled at 38).
+        if (unit.isMoving()) {
+            world.movement.walkPixels(unit);
+            if (unit.isMoving()) {
+                return;
+            }
+        }
         if (target.hitPoints() >= target.type().hitPoints()
                 || unit.type().repairRange() <= 0) {
             // A soldier on GiveOrder 27 walks and stands. It does not mend.

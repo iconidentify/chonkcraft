@@ -2547,6 +2547,20 @@ public final class Unit {
     private boolean battleNetBorrowedMoveForStep;
 
     /**
+     * This borrowed Move step belongs to GiveOrder 27, so residual follows
+     * script.bin rather than the ChonkCraft Move wait.
+     */
+    public boolean battleNetRepairStride() {
+        return battleNetRepairStride;
+    }
+
+    public void setBattleNetRepairStride(boolean repairStride) {
+        battleNetRepairStride = repairStride;
+    }
+
+    private boolean battleNetRepairStride;
+
+    /**
      * Consecutive tile steps that shared one heading on the current route.
      *
      * <p>Orc 11's type-two land assault pack (knight 1558 and archers
