@@ -216,6 +216,16 @@ final class BattleNetMovementSystem {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             return;
         }
+        if (world.battleNetStrideOddDestEvenStop(unit)) {
+            // The pathfinder floors a stride-two goal. A leftover heading
+            // then walks west or north past the odd click. Native is Still
+            // on the even neighbour facing that click.
+            unit.clearPath();
+            resetDisplacement(unit);
+            world.finishOrder(unit);
+            unit.setActionBeforeQueued(null);
+            return;
+        }
         // Saves written before the odd-anchor tanker repair can resume in
         // the middle of the bad command rather than pass through orderMove.
         // Once its owed pixels settle, a doubled path query snaps the odd

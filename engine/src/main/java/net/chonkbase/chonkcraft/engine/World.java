@@ -4491,6 +4491,40 @@ public final class World {
     }
 
     /**
+     * Whether a stride-two mover is on the even neighbour of an odd click.
+     *
+     * <p>The pathfinder floors a stride-two goal ({@code &= ~1}). A
+     * three-tile west or north click then still has a second heading that
+     * walks past the odd dest. Native parks on the even square facing the
+     * click. Campaign dest-arm still owns scout-patrol flyers.</p>
+     */
+    boolean battleNetStrideOddDestEvenStop(Unit unit) {
+        if (unit == null || !unit.battleNetDoubleStep()
+                || unit.type() == null) {
+            return false;
+        }
+        // Campaign dest-arm still owns a scout-patrol flyer. A player click
+        // is Move, and those balloons used to keep the leftover west/north
+        // stride because dest-arm never sees the Move action.
+        if (unit.battleNetScoutPatrol() && unit.order() != Unit.Order.MOVE) {
+            return false;
+        }
+        int destX = unit.orderTargetX();
+        int destY = unit.orderTargetY();
+        if (destX < 0 || destY < 0) {
+            return false;
+        }
+        if (destX % 2 == 0 && destY % 2 == 0) {
+            return false;
+        }
+        if ((unit.tileX() & 1) != 0 || (unit.tileY() & 1) != 0) {
+            return false;
+        }
+        return Math.max(Math.abs(unit.tileX() - destX),
+                Math.abs(unit.tileY() - destY)) == 1;
+    }
+
+    /**
      * Repacks a free wood-ray prefix as diagonal-preferring steps toward a
      * blocked order point.
      *
