@@ -26,6 +26,7 @@ import zipfile
 
 import bne_minimize
 import bne_command_matrix
+import bne_identity
 
 
 SCENARIO_SCHEMA = "chonkcraft-bne-playtest-scenario-1"
@@ -1039,6 +1040,349 @@ def split_command_report(ledger: dict[str, Any], *,
     }
 
 
+def ledger_row_comparison(row: dict[str, Any]) -> dict[str, Any]:
+    """Compare one retained native/Java row without inventing a scenario.
+
+    Execution ledgers intentionally retain only the command stream and the two
+    authenticated outcomes. Rebuilding a fake scenario identity and passing it
+    through adapter validation is both unnecessary and brittle. This comparison
+    uses the same relative-cycle normalization as ``compare_results`` and then
+    expands ``state`` so a fleet report can distinguish a route/tile family
+    from a projectile, cargo, order or sub-tile family.
+    """
+    commands = row.get("commands")
+    native = row.get("native_observations")
+    java = row.get("java_observations")
+    if not isinstance(commands, list) or not commands:
+        raise ValueError("execution-ledger row has no commands")
+    if not isinstance(native, list) or not isinstance(java, list):
+        raise ValueError("execution-ledger row has no paired observations")
+    if len(commands) != len(native) or len(commands) != len(java):
+        raise ValueError("execution-ledger row has unequal command/observation counts")
+    scenario = {
+        "commands": commands,
+        "pattern": "retained-commanded-fixture",
+    }
+    left = normalize_result({"observations": native, "events": []}, scenario)
+    right = normalize_result({"observations": java, "events": []}, scenario)
+    differences: list[dict[str, Any]] = []
+    for index, (native_item, java_item) in enumerate(zip(
+            left["observations"], right["observations"], strict=True)):
+        fields = [
+            key for key in (
+                "accepted", "progress_delay", "terminal_delay", "terminal_reason",
+            ) if native_item.get(key) != java_item.get(key)
+        ]
+        native_state = native_item.get("state") or {}
+        java_state = java_item.get("state") or {}
+        for key in sorted(set(native_state) | set(java_state)):
+            if native_state.get(key) != java_state.get(key):
+                fields.append(f"state.{key}")
+        if fields:
+            differences.append({
+                "command_index": index,
+                "kind": native_item["kind"],
+                "fields": fields,
+                "native": native_item,
+                "java": java_item,
+            })
+    if left["events"] != right["events"]:
+        differences.append({
+            "command_index": None,
+            "kind": "event-stream",
+            "fields": ["events"],
+            "native": left["events"],
+            "java": right["events"],
+        })
+    return {
+        "difference_count": len(differences),
+        "first_difference": differences[0] if differences else None,
+        "differences": differences,
+    }
+
+
+def _cluster_route(family: str, fields: list[str]) -> str:
+    field_set = set(fields)
+    if "accepted" in field_set:
+        return "order-resolution"
+    if "events" in field_set or field_set & {
+            "state.hit_points", "state.missile_count", "state.alive"}:
+        return "combat-effect-lifecycle"
+    if family in {"harvest", "return-goods", "harvest+return-goods"}:
+        return "resource-lifecycle"
+    if family == "repair":
+        return "repair-lifecycle"
+    if family in {"attack", "attack-ground", "patrol"}:
+        return "combat-command-cadence"
+    if family in {"stop", "move+stop"}:
+        return "replacement-and-stop"
+    if field_set & {"state.tile_x", "state.tile_y", "state.offset_x",
+                    "state.offset_y", "progress_delay", "terminal_delay"}:
+        return "movement-and-settle-cadence"
+    return "order-state-machine"
+
+
+def _cluster_priority(fields: list[str]) -> int:
+    weights = {
+        "accepted": 100,
+        "state.alive": 95,
+        "state.on_map": 90,
+        "state.hit_points": 90,
+        "state.carried": 85,
+        "state.cargo_count": 85,
+        "state.order": 80,
+        "state.target_id": 80,
+        "events": 75,
+        "terminal_reason": 70,
+        "state.tile_x": 65,
+        "state.tile_y": 65,
+        "state.missile_count": 65,
+        "progress_delay": 55,
+        "terminal_delay": 45,
+        "state.offset_x": 35,
+        "state.offset_y": 35,
+    }
+    return max((weights.get(field, 25) for field in fields), default=25)
+
+
+def _row_exactness(ledger: dict[str, Any]) -> dict[str, bool]:
+    result: dict[str, bool] = {}
+    for row in ledger.get("rows") or []:
+        content = row.get("command_content_sha256")
+        if not isinstance(content, str):
+            continue
+        try:
+            result[content] = ledger_row_comparison(row)["difference_count"] == 0
+        except (KeyError, TypeError, ValueError):
+            continue
+    return result
+
+
+def command_worklist(ledger: dict[str, Any], *,
+        inventory: dict[str, Any] | None = None,
+        baseline: dict[str, Any] | None = None,
+        expected_java_sha256: str | None = None) -> dict[str, Any]:
+    """Compile a flat commanded fleet into a systemic, regression-aware queue."""
+    if ledger.get("schema") != "chonkcraft-bne-playtest-execution-ledger-1":
+        raise ValueError("command worklist needs an execution ledger")
+    generated = int((inventory or {}).get("generated_scenarios") or 0)
+    exact = 0
+    divergent = 0
+    infrastructure = 0
+    families: dict[str, dict[str, int]] = {}
+    cluster_rows: dict[str, dict[str, Any]] = {}
+    java_hashes: set[str] = set()
+    queued_commands = 0
+    multi_command_scenarios = 0
+    exactness: dict[str, bool] = {}
+    for row in ledger.get("rows") or []:
+        commands = row.get("commands") or []
+        if len(commands) > 1:
+            multi_command_scenarios += 1
+        queued_commands += sum(1 for command in commands if command.get("queued"))
+        producer_hash = (row.get("java_producer") or {}).get("build_sha256")
+        if isinstance(producer_hash, str):
+            java_hashes.add(producer_hash)
+        row_families = sorted(row.get("families") or [])
+        for family in row_families:
+            families.setdefault(family, {"total": 0, "exact": 0, "divergent": 0})
+            families[family]["total"] += 1
+        try:
+            comparison = ledger_row_comparison(row)
+        except (KeyError, TypeError, ValueError):
+            infrastructure += 1
+            continue
+        is_exact = comparison["difference_count"] == 0
+        content = row.get("command_content_sha256")
+        if isinstance(content, str):
+            exactness[content] = is_exact
+        if is_exact:
+            exact += 1
+            for family in row_families:
+                families[family]["exact"] += 1
+            continue
+        divergent += 1
+        for family in row_families:
+            families[family]["divergent"] += 1
+        first = comparison["first_difference"]
+        assert first is not None
+        family_key = "+".join(row_families) or str(first["kind"])
+        signature_body = {
+            "family": family_key,
+            "kind": first["kind"],
+            "fields": sorted(first["fields"]),
+        }
+        signature = digest(signature_body)
+        cluster = cluster_rows.setdefault(signature, {
+            "signature": signature,
+            **signature_body,
+            "route": _cluster_route(family_key, first["fields"]),
+            "priority_weight": _cluster_priority(first["fields"]),
+            "count": 0,
+            "sources": [],
+            "example": first,
+        })
+        cluster["count"] += 1
+        source = _repo_relative(str(row.get("source") or ""))
+        if source and source not in cluster["sources"]:
+            cluster["sources"].append(source)
+    clusters = list(cluster_rows.values())
+    for cluster in clusters:
+        cluster["score"] = cluster["priority_weight"] * cluster["count"]
+    clusters.sort(key=lambda item: (-item["score"], -item["count"],
+                                    item["family"], item["signature"]))
+
+    baseline_delta = None
+    regressions: list[str] = []
+    if baseline is not None:
+        before = _row_exactness(baseline)
+        fixed: list[str] = []
+        new_exact: list[str] = []
+        new_divergent: list[str] = []
+        unchanged_exact = 0
+        unchanged_divergent = 0
+        for content, now_exact in exactness.items():
+            if content not in before:
+                (new_exact if now_exact else new_divergent).append(content)
+            elif before[content] and now_exact:
+                unchanged_exact += 1
+            elif not before[content] and not now_exact:
+                unchanged_divergent += 1
+            elif not before[content] and now_exact:
+                fixed.append(content)
+            else:
+                regressions.append(content)
+        baseline_delta = {
+            "fixed": len(fixed),
+            "regressed": len(regressions),
+            "unchanged_exact": unchanged_exact,
+            "unchanged_divergent": unchanged_divergent,
+            "new_exact": len(new_exact),
+            "new_divergent": len(new_divergent),
+            "missing_from_current": len(set(before) - set(exactness)),
+            "fixed_command_contents": sorted(fixed),
+            "regressed_command_contents": sorted(regressions),
+        }
+
+    generated_families = sorted(set((inventory or {}).get("families") or []))
+    executed_families = sorted(families)
+    stale_hashes = sorted(
+        value for value in java_hashes
+        if expected_java_sha256 is not None and value != expected_java_sha256)
+    comparable = exact + divergent
+    report = {
+        "schema": "chonkcraft-bne-player-intent-worklist-1",
+        "authority": {
+            "native_executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "expected_java_engine_sha256": expected_java_sha256,
+            "observed_java_engine_sha256": sorted(java_hashes),
+            "stale_java_producer_hashes": stale_hashes,
+        },
+        "fleet": {
+            "generated": generated,
+            "executed": int(ledger.get("dual_adapter_executed_scenarios") or 0),
+            "comparable": comparable,
+            "exact": exact,
+            "divergent": divergent,
+            "infrastructure_failures": infrastructure,
+            "exact_percent": round(100.0 * exact / comparable, 3)
+            if comparable else 0.0,
+        },
+        "families": {name: families[name] for name in sorted(families)},
+        "coverage": {
+            "generated_families": generated_families,
+            "executed_families": executed_families,
+            "generated_not_executed": sorted(
+                set(generated_families) - set(executed_families)),
+            "executed_not_generated": sorted(
+                set(executed_families) - set(generated_families)),
+            "generated_patterns": sorted(set((inventory or {}).get("patterns") or [])),
+            "queued_commands": queued_commands,
+            "multi_command_scenarios": multi_command_scenarios,
+            "group_transaction_scenarios": 0,
+            "scenario_layer": "resolved-per-unit-command-v1",
+            "limitations": [
+                "no authenticated selection/gesture/fan-out transaction layer",
+                "no executed queued command",
+                "group generation is not native UI group fan-out evidence",
+            ],
+        },
+        "baseline_delta": baseline_delta,
+        "clusters": clusters,
+        "gate": {
+            "current_identity": not stale_hashes,
+            "infrastructure_clean": infrastructure == 0,
+            "no_regressions": not regressions,
+            "improved": bool(baseline_delta and baseline_delta["fixed"] > 0
+                             and not regressions),
+            "parity": generated > 0 and exact == generated
+                      and infrastructure == 0 and not stale_hashes,
+            "meaning": (
+                "A green regression gate is not total BNE parity; missing "
+                "transaction-layer and generated cells remain explicit."
+            ),
+        },
+    }
+    report["report_sha256"] = digest(report)
+    return report
+
+
+def command_worklist_markdown(report: dict[str, Any], *, top: int = 12) -> str:
+    fleet = report["fleet"]
+    gate = report["gate"]
+    lines = [
+        "# Player-intent systemic worklist", "",
+        (f"**{fleet['exact']} / {fleet['comparable']} exact "
+         f"({fleet['exact_percent']:.1f}%) · {fleet['divergent']} divergent · "
+         f"{fleet['infrastructure_failures']} infrastructure failures**"), "",
+        "Both engines executing a row is not parity. This queue groups the first "
+        "normalized behavioral difference so one native rule can close multiple "
+        "independent witnesses.", "",
+    ]
+    delta = report.get("baseline_delta")
+    if delta is not None:
+        lines.extend([
+            "## Frozen-baseline delta", "",
+            (f"- Fixed: **{delta['fixed']}** · regressed: **{delta['regressed']}** · "
+             f"unchanged exact: {delta['unchanged_exact']} · unchanged divergent: "
+             f"{delta['unchanged_divergent']}"),
+            f"- Regression gate: **{'PASS' if gate['no_regressions'] else 'FAIL'}**",
+            "",
+        ])
+    lines.extend(["## Exactness by family", "", "| Family | Exact | Total |", "|---|---:|---:|"])
+    for family, counts in report["families"].items():
+        lines.append(f"| {family} | {counts['exact']} | {counts['total']} |")
+    lines.extend(["", "## Ranked systemic clusters", ""])
+    for index, cluster in enumerate(report["clusters"][:max(1, top)], 1):
+        lines.extend([
+            (f"### {index}. {cluster['family']} · {cluster['route']} · "
+             f"{cluster['count']} witnesses"), "",
+            f"First differing fields: `{', '.join(cluster['fields'])}`", "",
+        ])
+        for source in cluster["sources"][:5]:
+            lines.append(f"- `{source}`")
+        lines.append("")
+    coverage = report["coverage"]
+    lines.extend([
+        "## Coverage debt", "",
+        f"- Generated but not executed families: "
+        f"`{', '.join(coverage['generated_not_executed']) or 'none'}`",
+        f"- Executed but absent from generated taxonomy: "
+        f"`{', '.join(coverage['executed_not_generated']) or 'none'}`",
+        f"- Queued commands: **{coverage['queued_commands']}**",
+        f"- Multi-command scenarios: **{coverage['multi_command_scenarios']}**",
+        f"- Authenticated group transactions: **{coverage['group_transaction_scenarios']}**",
+        "",
+    ])
+    if report["authority"]["stale_java_producer_hashes"]:
+        lines.extend([
+            "## Invalid identity", "",
+            "The ledger was produced by a different engine input. Rerun it before "
+            "using this worklist.", "",
+        ])
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def _repo_relative(source: str) -> str:
     try:
         return str(Path(source).resolve().relative_to(Path(__file__).resolve().parents[3]))
@@ -1864,6 +2208,45 @@ def split_report_command(args: argparse.Namespace) -> int:
     return 0
 
 
+def worklist_command(args: argparse.Namespace) -> int:
+    ledger = load_json(args.ledger, "execution ledger")
+    inventory = load_json(args.inventory, "coverage inventory") \
+        if args.inventory is not None else None
+    baseline = load_json(args.baseline, "baseline execution ledger") \
+        if args.baseline is not None else None
+    repository = Path(__file__).resolve().parents[3]
+    identity = bne_identity.engine_input_identity(repository)
+    report = command_worklist(
+        ledger, inventory=inventory, baseline=baseline,
+        expected_java_sha256=identity["engine_input_sha256"])
+    report["source_identity"] = identity
+    # Identity is deliberately part of the final receipt. Add it before the
+    # final digest so a worklist cannot be copied onto a different tree and
+    # still authenticate as current.
+    report.pop("report_sha256", None)
+    report["report_sha256"] = digest(report)
+    write_json(args.output, report)
+    if args.markdown is not None:
+        destination = args.markdown.expanduser().resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(destination.name + ".tmp")
+        temporary.write_text(
+            command_worklist_markdown(report, top=args.top), encoding="utf-8")
+        temporary.replace(destination)
+    print(json.dumps({
+        **report["fleet"],
+        "cluster_count": len(report["clusters"]),
+        "current_identity": report["gate"]["current_identity"],
+        "no_regressions": report["gate"]["no_regressions"],
+        "output": str(args.output.expanduser().resolve()),
+        "markdown": str(args.markdown.expanduser().resolve())
+        if args.markdown is not None else None,
+    }, indent=2, sort_keys=True))
+    if args.fail_on_regression and not report["gate"]["no_regressions"]:
+        return 2
+    return 0
+
+
 def registry_command(args: argparse.Namespace) -> int:
     ledger = load_json(args.ledger, "execution ledger")
     registry = native_command_registry(ledger)
@@ -1991,6 +2374,18 @@ def parser() -> argparse.ArgumentParser:
     split.add_argument("--output", required=True, type=Path)
     split.add_argument("--generated", type=int, default=0)
     split.set_defaults(func=split_report_command)
+
+    worklist = commands.add_parser(
+        "worklist",
+        help="rank systemic command divergences and compare a frozen baseline")
+    worklist.add_argument("ledger", type=Path)
+    worklist.add_argument("--output", required=True, type=Path)
+    worklist.add_argument("--markdown", type=Path)
+    worklist.add_argument("--inventory", type=Path)
+    worklist.add_argument("--baseline", type=Path)
+    worklist.add_argument("--top", type=int, default=12)
+    worklist.add_argument("--fail-on-regression", action="store_true")
+    worklist.set_defaults(func=worklist_command)
 
     registry = commands.add_parser(
         "registry",

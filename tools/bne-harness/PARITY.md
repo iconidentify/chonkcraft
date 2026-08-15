@@ -44,38 +44,50 @@ Java internal cycle = fixture cycle + 2
 
 Always state which numbering system a note uses.
 
-## Current checkpoint — 2026-08-14 XOrc 9 identity and honest command counts
+## Current checkpoint — 2026-08-15 systemic parity program
 
-Branch `grok/bne-experience-top3`. Remote native capture is incomplete
-(`oracle-host` unreachable). Offline doctor is READY against the pinned
-2.02b executable and the USA ChonkPack.
+Branch `master`. The pinned BNE 2.02b executable, local pack, Branch Witness,
+and the remote fixture oracle on `i9beef` are READY. The remote campaign index
+and all 52 referenced fixtures have been opened and SHA-256 authenticated as
+the SSH user. `doctor --need fixture` now tests readability and every referenced
+fixture rather than mistaking root-owned, mode-0600 evidence for usable input.
 
-XOrc 9's fifty-two opening skeletons stay skeletons on the human-race
-slot. The historical CreateUnit race rewrite turned them into militia, so
-the cycle-one differ reported unmatched identities before anyone moved.
-The differ now pairs by owner and tile; type is a compared field. Ordinary
-racial counterparts still convert, because Garden of War halls will not
-train without that load step.
+The current commanded fleet is 240 generated scenarios, 131 executed by both
+adapters, 131 comparable, **88 exact and 43 materially divergent**, with zero
+infrastructure failures. This is a substantial improvement over the prior
+57/131 exact checkpoint, but it is not 88/240 parity: the remaining 109 rows
+have no dual-engine execution. Exactness is also concentrated in movement;
+repair, return-goods, patrol, attack-ground, queued commands, true group
+transactions, attack-move, stand-ground, and production remain thin or open.
 
-Per-map UGRD is parsed as a 782-byte profile and applied as a world-local
-overlay. Great Wall and Rescue keep their own gold and time; the shared
-upgrade catalog is not rewritten.
+Use `bne_playtest_explorer.py worklist` to turn the flat ledger into ranked
+systemic clusters, fixed-family counts, current-source authentication, and a
+frozen-baseline regression report. The v1 commanded rows enter below the UI
+gesture boundary. They prove resolved per-unit lifecycle only; they cannot
+prove selection order, one-click group fan-out, acknowledgements, map/minimap
+interpretation, or Shift queueing.
 
-Command reporting is split. The current commanded ledger is 240 generated,
-131 executed by both adapters, 131 comparable, 57 exact, 74 materially
-divergent, 0 infrastructure failures, 0 accept mismatches. Five compass
-move rows that differed only by leftover pixels now match: Java reports
-the terminal-cycle remainder, the same cycle native snapshots. GiveOrder 17
-and 27 now take peon/grunt attack-ground and a grunt told to mend a hall
-(the last accept miss). Remaining diffs are leftover pixels, settle
-cadence, and terminal classification. The generator now emits defend,
-attack-move and stand-ground (a 240-row synthetic seed produced 51/54/51
-of those kinds plus 24 group rows). Native commanded witnesses for those
-families stay capture-blocked; the injector still fail-closes defend. Both adapters executed is not
-complete and is not parity. Garden of War replay execution now certifies
-through dispatcher record 3,935: the blacksmith packet at 2,151 founds at
-90,6 on the hall body, native 1554's orc-shield1 research fulfills, and
-the fail-closed stop is native 1526's first move for player 0.
+The lab policy is schema 2. Fleet equality and required player-intent cells are
+the acceptance signal. The globally earliest divergence is diagnostic only;
+it must not select work or justify fixture-, mission-, unit-, or fitted-cycle
+branches. An accepted rule needs a family gain, no loss of an exact required
+cell, two independent positive witnesses plus a held-out/negative witness (or
+an unconditional transcribed binary rule), and a receipt matching the exact
+engine input being committed.
+
+Native-exact AI remains explicitly unproved. Semantic-v2's historical
+"AI executive" lane observes coarse player state, not the native 48-byte
+AI.BIN interpreter state or its per-cycle program counter. The next AI tool is
+a normalized decision ledger covering PC/list/table offsets, waits, state
+bytes, predicate attempts/results, writes, and launch consumption on both
+engines. Until that exists, a green coarse AI playability test is a floor, not
+a claim that the enemy chose what retail BNE chose.
+
+The XOrc 9 identity correction, world-local UGRD overlays, and replay prefix
+through dispatcher record 3,935 remain valid accomplishments from the prior
+checkpoint. Historical frontier pointers and ignored `CHECKPOINT.md` files are
+not fresh-context handoffs unless their producer identity matches the current
+source.
 
 ## Current integration checkpoint — 2026-08-08 visual/spatial round
 

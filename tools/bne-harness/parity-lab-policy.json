@@ -1,39 +1,54 @@
 {
-  "schema": 1,
+  "schema": 2,
   "name": "BNE Parity Lab",
-  "objective": "Increase the globally earliest Battle.net Edition parity frontier without regressing any previously clean case.",
+  "objective": "Increase authenticated fleet-wide Battle.net Edition parity, prioritizing player intent, movement, combat responsiveness, and native AI decisions without regressing an exact required cell.",
   "priority": [
-    "Preserve the authenticated baseline gate.",
-    "Investigate the globally earliest divergent cycle.",
-    "Prefer the experiment with the highest expected information gain per cost.",
-    "Prefer a native/Java causal twin over visible-state inference.",
-    "Minimize evidence before placing it in agent context."
+    "Bind every receipt and worklist to the current hermetic engine identity before choosing work.",
+    "Rank player-visible systemic clusters by frequency, independent witnesses, and upstream dependency.",
+    "Treat command resolution and movement as the first lane, native AI decisions as the second, and combat/effect lifecycle as the third.",
+    "Use the earliest divergence to diagnose a chosen family, never as the global work selector.",
+    "Prefer a native/Java causal twin or a transcribed binary rule over visible-state inference.",
+    "Minimize authenticated evidence before placing it in agent context."
   ],
   "acceptance": {
     "required": [
-      "focused case passes beyond its previous divergence",
-      "all 52 indexed campaign cases are present",
-      "full baseline regression gate passes",
-      "triage and lab manifests verify every retained artifact"
+      "focused tests demonstrably fail without the candidate and pass with it",
+      "the selected fixed-denominator family score improves",
+      "no previously exact required command cell regresses",
+      "global authenticated fleet equality does not decline",
+      "at least two independent positive witnesses and one negative or held-out witness support a mapped rule, unless the rule is unconditionally transcribed from the pinned binary",
+      "all relevant 52-case corpus inputs are readable and authenticated",
+      "receipts identify the exact clean or dirty engine input that produced them",
+      "playability and determinism gates finish with zero failures and zero unexplained skips"
     ],
     "forbidden_shortcuts": [
-      "declaring parity from screenshots",
+      "declaring parity from screenshots, playability tests, adapter execution counts, or generated scenario counts",
       "using a partial survey as a full proof",
-      "editing or replacing a sealed native fixture",
-      "merging a tournament winner automatically",
-      "skipping an earlier divergence to work on a later case",
-      "declaring parity from a counterfactual state clamp"
+      "editing or replacing sealed native evidence to make a candidate pass",
+      "adding fixture ids, unit ids, mission names, or unexplained fitted cycle constants to production predicates",
+      "selecting work solely because it owns the globally earliest divergence",
+      "accepting a one-fixture improvement without an independent witness or binary-authored rule",
+      "declaring parity from a counterfactual state clamp",
+      "merging a tournament winner automatically"
     ]
+  },
+  "circuit_breakers": {
+    "consecutive_no_gain_hypotheses_before_rerank": 2,
+    "failed_implementation_attempts_before_switching_workstream": 3,
+    "accepted_systemic_slices_per_round": 3,
+    "continue_rounds_until_objective_complete": true,
+    "commit_probes": false,
+    "one_family_may_consume_every_workstream": false
   },
   "automation": {
     "safe": [
       "read-only native disassembly",
-      "offline native trace capture in an isolated harness directory",
+      "offline native capture in an isolated harness directory",
       "Java diagnostics",
       "causal alignment and minimization",
       "bounded counterfactual replay in the test trace harness",
       "offline named predicate slicing from authenticated branch history",
-      "failure-atlas queries",
+      "failure-cluster and player-intent worklist queries",
       "bounded explainable rule synthesis",
       "candidate evaluation in disposable worktrees",
       "dashboard export"
@@ -53,8 +68,9 @@
     "winner_requires_no_regressions": true
   },
   "context_budget": {
-    "primary_handoff": ".bne-lab/latest.json -> manifest.json -> NEXT.md",
-    "load_case_files_only_for_selected_case": true,
+    "primary_handoff": "current engine identity -> current player-intent worklist -> selected minimized packet -> PARITY.md historical detail only as needed",
+    "reject_stale_receipts": true,
+    "load_case_files_only_for_selected_systemic_cluster": true,
     "prefer_causal_minimized_json": true,
     "read_full_PARITY_md_only_for_missing_historical_detail": true
   }

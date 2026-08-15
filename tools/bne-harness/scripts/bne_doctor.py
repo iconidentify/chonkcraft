@@ -133,7 +133,9 @@ def build_report(*, repository: Path, asset_pack: Path,
 
     remote: dict[str, Any] = {
         "host": remote_host, "reachable": False, "root": False,
-        "corpus": False, "docker": False, "branch_witness_image": False,
+        "corpus_exists": False, "corpus_readable": False,
+        "corpus_cases": 0, "corpus": False,
+        "docker": False, "branch_witness_image": False,
         "branch_capture_command": False,
         "output": "remote probe disabled",
     }
@@ -147,8 +149,33 @@ def build_report(*, repository: Path, asset_pack: Path,
         remote_command = "\n".join([
             f"parity_root={root}",
             'test -d "$parity_root" && echo root=1 || echo root=0',
-            'test -f "$parity_root/output/campaign-1800/corpus-index.json" '
-            '&& echo corpus=1 || echo corpus=0',
+            'corpus_index="$parity_root/output/campaign-1800/corpus-index.json"',
+            'test -f "$corpus_index" '
+            '&& echo corpus_exists=1 || echo corpus_exists=0',
+            # Existence is not usability. A root-owned mode-600 corpus once
+            # made doctor advertise a fixture route that failed as soon as an
+            # operator tried to read its first byte. Parse the index and open
+            # every declared fixture as the SSH user before publishing it.
+            'python3 - "$parity_root" "$corpus_index" <<\'PY\'\n'
+            'import json, os, sys\n'
+            'try:\n'
+            '    root, index = sys.argv[1:]\n'
+            '    with open(index, "r", encoding="utf-8") as source:\n'
+            '        data = json.load(source)\n'
+            '    cases = data.get("cases") if data.get("schema") == 1 else None\n'
+            '    if not isinstance(cases, list) or len(cases) != 52:\n'
+            '        raise ValueError("campaign corpus must contain 52 cases")\n'
+            '    base = os.path.join(root, "output", "campaign-1800")\n'
+            '    for case in cases:\n'
+            '        relative = case["fixture"]["path"]\n'
+            '        with open(os.path.join(base, relative), "rb") as fixture:\n'
+            '            fixture.read(1)\n'
+            '    print("corpus_readable=1")\n'
+            '    print(f"corpus_cases={len(cases)}")\n'
+            'except Exception as error:\n'
+            '    print("corpus_readable=0")\n'
+            '    print(f"corpus_error={type(error).__name__}")\n'
+            'PY',
             'docker info >/dev/null 2>&1 && echo docker=1 || echo docker=0',
             f'docker image inspect {shlex.quote(BRANCH_IMAGE)} >/dev/null 2>&1 '
             '&& echo branch_image=1 || echo branch_image=0',
@@ -166,10 +193,19 @@ def build_report(*, repository: Path, asset_pack: Path,
             remote_command,
         ], timeout + 2)
         output = response.get("output", "")
+        case_match = re.search(r"(?:^|\n)corpus_cases=(\d+)(?:\n|$)", output)
+        corpus_exists = "corpus_exists=1" in output
+        corpus_readable = "corpus_readable=1" in output
         remote.update({
             "reachable": response.get("returncode") == 0,
             "root": "root=1" in output,
-            "corpus": "corpus=1" in output,
+            "corpus_exists": corpus_exists,
+            "corpus_readable": corpus_readable,
+            "corpus_cases": int(case_match.group(1)) if case_match else 0,
+            # Keep the public field's old name, but strengthen its contract:
+            # corpus now means that the complete index and fixtures can
+            # actually be consumed by this SSH identity.
+            "corpus": corpus_exists and corpus_readable,
             "docker": "docker=1" in output,
             "branch_witness_image": "branch_image=1" in output,
             "branch_capture_command": "branch_capture=1" in output,
@@ -231,6 +267,8 @@ def _summary(report: dict[str, Any]) -> str:
         f"`{report['local']['pinned_executable'].get('authenticated', False)}`",
         f"- Remote `{report['remote']['host']}` reachable: "
         f"`{report['remote']['reachable']}`",
+        f"- Remote corpus readable (52 fixtures): "
+        f"`{report['remote']['corpus']}`",
         f"- Remote Branch Witness command runnable: "
         f"`{report['remote']['branch_capture_command']}`",
         "", "## Available routes", "",

@@ -746,6 +746,71 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertEqual(1, split["materially_divergent"])
         self.assertFalse(split["parity"])
 
+    def test_worklist_clusters_systemic_differences_and_tracks_regressions(self):
+        scenario = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if len(item["commands"]) == 1
+            and item["commands"][0]["kind"] == "move")
+        later = explorer._scenario_with_commands(scenario, [{
+            **scenario["commands"][0],
+            "issue_cycle": scenario["commands"][0]["issue_cycle"] + 1,
+        }])
+
+        def row(item, native_delay, java_delay, source):
+            native = self.result(item, "native", delay=native_delay)
+            java = self.result(item, "java", delay=java_delay)
+            return explorer.execution_ledger_row(
+                item, native, java, source=source)
+
+        baseline = explorer.execution_ledger([
+            row(scenario, 5, 8, "fixed.bnefx"),
+            row(later, 5, 5, "regressed.bnefx"),
+        ])
+        current = explorer.execution_ledger([
+            row(scenario, 5, 5, "fixed.bnefx"),
+            row(later, 5, 9, "regressed.bnefx"),
+        ])
+        inventory = {
+            "generated_scenarios": 10,
+            "families": ["move", "attack-move"],
+            "patterns": ["single", "group"],
+        }
+        report = explorer.command_worklist(
+            current, inventory=inventory, baseline=baseline,
+            expected_java_sha256="b" * 64)
+
+        self.assertEqual(1, report["fleet"]["exact"])
+        self.assertEqual(1, report["fleet"]["divergent"])
+        self.assertEqual(1, len(report["clusters"]))
+        self.assertEqual(["progress_delay", "terminal_delay"],
+                         report["clusters"][0]["fields"])
+        self.assertEqual("movement-and-settle-cadence",
+                         report["clusters"][0]["route"])
+        self.assertEqual(1, report["baseline_delta"]["fixed"])
+        self.assertEqual(1, report["baseline_delta"]["regressed"])
+        self.assertFalse(report["gate"]["no_regressions"])
+        self.assertTrue(report["gate"]["current_identity"])
+        self.assertEqual(["attack-move"],
+                         report["coverage"]["generated_not_executed"])
+        self.assertEqual(0, report["coverage"]["queued_commands"])
+        markdown = explorer.command_worklist_markdown(report)
+        self.assertIn("1 / 2 exact", markdown)
+        self.assertIn("movement-and-settle-cadence", markdown)
+
+    def test_worklist_rejects_a_stale_java_producer_identity(self):
+        scenario = explorer.generate_scenarios(
+            self.seed(), max_scenarios=1)[0]
+        row = explorer.execution_ledger_row(
+            scenario, self.result(scenario, "native"),
+            self.result(scenario, "java"), source="old-engine.bnefx")
+        report = explorer.command_worklist(
+            explorer.execution_ledger([row]),
+            expected_java_sha256="c" * 64)
+        self.assertFalse(report["gate"]["current_identity"])
+        self.assertEqual(["b" * 64],
+                         report["authority"]["stale_java_producer_hashes"])
+
 
 if __name__ == "__main__":
     unittest.main()

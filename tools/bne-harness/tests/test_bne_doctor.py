@@ -30,7 +30,9 @@ class DoctorTest(unittest.TestCase):
             def probe(command, timeout):
                 if "ssh" in Path(command[0]).name:
                     return {"available": True, "returncode": 0,
-                            "output": "root=1\ncorpus=1\ndocker=1\n"
+                            "output": "root=1\ncorpus_exists=1\n"
+                                      "corpus_readable=1\ncorpus_cases=52\n"
+                                      "docker=1\n"
                                       "branch_image=1\nbranch_capture=1"}
                 return {"available": False, "returncode": 1, "output": "off"}
 
@@ -45,6 +47,8 @@ class DoctorTest(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertTrue(report["remote"]["corpus"])
+        self.assertTrue(report["remote"]["corpus_readable"])
+        self.assertEqual(52, report["remote"]["corpus_cases"])
         self.assertEqual("remote-branch-witness", report["recommended"]["id"])
 
     def test_image_without_the_capture_subcommand_is_not_a_capture_route(self):
@@ -54,7 +58,9 @@ class DoctorTest(unittest.TestCase):
             def probe(command, timeout):
                 if "ssh" in Path(command[0]).name:
                     return {"available": True, "returncode": 0,
-                            "output": "root=1\ncorpus=1\ndocker=1\n"
+                            "output": "root=1\ncorpus_exists=1\n"
+                                      "corpus_readable=1\ncorpus_cases=52\n"
+                                      "docker=1\n"
                                       "branch_image=1\nbranch_capture=0"}
                 return {"available": False, "returncode": 1, "output": "off"}
 
@@ -69,6 +75,34 @@ class DoctorTest(unittest.TestCase):
         self.assertFalse(report["ready"])
         self.assertFalse(report["remote"]["branch_capture_command"])
         self.assertIsNone(report["recommended"])
+
+    def test_an_unreadable_remote_corpus_is_not_a_fixture_route(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository, asset, executable = self.layout(Path(temporary))
+
+            def probe(command, timeout):
+                if "ssh" in Path(command[0]).name:
+                    return {"available": True, "returncode": 0,
+                            "output": "root=1\ncorpus_exists=1\n"
+                                      "corpus_readable=0\n"
+                                      "corpus_error=PermissionError\n"
+                                      "docker=1\nbranch_image=1\n"
+                                      "branch_capture=1"}
+                return {"available": False, "returncode": 1, "output": "off"}
+
+            report = bne_doctor.build_report(
+                repository=repository, asset_pack=asset,
+                executable=executable, local_oracle_root=None,
+                remote_host="oracle-host",
+                remote_root="$HOME/.local/share/chonkcraft-bne-oracle",
+                need="fixture", probe=probe,
+            )
+
+        self.assertTrue(report["remote"]["corpus_exists"])
+        self.assertFalse(report["remote"]["corpus"])
+        self.assertFalse(report["ready"])
+        self.assertNotIn("remote-fixture-oracle",
+                         {route["id"] for route in report["routes"]})
 
     def test_missing_routes_are_reported_without_guessing(self):
         with tempfile.TemporaryDirectory() as temporary:

@@ -122,6 +122,32 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py split-report \
   --generated 240 --output work/playtest-explorer/command-split-report.json
 ```
 
+`worklist` turns that flat split into the queue an implementer should actually
+use. It expands state differences, groups fixtures with the same first
+behavioral signature, ranks clusters by player-visible impact and witness
+count, reports exactness per family, and makes missing queue/group/native
+families explicit. Supplying the ledger from the beginning of a goal freezes
+the regression comparison: an exact cell becoming divergent is reported even
+when a different case improves.
+
+```sh
+python3 tools/bne-harness/scripts/bne_playtest_explorer.py worklist \
+  /tmp/current-command-ledger.json \
+  --inventory tools/bne-harness/work/playtest-explorer/coverage-inventory.json \
+  --baseline /tmp/goal-baseline-command-ledger.json \
+  --output /tmp/player-intent-worklist.json \
+  --markdown /tmp/player-intent-worklist.txt \
+  --fail-on-regression
+```
+
+The worklist authenticates the Java producer against the current hermetic
+engine-input hash. A ledger created before a source or harness change is
+stale, not a baseline result. Its headline deliberately separates generated,
+executed, comparable, exact and divergent counts. The current v1 fixtures are
+resolved per-unit command evidence: they cannot satisfy selection gesture,
+group fan-out, acknowledgement, or queued-command coverage, and the report
+says so rather than rounding those cells into parity.
+
 ## Adapter contract
 
 An adapter writes `chonkcraft-bne-playtest-result-1` JSON. It must report one
