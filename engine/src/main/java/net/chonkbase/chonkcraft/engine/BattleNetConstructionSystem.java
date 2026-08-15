@@ -1810,14 +1810,31 @@ final class BattleNetConstructionSystem {
         // Native 1594 lands 26,21 at fixture 42 still on Repair and only
         // stands down at 56, after the last Move body. Still'ing the
         // arrival visit cut that body off (Java fulfilled at 38).
+        boolean leftoverLanded = false;
         if (unit.isMoving()) {
             world.movement.walkPixels(unit);
             if (unit.isMoving()) {
                 return;
             }
+            leftoverLanded = true;
         }
         if (target.hitPoints() >= target.type().hitPoints()
                 || unit.type().repairRange() <= 0) {
+            // Native leftover dest-arm stays Repair until the pixels land
+            // and Still starts at that snapshot (repair-1/00 fixture 56).
+            // The leftover-land visit already served one quiet beat, so two
+            // remaining Repair visits match that stand-down. Still'ing here
+            // fulfilled at 53.
+            if (leftoverLanded) {
+                unit.setBattleNetOrderDelay(3);
+                return;
+            }
+            if (unit.battleNetOrderDelay() > 0) {
+                unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                if (unit.battleNetOrderDelay() > 0) {
+                    return;
+                }
+            }
             // A soldier on GiveOrder 27 walks and stands. It does not mend.
             unit.setTarget(null);
             unit.setOrder(Unit.Order.STILL);

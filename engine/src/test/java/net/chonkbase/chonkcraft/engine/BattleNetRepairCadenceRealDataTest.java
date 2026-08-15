@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -79,5 +80,57 @@ class BattleNetRepairCadenceRealDataTest {
                 "retail stands down after the last Move body, not the arrival visit");
         assertEquals(Unit.Order.STILL, peon.order(),
                 "the peon must still stand down after the last Move body");
+    }
+
+    @Test
+    @DisplayName("an orc 1 hall mend is still Repair through fixture 55")
+    void anOrc1HallMendIsStillRepairThroughFixture55() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/orc/level01o", 0);
+        Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+        for (int tick = 0; tick < 2; tick++) {
+            mission.tick();
+        }
+        Unit peon = null;
+        Unit hall = null;
+        for (Unit unit : world.unitsSnapshot()) {
+            if (!unit.isAlive() || unit.type() == null) {
+                continue;
+            }
+            if (peon == null && unit.type().ident().contains("peon")
+                    && Math.max(Math.abs(unit.tileX() - 25),
+                            Math.abs(unit.tileY() - 18)) <= 2) {
+                peon = unit;
+            }
+            if (hall == null && unit.type().ident().contains("great-hall")) {
+                hall = unit;
+            }
+        }
+        assertNotNull(peon, "Orc 1 has no peon near 25,18");
+        assertNotNull(hall, "Orc 1 has no great hall");
+        boolean issued = false;
+        Integer stillAt = null;
+        while ((int) world.cycle() - 2 <= 70) {
+            if ((int) world.cycle() - 2 == 5 && !issued) {
+                assertTrue(commands.apply(GameCommand.repair(
+                                peon.player(), peon.id(), hall.id())),
+                        "the hall mend click must be accepted");
+                issued = true;
+            }
+            mission.tick();
+            if (issued && peon.order() == Unit.Order.STILL && stillAt == null) {
+                stillAt = (int) world.cycle() - 2;
+            }
+        }
+        assertTrue(stillAt != null && stillAt >= 56,
+                "retail stands Still at fixture 56 after leftover dest-arm, not "
+                        + stillAt);
     }
 }
