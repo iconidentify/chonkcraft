@@ -12521,6 +12521,24 @@ public final class World {
         }
         projectiles.interruptPendingAttack(unit);
         construction.abandonPendingBuild(unit);
+        // GiveOrder 17 on a melee unit out of range is a player Move to
+        // the forest-projected dest. Native attack-ground-1/02 is order
+        // 18 dest 28,18 at fixture 5; installing 17 walked due east to
+        // 27,18 and never stood down.
+        MissileType groundMissile = projectiles.missileFor(unit);
+        boolean meleeGround = groundMissile == null || groundMissile.isNone();
+        int range = Math.max(1, unit.type().maxAttackRange());
+        int distance = Math.max(Math.abs(unit.tileX() - toX),
+                Math.abs(unit.tileY() - toY));
+        if (fromPlayer && meleeGround && distance > range
+                && movement.leftoverLandedBesideForest(unit, toX, toY)) {
+            int[] dest = movement.projectPlayerMovePoint(unit, toX, toY);
+            boolean accepted = movement.orderCommandMove(unit, dest[0], dest[1]);
+            if (accepted) {
+                unit.setAttackGoal(toX, toY);
+            }
+            return accepted;
+        }
         unit.clearPath();
         unit.setTarget(null);
         unit.setAttackGoal(toX, toY);

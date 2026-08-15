@@ -300,8 +300,15 @@ final class PlayerIntentJournal {
                     before.researching);
             case UPGRADE_TO -> !java.util.Objects.equals(now.upgrading,
                     before.upgrading);
-            case ATTACK, ATTACK_GROUND, CAST -> targetChanged(
+            case ATTACK, CAST -> targetChanged(
                     tracking.targetSubmitted, targetNow);
+            // GiveOrder 17 into forest leftover-lands Still. Native
+            // attack-ground-1/02 fulfills at 43; requiring a damaged
+            // target left Java window-complete on the same Still square.
+            case ATTACK_GROUND -> targetChanged(
+                    tracking.targetSubmitted, targetNow)
+                    || "STILL".equals(now.order)
+                    && tracking.firstProgressCycle != null;
             case HARVEST -> now.carried != before.carried;
             case REPAIR -> "STILL".equals(now.order)
                     && tracking.firstProgressCycle != null;

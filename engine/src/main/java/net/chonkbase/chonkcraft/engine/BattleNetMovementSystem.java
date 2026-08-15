@@ -114,7 +114,7 @@ final class BattleNetMovementSystem {
      * Player/network clicks into forest are stored as the first tree on the
      * BNE line. Orc 1 peon 1594 commanded to 30,18 keeps 28,18.
      */
-    private int[] projectPlayerMovePoint(Unit unit, int toX, int toY) {
+    int[] projectPlayerMovePoint(Unit unit, int toX, int toY) {
         if (world.map.contains(toX, toY)
                 && !unit.type().airUnit()
                 && !world.battleNetTerrainPassable(unit, toX, toY)) {
@@ -995,6 +995,20 @@ final class BattleNetMovementSystem {
      * is working, it stands beside it.
      */
     void walkTowards(Unit worker, int tileX, int tileY) {
+        if (worker.pathLength() == 0 && worker.isMoving()) {
+            walkPixels(worker);
+            if (worker.isMoving()) {
+                return;
+            }
+            // GiveOrder 17 leftover-land beside an unenterable click is
+            // Still. Native 1594 lands 27,17 at 43; PF_WAIT 10 stayed
+            // Attack Ground through the window.
+            if (worker.order() == Unit.Order.ATTACK_GROUND
+                    && leftoverLandedBesideForest(worker, tileX, tileY)) {
+                world.finishOrder(worker);
+                return;
+            }
+        }
         if (worker.pathLength() == 0 && !worker.isMoving()) {
             // The spent route is served here too; see the building form
             // below for the measurement.
@@ -1651,6 +1665,43 @@ final class BattleNetMovementSystem {
      * the window. A farther spent prefix still pays the empty ten so a
      * repath can form.
      */
+    /**
+     * GiveOrder 17 leftover-land that still has one heading is Attack
+     * Ground, not the remaining Move leftover. Native peon 1594 lands
+     * 26,17 at 24, pays timer 3, then dest-arms E; continuing the leftover
+     * as Move Still'd at 40 dest 28,18.
+     */
+    boolean leftoverLandedBesideForest(Unit unit, int destX, int destY) {
+        if (unit == null || world.canEnter(unit, destX, destY)) {
+            return false;
+        }
+        Unit occupant = world.unitAt(destX, destY);
+        if (occupant != null && occupant.type() != null
+                && occupant.type().building()) {
+            return false;
+        }
+        return !world.battleNetTerrainPassable(unit, destX, destY);
+    }
+
+    boolean promoteGiveOrderAttackGroundAfterLeftover(Unit unit) {
+        if (unit == null || unit.order() != Unit.Order.MOVE
+                || unit.pathLength() != 1) {
+            return false;
+        }
+        int goalX = unit.attackGoalX();
+        int goalY = unit.attackGoalY();
+        if (goalX < 0 || goalY < 0
+                || (goalX == unit.orderTargetX() && goalY == unit.orderTargetY())) {
+            return false;
+        }
+        unit.setOrder(Unit.Order.ATTACK_GROUND);
+        unit.setOrderTarget(goalX, goalY);
+        // Leftover-land visit already stands. Two remaining quiet visits
+        // match native timer 3,2,1 then dest-arm at 27.
+        unit.setBattleNetOrderDelay(2);
+        return true;
+    }
+
     private boolean playerMoveLastStepReady(Unit unit) {
         if (!unit.battleNetPlayerCommandMove() || !unit.routeSpent()
                 || battleNetCommandPointReached(unit)) {
@@ -2067,6 +2118,9 @@ final class BattleNetMovementSystem {
             }
         }
         boolean stepped = false;
+        if (mayDecide && promoteGiveOrderAttackGroundAfterLeftover(unit)) {
+            return;
+        }
         if (mayDecide) {
             if (chaseMoveSequence && unit.walkHolding()) {
                 unit.setWalkHolding(false);
@@ -2201,6 +2255,9 @@ final class BattleNetMovementSystem {
                         // Already asked once this visit. Asking again used
                         // to recurse until the stack died on NerzyvsHTOSGOW
                         // after a two-short leftover dest-arm.
+                        return;
+                    }
+                    if (promoteGiveOrderAttackGroundAfterLeftover(unit)) {
                         return;
                     }
                     stepMoveOrder(unit);

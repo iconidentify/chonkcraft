@@ -2160,6 +2160,11 @@ final class BattleNetCombatSystem {
      * into.
      */
     void stepAttackGround(Unit unit) {
+        if (unit.battleNetOrderDelay() > 0) {
+            int left = unit.battleNetOrderDelay() - 1;
+            unit.setBattleNetOrderDelay(left);
+            return;
+        }
         int toX = unit.orderTargetX();
         int toY = unit.orderTargetY();
         if (!world.map.contains(toX, toY)) {
@@ -2184,6 +2189,15 @@ final class BattleNetCombatSystem {
         int range = Math.max(1, unit.type().maxAttackRange());
         int distance = Math.max(Math.abs(unit.tileX() - toX), Math.abs(unit.tileY() - toY));
         if (distance > range) {
+            // Leftover dest-arm that lands beside an unenterable click is
+            // the arrival. Native 1594 leftover-lands 27,17 and Stills at
+            // 43; walking on paid PF_WAIT 10 and stayed Attack Ground.
+            if (direct && !unit.isMoving() && unit.pathLength() == 0
+                    && unit.routeSpent()
+                    && world.movement.leftoverLandedBesideForest(unit, toX, toY)) {
+                world.finishOrder(unit);
+                return;
+            }
             world.movement.walkTowards(unit, toX, toY);
             return;
         }
