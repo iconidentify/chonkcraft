@@ -410,6 +410,22 @@ public final class World {
         return construction.mayBuild(worker, what);
     }
 
+    /**
+     * Whether this worker may raise this building on this mission.
+     *
+     * <p>The button table is only the first question. Human 1 forbids a
+     * barracks even though a peasant's buttons name one, and the first
+     * stronghold is still gated by the keep-equivalent until the hall
+     * upgrades. Asking only the relation let a typed command found what
+     * the panel had hidden.
+     */
+    public boolean mayBuild(Unit worker, UnitType what) {
+        if (worker == null || !mayBuild(worker.type(), what)) {
+            return false;
+        }
+        return productionRefusal(worker.player(), what.ident()) == null;
+    }
+
     /** @see BattleNetConstructionSystem#canPlaceBuilding */
     public boolean canPlaceBuilding(UnitType what, int tileX, int tileY) {
         return construction.canPlaceBuilding(what, tileX, tileY);
@@ -2456,10 +2472,11 @@ public final class World {
             }
             return false;
         }
-        if (!mayResearch(building.type(), upgradeIdent)) {
+        if (!mayResearch(building, upgradeIdent)) {
             if (traceResearch) {
                 System.err.println("JRESEARCH reject-relation cycle=" + cycle
-                        + " building=" + building.id() + " what=" + upgradeIdent);
+                        + " building=" + building.id() + " what=" + upgradeIdent
+                        + " why=" + productionRefusal(building.player(), upgradeIdent));
             }
             return false;
         }
@@ -6226,6 +6243,20 @@ public final class World {
         return allowed != null && allowed.contains(researcher.ident());
     }
 
+    /**
+     * Whether this building may research this upgrade on this mission.
+     *
+     * <p>The research buttons are only the pair. Human 1 forbids sword1
+     * even at a blacksmith, and later missions still wait on the tree.
+     * Asking only the button let a typed packet buy what the panel hid.
+     */
+    public boolean mayResearch(Unit researcher, String upgradeIdent) {
+        if (researcher == null || !mayResearch(researcher.type(), upgradeIdent)) {
+            return false;
+        }
+        return productionRefusal(researcher.player(), upgradeIdent) == null;
+    }
+
     private java.util.Map<String, java.util.Set<String>> researchers = java.util.Map.of();
 
     /**
@@ -6262,6 +6293,41 @@ public final class World {
         }
         java.util.Set<String> allowed = trainers.get(what.ident());
         return allowed != null && allowed.contains(trainer.ident());
+    }
+
+    /**
+     * Whether this building may train this unit on this mission.
+     *
+     * <p>The train-unit buttons are only who can produce. Human 1's hall
+     * still names a knight in that table, and the mission's allow string
+     * is what actually forbids it. Asking only the pair trained the
+     * untaught roster from a typed command.
+     */
+    public boolean mayTrain(Unit trainer, UnitType what) {
+        if (trainer == null || what == null || !mayTrain(trainer.type(), what)) {
+            return false;
+        }
+        return productionRefusal(trainer.player(), what.ident()) == null;
+    }
+
+    /**
+     * Why this player cannot have {@code ident} yet, or null when they can.
+     *
+     * <p>Two different tables answer. The allow string is the mission's
+     * teaching order; the dependency list is the tech tree. The panel
+     * already asked both, but {@link #orderTrain} used to ask neither.
+     */
+    public String productionRefusal(int player, String ident) {
+        if (ident == null) {
+            return "unknown";
+        }
+        if (allowed != null && !allowed.isAllowed(player, ident)) {
+            return "forbidden";
+        }
+        if (!dependenciesSatisfied(player, ident)) {
+            return "unmet-dependency";
+        }
+        return null;
     }
 
     /** Trainer identifiers in {@code AiHelpers.Train()} button order. */
@@ -6541,10 +6607,11 @@ public final class World {
             }
             return false;
         }
-        if (!mayTrain(building.type(), what)) {
+        if (!mayTrain(building, what)) {
             if (traceTraining) {
                 System.err.println("JTRAIN reject-relation cycle=" + cycle
-                        + " building=" + building.id());
+                        + " building=" + building.id()
+                        + " why=" + productionRefusal(building.player(), what.ident()));
             }
             return false;
         }
@@ -6634,6 +6701,9 @@ public final class World {
                 || !building.type().building()
                 || building.order() != Unit.Order.STILL
                 || building.producing() != null || building.upgradingTo() != null) {
+            return false;
+        }
+        if (productionRefusal(building.player(), what.ident()) != null) {
             return false;
         }
         Player player = players[building.player()];

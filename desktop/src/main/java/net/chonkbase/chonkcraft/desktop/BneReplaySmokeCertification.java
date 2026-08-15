@@ -626,13 +626,13 @@ public final class BneReplaySmokeCertification {
                 yield unit.order() == Unit.Order.STILL
                     && unit.researching() == null
                     && unit.upgradingTo() == null
-                    && world.mayTrain(unit.type(), product);
+                    && world.mayTrain(unit, product);
             }
             case 2 -> code <= 0x17
                     && unit.order() == Unit.Order.STILL
                     && unit.producing() == null
                     && unit.upgradingTo() == null
-                    && world.mayResearch(unit.type(), retailUpgrade(code));
+                    && world.mayResearch(unit, retailUpgrade(code));
             case 3 -> unit.order() == Unit.Order.STILL
                     && unit.producing() == null
                     && unit.upgradingTo() == null
@@ -661,8 +661,8 @@ public final class BneReplaySmokeCertification {
             entry.put("alive", unit.isAlive());
             entry.put("bound", boundJava.contains(unit.id()));
             entry.put("may_produce", family == 2
-                    ? world.mayResearch(unit.type(), product)
-                    : world.mayTrain(unit.type(), productType));
+                    ? world.mayResearch(unit, product)
+                    : world.mayTrain(unit, productType));
             state.add(entry);
         }
         return state;

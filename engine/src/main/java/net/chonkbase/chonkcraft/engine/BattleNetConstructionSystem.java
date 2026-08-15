@@ -763,9 +763,10 @@ final class BattleNetConstructionSystem {
                     "invalid-builder-or-type");
             return false;
         }
-        if (!mayBuild(worker.type(), what)) {
+        if (!world.mayBuild(worker, what)) {
+            String why = world.productionRefusal(worker.player(), what.ident());
             traceBattleNetBuildRejection(worker, what, tileX, tileY,
-                    "builder-permission");
+                    why == null ? "builder-permission" : why);
             return false;
         }
         // The placement cursor asks canPlaceBuilding before it emits this

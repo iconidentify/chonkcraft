@@ -2950,7 +2950,7 @@ public final class AiPlayer {
                 }
                 continue;
             }
-            if (!world.mayBuild(worker.type(), wanted)) {
+            if (!world.mayBuild(worker, wanted)) {
                 continue;
             }
             // AiCheckUnitType's resource failure ends this ready attempt; it
