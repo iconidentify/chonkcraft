@@ -208,7 +208,30 @@ def load_frames(fixture: Path) -> list[dict[str, Any]]:
     return frames
 
 
-def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]]) \
+def fixture_command_events(archive: zipfile.ZipFile) -> tuple[list[str], list[str]]:
+    if "trace.txt" not in archive.namelist():
+        return [], []
+    applied: list[str] = []
+    rejected: list[str] = []
+    for line in archive.read("trace.txt").decode("utf-8", "replace").splitlines():
+        if "event=command-applied" in line:
+            applied.append(line)
+        elif "event=command-rejected" in line:
+            rejected.append(line)
+    return applied, rejected
+
+
+def event_names_command(line: str, command: dict[str, Any]) -> bool:
+    return (
+        f"cycle={command['issue_cycle']}" in line
+        and f"unit={command['unit_id']}" in line
+        and f"action={command['kind']}" in line
+    )
+
+
+def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
+        applied_events: list[str] | None = None,
+        rejected_events: list[str] | None = None) \
         -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     by_cycle = {int(frame["cycle"]): frame for frame in frames}
     last_cycle = max(by_cycle)
@@ -229,6 +252,12 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]]) \
         terminal_reason = None
         latest = baseline
         accepted = False
+        if any(event_names_command(line, command)
+               for line in (applied_events or ())):
+            accepted = True
+        if any(event_names_command(line, command)
+               for line in (rejected_events or ())):
+            accepted = False
         for cycle in range(issued, min(last_cycle, window) + 1):
             frame = by_cycle.get(cycle)
             if frame is None:
@@ -286,6 +315,7 @@ def run_from_fixture(scenario: dict[str, Any], fixture: Path,
     with zipfile.ZipFile(fixture) as archive:
         manifest = json.loads(archive.read("manifest.json"))
         fixture_commands = parse_fixture_commands(archive)
+        applied_events, rejected_events = fixture_command_events(archive)
     fixture_authority(manifest)
     if not commands_match(scenario, fixture_commands):
         raise ValueError(
@@ -295,7 +325,8 @@ def run_from_fixture(scenario: dict[str, Any], fixture: Path,
     if requested and captured and requested != captured:
         raise ValueError("native fixture ran a different scenario")
     frames = load_frames(fixture)
-    observations, events = observe_commands(scenario, frames)
+    observations, events = observe_commands(
+        scenario, frames, applied_events, rejected_events)
     return {
         "schema": RESULT_SCHEMA,
         "side": "native",

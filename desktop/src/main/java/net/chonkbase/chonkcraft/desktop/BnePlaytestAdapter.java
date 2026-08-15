@@ -136,6 +136,12 @@ public final class BnePlaytestAdapter {
         if (javaId == null) {
             return false;
         }
+        // The campaign injector only GiveOrders the local player. Issuing as
+        // the enemy made a native unit-not-local refusal look like Java
+        // accepted a patrol or stop.
+        if (actorPlayer(scenario, number(command.get("unit_id"), "unit id")) != 0) {
+            return false;
+        }
         GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario);
         if (order == null) {
             return false;

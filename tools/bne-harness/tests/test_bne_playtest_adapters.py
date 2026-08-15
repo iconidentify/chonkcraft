@@ -168,6 +168,50 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertFalse(ledger["complete"],
                          "one MOVE is not the 100-scenario threshold")
 
+    def test_native_treats_an_applied_occupied_move_as_accepted(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded"
+            / "command-campaign-human-human02-pud-ground-occupied.bnefx"
+        )
+        if not fixture.is_file():
+            self.skipTest("occupied Human 2 move fixture is missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        result = native.run_from_fixture(scenario, fixture, PINNED, "a" * 64)
+        explorer.validate_result(result, scenario, "native")
+        self.assertTrue(result["observations"][0]["accepted"],
+                        "GiveOrder applied the occupied click even though "
+                        "the hull never left its square")
+
+    def test_java_refuses_an_enemy_patrol_the_injector_rejected(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/patrol-1/02.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("enemy patrol fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertFalse(native_result["observations"][0]["accepted"],
+                         "native GiveOrder refuses a unit that is not local")
+        self.assertFalse(java_result["observations"][0]["accepted"],
+                         "Java must not issue the enemy's patrol")
+
     def test_both_adapters_accept_a_commanded_orc_one_attack(self):
         pack = Path.home() / (
             ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
