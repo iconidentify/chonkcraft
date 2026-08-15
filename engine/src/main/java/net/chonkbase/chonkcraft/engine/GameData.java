@@ -547,12 +547,12 @@ public final class GameData {
         if (source == null) {
             return null;
         }
-        applyBattleNetUnitTypeProfile(source, mapPath);
         GameMap map = GameMap.from(source, loadTileset(source.tileset()).tileset());
         applyTilesetCritter(map.tileset().name());
         Player[] players = Player.from(source);
         World world = new World(map, players, initializationSeed);
         configureWorld(world, source);
+        applyBattleNetCampaignHitPoints(world, mapPath);
 
         populate(world, source);
         applyBattleNetCampaignRoster(world, mapPath);
@@ -594,31 +594,16 @@ public final class GameData {
      * stock 90 hit points; the ChonkCraft script's later reduction is ignored
      * above in this profile.
      */
-    private void applyBattleNetUnitTypeProfile(PudMap source, String mapPath) {
-        Map<String, UnitType> types = unitTypes().types();
-        if (source.unitData() != null && !source.unitData().useDefaults()) {
-            for (int code = 0; code < source.unitData().hitPoints().length; code++) {
-                int hitPoints = source.unitData().hitPoints(code);
-                String ident = net.chonkbase.chonkcraft.data.map.PudUnitTypes.name(code);
-                // Zero denotes an indestructible/special type, not a Java
-                // unit whose current HP should begin dead.
-                if (hitPoints > 0 && !ident.isEmpty()) {
-                    setHitPoints(types, ident, hitPoints);
-                }
-            }
-        }
-        setHitPoints(types, "unit-oil-patch", 1);
-        setHitPoints(types, "unit-circle-of-power", 1);
-        // ChonkCraft's extended hero definition gives Korgath Bladefist 120 HP.
-        // Retail BNE's stock table gives the sharp-axe slot 40; Orc 2 places
-        // the hero without a UDTA override, making the stock distinction part
-        // of the first authoritative frame.
-        setHitPoints(types, "unit-sharp-axe", 40);
-        // Beyond the Dark Portal's Human 9 campaign setup deliberately
-        // starts its otherwise stock 5,000-HP runestones at 400 HP. This is
-        // post-PUD campaign state, not a UDTA override.
+    /**
+     * Campaign-only hit-point overrides that are not a UDTA column.
+     *
+     * <p>Oil-patch, circle and sharp-axe are applied by the world's
+     * profile overlay. Human 9's runestones are post-PUD campaign
+     * state and stay on that world.
+     */
+    private static void applyBattleNetCampaignHitPoints(World world, String mapPath) {
         if ("campaigns/human-exp/levelx09h".equals(mapPath)) {
-            setHitPoints(types, "unit-runestone", 400);
+            world.overlayUnitHitPoints("unit-runestone", 400);
         }
     }
 
@@ -639,7 +624,10 @@ public final class GameData {
 
     private void transformPlacedUnits(World world, int player,
             String fromIdent, String toIdent) {
-        UnitType target = unitTypes().types().get(toIdent);
+        UnitType target = world.registeredUnitType(toIdent);
+        if (target == null) {
+            target = unitTypes().types().get(toIdent);
+        }
         if (target == null) {
             return;
         }
@@ -648,14 +636,6 @@ public final class GameData {
                     && fromIdent.equals(unit.type().ident())) {
                 world.transformInto(unit, target);
             }
-        }
-    }
-
-    private static void setHitPoints(Map<String, UnitType> types,
-            String ident, int hitPoints) {
-        UnitType type = types.get(ident);
-        if (type != null) {
-            type.setHitPoints(hitPoints);
         }
     }
 
@@ -1386,7 +1366,10 @@ public final class GameData {
             if (net.chonkbase.chonkcraft.data.map.PudUnitTypes.isStartLocation(entry.type())) {
                 continue;
             }
-            UnitType type = roster.types().get(entry.typeName());
+            UnitType type = world.registeredUnitType(entry.typeName());
+            if (type == null) {
+                type = roster.types().get(entry.typeName());
+            }
             if (type == null) {
                 continue;
             }

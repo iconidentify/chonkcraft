@@ -1223,6 +1223,103 @@ public final class UnitType {
         return rawProperties;
     }
 
+    /**
+     * A same-ident copy whose combat stats can be rewritten for one map
+     * without touching the shared catalog.
+     */
+    public UnitType copyForMapProfile() {
+        UnitType copy = new UnitType(ident);
+        copy.name = name;
+        copy.imageFile = imageFile;
+        copy.imageWidth = imageWidth;
+        copy.imageHeight = imageHeight;
+        copy.animations = animations;
+        copy.numDirections = numDirections;
+        copy.animationSet = animationSet;
+        copy.icon = icon;
+        copy.construction = construction;
+        copy.corpse = corpse;
+        copy.drawLevel = drawLevel;
+        copy.tileWidth = tileWidth;
+        copy.tileHeight = tileHeight;
+        copy.boxWidth = boxWidth;
+        copy.boxHeight = boxHeight;
+        copy.elevated = elevated;
+        copy.shadowFile = shadowFile;
+        copy.hitPoints = hitPoints;
+        copy.mana = mana;
+        copy.manaStart = manaStart;
+        copy.armor = armor;
+        copy.basicDamage = basicDamage;
+        copy.piercingDamage = piercingDamage;
+        copy.sightRange = sightRange;
+        copy.maxAttackRange = maxAttackRange;
+        copy.minAttackRange = minAttackRange;
+        copy.speed = speed;
+        copy.priority = priority;
+        copy.points = points;
+        copy.demand = demand;
+        copy.supply = supply;
+        copy.level = level;
+        copy.repairHp = repairHp;
+        copy.repairRange = repairRange;
+        copy.missile = missile;
+        copy.reactRangePerson = reactRangePerson;
+        copy.reactRangeComputer = reactRangeComputer;
+        copy.randomMovementProbability = randomMovementProbability;
+        copy.randomMovementDistance = randomMovementDistance;
+        copy.unitTypeClass = unitTypeClass;
+        copy.maxOnBoard = maxOnBoard;
+        copy.clicksToExplode = clicksToExplode;
+        copy.neutralMinimapColour = neutralMinimapColour;
+        copy.canTransport.addAll(canTransport);
+        copy.building = building;
+        copy.visibleUnderFog = visibleUnderFog;
+        copy.landUnit = landUnit;
+        copy.seaUnit = seaUnit;
+        copy.airUnit = airUnit;
+        copy.shoreBuilding = shoreBuilding;
+        copy.builderOutside = builderOutside;
+        copy.canAttack = canAttack;
+        copy.canTargetLand = canTargetLand;
+        copy.canTargetSea = canTargetSea;
+        copy.canTargetAir = canTargetAir;
+        copy.selectableByRectangle = selectableByRectangle;
+        copy.explosion = explosion;
+        copy.coward = coward;
+        copy.detectCloak = detectCloak;
+        copy.permanentCloak = permanentCloak;
+        copy.vanishes = vanishes;
+        copy.revealer = revealer;
+        copy.nonSolid = nonSolid;
+        copy.groundAttack = groundAttack;
+        copy.sideAttack = sideAttack;
+        copy.rightMouseAction = rightMouseAction;
+        copy.tilesetImageFiles.putAll(tilesetImageFiles);
+        copy.gathering.putAll(gathering);
+        copy.stores.addAll(stores);
+        copy.costs.putAll(costs);
+        copy.repairCosts.putAll(repairCosts);
+        copy.improveProduction.putAll(improveProduction);
+        copy.sounds.putAll(sounds);
+        copy.rawProperties.putAll(rawProperties);
+        copy.shadowWidth = shadowWidth;
+        copy.shadowHeight = shadowHeight;
+        copy.shadowOffsetX = shadowOffsetX;
+        copy.shadowOffsetY = shadowOffsetY;
+        copy.shadowSpriteFrame = shadowSpriteFrame;
+        copy.rotationSpeed = rotationSpeed;
+        copy.indestructible = indestructible;
+        copy.wall = wall;
+        copy.onReadyExplores = onReadyExplores;
+        copy.givesResource = givesResource;
+        copy.canHarvest = canHarvest;
+        for (java.util.List<BuildRestriction> andList : buildingRules) {
+            copy.buildingRules.add(new java.util.ArrayList<>(andList));
+        }
+        return copy;
+    }
+
     @Override
     public String toString() {
         return ident;

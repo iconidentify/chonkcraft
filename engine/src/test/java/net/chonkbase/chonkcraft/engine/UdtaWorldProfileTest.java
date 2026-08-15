@@ -125,6 +125,47 @@ class UdtaWorldProfileTest {
                 "applying a custom UDTA mutated the farm catalog price");
     }
 
+    @Test
+    @DisplayName("a custom udta hit-point table is born on the unit and the catalog stays put")
+    void aCustomUdtaHitPointTableIsBornOnTheUnitAndTheCatalogStaysPut() {
+        World world = new World(grass(16));
+        UnitType catalog = new UnitType("unit-footman");
+        catalog.setTileSize(1, 1);
+        catalog.setHitPoints(60);
+        catalog.setArmor(2);
+        catalog.setBasicDamage(6);
+        catalog.setPiercingDamage(3);
+        world.setUnitTypes(java.util.Map.of("unit-footman", catalog));
+
+        int[] empty = new int[110];
+        int[] hitPoints = new int[110];
+        int[] armor = new int[110];
+        int[] basic = new int[110];
+        int[] piercing = new int[110];
+        hitPoints[0] = 900;
+        armor[0] = 12;
+        basic[0] = 18;
+        piercing[0] = 9;
+        world.setBattleNetUnitProfile(new PudMap.PudUnitData(
+                false, hitPoints, empty, empty, empty, empty, armor, basic,
+                piercing, empty, empty));
+
+        UnitType local = world.registeredUnitType("unit-footman");
+        assertEquals(900, local.hitPoints(),
+                "Gauntlet-style footman hit points did not reach the world table");
+        assertEquals(12, local.armor(),
+                "the map's armor column was not applied");
+        assertEquals(18, local.basicDamage(),
+                "the map's basic-damage column was not applied");
+        Unit spawned = world.createUnit(local, 0, 2, 2);
+        assertEquals(900, spawned.hitPoints(),
+                "the placed footman was born on the catalog 60");
+        assertEquals(60, catalog.hitPoints(),
+                "applying Gauntlet mutated the shared footman catalog");
+        assertEquals(2, catalog.armor(),
+                "applying Gauntlet mutated the shared armor");
+    }
+
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());
         for (int y = 0; y < size; y++) {

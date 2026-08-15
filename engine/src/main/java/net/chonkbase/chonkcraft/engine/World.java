@@ -532,6 +532,9 @@ public final class World {
     public void setBattleNetUnitProfile(
             net.chonkbase.chonkcraft.data.map.PudMap.PudUnitData profile) {
         battleNetUnitProfile = profile;
+        if (!unitTypes.isEmpty()) {
+            applyBattleNetUnitProfile();
+        }
     }
 
     /**
@@ -2251,7 +2254,91 @@ public final class World {
 
     /** Tells the world what types exist, by identifier. */
     public void setUnitTypes(java.util.Map<String, UnitType> types) {
-        this.unitTypes = java.util.Map.copyOf(types);
+        this.unitTypes = types == null
+                ? java.util.Map.of()
+                : new java.util.LinkedHashMap<>(types);
+        applyBattleNetUnitProfile();
+    }
+
+    /** The registered type for this identifier, or null. */
+    public UnitType registeredUnitType(String ident) {
+        return ident == null ? null : unitTypes.get(ident);
+    }
+
+    /**
+     * Rewrites this world's type table from the map's UDTA without
+     * touching the shared catalog.
+     *
+     * <p>Gauntlet stores a 900-HP footman and Heroes 2 a 400-HP one.
+     * Mutating the catalog made the next mission inherit those figures.
+     * A zero hit-point column is a disabled unused type, not a corpse.
+     */
+    void applyBattleNetUnitProfile() {
+        if (unitTypes.isEmpty()) {
+            return;
+        }
+        java.util.LinkedHashMap<String, UnitType> next = new java.util.LinkedHashMap<>();
+        for (var entry : unitTypes.entrySet()) {
+            next.put(entry.getKey(), overlayCombatStats(entry.getValue()));
+        }
+        unitTypes = next;
+    }
+
+    /** Campaign-only hit-point overrides that are not a UDTA column. */
+    public void overlayUnitHitPoints(String ident, int hitPoints) {
+        UnitType type = unitTypes.get(ident);
+        if (type == null || hitPoints <= 0 || type.hitPoints() == hitPoints) {
+            return;
+        }
+        UnitType copy = type.copyForMapProfile();
+        copy.setHitPoints(hitPoints);
+        java.util.LinkedHashMap<String, UnitType> next = new java.util.LinkedHashMap<>(unitTypes);
+        next.put(ident, copy);
+        unitTypes = next;
+    }
+
+    private UnitType overlayCombatStats(UnitType type) {
+        int hitPoints = type.hitPoints();
+        int armor = type.armor();
+        int basic = type.basicDamage();
+        int piercing = type.piercingDamage();
+        int range = type.maxAttackRange();
+        int sight = type.sightRange();
+        var profile = battleNetUnitProfile;
+        int code = PudUnitTypes.code(type.ident());
+        if (profile != null && !profile.useDefaults() && code >= 0
+                && profile.hitPoints(code) > 0) {
+            hitPoints = profile.hitPoints(code);
+            armor = profile.armor(code);
+            basic = profile.basicDamage(code);
+            piercing = profile.piercingDamage(code);
+            if (profile.attackRange(code) > 0) {
+                range = profile.attackRange(code);
+            }
+            if (profile.sight(code) > 0) {
+                sight = profile.sight(code);
+            }
+        }
+        if ("unit-oil-patch".equals(type.ident())
+                || "unit-circle-of-power".equals(type.ident())) {
+            hitPoints = 1;
+        }
+        if ("unit-sharp-axe".equals(type.ident())) {
+            hitPoints = 40;
+        }
+        if (hitPoints == type.hitPoints() && armor == type.armor()
+                && basic == type.basicDamage() && piercing == type.piercingDamage()
+                && range == type.maxAttackRange() && sight == type.sightRange()) {
+            return type;
+        }
+        UnitType copy = type.copyForMapProfile();
+        copy.setHitPoints(hitPoints);
+        copy.setArmor(armor);
+        copy.setBasicDamage(basic);
+        copy.setPiercingDamage(piercing);
+        copy.setMaxAttackRange(range);
+        copy.setSightRange(sight);
+        return copy;
     }
 
     /**
@@ -6751,6 +6838,10 @@ public final class World {
         if (unit == null || wanted == null || !unit.isAlive()) {
             return false;
         }
+        UnitType registered = registeredUnitType(wanted.ident());
+        if (registered != null) {
+            wanted = registered;
+        }
         UnitType was = unit.type();
         double share = was.hitPoints() <= 0
                 ? 1.0
@@ -6799,6 +6890,10 @@ public final class World {
             return true;
         }
         UnitType what = building.producing();
+        UnitType registered = registeredUnitType(what.ident());
+        if (registered != null) {
+            what = registered;
+        }
         // The completing cycle still reads as training: upstream's order
         // spawns the unit and is only Finished, popping to Still on the
         // next cycle's advance -- level08h's great hall shows train at 272,
