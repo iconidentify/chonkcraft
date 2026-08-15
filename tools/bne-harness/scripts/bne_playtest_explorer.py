@@ -41,7 +41,7 @@ TIMING_OFFSETS = (0, 1, 4, 5, 9, 10, 14, 15)
 TURN_BOUNDARY_OFFSETS = {14, 15}
 COMMAND_FAMILIES = {
     "move", "attack", "attack-ground", "attack-move", "stop",
-    "stand-ground", "patrol", "follow", "harvest", "return-goods",
+    "stand-ground", "patrol", "follow", "defend", "harvest", "return-goods",
     "board", "unload", "repair", "build", "cast", "train", "research",
 }
 POINT_CONGESTION_FAMILIES = {

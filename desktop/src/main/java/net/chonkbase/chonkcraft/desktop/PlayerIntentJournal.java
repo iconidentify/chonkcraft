@@ -200,7 +200,7 @@ final class PlayerIntentJournal {
                 && now.worksiteTileX == command.x()
                 && now.worksiteTileY == command.y();
         return switch (command.kind()) {
-            case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW -> moved;
+            case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW, DEFEND -> moved;
             case ATTACK, ATTACK_GROUND, CAST -> moved || targetChanged;
             case HARVEST, RETURN_GOODS -> moved || before.carried != now.carried;
             case BUILD -> moved || foundationCreated;
@@ -223,7 +223,7 @@ final class PlayerIntentJournal {
         // terminal or a successful action is mislabeled as a disappearance.
         if (fulfilled(tracking, now, targetNow, unit)) {
             return switch (tracking.command.kind()) {
-                case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW -> "settled";
+                case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW, DEFEND -> "settled";
                 default -> "fulfilled";
             };
         }
@@ -253,6 +253,7 @@ final class PlayerIntentJournal {
                                     && tracking.goal.touches(unit));
             case STOP -> "STILL".equals(now.order);
             case STAND_GROUND -> "STAND_GROUND".equals(now.order);
+            case DEFEND -> "DEFEND".equals(now.order);
             case BUILD -> now.worksiteId != null
                     && now.worksiteType != null
                     && now.worksiteTileX == command.x()
@@ -321,7 +322,7 @@ final class PlayerIntentJournal {
 
     private static boolean movement(GameCommand.Kind kind) {
         return switch (kind) {
-            case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW -> true;
+            case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW, DEFEND -> true;
             default -> false;
         };
     }

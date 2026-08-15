@@ -98,7 +98,14 @@ public record GameCommand(Kind kind, int player, int unitId, int x, int y, int t
          * but this implementation's ATTACK names
          * a unit and nothing else, so the tile form is its own kind.
          */
-        ATTACK_MOVE
+        ATTACK_MOVE,
+        /**
+         * Keep up with a friendly unit and fight what attacks it.
+         *
+         * <p>BNE's Alt-right-click. Appended so existing wire ordinals stay
+         * put.
+         */
+        DEFEND
     }
 
     /** The empty command sent when a player did nothing. */
@@ -222,6 +229,10 @@ public record GameCommand(Kind kind, int player, int unitId, int x, int y, int t
 
     public static GameCommand follow(int player, int unitId, int targetId) {
         return new GameCommand(Kind.FOLLOW, player, unitId, 0, 0, targetId, 0, false);
+    }
+
+    public static GameCommand defend(int player, int unitId, int targetId) {
+        return new GameCommand(Kind.DEFEND, player, unitId, 0, 0, targetId, 0, false);
     }
 
     public static GameCommand unloadOne(int player, int transportId, int passengerId) {

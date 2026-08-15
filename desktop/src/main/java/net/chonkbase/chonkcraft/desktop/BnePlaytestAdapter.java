@@ -176,6 +176,7 @@ public final class BnePlaytestAdapter {
             case "stand-ground" -> GameCommand.standGround(player, javaId);
             case "patrol" -> GameCommand.patrol(player, javaId, x, y);
             case "follow" -> GameCommand.follow(player, javaId, targetJava);
+            case "defend" -> GameCommand.defend(player, javaId, targetJava);
             case "harvest" -> GameCommand.harvest(player, javaId, x, y);
             case "return-goods" -> GameCommand.returnGoods(player, javaId);
             case "board" -> GameCommand.board(player, javaId, targetJava);

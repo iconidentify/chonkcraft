@@ -389,4 +389,24 @@ class RightClickTableTest {
                         + ": upstream's follow branches send Move when the target"
                         + " CanMove() is false");
     }
+
+    @Test
+    @DisplayName("alt-right-click on a friend is defend, not a walk")
+    void altRightClickDefendsAFriend() {
+        Scene scene = scene();
+        Unit footman = place(scene, "unit-footman", 0, 3, 3);
+        Unit peasant = footman == null ? null
+                : place(scene, "unit-peasant", 0, footman.tileX() + 2, footman.tileY());
+        Assumptions.assumeTrue(footman != null && peasant != null,
+                "nowhere to put a footman and a peasant");
+
+        only(scene, footman);
+        rightClick(scene.screen(), peasant.tileX(), peasant.tileY(), false, true);
+
+        assertEquals(Unit.Order.DEFEND, footman.order(),
+                "alt-right-click on a friend gave " + footman.order()
+                        + ": BNE SendCommandDefend used to fall through to Move");
+        assertSame(peasant, footman.target(),
+                "the defended friend is not the defend target");
+    }
 }

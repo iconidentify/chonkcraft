@@ -3091,12 +3091,13 @@ final class GameScreen extends JPanel {
         if (keys.control() && under != null && under != unit) {
             return follow(unit, under, tileX, tileY, queued);
         }
-        // Alt alone is upstream's SendCommandDefend: keep up with a friendly
-        // unit and fight whatever attacks it. This implementation has no defend order --
-        // there is no {@code World.orderDefend} and no
-        // {@code Unit.Order.DEFEND} -- so alt falls through to the ordinary
-        // table and a right click means what it would have meant without it.
-        // That is a gap rather than a decision, and it is covered by focused tests.
+        // Alt alone is BNE's SendCommandDefend: keep up with a friendly unit
+        // and fight whatever attacks it. A missing order used to fall through
+        // to Move, so the click looked accepted while the unit walked off.
+        if (keys.alt() && !keys.control() && under != null && under != unit) {
+            return issueStatus(GameCommand.defend(
+                    localPlayer, unit.id(), under.id()).withQueued(queued));
+        }
 
         // Boarding is asked before the unit's own right-click rule, because
         // it is the one order that depends on what was clicked rather than on

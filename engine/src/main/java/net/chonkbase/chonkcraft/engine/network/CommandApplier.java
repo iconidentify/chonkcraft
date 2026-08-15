@@ -234,6 +234,14 @@ public final class CommandApplier {
                     accepted = false;
                 }
             }
+            case DEFEND -> {
+                Unit target = findUnit(command.targetId());
+                if (target != null) {
+                    accepted = world.orderDefend(unit, target);
+                } else {
+                    accepted = false;
+                }
+            }
             case UNLOAD_ONE -> {
                 Unit passenger = findUnit(command.targetId());
                 if (passenger != null) {
@@ -318,7 +326,7 @@ public final class CommandApplier {
         return switch (kind) {
             case MOVE, ATTACK, HARVEST, BUILD, CAST, PATROL, REPAIR, EXPLORE,
                     RETURN_GOODS, STAND_GROUND, ATTACK_GROUND, ATTACK_MOVE,
-                    BOARD, FOLLOW -> true;
+                    BOARD, FOLLOW, DEFEND -> true;
             default -> false;
         };
     }
@@ -345,6 +353,7 @@ public final class CommandApplier {
             case ATTACK_MOVE -> Unit.QueuedOrderKind.ATTACK_MOVE;
             case BOARD -> Unit.QueuedOrderKind.BOARD;
             case FOLLOW -> Unit.QueuedOrderKind.FOLLOW;
+            case DEFEND -> Unit.QueuedOrderKind.DEFEND;
             default -> null;
         };
         if (kind == null
@@ -353,7 +362,8 @@ public final class CommandApplier {
                 || ((kind == Unit.QueuedOrderKind.ATTACK
                         || kind == Unit.QueuedOrderKind.REPAIR
                         || kind == Unit.QueuedOrderKind.BOARD
-                        || kind == Unit.QueuedOrderKind.FOLLOW) && target == null)) {
+                        || kind == Unit.QueuedOrderKind.FOLLOW
+                        || kind == Unit.QueuedOrderKind.DEFEND) && target == null)) {
             return null;
         }
         return new Unit.QueuedOrder(kind, command.x(), command.y(), target, type, value);

@@ -5923,6 +5923,7 @@ public final class World {
         Unit.Order order = unit.currentAction();
         return order == Unit.Order.ATTACK || order == Unit.Order.ATTACK_MOVE
                 || order == Unit.Order.REPAIR || order == Unit.Order.FOLLOW
+                || order == Unit.Order.DEFEND
                 || order == Unit.Order.BOARD || order == Unit.Order.UNLOAD
                 || order == Unit.Order.SPELL_CAST || order == Unit.Order.STAND_GROUND
                 // COrder_Still::AutoAttackStand attacks in-place on that same
@@ -7749,6 +7750,7 @@ public final class World {
                 case ATTACK_MOVE -> combat.orderAttackMove(unit, queued.x(), queued.y());
                 case BOARD -> orderBoard(unit, queued.target());
                 case FOLLOW -> orderFollow(unit, queued.target());
+                case DEFEND -> orderDefend(unit, queued.target());
             };
             if (accepted && unit.order() != Unit.Order.STILL) {
                 // "unit.Wait = 0" on the pop. Whatever the order that just ended was waiting
@@ -8202,6 +8204,7 @@ public final class World {
                 case UNLOAD -> stepUnload(unit);
                 case SPELL_CAST -> stepSpellCast(unit);
                 case FOLLOW -> stepFollow(unit);
+                case DEFEND -> stepDefend(unit);
             }
             combat.finishBattleNetAttackSequenceMarker(unit);
             if (unit.order() == Unit.Order.STILL && unit.hasQueuedOrders()
@@ -10781,6 +10784,100 @@ public final class World {
         unit.setTarget(target);
         unit.setOrder(Unit.Order.FOLLOW);
         return true;
+    }
+
+    /**
+     * Sends a unit to stay with a friend and fight what threatens it.
+     *
+     * <p>BNE's Alt-right-click. Follow never draws a weapon; this order
+     * does. A lost, dead, or hostile ward is a refusal -- Java used to
+     * drop Alt-right-click through to Move, so the click looked accepted
+     * while the unit walked away from the friend it was asked to guard.
+     */
+    public boolean orderDefend(Unit unit, Unit target) {
+        if (unit == null || target == null || unit == target
+                || !unit.isAlive() || !target.isAlive() || !target.isOnMap()
+                || unit.type() == null || unit.type().speed() <= 0
+                || !canDefend(unit, target)) {
+            return false;
+        }
+        unit.clearPath();
+        unit.setTarget(target);
+        unit.setOrder(Unit.Order.DEFEND);
+        return true;
+    }
+
+    private boolean canDefend(Unit unit, Unit target) {
+        return unit.player() == target.player()
+                || isAllied(unit.player(), target.player());
+    }
+
+    private void stepDefend(Unit unit) {
+        Unit ward = unit.target();
+        if (ward == null || !ward.isAlive() || !ward.isOnMap()) {
+            unit.setTarget(null);
+            unit.clearPath();
+            unit.setOrder(Unit.Order.STILL);
+            return;
+        }
+        if (unit.type() != null && unit.type().canAttack() && unit.isAggressive()) {
+            Unit threat = nearestThreatToWard(unit, ward);
+            if (threat != null) {
+                unit.setTarget(threat);
+                combat.stepAttack(unit);
+                if (unit.order() == Unit.Order.DEFEND) {
+                    unit.setTarget(ward);
+                }
+                return;
+            }
+        }
+        if (unit.distanceTo(ward) <= 1) {
+            unit.clearPath();
+            return;
+        }
+        boolean stale = unit.pathGoalX() != ward.tileX()
+                || unit.pathGoalY() != ward.tileY();
+        if (!unit.isMoving() && (unit.pathLength() == 0 || stale)) {
+            unit.clearPath();
+            PathFinder.Goal goal = new PathFinder.Goal(
+                    ward.tileX(), ward.tileY(),
+                    Math.max(1, ward.type().tileWidth()),
+                    Math.max(1, ward.type().tileHeight()),
+                    0, 1);
+            PathFinder.Path path = pathFinder.find(
+                    unit.tileX(), unit.tileY(), goal, moverFor(unit));
+            if (path.result() != PathFinder.Result.FOUND) {
+                return;
+            }
+            unit.setPath(path);
+            unit.setPathGoal(ward.tileX(), ward.tileY());
+        }
+        combat.stepMoveTowardsTarget(unit);
+        if (unit.target() != ward && unit.order() == Unit.Order.DEFEND) {
+            unit.setTarget(ward);
+        }
+    }
+
+    private Unit nearestThreatToWard(Unit defender, Unit ward) {
+        Unit best = null;
+        int bestDist = Integer.MAX_VALUE;
+        int range = Math.max(1, defender.type().maxAttackRange());
+        for (Unit other : unitsSnapshot()) {
+            if (other == defender || other == ward || !other.isAlive()
+                    || !other.isOnMap() || other.type() == null
+                    || !other.type().canAttack()) {
+                continue;
+            }
+            if (canDefend(defender, other)) {
+                continue;
+            }
+            int dist = Math.min(defender.distanceTo(other), ward.distanceTo(other));
+            if (dist <= range && dist < bestDist) {
+                best = other;
+                bestDist = dist;
+            }
+        }
+        return best;
     }
 
     /**

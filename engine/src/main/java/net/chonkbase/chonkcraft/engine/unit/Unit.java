@@ -205,7 +205,8 @@ public final class Unit {
         ATTACK_GROUND,
         ATTACK_MOVE,
         BOARD,
-        FOLLOW
+        FOLLOW,
+        DEFEND
     }
 
     /**
@@ -883,7 +884,15 @@ public final class Unit {
          * order finds a stretch of coast, sails to it, and only then lets
          * anybody off.
          */
-        UNLOAD
+        UNLOAD,
+        /**
+         * Keeping up with a friendly unit and fighting what threatens it.
+         *
+         * <p>BNE's Alt-right-click. Distinct from {@link #FOLLOW}, which
+         * never draws a weapon, and from {@link #STAND_GROUND}, which never
+         * leaves its tile.
+         */
+        DEFEND
     }
 
     /** Looking for a drop zone. {@code FIND_DROPZONE_STATE}. */
