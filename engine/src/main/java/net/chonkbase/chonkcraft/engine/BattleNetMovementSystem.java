@@ -259,6 +259,18 @@ final class BattleNetMovementSystem {
         int[] waits = playerCommandWaits(unit);
         int actionWait = waits[0];
         int queueWait = waits[1];
+        // Script.bin Still is already on OP0 (queueWait 0) while a slow
+        // siege engine's presentation Still still has a wait. Native 413
+        // OP0 continues into the shared 4985 Still body -- remaining timer
+        // 3 at the click -- so first dest-arm is fixture 11. Paying only
+        // actionWait snapped Orc 8 1576 at 8 and left every later leftover
+        // three cycles early.
+        if (queueWait == 0 && before == Unit.Order.STILL
+                && siegeUsesScriptBinMovePace(unit)
+                && unit.animation() != null
+                && unit.animation().waitCycles() > 0) {
+            queueWait = unit.animation().waitCycles();
+        }
         int[] dest = projectPlayerMovePoint(unit, toX, toY);
         boolean accepted = orderMove(unit, dest[0], dest[1],
                 actionWait + queueWait);
@@ -3861,16 +3873,17 @@ final class BattleNetMovementSystem {
             if (world.battleNetSequence != null && unit.chasing()) {
                 world.combat.armBattleNetChaseMoveBody(unit);
             }
-            // Residual pixel pace for 2x2 movers: script.bin Move waits, not
-            // ChonkCraft Move. XOrc 8 submarine 1433 double-stepped 102,88→100,86
-            // at fixture 44 while retail held residual two for one more cycle
-            // and stepped at 45 -- ChonkCraft submarine Move has irregular wait-1
-            // stretches that skip two native holds.
+            // Residual pixel pace for 2x2 movers, critters, and slow siege:
+            // script.bin Move waits, not ChonkCraft Move. XOrc 8 submarine
+            // 1433 double-stepped 102,88→100,86 at fixture 44 while retail
+            // held residual two for one more cycle and stepped at 45 --
+            // ChonkCraft submarine Move has irregular wait-1 stretches that
+            // skip two native holds. Catapult/ballista Move opens
+            // "if-var R >= 60 turn" and used to freeze leftover -32 for
+            // thirty cycles; native Orc 8 1576 dest-arms 2px/2cycles from
+            // fixture 13 with no turn stall.
             if (world.battleNetSequence != null
-                    && (unit.battleNetDoubleStep()
-                            || unit.battleNetRepairStride()
-                            || "unit-critter".equals(
-                                    unit.type().ident()))) {
+                    && usesBattleNetMovePace(unit)) {
                 armBattleNetMovePace(unit);
             }
             unit.setBattleNetChaseStepReady(false);
@@ -4189,8 +4202,38 @@ final class BattleNetMovementSystem {
 
 
     /**
+     * Whether leftover dest-arm uses {@code script.bin} Move waits.
+     *
+     * <p>Double-step ships, repair strides, and critters already did. Slow
+     * siege engines join them because ChonkCraft Move's turn branch is not
+     * how retail dest-arms a committed leftover heading.
+     */
+    boolean usesBattleNetMovePace(Unit unit) {
+        if (unit == null || unit.type() == null) {
+            return false;
+        }
+        return unit.battleNetDoubleStep()
+                || unit.battleNetRepairStride()
+                || "unit-critter".equals(unit.type().ident())
+                || siegeUsesScriptBinMovePace(unit);
+    }
+
+    /**
+     * Ballista and catapult are the only shipped types with a slow turn.
+     * Their ChonkCraft Move asks {@code if-var R >= 60} and waits thirty
+     * when it does. Retail leftover dest-arm does not.
+     */
+    boolean siegeUsesScriptBinMovePace(Unit unit) {
+        if (unit == null || unit.type() == null) {
+            return false;
+        }
+        int rotation = unit.type().rotationSpeed();
+        return rotation > 0 && rotation < 128;
+    }
+
+    /**
      * Arms the retail Move body that paces residual drain for double-step
-     * ships and land critters.
+     * ships, land critters, and slow siege engines.
      *
      * <p>Same open as chase: frame + OP0 leaves the cursor on the first pixel
      * opcode with timer 1, so the next walk visit spends the first pace.
