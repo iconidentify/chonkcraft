@@ -167,6 +167,17 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertIn("attack unit", script)
         self.assertIn("target", script)
 
+    def test_native_direct_injector_emits_attack_ground(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["attack-ground"]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "attack-ground"
+                   for command in item["commands"]))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("attack-ground unit", script)
+        self.assertIn(" x ", script)
+
     def test_native_direct_injector_emits_repair(self):
         seed = self.seed()
         seed["actors"][0]["capabilities"] = ["repair"]
@@ -223,6 +234,11 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             registry["families"]["repair"]["native_execution_works"],
             "repair stays fail-closed until both adapters execute it")
+        self.assertEqual(17, registry["families"]["attack-ground"][
+            "evidence_hashes"]["order_function_index"])
+        self.assertFalse(
+            registry["families"]["attack-ground"]["native_execution_works"],
+            "attack-ground stays fail-closed until both adapters execute it")
 
     def test_native_command_registry_counts_only_ledger_executions(self):
         ledger = {
@@ -250,6 +266,22 @@ class PlaytestExplorerTest(unittest.TestCase):
         scenario = next(
             item for item in explorer.generate_scenarios(seed, max_scenarios=80)
             if all(command["kind"] == "harvest" for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
+
+    def test_comparison_catches_a_mutated_attack_ground_result(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["attack-ground"]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "attack-ground"
+                   for command in item["commands"]))
         native = self.result(scenario, "native")
         java = self.result(scenario, "java")
         self.assertEqual(0, explorer.compare_results(
@@ -580,6 +612,37 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             report.get("complete", True),
             "generated inventory is not the 100 dual-adapter requirement")
+        self.assertEqual(report.get("executed_families"), [],
+                         "generation names no dual-adapter families")
+
+    def test_inventory_copies_ledger_count_without_becoming_complete(self):
+        corpus = (
+            Path(__file__).resolve().parents[1]
+            / "work/corpus/campaign-1800/cases"
+        )
+        ledger_path = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/execution-ledger.json"
+        )
+        fixture = corpus / "retail-orc-01-idle.bnefx"
+        if not fixture.is_file() or not ledger_path.is_file():
+            self.skipTest("idle fixture or execution ledger is missing")
+        ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        report = explorer.coverage_inventory(
+            [explorer.seed_from_idle_fixture(fixture)],
+            max_scenarios=20, ledger=ledger)
+        self.assertGreaterEqual(report["generated_scenarios"], 1)
+        self.assertGreaterEqual(
+            report["dual_adapter_executed_scenarios"], 100,
+            "the ledger's executed count must appear beside generation")
+        self.assertNotEqual(
+            report["generated_scenarios"],
+            report["dual_adapter_executed_scenarios"],
+            "generation and dual-adapter execution are different numbers")
+        self.assertIn("repair", report["executed_families"])
+        self.assertFalse(
+            report["complete"],
+            "attaching a ledger must not mark generated inventory complete")
 
     def test_a_commanded_move_then_stop_fixture_keeps_both_orders(self):
         fixture = (

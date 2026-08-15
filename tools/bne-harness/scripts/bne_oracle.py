@@ -38,7 +38,7 @@ CAMPAIGN_SCENARIO = re.compile(
     re.IGNORECASE,
 )
 SCRIPT_COMMAND_MOVE = re.compile(
-    r"^cycle ([1-9]\d*) (move|patrol) unit (\d+) x (\d+) y (\d+)$"
+    r"^cycle ([1-9]\d*) (move|patrol|attack-ground) unit (\d+) x (\d+) y (\d+)$"
 )
 SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground|return-goods) unit (\d+)$"
@@ -116,7 +116,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
             else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
-                    "'cycle N move unit SLOT x X y Y', "
+                    "'cycle N move|patrol|attack-ground unit SLOT x X y Y', "
                     "'cycle N stop|stand-ground|return-goods unit SLOT', or "
                     "'cycle N attack|harvest|repair unit SLOT target T'"
                 )

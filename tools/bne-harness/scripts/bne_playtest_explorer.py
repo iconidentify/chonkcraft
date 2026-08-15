@@ -59,7 +59,7 @@ REPLACE_FAMILY_RANK = {
     "harvest": 3, "cast": 3, "build": 4,
 }
 INJECTOR_MOVE = re.compile(
-    r"cycle (\d+) (move|patrol) unit (\d+) x (\d+) y (\d+)\Z")
+    r"cycle (\d+) (move|patrol|attack-ground) unit (\d+) x (\d+) y (\d+)\Z")
 INJECTOR_STANCE = re.compile(
     r"cycle (\d+) (stop|stand-ground|return-goods) unit (\d+)\Z")
 REGISTRY_SCHEMA = "chonkcraft-bne-native-command-registry-1"
@@ -219,6 +219,27 @@ NATIVE_FAMILY_EVIDENCE = {
         "arguments": ["issue_cycle", "unit_id", "target_id"],
         "supported_variants": ["building"],
         "unsupported_variants": ["combat-unit-target-becomes-move"],
+    },
+    "attack-ground": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 17,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "constructor": "0x004367a0",
+            "replay_pack_1_0x13_count": 28,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N attack-ground unit SLOT x X y Y. Retail 0x13 packets "
+            "carry function index 17, almost always dest xy and target -1. "
+            "The constructor at 0x004367a0 clears the unit target and "
+            "installs order 17, or order 18 when that action is refused."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "x", "y"],
+        "supported_variants": ["open-ground"],
+        "unsupported_variants": ["queued-follow-up"],
     },
     "production": {
         "evidence_authority": "retail-replay-dispatcher",
@@ -610,12 +631,15 @@ def seed_from_idle_fixture(fixture: Path, **kwargs: Any) -> dict[str, Any]:
 
 
 def coverage_inventory(seeds: list[dict[str, Any]], *,
-        max_scenarios: int = 256) -> dict[str, Any]:
+        max_scenarios: int = 256,
+        ledger: dict[str, Any] | None = None) -> dict[str, Any]:
     """Generate without executing. Counts families, patterns and tokens.
 
     Generated rows never satisfy the 100-scenario dual-adapter requirement.
-    ``dual_adapter_executed_scenarios`` stays 0 here; only a run that both
-    production adapters actually execute can raise that count.
+    ``generated_scenarios`` is only what the compiler emitted. The executed
+    count is copied from an execution ledger when one is supplied, otherwise
+    it stays 0. ``complete`` stays false on this document even when the
+    ledger itself has crossed the threshold.
     """
     if len(seeds) < 1:
         raise ValueError("coverage inventory needs at least one seed")
@@ -639,11 +663,19 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
             "families": sorted(seed_families),
             "patterns": sorted(seed_patterns),
         })
+    executed = 0
+    executed_families: list[str] = []
+    if ledger is not None:
+        if ledger.get("schema") != "chonkcraft-bne-playtest-execution-ledger-1":
+            raise ValueError("coverage inventory ledger has the wrong schema")
+        executed = int(ledger.get("dual_adapter_executed_scenarios") or 0)
+        executed_families = list(ledger.get("families") or [])
     return {
         "schema": "chonkcraft-bne-playtest-coverage-inventory-1",
         "seed_count": len(seeds),
         "generated_scenarios": generated,
-        "dual_adapter_executed_scenarios": 0,
+        "dual_adapter_executed_scenarios": executed,
+        "executed_families": executed_families,
         "command_family_count": len(families),
         "families": sorted(families),
         "patterns": sorted(patterns),
@@ -939,7 +971,7 @@ def native_command_registry(ledger: dict[str, Any] | None = None) -> dict[str, A
         dual = counts.get(name, 0)
         injector = name in {
             "move", "stop", "attack", "harvest", "patrol", "return-goods",
-            "repair",
+            "repair", "attack-ground",
         }
         families[name] = {
             "evidence_authority": evidence["evidence_authority"],
@@ -1241,7 +1273,7 @@ def native_command_script(scenario: dict[str, Any]) -> str:
         f"# scenario-sha256 {scenario['scenario_sha256']}",
     ]
     for command in scenario["commands"]:
-        if command["kind"] in {"move", "patrol"}:
+        if command["kind"] in {"move", "patrol", "attack-ground"}:
             if not all(isinstance(command.get(key), int) for key in ("x", "y")):
                 raise ValueError(f"{command['kind']} command has no integer destination")
             lines.append(
@@ -1583,12 +1615,17 @@ def _command_tokens(value: str) -> list[str]:
 
 def coverage_inventory_command(args: argparse.Namespace) -> int:
     seeds = [seed_from_idle_fixture(path) for path in args.fixtures]
-    report = coverage_inventory(seeds, max_scenarios=args.max_scenarios)
+    ledger = None
+    if args.ledger is not None:
+        ledger = load_json(args.ledger, "execution ledger")
+    report = coverage_inventory(
+        seeds, max_scenarios=args.max_scenarios, ledger=ledger)
     write_json(args.output, report)
     print(json.dumps({
         "seed_count": report["seed_count"],
         "generated_scenarios": report["generated_scenarios"],
         "dual_adapter_executed_scenarios": report["dual_adapter_executed_scenarios"],
+        "executed_families": report["executed_families"],
         "complete": report["complete"],
         "command_family_count": report["command_family_count"],
         "families": report["families"],
@@ -1760,6 +1797,10 @@ def parser() -> argparse.ArgumentParser:
     inventory.add_argument("fixtures", nargs="+", type=Path)
     inventory.add_argument("--output", required=True, type=Path)
     inventory.add_argument("--max-scenarios", type=int, default=1200)
+    inventory.add_argument(
+        "--ledger", type=Path,
+        help="copy dual-adapter counts from an execution ledger; "
+             "generation still cannot mark this inventory complete")
     inventory.set_defaults(func=coverage_inventory_command)
 
     fixture = commands.add_parser(

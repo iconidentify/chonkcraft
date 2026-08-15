@@ -243,6 +243,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_PATROL 5
 #define SCRIPT_COMMAND_RETURN_GOODS 6
 #define SCRIPT_COMMAND_REPAIR 7
+#define SCRIPT_COMMAND_ATTACK_GROUND 8
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -860,6 +861,17 @@ static BOOL read_command_file(void) {
             if (fields == 4) {
                 action = SCRIPT_COMMAND_PATROL;
             } else {
+                extra = '\0';
+                fields = sscanf(cursor,
+                        "cycle %lu attack-ground unit %lu x %lu y %lu %c",
+                        &cycle, &slot, &x, &y, &extra);
+                if (fields == 4) {
+                    /* Replay-pack-1 has 28 0x13 packets at function index
+                     * 17, almost always dest xy and target -1. Constructor
+                     * 0x004367a0 clears the unit target and installs
+                     * order 17, or order 18 when that action is refused. */
+                    action = SCRIPT_COMMAND_ATTACK_GROUND;
+                } else {
                 char action_name[16];
 
                 extra = '\0';
@@ -908,6 +920,7 @@ static BOOL read_command_file(void) {
                         target = SCRIPT_NO_TARGET;
                     }
                 }
+            }
             }
         }
         if (action == 0 || cycle == 0 || cycle > 0x7fffffffUL
@@ -1394,6 +1407,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_REPAIR) {
         return "repair";
     }
+    if (action == SCRIPT_COMMAND_ATTACK_GROUND) {
+        return "attack-ground";
+    }
     return "unknown";
 }
 
@@ -1427,6 +1443,9 @@ static unsigned int script_order_function_index(BYTE action) {
     }
     if (action == SCRIPT_COMMAND_REPAIR) {
         return 27;
+    }
+    if (action == SCRIPT_COMMAND_ATTACK_GROUND) {
+        return 17;
     }
     return 0xff;
 }

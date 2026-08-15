@@ -438,6 +438,67 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertFalse(java_result["observations"][0]["accepted"],
                          "a grunt has no repair button, so Java must not issue the mend")
 
+    def test_both_adapters_accept_a_commanded_catapult_attack_ground(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/attack-ground-1/00.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded catapult attack-ground fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        explorer.validate_result(native_result, scenario, "native")
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertEqual(5, scenario["commands"][0]["issue_cycle"],
+                         "the ground volley is issued on the commanded cycle")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 17 applied the catapult ground click")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must take the paired catapult ground click")
+        self.assertEqual(
+            "ATTACK_GROUND", java_result["observations"][0]["state"]["order"],
+            "the catapult must stay on the ground volley")
+
+    def test_a_peon_ground_click_is_not_a_catapult_volley(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/attack-ground-1/02.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded peon attack-ground fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 17 still applies on a peon")
+        self.assertFalse(java_result["observations"][0]["accepted"],
+                         "a peon has nothing to throw at bare ground")
+
 
 if __name__ == "__main__":
     unittest.main()
