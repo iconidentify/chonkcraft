@@ -2175,10 +2175,12 @@ final class BattleNetCombatSystem {
             }
             return;
         }
-        if (direct && !world.map.field(toX, toY).isWall()) {
-            unit.setOrder(Unit.Order.STILL);
-            return;
-        }
+        // Melee GiveOrder 17 on grass is a real order: the Orc 1 grunt
+        // stays in ATTACK_GROUND beside 22,23. Java used to stand down on
+        // the first step, so the commanded fixture never held the label.
+        // There is still nothing to swing at, so in-range melee just faces
+        // the square. Out of range it walks, which is how the Orc 1 peon
+        // left 25,18 toward 30,18.
         int range = Math.max(1, unit.type().maxAttackRange());
         int distance = Math.max(Math.abs(unit.tileX() - toX), Math.abs(unit.tileY() - toY));
         if (distance > range) {

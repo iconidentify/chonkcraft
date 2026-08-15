@@ -529,13 +529,18 @@ class UnitOrdersTest {
     }
 
     @Test
-    @DisplayName("only a unit with a projectile can shell a square")
-    void attackGroundNeedsAMissile() {
+    @DisplayName("a footman takes attack-ground on grass and keeps the order")
+    void aFootmanTakesAttackGroundOnGrass() {
         Fixture fixture = load();
         World world = world(fixture.data());
         Unit footman = world.createUnit(fixture.types().get("unit-footman"), 0,
                 fixture.x(), fixture.y());
-        // A footman strikes rather than throwing, so it has nothing to lob.
-        assertTrue(!world.orderAttackGround(footman, fixture.x() + 4, fixture.y()));
+        // GiveOrder table 17 installs the order even when there is nothing
+        // to throw: commanded Orc 1 grunt 1592 held ATTACK_GROUND on grass.
+        assertTrue(world.orderAttackGround(footman, fixture.x() + 4, fixture.y()),
+                "a footman was refused attack-ground on open ground");
+        run(world, 8);
+        assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
+                "the footman stood down instead of holding attack-ground");
     }
 }

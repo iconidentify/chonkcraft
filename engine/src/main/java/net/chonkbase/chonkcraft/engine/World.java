@@ -11981,41 +11981,20 @@ public final class World {
      *
      * <p>{@code COrder::NewActionAttack} accepts a tile as well as a unit.
      * That distinction is what lets a footman attack a wall: walls are map
-     * terrain, so there is no unit for {@link #orderAttack} to name. The old
-     * attack-ground order admitted missiles only and made every melee army
-     * stop at a wall it should have been able to hack down.
+     * terrain, so there is no unit for {@link #orderAttack} to name.
      *
-     * <p>A unit that cannot attack never takes this order.
-     * {@code CommandAttackGround} tests {@code unit.Type->CanAttack} before it
-     * asks for an order slot, and for a unit
-     * without it writes into {@code unit.NewOrder} -- the rally slot, "order
-     * for new trained units" ({@code unit.h:426}) -- instead of into the
-     * unit's own queue. Its sibling {@code CommandAttack} does the same at
-     * {@code :340}. Either way the unit is not put in a firing order, which is
-     * what refusing here reproduces, and it is what
-     * {@link #orderAttack} and {@link #orderAttackMove} already did.
-     *
-     * <p>This one made the test in {@code orderAttack},
-     * {@code orderAttackMove}, {@code autoAttack}, {@code stepStandGround} and
-     * the button table, and not here: attack-ground refused only a unit whose
-     * missile was {@code missile-none}. Measured over the whole roster of 143,
-     * one shipped type got through -- the critter, which carries
-     * {@code Missile = "missile-critter-explosion"} and
-     * {@code BasicDamage = 80} for the click-it-ten-times easter egg and no
-     * {@code CanAttack}. It took the order and stood in {@code ATTACK_GROUND}
-     * doing nothing, because its animation set has no attack in it, so what a
-     * player could actually see was bounded at a sheep in a firing stance.
+     * <p>The button table still hides Attack Ground on units that cannot
+     * bombard. The synchronized GiveOrder path does not: commanded BNE
+     * fixtures {@code attack-ground-1/02} (Orc 1 peon 1594 at 30,18) and
+     * {@code attack-ground-1/03} (grunt 1592 at 22,23) both install order
+     * 17. Java used to refuse those packets -- no CanAttack, or melee on
+     * grass -- so the explorer recorded rejected where native walked and
+     * held ATTACK_GROUND. Buildings stay refused; they are not a GiveOrder
+     * 17 actor.
      */
     public boolean orderAttackGround(Unit unit, int toX, int toY) {
-        if (unit == null || !unit.isAlive() || !unit.type().canAttack()
+        if (unit == null || !unit.isAlive() || unit.type().building()
                 || !map.contains(toX, toY)) {
-            return false;
-        }
-        MissileType missile = projectiles.missileFor(unit);
-        // A melee unit may still be sent at a wall, which is terrain and so
-        // has no unit for orderAttack to name; it may not be sent at bare
-        // ground, having nothing to throw at it.
-        if ((missile == null || missile.isNone()) && !map.field(toX, toY).isWall()) {
             return false;
         }
         unit.setSavedOrder(null);

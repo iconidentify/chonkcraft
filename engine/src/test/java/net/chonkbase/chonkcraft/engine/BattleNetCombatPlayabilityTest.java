@@ -68,12 +68,22 @@ class BattleNetCombatPlayabilityTest {
         assertFalse(fixture.commands().apply(
                         GameCommand.repair(0, footman.id(), friend.id())),
                 "a footman falsely accepted a worker-only repair order");
-        assertFalse(fixture.commands().apply(
+        // Empty send-home and GiveOrder 17 are not refusals. Native
+        // NewActionReturnGoods walks an empty hull to the gold depot, and
+        // commanded Orc 1 grunt 1592 takes attack-ground on grass.
+        assertTrue(fixture.commands().apply(
                         GameCommand.returnGoods(0, footman.id())),
-                "an empty footman falsely accepted a resource-return order");
-        assertFalse(fixture.commands().apply(
+                "an empty send-home was refused");
+        assertTrue(fixture.commands().apply(
                         GameCommand.attackGround(0, footman.id(), 12, 12)),
-                "a footman falsely accepted a siege-only ground attack");
+                "GiveOrder 17 on a footman was refused");
+        fixture.world.tick();
+        assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
+                "the footman stood down instead of holding attack-ground");
+        Unit peon = place(fixture, "unit-peon", 1, 8, 12);
+        assertTrue(fixture.commands().apply(
+                        GameCommand.attackGround(1, peon.id(), 14, 12)),
+                "GiveOrder 17 on a peon was refused");
         assertFalse(fixture.commands().apply(
                         GameCommand.unload(0, footman.id(), 12, 12)),
                 "a footman falsely accepted a transport-only unload order");

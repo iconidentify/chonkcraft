@@ -11,7 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -53,10 +53,10 @@ import org.junit.jupiter.api.Test;
 class TypeFlagsOnEveryPathTest {
 
     private static GameData load() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II retail assets configured.");
+        return new GameData(assets);
     }
 
     /** Dry land, two people, and the whole shipped roster loaded. */
@@ -83,8 +83,8 @@ class TypeFlagsOnEveryPathTest {
     }
 
     @Test
-    @DisplayName("a sheep cannot be told to open fire on a piece of ground")
-    void nothingWithoutCanAttackTakesAnAttackGroundOrder() {
+    @DisplayName("a hall cannot be told to open fire on a piece of ground")
+    void aBuildingDoesNotTakeAnAttackGroundOrder() {
         GameData data = load();
         World world = plain(data);
 
@@ -92,7 +92,7 @@ class TypeFlagsOnEveryPathTest {
         int accepted = 0;
         StringBuilder got = new StringBuilder();
         for (UnitType type : data.unitTypes().types().values()) {
-            if (type.canAttack() || type.building() || type.hitPoints() <= 0) {
+            if (!type.building() || type.hitPoints() <= 0) {
                 continue;
             }
             Unit unit = world.createUnit(type, 0, 5, 5);
@@ -107,14 +107,29 @@ class TypeFlagsOnEveryPathTest {
             }
             world.remove(unit);
         }
-        // Counted first: an empty sweep would pass while the critter kept its
-        // firing order.
-        assertTrue(checked > 5, "only " + checked + " types without CanAttack were tried, so "
+        assertTrue(checked > 5, "only " + checked + " buildings were tried, so "
                 + "this sweep proves very little");
         assertEquals(0, accepted,
-                accepted + " types with no CanAttack were put into ATTACK_GROUND:" + got
-                        + " -- CommandAttackGround tests Type->CanAttack before it takes an "
-                        + "order slot (command.cpp:372)");
+                accepted + " buildings were put into ATTACK_GROUND:" + got);
+    }
+
+    @Test
+    @DisplayName("a peon takes the attack-ground order the injector installed")
+    void aPeonTakesTheAttackGroundOrderTheInjectorInstalled() {
+        GameData data = load();
+        World world = plain(data);
+        UnitType peon = data.unitTypes().types().get("unit-peon");
+        assertNotNull(peon, "no peon in the roster");
+
+        Unit unit = world.createUnit(peon, 0, 5, 5);
+        assertNotNull(unit, "the peon could not be placed");
+        unit.setHitPoints(peon.hitPoints());
+        // Commanded fixture attack-ground-1/02: native GiveOrder 17 on
+        // Orc 1 peon 1594 at 30,18 is accepted. The button stays hidden.
+        assertTrue(world.orderAttackGround(unit, 12, 12),
+                "the peon was refused attack-ground that native GiveOrder 17 installed");
+        assertSame(Unit.Order.ATTACK_GROUND, unit.order(),
+                "the peon accepted the order and is not in it");
     }
 
     @Test
