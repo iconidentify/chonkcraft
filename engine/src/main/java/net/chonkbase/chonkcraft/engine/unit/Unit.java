@@ -488,7 +488,11 @@ public final class Unit {
      */
     private int battleNetGoldFreePrefixLength;
 
-    /** Whether an indoor resource approach has promoted to native action 25. */
+    /**
+     * Whether leftover-land on an empty send-home paid action 25 and may
+     * dest-arm onto {@code 0x41f430}. Laden doorsteps leave this clear so
+     * they still serve the empty ten.
+     */
     private boolean battleNetResourceApproachStaged;
 
     /** Whether action 25 must replace a tail inherited from action 23. */

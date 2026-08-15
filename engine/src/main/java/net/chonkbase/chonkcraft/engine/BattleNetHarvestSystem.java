@@ -378,7 +378,8 @@ final class BattleNetHarvestSystem {
             // the shipyard at (43,16), retrying SW into (45,16) every fifteen
             // cycles. Consume the route boundary here and preserve its normal
             // empty-route wait before the load is banked.
-            if (worker.distanceTo(depot) <= 1 && worker.pathLength() > 0) {
+            if (worker.distanceTo(depot) <= 1 && worker.pathLength() > 0
+                    && !worker.battleNetResourceApproachStaged()) {
                 int heading = worker.peekHeading();
                 int stride = world.battleNetMovementStride(worker);
                 int nextX = worker.tileX() + Direction.deltaX(heading) * stride;
@@ -416,16 +417,45 @@ final class BattleNetHarvestSystem {
             // ten cycles before the other engine had it.
             if (world.movement.isStepping(worker) || worker.isMoving()) {
                 world.movement.walkPixels(worker);
+                if (world.movement.isStepping(worker) || worker.isMoving()
+                        || worker.carried() != 0) {
+                    // Laden leftover-land still starts PF_WAIT next visit.
+                    // Falling through here used to bank one cycle early.
+                    return;
+                }
+            }
+            if (world.movement.depotRingAction25(worker, depot)) {
+                // Empty leftover-land on the hall ring. Native stands
+                // action 25 for this visit plus delay 2, then dest-arms
+                // onto 0x41f430. PF_WAIT 10 entered Orc 1 at 65.
+                worker.setRouteSpent(false);
+                worker.setBattleNetOrderDelay(2);
+                worker.setBattleNetResourceApproachStaged(true);
                 return;
             }
-            if (world.movement.spendTheEmptyRoute(worker)) {
+            if (world.movement.depotRingDestArm(worker, depot)) {
+                boolean pathWait = world.movement.walkTowards(worker, depot);
+                if (pathWait && worker.order() == Unit.Order.HARVEST
+                        && worker.waitCycles() > 0) {
+                    resourceWalkWaited(worker, depot.tileX(), depot.tileY(),
+                            depot.type().tileWidth(), depot.type().tileHeight());
+                }
+                return;
+            }
+            if (!worker.battleNetResourceApproachStaged()
+                    && world.movement.spendTheEmptyRoute(worker)) {
                 // The route-end wait is a PF_WAIT like any other to
                 // MoveToDepot's arm, and it climbs the same ladder.
                 resourceWalkWaited(worker, depot.tileX(), depot.tileY(),
                         depot.type().tileWidth(), depot.type().tileHeight());
                 return;
             }
-            if (!confirmResourceWalkArrival(worker, depot)) {
+            // Dest-arm leftover-land on 0x41f430 is PF_REACHED. Asking
+            // confirm from inside the hall used to store an escape path
+            // and leave Orc 1 standing on 25,22 after fixture 75.
+            boolean destArmArrived = worker.battleNetResourceApproachStaged()
+                    && worker.distanceTo(depot) == 0;
+            if (!destArmArrived && !confirmResourceWalkArrival(worker, depot)) {
                 return;
             }
             // At the depot. The path that brought it here ends inside the
@@ -455,6 +485,7 @@ final class BattleNetHarvestSystem {
             // survives for StopGathering's indoor dropout fallback.
             worker.setReturnDepotGoal(null);
             enterResource(worker, depot);
+            worker.setBattleNetResourceApproachStaged(false);
             // One less than the data's number here too: MoveToDepot docks
             // the freshly set wait immediately -- "if (unit.Wait)
             // unit.Wait--" -- so a

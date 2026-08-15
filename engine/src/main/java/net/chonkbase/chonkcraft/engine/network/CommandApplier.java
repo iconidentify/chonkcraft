@@ -213,7 +213,7 @@ public final class CommandApplier {
                 }
             }
             case EXPLORE -> accepted = world.orderExplore(unit);
-            case RETURN_GOODS -> accepted = world.orderReturnGoods(unit);
+            case RETURN_GOODS -> accepted = world.orderReturnGoods(unit, true);
             case STAND_GROUND -> world.orderStandGround(unit);
             case ATTACK_GROUND -> accepted = world.orderAttackGround(
                     unit, command.x(), command.y(), true);

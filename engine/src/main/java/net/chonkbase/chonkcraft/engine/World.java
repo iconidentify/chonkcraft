@@ -4638,15 +4638,7 @@ public final class World {
         int right = left + width - 1;
         int bottom = top + height - 1;
         if (target.type().givesResource() != null) {
-            int x = left;
-            int y = top;
-            if (left < worker.tileX()) {
-                x = worker.tileX() < right ? left + width / 2 : right;
-            }
-            if (top < worker.tileY()) {
-                y = worker.tileY() < bottom ? top + height / 2 : bottom;
-            }
-            return new int[] {x, y};
+            return battleNetNearEdgePoint(worker, left, top, right, bottom, width, height);
         }
 
         boolean[] connected = battleNetConnectivityCell(worker);
@@ -4664,6 +4656,35 @@ public final class World {
             }
         }
         return new int[] {left, top};
+    }
+
+    /**
+     * MoveToDepot leftover dest-arm point ({@code 0x41f430}).
+     *
+     * <p>An empty send-home leftover-lands on the repair ring (26,21 from
+     * 25,18) then dest-arms onto this near-edge hall tile (25,22), not
+     * the connected origin the walk used to aim at.</p>
+     */
+    int[] battleNetDepotEntryPoint(Unit worker, Unit depot) {
+        int left = depot.tileX();
+        int top = depot.tileY();
+        int width = Math.max(1, depot.type().tileWidth());
+        int height = Math.max(1, depot.type().tileHeight());
+        return battleNetNearEdgePoint(worker, left, top,
+                left + width - 1, top + height - 1, width, height);
+    }
+
+    private static int[] battleNetNearEdgePoint(Unit worker, int left, int top,
+            int right, int bottom, int width, int height) {
+        int x = left;
+        int y = top;
+        if (left < worker.tileX()) {
+            x = worker.tileX() < right ? left + width / 2 : right;
+        }
+        if (top < worker.tileY()) {
+            y = worker.tileY() < bottom ? top + height / 2 : bottom;
+        }
+        return new int[] {x, y};
     }
 
     /**
@@ -12394,6 +12415,15 @@ public final class World {
      * order a cycle early.
      */
     public boolean orderReturnGoods(Unit unit) {
+        return orderReturnGoods(unit, false);
+    }
+
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder click: Still pays the
+     *     player command wait before the hall walk. Skipping it leftover-
+     *     landed Orc 1 at 53 instead of 56.
+     */
+    public boolean orderReturnGoods(Unit unit, boolean fromPlayer) {
         if (unit == null || !unit.isAlive()) {
             return false;
         }
@@ -12435,6 +12465,12 @@ public final class World {
         unit.setResourceTile(-1, -1);
         unit.setResourceWaitLadder(0);
         unit.rememberActionBeforeQueued(before);
+        // Harvest used to skip this wait and walk into the mine three
+        // cycles early. Empty send-home from Still has the same start:
+        // native leftover-lands 26,21 at 56, Java without it at 53.
+        if (fromPlayer && before == Unit.Order.STILL) {
+            unit.setBattleNetOrderDelay(movement.playerCommandDelay(unit));
+        }
         return true;
     }
 

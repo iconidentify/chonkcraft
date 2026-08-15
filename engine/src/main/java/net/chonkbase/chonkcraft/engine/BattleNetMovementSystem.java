@@ -1072,6 +1072,7 @@ final class BattleNetMovementSystem {
      *         separate state ladder
      */
     boolean walkTowards(Unit worker, Unit building) {
+        boolean depotDestArm = false;
         if (worker.order() == Unit.Order.HARVEST) {
             // DoActionMove increments PathFinderOutput::Cycles on every call,
             // including a cached step, a spent-route wait and an unreachable
@@ -1178,7 +1179,24 @@ final class BattleNetMovementSystem {
         if (worker.pathLength() == 0 && !worker.isMoving()) {
             boolean stageSpentBattleNetGold = false;
             boolean goldFreePrefixReplan = false;
-            if (worker.order() == Unit.Order.HARVEST && !worker.returningToDepot()
+            if (depotRingAction25(worker, building)) {
+                // Leftover dest-arm landed on the MoveToDepot ring.
+                // Native pays action 25 (land visit plus delay 2) then
+                // dest-arms onto 0x41f430. PF_WAIT 10 entered Orc 1 at 65.
+                worker.setRouteSpent(false);
+                worker.setBattleNetOrderDelay(2);
+                worker.setBattleNetResourceApproachStaged(true);
+                return true;
+            }
+            if (depotRingDestArm(worker, building)) {
+                int[] entry = world.battleNetDepotEntryPoint(worker, building);
+                int heading = Direction.fromDelta(
+                        Integer.signum(entry[0] - worker.tileX()),
+                        Integer.signum(entry[1] - worker.tileY()));
+                worker.setPath(new PathFinder.Path(
+                        PathFinder.Result.FOUND, new int[] {heading}));
+                depotDestArm = true;
+            } else if (worker.order() == Unit.Order.HARVEST && !worker.returningToDepot()
                     && worker.routeSpent()
                     && building.type().givesResource() == UnitType.Resource.GOLD) {
                 int[] approach = world.battleNetApproachPoint(worker, building);
@@ -1213,11 +1231,11 @@ final class BattleNetMovementSystem {
             // steps at 715 and again at 742 upstream, the segment break in
             // the middle, where this implementation re-asked at once and sailed at
             // 731.
-            if (!stageSpentBattleNetGold && spendTheEmptyRoute(worker)) {
+            if (!depotDestArm && !stageSpentBattleNetGold && spendTheEmptyRoute(worker)) {
                 return true;
             }
-            PathFinder.Path path;
-            path = world.construction.findBattleNetBuildingPath(
+            if (!depotDestArm) {
+            PathFinder.Path path = world.construction.findBattleNetBuildingPath(
                     worker, building, goldFreePrefixReplan);
             if (path.result() == PathFinder.Result.UNREACHABLE
                     && worker.order() == Unit.Order.HARVEST) {
@@ -1301,13 +1319,20 @@ final class BattleNetMovementSystem {
                     return true;
                 }
             }
+            }
         }
         Unit.Order saved = worker.order();
         worker.setBattleNetBorrowedMoveForStep(true);
         worker.setOrder(Unit.Order.MOVE);
+        if (depotDestArm) {
+            world.setMovementFieldFlags(building, false);
+        }
         try {
             stepMove(worker);
         } finally {
+            if (depotDestArm) {
+                world.setMovementFieldFlags(building, true);
+            }
             worker.setBattleNetBorrowedMoveForStep(false);
         }
         if (worker.order() != Unit.Order.DYING) {
@@ -1549,6 +1574,47 @@ final class BattleNetMovementSystem {
      *
      * @return whether the unit is spending that pause now
      */
+    /**
+     * Empty send-home leftover-landed one or two tiles from 0x41f430.
+     * Native pays action 25 (this visit plus delay 2) then dest-arms
+     * onto that point. PF_WAIT 10 entered Orc 1 at 65 instead of 75.
+     * A laden doorstep still serves the empty ten.
+     */
+    boolean depotRingAction25(Unit worker, Unit building) {
+        return depotRingReady(worker, building, true);
+    }
+
+    /**
+     * After action 25, leftover dest-arm onto 0x41f430 rather than
+     * asking a new route. A replan used to overwrite that heading.
+     */
+    boolean depotRingDestArm(Unit worker, Unit building) {
+        return depotRingReady(worker, building, false);
+    }
+
+    private boolean depotRingReady(Unit worker, Unit building, boolean action25) {
+        if (worker == null || building == null || !worker.returningToDepot()
+                || worker.carried() != 0 || worker.pathLength() > 0
+                || worker.isMoving()) {
+            return false;
+        }
+        if (action25) {
+            if (!worker.routeSpent() || worker.battleNetResourceApproachStaged()) {
+                return false;
+            }
+        } else if (worker.routeSpent() || worker.battleNetOrderDelay() > 0
+                || !worker.battleNetResourceApproachStaged()) {
+            return false;
+        }
+        int[] entry = world.battleNetDepotEntryPoint(worker, building);
+        if (worker.tileX() == entry[0] && worker.tileY() == entry[1]) {
+            return false;
+        }
+        int cheb = Math.max(Math.abs(entry[0] - worker.tileX()),
+                Math.abs(entry[1] - worker.tileY()));
+        return cheb >= 1 && cheb <= 2;
+    }
+
     boolean spendTheEmptyRoute(Unit unit) {
         if (!unit.routeSpent()) {
             return false;
