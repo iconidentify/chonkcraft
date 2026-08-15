@@ -443,7 +443,15 @@ public final class World {
 
     /** @see BattleNetConstructionSystem#orderRepair */
     public boolean orderRepair(Unit unit, Unit target) {
-        return construction.orderRepair(unit, target);
+        return construction.orderRepair(unit, target, false);
+    }
+
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder click: a soldier on
+     *     Still writes next_order 27 through the remaining Still wait
+     */
+    public boolean orderRepair(Unit unit, Unit target, boolean fromPlayer) {
+        return construction.orderRepair(unit, target, fromPlayer);
     }
 
     /** @see BattleNetMovementSystem#orderMove */
@@ -8544,6 +8552,13 @@ public final class World {
                     unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
                     if (unit.battleNetOrderDelay() == 0) {
                         beginNextQueuedOrder(unit);
+                        // GiveOrder 27 pops after the Still body. Native
+                        // first_progress is that Repair visit (repair-1/03
+                        // fixture 9). Waiting for the next tick's step left
+                        // first walk at 10.
+                        if (unit.order() == Unit.Order.REPAIR) {
+                            construction.stepRepair(unit);
+                        }
                     }
                 } else {
                     beginNextQueuedOrder(unit);

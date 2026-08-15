@@ -1878,8 +1878,16 @@ final class BattleNetConstructionSystem {
      * range. Commanded fixture {@code repair-1/03} is Orc 1 grunt 1592
      * told to mend hall 1593: native keeps order 27 and stands on 21,23.
      * Converting that to Move toward the origin walked it to 22,21.
+     *
+     * @param fromPlayer {@code true} for a GiveOrder click: a soldier on
+     *     Still writes next_order 27 and keeps Still for the remaining
+     *     Still wait. A peon who can mend still installs Repair now.
      */
     boolean orderRepair(Unit unit, Unit target) {
+        return orderRepair(unit, target, false);
+    }
+
+    boolean orderRepair(Unit unit, Unit target, boolean fromPlayer) {
         if (unit == null || target == null || !unit.isAlive() || !target.isAlive()) {
             return false;
         }
@@ -1893,6 +1901,25 @@ final class BattleNetConstructionSystem {
         // hall, which is why the peon never left the square.
         if (!target.type().building() && !target.type().canTransport()) {
             return world.orderMove(unit, target.tileX(), target.tileY());
+        }
+        // Native GiveOrder 27 from Still on a no-mend actor writes
+        // next_order 27 and restarts Still: Orc 1 grunt 1592 timer 4
+        // through fixture 8, Repair at 9. Installing Repair on the
+        // issue cycle walked at 5 and stood down at 56.
+        if (fromPlayer && unit.order() == Unit.Order.STILL
+                && unit.type().repairRange() <= 0) {
+            int[] waits = world.movement.playerCommandWaits(unit);
+            int stillWait = waits[1] > 0 ? waits[1] : waits[0];
+            unit.setTarget(target);
+            unit.setOrderTarget(target.tileX(), target.tileY());
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.REPAIR,
+                    target.tileX(), target.tileY(), target, null, null));
+            unit.setQueuedReplacementPending(true);
+            // The issue visit still decrements this delay, so add the beat
+            // native spends writing next_order instead of counting down.
+            unit.setBattleNetOrderDelay(stillWait + 1);
+            return true;
         }
         unit.clearPath();
         unit.setTarget(target);

@@ -133,4 +133,63 @@ class BnePlaytestAdapterTest {
         assertEquals(2, ((Number) state.get("missile_count")).intValue(),
                 "the Still visit still has the landed rock and its impact, not later axe throws");
     }
+
+    @Test
+    @DisplayName("an orc 1 grunt hall mend reports first progress at fixture 9")
+    void anOrc1GruntHallMendReportsFirstProgressAtFixture9() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-playtest-repair-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        String scenarioSha = "d".repeat(64);
+        String scenario = """
+                {
+                  "schema": "chonkcraft-bne-playtest-scenario-1",
+                  "scenario_sha256": "%s",
+                  "seed_identity": {"fixture": "repair-1-03"},
+                  "setup": {
+                    "kind": "sealed-fixture",
+                    "scenario": "Campaign\\\\Orc\\\\Orc01.pud",
+                    "seed": 1
+                  },
+                  "pattern": "single",
+                  "settle_cycles": 155,
+                  "actors": [
+                    {"id": 1592, "player": 0, "domain": "land",
+                     "capabilities": ["repair"], "x": 18, "y": 23}
+                  ],
+                  "targets": [
+                    {"id": 1593, "player": 0, "domain": "land", "x": 22, "y": 22}
+                  ],
+                  "commands": [
+                    {"kind": "repair", "unit_id": 1592, "target_id": 1593,
+                     "queued": false, "issue_cycle": 5}
+                  ]
+                }
+                """.formatted(scenarioSha);
+        Map<String, Object> parsed = Json.parseObject(scenario);
+        parsed.put("scenario_sha256", scenarioSha);
+        Files.writeString(scenarioPath, Json.write(parsed), StandardCharsets.UTF_8);
+
+        BnePlaytestAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "b".repeat(64),
+        });
+
+        Map<String, Object> result = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        Map<?, ?> observation = (Map<?, ?>) ((List<?>) result.get("observations"))
+                .getFirst();
+        Map<?, ?> state = (Map<?, ?>) observation.get("state");
+        assertEquals(9, ((Number) observation.get("first_progress_cycle")).intValue(),
+                "the grunt's Still wait pops Repair at fixture 9, not earlier dest-arm");
+        assertEquals(60, ((Number) observation.get("terminal_cycle")).intValue(),
+                "the grunt stands Still on 21,23 at fixture 60");
+        assertEquals(21, ((Number) state.get("tile_x")).intValue(),
+                "the grunt stands on the west hall ring");
+        assertEquals(23, ((Number) state.get("tile_y")).intValue(),
+                "the grunt stands on the west hall ring");
+    }
 }

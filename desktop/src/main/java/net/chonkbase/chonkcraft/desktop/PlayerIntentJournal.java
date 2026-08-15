@@ -231,6 +231,13 @@ final class PlayerIntentJournal {
                     || !java.util.Objects.equals(before.order, now.order);
             case HARVEST, RETURN_GOODS -> moved || before.carried != now.carried
                     || !java.util.Objects.equals(before.order, now.order);
+            // Native first_progress for GiveOrder 27 from Still is the
+            // Still-to-Repair (or Still-to-Move) pop. Counting every order
+            // change made leftover harvest repair-1/04 first progress 5
+            // while native stays Harvest + next_order 27 until 6.
+            case REPAIR -> moved
+                    || "STILL".equals(before.order)
+                    && !java.util.Objects.equals(before.order, now.order);
             case BUILD -> moved || foundationCreated;
             case TRAIN, RESEARCH, UPGRADE_TO -> productionChanged;
             case BOARD, UNLOAD, UNLOAD_ONE -> moved

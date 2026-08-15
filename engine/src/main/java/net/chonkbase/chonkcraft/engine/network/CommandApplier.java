@@ -207,7 +207,7 @@ public final class CommandApplier {
             case REPAIR -> {
                 Unit target = findUnit(command.targetId());
                 if (target != null) {
-                    accepted = world.orderRepair(unit, target);
+                    accepted = world.orderRepair(unit, target, true);
                 } else {
                     accepted = false;
                 }
