@@ -157,7 +157,36 @@ final class BattleNetMovementSystem {
             unit.setOrder(Unit.Order.STILL);
             return true;
         }
-        return promoteQueuedPlayerMoveAfterLeftover(unit);
+        if (promoteQueuedPlayerMoveAfterLeftover(unit)) {
+            return true;
+        }
+        return promoteQueuedRepairAfterLeftover(unit);
+    }
+
+    /**
+     * After leftover dest-arm pixels land, native pops queued Repair and
+     * pays wait 3 -- Human 5 peasant 1512 Harvest to Repair at fixture 19.
+     */
+    boolean promoteQueuedRepairAfterLeftover(Unit unit) {
+        if (unit == null || !unit.queuedReplacementPending()
+                || !unit.hasQueuedOrders() || unit.isMoving()) {
+            return false;
+        }
+        if (unit.residualX() != 0 || unit.residualY() != 0) {
+            return false;
+        }
+        Unit.QueuedOrder next = unit.queuedOrders().getFirst();
+        if (next.kind() != Unit.QueuedOrderKind.REPAIR || next.target() == null) {
+            return false;
+        }
+        unit.pollQueuedOrder();
+        unit.setQueuedReplacementPending(false);
+        world.construction.orderRepair(unit, next.target(), false);
+        // Leftover-land visit already executed the walk-bearing leftover,
+        // so two remaining quiet Repair visits match that three-visit start.
+        unit.setBattleNetOrderDelay(2);
+        unit.setActionBeforeQueued(null);
+        return true;
     }
 
     boolean promoteQueuedPlayerMoveAfterLeftover(Unit unit) {

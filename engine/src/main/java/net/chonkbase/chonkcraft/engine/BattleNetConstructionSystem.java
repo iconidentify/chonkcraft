@@ -1899,8 +1899,35 @@ final class BattleNetConstructionSystem {
         // flags carry 0x20 (building) or 0x0400 (transport). Anything
         // else becomes a walk to that hull. Used to refuse a standing
         // hall, which is why the peon never left the square.
-        if (!target.type().building() && !target.type().canTransport()) {
-            return world.orderMove(unit, target.tileX(), target.tileY());
+        boolean walkOnly = !target.type().building() && !target.type().canTransport();
+        // A dest-arm leftover already owns a heading. Native writes
+        // next_order 27 and the new point, then keeps draining that
+        // leftover -- Human 5 peasant 1512 first Repair at fixture 19
+        // still on Harvest. Installing Repair on the issue cycle
+        // Still'd at 119 on 39,100; native is Still at 118.
+        if (fromPlayer && world.movement.leftoverWalkBearing(
+                unit.currentAction(), unit)) {
+            if (walkOnly) {
+                return world.orderCommandMove(
+                        unit, target.tileX(), target.tileY());
+            }
+            unit.setTarget(target);
+            unit.setOrderTarget(target.tileX(), target.tileY());
+            unit.setPathGoal(target.tileX(), target.tileY());
+            unit.clearPath();
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.REPAIR,
+                    target.tileX(), target.tileY(), target, null, null));
+            unit.setQueuedReplacementPending(true);
+            return true;
+        }
+        if (walkOnly) {
+            // Native GiveOrder 27 from Still onto a grunt is player Move
+            // (timer 3, Still at 104). Autonomous orderMove delay 2
+            // Still'd at 103.
+            return fromPlayer
+                    ? world.orderCommandMove(unit, target.tileX(), target.tileY())
+                    : world.orderMove(unit, target.tileX(), target.tileY());
         }
         // Native GiveOrder 27 from Still on a no-mend actor writes
         // next_order 27 and restarts Still: Orc 1 grunt 1592 timer 4
