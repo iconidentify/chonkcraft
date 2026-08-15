@@ -448,6 +448,12 @@ final class BattleNetMovementSystem {
             // empty replan promoted Still after only five of them.
             if (battleNetOccupiedPointRefusal(unit)) {
                 unit.setRouteSpent(false);
+            } else if (playerMoveLastStepReady(unit)) {
+                // Leftover dest-arm landed one tile short of the click.
+                // Native batch-1/26 takes that last heading onto 32,7 at
+                // fixture 36. The empty-route ten-cycle wait dest-armed
+                // the last tile only at 47.
+                unit.setRouteSpent(false);
             } else if (spendTheEmptyRoute(unit)) {
                 // Every PF_WAIT runs the blocker test, the count-born one
                 // included: {@code COrder_Move::Execute}'s wait arm
@@ -1509,6 +1515,25 @@ final class BattleNetMovementSystem {
         // past it, and the drift until the next real step follows it.
         unit.setLastStepHeading(World.PHANTOM_HEADING);
         return true;
+    }
+
+    /**
+     * Whether leftover dest-arm landed one passable tile short of a player
+     * Move click. That last heading is not an intermediate empty buffer.
+     */
+    private boolean playerMoveLastStepReady(Unit unit) {
+        if (!unit.battleNetPlayerCommandMove() || !unit.routeSpent()
+                || battleNetCommandPointReached(unit)) {
+            return false;
+        }
+        int destX = unit.orderTargetX();
+        int destY = unit.orderTargetY();
+        if (!world.map.contains(destX, destY)) {
+            return false;
+        }
+        int chebyshev = Math.max(Math.abs(unit.tileX() - destX),
+                Math.abs(unit.tileY() - destY));
+        return chebyshev == 1 && world.canEnter(unit, destX, destY);
     }
 
     /** Whether a spent point route terminates in a live occupied step. */
