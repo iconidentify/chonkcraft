@@ -1615,12 +1615,24 @@ public final class Unit {
     }
 
     public void setOrder(Order order) {
+        Order previous = this.order;
         this.order = order;
-        if (order != Order.STILL) {
-            // Every native action selects its own binary animation sequence.
-            // The Java BNE profile currently interprets Still timing only, so
-            // invalidate that cursor while another order owns the unit. When
-            // it next stands still World will select a fresh Still sequence.
+        boolean keepCapitalPatrolCursor =
+                type != null
+                && type.seaUnit()
+                && ("unit-battleship".equals(type.ident())
+                        || "unit-ogre-juggernaught".equals(type.ident()))
+                && (order == Order.PATROL
+                        || (order == Order.MOVE && battleNetBorrowedMoveForStep
+                                && previous == Order.PATROL));
+        if (order != Order.STILL && !keepCapitalPatrolCursor) {
+            // Still keeps its cursor so the idle dispatcher can fire.
+            // Capital-ship Patrol used to wipe that same cursor, so XOrc 11's
+            // battleship lost the Still program at promote and never reached
+            // the Move-body OP0 that opens Attack at fixture 58. walkTowards
+            // borrows MOVE for that one stride and must not wipe it either.
+            // Other Patrol (scouts, destroyers) still wipe -- keeping those
+            // cursors shifted Human 12's async scout dest off 107,51.
             battleNetSequenceOffset = -1;
         }
     }

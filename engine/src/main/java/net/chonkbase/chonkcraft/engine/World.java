@@ -10670,8 +10670,23 @@ public final class World {
      * things.
      */
     private void stepPatrol(Unit unit) {
-        if (unit.battleNetOrderDelay() > 0) {
+        boolean delayHold = unit.battleNetOrderDelay() > 0;
+        if (delayHold) {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+        }
+        // Capital-ship Patrol keeps the Still/Move cursor and only scans on
+        // opcode zero. The 15-cycle autoAttack used to fire once the first
+        // leftover path existed, queue AttackMove, and arm delay 14, so
+        // XOrc 11 battleship 1511 never left Patrol. Native 1511 stays
+        // Patrol through the first-stride Move body and opens Attack 12
+        // at the next OP0 (fixture 58) on 18,40. Tick even during the
+        // constructor delay so timer 3 from promote expires on that first
+        // free visit, not three visits later.
+        boolean patrolOp0 = tickBattleNetPatrolSequence(unit);
+        if (delayHold) {
+            return;
+        }
+        if (patrolOp0 && battleNetPatrolAcquire(unit)) {
             return;
         }
         // Drain residual before acquisition and leftover free-consume. A
@@ -10722,10 +10737,17 @@ public final class World {
         // battleships used to convert to AttackMove on the first free visit
         // and step a cycle late (native still Patrol at 18,40 / 8,26 on
         // fixture cycle 5). Residual mid-slide never reaches here.
+        boolean standingPatrol = battleNetStandingPatrolSequence(unit);
+        if (standingPatrol && !patrolOp0) {
+            // Move-body visits stay on Patrol until the next OP0. Destroyer
+            // leftover-settle (1542) does not own this cursor and still
+            // falls through to autoAttack below.
+            return;
+        }
         boolean awaitingFirstPatrolStep = unit.battleNetDoubleStep()
                 && unit.pathLength() == 0
                 && !unit.isMoving();
-        if (!awaitingFirstPatrolStep && combat.autoAttack(unit)) {
+        if (!standingPatrol && !awaitingFirstPatrolStep && combat.autoAttack(unit)) {
             // Sea double-step with multi-step leftover (typically residual-
             // settled): native rewrites the route to the hostile and holds
             // under Patrol for fifteen animation ticks (1542: timer 15 at
@@ -10991,6 +11013,15 @@ public final class World {
         // stepMove reads the order it is given, so a patrolling unit has to
         // borrow the move order for the duration of the step and give it back.
         movement.walkTowards(unit, unit.orderTargetX(), unit.orderTargetY());
+        if (patrolOp0 && battleNetStandingPatrolSequence(unit)
+                && unit.order() == Unit.Order.PATROL) {
+            // One stride per OP0. Drop leftover headings so the Move body
+            // can finish on this tile -- keeping them used to let autoAttack
+            // see path>0 and arm the 15-tick hold, or walk off 18,40 before
+            // fixture 58.
+            armBattleNetPatrolMoveBody(unit);
+            unit.clearPath();
+        }
     }
 
     /**
@@ -12078,7 +12109,130 @@ public final class World {
         unit.setPatrol(unit.tileX(), unit.tileY());
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);
+        armBattleNetPatrolSequence(unit);
         return true;
+    }
+
+    /**
+     * Keeps the Still cursor a capital-ship Patrol was promoted from, or
+     * installs Move when that cursor was already gone.
+     *
+     * <p>Native 1511 keeps Still 2955 and resets the timer to 3 on the
+     * promote visit. Wiping the cursor here used to leave every later
+     * walkTowards on sequence -1, so the ship never saw the Move-body OP0
+     * that opens Attack at fixture 58.
+     */
+    private void armBattleNetPatrolSequence(Unit unit) {
+        if (battleNetSequence == null || unit == null || unit.type() == null
+                || !unit.type().seaUnit()
+                || !isBattleNetCapitalShip(unit.type().ident())) {
+            return;
+        }
+        if (unit.battleNetSequenceOffset() >= 0) {
+            unit.setBattleNetAnimationTimer(3);
+            return;
+        }
+        int move = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        if (move >= 0) {
+            unit.setBattleNetSequenceOffset(move);
+            unit.setBattleNetAnimationTimer(3);
+        }
+    }
+
+    /**
+     * Whether this Patrol's binary sequence owns acquire and stride cadence.
+     *
+     * <p>Capital ships hold one double-step for the whole Move body and
+     * scan only on opcode zero (XOrc 11 1511: west at fixture 5, Attack at
+     * 58). Destroyers keep leftover-settle autoAttack -- applying this
+     * cursor to 1542 would drop the fifteen-tick hold at fixture 40.
+     */
+    private boolean battleNetStandingPatrolSequence(Unit unit) {
+        return battleNetSequence != null
+                && unit != null
+                && unit.type() != null
+                && unit.battleNetDoubleStep()
+                && unit.type().seaUnit()
+                && isBattleNetCapitalShip(unit.type().ident())
+                && unit.battleNetSequenceOffset() >= 0;
+    }
+
+    /**
+     * Advances the Patrol sequence. Returns whether this visit is opcode
+     * zero, which is the only visit that may scan or take a capital-ship
+     * stride.
+     */
+    private boolean tickBattleNetPatrolSequence(Unit unit) {
+        if (!battleNetStandingPatrolSequence(unit)) {
+            return false;
+        }
+        BattleNetSequence.Tick tick = battleNetSequence.tick(
+                unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer());
+        if (!tick.valid()) {
+            return false;
+        }
+        unit.setBattleNetSequenceOffset(tick.offset());
+        unit.setBattleNetAnimationTimer(tick.timer());
+        return tick.actionMarker();
+    }
+
+    /**
+     * Hostile scan at a standing-patrol opcode zero.
+     *
+     * <p>This is order 12, not the 15-cycle AttackMove queue. Native 1511
+     * opens Attack at fixture 58 on the same visit the Move body returns
+     * to OP0, still on 18,40, once the orc destroyer at 10,42 is inside
+     * computer react 8. The first OP0 is still on 20,40 (dist 10) and
+     * must miss so fixture 5 stays Patrol.
+     */
+    private boolean battleNetPatrolAcquire(Unit unit) {
+        if (unit.order() != Unit.Order.PATROL
+                || unit.type() == null
+                || !unit.type().canAttack()
+                || !unit.isAggressive()
+                || unit.isDying()
+                || !unit.isOnMap()
+                || isBattleNetArmedTower(unit)
+                || cycle <= 1) {
+            return false;
+        }
+        int range = unit.type().reactRange(isPerson(unit.player()));
+        if (range <= 0) {
+            return false;
+        }
+        Unit target = targets.findBattleNetHostile(unit, range,
+                unit.offeredTarget());
+        return target != null && orderAttack(unit, target, false);
+    }
+
+    /**
+     * Switches a just-stepped capital-ship Patrol onto the Move body past
+     * the opening opcode zero, matching native 1511 sequence 2963 timer 1
+     * after the west stride at fixture 5.
+     */
+    private void armBattleNetPatrolMoveBody(Unit unit) {
+        if (battleNetSequence == null || unit == null || unit.type() == null) {
+            return;
+        }
+        int moveStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attackStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int cursor = unit.battleNetSequenceOffset();
+        if (moveStart >= 0 && cursor >= moveStart
+                && (attackStart < 0 || cursor < attackStart)) {
+            return;
+        }
+        if (moveStart < 0) {
+            return;
+        }
+        BattleNetSequence.Tick open = battleNetSequence.tick(moveStart, 1);
+        if (!open.valid()) {
+            return;
+        }
+        unit.setBattleNetSequenceOffset(open.offset());
+        unit.setBattleNetAnimationTimer(open.timer());
     }
 
     /**
@@ -12968,6 +13122,9 @@ public final class World {
                     && chebyshev <= stride
                     && battleNetNavalRewriteOpenWater(x, y);
             unit.setBattleNetOrderDelay(openWaterWiggle ? 5 : 2);
+            // FUN_00452ef0 gives the new Patrol three animation calls
+            // before its first opcode zero. Native 1511 keeps Still 2955
+            // with timer 3 on the promote visit (fixture 2) and steps at 5.
         }
     }
 
