@@ -40,6 +40,35 @@ class BattleNetStrideDestTest {
     }
 
     @Test
+    @DisplayName("a destroyer keeps Move while residual drains on the even neighbour")
+    void aDestroyerKeepsMoveWhileResidualDrainsOnTheEvenNeighbour() {
+        World world = openWater();
+        Unit ship = world.createUnit(destroyerType(), 0, 10, 10);
+        CommandApplier applier = new CommandApplier(world, List.of(ship.type()));
+        assertTrue(applier.apply(GameCommand.move(0, ship.id(), 10, 7)),
+                "the south click must be accepted");
+        boolean sawPark = false;
+        boolean heldMoveOnPark = false;
+        for (int i = 0; i < 80; i++) {
+            world.tick();
+            if (ship.tileY() == 8) {
+                if (!sawPark && ship.order() == Unit.Order.MOVE) {
+                    heldMoveOnPark = true;
+                }
+                sawPark = true;
+                if (ship.order() == Unit.Order.STILL) {
+                    break;
+                }
+            }
+        }
+        assertTrue(sawPark, "the destroyer never parked on 10,8");
+        assertTrue(heldMoveOnPark,
+                "wiping residual used to Still the hull the visit it parked");
+        assertEquals(Unit.Order.STILL, ship.order(),
+                "the hull must still stand down after the residual drains");
+    }
+
+    @Test
     @DisplayName("a balloon west click of three tiles parks on the even neighbour")
     void aBalloonWestClickOfThreeTilesParksOnTheEvenNeighbour() {
         World world = openAir();

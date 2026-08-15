@@ -279,12 +279,19 @@ final class BattleNetMovementSystem {
         }
         if (world.battleNetStrideOddDestEvenStop(unit)) {
             // The pathfinder floors a stride-two goal. A leftover heading
-            // then walks west or north past the odd click. Native is Still
-            // on the even neighbour facing that click.
+            // then walks west or north past the odd click. Native parks on
+            // the even neighbour facing that click -- but it keeps Move
+            // and drains the stride residual first. Wiping pixels here
+            // used to Still a balloon at fixture 10 while native held
+            // Move through 28 and stood down at 29.
             unit.clearPath();
-            resetDisplacement(unit);
-            world.finishOrder(unit);
-            unit.setActionBeforeQueued(null);
+            if (unit.isMoving()) {
+                walkPixels(unit);
+                if (unit.isMoving()) {
+                    return;
+                }
+            }
+            finishBattleNetMoveAtTarget(unit);
             return;
         }
         // Saves written before the odd-anchor tanker repair can resume in
