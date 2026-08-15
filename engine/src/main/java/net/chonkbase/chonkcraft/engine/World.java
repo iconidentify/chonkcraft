@@ -11778,10 +11778,26 @@ public final class World {
      * order a cycle early.
      */
     public boolean orderReturnGoods(Unit unit) {
-        UnitType.Resource cargo = unit == null ? null
-                : unit.heldResource() != null ? unit.heldResource() : unit.carrying();
-        if (unit == null || !unit.isAlive() || cargo == null || unit.carried() <= 0) {
+        if (unit == null || !unit.isAlive()) {
             return false;
+        }
+        UnitType.Resource cargo = unit.heldResource() != null
+                ? unit.heldResource() : unit.carrying();
+        // NewActionReturnGoods at 0x00436ac0 installs Still when FindDeposit
+        // answers none. It does not refuse an empty hand: dest 0,0 still
+        // names the nearest reachable gold depot and the hull walks there.
+        // A local unit with no friendly depot stays Still. Used to return
+        // false on empty cargo, which made a send-home look rejected while
+        // native was already on the hall walk.
+        UnitType.Resource depotResource = cargo != null
+                ? cargo : UnitType.Resource.GOLD;
+        Unit depot = harvest.bestDepotByTravel(unit, depotResource, 1000);
+        if (depot == null) {
+            unit.setOrder(Unit.Order.STILL);
+            return true;
+        }
+        if (cargo == null) {
+            cargo = depotResource;
         }
         Unit.Order before = unit.order();
         // NewActionReturnGoods copies CUnit::CurrentResource, not the

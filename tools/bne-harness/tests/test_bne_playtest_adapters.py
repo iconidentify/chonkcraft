@@ -275,7 +275,7 @@ class PlaytestAdapterTest(unittest.TestCase):
             java_result["observations"][1]["state"]["tile_y"]),
             "both engines bank at the great hall")
 
-    def test_java_refuses_an_empty_return_goods_the_button_hides(self):
+    def test_both_adapters_send_an_empty_peon_to_the_hall(self):
         pack = Path.home() / (
             ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
         fixture = (
@@ -283,9 +283,11 @@ class PlaytestAdapterTest(unittest.TestCase):
             / "work/playtest-explorer/commanded/return-goods-1/00.bnefx"
         )
         if not fixture.is_file() or not pack.is_file():
-            self.skipTest("empty return-goods fixture or BNE pack missing")
+            self.skipTest("empty Orc 1 return-goods fixture or BNE pack missing")
         seed = explorer.seed_from_commanded_fixture(fixture)
         scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
         script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
         with tempfile.TemporaryDirectory() as directory:
             adapter = explorer.Adapter("java", [
@@ -294,9 +296,48 @@ class PlaytestAdapterTest(unittest.TestCase):
                 "--asset-pack", str(pack), "--skip-build",
             ], timeout=180.0)
             java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
         explorer.validate_result(java_result, scenario, "java")
-        self.assertFalse(java_result["observations"][0]["accepted"],
-                         "an empty peon has nothing to return")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 24 applies an empty send-home")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must not refuse an empty send-home")
+        self.assertEqual((22, 22), (
+            java_result["observations"][0]["state"]["tile_x"],
+            java_result["observations"][0]["state"]["tile_y"]),
+            "the empty peon walks to the great hall")
+
+    def test_both_adapters_leave_a_send_home_still_when_no_depot_exists(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/return-goods-2/01.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("no-depot return-goods fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(native_result, scenario, "native")
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 24 still applies when FindDeposit fails")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must apply the click even when there is no hall")
+        self.assertEqual((20, 31), (
+            java_result["observations"][0]["state"]["tile_x"],
+            java_result["observations"][0]["state"]["tile_y"]),
+            "no friendly depot means the hull stays put")
 
 
 if __name__ == "__main__":

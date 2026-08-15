@@ -3139,16 +3139,17 @@ final class BattleNetHarvestSystem {
 
     /** Carries whatever is held back to the nearest depot. */
     void stepReturnGoods(Unit unit) {
-        if (unit.carrying() == null || unit.carried() <= 0) {
-            unit.setOrder(Unit.Order.STILL);
-            return;
-        }
+        // NewActionReturnGoods still walks when the hand is empty: FindDeposit
+        // names the hall, and a zero load enters it the same way a full one
+        // does. Used to Still here, which left an empty send-home on the
+        // spawn tile while native was already on the hall doorstep.
+        UnitType.Resource resource = unit.carrying() != null
+                ? unit.carrying() : UnitType.Resource.GOLD;
         // The return order is COrder_Resource in its going-home states, and
         // its depot is FindDeposit's: nearest by the walked route,
         // unreachable ones excluded (NewActionReturnGoods,
         // The game ).
-        Unit depot = unit.type().gathering().containsKey(unit.carrying())
-                ? bestDepotByTravel(unit, unit.carrying(), 1000) : null;
+        Unit depot = bestDepotByTravel(unit, resource, 1000);
         if (depot == null) {
             // Born in SUB_UNREACHABLE_DEPOT: the first cycle's Execute is
             // ResourceGiveUp, which keeps the load -- a goalless order has

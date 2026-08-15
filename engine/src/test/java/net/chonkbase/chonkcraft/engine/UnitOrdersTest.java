@@ -469,13 +469,16 @@ class UnitOrdersTest {
     }
 
     @Test
-    @DisplayName("an empty worker has nothing to return")
-    void returnGoodsNeedsALoad() {
+    @DisplayName("an empty send-home without a depot stands still")
+    void returnGoodsWithoutADepotStandsStill() {
         Fixture fixture = load();
         World world = world(fixture.data());
         Unit worker = world.createUnit(fixture.types().get("unit-peasant"), 0,
                 fixture.x(), fixture.y());
-        assertTrue(!world.orderReturnGoods(worker));
+        assertTrue(world.orderReturnGoods(worker),
+                "GiveOrder table 24 still applies when FindDeposit answers none");
+        assertEquals(Unit.Order.STILL, worker.order(),
+                "native installs Still rather than a hall walk");
     }
 
     @Test
