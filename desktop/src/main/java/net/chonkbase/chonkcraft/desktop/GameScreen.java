@@ -2713,7 +2713,11 @@ final class GameScreen extends JPanel {
             }
         }
         selectionChanged(first);
-        status = count == 0 ? "" : count + " selected.";
+        if (selected != null && !selected.selected()) {
+            selectionChanged(firstSelected());
+        }
+        int kept = countSelected();
+        status = kept == 0 ? "" : kept + " selected.";
         if (first != null) {
             playUnit(first, "selected", this::chooseSample);
         }
@@ -2739,9 +2743,17 @@ final class GameScreen extends JPanel {
         }
         if (add && clicked != null && world.canControl(localPlayer, clicked.player())) {
             // Shift adds to the selection rather than replacing it, which is
-            // how a mixed group is put together.
+            // how a mixed group is put together. A tenth unit is refused:
+            // selecting it used to steal the sidebar even though the packet
+            // never took it.
+            if (!clicked.selected() && countSelected() >= MAX_SELECTED_UNITS) {
+                return;
+            }
             clicked.setSelected(!clicked.selected());
             selectionChanged(clicked.selected() ? clicked : firstSelected());
+            if (selected != null && !selected.selected()) {
+                selectionChanged(firstSelected());
+            }
             status = countSelected() + " selected.";
             return;
         }
@@ -3195,18 +3207,9 @@ final class GameScreen extends JPanel {
         if (canFollow(unit, under)) {
             return follow(unit, under, tileX, tileY, queued);
         }
-        // A worker sent at an enemy hits it. Upstream's worker table has no
-        // attack branch at all -- {@code DoRightButton_Worker} falls straight
-        // to {@code SendCommandMove}, so a peasant ordered onto a footman
-        // walks up to him and waits to be hit first. This implementation departs from
-        // that deliberately, because Warcraft II's own peasants swing when
-        // they are sent at something. What it costs is bounded: a worker that
-        // upstream would have left standing attacks instead, which is the
-        // same fight one exchange earlier.
-        if (under != null && world.isEnemyPlayer(unit.player(), under.player())) {
-            return issueStatus(GameCommand.attack(
-                    localPlayer, unit.id(), under.id()).withQueued(queued));
-        }
+        // DoRightButton_Worker has no attack branch. Java used to send Attack
+        // here, so a peasant ordered onto an enemy footman started a fight
+        // the native table never asked for.
         return issueStatus(GameCommand.move(
                 localPlayer, unit.id(), tileX, tileY).withQueued(queued));
     }
@@ -3380,6 +3383,14 @@ final class GameScreen extends JPanel {
         }
     }
 
+    void selectWithinForTest(java.awt.Rectangle screen) {
+        selectWithin(screen, false);
+    }
+
+    void shiftSelectForTest(Unit unit) {
+        selectUnit(unit, true);
+    }
+
     void selectForTest(Unit unit) {
         for (Unit other : world.unitsSnapshot()) {
             other.setSelected(other == unit);
@@ -3404,6 +3415,10 @@ final class GameScreen extends JPanel {
 
     java.util.List<Integer> selectedIdsForTest() {
         return java.util.List.copyOf(selectedIds());
+    }
+
+    Unit selectedForTest() {
+        return selected;
     }
 
     java.util.List<PlayerIntentJournal.Entry> intentEntriesForTest() {

@@ -592,6 +592,53 @@ class SelectionChangeTest {
      * centre, give or take a character of rounding.
      */
     @Test
+    @DisplayName("a rectangle over twelve units reports nine selected")
+    void aRectangleOverTwelveUnitsReportsNineSelected() {
+        Scene scene = scene();
+        var type = scene.data.unitTypes().types().get("unit-footman");
+        Assumptions.assumeTrue(type != null, "no footman type");
+        java.util.List<Unit> group = new java.util.ArrayList<>();
+        for (int i = 0; i < 16 && group.size() < 12; i++) {
+            Unit made = scene.world.createUnit(type, ME, 2 + (i % 6), 2 + (i / 6));
+            if (made != null) {
+                group.add(made);
+            }
+        }
+        Assumptions.assumeTrue(group.size() >= 12, "could not stand twelve footmen");
+        scene.screen.selectWithinForTest(new Rectangle(0, 0, WIDTH, HEIGHT));
+        assertEquals(9, scene.screen.selectedIdsForTest().size(),
+                "more than nine units stayed selected");
+        assertEquals("9 selected.", scene.screen.status(),
+                "the status line counted units the nine-slot packet cannot hold");
+    }
+
+    @Test
+    @DisplayName("a tenth shift-click does not steal the sidebar")
+    void aTenthShiftClickDoesNotStealTheSidebar() {
+        Scene scene = scene();
+        var type = scene.data.unitTypes().types().get("unit-footman");
+        Assumptions.assumeTrue(type != null, "no footman type");
+        java.util.List<Unit> group = new java.util.ArrayList<>();
+        for (int i = 0; i < 16 && group.size() < 10; i++) {
+            Unit made = scene.world.createUnit(type, ME, 2 + (i % 5), 2 + (i / 5));
+            if (made != null) {
+                group.add(made);
+            }
+        }
+        Assumptions.assumeTrue(group.size() >= 10, "could not stand ten footmen");
+        scene.screen.selectForTest(group.subList(0, 9));
+        Unit first = group.get(0);
+        Unit tenth = group.get(9);
+        scene.screen.shiftSelectForTest(tenth);
+        assertEquals(9, scene.screen.selectedIdsForTest().size(),
+                "the tenth unit joined the selection");
+        assertTrue(first.selected(), "the original selection was dropped");
+        assertFalse(tenth.selected(), "the rejected tenth stayed selected");
+        assertEquals(first, scene.screen.selectedForTest(),
+                "the sidebar switched to the unit the packet refused");
+    }
+
+    @Test
     @DisplayName("an armed order's name sits centred on the status strip")
     void theStatusLineIsCentredOnItsStrip() {
         Scene scene = scene();

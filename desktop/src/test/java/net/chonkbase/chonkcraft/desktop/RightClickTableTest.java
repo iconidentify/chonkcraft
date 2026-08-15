@@ -391,6 +391,24 @@ class RightClickTableTest {
     }
 
     @Test
+    @DisplayName("a worker right-clicked onto an enemy walks rather than attacks")
+    void aWorkerRightClickedOntoAnEnemyWalksRatherThanAttacks() {
+        Scene scene = scene();
+        Unit peasant = place(scene, "unit-peasant", 0, 3, 3);
+        Unit grunt = peasant == null ? null
+                : place(scene, "unit-grunt", 1, peasant.tileX() + 2, peasant.tileY());
+        Assumptions.assumeTrue(peasant != null && grunt != null,
+                "nowhere to put a peasant and a grunt");
+
+        only(scene, peasant);
+        rightClick(scene.screen(), grunt.tileX(), grunt.tileY(), false, false);
+
+        assertEquals(Unit.Order.MOVE, peasant.order(),
+                "a peasant sent at an enemy took " + peasant.order()
+                        + ": BNE's worker table has no attack branch");
+    }
+
+    @Test
     @DisplayName("alt-right-click on a friend is defend, not a walk")
     void altRightClickDefendsAFriend() {
         Scene scene = scene();
