@@ -45,7 +45,10 @@ final class PlayerIntentJournal {
             int unitMaxY = unit.tileY() + Math.max(1, unit.type().tileHeight()) - 1;
             int gapX = rectangleGap(unit.tileX(), unitMaxX, minX, maxX);
             int gapY = rectangleGap(unit.tileY(), unitMaxY, minY, maxY);
-            return Math.max(gapX, gapY) <= 1;
+            // Flyers walk a doubled lattice, so Human 13's occupied daemon
+            // stands still two tiles short of the click (86,2 vs 86,4).
+            int reach = unit.type() != null && unit.type().airUnit() ? 2 : 1;
+            return Math.max(gapX, gapY) <= reach;
         }
 
         private static int rectangleGap(int aMin, int aMax, int bMin, int bMax) {
@@ -107,7 +110,7 @@ final class PlayerIntentJournal {
                 destination.issue(command);
                 State delivered = stateOf(world, command.unitId());
                 order(submittedAt, selection, command, null,
-                        submitted, targetSubmitted, delivered, goal);
+                        submitted, targetSubmitted, delivered, goal, world);
             }
 
             @Override
@@ -120,7 +123,7 @@ final class PlayerIntentJournal {
                 boolean accepted = destination.issueAccepted(command);
                 State delivered = stateOf(world, command.unitId());
                 order(submittedAt, selection, command, accepted,
-                        submitted, targetSubmitted, delivered, goal);
+                        submitted, targetSubmitted, delivered, goal, world);
                 return accepted;
             }
         };
@@ -128,7 +131,7 @@ final class PlayerIntentJournal {
 
     private synchronized void order(long cycle, List<Integer> selectedUnitIds,
             GameCommand command, Boolean accepted, State submitted,
-            State targetSubmitted, State delivered, Goal goal) {
+            State targetSubmitted, State delivered, Goal goal, World world) {
         long id = nextIntentId++;
         add(new Entry(id, cycle, "order", List.copyOf(selectedUnitIds), command, accepted));
         if (submitted == null || command.unitId() == 0) {
@@ -147,6 +150,15 @@ final class PlayerIntentJournal {
         if (Boolean.FALSE.equals(accepted)) {
             tracking.terminalCycle = cycle;
             tracking.terminalReason = "rejected";
+        } else {
+            Unit unit = find(world, command.unitId());
+            State targetNow = stateOf(world, command.targetId());
+            String terminal = terminalReason(tracking, tracking.latest, targetNow,
+                    cycle, world, unit);
+            if (terminal != null) {
+                tracking.terminalCycle = cycle;
+                tracking.terminalReason = terminal;
+            }
         }
         while (outcomes.size() >= LIMIT) {
             outcomes.removeFirst();
@@ -248,10 +260,7 @@ final class PlayerIntentJournal {
         State before = tracking.submitted;
         return switch (command.kind()) {
             case MOVE, ATTACK_MOVE, PATROL, EXPLORE, FOLLOW ->
-                    "STILL".equals(now.order)
-                            && (tracking.firstProgressCycle != null
-                                || tracking.goal != null
-                                    && tracking.goal.touches(unit));
+                    movementSettled(tracking, now, unit);
             case STOP -> "STILL".equals(now.order);
             case STAND_GROUND -> "STAND_GROUND".equals(now.order);
             case DEFEND -> "DEFEND".equals(now.order);
@@ -274,6 +283,27 @@ final class PlayerIntentJournal {
                     && "STILL".equals(now.order);
             default -> false;
         };
+    }
+
+    /**
+     * A walk is over when the unit stands still after making progress, or
+     * is already on the edge of a blocked click. The native fixture
+     * adapter uses the same Still-after-progress rule; requiring the dest
+     * tile made nineteen Human walks wait the whole window while native
+     * had already stood still one square short.
+     */
+    private static boolean movementSettled(Tracking tracking, State now,
+            Unit unit) {
+        if (!"STILL".equals(now.order)) {
+            return false;
+        }
+        if (tracking.goal != null && tracking.goal.blocked()
+                && tracking.goal.touches(unit)) {
+            return true;
+        }
+        return tracking.firstProgressCycle != null
+                || now.tileX == tracking.command.x()
+                && now.tileY == tracking.command.y();
     }
 
     private static boolean targetChanged(State before, State now) {

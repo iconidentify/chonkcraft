@@ -12,6 +12,7 @@ import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class PlayerIntentJournalTest {
@@ -103,6 +104,26 @@ class PlayerIntentJournalTest {
         PlayerIntentJournal.Outcome result = journal.outcomeSnapshot().getFirst();
         assertEquals("acknowledged-no-progress", result.terminalReason());
         assertEquals(null, result.firstProgressCycle());
+    }
+
+    @Test
+    @DisplayName("an already-touching blocked click settles on the issue cycle")
+    void anAlreadyTouchingBlockedClickSettlesOnTheIssueCycle() {
+        World world = world();
+        UnitType workerType = movable("unit-peon");
+        UnitType mineType = building("unit-gold-mine", 3, 3);
+        Unit worker = world.createUnit(workerType, 0, 5, 6);
+        world.createUnit(mineType, 15, 6, 6);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> { }, world::cycle,
+                () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.move(0, worker.id(), 7, 7));
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals("settled", outcome.terminalReason(),
+                "standing on the mine's edge must close the click immediately");
+        assertEquals(Long.valueOf(0), outcome.terminalCycle(),
+                "the native adapter snapshots that Still on the issue cycle");
     }
 
     @Test

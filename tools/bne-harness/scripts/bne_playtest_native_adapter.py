@@ -141,6 +141,19 @@ def progressed(before: dict[str, Any], now: dict[str, Any], kind: str) -> bool:
         before.get("hit_points") != now.get("hit_points"))
 
 
+def standing_at_move_goal(command: dict[str, Any], now: dict[str, Any]) -> bool:
+    """A still unit already on or beside the click has settled the order."""
+    if command.get("kind") not in {"move", "attack-move", "patrol", "follow"}:
+        return False
+    dest_x = command.get("x")
+    dest_y = command.get("y")
+    tile_x = now.get("tile_x")
+    tile_y = now.get("tile_y")
+    if dest_x is None or dest_y is None or tile_x is None or tile_y is None:
+        return False
+    return max(abs(int(tile_x) - int(dest_x)), abs(int(tile_y) - int(dest_y))) <= 1
+
+
 def load_json(path: Path) -> dict[str, Any]:
     return explorer.load_json(path, "playtest scenario")
 
@@ -273,7 +286,9 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
                 terminal_cycle = cycle
                 terminal_reason = "unit-unavailable"
                 break
-            if first_progress is not None and now.get("order") == "STILL":
+            if now.get("order") == "STILL" and (
+                    first_progress is not None
+                    or standing_at_move_goal(command, now)):
                 terminal_cycle = cycle
                 terminal_reason = (
                     "settled" if kind in {

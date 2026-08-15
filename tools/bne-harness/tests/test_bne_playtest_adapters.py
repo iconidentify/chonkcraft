@@ -500,8 +500,8 @@ class PlaytestAdapterTest(unittest.TestCase):
         explorer.validate_result(java_result, scenario, "java")
         self.assertTrue(native_result["observations"][0]["accepted"],
                         "GiveOrder table 17 still applies on a peon")
-        self.assertFalse(java_result["observations"][0]["accepted"],
-                         "a peon has nothing to throw at bare ground")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                         "GiveOrder 17 walks a peon toward the clicked grass")
 
 
 if __name__ == "__main__":
