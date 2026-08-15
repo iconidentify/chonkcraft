@@ -1571,7 +1571,56 @@ final class BattleNetMovementSystem {
      *     range-aware route the attack order laid and put the unit straight
      *     back into jogging on the spot.
      */
+    /**
+     * A melee leftover residual that already stands in weapon range, with
+     * its last heading naming the quarry's occupied square, dest-arms into
+     * Attack once leftover debt is at most a quarter-tile. The same 8-pixel
+     * "nearly settled" gate already owns ranged leftover residual. Native
+     * XHuman 9 enters Attack@1188 at leftover 0 on fixture 46; Java's
+     * leftover is still 8 at that fixture because the chase opened later,
+     * and waiting for leftover 0 pushed opcode ten past 55.
+     */
+    private boolean arriveMeleeLeftoverOnOccupiedQuarry(Unit unit) {
+        if (unit == null || unit.type() == null
+                || unit.type().maxAttackRange() != 1
+                || unit.pathLength() != 1
+                || unit.target() == null
+                || World.battleNetRangedChaseUnit(unit)
+                || (unit.order() != Unit.Order.ATTACK
+                        && unit.order() != Unit.Order.ATTACK_MOVE
+                        && !unit.chasing())) {
+            return false;
+        }
+        int debt = Math.max(Math.abs(unit.offsetX()), Math.abs(unit.offsetY()));
+        if (debt > 8) {
+            return false;
+        }
+        int heading = unit.peekHeading();
+        int nextX = unit.tileX() + Direction.deltaX(heading);
+        int nextY = unit.tileY() + Direction.deltaY(heading);
+        Unit quarry = world.unitAt(nextX, nextY);
+        if (quarry == null || quarry != unit.target()
+                || !world.targets.inAttackRange(unit, quarry)) {
+            return false;
+        }
+        unit.clearPath();
+        unit.setRouteSpent(false);
+        unit.setBattleNetCollisionCounter(0);
+        unit.setBattleNetChaseEmptyRouteReplan(false);
+        unit.setChasing(false);
+        unit.setFighting(true);
+        unit.setBattleNetResidualEmptyRouteSettle(false);
+        resetDisplacement(unit);
+        world.openBattleNetAttackAfterChaseResidual(unit, true);
+        world.consumeBattleNetPendingMeleeSyncRand(unit);
+        world.turnToTarget(unit, quarry, 0, 0);
+        return true;
+    }
+
     void stepMove(Unit unit, boolean replanOnExhaustion) {
+        if (arriveMeleeLeftoverOnOccupiedQuarry(unit)) {
+            return;
+        }
         // Nothing is asked of the route while the move animation is still
         // running. DoActionMove reaches NextPathElement only when
         //
@@ -3235,21 +3284,7 @@ final class BattleNetMovementSystem {
                     // 46 and strikes at 55. Treating S as an ordinary body
                     // collision armed the 23-cycle refusal wait and postponed
                     // the first Java blow until fixture 81.
-                    boolean reachedOccupiedQuarry = hardBlocker != null
-                            && hardBlocker == unit.target()
-                            && unit.type().maxAttackRange() <= 1
-                            && world.targets.inAttackRange(unit, hardBlocker);
-                    if (reachedOccupiedQuarry) {
-                        unit.clearPath();
-                        unit.setRouteSpent(false);
-                        unit.setBattleNetCollisionCounter(0);
-                        unit.setBattleNetChaseEmptyRouteReplan(false);
-                        unit.setChasing(false);
-                        unit.setFighting(true);
-                        unit.setBattleNetResidualEmptyRouteSettle(false);
-                        world.openBattleNetAttackAfterChaseResidual(unit, true);
-                        world.consumeBattleNetPendingMeleeSyncRand(unit);
-                        world.turnToTarget(unit, hardBlocker, 0, 0);
+                    if (arriveMeleeLeftoverOnOccupiedQuarry(unit)) {
                         return;
                     }
                     boolean allyHard = hardBlocker != null
