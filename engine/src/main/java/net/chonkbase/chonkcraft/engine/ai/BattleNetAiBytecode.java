@@ -114,6 +114,65 @@ public final class BattleNetAiBytecode {
     }
 
     /**
+     * Expands the 0x4273e0 box around land buildings, newest first.
+     *
+     * <p>Native walks {@code 0x4be264[player]} (unit pool inserted at the
+     * head, so reverse creation order). A unit is skipped unless flags
+     * {@code +0x1e} are clear, type flag {@code 0x20} (building) is set, and
+     * type flags {@code 0x10800} are clear -- sea, shore, and water-sited
+     * oil platforms stay out. Updating a min skips the max on that axis.
+     * After the walk, min
+     * subtracts 5 and max adds 8, clamped to {@code [0, mapSize-1]}.
+     *
+     * @param tilesNewestFirst land-building origins, newest first
+     */
+    public static void expandLandBuildBounds(byte[] state, int mapSize,
+            java.util.List<int[]> tilesNewestFirst) {
+        installEmptyBuildBounds(state, mapSize);
+        if (state == null || tilesNewestFirst == null
+                || tilesNewestFirst.isEmpty()) {
+            return;
+        }
+        for (int[] tile : tilesNewestFirst) {
+            if (tile == null || tile.length < 2) {
+                continue;
+            }
+            expandAxis(state, OFF_BOUND_MIN_X, OFF_BOUND_MAX_X, tile[0]);
+            expandAxis(state, OFF_BOUND_MIN_Y, OFF_BOUND_MAX_Y, tile[1]);
+        }
+        padBuildBounds(state, mapSize);
+    }
+
+    private static void expandAxis(byte[] state, int minOff, int maxOff,
+            int value) {
+        int min = state[minOff];
+        int max = state[maxOff];
+        if (value < min) {
+            state[minOff] = (byte) value;
+        } else if (value > max) {
+            state[maxOff] = (byte) value;
+        }
+    }
+
+    private static void padBuildBounds(byte[] state, int mapSize) {
+        int last = Math.max(0, mapSize - 1);
+        state[OFF_BOUND_MIN_X] = padMin(state[OFF_BOUND_MIN_X]);
+        state[OFF_BOUND_MIN_Y] = padMin(state[OFF_BOUND_MIN_Y]);
+        state[OFF_BOUND_MAX_X] = padMax(state[OFF_BOUND_MAX_X], last);
+        state[OFF_BOUND_MAX_Y] = padMax(state[OFF_BOUND_MAX_Y], last);
+    }
+
+    private static byte padMin(byte value) {
+        int next = value - 5;
+        return (byte) (next < 0 ? 0 : next);
+    }
+
+    private static byte padMax(byte value, int last) {
+        int next = value + 8;
+        return (byte) (next > last ? last : next);
+    }
+
+    /**
      * One simulation-step tick: decrement wait or execute until wait is set.
      *
      * @return updated program counter

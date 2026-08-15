@@ -70,4 +70,20 @@ class BattleNetAiBytecodeTest {
         assertEquals(0xff, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff);
         assertEquals(32, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff);
     }
+
+    @Test
+    void expandLandBuildBoundsPadsADecreasingYWalk() {
+        byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
+        java.util.List<int[]> newestFirst = java.util.List.of(
+                new int[] {18, 31},
+                new int[] {10, 23},
+                new int[] {18, 19},
+                new int[] {5, 11},
+                new int[] {8, 2});
+        BattleNetAiBytecode.expandLandBuildBounds(state, 96, newestFirst);
+        assertEquals(0, state[BattleNetAiBytecode.OFF_BOUND_MIN_Y] & 0xff);
+        assertEquals(26, state[BattleNetAiBytecode.OFF_BOUND_MAX_X] & 0xff);
+        assertEquals(7, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff);
+        assertEquals(0, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff);
+    }
 }

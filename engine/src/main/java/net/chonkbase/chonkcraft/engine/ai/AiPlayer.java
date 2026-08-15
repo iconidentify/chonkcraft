@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine.ai;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -377,12 +378,14 @@ public final class AiPlayer {
         if (battleNetAiState == null || world == null) {
             return;
         }
-        // Native 0x4273e0 writes the inverted build box before the first
-        // ready pulse. Leaving these bytes zero made the compared
-        // AIPlayerState disagree with Orc 1 / Human 1 game-before dumps.
+        // Native 0x4273e0 writes the inverted build box, then expands
+        // around land buildings when the player has a unit list. Orc 1 /
+        // Human 1 computers have no land building, so the box stays
+        // 32,-1,-1,32. Human 4 / Orc 4 expand and pad -5/+8.
         if (world.map() != null) {
-            BattleNetAiBytecode.installEmptyBuildBounds(
-                    battleNetAiState, world.map().width());
+            BattleNetAiBytecode.expandLandBuildBounds(
+                    battleNetAiState, world.map().width(),
+                    landBuildingTilesNewestFirst(world));
         }
         for (int step = 0; step < 32; step++) {
             int waitBefore = BattleNetAiBytecode.waitCounter(battleNetAiState);
@@ -402,6 +405,36 @@ public final class AiPlayer {
                 return;
             }
         }
+    }
+
+    /**
+     * Whether native 0x4273e0 counts this type. Type flag 0x20 is a
+     * building; 0x10800 drops sea, shore, and water-sited oil platforms.
+     */
+    private static boolean countsForBuildBounds(UnitType type) {
+        if (type == null || !type.building() || type.seaUnit()
+                || type.shoreBuilding()) {
+            return false;
+        }
+        String corpse = type.corpse();
+        return corpse == null || !corpse.contains("water");
+    }
+
+    /**
+     * Land-building origins, newest first, matching native 0x4be264
+     * head-insert order.
+     */
+    private List<int[]> landBuildingTilesNewestFirst(World world) {
+        List<int[]> tiles = new ArrayList<>();
+        for (Unit unit : world.units()) {
+            if (unit == null || unit.player() != playerIndex
+                    || !unit.isAlive() || !countsForBuildBounds(unit.type())) {
+                continue;
+            }
+            tiles.add(new int[] {unit.tileX(), unit.tileY()});
+        }
+        Collections.reverse(tiles);
+        return tiles;
     }
 
     /**
