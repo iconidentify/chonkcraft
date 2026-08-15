@@ -1117,7 +1117,16 @@ final class BattleNetConstructionSystem {
 
     /**
      * The terrain half of {@code CanBuildUnitType}: every square of the
-     * footprint has to be ground this type accepts and hold nothing.
+     * footprint has to be ground this type accepts and hold nothing that
+     * native CheckCanBuild treats as blocking.
+     *
+     * <p>A building paints {@code MapFieldBuilding} across its whole
+     * footprint so walkers go around it. CheckCanBuild does not use that
+     * bit. It refuses a tile when a solid building's origin sits there, or
+     * when a mobile unit is standing on it. Java used to treat every hall
+     * tile as occupied, so Garden of War's authenticated blacksmith packet
+     * at 90,6 -- on the body of the 4x4 hall at 89,5 -- never founded, and
+     * replay execution stopped at the research that needs that smith.
      */
     boolean footprintIsClear(UnitType what, int tileX, int tileY) {
         int width = Math.max(1, what.tileWidth());
@@ -1125,17 +1134,68 @@ final class BattleNetConstructionSystem {
         long allowed = Unit.movementMaskFor(what);
         for (int dy = 0; dy < height; dy++) {
             for (int dx = 0; dx < width; dx++) {
-                MapField field = world.map.fieldOrNull(tileX + dx, tileY + dy);
+                int x = tileX + dx;
+                int y = tileY + dy;
+                MapField field = world.map.fieldOrNull(x, y);
                 if (field == null
                         || !field.hasFlag(allowed)
                         || field.hasFlag(TileFlag.UNPASSABLE)
                         || field.hasFlag(TileFlag.NO_BUILDING)
-                        || field.isOccupied()) {
+                        || field.hasFlag(TileFlag.LAND_UNIT | TileFlag.SEA_UNIT)
+                        || solidBuildingOriginAt(x, y)) {
                     return false;
                 }
             }
         }
         return true;
+    }
+
+    /**
+     * Whether a solid building's stored tile is this square.
+     *
+     * <p>Retail occupancy for movement covers the whole footprint. The
+     * build predicate only sees the origin tile -- otherwise a 3x3 smith
+     * can never be ordered onto 90,6 beside a hall whose origin is 89,5.
+     */
+    boolean solidBuildingOriginAt(int tileX, int tileY) {
+        for (Unit unit : world.units) {
+            if (unit.tileX() != tileX || unit.tileY() != tileY
+                    || !unit.isAlive() || !unit.isOnMap()
+                    || unit.type() == null || !unit.type().building()
+                    || unit.type().nonSolid() || unit.type().hitPoints() <= 0) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+
+    /**
+     * Whether this worker is walking to found and must ignore
+     * {@code MapFieldBuilding} the same way CheckCanBuild does.
+     *
+     * <p>Garden of War's authenticated blacksmith packet sits at 90,6, on
+     * the body of the 4x4 hall at 89,5. Every neighbour of 90,6 is also a
+     * hall tile. Java used to treat those flags as a wall, so the peon
+     * stopped at 92,4 and native unit 1554 had no Java blacksmith to bind
+     * to at record 3477. The order is flipped to MOVE for the step itself,
+     * which is why this keys off the pending type rather than the label.
+     */
+    boolean builderWalksThroughBuildingBodies(Unit unit) {
+        return unit != null && unit.isOnMap() && unit.worksite() == null
+                && unit.pendingBuild() != null;
+    }
+
+
+    /**
+     * Blocking flags for a builder's walk: same as movement, minus the
+     * building bit that CheckCanBuild also ignores. Origin tiles stay
+     * closed so a 1x1 wall is still a wall.
+     */
+    long builderTraversalBlocking(Unit unit) {
+        long blocking = unit.blockingFlags() & ~TileFlag.BUILDING;
+        return blocking;
     }
 
 

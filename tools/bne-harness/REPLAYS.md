@@ -32,12 +32,12 @@ aggregate, compiles all 764,756 native dispatcher records, then checks Java's
 exact ordered fan-out, nine-unit cap, acceptance recording, and progress by
 every member of a congested 3×3 group. It also reconstructs the authenticated
 Garden of War startup and executes the proved command subset in the Java
-engine. The current certified floor is 3,477 dispatcher records, 472 decoded
-commands, 166 submitted unit orders, 142 dispatcher acceptances, 138 orders
-with a physical effect or proved blocked-goal settlement, and 136 fulfilled
-objectives across 32 bound native
-units. Execution stops fail-closed at native unit 1554's first unsupported
-identity at record 3,477; moving that proved boundary forward is an
+engine. The current certified floor is 3,935 dispatcher records, 543 decoded
+commands, 189 submitted unit orders, 159 dispatcher acceptances, 154 orders
+with a physical effect or proved blocked-goal settlement, and 153 fulfilled
+objectives across 37 bound native
+units. Execution stops fail-closed at native unit 1526's first unsupported
+identity at record 3,935; moving that proved boundary forward is an
 improvement, while any earlier stop fails the gate.
 
 During play the desktop keeps bounded 512-entry in-memory intent and outcome
@@ -204,10 +204,9 @@ and high is 10,000 / 5,000 / 5,000. Map-default keeps PUD values above the
 retail multiplayer floor and raises lower active banks to 2,100 / 1,100 /
 1,000. Treating every replay as map-default caused later worker production to
 vanish even though every decoded command was correct. Applying the proved
-high-resource bank advanced the certified Garden of War opening from 1,637 to
-2,451 dispatcher records. Proving the synchronized turn cadence and birth-slot
-bridge then advanced it to 3,477 records, 166 submitted orders and 32 bound
-native units.
+high-resource bank, the synchronized turn cadence, the birth-slot bridge,
+and founding the 90,6 blacksmith on the hall body now certify 3,935
+records, 189 submitted orders and 37 bound native units.
 
 The cadence is no longer inferred from a replay header. In the pinned 2.02b
 executable the game loop at `0x00420e9a..0x00420eb5` compares the synchronized
@@ -215,10 +214,10 @@ dispatcher interval with `0x1f4` (500 ms), and the network manager is called at
 `0x00420fbb`. At the Java simulation's 30 Hz this is exactly fifteen cycles per
 turn. The lobby speed byte is a UI pacing-table index, not a cycle count.
 
-The retained boundary is structural rather than opaque: native unit 1554
-submits a family-two production command at record 3,477, after the guarded
+The retained boundary is structural rather than opaque: native unit 1526
+submits a move at record 3,935, after the guarded
 native-high-slot/Java-low-ID birth-order bridge can no longer identify one
-compatible Java producer without guessing. The smoke receipt retains the
+compatible Java mover without guessing. The smoke receipt retains the
 complete player production state. It also structurally indexes every retained
 record after that boundary—command-family counts, selected native identities,
 and unsupported packets—while clearly labeling those records as unexecuted.
@@ -228,9 +227,11 @@ match invisible or requiring a throwaway parser to choose the next adapter.
 Replay packets are player inputs, not native success receipts. Retail opcode
 `0x09` acknowledges a build packet in `0x00475e50`, then `0x0043afe0` begins
 the approach/site state machine; collision or reachability can still reject the
-foundation later. One recorded blacksmith click at `(90,6)` overlaps the
-initial Great Hall's four-tile footprint, so the packet alone cannot prove a
-native blacksmith ever existed. The outcome gate consequently reports four
+foundation later. The recorded blacksmith click at `(90,6)` overlaps the
+body of the 4x4 Great Hall at 89,5. CheckCanBuild ignores
+`MapFieldBuilding` except at a solid building's origin, and a builder
+walking to found uses the same occupancy, so that packet now founds and
+native 1554's later shield research binds. The outcome gate consequently reports four
 separate facts:
 dispatcher acceptance, first physical effect, requested-objective fulfillment,
 and terminal rejection/supersession/failure. Native packet injection remains

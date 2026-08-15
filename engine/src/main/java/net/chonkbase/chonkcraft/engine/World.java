@@ -5335,13 +5335,19 @@ public final class World {
 
     BattleNetPathFinder.Passability battleNetTraversalPassability(Unit unit) {
         long mask = unit.movementMask();
-        long blocking = unit.blockingFlags();
+        boolean ignoreBuilding = construction.builderWalksThroughBuildingBodies(unit);
+        long blocking = ignoreBuilding
+                ? construction.builderTraversalBlocking(unit)
+                : unit.blockingFlags();
         int mapWidth = map.width();
         int mapHeight = map.height();
         return new BattleNetPathFinder.Passability() {
             @Override
             public boolean canEnter(int x, int y) {
-                return map.isFootprintFree(x, y, 1, 1, mask, blocking);
+                if (!map.isFootprintFree(x, y, 1, 1, mask, blocking)) {
+                    return false;
+                }
+                return !ignoreBuilding || !construction.solidBuildingOriginAt(x, y);
             }
 
             @Override
@@ -13166,7 +13172,21 @@ public final class World {
         // The unit's own occupancy is still set on its current square, so
         // clear it for the test and restore it afterwards.
         markOccupancy(unit, false);
-        boolean free = map.isFootprintFree(x, y, w, h, unit.movementMask(), unit.blockingFlags());
+        boolean ignoreBuilding = construction.builderWalksThroughBuildingBodies(unit);
+        long blocking = ignoreBuilding
+                ? construction.builderTraversalBlocking(unit)
+                : unit.blockingFlags();
+        boolean free = map.isFootprintFree(x, y, w, h, unit.movementMask(), blocking);
+        if (free && ignoreBuilding) {
+            for (int dy = 0; dy < h && free; dy++) {
+                for (int dx = 0; dx < w; dx++) {
+                    if (construction.solidBuildingOriginAt(x + dx, y + dy)) {
+                        free = false;
+                        break;
+                    }
+                }
+            }
+        }
         markOccupancy(unit, true);
         return free;
     }

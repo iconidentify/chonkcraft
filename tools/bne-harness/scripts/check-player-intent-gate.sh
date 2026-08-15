@@ -99,13 +99,13 @@ import sys
 
 report = json.load(open(sys.argv[1], encoding="utf-8"))
 minimums = {
-    "processed_records": 3477,
-    "processed_commands": 472,
-    "submitted_orders": 166,
-    "accepted_orders": 142,
-    "progressed_orders": 138,
-    "fulfilled_orders": 136,
-    "bound_native_units": 32,
+    "processed_records": 3935,
+    "processed_commands": 543,
+    "submitted_orders": 189,
+    "accepted_orders": 159,
+    "progressed_orders": 154,
+    "fulfilled_orders": 153,
+    "bound_native_units": 37,
 }
 for name, floor in minimums.items():
     if report.get(name, -1) < floor:
@@ -127,11 +127,12 @@ if report.get("silent_failures") != 0:
     raise SystemExit(
         "replay smoke gate: acknowledged orders with no physical effect increased")
 stop = report.get("stopped_at") or {}
-if stop.get("record", 0) < 3477:
+if stop.get("record", 0) < 3935:
     raise SystemExit(f"replay smoke gate: unexpected stop boundary {stop!r}")
-if stop.get("record") == 3477 and (
+if stop.get("record") == 3935 and (
         stop.get("name") != "unit-identity-unresolved"
-        or stop.get("native_unit") != 1554):
-    raise SystemExit(f"replay smoke gate: changed h3477 identity boundary {stop!r}")
-print("real BNE replay execution: PASS — 3477+ records, 136 objectives fulfilled")
+        or stop.get("native_unit") != 1526
+        or stop.get("opcode") != 16):
+    raise SystemExit(f"replay smoke gate: changed h3935 identity boundary {stop!r}")
+print("real BNE replay execution: PASS — 3935+ records, 153 objectives fulfilled")
 PY

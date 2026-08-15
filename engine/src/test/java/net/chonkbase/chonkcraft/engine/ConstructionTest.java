@@ -302,13 +302,49 @@ class ConstructionTest {
         world.createUnit(barracks(), 0, 10, 10);
         Unit worker = world.createUnit(peasant(), 0, 3, 3);
 
-        // The barracks occupies 10..12; a farm at 11,11 would overlap it.
-        assertFalse(world.canPlaceBuilding(farm(), 11, 11));
+        // The barracks origin is 10,10. A farm whose footprint only covers
+        // the barracks body is still legal -- Garden of War's blacksmith at
+        // 90,6 sits on the hall body at 89,5. The origin tile itself is not.
+        assertTrue(world.canPlaceBuilding(farm(), 11, 11),
+                "a farm that only overlaps a barracks body was refused");
+        assertFalse(world.canPlaceBuilding(farm(), 10, 10),
+                "a farm on the barracks origin was accepted");
         assertTrue(world.orderBuild(worker, farm(), 11, 11),
                 "retail queues the synchronized build command and checks the site on arrival");
         assertEquals(Unit.Order.BUILD, worker.order());
         // Clear ground beside it is fine.
         assertTrue(world.canPlaceBuilding(farm(), 15, 15));
+    }
+
+    @Test
+    @DisplayName("a builder walks onto a barracks body and founds there")
+    void aBuilderWalksOntoABarracksBodyAndFoundsThere() {
+        World world = richWorld(30);
+        world.createUnit(barracks(), 0, 10, 10);
+        Unit worker = world.createUnit(peasant(), 0, 8, 10);
+
+        assertTrue(world.orderBuild(worker, farm(), 11, 11),
+                "retail queues a farm whose footprint only covers a barracks body");
+
+        Unit farm = null;
+        for (int cycle = 0; cycle < 800 && farm == null; cycle++) {
+            world.tick();
+            for (Unit unit : world.unitsSnapshot()) {
+                if (unit.isAlive() && unit.type() != null
+                        && "unit-farm".equals(unit.type().ident())
+                        && unit.tileX() == 11 && unit.tileY() == 11) {
+                    farm = unit;
+                    break;
+                }
+            }
+            if (worker.order() == Unit.Order.STILL && worker.pendingBuild() == null) {
+                break;
+            }
+        }
+        assertNotNull(farm,
+                "the farm never founded on the barracks body; worker "
+                        + worker.id() + " at " + worker.tileX() + ","
+                        + worker.tileY() + " order=" + worker.order());
     }
 
     @Test

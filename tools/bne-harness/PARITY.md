@@ -64,9 +64,10 @@ upgrade catalog is not rewritten.
 Command reporting is split. The current commanded ledger is 240 generated,
 131 executed by both adapters, 131 comparable, 52 exact, 79 materially
 divergent, 0 infrastructure failures. Both adapters executed is not
-complete and is not parity. Garden of War replay execution still stops at
-dispatcher record 3,477: native 1554 researches orc-shield1 and Java has
-not founded the blacksmith accepted at record 2,151.
+complete and is not parity. Garden of War replay execution now certifies
+through dispatcher record 3,935: the blacksmith packet at 2,151 founds at
+90,6 on the hall body, native 1554's orc-shield1 research fulfills, and
+the fail-closed stop is native 1526's first move for player 0.
 
 ## Current integration checkpoint — 2026-08-08 visual/spatial round
 
