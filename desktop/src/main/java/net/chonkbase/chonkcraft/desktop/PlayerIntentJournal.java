@@ -277,6 +277,8 @@ final class PlayerIntentJournal {
             case ATTACK, ATTACK_GROUND, CAST -> targetChanged(
                     tracking.targetSubmitted, targetNow);
             case HARVEST -> now.carried != before.carried;
+            case REPAIR -> "STILL".equals(now.order)
+                    && tracking.firstProgressCycle != null;
             case RETURN_GOODS -> before.carried > 0 && now.carried == 0;
             case BOARD -> !now.onMap;
             case UNLOAD, UNLOAD_ONE -> tracking.firstProgressCycle != null

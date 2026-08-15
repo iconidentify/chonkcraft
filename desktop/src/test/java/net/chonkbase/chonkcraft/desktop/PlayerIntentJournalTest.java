@@ -127,6 +127,32 @@ class PlayerIntentJournalTest {
     }
 
     @Test
+    @DisplayName("a worker who walks to mend stands still as fulfilled")
+    void aWorkerWhoWalksToMendStandsStillAsFulfilled() {
+        World world = world();
+        UnitType workerType = movable("unit-peon");
+        workerType.setRepairRange(1);
+        UnitType hallType = building("unit-great-hall", 4, 4);
+        Unit worker = world.createUnit(workerType, 0, 1, 1);
+        Unit hall = world.createUnit(hallType, 0, 4, 4);
+        hall.setHitPoints(200);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(command -> {
+            worker.setOrder(Unit.Order.REPAIR);
+            worker.setTarget(hall);
+        }, world::cycle, () -> List.of(worker.id()), world);
+
+        sink.issueAccepted(GameCommand.repair(0, worker.id(), hall.id()));
+        worker.setTile(3, 4);
+        worker.setOrder(Unit.Order.STILL);
+        journal.observe(8, world);
+
+        PlayerIntentJournal.Outcome outcome = journal.outcomeSnapshot().getFirst();
+        assertEquals("fulfilled", outcome.terminalReason(),
+                "walking to the hall and standing still must fulfill the mend");
+    }
+
+    @Test
     void alreadyTouchingABlockedMoveGoalIsARealSettlement() {
         World world = world();
         UnitType workerType = movable("unit-peon");
