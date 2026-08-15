@@ -461,10 +461,11 @@ final class BattleNetMovementSystem {
             if (battleNetOccupiedPointRefusal(unit)) {
                 unit.setRouteSpent(false);
             } else if (playerMoveLastStepReady(unit)) {
-                // Leftover dest-arm landed one tile short of the click.
-                // Native batch-1/26 takes that last heading onto 32,7 at
-                // fixture 36. The empty-route ten-cycle wait dest-armed
-                // the last tile only at 47.
+                // Leftover dest-arm landed one or two tiles short of the
+                // click. Native batch-1/26 takes the last heading onto
+                // 32,7 at fixture 36; batch-1/31 leftover-lands on 73,92
+                // two short of 75,91 and is Still there at 73. The empty
+                // ten dest-armed that last tile only after fixture 71.
                 unit.setRouteSpent(false);
             } else if (spendTheEmptyRoute(unit)) {
                 // Every PF_WAIT runs the blocker test, the count-born one
@@ -1530,8 +1531,15 @@ final class BattleNetMovementSystem {
     }
 
     /**
-     * Whether leftover dest-arm landed one passable tile short of a player
-     * Move click. That last heading is not an intermediate empty buffer.
+     * Whether leftover dest-arm landed one or two passable tiles short
+     * of a player Move click.
+     *
+     * <p>That remaining heading is not an intermediate empty buffer.
+     * Native batch-1/26 takes the last tile when leftover lands one
+     * short. batch-1/31 leftover-lands two short of 75,91 and dest-arms
+     * through 74,91 onto the click; a PF_WAIT 10 there is still Move at
+     * the window. A farther spent prefix still pays the empty ten so a
+     * repath can form.
      */
     private boolean playerMoveLastStepReady(Unit unit) {
         if (!unit.battleNetPlayerCommandMove() || !unit.routeSpent()
@@ -1545,7 +1553,8 @@ final class BattleNetMovementSystem {
         }
         int chebyshev = Math.max(Math.abs(unit.tileX() - destX),
                 Math.abs(unit.tileY() - destY));
-        return chebyshev == 1 && world.canEnter(unit, destX, destY);
+        return chebyshev >= 1 && chebyshev <= 2
+                && world.canEnter(unit, destX, destY);
     }
 
     /** Whether a spent point route terminates in a live occupied step. */
