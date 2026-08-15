@@ -558,6 +558,12 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             # walk and attack. That is the retail control rule, not a range.
             if "attack" in allowed and "move" in allowed:
                 allowed.add("attack-move")
+            # Alt-right-click Defend is not a button. A fighter that can
+            # walk can be told to guard a friend. Native commanded
+            # witnesses are still capture-blocked; generation must still
+            # emit the family so Java can run the matrix.
+            if "attack" in allowed and "move" in allowed:
+                allowed.add("defend")
             actors[slot]["capabilities"] = sorted(allowed)
             actors[slot]["type_ident"] = ident
     for slot in hostiles + resources + repairables:
@@ -581,6 +587,8 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             ids.extend(resources)
         if "repair" in caps:
             ids.extend(repairables)
+        if "defend" in caps:
+            ids.extend(slot for slot in actors if slot != actor["id"])
         actor["target_ids"] = sorted(set(ids))
     for slot in harvesters[:2]:
         if slot in actors:
@@ -1199,15 +1207,17 @@ def legal_commands(seed: dict[str, Any]) -> list[dict[str, Any]]:
                         command["point_kind"] = "unaffordable"
                     commands.append(command)
                 continue
-            if family in {"attack", "follow", "harvest", "board", "repair"}:
+            if family in {"attack", "follow", "defend", "harvest", "board", "repair"}:
                 for target_id in target_ids:
                     target = _target(seed, target_id)
                     if target is None:
                         continue
                     if family == "attack" and target.get("player") == actor.get("player"):
                         continue
-                    if family in {"follow", "board", "repair"} \
+                    if family in {"follow", "defend", "board", "repair"} \
                             and target.get("player") != actor.get("player"):
+                        continue
+                    if family == "defend" and target_id == actor_id:
                         continue
                     commands.append({**base, "target_id": target_id})
     unique = {digest(command): command for command in commands}

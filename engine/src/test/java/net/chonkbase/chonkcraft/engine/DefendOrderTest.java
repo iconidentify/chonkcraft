@@ -107,4 +107,61 @@ class DefendOrderTest {
         assertFalse(applier.apply(GameCommand.defend(0, guard.id(), ward.id())),
                 "defend accepted a dead ward");
     }
+
+    @Test
+    @DisplayName("one, three and nine selected fighters all take the same defend")
+    void oneThreeAndNineSelectedFightersAllTakeTheSameDefend() {
+        UnitType type = soldier("unit-footman");
+        World world = world(type);
+        Unit ward = world.createUnit(type, 0, 20, 4);
+        CommandApplier applier = new CommandApplier(world, List.of(type));
+        int[] counts = {1, 3, 9};
+        int nextX = 2;
+        for (int count : counts) {
+            Unit[] squad = new Unit[count];
+            for (int i = 0; i < count; i++) {
+                squad[i] = world.createUnit(type, 0, nextX++, 4);
+            }
+            for (Unit guard : squad) {
+                assertTrue(applier.apply(GameCommand.defend(0, guard.id(), ward.id())),
+                        count + " selected: " + guard.id() + " was refused defend");
+                assertEquals(Unit.Order.DEFEND, guard.order(),
+                        count + " selected: " + guard.id() + " is not on defend");
+                assertEquals(ward, guard.target(),
+                        count + " selected: " + guard.id() + " is not guarding the ward");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("three selected fighters all take the same attack-move")
+    void threeSelectedFightersAllTakeTheSameAttackMove() {
+        UnitType type = soldier("unit-footman");
+        World world = world(type);
+        CommandApplier applier = new CommandApplier(world, List.of(type));
+        Unit[] squad = {
+                world.createUnit(type, 0, 2, 4),
+                world.createUnit(type, 0, 3, 4),
+                world.createUnit(type, 0, 4, 4),
+        };
+        for (Unit fighter : squad) {
+            assertTrue(applier.apply(GameCommand.attackMove(0, fighter.id(), 18, 4)),
+                    fighter.id() + " was refused attack-move");
+            assertEquals(Unit.Order.ATTACK_MOVE, fighter.order(),
+                    fighter.id() + " is not on attack-move");
+        }
+    }
+
+    @Test
+    @DisplayName("a stand-ground click holds the unit in place")
+    void aStandGroundClickHoldsTheUnitInPlace() {
+        UnitType type = soldier("unit-footman");
+        World world = world(type);
+        Unit guard = world.createUnit(type, 0, 4, 4);
+        CommandApplier applier = new CommandApplier(world, List.of(type));
+        assertTrue(applier.apply(GameCommand.standGround(0, guard.id())),
+                "stand-ground was refused");
+        assertEquals(Unit.Order.STAND_GROUND, guard.order(),
+                "the unit is not holding ground");
+    }
 }

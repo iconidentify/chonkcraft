@@ -167,6 +167,25 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertIn("attack unit", script)
         self.assertIn("target", script)
 
+    def test_legal_commands_emit_defend_for_a_friend(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["defend"]
+        seed["actors"][0]["target_ids"] = [110]
+        commands = explorer.legal_commands(seed)
+        defend = [item for item in commands if item["kind"] == "defend"]
+        self.assertTrue(defend, "defend produced no legal commands")
+        self.assertEqual([110], [item["target_id"] for item in defend])
+
+    def test_native_direct_injector_still_refuses_unproved_defend(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["defend"]
+        seed["actors"][0]["target_ids"] = [110]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=40)
+            if item["commands"][0]["kind"] == "defend")
+        with self.assertRaisesRegex(ValueError, "does not prove"):
+            explorer.native_command_script(scenario)
+
     def test_native_direct_injector_emits_attack_ground(self):
         seed = self.seed()
         seed["actors"][0]["capabilities"] = ["attack-ground"]

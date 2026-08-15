@@ -3068,7 +3068,7 @@ final class GameScreen extends JPanel {
      * @param shift   append behind whatever the unit is already doing --
      *                upstream's {@code EFlushMode::Off}
      * @param control follow anything, including an enemy
-     * @param alt     defend a friendly unit, which this implementation cannot yet do
+     * @param alt     defend a friendly unit -- BNE SendCommandDefend
      */
     record Modifiers(boolean shift, boolean control, boolean alt) {
 
