@@ -60,4 +60,14 @@ class BattleNetAiBytecodeTest {
         assertEquals(1, BattleNetAiBytecode.waitCounter(state));
         assertEquals(0, state[BattleNetAiBytecode.OFF_WANTED_BASIC] & 0xff);
     }
+
+    @Test
+    void installEmptyBuildBoundsWritesTheInvertedNativeBox() {
+        byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
+        BattleNetAiBytecode.installEmptyBuildBounds(state, 32);
+        assertEquals(32, state[BattleNetAiBytecode.OFF_BOUND_MIN_Y] & 0xff);
+        assertEquals(0xff, state[BattleNetAiBytecode.OFF_BOUND_MAX_X] & 0xff);
+        assertEquals(0xff, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff);
+        assertEquals(32, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff);
+    }
 }

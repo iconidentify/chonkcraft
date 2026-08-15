@@ -377,6 +377,13 @@ public final class AiPlayer {
         if (battleNetAiState == null || world == null) {
             return;
         }
+        // Native 0x4273e0 writes the inverted build box before the first
+        // ready pulse. Leaving these bytes zero made the compared
+        // AIPlayerState disagree with Orc 1 / Human 1 game-before dumps.
+        if (world.map() != null) {
+            BattleNetAiBytecode.installEmptyBuildBounds(
+                    battleNetAiState, world.map().width());
+        }
         for (int step = 0; step < 32; step++) {
             int waitBefore = BattleNetAiBytecode.waitCounter(battleNetAiState);
             int pcBefore = battleNetAiPc;

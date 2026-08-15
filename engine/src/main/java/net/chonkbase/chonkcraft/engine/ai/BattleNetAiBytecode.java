@@ -39,6 +39,14 @@ public final class BattleNetAiBytecode {
     public static final int OFF_WANTED_BALLOONS = 0x1e;
     public static final int OFF_WANTED_FLYERS = 0x20;
     public static final int OFF_LIST_BOUND = 0x22;
+    /** Signed min-Y of the 0x4273e0 build box. */
+    public static final int OFF_BOUND_MIN_Y = 0x2b;
+    /** Signed max-X of the 0x4273e0 build box. */
+    public static final int OFF_BOUND_MAX_X = 0x2c;
+    /** Signed max-Y of the 0x4273e0 build box. */
+    public static final int OFF_BOUND_MAX_Y = 0x2d;
+    /** Signed min-X of the 0x4273e0 build box. */
+    public static final int OFF_BOUND_MIN_X = 0x2e;
 
     private static final int MAX_OPS_PER_STEP = 256;
 
@@ -84,6 +92,25 @@ public final class BattleNetAiBytecode {
         int pc = rec + 4;
         // Run until wait is non-zero (native FUN_00424e40 init).
         return runUntilWait(ai, state, pc, true);
+    }
+
+    /**
+     * Writes the inverted 0x4273e0 build box used when the player has no
+     * first building. Native loads map size into AL and 0xff into BL, then
+     * stores minX=minY=size and maxX=maxY=-1. Orc 1 and Human 1 have no
+     * 0x4be264 head at match-ready, so the box stays 32,-1,-1,32. Human 4
+     * later expands around its hall; that walk is a separate rule.
+     */
+    public static void installEmptyBuildBounds(byte[] state, int mapSize) {
+        if (state == null || state.length < STATE_BYTES) {
+            return;
+        }
+        byte size = (byte) mapSize;
+        byte empty = (byte) 0xff;
+        state[OFF_BOUND_MIN_Y] = size;
+        state[OFF_BOUND_MAX_X] = empty;
+        state[OFF_BOUND_MAX_Y] = empty;
+        state[OFF_BOUND_MIN_X] = size;
     }
 
     /**
