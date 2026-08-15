@@ -1954,6 +1954,18 @@ final class BattleNetMovementSystem {
                     stepMoveOrder(unit);
                     return;
                 }
+                if (unit.battleNetPlayerCommandMove()
+                        && !battleNetCommandPointReached(unit)) {
+                    // A fresh player Move can replace a resource order while
+                    // its committed stride still owes pixels. That inherited
+                    // residual has no route for the new click; once it drains,
+                    // retail asks for the replacement route instead of
+                    // promoting Still. Human 5 peasant 1512 is clicked away
+                    // from its harvest at fixture five and continues to
+                    // 34,103 after completing the old stride.
+                    stepMoveOrder(unit);
+                    return;
+                }
                 if (spendTheEmptyRoute(unit)) {
                     return;
                 }
