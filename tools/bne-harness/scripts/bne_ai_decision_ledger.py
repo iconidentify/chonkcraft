@@ -17,6 +17,7 @@ fail closed.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -140,19 +141,53 @@ def build_ledger(rows: list[dict[str, Any]], *,
     }
 
 
-def first_difference(left: dict[str, Any], right: dict[str, Any]) \
-        -> dict[str, Any] | None:
+def coverage_report(ledger: dict[str, Any], *,
+                    active_players: list[int] | None = None,
+                    cycles: list[int] | None = None) -> dict[str, Any]:
+    """Describe what was actually observed; generation is never execution."""
+    rows = ledger.get("rows") or []
+    observed = {(int(item["cycle"]), int(item["player"])) for item in rows}
+    expected = ({(cycle, player) for cycle in (cycles or ())
+                 for player in (active_players or ())}
+                if active_players is not None and cycles is not None else set())
+    missing = sorted(expected - observed)
+    players = sorted({int(item["player"]) for item in rows})
+    observed_cycles = sorted({int(item["cycle"]) for item in rows})
+    return {
+        "complete": bool(rows) and not missing,
+        "rows": len(rows),
+        "players": players,
+        "cycles": observed_cycles,
+        "cycle_span": ([observed_cycles[0], observed_cycles[-1]]
+                       if observed_cycles else None),
+        "independent_choice_rows": sum(
+            item.get("classification") == "independent-choice"
+            for item in rows),
+        "predicate_events": sum(len(item.get("predicates") or ())
+                                for item in rows),
+        "write_events": sum(len(item.get("writes") or ()) for item in rows),
+        "launch_events": sum(len(item.get("launches") or ()) for item in rows),
+        "missing_active_player_cycles": [
+            {"cycle": cycle, "player": player} for cycle, player in missing
+        ],
+    }
+
+
+STATE_FIELDS = (
+    "cycle", "player", "profile", "wait", "pc_offset", "list_offset",
+    "threshold_offset", "non_pointer_hex",
+)
+TELEMETRY_FIELDS = ("predicates", "writes", "launches", "classification")
+
+
+def first_difference_in(left: dict[str, Any], right: dict[str, Any],
+                        fields: tuple[str, ...]) -> dict[str, Any] | None:
     if left.get("schema") != right.get("schema"):
         return {"cycle": 0, "player": -1, "field": "schema",
                 "left": left.get("schema"), "right": right.get("schema")}
     a_rows = left.get("rows") or []
     b_rows = right.get("rows") or []
     limit = max(len(a_rows), len(b_rows))
-    fields = (
-        "cycle", "player", "profile", "wait", "pc_offset", "list_offset",
-        "threshold_offset", "non_pointer_hex", "predicates", "writes",
-        "launches", "classification",
-    )
     for index in range(limit):
         if index >= len(a_rows) or index >= len(b_rows):
             row = a_rows[index] if index < len(a_rows) else b_rows[index]
@@ -166,6 +201,24 @@ def first_difference(left: dict[str, Any], right: dict[str, Any]) \
                         "field": field, "left": a.get(field),
                         "right": b.get(field)}
     return None
+
+
+def first_state_difference(left: dict[str, Any], right: dict[str, Any]) \
+        -> dict[str, Any] | None:
+    """First committed-state mismatch, independent of optional hook telemetry."""
+    return first_difference_in(left, right, STATE_FIELDS)
+
+
+def first_telemetry_difference(left: dict[str, Any], right: dict[str, Any]) \
+        -> dict[str, Any] | None:
+    """First predicate/write/launch mismatch after state rows are paired."""
+    return first_difference_in(left, right, TELEMETRY_FIELDS)
+
+
+def first_difference(left: dict[str, Any], right: dict[str, Any]) \
+        -> dict[str, Any] | None:
+    return (first_state_difference(left, right)
+            or first_telemetry_difference(left, right))
 
 
 def ledgers_identical(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -224,10 +277,15 @@ def _mutate_int_field(ledger: dict[str, Any], cycle: int, player: int,
 def compare_command(left: Path, right: Path) -> dict[str, Any]:
     a = load_ledger(left)
     b = load_ledger(right)
-    difference = first_difference(a, b)
+    state_difference = first_state_difference(a, b)
+    telemetry_difference = first_telemetry_difference(a, b)
     return {
-        "identical": difference is None,
-        "difference": difference,
+        "identical": state_difference is None and telemetry_difference is None,
+        "state_identical": state_difference is None,
+        "telemetry_identical": telemetry_difference is None,
+        "difference": state_difference or telemetry_difference,
+        "state_difference": state_difference,
+        "telemetry_difference": telemetry_difference,
         "left": str(left),
         "right": str(right),
     }
@@ -259,36 +317,141 @@ def parse_trace_fields(line: str) -> dict[str, str]:
     return fields
 
 
+def derive_ai_base(text: str, ai_bin: bytes) -> int:
+    """Derive the ASLR heap base from authenticated profile list pointers."""
+    if len(ai_bin) < 83 * 2:
+        raise ValueError("AI.BIN is too short for the 83-profile table")
+    candidates: set[int] = set()
+    for line in text.splitlines():
+        if "event=ai-build-boundary" not in line:
+            continue
+        fields = parse_trace_fields(line)
+        if "state" not in fields or "profile" not in fields:
+            continue
+        profile = int(fields["profile"])
+        if profile < 0 or profile >= 83:
+            raise ValueError(f"AI profile is out of range: {profile}")
+        record = int.from_bytes(ai_bin[profile * 2:profile * 2 + 2], "little")
+        if record + 3 >= len(ai_bin):
+            raise ValueError(f"AI profile {profile} record is out of range")
+        list_offset = int.from_bytes(ai_bin[record:record + 2], "little")
+        threshold_offset = int.from_bytes(ai_bin[record + 2:record + 4], "little")
+        raw = parse_state_hex(fields["state"])
+        live_list = _u32(raw, PTR_LIST)
+        live_threshold = _u32(raw, PTR_THRESHOLD)
+        if live_list:
+            candidates.add(live_list - list_offset)
+        if live_threshold and threshold_offset != 0xffff:
+            candidates.add(live_threshold - threshold_offset)
+    if len(candidates) != 1:
+        raise ValueError(f"AI.BIN base is not unique: {sorted(candidates)}")
+    base = next(iter(candidates))
+    if base <= 0:
+        raise ValueError("derived AI.BIN base is not a process address")
+    return base
+
+
+def _state_writes(before: bytes | None, after: bytes) -> list[dict[str, int]]:
+    if before is None or len(before) != STATE_BYTES:
+        return []
+    return [
+        {"offset": offset, "before": before[offset], "after": after[offset]}
+        for offset in range(STATE_BYTES) if before[offset] != after[offset]
+    ]
+
+
+def _merge_writes(*groups: list[dict[str, int]]) -> list[dict[str, int]]:
+    merged: dict[int, dict[str, int]] = {}
+    for group in groups:
+        for item in group:
+            merged[int(item["offset"])] = item
+    return [merged[offset] for offset in sorted(merged)]
+
+
+def _opcode3_predicates(ai_bin: bytes | None, incoming: bytes | None,
+        outgoing: bytes, ai_base: int, ai_size: int) -> list[dict[str, Any]]:
+    """Recover WAIT-UNTIL attempts that the boundary snapshots do not hook.
+
+    Opcode 3 at the incoming program counter is the pinned WAIT-UNTIL
+    predicate. A failed gate restores the same PC and writes wait=1. A
+    successful gate advances two bytes. This is transcribed from the
+    opcode, not inferred from a later visual.
+    """
+    if ai_bin is None or incoming is None or _u32(incoming, 0) != 0:
+        return []
+    try:
+        pc = normalize_pointer(_u32(incoming, PTR_PC), ai_base, ai_size)
+        later = normalize_pointer(_u32(outgoing, PTR_PC), ai_base, ai_size)
+    except ValueError:
+        return []
+    if pc < 0 or pc + 1 >= len(ai_bin) or ai_bin[pc] != 3:
+        return []
+    return [{"id": ai_bin[pc + 1], "result": later != pc}]
+
+
 def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
-        phase: str = "game-before") -> dict[str, Any]:
+        phase: str = "game-after",
+        active_players: list[int] | None = None,
+        cycles: list[int] | None = None,
+        ai_bin: bytes | None = None) -> dict[str, Any]:
     """Build a compared ledger from tracer ai-build-boundary 48-byte dumps.
 
     Native CHONK_BNE_TRACE_AI_BUILD_STATE writes the live AIPlayerState
     as 48 comma-separated hex bytes. Pointers at +0x04 / +0x23 / +0x27
     are process addresses; they become ai.bin file offsets here.
+
+    The interpreter often runs after the committed game-after snapshot, so
+    a same-cycle game-before dump already contains the new wait and hides
+    the write. Seed incoming state from the previous committed after
+    (including the last warmup-after). Keep intra-tick before/after diffs
+    so a write that lands inside the unit tick is still visible.
     """
     rows: list[dict[str, Any]] = []
+    committed: dict[int, bytes] = {}
+    tick_before: dict[int, bytes] = {}
     for line in text.splitlines():
         if "event=ai-build-boundary" not in line:
             continue
         fields = parse_trace_fields(line)
-        if fields.get("phase") != phase:
+        line_phase = fields.get("phase")
+        if line_phase in {"game-before", "warmup-before", "warmup-after",
+                          phase}:
+            if "state" not in fields or "player" not in fields:
+                raise ValueError("ai-build-boundary is missing player or state")
+        if line_phase in {"game-before", "warmup-before"}:
+            tick_before[int(fields["player"])] = parse_state_hex(fields["state"])
             continue
-        if "state" not in fields or "player" not in fields:
-            raise ValueError("ai-build-boundary is missing player or state")
+        if line_phase == "warmup-after":
+            committed[int(fields["player"])] = parse_state_hex(fields["state"])
+            continue
+        if line_phase != phase:
+            continue
         raw = parse_state_hex(fields["state"])
+        player = int(fields["player"])
+        incoming = committed.get(player, tick_before.get(player))
+        writes = _merge_writes(
+            _state_writes(incoming, raw),
+            _state_writes(tick_before.get(player), raw),
+        )
+        classification = ("independent-choice"
+                          if incoming is not None and _u32(incoming, 0) == 0
+                          else "fallout")
         rows.append(row(
             cycle=int(fields.get("index") or 0),
-            player=int(fields["player"]),
+            player=player,
             profile=int(fields.get("profile") or 0),
             raw_state=raw,
             ai_base=ai_base,
             ai_size=ai_size,
-            classification="fallout",
+            predicates=_opcode3_predicates(
+                ai_bin, incoming, raw, ai_base, ai_size),
+            writes=writes,
+            classification=classification,
         ))
+        committed[player] = raw
     if not rows:
         raise ValueError("native trace has no ai-build-boundary dumps")
-    return build_ledger(rows)
+    return build_ledger(rows, active_players=active_players, cycles=cycles)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -300,26 +463,50 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("right", type=Path)
     from_trace = sub.add_parser("from-trace")
     from_trace.add_argument("trace", type=Path)
-    from_trace.add_argument("--ai-base", type=lambda value: int(value, 0),
-                            required=True)
-    from_trace.add_argument("--ai-size", type=lambda value: int(value, 0),
-                            required=True)
+    from_trace.add_argument("--ai-bin", type=Path,
+                            help="authenticated maindat entry 277; derives heap base and size")
+    from_trace.add_argument("--ai-base", type=lambda value: int(value, 0))
+    from_trace.add_argument("--ai-size", type=lambda value: int(value, 0))
     from_trace.add_argument("--output", type=Path, required=True)
+    from_trace.add_argument("--phase", default="game-after")
+    from_trace.add_argument("--active-player", type=int, action="append")
+    from_trace.add_argument("--cycle", type=int, action="append")
+    coverage = sub.add_parser("coverage")
+    coverage.add_argument("ledger", type=Path)
+    coverage.add_argument("--active-player", type=int, action="append")
+    coverage.add_argument("--cycle", type=int, action="append")
     args = parser.parse_args(argv)
     if args.command == "compare":
         report = compare_command(args.left, args.right)
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0 if report["identical"] else 1
     if args.command == "from-trace":
+        trace_text = args.trace.read_text(encoding="utf-8")
+        ai_bytes = args.ai_bin.read_bytes() if args.ai_bin is not None else None
+        ai_base = derive_ai_base(trace_text, ai_bytes) if ai_bytes is not None \
+            else args.ai_base
+        ai_size = len(ai_bytes) if ai_bytes is not None else args.ai_size
+        if ai_base is None or ai_size is None:
+            parser.error("from-trace requires --ai-bin or both --ai-base and --ai-size")
         built = ledger_from_native_trace(
-            args.trace.read_text(encoding="utf-8"),
-            ai_base=args.ai_base, ai_size=args.ai_size)
+            trace_text, ai_base=ai_base, ai_size=ai_size, phase=args.phase,
+            active_players=args.active_player, cycles=args.cycle,
+            ai_bin=ai_bytes)
+        if ai_bytes is not None:
+            built["ai_bin_sha256"] = hashlib.sha256(ai_bytes).hexdigest()
+            built["ai_bin_bytes"] = len(ai_bytes)
         args.output.write_text(
             json.dumps(built, indent=2, sort_keys=True) + "\n",
             encoding="utf-8")
         print(json.dumps({"rows": len(built["rows"]),
                           "output": str(args.output)}, indent=2))
         return 0
+    if args.command == "coverage":
+        report = coverage_report(load_ledger(args.ledger),
+                                 active_players=args.active_player,
+                                 cycles=args.cycle)
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0 if report["complete"] else 1
     return 2
 
 
