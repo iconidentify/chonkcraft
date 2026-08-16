@@ -22,6 +22,7 @@ typedef void (__cdecl *idle_function)(BYTE *);
 typedef BYTE *(__cdecl *projectile_function)(BYTE *);
 typedef void (__cdecl *give_order_function)(
         BYTE *, int, int, BYTE *, void *);
+typedef int (__cdecl *production_apply_function)(BYTE *, int, int);
 typedef BYTE *(__cdecl *find_unit_function)(BYTE *);
 typedef BYTE *(__cdecl *find_auto_target_function)(BYTE *, char);
 typedef int (__cdecl *target_score_function)(BYTE *, BYTE *);
@@ -248,6 +249,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_ATTACK_GROUND 8
 #define SCRIPT_COMMAND_ATTACK_MOVE 9
 #define SCRIPT_COMMAND_STAND_GROUND 10
+#define SCRIPT_COMMAND_TRAIN 11
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -942,6 +944,18 @@ static BOOL read_command_file(void) {
                         x = 0;
                         y = 0;
                         target = SCRIPT_NO_TARGET;
+                    } else {
+                        extra = '\0';
+                        fields = sscanf(cursor,
+                                "cycle %lu train unit %lu type %lu %c",
+                                &cycle, &slot, &x, &extra);
+                        if (fields == 3) {
+                            /* 0x15 inner apply at 0x40e2a0: (unit, type,
+                             * mode=0 train). Not an ORDER_FUNCTIONS slot. */
+                            action = SCRIPT_COMMAND_TRAIN;
+                            y = 0;
+                            target = SCRIPT_NO_TARGET;
+                        }
                     }
                 }
             }
@@ -1441,6 +1455,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_STAND_GROUND) {
         return "stand-ground";
     }
+    if (action == SCRIPT_COMMAND_TRAIN) {
+        return "train";
+    }
     return "unknown";
 }
 
@@ -1556,6 +1573,36 @@ static void apply_commands(LONG cycle) {
                 || command->action == SCRIPT_COMMAND_HARVEST
                 || command->action == SCRIPT_COMMAND_REPAIR) {
             reject_command(command, "target-required");
+            continue;
+        }
+        if (command->action == SCRIPT_COMMAND_TRAIN) {
+            static const BYTE expected_production[] = {
+                0x81, 0xec, 0xc4, 0x00, 0x00, 0x00
+            };
+            int produced;
+
+            if (!executable_page_contains(BNE_202_PRODUCTION_APPLY)
+                    || memcmp(BNE_202_PRODUCTION_APPLY, expected_production,
+                        sizeof(expected_production)) != 0) {
+                reject_command(command, "production-signature");
+                continue;
+            }
+            /* Replay opcode 0x15 mode 0. Byte 1 is the PUD type. */
+            produced = ((production_apply_function) (void *)
+                    BNE_202_PRODUCTION_APPLY)(
+                    unit, (int) command->x, 0);
+            if (produced == 0) {
+                reject_command(command, "refused");
+                continue;
+            }
+            trace_write("# bne-trace event=command-applied cycle=%ld "
+                    "action=train unit=%lu target=%lu x=%u y=%u "
+                    "function-index=15 produced=%d",
+                    command->cycle,
+                    (unsigned long) command->unit_slot,
+                    (unsigned long) command->target_slot,
+                    (unsigned int) command->x, (unsigned int) command->y,
+                    produced);
             continue;
         }
         if (!executable_page_contains(BNE_202_GIVE_ORDER)

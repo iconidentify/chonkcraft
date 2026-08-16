@@ -95,6 +95,18 @@ class OracleIdentityTest(unittest.TestCase):
         self.assertEqual(1596, commands[1]["target"])
         self.assertEqual(1593, commands[2]["target"])
 
+    def test_parses_a_train_command_script(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text(
+                "cycle 5 train unit 1530 type 3\n",
+                encoding="ascii",
+            )
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual(["train"], [command["action"] for command in commands])
+        self.assertEqual(1530, commands[0]["unit"])
+        self.assertEqual(3, commands[0]["x"])
+
     def test_parses_stop_and_stand_ground_command_scripts(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.txt"
@@ -192,6 +204,27 @@ u 1594 unit-peon p0 25 18 hp 30 o STILL
 cycle 2 seed 00000001
 p 0 gold 1000 wood 1000 oil 0
 u 1594 unit-peon p0 25 18 hp 30 o STILL
+# bne-trace event=cycle-limit cycle=2
+# bne-trace protocol=2 event=detach cycles=2 screens=0
+"""
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace.txt"
+            trace.write_text(trace_text)
+            result = bne_oracle.validate_trace(trace, 2, expected_commands=1)
+        self.assertEqual(0, result["commands_applied"])
+        self.assertEqual(1, result["commands_rejected"])
+
+    def test_allows_a_production_apply_that_the_building_refused(self):
+        trace_text = """\
+# bne-trace event=storm-open-file archive=00000000 path="Campaign\\\\Orc\\\\Orc01.pud" scope=1 result=1 handle=1 error=0
+# bne-trace event=match-ready slots=1600
+cycle 1 seed 00000001
+p 0 gold 1000 wood 1000 oil 0
+u 1593 unit-great-hall p0 24 16 hp 1200 o STILL
+# bne-trace event=command-rejected cycle=5 action=train unit=1593 x=0 y=0 reason=refused
+cycle 2 seed 00000001
+p 0 gold 1000 wood 1000 oil 0
+u 1593 unit-great-hall p0 24 16 hp 1200 o STILL
 # bne-trace event=cycle-limit cycle=2
 # bne-trace protocol=2 event=detach cycles=2 screens=0
 """

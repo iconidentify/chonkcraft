@@ -43,6 +43,9 @@ SCRIPT_COMMAND_MOVE = re.compile(
 SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground|return-goods) unit (\d+)$"
 )
+SCRIPT_COMMAND_TRAIN = re.compile(
+    r"^cycle ([1-9]\d*) train unit (\d+) type (\d+)$"
+)
 SCRIPT_COMMAND_TARGETED = re.compile(
     r"^cycle ([1-9]\d*) (attack|harvest|repair) unit (\d+) target (\d+)$"
 )
@@ -55,6 +58,8 @@ GAME_RULE_REJECT_REASONS = {
     "target-is-self",
     "target-required",
     "not-a-worker",
+    # 0x40e2a0 returned 0: the hall/barracks would not start that type.
+    "refused",
 }
 COMMAND_REJECT_REASON = re.compile(r"\breason=([a-z0-9-]+)\b")
 
@@ -92,6 +97,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 continue
             move = SCRIPT_COMMAND_MOVE.fullmatch(line)
             stance = SCRIPT_COMMAND_STANCE.fullmatch(line)
+            train = SCRIPT_COMMAND_TRAIN.fullmatch(line)
             targeted = SCRIPT_COMMAND_TARGETED.fullmatch(line)
             target = None
             if move is not None:
@@ -106,6 +112,12 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 slot = int(stance.group(3))
                 x = 0
                 y = 0
+            elif train is not None:
+                cycle = int(train.group(1))
+                action = "train"
+                slot = int(train.group(2))
+                x = int(train.group(3))
+                y = 0
             elif targeted is not None:
                 cycle = int(targeted.group(1))
                 action = targeted.group(2)
@@ -117,7 +129,8 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
                     "'cycle N move|patrol|attack-ground|attack-move unit SLOT x X y Y', "
-                    "'cycle N stop|stand-ground|return-goods unit SLOT', or "
+                    "'cycle N stop|stand-ground|return-goods unit SLOT', "
+                    "'cycle N train unit SLOT type T', or "
                     "'cycle N attack|harvest|repair unit SLOT target T'"
                 )
             if cycle < previous_cycle:

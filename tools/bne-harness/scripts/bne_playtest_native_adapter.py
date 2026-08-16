@@ -195,6 +195,7 @@ def command_key(command: dict[str, Any]) -> tuple[Any, ...]:
         command.get("x"),
         command.get("y"),
         command.get("target_id"),
+        command.get("type_index"),
         command["issue_cycle"],
     )
 

@@ -63,6 +63,8 @@ INJECTOR_MOVE = re.compile(
     r"cycle (\d+) (move|patrol|attack-ground|attack-move) unit (\d+) x (\d+) y (\d+)\Z")
 INJECTOR_STANCE = re.compile(
     r"cycle (\d+) (stop|stand-ground|return-goods) unit (\d+)\Z")
+INJECTOR_TRAIN = re.compile(
+    r"cycle (\d+) train unit (\d+) type (\d+)\Z")
 REGISTRY_SCHEMA = "chonkcraft-bne-native-command-registry-1"
 DEFAULT_NATIVE_COMMAND_REGISTRY = (
     Path(__file__).resolve().parents[1] / "playtest-native-commands.json"
@@ -279,15 +281,17 @@ NATIVE_FAMILY_EVIDENCE = {
             "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
             "opcode": "0x15",
             "fixed_bytes": 3,
+            "apply": "0x0040e2a0",
+            "mode": 0,
         },
         "encoding": (
-            "InSight embedded opcode 0x15; byte 1 names the unit/tech/"
-            "building, byte 2 selects 0=train 1/2=research 3=transform."
+            "Guarded campaign injector; script line cycle N train unit SLOT "
+            "type T. Retail 0x15 byte 1 is the PUD type and byte 2 is 0=train. "
+            "The injector calls 0x0040e2a0(unit, type, 0)."
         ),
         "arguments": ["issue_cycle", "unit_id", "type_index"],
         "supported_variants": [],
         "unsupported_variants": [
-            "native-injector-script",
             "family-2-research-until-garden-of-war-3477-unblocked",
         ],
     },
@@ -754,6 +758,16 @@ def parse_injector_script(text: str) -> list[dict[str, Any]]:
                 "issue_cycle": cycle,
             })
             continue
+        train = INJECTOR_TRAIN.fullmatch(line)
+        if train is not None:
+            commands.append({
+                "kind": "train",
+                "unit_id": int(train.group(2)),
+                "type_index": int(train.group(3)),
+                "queued": False,
+                "issue_cycle": int(train.group(1)),
+            })
+            continue
         if targeted is not None:
             cycle = int(targeted.group(1))
             commands.append({
@@ -810,6 +824,10 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             if command["target_id"] not in actor["target_ids"]:
                 actor["target_ids"].append(command["target_id"])
                 actor["target_ids"].sort()
+        if command["kind"] == "train" and isinstance(
+                command.get("type_index"), int):
+            actor["type_index"] = command["type_index"]
+            continue
         if command["kind"] in {
                 "stop", "stand-ground", "attack", "harvest", "return-goods",
                 "repair"}:
@@ -827,7 +845,7 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
         raise ValueError("commanded fixture produced an empty seed")
     if not points and any(command["kind"] not in {
             "stop", "stand-ground", "attack", "harvest", "return-goods",
-            "repair"}
+            "repair", "train", "research"}
             for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
@@ -1791,6 +1809,14 @@ def native_command_script(scenario: dict[str, Any]) -> str:
             lines.append(
                 f"cycle {command['issue_cycle']} {command['kind']} "
                 f"unit {command['unit_id']}")
+            continue
+        if command["kind"] == "train":
+            type_index = command.get("type_index")
+            if not isinstance(type_index, int):
+                raise ValueError("train command has no type index")
+            lines.append(
+                f"cycle {command['issue_cycle']} train "
+                f"unit {command['unit_id']} type {type_index}")
             continue
         if command["kind"] in {"attack", "harvest", "repair"}:
             if not isinstance(command.get("target_id"), int):

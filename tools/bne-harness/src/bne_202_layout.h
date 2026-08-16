@@ -33,6 +33,8 @@
 /* 0x4368b0 is not in ORDER_FUNCTIONS. It is the order-15 installer
  * 0x0D stand-ground reaches: push 0x0f; call 0x453130. */
 #define BNE_202_STAND_GROUND_ORDER ((BYTE *) 0x004368b0)
+/* 0x15 production inner apply: cdecl (unit, type, mode) with mode 0=train. */
+#define BNE_202_PRODUCTION_APPLY ((BYTE *) 0x0040e2a0)
 #define BNE_202_SYNC_DISPATCH_CALL ((BYTE *) 0x0047800b)
 #define BNE_202_SYNC_DISPATCH_TARGET ((BYTE *) 0x004782a0)
 #define BNE_202_STORM_OPEN_ARCHIVE_IAT ((void **) 0x00490360)

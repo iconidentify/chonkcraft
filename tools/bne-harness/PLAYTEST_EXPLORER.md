@@ -57,16 +57,13 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-fixture \
 ```
 
 Each generated movement, stop, patrol, attack, harvest, return-goods,
-repair, attack-ground or attack-move scenario can be encoded directly
-for the guarded native command injector.
-Those families use the same `GiveOrder` entry as the authenticated `0x13`
-dispatcher, with table indices 3, 2, 5, 8, 23, 24, 27 and 17. Return-goods packets
-carry dest `0,0` and target `-1`. Repair packets carry a live building or
-transport target. Attack-move uses the dest-only shape of table 8 (dest xy,
-target `-1`); table 17 remains attack-ground. Other command families fail
-closed here
-and must use the authenticated replay-packet adapter; they are never guessed
-into native order-function calls.
+repair, attack-ground, attack-move, stand-ground or train scenario can be
+encoded directly for the guarded native command injector.
+Those `0x13` families use `GiveOrder` with table indices 3, 2, 5, 8, 23,
+24, 27 and 17. Stand-ground calls the order-15 installer at `0x4368b0`.
+Train calls the `0x15` inner apply at `0x40e2a0` as
+`cycle N train unit SLOT type T` (mode 0). Other families fail closed
+and must use the authenticated replay-packet adapter.
 
 `playtest-native-commands.json` is the machine-readable registry. It is built
 from the execution ledger plus the pinned encodings above. Dual-adapter

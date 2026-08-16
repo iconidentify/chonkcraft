@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.chonkbase.assetpack.Json;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.data.map.PudUnitTypes;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
@@ -57,6 +58,16 @@ public final class BnePlaytestAdapter {
             List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
             CommandApplier applier = new CommandApplier(world, roster);
             data.configureCommands(applier);
+            // Retail 0x15 byte 1 is the PUD type. GameCommand.train still
+            // carries a roster index, which is why a generated type 0 must
+            // become the footman and not roster[0] (the alchemist).
+            Map<Integer, Integer> pudToRoster = new HashMap<>();
+            for (int code = 0; code < PudUnitTypes.count(); code++) {
+                UnitType type = data.unitTypes().types().get(PudUnitTypes.name(code));
+                if (type != null) {
+                    pudToRoster.put(code, applier.indexOf(type));
+                }
+            }
             PlayerIntentJournal journal = new PlayerIntentJournal();
             AtomicInteger fixtureCycle = new AtomicInteger(0);
             CommandSink sink = journal.wrap(CommandSink.local(applier),
@@ -87,7 +98,7 @@ public final class BnePlaytestAdapter {
                         continue;
                     }
                     long before = journal.outcomeSnapshot().size();
-                    issue(sink, command, nativeToJava, scenario);
+                    issue(sink, command, nativeToJava, scenario, pudToRoster);
                     List<PlayerIntentJournal.Outcome> after = journal.outcomeSnapshot();
                     if (after.size() > before) {
                         issuedIntents.put(index, after.getLast().intentId());
@@ -131,7 +142,8 @@ public final class BnePlaytestAdapter {
     }
 
     private static boolean issue(CommandSink sink, Map<String, Object> command,
-            Map<Integer, Integer> nativeToJava, Map<String, Object> scenario) {
+            Map<Integer, Integer> nativeToJava, Map<String, Object> scenario,
+            Map<Integer, Integer> pudToRoster) {
         Integer javaId = nativeToJava.get(number(command.get("unit_id"), "unit id"));
         if (javaId == null) {
             return false;
@@ -142,7 +154,8 @@ public final class BnePlaytestAdapter {
         if (actorPlayer(scenario, number(command.get("unit_id"), "unit id")) != 0) {
             return false;
         }
-        GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario);
+        GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario,
+                pudToRoster);
         if (order == null) {
             return false;
         }
@@ -150,7 +163,8 @@ public final class BnePlaytestAdapter {
     }
 
     private static GameCommand toGameCommand(Map<String, Object> command, int javaId,
-            Map<Integer, Integer> nativeToJava, Map<String, Object> scenario) {
+            Map<Integer, Integer> nativeToJava, Map<String, Object> scenario,
+            Map<Integer, Integer> pudToRoster) {
         int player = actorPlayer(scenario, number(command.get("unit_id"), "unit id"));
         boolean queued = Boolean.TRUE.equals(command.get("queued"));
         String kind = string(command.get("kind"), "command kind");
@@ -183,7 +197,8 @@ public final class BnePlaytestAdapter {
             case "unload" -> GameCommand.unload(player, javaId, x, y);
             case "repair" -> GameCommand.repair(player, javaId, targetJava);
             case "build" -> GameCommand.build(player, javaId, typeIndex, x, y);
-            case "train" -> GameCommand.train(player, javaId, typeIndex);
+            case "train" -> GameCommand.train(player, javaId,
+                    pudToRoster.getOrDefault(typeIndex, -1));
             case "research" -> GameCommand.research(player, javaId, typeIndex);
             case "cast" -> targetJava == 0
                     ? GameCommand.castAt(player, javaId, x, y, typeIndex)

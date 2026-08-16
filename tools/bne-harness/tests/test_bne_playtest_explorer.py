@@ -157,6 +157,20 @@ class PlaytestExplorerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not prove"):
             explorer.native_command_script(scenario)
 
+    def test_native_direct_injector_emits_train(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["train"]
+        seed["actors"][0]["type_index"] = 3
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=40)
+            if item["commands"][0]["kind"] == "train")
+        script = explorer.native_command_script(scenario)
+        self.assertIn("train unit", script)
+        self.assertIn("type 3", script)
+        parsed = explorer.parse_injector_script(script)
+        self.assertEqual("train", parsed[0]["kind"])
+        self.assertEqual(3, parsed[0]["type_index"])
+
     def test_native_direct_injector_emits_attack(self):
         scenario = next(
             item for item in explorer.generate_scenarios(
@@ -698,6 +712,20 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             report["complete"],
             "attaching a ledger must not mark generated inventory complete")
+
+    def test_a_commanded_train_fixture_needs_no_destination_point(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/train-1/00.bnefx"
+        )
+        if not fixture.is_file():
+            self.skipTest("authenticated Orc 1 train-refuse fixture is missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        self.assertEqual(["train"], [command["kind"] for command in scenario["commands"]])
+        self.assertEqual(1593, scenario["commands"][0]["unit_id"])
+        self.assertEqual(0, scenario["commands"][0]["type_index"])
+        self.assertEqual(5, scenario["commands"][0]["issue_cycle"])
 
     def test_a_commanded_move_then_stop_fixture_keeps_both_orders(self):
         fixture = (
