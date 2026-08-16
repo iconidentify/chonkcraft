@@ -59,9 +59,14 @@ transaction open through an aimed field click. Build, train, research and
 upgrade-to refusals that never reach a wire command now journal the family,
 `queued=false`, reason and Notify acknowledgement. Coverage retires those two
 required-route debts only when receipts actually contain those observations;
-the 532-cell matrix is unchanged. Native layered hooks for the same two
-routes, plus target, wire, progress and terminal layers on field/plain/move,
-remain open, so certification stays red.
+the 532-cell matrix is unchanged. Native `DoRightButton` now also hooks
+public GiveOrder at `0x00451070`. After retail target lookup it emits
+`player-gesture` with the observed target shape, reconstructs the eight-byte
+`0x13` wire from the GiveOrder arguments, records the one-voice group
+acknowledgement, and follows signed pixel `IX`/`IY` through first walk
+progress and Still-after-progress settlement. Keyboard and command-panel
+native hooks remain open. Those new layers do not count until a sealed
+field/plain/move recapture contains them.
 `bne_player_transaction.py` compiles observed facts without silently
 turning a per-unit order into proof of a physical transaction. Schema 2 names
 all eight layers independently. The older native `DoRightButton` hook proves
@@ -109,16 +114,26 @@ python3 tools/bne-harness/scripts/bne_player_transaction.py coverage \
 
 Import verifies every trace against its `.bnefx` archive, sealed manifest,
 complete fixture/scenario key, pinned 2.02b executable, tracer/injector/source
-identities and exact trace bytes, then stores a content-addressed receipt. The
-seven currently sealed `i9beef` captures import as seven transactions and 12
-ordered unit commands: seven prove gesture, ordered selection and acceptance;
-five are true groups; one proves an empty-selection refusal. They correctly
-leave target interpretation, serialized wire bytes, acknowledgement, physical
-progress and non-refusal terminal settlement open. Coverage emits one recipe
-for every missing origin/modifier/family cell. An executable cell carries the
-real `bne_oracle.py run` and import argv; an unobservable cell is
+identities and exact trace bytes, then stores a content-addressed receipt. A
+sealed Human 1 field/plain/single-footman/open-ground/move recapture now
+proves all eight layers: retail target shape `open-ground`, reconstructed
+eight-byte `0x13` wire `1319001c00ffff03`, the one-voice acknowledgement,
+first pixel progress at cycle 10, and Still-after-progress settlement at
+cycle 393 on `(25,28)` with 46 hit points. That cell fills the 532-cell
+matrix once. The seven older `i9beef` captures remain gesture/selection/
+acceptance-only. Coverage emits one recipe for every missing
+origin/modifier/family cell. An executable cell carries the real
+`bne_oracle.py run` and import argv; an unobservable cell is
 `blocked-on-hook` with the exact native hook debt. A GiveOrder fixture can
 never satisfy this physical-UI lane.
+
+The first causal mismatch on that same walk is not an engine edit. Native
+settles at cycle 393 with 46 hit points after first progress at 10. The Java
+CommandApplier twin of the same Human 1 footman first progresses at cycle 9
+and settles at cycle 415 with 49 hit points. Java still has no physical
+DoRightButton receipt, so certification stays 0/532 paired. The work order
+stays evidence-open: cycle-level Java traces are required before a pixel-
+versus-tile progress rule or a combat-on-the-walk rule can be written.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

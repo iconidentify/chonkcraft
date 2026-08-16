@@ -98,7 +98,8 @@ public final class BnePlaytestAdapter {
                         continue;
                     }
                     long before = journal.outcomeSnapshot().size();
-                    issue(sink, command, nativeToJava, scenario, pudToRoster);
+                    issue(sink, command, nativeToJava, scenario, pudToRoster,
+                            world);
                     List<PlayerIntentJournal.Outcome> after = journal.outcomeSnapshot();
                     if (after.size() > before) {
                         issuedIntents.put(index, after.getLast().intentId());
@@ -143,15 +144,18 @@ public final class BnePlaytestAdapter {
 
     private static boolean issue(CommandSink sink, Map<String, Object> command,
             Map<Integer, Integer> nativeToJava, Map<String, Object> scenario,
-            Map<Integer, Integer> pudToRoster) {
+            Map<Integer, Integer> pudToRoster,
+            net.chonkbase.chonkcraft.engine.World world) {
         Integer javaId = nativeToJava.get(number(command.get("unit_id"), "unit id"));
         if (javaId == null) {
             return false;
         }
-        // The campaign injector only GiveOrders the local player. Issuing as
-        // the enemy made a native unit-not-local refusal look like Java
-        // accepted a patrol or stop.
-        if (actorPlayer(scenario, number(command.get("unit_id"), "unit id")) != 0) {
+        // Human 1's person is owner 1. A hardcoded player==0 test used to
+        // drop that click before CommandApplier saw it, so a native
+        // field-move looked like a Java refusal.
+        int player = actorPlayer(scenario, number(command.get("unit_id"), "unit id"));
+        Unit actor = unit(world, javaId);
+        if (actor == null || !world.canControl(player, actor.player())) {
             return false;
         }
         GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario,

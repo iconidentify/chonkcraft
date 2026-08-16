@@ -308,6 +308,7 @@ def _layered_trace_evidence(trace: str, map_path: str | None,
     feedback = []
     decisions = []
     outcomes = []
+    identities = []
     for line in trace.splitlines():
         fields = _trace_fields(line)
         event = fields.get("event")
@@ -376,6 +377,19 @@ def _layered_trace_evidence(trace: str, map_path: str | None,
                 "reason": fields.get("reason"),
                 "cycle": _optional_int(fields.get("cycle")),
             })
+        elif event == "player-unit-identity":
+            identities.append({
+                "local_id": int(fields["local-id"]),
+                "generation": int(fields.get("generation", 0)),
+                "identity": {
+                    "origin": fields.get("origin", "initial"),
+                    "owner": int(fields["owner"]),
+                    "type": fields["type"],
+                    "x": int(fields["x"]),
+                    "y": int(fields["y"]),
+                    "ordinal": int(fields.get("ordinal", 0)),
+                },
+            })
         elif event == "player-outcome":
             outcomes.append({
                 "intent_id": int(fields["intent"]),
@@ -409,6 +423,10 @@ def _layered_trace_evidence(trace: str, map_path: str | None,
         "player_decisions": decisions,
         "player_feedback": feedback,
         "player_outcomes": outcomes,
+        "unit_identities": ({
+            "schema": UNIT_IDENTITY_SCHEMA,
+            "units": identities,
+        } if identities else None),
     }
 
 

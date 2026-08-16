@@ -75,6 +75,7 @@ static LONG trace_unit_slot = -1;
 static idle_function original_idle = NULL;
 static projectile_function original_projectile = NULL;
 static give_order_function original_internal_give_order = NULL;
+static give_order_function original_give_order = NULL;
 static ai_home_function original_ai_home = NULL;
 static set_ai_behavior_function original_set_ai_behavior = NULL;
 static find_square_function original_find_square = NULL;
@@ -272,7 +273,53 @@ static DWORD next_script_command = 0;
 static BOOL command_file_valid = TRUE;
 static LONG selection_batch_cycle = -1;
 
+#define PLAYER_TX_LIMIT BNE_SELECTION_LIMIT
+#define PLAYER_TX_WINDOW 600
+
+typedef struct player_tx_order {
+    DWORD slot;
+    DWORD target_slot;
+    int x;
+    int y;
+    unsigned int function_index;
+    unsigned int after_order;
+    BYTE type;
+} player_tx_order;
+
+typedef struct player_tx_track {
+    BOOL open;
+    DWORD slot;
+    DWORD intent_id;
+    DWORD transaction_id;
+    LONG submitted_cycle;
+    unsigned int function_index;
+    int dest_x;
+    int dest_y;
+    DWORD target_slot;
+    short start_px;
+    short start_py;
+    short last_px;
+    short last_py;
+    LONG first_progress_cycle;
+    BOOL accepted;
+    unsigned int last_order;
+    WORD last_hp;
+    BOOL last_alive;
+    BOOL last_on_map;
+} player_tx_track;
+
+static BOOL player_tx_capturing = FALSE;
+static DWORD player_tx_id = 0;
+static DWORD player_tx_next_intent = 1;
+static player_tx_order player_tx_orders[PLAYER_TX_LIMIT];
+static DWORD player_tx_order_count = 0;
+static player_tx_track player_tx_tracks[PLAYER_TX_LIMIT];
+static DWORD player_tx_track_count = 0;
+
 static BOOL executable_page_contains(const void *address);
+static DWORD unit_slot_of(const BYTE *pool, DWORD pool_count, const BYTE *unit);
+static void player_tx_flush_open(LONG cycle);
+static void player_tx_observe_cycle(LONG cycle, BYTE *pool, DWORD pool_count);
 static void trace_critter_scheduler_state(const BYTE *pool, DWORD pool_count);
 static void trace_initialization_semantics(const char *phase, LONG index,
         const BYTE *pool, DWORD pool_count);
@@ -797,6 +844,7 @@ static void trace_close(void) {
                 (unsigned long) replay_schedule_consumed,
                 (unsigned long) replay_schedule_records);
     }
+    player_tx_flush_open(traced_cycles);
     trace_write("# bne-trace protocol=%d event=detach cycles=%ld screens=%ld",
             CHONK_BNE_TRACE_PROTOCOL, traced_cycles, screen_callbacks);
     state_complete = state_close();
@@ -1027,6 +1075,435 @@ static WORD read_word(const BYTE *unit, size_t offset) {
     WORD value;
     memcpy(&value, unit + offset, sizeof(value));
     return value;
+}
+
+static short read_short(const BYTE *unit, size_t offset) {
+    short value;
+    memcpy(&value, unit + offset, sizeof(value));
+    return value;
+}
+
+static unsigned int order_function_index(void *order_function) {
+    unsigned int index;
+
+    for (index = 0; index <= 60; index++) {
+        if (BNE_202_ORDER_FUNCTIONS[index] == order_function) {
+            return index;
+        }
+    }
+    return 0xff;
+}
+
+static const char *player_tx_family_name(unsigned int function_index) {
+    if (function_index == 3) {
+        return "move";
+    }
+    if (function_index == 2) {
+        return "stop";
+    }
+    if (function_index == 8) {
+        return "attack";
+    }
+    if (function_index == 5) {
+        return "patrol";
+    }
+    if (function_index == 23) {
+        return "harvest";
+    }
+    if (function_index == 24) {
+        return "return-goods";
+    }
+    if (function_index == 27) {
+        return "repair";
+    }
+    if (function_index == 17) {
+        return "attack-ground";
+    }
+    return "unknown";
+}
+
+static void player_tx_format_wire(const player_tx_order *order, char *out,
+        size_t out_size) {
+    unsigned short x = (unsigned short) order->x;
+    unsigned short y = (unsigned short) order->y;
+    unsigned short target = order->target_slot == SCRIPT_NO_TARGET
+            ? 0xffffU : (unsigned short) order->target_slot;
+
+    /* 0x00475f80 reads an 8-byte 0x13 packet as opcode, x, y, target slot,
+     * ORDER_FUNCTIONS index. Reconstruct those bytes from the GiveOrder
+     * arguments DoRightButton actually used -- do not invent a dest. */
+    snprintf(out, out_size, "13%02x%02x%02x%02x%02x%02x%02x",
+            (unsigned int) (x & 0xffU), (unsigned int) (x >> 8),
+            (unsigned int) (y & 0xffU), (unsigned int) (y >> 8),
+            (unsigned int) (target & 0xffU), (unsigned int) (target >> 8),
+            (unsigned int) (order->function_index & 0xffU));
+}
+
+static const char *player_tx_target_shape(BYTE *pool, DWORD pool_count,
+        unsigned int click_x, unsigned int click_y) {
+    WORD *squares = *BNE_202_MAP_SQUARES_POINTER;
+    WORD map_size = *BNE_202_MAP_SIZE;
+    WORD square;
+    DWORD index;
+
+    for (index = 0; index < player_tx_order_count; index++) {
+        DWORD slot = player_tx_orders[index].target_slot;
+        BYTE *target;
+        DWORD flags;
+
+        if (slot == SCRIPT_NO_TARGET || pool == NULL || slot >= pool_count) {
+            continue;
+        }
+        target = pool + slot * BNE_UNIT_BYTES;
+        flags = BNE_202_UNIT_TYPE_FLAGS[target[BNE_UNIT_TYPE]];
+        if ((flags & BNE_UNIT_TYPE_TRANSPORT) != 0) {
+            return "transport";
+        }
+        if ((flags & BNE_UNIT_TYPE_BUILDING) != 0) {
+            return "building";
+        }
+        return "unit";
+    }
+    if (squares == NULL || click_x >= map_size || click_y >= map_size) {
+        return "chrome";
+    }
+    square = squares[click_y * map_size + click_x];
+    if ((square & BNE_SQUARE_FOREST) != 0) {
+        return "trees";
+    }
+    if ((square & BNE_SQUARE_UNIT_HERE) != 0) {
+        return "occupied-ground";
+    }
+    return "open-ground";
+}
+
+static void player_tx_begin(void) {
+    player_tx_id++;
+    player_tx_order_count = 0;
+    memset(player_tx_orders, 0, sizeof(player_tx_orders));
+}
+
+static void player_tx_record_give_order(BYTE *unit, int x, int y, BYTE *target,
+        unsigned int function_index) {
+    BYTE *pool = *BNE_202_UNIT_POOL_POINTER;
+    DWORD pool_count = *BNE_202_UNIT_POOL_COUNT;
+    player_tx_order *order;
+
+    if (!player_tx_capturing || player_tx_order_count >= PLAYER_TX_LIMIT
+            || pool == NULL || unit == NULL) {
+        return;
+    }
+    order = &player_tx_orders[player_tx_order_count++];
+    order->slot = unit_slot_of(pool, pool_count, unit);
+    order->target_slot = unit_slot_of(pool, pool_count, target);
+    order->x = x;
+    order->y = y;
+    order->function_index = function_index;
+    order->after_order = unit[BNE_UNIT_ORDER];
+    order->type = unit[BNE_UNIT_TYPE];
+}
+
+static void player_tx_write_optional_cycle(char *out, size_t out_size,
+        LONG cycle) {
+    if (cycle <= 0) {
+        snprintf(out, out_size, "none");
+        return;
+    }
+    snprintf(out, out_size, "%ld", cycle);
+}
+
+static void player_tx_write_optional_slot(char *out, size_t out_size,
+        DWORD slot) {
+    if (slot == SCRIPT_NO_TARGET) {
+        snprintf(out, out_size, "none");
+        return;
+    }
+    snprintf(out, out_size, "%lu", (unsigned long) slot);
+}
+
+static void player_tx_emit_outcome_line(const player_tx_track *track,
+        const char *terminal_reason, LONG terminal_cycle) {
+    char progress[16];
+    char target_id[16];
+    const char *family = player_tx_family_name(track->function_index);
+    int tile_x = track->last_px / BNE_TILE_PIXELS;
+    int tile_y = track->last_py / BNE_TILE_PIXELS;
+    int offset_x = track->last_px - tile_x * BNE_TILE_PIXELS;
+    int offset_y = track->last_py - tile_y * BNE_TILE_PIXELS;
+
+    player_tx_write_optional_cycle(progress, sizeof(progress),
+            track->first_progress_cycle);
+    player_tx_write_optional_slot(target_id, sizeof(target_id),
+            track->target_slot);
+    trace_write("# bne-trace event=player-outcome transaction=%lu intent=%lu "
+            "submitted-cycle=%ld unit=%lu family=%s accepted=%s "
+            "first-progress-cycle=%s terminal-cycle=%ld terminal-reason=%s "
+            "tile-x=%d tile-y=%d offset-x=%d offset-y=%d order=%s "
+            "target-id=%s hit-points=%u carried=0 alive=%s on-map=%s "
+            "missile-count=0",
+            (unsigned long) track->transaction_id,
+            (unsigned long) track->intent_id,
+            track->submitted_cycle,
+            (unsigned long) track->slot,
+            family,
+            track->accepted ? "true" : "false",
+            progress,
+            terminal_cycle,
+            terminal_reason,
+            tile_x, tile_y, offset_x, offset_y,
+            bne_order_name(track->last_order),
+            target_id,
+            (unsigned int) track->last_hp,
+            track->last_alive ? "true" : "false",
+            track->last_on_map ? "true" : "false");
+}
+
+static void player_tx_start_tracks(LONG cycle, BYTE *pool, DWORD pool_count,
+        DWORD gesture_intent) {
+    DWORD index;
+
+    player_tx_track_count = 0;
+    memset(player_tx_tracks, 0, sizeof(player_tx_tracks));
+    for (index = 0; index < player_tx_order_count
+            && player_tx_track_count < PLAYER_TX_LIMIT; index++) {
+        const player_tx_order *order = &player_tx_orders[index];
+        player_tx_track *track;
+        BYTE *unit;
+
+        if (pool == NULL || order->slot == SCRIPT_NO_TARGET
+                || order->slot >= pool_count) {
+            continue;
+        }
+        unit = pool + order->slot * BNE_UNIT_BYTES;
+        track = &player_tx_tracks[player_tx_track_count++];
+        track->open = TRUE;
+        track->slot = order->slot;
+        track->intent_id = gesture_intent + 1 + index;
+        track->transaction_id = player_tx_id;
+        track->submitted_cycle = cycle;
+        track->function_index = order->function_index;
+        track->dest_x = order->x;
+        track->dest_y = order->y;
+        track->target_slot = order->target_slot;
+        track->start_px = read_short(unit, BNE_UNIT_PIXEL_X);
+        track->start_py = read_short(unit, BNE_UNIT_PIXEL_Y);
+        track->last_px = track->start_px;
+        track->last_py = track->start_py;
+        track->first_progress_cycle = 0;
+        track->accepted = TRUE;
+        track->last_order = unit[BNE_UNIT_ORDER];
+        track->last_hp = read_word(unit, BNE_UNIT_HP);
+        track->last_alive = (unit[BNE_UNIT_FLAGS3]
+                & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) == 0;
+        track->last_on_map = (unit[BNE_UNIT_FLAGS3] & BNE_UNIT_HIDDEN) == 0;
+    }
+}
+
+static void player_tx_observe_cycle(LONG cycle, BYTE *pool, DWORD pool_count) {
+    DWORD index;
+
+    if (pool == NULL) {
+        return;
+    }
+    for (index = 0; index < player_tx_track_count; index++) {
+        player_tx_track *track = &player_tx_tracks[index];
+        BYTE *unit;
+        BYTE flags;
+        BOOL still;
+        BOOL tile_moved;
+        BOOL pixel_moved;
+        int tile_x;
+        int tile_y;
+        const char *reason = NULL;
+
+        if (!track->open) {
+            continue;
+        }
+        if (track->slot >= pool_count) {
+            track->last_alive = FALSE;
+            track->last_on_map = FALSE;
+            player_tx_emit_outcome_line(track, "unit-unavailable", cycle);
+            track->open = FALSE;
+            continue;
+        }
+        unit = pool + track->slot * BNE_UNIT_BYTES;
+        flags = unit[BNE_UNIT_FLAGS3];
+        track->last_px = read_short(unit, BNE_UNIT_PIXEL_X);
+        track->last_py = read_short(unit, BNE_UNIT_PIXEL_Y);
+        track->last_order = unit[BNE_UNIT_ORDER];
+        track->last_hp = read_word(unit, BNE_UNIT_HP);
+        track->last_alive = (flags & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) == 0;
+        track->last_on_map = (flags & BNE_UNIT_HIDDEN) == 0;
+        still = strcmp(bne_order_name(track->last_order), "STILL") == 0;
+        tile_x = track->last_px / BNE_TILE_PIXELS;
+        tile_y = track->last_py / BNE_TILE_PIXELS;
+        tile_moved = (track->start_px / BNE_TILE_PIXELS != tile_x)
+                || (track->start_py / BNE_TILE_PIXELS != tile_y);
+        pixel_moved = track->last_px != track->start_px
+                || track->last_py != track->start_py;
+        if (track->first_progress_cycle <= 0
+                && (tile_moved || (pixel_moved && !still))) {
+            track->first_progress_cycle = cycle;
+        }
+        if (!track->last_alive || !track->last_on_map) {
+            reason = "unit-unavailable";
+        } else if (still && (track->first_progress_cycle > 0
+                || (tile_x == track->dest_x && tile_y == track->dest_y))) {
+            reason = "settled";
+        } else if (cycle - track->submitted_cycle >= PLAYER_TX_WINDOW) {
+            reason = track->first_progress_cycle > 0
+                    ? "window-complete" : "acknowledged-no-progress";
+        }
+        if (reason != NULL) {
+            player_tx_emit_outcome_line(track, reason, cycle);
+            track->open = FALSE;
+        }
+    }
+}
+
+static void player_tx_flush_open(LONG cycle) {
+    DWORD index;
+
+    for (index = 0; index < player_tx_track_count; index++) {
+        player_tx_track *track = &player_tx_tracks[index];
+        const char *reason;
+
+        if (!track->open) {
+            continue;
+        }
+        reason = track->first_progress_cycle > 0
+                ? "window-complete" : "acknowledged-no-progress";
+        player_tx_emit_outcome_line(track, reason, cycle);
+        track->open = FALSE;
+    }
+}
+
+static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
+        DWORD pool_count, const char *selected_list) {
+    DWORD gesture_intent;
+    DWORD index;
+    const char *shape;
+    const char *family = "unknown";
+    BOOL same_family = TRUE;
+
+    if (player_tx_id == 0) {
+        player_tx_id = 1;
+    }
+    gesture_intent = player_tx_next_intent++;
+    shape = player_tx_target_shape(pool, pool_count, command->x, command->y);
+    if (player_tx_order_count > 0) {
+        family = player_tx_family_name(player_tx_orders[0].function_index);
+        for (index = 1; index < player_tx_order_count; index++) {
+            if (strcmp(family, player_tx_family_name(
+                    player_tx_orders[index].function_index)) != 0) {
+                same_family = FALSE;
+                break;
+            }
+        }
+    }
+    /* Target shape is classified after DoRightButton / GiveOrder, never
+     * from the click coordinate alone. */
+    trace_write("# bne-trace event=player-gesture transaction=%lu intent=%lu "
+            "cycle=%ld origin=field detail=right-click screen-x=none "
+            "screen-y=none tile-x=%u tile-y=%u modifiers=plain "
+            "target-id=none target-shape=%s selected=%s",
+            (unsigned long) player_tx_id, (unsigned long) gesture_intent,
+            command->cycle, (unsigned int) command->x,
+            (unsigned int) command->y, shape, selected_list);
+    if (player_tx_order_count == 0) {
+        trace_write("# bne-trace event=player-decision transaction=%lu "
+                "accepted=false family=unknown queued=false "
+                "reason=empty-selection cycle=%ld",
+                (unsigned long) player_tx_id, command->cycle);
+        trace_write("# bne-trace event=player-feedback transaction=%lu "
+                "intent=%lu cycle=%ld acknowledged=true mode=silent "
+                "detail=empty-selection",
+                (unsigned long) player_tx_id,
+                (unsigned long) gesture_intent, command->cycle);
+        return;
+    }
+    if (same_family) {
+        trace_write("# bne-trace event=player-decision transaction=%lu "
+                "accepted=true family=%s queued=false reason=give-order "
+                "cycle=%ld",
+                (unsigned long) player_tx_id, family, command->cycle);
+    }
+    for (index = 0; index < player_tx_order_count; index++) {
+        const player_tx_order *order = &player_tx_orders[index];
+        BYTE *unit;
+        unsigned int ordinal = 0;
+        DWORD earlier;
+
+        if (pool == NULL || order->slot == SCRIPT_NO_TARGET
+                || order->slot >= pool_count) {
+            continue;
+        }
+        unit = pool + order->slot * BNE_UNIT_BYTES;
+        for (earlier = 0; earlier < order->slot; earlier++) {
+            BYTE *other = pool + earlier * BNE_UNIT_BYTES;
+            if ((other[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
+                continue;
+            }
+            if (other[BNE_UNIT_OWNER] == unit[BNE_UNIT_OWNER]
+                    && other[BNE_UNIT_TYPE] == unit[BNE_UNIT_TYPE]
+                    && read_word(other, BNE_UNIT_X) == read_word(unit, BNE_UNIT_X)
+                    && read_word(other, BNE_UNIT_Y) == read_word(unit, BNE_UNIT_Y)) {
+                ordinal++;
+            }
+        }
+        trace_write("# bne-trace event=player-unit-identity local-id=%lu "
+                "generation=%lu origin=initial owner=%u type=%s x=%u y=%u "
+                "ordinal=%u",
+                (unsigned long) order->slot,
+                (unsigned long) (unit_generations[order->slot] == 0
+                        ? 0 : unit_generations[order->slot] - 1),
+                (unsigned int) unit[BNE_UNIT_OWNER],
+                bne_unit_type_name(unit[BNE_UNIT_TYPE]),
+                (unsigned int) read_word(unit, BNE_UNIT_X),
+                (unsigned int) read_word(unit, BNE_UNIT_Y),
+                ordinal);
+    }
+    for (index = 0; index < player_tx_order_count; index++) {
+        const player_tx_order *order = &player_tx_orders[index];
+        DWORD intent = player_tx_next_intent++;
+        char wire[32];
+        char target_id[16];
+        const char *mode = index == 0 ? "voice" : "silent";
+        const char *detail = index == 0 ? "ack" : "group-suppressed";
+
+        player_tx_format_wire(order, wire, sizeof(wire));
+        player_tx_write_optional_slot(target_id, sizeof(target_id),
+                order->target_slot);
+        trace_write("# bne-trace event=player-order transaction=%lu "
+                "intent=%lu ordinal=%lu cycle=%ld family=%s player=%u "
+                "unit=%lu x=%d y=%d target-id=%s type-index=0 queued=false "
+                "wire=%s accepted=true selected=%s",
+                (unsigned long) player_tx_id, (unsigned long) intent,
+                (unsigned long) index, command->cycle,
+                player_tx_family_name(order->function_index),
+                (unsigned int) *BNE_202_UI_PLAYER,
+                (unsigned long) order->slot, order->x, order->y,
+                target_id, wire, selected_list);
+        trace_write("# bne-trace event=player-feedback transaction=%lu "
+                "intent=%lu cycle=%ld acknowledged=true mode=%s detail=%s",
+                (unsigned long) player_tx_id, (unsigned long) intent,
+                command->cycle, mode, detail);
+    }
+    /* Intents were assigned sequentially starting at gesture+1. Reset the
+     * counter is unnecessary; start_tracks recomputes the same ids. */
+    player_tx_next_intent = gesture_intent + 1;
+    player_tx_start_tracks(command->cycle, pool, pool_count, gesture_intent);
+    player_tx_next_intent = gesture_intent + 1 + player_tx_order_count;
+}
+
+static void __cdecl traced_give_order(BYTE *unit, int x, int y, BYTE *target,
+        void *order_function) {
+    unsigned int function_index = order_function_index(order_function);
+
+    if (original_give_order != NULL) {
+        original_give_order(unit, x, y, target, order_function);
+    }
+    player_tx_record_give_order(unit, x, y, target, function_index);
 }
 
 static void __cdecl traced_ai_home(BYTE *unit) {
@@ -1633,8 +2110,12 @@ static void apply_ui_right_click(const script_command *command,
             command->cycle, (unsigned int) command->x,
             (unsigned int) command->y,
             (unsigned int) *BNE_202_UI_PLAYER, selected_list);
+    player_tx_begin();
+    player_tx_capturing = TRUE;
     ((do_right_button_function) (void *) BNE_202_DO_RIGHT_BUTTON)(
             (int) command->x, (int) command->y, NULL, 0, 0);
+    player_tx_capturing = FALSE;
+    player_tx_emit_dispatch(command, pool, pool_count, selected_list);
     for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
         BYTE *unit = selected[index];
         DWORD slot = unit_slot_of(pool, pool_count, unit);
@@ -1766,9 +2247,10 @@ static void apply_commands(LONG cycle) {
                     produced);
             continue;
         }
-        if (!executable_page_contains(BNE_202_GIVE_ORDER)
-                || memcmp(BNE_202_GIVE_ORDER, expected_give_order,
-                    sizeof(expected_give_order)) != 0) {
+        if (original_give_order == NULL
+                && (!executable_page_contains(BNE_202_GIVE_ORDER)
+                    || memcmp(BNE_202_GIVE_ORDER, expected_give_order,
+                        sizeof(expected_give_order)) != 0)) {
             reject_command(command, "give-order-signature");
             continue;
         }
@@ -1797,7 +2279,9 @@ static void apply_commands(LONG cycle) {
                 continue;
             }
         }
-        ((give_order_function) (void *) BNE_202_GIVE_ORDER)(
+        (original_give_order != NULL
+                ? original_give_order
+                : (give_order_function) (void *) BNE_202_GIVE_ORDER)(
                 unit, (int) dest_x, (int) dest_y, target, order_function);
         trace_write("# bne-trace event=command-applied cycle=%ld action=%s "
                 "unit=%lu target=%lu x=%u y=%u function-index=%u",
@@ -2177,7 +2661,9 @@ static void snapshot_cycle(void) {
                 cycle);
     }
     trace_command_unit_state(cycle, pool, pool_count);
+    player_tx_observe_cycle(cycle, pool, pool_count);
     if (trace_cycle_limit > 0 && cycle >= trace_cycle_limit) {
+        player_tx_flush_open(cycle);
         trace_write("# bne-trace event=cycle-limit cycle=%ld", cycle);
         /* ExitProcess runs DLL detach callbacks while this old game is still
          * inside its update call. Wine's macOS driver can deadlock there and
@@ -3151,6 +3637,56 @@ static BOOL install_projectile_hook(void) {
     return TRUE;
 }
 
+static BOOL install_give_order_hook(void) {
+    static const BYTE expected[] = {0x8b, 0x44, 0x24, 0x04, 0x33, 0xc9};
+    BYTE replacement[sizeof(expected)];
+    BYTE *trampoline;
+    int32_t relative;
+    DWORD old_protection;
+
+    if (!executable_page_contains(BNE_202_GIVE_ORDER)
+            || memcmp(BNE_202_GIVE_ORDER, expected, sizeof(expected)) != 0) {
+        trace_write("# bne-trace event=give-order-hook-rejected "
+                "reason=signature");
+        return FALSE;
+    }
+    trampoline = (BYTE *) VirtualAlloc(NULL, sizeof(expected) + 5,
+            MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    if (trampoline == NULL) {
+        trace_write("# bne-trace event=give-order-hook-rejected "
+                "reason=allocation");
+        return FALSE;
+    }
+    memcpy(trampoline, expected, sizeof(expected));
+    trampoline[sizeof(expected)] = 0xe9;
+    relative = (int32_t) ((BNE_202_GIVE_ORDER + sizeof(expected))
+            - (trampoline + sizeof(expected) + 5));
+    memcpy(trampoline + sizeof(expected) + 1, &relative, sizeof(relative));
+    original_give_order = (give_order_function) (void *) trampoline;
+
+    memset(replacement, 0x90, sizeof(replacement));
+    replacement[0] = 0xe9;
+    relative = (int32_t) ((BYTE *) (void *) traced_give_order
+            - (BNE_202_GIVE_ORDER + 5));
+    memcpy(replacement + 1, &relative, sizeof(relative));
+    if (!VirtualProtect(BNE_202_GIVE_ORDER, sizeof(replacement),
+            PAGE_EXECUTE_READWRITE, &old_protection)) {
+        original_give_order = NULL;
+        VirtualFree(trampoline, 0, MEM_RELEASE);
+        trace_write("# bne-trace event=give-order-hook-rejected "
+                "reason=virtual-protect");
+        return FALSE;
+    }
+    memcpy(BNE_202_GIVE_ORDER, replacement, sizeof(replacement));
+    FlushInstructionCache(GetCurrentProcess(), BNE_202_GIVE_ORDER,
+            sizeof(replacement));
+    VirtualProtect(BNE_202_GIVE_ORDER, sizeof(replacement),
+            old_protection, &old_protection);
+    trace_write("# bne-trace event=give-order-hook-installed "
+            "target=0x00451070");
+    return TRUE;
+}
+
 static BOOL install_internal_order_hook(void) {
     static const BYTE expected[] = {0x83, 0xec, 0x08, 0x33, 0xc0};
     BYTE replacement[sizeof(expected)];
@@ -3659,6 +4195,7 @@ __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
     install_async_random_hook();
     install_projectile_hook();
     install_idle_hook();
+    install_give_order_hook();
     install_internal_order_hook();
     install_ai_home_hook();
     install_set_ai_behavior_hook();

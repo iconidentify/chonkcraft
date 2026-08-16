@@ -428,6 +428,90 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertEqual(["voice", "silent"], [
             command["feedback"]["mode"] for command in item["commands"]])
 
+    def test_tracer_hooks_public_give_order_for_layered_field_move(self):
+        source = (Path(__file__).parents[1] / "src" / "tracer.c").read_text(
+            encoding="utf-8")
+        self.assertIn("traced_give_order", source,
+                      "DoRightButton must be observed at public GiveOrder")
+        self.assertIn("install_give_order_hook", source,
+                      "the 0x00451070 trampoline has to be installed")
+        self.assertIn("event=player-gesture", source)
+        self.assertIn("event=player-order", source)
+        self.assertIn("event=player-feedback", source)
+        self.assertIn("event=player-outcome", source)
+        self.assertIn("0x13", source)
+        self.assertIn("group-suppressed", source,
+                      "a group keeps one voice; the rest stay silent")
+        self.assertIn("BNE_UNIT_PIXEL_X", source)
+        self.assertIn("BNE_SQUARE_FOREST", source)
+
+    def test_reconstructed_0x13_field_move_compiles_all_eight_layers(self):
+        compiled = transaction.compile_ui_trace(
+            "\n".join([
+                "# bne-trace event=player-gesture transaction=1 intent=1 "
+                "cycle=5 origin=field detail=right-click screen-x=none "
+                "screen-y=none tile-x=25 tile-y=28 modifiers=plain "
+                "target-id=none target-shape=open-ground selected=1598",
+                "# bne-trace event=player-order transaction=1 intent=2 "
+                "ordinal=0 cycle=5 family=move player=1 unit=1598 x=25 y=28 "
+                "target-id=none type-index=0 queued=false "
+                "wire=1319001c00ffff03 accepted=true selected=1598",
+                "# bne-trace event=player-feedback transaction=1 intent=2 "
+                "cycle=5 acknowledged=true mode=voice detail=ack",
+                "# bne-trace event=player-outcome transaction=1 intent=2 "
+                "submitted-cycle=5 unit=1598 family=move accepted=true "
+                "first-progress-cycle=9 terminal-cycle=45 "
+                "terminal-reason=settled tile-x=25 tile-y=28 offset-x=0 "
+                "offset-y=0 order=STILL target-id=none hit-points=60 "
+                "carried=0 alive=true on-map=true missile-count=0",
+            ]),
+            source="native-0x13-field-move")
+        item = compiled["transactions"][0]
+        self.assertTrue(all(item["coverage"]["layers"].values()),
+                        "an observed field/plain/move 0x13 packet must prove "
+                        "target, wire, acknowledgement, progress and terminal")
+        self.assertEqual("1319001c00ffff03", item["commands"][0]["wire_hex"])
+        self.assertEqual("open-ground", item["gesture"]["target_shape"])
+        self.assertEqual("voice", item["commands"][0]["feedback"]["mode"])
+        self.assertEqual(9, item["outcomes"][0]["first_progress_cycle"])
+        self.assertEqual("settled", item["outcomes"][0]["terminal_reason"])
+
+    def test_native_unit_identity_event_closes_the_lifecycle(self):
+        compiled = transaction.compile_ui_trace(
+            "\n".join([
+                "# bne-trace event=player-gesture transaction=1 intent=1 "
+                "cycle=5 origin=field detail=right-click screen-x=none "
+                "screen-y=none tile-x=25 tile-y=28 modifiers=plain "
+                "target-id=none target-shape=open-ground selected=1598",
+                "# bne-trace event=player-unit-identity local-id=1598 "
+                "generation=0 origin=initial owner=1 type=unit-footman "
+                "x=21 y=5 ordinal=0",
+                "# bne-trace event=player-order transaction=1 intent=2 "
+                "ordinal=0 cycle=5 family=move player=1 unit=1598 x=25 y=28 "
+                "target-id=none type-index=0 queued=false "
+                "wire=1319001c00ffff03 accepted=true selected=1598",
+                "# bne-trace event=player-feedback transaction=1 intent=2 "
+                "cycle=5 acknowledged=true mode=voice detail=ack",
+                "# bne-trace event=player-outcome transaction=1 intent=2 "
+                "submitted-cycle=5 unit=1598 family=move accepted=true "
+                "first-progress-cycle=10 terminal-cycle=45 "
+                "terminal-reason=settled tile-x=25 tile-y=28 offset-x=0 "
+                "offset-y=0 order=STILL target-id=none hit-points=60 "
+                "carried=0 alive=true on-map=true missile-count=0",
+            ]),
+            source="native-identity")
+        identities = compiled["unit_identities"]["units"]
+        self.assertEqual(1, len(identities),
+                         "GiveOrder must name the selected footman's lifetime")
+        self.assertEqual(1598, identities[0]["local_id"])
+        self.assertEqual("unit-footman", identities[0]["identity"]["type"])
+        canonical = transaction.canonical_transaction(
+            compiled["transactions"][0],
+            transaction._unit_identity_index(compiled),
+            require_stable=True)
+        self.assertEqual(identities[0]["stable_sha256"],
+                         canonical["commands"][0]["unit_identity"])
+
     def test_native_manifest_authenticates_exact_trace_bytes(self):
         payload = b"# trace\n"
         manifest, validation = native_manifest(payload)

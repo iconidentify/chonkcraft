@@ -82,6 +82,59 @@ class BnePlaytestAdapterTest {
     }
 
     @Test
+    @DisplayName("a human 1 footman accepts a field move as the person player")
+    void aHuman1FootmanAcceptsAFieldMoveAsThePersonPlayer() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-playtest-human01-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        String scenarioSha = "d".repeat(64);
+        String scenario = """
+                {
+                  "schema": "chonkcraft-bne-playtest-scenario-1",
+                  "scenario_sha256": "%s",
+                  "seed_identity": {"fixture": "human01-field-move"},
+                  "setup": {
+                    "kind": "sealed-fixture",
+                    "scenario": "Campaign\\\\Human\\\\Human01.pud",
+                    "seed": 1
+                  },
+                  "pattern": "single",
+                  "settle_cycles": 40,
+                  "actors": [
+                    {"id": 1598, "player": 1, "domain": "land",
+                     "capabilities": ["move"], "x": 21, "y": 5}
+                  ],
+                  "targets": [],
+                  "commands": [
+                    {"kind": "move", "unit_id": 1598, "x": 25, "y": 28,
+                     "queued": false, "issue_cycle": 5}
+                  ]
+                }
+                """.formatted(scenarioSha);
+        Map<String, Object> parsed = Json.parseObject(scenario);
+        parsed.put("scenario_sha256", scenarioSha);
+        Files.writeString(scenarioPath, Json.write(parsed), StandardCharsets.UTF_8);
+
+        BnePlaytestAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "e".repeat(64),
+        });
+
+        Map<String, Object> result = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        List<?> observations = (List<?>) result.get("observations");
+        assertEquals(1, observations.size(), "the footman order must be observed");
+        Map<?, ?> observation = (Map<?, ?>) observations.getFirst();
+        assertEquals(Boolean.TRUE, observation.get("accepted"),
+                "Human 1's person is owner 1; the starting footman must accept");
+        assertNotNull(observation.get("first_progress_cycle"),
+                "the footman must physically start walking");
+    }
+
+    @Test
     @DisplayName("a human 13 north click reports two live shots at the still visit")
     void aHuman13NorthClickReportsTwoLiveShotsAtTheStillVisit() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
