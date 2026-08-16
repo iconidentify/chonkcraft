@@ -87,12 +87,35 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("a computer whose install stored zero still arms the builder-scan latch")
+    void aComputerWhoseInstallStoredZeroStillArmsTheBuilderScanLatch() {
+        // Human 1 profile 1 and Human 4 profile 3 both SET +0x0c=0. Native
+        // 0x428160 already sees 1 at warmup-before. Orc 1 SET 1 and must stay 1.
+        assertArmed("campaigns/human/level01h");
+        assertArmed("campaigns/human/level04h");
+        assertArmed("campaigns/orc/level01o");
+    }
+
+    @Test
     @DisplayName("a person-only map does not invent a computer instruction")
     void aPersonOnlyMapDoesNotInventAComputerInstruction() {
         World world = new World(new GameMap(16, 16, new Tileset()));
         List<AiDecisionLedger.Row> rows = AiDecisionLedger.snapshot(world, 1);
         assertTrue(rows.isEmpty(),
                 "a map with no computer player has no ai.bin instruction");
+    }
+
+    private static void assertArmed(String map) {
+        List<AiDecisionLedger.Row> rows = emit(map, 1);
+        assertFalse(rows.isEmpty(), map + " must emit a computer-player row");
+        for (AiDecisionLedger.Row row : rows) {
+            String hex = row.nonPointerHex();
+            assertEquals(72, hex.length(),
+                    "the compared state is the 36 non-pointer bytes");
+            assertEquals("01", hex.substring(16, 18),
+                    map + " player " + row.player()
+                            + " must keep +0x0c armed for the 0x428160 builder scan");
+        }
     }
 
     private static List<AiDecisionLedger.Row> emit(String map, int last) {

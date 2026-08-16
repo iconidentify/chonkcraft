@@ -79,8 +79,13 @@ from authenticated `ai.bin` when the incoming wait is zero. The same Orc 1
 player-1 capture now compares `state_identical` and `telemetry_identical`
 through 12, 200, and 1,800 cycles: PC stays `0x1ba6`, wait oscillates 0/1,
 predicate 3 (worker count) fails every independent choice, and no launch is
-consumed. That is still one player and one mission -- not AI-lane
-certification. Other computer players and missions remain open. A later independent
+consumed.
+
+Human 1 and Human 4 computers SET `+0x0c=0` during install. Native
+`0x428160` already reads that byte as the builder-scan latch and skips the
+map walk when it is zero. Java now arms the latch after install. Human 4
+player 0 is exact through 200 cycles; Orc 1 player 1 stays exact. That is
+still not every computer on every mission. A later independent
 choice that is not opcode 3, or a launch the boundary snapshots never hook,
 remains telemetry debt. Do not change engine behavior to invent those events.
 

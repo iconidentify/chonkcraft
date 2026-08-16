@@ -29,6 +29,30 @@ class BattleNetAiBytecodeTest {
         assertEquals(17, next);
         assertEquals(256, BattleNetAiBytecode.waitCounter(state));
         assertEquals(0, state[BattleNetAiBytecode.OFF_WANTED_BASIC] & 0xff);
+        assertEquals(1, state[BattleNetAiBytecode.OFF_COMPUTER_ARMED] & 0xff,
+                "0x428160 skips the builder scan when +0x0c is left at the SET 0");
+    }
+
+    @Test
+    void installArmsTheComputerLatchAfterBytecodeStoresZero() {
+        byte[] ai = new byte[20];
+        byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
+        ai[0] = 8;
+        int pc = 12;
+        ai[pc++] = 0;
+        ai[pc++] = (byte) BattleNetAiBytecode.OFF_COMPUTER_ARMED;
+        ai[pc++] = 0;
+        ai[pc++] = 2;
+        ai[pc++] = 1;
+        ai[pc++] = 0;
+        ai[pc++] = 0;
+        ai[pc++] = 0;
+
+        BattleNetAiBytecode.install(ai, 0, state);
+
+        assertEquals(1, state[BattleNetAiBytecode.OFF_COMPUTER_ARMED] & 0xff,
+                "a profile that SET +0x0c=0 is still armed for 0x428160");
+        assertEquals(1, BattleNetAiBytecode.waitCounter(state));
     }
 
     @Test

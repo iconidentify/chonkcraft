@@ -19,6 +19,16 @@ public final class BattleNetAiBytecode {
     public static final int OFF_LAUNCH_GROUND = 0x09;
     public static final int OFF_LAUNCH_NAVAL = 0x0a;
     public static final int OFF_LAUNCH_AIR = 0x0b;
+    /**
+     * Computer builder-scan latch at {@code +0x0c}.
+     *
+     * <p>Native {@code 0x428160} reads {@code [owner*48 + 0x004af124]} and
+     * skips the map-component walk when the byte is zero. Profiles 1 and 3
+     * store 0 here during install; the live computer dump is already 1
+     * before the first warmup tick. Leaving the SET 0 in place used to
+     * disable that walk.
+     */
+    public static final int OFF_COMPUTER_ARMED = 0x0c;
     public static final int OFF_GROUND_FORCE_COUNT = 0x0d;
     public static final int OFF_GROUND_FORCE_MULTIPLIER = 0x0e;
     public static final int OFF_NAVAL_FORCE_COUNT = 0x0f;
@@ -91,7 +101,11 @@ public final class BattleNetAiBytecode {
         // Bytecode starts at record + 4 (after list and threshold words).
         int pc = rec + 4;
         // Run until wait is non-zero (native FUN_00424e40 init).
-        return runUntilWait(ai, state, pc, true);
+        int next = runUntilWait(ai, state, pc, true);
+        // 0x428160 tests this latch before the computer builder scan.
+        // Install bytecode may have stored 0; the live computer is armed.
+        state[OFF_COMPUTER_ARMED] = 1;
+        return next;
     }
 
     /**
