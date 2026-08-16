@@ -28,9 +28,9 @@ no authenticated queued-command cells and no authenticated group transaction.
 
 The first real AI-cycle proof is better than the old coarse AI counter: Orc 1
 player 1 has exact committed `ai.bin` state and exact recovered wait/predicate
-telemetry through 12 and 200 cycles. That is still one player and one mission.
-Combat-lifecycle cells, the 1,800-cycle window, and the other computer
-players remain open, so AI parity is not certified.
+telemetry through 12, 200, and 1,800 cycles. That is still one player and one
+mission stuck on a failed worker-count WAIT-UNTIL. Combat-lifecycle cells and
+the other computer players remain open, so AI parity is not certified.
 
 The campaign catalog is exactly 52 missions and 137 trigger programs: 55
 victories, 79 defeats, one delayed victory, one flag, and one diplomacy action.

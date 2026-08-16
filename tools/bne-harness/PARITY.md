@@ -85,9 +85,9 @@ attempts/results, writes, and launch consumption on both engines. Its first
 end-to-end Orc 1 smoke run found committed state exact through 12 cycles. The
 same capture now also compares wait writes and opcode-3 WAIT-UNTIL telemetry
 after `from-trace` stopped letting a same-cycle `game-before` dump hide the
-previous committed write. Orc 1 player 1 stays exact through 200 cycles on
+previous committed write. Orc 1 player 1 stays exact through 1,800 cycles on
 that recovered ledger. That is still one player and one mission -- not the
-1,800-cycle multi-player scorecard. Until that grows across missions and
+multi-player scorecard. Until that grows across missions and
 effect outcomes, a green coarse AI playability test is a floor, not a claim
 that the enemy chose what retail BNE chose.
 

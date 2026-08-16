@@ -77,9 +77,10 @@ same-cycle `game-before` dump already holds the new wait and hides the write.
 (including the last warmup-after) and recovers opcode-3 WAIT-UNTIL attempts
 from authenticated `ai.bin` when the incoming wait is zero. The same Orc 1
 player-1 capture now compares `state_identical` and `telemetry_identical`
-through 12 and 200 cycles: PC stays `0x1ba6`, wait oscillates 0/1, predicate 3
-fails every independent choice, and no launch is consumed. That is still one
-player and one mission -- not AI-lane certification. A later independent
+through 12, 200, and 1,800 cycles: PC stays `0x1ba6`, wait oscillates 0/1,
+predicate 3 (worker count) fails every independent choice, and no launch is
+consumed. That is still one player and one mission -- not AI-lane
+certification. Other computer players and missions remain open. A later independent
 choice that is not opcode 3, or a launch the boundary snapshots never hook,
 remains telemetry debt. Do not change engine behavior to invent those events.
 
