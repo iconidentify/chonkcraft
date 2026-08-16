@@ -8,7 +8,7 @@ Copy the block below into Grok from
 
 Authority and scope:
 - Work only in /Users/chrisk/Documents/source/wargus-java on the current branch and preserve pre-existing changes. Inspect status, HEAD and diff before editing. Never reset or discard another agent's work.
-- Expected starting branch is `master` at pushed HEAD `455e2938c12396b4e6ca7b768344387f39109404`. If HEAD has legitimately advanced, resolve the current measurements dynamically rather than resetting it.
+- Expected starting branch is `master` at or after the pushed sealed engine baseline `455e2938c12396b4e6ca7b768344387f39109404`. Resolve the actual current HEAD and measurements dynamically; never reset a legitimate later handoff/documentation commit.
 - The sole behavior authority is the pinned English retail Warcraft II Battle.net Edition 2.02b executable, 712704 bytes, SHA-256 b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807.
 - Use the authenticated ChonkPack at $HOME/.chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack and i9beef for native capture. Begin with `python3 tools/bne-harness/scripts/bne_java.py doctor --need capture`; a root-owned/unreadable fixture is NOT READY.
 - Read completely before work: tools/bne-harness/NEXT_LEVEL_PARITY.md, PARITY.md current checkpoint/method, parity-lab-policy.json, AI_DECISION_LEDGER.md, player-transaction-requirements.json, combat-lifecycle-requirements.json, and the latest generated status plus player worklist after running the gate.
