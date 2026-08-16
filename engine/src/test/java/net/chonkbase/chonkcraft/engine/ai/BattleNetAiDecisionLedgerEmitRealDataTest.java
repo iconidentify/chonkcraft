@@ -87,6 +87,20 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("a long install wait is still 65532 at game-before cycle 1")
+    void aLongInstallWaitIsStill65532AtGameBeforeCycle1() {
+        // Native Human 1 p0 and Orc 2 p1 warmup-1 is a no-op on WAIT 65534.
+        // Game-before 1 is 65532. Ticking world.cycle 1 used to report 65531.
+        // Orc 1's bootstrap wait 1 must still tick (game-before 1 is 0).
+        assertEquals(65532, firstWait("campaigns/human/level01h", 0),
+                "Human 1 player 0 is wait 65532 at game-before 1");
+        assertEquals(65532, firstWait("campaigns/orc/level02o", 1),
+                "Orc 2 player 1 is wait 65532 at game-before 1");
+        assertEquals(0, firstWait("campaigns/orc/level01o", 1),
+                "Orc 1 player 1 is wait 0 at game-before 1");
+    }
+
+    @Test
     @DisplayName("a computer whose install stored zero still arms the builder-scan latch")
     void aComputerWhoseInstallStoredZeroStillArmsTheBuilderScanLatch() {
         // Human 1 profile 1 and Human 4 profile 3 both SET +0x0c=0. Native
@@ -116,6 +130,17 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
                     map + " player " + row.player()
                             + " must keep +0x0c armed for the 0x428160 builder scan");
         }
+    }
+
+    private static int firstWait(String map, int player) {
+        List<AiDecisionLedger.Row> rows = emit(map, 1);
+        for (AiDecisionLedger.Row row : rows) {
+            if (row.player() == player) {
+                return row.waitCount();
+            }
+        }
+        throw new AssertionError(map + " player " + player
+                + " has no cycle-1 AI row");
     }
 
     private static List<AiDecisionLedger.Row> emit(String map, int last) {

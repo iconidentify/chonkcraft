@@ -376,6 +376,17 @@ public final class AiPlayer {
             battleNetLastTickIndependent = false;
             return;
         }
+        // Native warmup-1 does not decrement an install WAIT already longer
+        // than a one-step gate. Human 1 player 0 and Orc 2 player 1 stay
+        // 65534 through warmup-1 and are 65532 at game-before 1. Ticking
+        // that first world cycle left them at 65531. Profile 0 has already
+        // SETed wait 1 in the post-placement bootstrap, so it must still
+        // tick here (Orc 1 game-before 1 is 0).
+        if (world.cycle() == 1
+                && BattleNetAiBytecode.waitCounter(battleNetAiState) > 8) {
+            battleNetLastTickIndependent = false;
+            return;
+        }
         byte[] before = battleNetAiState.clone();
         battleNetLastTickIndependent =
                 BattleNetAiBytecode.waitCounter(battleNetAiState) == 0;

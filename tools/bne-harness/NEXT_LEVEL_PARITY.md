@@ -33,10 +33,11 @@ authenticated group transaction.
 
 The first real AI-cycle proof is better than the old coarse AI counter: Orc 1
 player 1 has exact committed `ai.bin` state and exact recovered wait/predicate
-telemetry through 12, 200, and 1,800 cycles. Human 4 player 0 is exact
-through 200 cycles after the `+0x0c` builder-scan latch is armed. Combat
-lifecycle cells and the remaining computers remain open, so AI parity is not
-certified.
+telemetry through 12, 200, and 1,800 cycles. Human 1 player 0 is exact
+through 12 cycles: native warmup-1 does not decrement an install WAIT already
+longer than a one-step gate. Human 4 player 0 is exact through 200 cycles
+after the `+0x0c` builder-scan latch is armed. Combat lifecycle cells and
+the remaining computers remain open, so AI parity is not certified.
 
 The campaign catalog is exactly 52 missions and 137 trigger programs: 55
 victories, 79 defeats, one delayed victory, one flag, and one diplomacy action.
