@@ -52,15 +52,15 @@ and all 52 referenced fixtures have been opened and SHA-256 authenticated as
 the SSH user. `doctor --need fixture` now tests readability and every referenced
 fixture rather than mistaking root-owned, mode-0600 evidence for usable input.
 
-The current commanded fleet is 240 generated scenarios, 131 executed by both
-adapters, 131 comparable, **126 exact and 5 materially divergent**, with zero
+The current commanded fleet is 240 generated scenarios, 134 executed by both
+adapters, 134 comparable, **129 exact and 5 materially divergent**, with zero
 infrastructure failures. This is a substantial improvement over the prior
-57/131 exact checkpoint, but it is not 126/240 parity: the remaining 109 rows
+57/131 exact checkpoint, but it is not 129/240 parity: the remaining 106 rows
 have no dual-engine execution. Exactness is also concentrated in movement;
 repair, return-goods, patrol, attack-ground, queued commands, true group
 transactions, stand-ground, and production remain thin or open. Attack-move
-now has a dest-path injector and commanded dual-adapter cells; first-progress
-matches the sealed dest-path Still wait, and terminal is still one cycle late.
+now has a dest-path injector and commanded dual-adapter cells that match
+first-progress and terminal.
 
 Use `bne_playtest_explorer.py worklist` to turn the flat ledger into ranked
 systemic clusters, fixed-family counts, current-source authentication, and a

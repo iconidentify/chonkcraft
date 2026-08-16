@@ -2570,6 +2570,14 @@ final class BattleNetCombatSystem {
         // early, and the damage roll comes off the shared stream.
         if (world.movement.isStepping(unit)) {
             stepMoveTowardsTarget(unit);
+            // Dest leftover last heading that lands this visit Stills now.
+            // Orc 1 dest-attack offsets hit nought at 92 and native is Still
+            // that visit; returning here forced the next-visit dest-arrival
+            // and settled at 93. A last step that is still Moving after the
+            // drain keeps the next-visit dest-arrival below.
+            if (finishDestAttackWhenLeftoverLands(unit)) {
+                return;
+            }
             // The dead-goal check is not sleep-gated and runs on any beat
             // that leaves the animation breakable -- CheckForTargetInRange
             // opens with CheckIfGoalValid, and
@@ -3377,6 +3385,41 @@ final class BattleNetCombatSystem {
                 }
             }
         }
+    }
+
+
+    /**
+     * Dest leftover last heading that just landed on the dest square.
+     *
+     * <p>The stepping arm used to return after draining those last pixels,
+     * so dest-arrival only ran the next visit. Dest-attack Stills on the
+     * land visit itself.
+     */
+    private boolean finishDestAttackWhenLeftoverLands(Unit unit) {
+        int toX = unit.attackMoveX();
+        int toY = unit.attackMoveY();
+        if (unit.target() != null
+                || !world.map.contains(toX, toY)
+                || unit.tileX() != toX || unit.tileY() != toY
+                || unit.offsetX() != 0 || unit.offsetY() != 0
+                || unit.walkHolding()
+                || unit.animation().unbreakable()) {
+            return false;
+        }
+        if (!unit.routeSpent()) {
+            world.movement.resetDisplacement(unit);
+        }
+        unit.clearPath();
+        unit.setAutoTargeting(false);
+        unit.rememberActionBeforeQueued(unit.order());
+        if (unit.savedOrder() == Unit.Order.PATROL
+                || unit.savedOrder() == Unit.Order.EXPLORE) {
+            world.finishAttackOrder(unit);
+        } else {
+            unit.takeSavedOrder();
+            world.finishOrder(unit);
+        }
+        return true;
     }
 
 

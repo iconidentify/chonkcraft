@@ -49,6 +49,8 @@ class BattleNetAttackMoveStillQueueRealDataTest {
         boolean issued = false;
         Integer promoted = null;
         Integer destArm = null;
+        Integer arrived = null;
+        Integer settled = null;
         while (fixtureCycle(world) <= 160) {
             if (fixtureCycle(world) == 4 && !issued) {
                 assertTrue(commands.apply(GameCommand.attackMove(
@@ -66,6 +68,13 @@ class BattleNetAttackMoveStillQueueRealDataTest {
                     || grunt.offsetX() != 0 || grunt.offsetY() != 0)) {
                 destArm = fixtureCycle(world);
             }
+            if (arrived == null && grunt.tileX() == 22 && grunt.tileY() == 18) {
+                arrived = fixtureCycle(world);
+            }
+            if (settled == null && grunt.order() == Unit.Order.STILL
+                    && grunt.tileX() == 22 && grunt.tileY() == 18) {
+                settled = fixtureCycle(world);
+            }
         }
         assertTrue(issued, "the ground attack click must be issued");
         assertEquals(9, promoted,
@@ -78,6 +87,10 @@ class BattleNetAttackMoveStillQueueRealDataTest {
         assertEquals(18, grunt.tileY(),
                 "retail's grunt settles 22,18, not "
                         + grunt.tileX() + "," + grunt.tileY());
+        assertEquals(76, arrived,
+                "retail's dest leftover starts on 22,18 at fixture 76, not " + arrived);
+        assertEquals(92, settled,
+                "retail Stills dest leftover when its last heading lands at 92, not " + settled);
     }
 
     @Test
@@ -102,6 +115,8 @@ class BattleNetAttackMoveStillQueueRealDataTest {
         boolean issued = false;
         Integer promoted = null;
         Integer destArm = null;
+        Integer arrived = null;
+        Integer settled = null;
         while (fixtureCycle(world) <= 160) {
             if (fixtureCycle(world) == 4 && !issued) {
                 assertTrue(commands.apply(GameCommand.attackMove(
@@ -119,6 +134,13 @@ class BattleNetAttackMoveStillQueueRealDataTest {
                     || soldier.offsetX() != 0 || soldier.offsetY() != 0)) {
                 destArm = fixtureCycle(world);
             }
+            if (arrived == null && soldier.tileX() == 24 && soldier.tileY() == 31) {
+                arrived = fixtureCycle(world);
+            }
+            if (settled == null && soldier.order() == Unit.Order.STILL
+                    && soldier.tileX() == 24 && soldier.tileY() == 31) {
+                settled = fixtureCycle(world);
+            }
         }
         assertTrue(issued, "the ground attack click must be issued");
         assertEquals(5, promoted,
@@ -132,6 +154,10 @@ class BattleNetAttackMoveStillQueueRealDataTest {
         assertEquals(31, soldier.tileY(),
                 "retail's soldier settles 24,31, not "
                         + soldier.tileX() + "," + soldier.tileY());
+        assertEquals(56, arrived,
+                "retail's dest leftover starts on 24,31 at fixture 56, not " + arrived);
+        assertEquals(72, settled,
+                "retail Stills dest leftover when its last heading lands at 72, not " + settled);
     }
 
     private static int fixtureCycle(World world) {
