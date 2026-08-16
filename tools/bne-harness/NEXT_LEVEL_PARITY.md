@@ -119,9 +119,11 @@ sealed Human 1 field/plain/single-footman/open-ground/move recapture now
 proves all eight layers: retail target shape `open-ground`, reconstructed
 eight-byte `0x13` wire `1319001c00ffff03`, the one-voice acknowledgement,
 first pixel progress at cycle 10, and Still-after-progress settlement at
-cycle 393 on `(25,28)` with 46 hit points. That cell fills the 532-cell
-matrix once. The seven older `i9beef` captures remain gesture/selection/
-acceptance-only. Coverage emits one recipe for every missing
+cycle 393 on `(25,28)` with 46 hit points. A two-wide click at the same
+square dest-spreads to `(25,27)` and `(25,29)` with wires `1319001b00ffff03`
+and `1319001d00ffff03`; the first selected footman keeps the voice and the
+second is `group-suppressed`. Those two cells fill the 532-cell matrix.
+The seven older `i9beef` captures remain gesture/selection/acceptance-only. Coverage emits one recipe for every missing
 origin/modifier/family cell. An executable cell carries the real
 `bne_oracle.py run` and import argv; an unobservable cell is
 `blocked-on-hook` with the exact native hook debt. A GiveOrder fixture can
