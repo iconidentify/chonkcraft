@@ -8,8 +8,8 @@ it is not the roadmap.
 ## Honest starting point
 
 The current authenticated command fleet contains 240 generated cells. Both
-production adapters have executed 134 of them. Of those, 132 are exact and
-two are materially different, with zero infrastructure failures:
+production adapters have executed 134 of them. Of those, 133 are exact and
+one is materially different, with zero infrastructure failures:
 
 | Family | Exact / comparable | Current debt |
 | --- | ---: | --- |
@@ -18,12 +18,12 @@ two are materially different, with zero infrastructure failures:
 | Attack-ground | 4 / 4 | add gesture/target shapes |
 | Attack-move | 3 / 3 | expand physical gestures and groups |
 | Patrol | 3 / 3 | expand physical gestures and groups |
-| Attack | 3 / 4 | one residual-offset result |
+| Attack | 4 / 4 | expand physical gestures and groups |
 | Harvest | 3 / 4 | one resource-lifecycle result |
 | Repair | 5 / 5 | expand physical gestures and groups |
 | Return goods | 4 / 5 | one progress/terminal result |
 
-This is **132/134 comparable**, not 132/240 complete. A player Patrol click
+This is **133/134 comparable**, not 133/240 complete. A player Patrol click
 from Still keeps Still through the remaining idle, dest-arms after the
 player command wait, walks the Bresenham leftover (type-two assault leftover
 exhaust does not apply), and turns around on the land visit instead of

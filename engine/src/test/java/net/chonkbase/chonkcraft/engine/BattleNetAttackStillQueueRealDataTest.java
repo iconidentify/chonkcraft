@@ -119,7 +119,8 @@ class BattleNetAttackStillQueueRealDataTest {
         assertNotNull(target, "Orc 1 has no enemy on 2,29");
         boolean issued = false;
         Integer promoted = null;
-        while (fixtureCycle(world) <= 16) {
+        Integer destArm = null;
+        while (fixtureCycle(world) <= 160) {
             if (fixtureCycle(world) == 4 && !issued) {
                 assertTrue(commands.apply(GameCommand.attack(
                                 grunt.player(), grunt.id(), target.id())),
@@ -131,11 +132,28 @@ class BattleNetAttackStillQueueRealDataTest {
                     && grunt.order() == Unit.Order.ATTACK) {
                 promoted = fixtureCycle(world);
             }
+            if (issued && destArm == null
+                    && (grunt.tileX() != 20 || grunt.tileY() != 27
+                    || grunt.offsetX() != 0 || grunt.offsetY() != 0)) {
+                destArm = fixtureCycle(world);
+            }
         }
         assertTrue(issued, "the attack click must be issued");
         assertEquals(5, promoted,
                 "a grunt already on the Still marker installs Attack on the issue visit, not "
                         + promoted);
+        assertEquals(8, destArm,
+                "retail dest-arms the marker-ready Attack at fixture 8, not "
+                        + destArm);
+        assertEquals(10, grunt.tileX(),
+                "retail is Attack on 10,30 at the window, not "
+                        + grunt.tileX() + "," + grunt.tileY());
+        assertEquals(30, grunt.tileY(),
+                "retail is Attack on 10,30 at the window, not "
+                        + grunt.tileX() + "," + grunt.tileY());
+        assertTrue(Math.floorMod(grunt.offsetX(), 32) > 10,
+                "retail leftover west residual is still draining, not offset "
+                        + grunt.offsetX());
     }
 
     private static int fixtureCycle(World world) {

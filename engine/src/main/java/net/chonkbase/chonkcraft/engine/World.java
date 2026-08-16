@@ -3852,6 +3852,15 @@ public final class World {
             // 0xb=0 while standing 1531 seeds at cycle 6).
             unit.setBattleNetPendingMeleeSyncRand(
                     battleNetMeleeSyncRandType(unit));
+            // Native GiveOrder 8 that installs Attack on the issue visit
+            // dest-arms after those three quiet Attack calls: attack-1/01
+            // grunt 1589 is Attack timer 3 at cycle 5 and first walks at 8.
+            // Dest-arming on the issue visit arrived 10,30 three cycles
+            // early (offset 10 vs 16). A Still-queued Attack already set
+            // its pop delay and must keep it.
+            if (fromPlayer && unit.battleNetOrderDelay() == 0) {
+                unit.setBattleNetOrderDelay(3);
+            }
         }
         return true;
     }
