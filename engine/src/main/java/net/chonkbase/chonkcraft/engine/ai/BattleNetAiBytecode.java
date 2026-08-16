@@ -137,8 +137,12 @@ public final class BattleNetAiBytecode {
      * clear, type flag {@code 0x20} (building) is set, and type flags
      * {@code 0x10800} are clear -- sea, shore, and water-sited oil
      * platforms stay out. Updating a min skips the max on that axis.
-     * After the walk, min subtracts 5 and max adds 8, clamped to
-     * {@code [0, mapSize-1]}.
+     * After the walk, min subtracts 5 and max adds 8 as 8-bit wrapping
+     * stores, then a signed clamp: min {@code < 0} becomes 0 and max
+     * {@code > (int8)(mapSize-1)} becomes {@code mapSize-1}. A 128-tile
+     * town used to pad an unexpanded min of 128 down to 0 because the
+     * subtract ran in wider integer arithmetic, which is why retail
+     * keeps 123 ({@code 0x80-5}) and can leave a wrapped max of 134.
      *
      * @param tilesNewestFirst land-building origins, newest first
      */
@@ -179,13 +183,13 @@ public final class BattleNetAiBytecode {
     }
 
     private static byte padMin(byte value) {
-        int next = value - 5;
-        return (byte) (next < 0 ? 0 : next);
+        byte next = (byte) (value - 5);
+        return next < 0 ? 0 : next;
     }
 
     private static byte padMax(byte value, int last) {
-        int next = value + 8;
-        return (byte) (next > last ? last : next);
+        byte next = (byte) (value + 8);
+        return next > (byte) last ? (byte) last : next;
     }
 
     /**

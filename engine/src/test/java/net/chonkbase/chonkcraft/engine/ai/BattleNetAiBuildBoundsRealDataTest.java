@@ -24,9 +24,11 @@ import org.junit.jupiter.api.Test;
  * computers have only a watch tower, so {@code 0x439ce0} returns null
  * and the 64-tile box stays {@code 40,ff,ff,40}. Human 4 expands
  * to {@code 45,5f,5f,38} and Orc 4 to {@code 00,1a,07,00} after the
- * newest-first land walk and pad -5/+8. Sea and shore buildings stay
- * out. A computer with no gold depot must not receive a building
- * rectangle.
+ * newest-first land walk and pad -5/+8. A 128-tile computer whose
+ * signed min never moves pads {@code 0x80-5} to 123, so Human 5 is
+ * {@code 7b,36,75,7b} and Orc 12 is {@code 7b,4d,3b,7b}. Sea and
+ * shore buildings stay out. A computer with no gold depot must not
+ * receive a building rectangle.
  */
 class BattleNetAiBuildBoundsRealDataTest {
 
@@ -94,6 +96,24 @@ class BattleNetAiBuildBoundsRealDataTest {
     @DisplayName("a human 3 computer with farms and no hall keeps the inverted box")
     void aHuman3ComputerWithFarmsAndNoHallKeepsTheInvertedBox() {
         assertBuildBox("campaigns/human/level03h", 0, 0x40, 0xff, 0xff, 0x40);
+    }
+
+    @Test
+    @DisplayName("a human 5 computer pads the unused 128-tile min to 123")
+    void aHuman5ComputerPadsTheUnused128TileMinTo123() {
+        assertBuildBox("campaigns/human/level05h", 0, 0x7b, 0x36, 0x75, 0x7b);
+    }
+
+    @Test
+    @DisplayName("an orc 12 computer pads the unused 128-tile min to 123")
+    void anOrc12ComputerPadsTheUnused128TileMinTo123() {
+        assertBuildBox("campaigns/orc/level12o", 1, 0x7b, 0x4d, 0x3b, 0x7b);
+    }
+
+    @Test
+    @DisplayName("a human 13 computer keeps a wrapped 128-tile max of 134")
+    void aHuman13ComputerKeepsAWrapped128TileMaxOf134() {
+        assertBuildBox("campaigns/human/level13h", 0, 0x7b, 0x86, 0x3c, 0x7b);
     }
 
     @Test

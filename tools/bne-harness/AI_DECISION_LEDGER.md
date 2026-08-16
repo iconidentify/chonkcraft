@@ -84,8 +84,14 @@ consumed.
 Human 1 and Human 4 computers SET `+0x0c=0` during install. Native
 `0x428160` already reads that byte as the builder-scan latch and skips the
 map walk when it is zero. Java now arms the latch after install. Human 4
-player 0 is exact through 200 cycles; Orc 1 player 1 stays exact. That is
-still not every computer on every mission. A later independent
+player 0 is exact through 200 cycles; Orc 1 player 1 stays exact.
+
+The 0x4273e0 pad after the land walk is 8-bit wrapping minus 5 / plus 8,
+then a signed clamp. A 128-tile computer whose signed min never moves
+used to pad 128 down to 0 in wider integer arithmetic; retail wraps
+`0x80-5` to 123 and can leave a wrapped max of 134. Human 5 player 0,
+Orc 12 player 1, and Human 13 (all three computers) now match that box.
+That is still not every computer on every mission. A later independent
 choice that is not opcode 3, or a launch the boundary snapshots never hook,
 remains telemetry debt. Do not change engine behavior to invent those events.
 

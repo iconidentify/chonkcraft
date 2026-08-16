@@ -110,4 +110,32 @@ class BattleNetAiBytecodeTest {
         assertEquals(7, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff);
         assertEquals(0, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff);
     }
+
+    @Test
+    void expandLandBuildBoundsOnA128TileMapPadsAnUnexpandedMinTo123() {
+        byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
+        BattleNetAiBytecode.expandLandBuildBounds(
+                state, 128, java.util.List.of(new int[] {46, 109}));
+        assertEquals(0x7b, state[BattleNetAiBytecode.OFF_BOUND_MIN_Y] & 0xff,
+                "a 128-tile town wraps the unused min of 128 minus 5 to 123");
+        assertEquals(54, state[BattleNetAiBytecode.OFF_BOUND_MAX_X] & 0xff,
+                "the 128-tile max-X still adds 8 when it stays under 127");
+        assertEquals(117, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff,
+                "the 128-tile max-Y still adds 8 when it stays under 127");
+        assertEquals(0x7b, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff,
+                "a 128-tile town wraps the unused min-X of 128 minus 5 to 123");
+    }
+
+    @Test
+    void expandLandBuildBoundsOnA128TileMapKeepsAWrappedMax() {
+        byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
+        BattleNetAiBytecode.expandLandBuildBounds(
+                state, 128, java.util.List.of(new int[] {126, 60}));
+        assertEquals(0x86, state[BattleNetAiBytecode.OFF_BOUND_MAX_X] & 0xff,
+                "126 plus 8 wraps to 134 and a signed compare against 127 keeps it");
+        assertEquals(68, state[BattleNetAiBytecode.OFF_BOUND_MAX_Y] & 0xff,
+                "a mid-map 128-tile max-Y still adds 8");
+        assertEquals(0x7b, state[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff,
+                "the unused 128-tile min still wraps to 123 beside a wrapped max");
+    }
 }
