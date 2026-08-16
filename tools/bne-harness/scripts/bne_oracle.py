@@ -49,6 +49,12 @@ SCRIPT_COMMAND_TRAIN = re.compile(
 SCRIPT_COMMAND_TARGETED = re.compile(
     r"^cycle ([1-9]\d*) (attack|harvest|repair) unit (\d+) target (\d+)$"
 )
+SCRIPT_COMMAND_SELECT = re.compile(
+    r"^cycle ([1-9]\d*) select unit (\d+)$"
+)
+SCRIPT_COMMAND_UI_RIGHT_CLICK = re.compile(
+    r"^cycle ([1-9]\d*) ui-right-click x (\d+) y (\d+)$"
+)
 GAME_RULE_REJECT_REASONS = {
     "unit-not-local",
     "unit-not-live",
@@ -60,6 +66,8 @@ GAME_RULE_REJECT_REASONS = {
     "not-a-worker",
     # 0x40e2a0 returned 0: the hall/barracks would not start that type.
     "refused",
+    "selection-full",
+    "do-right-button-signature",
 }
 COMMAND_REJECT_REASON = re.compile(r"\breason=([a-z0-9-]+)\b")
 
@@ -99,6 +107,8 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
             stance = SCRIPT_COMMAND_STANCE.fullmatch(line)
             train = SCRIPT_COMMAND_TRAIN.fullmatch(line)
             targeted = SCRIPT_COMMAND_TARGETED.fullmatch(line)
+            selected = SCRIPT_COMMAND_SELECT.fullmatch(line)
+            ui_click = SCRIPT_COMMAND_UI_RIGHT_CLICK.fullmatch(line)
             target = None
             if move is not None:
                 cycle = int(move.group(1))
@@ -125,13 +135,27 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 target = int(targeted.group(4))
                 x = 0
                 y = 0
+            elif selected is not None:
+                cycle = int(selected.group(1))
+                action = "select"
+                slot = int(selected.group(2))
+                x = 0
+                y = 0
+            elif ui_click is not None:
+                cycle = int(ui_click.group(1))
+                action = "ui-right-click"
+                slot = 0
+                x = int(ui_click.group(2))
+                y = int(ui_click.group(3))
             else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
                     "'cycle N move|patrol|attack-ground|attack-move unit SLOT x X y Y', "
                     "'cycle N stop|stand-ground|return-goods unit SLOT', "
-                    "'cycle N train unit SLOT type T', or "
-                    "'cycle N attack|harvest|repair unit SLOT target T'"
+                    "'cycle N train unit SLOT type T', "
+                    "'cycle N attack|harvest|repair unit SLOT target T', "
+                    "'cycle N select unit SLOT', or "
+                    "'cycle N ui-right-click x X y Y'"
                 )
             if cycle < previous_cycle:
                 raise ValueError(f"commands are not cycle-sorted at {path}:{line_number}")

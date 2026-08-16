@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,163 @@ def _load(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"receipt is not an object: {path}")
     return value
+
+
+_UI_RIGHT_CLICK = re.compile(
+    r"event=ui-right-click cycle=(?P<cycle>-?\d+) x=(?P<x>\d+) "
+    r"y=(?P<y>\d+) ui-player=(?P<player>\d+) selected=(?P<selected>\S*)")
+_UI_FANOUT = re.compile(
+    r"event=ui-fanout cycle=(?P<cycle>-?\d+) unit=(?P<unit>\d+) "
+    r"order=(?P<order>\d+) next-order=(?P<next_order>\d+) "
+    r"order-x=(?P<order_x>\d+) order-y=(?P<order_y>\d+)")
+_UNIT_STATE = re.compile(
+    r"event=command-unit-state cycle=(?P<cycle>-?\d+) unit=(?P<unit>\d+) "
+    r".* order=(?P<order>\d+) next-order=(?P<next_order>\d+) "
+    r"order-x=(?P<order_x>\d+) order-y=(?P<order_y>\d+)")
+
+
+_ORDER_NAME = {
+    1: "STILL",
+    2: "STAND_GROUND",
+    3: "MOVE",
+    5: "PATROL",
+    8: "ATTACK",
+    9: "ATTACK",
+    10: "ATTACK_MOVE",
+    11: "ATTACK_MOVE",
+}
+
+
+def compile_ui_trace(trace: str, *, source: str, map_path: str | None = None,
+        settle_cycle: int | None = None) -> dict[str, Any]:
+    """Turn a native DoRightButton trace into a player-intent evidence packet."""
+    gesture = None
+    fanouts: list[dict[str, Any]] = []
+    states: dict[int, list[tuple[int, dict[str, int]]]] = {}
+    for line in trace.splitlines():
+        match = _UI_RIGHT_CLICK.search(line)
+        if match:
+            selected = [int(item) for item in match.group("selected").split(",")
+                        if item]
+            gesture = {
+                "cycle": int(match.group("cycle")),
+                "player": int(match.group("player")),
+                "x": int(match.group("x")),
+                "y": int(match.group("y")),
+                "selected": selected,
+            }
+            continue
+        match = _UI_FANOUT.search(line)
+        if match:
+            installed = int(match.group("order"))
+            queued = int(match.group("next_order"))
+            fanouts.append({
+                "cycle": int(match.group("cycle")),
+                "unit": int(match.group("unit")),
+                "order": queued if queued not in (0, 60) else installed,
+                "order_x": int(match.group("order_x")),
+                "order_y": int(match.group("order_y")),
+            })
+            continue
+        match = _UNIT_STATE.search(line)
+        if match:
+            unit = int(match.group("unit"))
+            states.setdefault(unit, []).append((int(match.group("cycle")), {
+                "order": int(match.group("order")),
+                "order_x": int(match.group("order_x")),
+                "order_y": int(match.group("order_y")),
+            }))
+    if gesture is None:
+        raise ValueError("native UI trace has no ui-right-click event")
+    if not fanouts:
+        raise ValueError("native UI trace has no ui-fanout from the selection")
+    intents: list[dict[str, Any]] = [{
+        "intent_id": 1,
+        "transaction_id": 1,
+        "cycle": gesture["cycle"],
+        "event": "gesture",
+        "selected_unit_ids": list(gesture["selected"]),
+        "gesture": {
+            "origin": "field",
+            "detail": "right-click",
+            "screen_x": None,
+            "screen_y": None,
+            "tile_x": gesture["x"],
+            "tile_y": gesture["y"],
+            "modifiers": "plain",
+            "target_id": None,
+            "target_shape": "open-ground",
+        },
+    }]
+    outcomes: list[dict[str, Any]] = []
+    for offset, fanout in enumerate(fanouts, start=2):
+        family = _ORDER_NAME.get(fanout["order"], "move").lower().replace("_", "-")
+        if family.startswith("attack-move"):
+            family = "move"
+        intents.append({
+            "intent_id": offset,
+            "transaction_id": 1,
+            "cycle": fanout["cycle"],
+            "event": "order",
+            "selected_unit_ids": list(gesture["selected"]),
+            "accepted": True,
+            "command": {
+                "kind": family.upper().replace("-", "_"),
+                "player": gesture["player"],
+                "unit_id": fanout["unit"],
+                "x": fanout["order_x"],
+                "y": fanout["order_y"],
+                "target_id": 0,
+                "type_index": 0,
+                "queued": False,
+                "wire_hex": "",
+            },
+        })
+        history = states.get(fanout["unit"]) or []
+        first_progress = None
+        latest = {
+            "order": fanout["order"],
+            "order_x": fanout["order_x"],
+            "order_y": fanout["order_y"],
+        }
+        for cycle, row in history:
+            if cycle < fanout["cycle"]:
+                continue
+            if first_progress is None and (
+                    row["order"] != 1 or row["order_x"] != fanout["order_x"]
+                    or row["order_y"] != fanout["order_y"]):
+                first_progress = cycle
+            latest = row
+        terminal_cycle = settle_cycle
+        if history:
+            terminal_cycle = history[-1][0]
+        outcomes.append({
+            "intent_id": offset,
+            "transaction_id": 1,
+            "submitted_cycle": fanout["cycle"],
+            "unit_id": fanout["unit"],
+            "command": family,
+            "accepted": True,
+            "first_progress_cycle": first_progress,
+            "terminal_cycle": terminal_cycle,
+            "terminal_reason": "settled" if latest["order"] == 1 else "window-complete",
+            "tile_x": latest["order_x"],
+            "tile_y": latest["order_y"],
+            "offset_x": 0,
+            "offset_y": 0,
+            "order": _ORDER_NAME.get(latest["order"], "STILL"),
+            "target_id": None,
+            "hit_points": None,
+            "carried": 0,
+            "alive": True,
+            "on_map": True,
+            "missile_count": 0,
+        })
+    return compile_evidence({
+        "map_path": map_path,
+        "player_intents": intents,
+        "player_outcomes": outcomes,
+    }, source=source)
 
 
 def compile_evidence(evidence: dict[str, Any], *, source: str) -> dict[str, Any]:
@@ -277,6 +435,10 @@ def main(argv: list[str] | None = None) -> int:
     compile_parser = sub.add_parser("compile-evidence")
     compile_parser.add_argument("evidence", type=Path)
     compile_parser.add_argument("--output", required=True, type=Path)
+    trace_parser = sub.add_parser("from-ui-trace")
+    trace_parser.add_argument("trace", type=Path)
+    trace_parser.add_argument("--output", required=True, type=Path)
+    trace_parser.add_argument("--map-path", type=str, default=None)
     compare_parser = sub.add_parser("compare")
     compare_parser.add_argument("left", type=Path)
     compare_parser.add_argument("right", type=Path)
@@ -289,6 +451,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "compile-evidence":
         compiled = compile_evidence(_load(args.evidence), source=str(args.evidence))
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(compiled, indent=2, sort_keys=True) + "\n",
+                               encoding="utf-8")
+        print(json.dumps({"transactions": len(compiled["transactions"]),
+                          "output": str(args.output)}, indent=2))
+        return 0
+    if args.command == "from-ui-trace":
+        compiled = compile_ui_trace(
+            args.trace.read_text(encoding="utf-8", errors="replace"),
+            source=str(args.trace), map_path=args.map_path)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(compiled, indent=2, sort_keys=True) + "\n",
                                encoding="utf-8")

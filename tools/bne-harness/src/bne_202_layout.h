@@ -30,6 +30,17 @@
 #define BNE_202_INTERNAL_GIVE_ORDER ((BYTE *) 0x004513d0)
 #define BNE_202_GIVE_ORDER ((BYTE *) 0x00451070)
 #define BNE_202_ORDER_FUNCTIONS ((void **) 0x00495fcc)
+/* Right-click group applicator: walks the nine-slot selection and calls
+ * GiveOrder. Callers are the UI button-up path at 0x00455f06 and the
+ * 0x13 replay/network wrapper at 0x00476500. cdecl (x, y, target, 0, 0). */
+#define BNE_202_DO_RIGHT_BUTTON ((BYTE *) 0x0043b870)
+/* Per-player ordered selection: 9 unit pointers at
+ * 0x004bb728 + player*9. Cursor at 0x004bb720. UI owner byte 0x004b4984
+ * is what the applicator compares to unit+0x2c. */
+#define BNE_202_SELECTED_UNITS ((BYTE **) 0x004bb728)
+#define BNE_202_SELECTED_CURSOR ((BYTE *) 0x004bb720)
+#define BNE_202_UI_PLAYER ((BYTE *) 0x004b4984)
+#define BNE_SELECTION_LIMIT 9
 /* 0x4368b0 is not in ORDER_FUNCTIONS. It is the order-15 installer
  * 0x0D stand-ground reaches: push 0x0f; call 0x453130. */
 #define BNE_202_STAND_GROUND_ORDER ((BYTE *) 0x004368b0)

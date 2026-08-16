@@ -147,6 +147,40 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertFalse(report["complete"])
         self.assertEqual([1], report["incomplete_transactions"])
 
+    def test_native_do_right_button_trace_is_one_group_transaction(self):
+        compiled = transaction.compile_ui_trace(
+            "\n".join([
+                "# bne-trace event=ui-right-click cycle=5 x=25 y=28 "
+                "ui-player=1 selected=1598,1597",
+                "# bne-trace event=ui-fanout cycle=5 unit=1598 "
+                "order=3 next-order=60 order-x=25 order-y=28",
+                "# bne-trace event=ui-fanout cycle=5 unit=1597 "
+                "order=3 next-order=60 order-x=25 order-y=28",
+                "# bne-trace event=command-unit-state cycle=80 unit=1598 "
+                "sequence=0 sequence-flags=0 animation-timer=0 animation=0 "
+                "frame=0 face=0 order=1 next-order=60 order-x=25 order-y=28 "
+                "path-head=0",
+                "# bne-trace event=command-unit-state cycle=80 unit=1597 "
+                "sequence=0 sequence-flags=0 animation-timer=0 animation=0 "
+                "frame=0 face=0 order=1 next-order=60 order-x=25 order-y=28 "
+                "path-head=0",
+            ]),
+            source="test-trace")
+        self.assertEqual(1, len(compiled["transactions"]))
+        item = compiled["transactions"][0]
+        self.assertTrue(item["coverage"]["physical_gesture"],
+                        "DoRightButton must keep the field click as the gesture")
+        self.assertTrue(item["coverage"]["group_fanout"],
+                        "two selected footmen must stay one transaction")
+        self.assertEqual([1598, 1597],
+                         [command["unit_id"] for command in item["commands"]])
+        self.assertEqual([(25, 28), (25, 28)],
+                         [(command["x"], command["y"]) for command in item["commands"]],
+                         "fan-out dests belong on the commands, not only the click")
+        self.assertEqual("field", item["gesture"]["origin"])
+        self.assertEqual(25, item["gesture"]["tile_x"])
+        self.assertEqual(28, item["gesture"]["tile_y"])
+
 
 if __name__ == "__main__":
     unittest.main()

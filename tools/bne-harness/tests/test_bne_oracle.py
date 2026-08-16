@@ -120,6 +120,22 @@ class OracleIdentityTest(unittest.TestCase):
                          [command["action"] for command in commands])
         self.assertEqual(1594, commands[0]["unit"])
 
+    def test_parses_select_and_ui_right_click_command_scripts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text(
+                "cycle 5 select unit 1598\n"
+                "cycle 5 select unit 1597\n"
+                "cycle 5 ui-right-click x 25 y 28\n",
+                encoding="ascii",
+            )
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual(["select", "select", "ui-right-click"],
+                         [command["action"] for command in commands])
+        self.assertEqual([1598, 1597, 0],
+                         [command["unit"] for command in commands])
+        self.assertEqual((25, 28), (commands[2]["x"], commands[2]["y"]))
+
     def test_rejects_an_unsorted_command_script(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.txt"

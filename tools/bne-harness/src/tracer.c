@@ -22,6 +22,8 @@ typedef void (__cdecl *idle_function)(BYTE *);
 typedef BYTE *(__cdecl *projectile_function)(BYTE *);
 typedef void (__cdecl *give_order_function)(
         BYTE *, int, int, BYTE *, void *);
+typedef void (__cdecl *do_right_button_function)(
+        int, int, BYTE *, int, int);
 typedef int (__cdecl *production_apply_function)(BYTE *, int, int);
 typedef BYTE *(__cdecl *find_unit_function)(BYTE *);
 typedef BYTE *(__cdecl *find_auto_target_function)(BYTE *, char);
@@ -250,6 +252,8 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_ATTACK_MOVE 9
 #define SCRIPT_COMMAND_STAND_GROUND 10
 #define SCRIPT_COMMAND_TRAIN 11
+#define SCRIPT_COMMAND_SELECT 12
+#define SCRIPT_COMMAND_UI_RIGHT_CLICK 13
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -266,6 +270,7 @@ static script_command script_commands[MAX_SCRIPT_COMMANDS];
 static DWORD script_command_count = 0;
 static DWORD next_script_command = 0;
 static BOOL command_file_valid = TRUE;
+static LONG selection_batch_cycle = -1;
 
 static BOOL executable_page_contains(const void *address);
 static void trace_critter_scheduler_state(const BYTE *pool, DWORD pool_count);
@@ -855,6 +860,27 @@ static BOOL read_command_file(void) {
 
         extra = '\0';
         fields = sscanf(cursor,
+                "cycle %lu select unit %lu %c",
+                &cycle, &slot, &extra);
+        if (fields == 2) {
+            action = SCRIPT_COMMAND_SELECT;
+            x = 0;
+            y = 0;
+            target = SCRIPT_NO_TARGET;
+        } else {
+        extra = '\0';
+        fields = sscanf(cursor,
+                "cycle %lu ui-right-click x %lu y %lu %c",
+                &cycle, &x, &y, &extra);
+        if (fields == 3) {
+            /* 0x0043b870 walks the current selection. The unit slot is
+             * unused; dest xy is the clicked square. */
+            action = SCRIPT_COMMAND_UI_RIGHT_CLICK;
+            slot = 0;
+            target = SCRIPT_NO_TARGET;
+        } else {
+        extra = '\0';
+        fields = sscanf(cursor,
                 "cycle %lu move unit %lu x %lu y %lu %c",
                 &cycle, &slot, &x, &y, &extra);
         if (fields == 4) {
@@ -961,6 +987,8 @@ static BOOL read_command_file(void) {
             }
             }
             }
+        }
+        }
         }
         if (action == 0 || cycle == 0 || cycle > 0x7fffffffUL
                 || slot >= BNE_UNIT_LIMIT || x > 127 || y > 127
@@ -1458,6 +1486,12 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_TRAIN) {
         return "train";
     }
+    if (action == SCRIPT_COMMAND_SELECT) {
+        return "select";
+    }
+    if (action == SCRIPT_COMMAND_UI_RIGHT_CLICK) {
+        return "ui-right-click";
+    }
     return "unknown";
 }
 
@@ -1509,6 +1543,118 @@ static void reject_command(const script_command *command, const char *reason) {
             (unsigned int) command->x, (unsigned int) command->y, reason);
 }
 
+static BYTE **ui_selected_units(void) {
+    return BNE_202_SELECTED_UNITS + (size_t) (*BNE_202_UI_PLAYER) * BNE_SELECTION_LIMIT;
+}
+
+static DWORD unit_slot_of(const BYTE *pool, DWORD pool_count, const BYTE *unit) {
+    DWORD slot;
+
+    if (pool == NULL || unit == NULL) {
+        return SCRIPT_NO_TARGET;
+    }
+    if (unit < pool) {
+        return SCRIPT_NO_TARGET;
+    }
+    slot = (DWORD) ((unit - pool) / BNE_UNIT_BYTES);
+    if (slot >= pool_count) {
+        return SCRIPT_NO_TARGET;
+    }
+    return slot;
+}
+
+static void apply_select(const script_command *command, BYTE *unit) {
+    BYTE **selected = ui_selected_units();
+    DWORD index;
+
+    if (selection_batch_cycle != command->cycle) {
+        for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
+            selected[index] = NULL;
+        }
+        *BNE_202_SELECTED_CURSOR = 0;
+        selection_batch_cycle = command->cycle;
+    }
+    for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
+        if (selected[index] == unit) {
+            trace_write("# bne-trace event=command-applied cycle=%ld "
+                    "action=select unit=%lu x=0 y=0 function-index=select",
+                    command->cycle, (unsigned long) command->unit_slot);
+            return;
+        }
+        if (selected[index] == NULL) {
+            selected[index] = unit;
+            trace_write("# bne-trace event=command-applied cycle=%ld "
+                    "action=select unit=%lu x=0 y=0 function-index=select "
+                    "index=%lu",
+                    command->cycle, (unsigned long) command->unit_slot,
+                    (unsigned long) index);
+            return;
+        }
+    }
+    reject_command(command, "selection-full");
+}
+
+static void apply_ui_right_click(const script_command *command,
+        BYTE *pool, DWORD pool_count) {
+    static const BYTE expected_do_right_button[] = {
+        0x83, 0xec, 0x08, 0x55, 0x8b, 0x6c, 0x24, 0x10
+    };
+    BYTE **selected = ui_selected_units();
+    char selected_list[128];
+    DWORD written = 0;
+    DWORD index;
+
+    if (!executable_page_contains(BNE_202_DO_RIGHT_BUTTON)
+            || memcmp(BNE_202_DO_RIGHT_BUTTON, expected_do_right_button,
+                sizeof(expected_do_right_button)) != 0) {
+        reject_command(command, "do-right-button-signature");
+        return;
+    }
+    selected_list[0] = '\0';
+    for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
+        DWORD slot = unit_slot_of(pool, pool_count, selected[index]);
+        if (slot == SCRIPT_NO_TARGET) {
+            continue;
+        }
+        if (written > 0 && written + 1 < sizeof(selected_list)) {
+            selected_list[written++] = ',';
+            selected_list[written] = '\0';
+        }
+        written += (DWORD) snprintf(selected_list + written,
+                sizeof(selected_list) - written, "%lu", (unsigned long) slot);
+        if (written >= sizeof(selected_list)) {
+            written = (DWORD) sizeof(selected_list) - 1;
+            selected_list[written] = '\0';
+            break;
+        }
+    }
+    trace_write("# bne-trace event=ui-right-click cycle=%ld x=%u y=%u "
+            "ui-player=%u selected=%s",
+            command->cycle, (unsigned int) command->x,
+            (unsigned int) command->y,
+            (unsigned int) *BNE_202_UI_PLAYER, selected_list);
+    ((do_right_button_function) (void *) BNE_202_DO_RIGHT_BUTTON)(
+            (int) command->x, (int) command->y, NULL, 0, 0);
+    for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
+        BYTE *unit = selected[index];
+        DWORD slot = unit_slot_of(pool, pool_count, unit);
+        if (slot == SCRIPT_NO_TARGET) {
+            continue;
+        }
+        trace_write("# bne-trace event=ui-fanout cycle=%ld unit=%lu "
+                "order=%u next-order=%u order-x=%u order-y=%u",
+                command->cycle, (unsigned long) slot,
+                (unsigned int) unit[BNE_UNIT_ORDER],
+                (unsigned int) unit[BNE_UNIT_NEXT_ORDER],
+                (unsigned int) read_word(unit, BNE_UNIT_ORDER_X),
+                (unsigned int) read_word(unit, BNE_UNIT_ORDER_Y));
+    }
+    trace_write("# bne-trace event=command-applied cycle=%ld "
+            "action=ui-right-click unit=0 x=%u y=%u function-index=ui",
+            command->cycle, (unsigned int) command->x,
+            (unsigned int) command->y);
+}
+
 static void apply_commands(LONG cycle) {
     static const BYTE expected_give_order[] = {
         0x8b, 0x44, 0x24, 0x04, 0x33, 0xc9
@@ -1531,6 +1677,10 @@ static void apply_commands(LONG cycle) {
             reject_command(command, "missed-cycle");
             continue;
         }
+        if (command->action == SCRIPT_COMMAND_UI_RIGHT_CLICK) {
+            apply_ui_right_click(command, pool, pool_count);
+            continue;
+        }
         if (pool == NULL || command->unit_slot >= pool_count) {
             reject_command(command, "unit-slot-out-of-range");
             continue;
@@ -1538,6 +1688,17 @@ static void apply_commands(LONG cycle) {
         unit = pool + command->unit_slot * BNE_UNIT_BYTES;
         if ((unit[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
             reject_command(command, "unit-not-live");
+            continue;
+        }
+        if (command->action == SCRIPT_COMMAND_SELECT) {
+            /* DoRightButton compares unit+0x2c to the UI owner byte, not
+             * the network local-player slot. Human 1's footmen are owner 1
+             * while LOCAL_PLAYER stays 0. */
+            if (unit[BNE_UNIT_OWNER] != *BNE_202_UI_PLAYER) {
+                reject_command(command, "unit-not-local");
+                continue;
+            }
+            apply_select(command, unit);
             continue;
         }
         if (unit[BNE_UNIT_OWNER] != *BNE_202_LOCAL_PLAYER) {
