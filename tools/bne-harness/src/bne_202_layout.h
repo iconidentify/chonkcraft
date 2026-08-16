@@ -30,6 +30,9 @@
 #define BNE_202_INTERNAL_GIVE_ORDER ((BYTE *) 0x004513d0)
 #define BNE_202_GIVE_ORDER ((BYTE *) 0x00451070)
 #define BNE_202_ORDER_FUNCTIONS ((void **) 0x00495fcc)
+/* 0x4368b0 is not in ORDER_FUNCTIONS. It is the order-15 installer
+ * 0x0D stand-ground reaches: push 0x0f; call 0x453130. */
+#define BNE_202_STAND_GROUND_ORDER ((BYTE *) 0x004368b0)
 #define BNE_202_SYNC_DISPATCH_CALL ((BYTE *) 0x0047800b)
 #define BNE_202_SYNC_DISPATCH_TARGET ((BYTE *) 0x004782a0)
 #define BNE_202_STORM_OPEN_ARCHIVE_IAT ((void **) 0x00490360)

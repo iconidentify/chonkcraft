@@ -108,19 +108,23 @@ NATIVE_FAMILY_EVIDENCE = {
         "unsupported_variants": ["0x0c-ui-thunk"],
     },
     "stand-ground": {
-        "evidence_authority": "retail-replay-dispatcher",
+        "evidence_authority": "pinned-bne-2.02b-give-order-order-15",
         "evidence_hashes": {
             "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
             "opcode": "0x0d",
-            "fixed_bytes": 1,
+            "installer": "0x004368b0",
+            "give_order": "0x00451070",
+            "order": 15,
         },
         "encoding": (
-            "InSight embedded opcode 0x0D, one byte, applies to the current "
-            "selection. No proved non-UI GiveOrder apply."
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N stand-ground unit SLOT. The 0x0D replay byte walks "
+            "the selection into 0x4368b0, which is not an ORDER_FUNCTIONS "
+            "slot: it pushes order 15 and calls 0x453130."
         ),
         "arguments": ["issue_cycle", "unit_id"],
-        "supported_variants": [],
-        "unsupported_variants": ["native-injector-script"],
+        "supported_variants": ["unit-slot"],
+        "unsupported_variants": ["0x0d-selection-thunk"],
     },
     "attack": {
         "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
@@ -1472,7 +1476,7 @@ def native_command_registry(ledger: dict[str, Any] | None = None) -> dict[str, A
         dual = counts.get(name, 0)
         injector = name in {
             "move", "stop", "attack", "harvest", "patrol", "return-goods",
-            "repair", "attack-ground", "attack-move",
+            "repair", "attack-ground", "attack-move", "stand-ground",
         }
         families[name] = {
             "evidence_authority": evidence["evidence_authority"],

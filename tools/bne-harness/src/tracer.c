@@ -247,6 +247,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_REPAIR 7
 #define SCRIPT_COMMAND_ATTACK_GROUND 8
 #define SCRIPT_COMMAND_ATTACK_MOVE 9
+#define SCRIPT_COMMAND_STAND_GROUND 10
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -932,6 +933,15 @@ static BOOL read_command_file(void) {
                         x = 0;
                         y = 0;
                         target = SCRIPT_NO_TARGET;
+                    } else if (fields == 3
+                            && strcmp(action_name, "stand-ground") == 0) {
+                        /* 0x0D is the one-byte selection opcode. Its
+                         * installer is 0x4368b0 (order 15 via 0x453130),
+                         * which is not a 0x13 ORDER_FUNCTIONS slot. */
+                        action = SCRIPT_COMMAND_STAND_GROUND;
+                        x = 0;
+                        y = 0;
+                        target = SCRIPT_NO_TARGET;
                     }
                 }
             }
@@ -1428,6 +1438,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_ATTACK_MOVE) {
         return "attack-move";
     }
+    if (action == SCRIPT_COMMAND_STAND_GROUND) {
+        return "stand-ground";
+    }
     return "unknown";
 }
 
@@ -1552,14 +1565,29 @@ static void apply_commands(LONG cycle) {
             continue;
         }
         function_index = script_order_function_index(command->action);
-        if (function_index > 60) {
+        if (command->action == SCRIPT_COMMAND_STAND_GROUND) {
+            static const BYTE expected_stand_ground[] = {
+                0x8b, 0x44, 0x24, 0x04, 0x6a, 0x0f
+            };
+            if (!executable_page_contains(BNE_202_STAND_GROUND_ORDER)
+                    || memcmp(BNE_202_STAND_GROUND_ORDER,
+                        expected_stand_ground,
+                        sizeof(expected_stand_ground)) != 0) {
+                reject_command(command, "stand-ground-signature");
+                continue;
+            }
+            /* Replay opcode 0x0D, not an ORDER_FUNCTIONS index. */
+            function_index = 0x0d;
+            order_function = BNE_202_STAND_GROUND_ORDER;
+        } else if (function_index > 60) {
             reject_command(command, "unsupported-action");
             continue;
-        }
-        order_function = BNE_202_ORDER_FUNCTIONS[function_index];
-        if (!executable_page_contains(order_function)) {
-            reject_command(command, "order-function");
-            continue;
+        } else {
+            order_function = BNE_202_ORDER_FUNCTIONS[function_index];
+            if (!executable_page_contains(order_function)) {
+                reject_command(command, "order-function");
+                continue;
+            }
         }
         ((give_order_function) (void *) BNE_202_GIVE_ORDER)(
                 unit, (int) dest_x, (int) dest_y, target, order_function);
