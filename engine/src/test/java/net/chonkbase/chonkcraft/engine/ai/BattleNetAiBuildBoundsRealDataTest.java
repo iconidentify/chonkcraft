@@ -177,6 +177,20 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
+    @DisplayName("an expansion computer keeps the land box when its newest unit is a dead-vision leftover")
+    void anExpansionComputerKeepsTheLandBoxWhenItsNewestUnitIsADeadVisionLeftover() {
+        assertBuildBox("campaigns/human-exp/levelx07h", 6, 399,
+                0x7b, 0x1e, 0x37, 0x7b);
+    }
+
+    @Test
+    @DisplayName("a second expansion computer keeps the land box when a destroyer leaves a dead-vision head")
+    void aSecondExpansionComputerKeepsTheLandBoxWhenADestroyerLeavesADeadVisionHead() {
+        assertBuildBox("campaigns/orc-exp/levelx08o", 2, 1499,
+                0x7b, 0x5f, 0x4d, 0x7b);
+    }
+
+    @Test
     @DisplayName("an expansion computer whose newest unit shares the hall island still expands")
     void anExpansionComputerWhoseNewestUnitSharesTheHallIslandStillExpands() {
         assertBuildBox("campaigns/human-exp/levelx03h", 4, 699,

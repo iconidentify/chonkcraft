@@ -496,11 +496,19 @@ public final class AiPlayer {
     private boolean hasGoldDepot(World world) {
         Unit head = null;
         for (Unit unit : world.units()) {
-            if (unit != null && unit.player() == playerIndex
-                    && unit.type() != null && !unit.destroyed()
-                    && unit.order() != Unit.Order.DYING) {
-                head = unit;
+            if (unit == null || unit.player() != playerIndex
+                    || unit.type() == null || unit.destroyed()
+                    || unit.order() == Unit.Order.DYING) {
+                continue;
             }
+            // Native AssignToPlayer skips vanishing types. A destroyer's
+            // dead-vision leftover used to become the 0x4be264 head and
+            // invert the box for one fifty-cycle beat: XHuman 7 player 6
+            // at 399 and XOrc 8 player 2 at 1499.
+            if (unit.type().vanishes() || unit.type().revealer()) {
+                continue;
+            }
+            head = unit;
         }
         if (head == null || head.type() == null) {
             return false;
