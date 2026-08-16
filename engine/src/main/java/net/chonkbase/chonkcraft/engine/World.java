@@ -6530,6 +6530,13 @@ public final class World {
     static final int PROGRESS_PER_TIME_UNIT = 600;
 
     /**
+     * Retail {@code 0x40dcd0} stores TIME*2 as the hall's production goal.
+     * Order 37 adds one per animation yield, so a TIME-45 peon needs 90
+     * yields, not (45-1)*6+1 Still drips.
+     */
+    static final int BATTLE_NET_TRAIN_TICKS_PER_TIME = 2;
+
+    /**
      * Selects BNE's fixed path goal on one axis of a target footprint.
      *
      * <p>This is the coordinate rule in native {@code 0x41f430}. A mover on
@@ -7030,7 +7037,8 @@ public final class World {
         building.setProducing(what);
         building.setProgress(0);
         building.setProgressGoal(
-                unitCosts(what).getOrDefault(UnitType.Resource.TIME, 1) * PROGRESS_PER_TIME_UNIT);
+                Math.max(1, unitCosts(what).getOrDefault(UnitType.Resource.TIME, 1))
+                        * BATTLE_NET_TRAIN_TICKS_PER_TIME);
     }
 
     /**
@@ -7140,16 +7148,15 @@ public final class World {
         if (building.producing() == null) {
             return false;
         }
-        stepWorkAnimation(building, AnimationSet.State.TRAIN);
-        building.setProgress(building.progress() + BUILD_PROGRESS_PER_CYCLE);
-        // The last time unit is not served: COrder_Train ticks on its first
-        // execute and completes the moment Ticks reaches the cost, so a
-        // trainee of time cost N takes (N - 1) * 6 + 1 cycles, not N * 6
-        // level08h's second peon starts at 37
-        // and steps out at 272 upstream, five cycles before a port that
-        // waited out the whole final beat.
-        if (building.progress() + PROGRESS_PER_TIME_UNIT - BUILD_PROGRESS_PER_CYCLE
-                < building.progressGoal()) {
+        boolean yielded = stepWorkAnimation(building, AnimationSet.State.TRAIN);
+        // Native 0x40e1e0 runs only when 0x402440 returns 1 (the wait-1
+        // yield). A Still drip of 100/cycle used to walk a TIME-45 peon out
+        // around 265; Orc 1's paid peon stays in order 37 for 463 cycles.
+        if (!yielded) {
+            return true;
+        }
+        building.setProgress(building.progress() + 1);
+        if (building.progress() < building.progressGoal()) {
             return true;
         }
         UnitType what = building.producing();
@@ -13855,10 +13862,10 @@ public final class World {
     }
 
     /** Plays the animation belonging to a non-combat work order. */
-    void stepWorkAnimation(Unit unit, AnimationSet.State state) {
+    boolean stepWorkAnimation(Unit unit, AnimationSet.State state) {
         AnimationSet set = unit.type().animationSet();
         if (set == null) {
-            return;
+            return false;
         }
         Animation animation = set.get(state);
         // Upstream lets an outside builder use its repair swing when a mod
@@ -13870,7 +13877,7 @@ public final class World {
             animation = set.getOrStill(state);
         }
         unit.animation().switchTo(animation);
-        advance(unit);
+        return advance(unit).yielded();
     }
 
     /**

@@ -49,7 +49,7 @@ class UdtaWorldProfileTest {
                 "the cheaper Rescue-style price was refused");
         assertEquals(200, world.player(0).get(Resource.GOLD),
                 "the player was charged the catalog 600 instead of the map 200");
-        assertEquals(20 * World.PROGRESS_PER_TIME_UNIT, hall.progressGoal(),
+        assertEquals(20 * World.BATTLE_NET_TRAIN_TICKS_PER_TIME, hall.progressGoal(),
                 "training used the catalog 60 instead of the map 20");
         assertEquals(600, footman.costs().get(Resource.GOLD),
                 "applying a custom UDTA mutated the shared unit catalog");

@@ -109,11 +109,16 @@ public final class AnimationRunner {
     private int rotationSpeed = 128;
     /** What one cycle of animation produced. */
     public record Step(int move, boolean attacked, String sound, int frame,
-            List<Animation.Instruction> effects, int rotation) {
+            List<Animation.Instruction> effects, int rotation, boolean yielded) {
 
         Step(int move, boolean attacked, String sound, int frame,
                 List<Animation.Instruction> effects) {
-            this(move, attacked, sound, frame, effects, 0);
+            this(move, attacked, sound, frame, effects, 0, false);
+        }
+
+        Step(int move, boolean attacked, String sound, int frame,
+                List<Animation.Instruction> effects, int rotation) {
+            this(move, attacked, sound, frame, effects, rotation, false);
         }
     }
 
@@ -230,6 +235,7 @@ public final class AnimationRunner {
 
         int move = 0;
         boolean attacked = false;
+        boolean yielded = false;
         String sound = null;
         int currentFrame = frame;
         List<Animation.Instruction> effects = null;
@@ -246,7 +252,16 @@ public final class AnimationRunner {
             Animation.Instruction instruction = animation.at(state.index());
             switch (instruction.kind()) {
                 case FRAME -> currentFrame = instruction.value();
-                case WAIT -> state.setWaitCycles(spellAdjusted(instruction.value()));
+                case WAIT -> {
+                    int wait = spellAdjusted(instruction.value());
+                    state.setWaitCycles(wait);
+                    // Native 0x402440 opcode 0 yields to the unit order and
+                    // sets the animation timer to 1. Building Train scripts
+                    // write that yield as wait 1 after wait 4.
+                    if (wait == 1) {
+                        yielded = true;
+                    }
+                }
                 // Scaled by terrain cost, as UnitShowAnimationScaled does.
                 case MOVE -> move += instruction.value() * scale;
                 case ATTACK -> attacked = true;
@@ -347,6 +362,7 @@ public final class AnimationRunner {
             state.setIndex((state.index() + 1) % animation.size());
         }
         return new Step(move, attacked, sound, currentFrame,
-                effects == null ? List.of() : List.copyOf(effects), pendingRotation);
+                effects == null ? List.of() : List.copyOf(effects), pendingRotation,
+                yielded);
     }
 }

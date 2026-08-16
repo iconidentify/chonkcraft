@@ -75,7 +75,7 @@ class UdtaSacrificeDebitRealDataTest {
                     "the cheaper Sacrifice peon was refused");
             assertEquals(350, world.player(0).get(Resource.GOLD),
                     "the player was charged the catalog 400 instead of the map 50");
-            assertEquals(20 * World.PROGRESS_PER_TIME_UNIT, hall.progressGoal(),
+            assertEquals(20 * World.BATTLE_NET_TRAIN_TICKS_PER_TIME, hall.progressGoal(),
                     "training used the catalog 45 instead of the map 20");
             assertEquals(400, catalog.costs().get(Resource.GOLD),
                     "applying Sacrifice mutated the shared peon catalog");
