@@ -30,7 +30,7 @@ from bne_fixture import validate_fixture
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_REMOTE_HOST = os.environ.get("CHONKCRAFT_ORACLE_HOST", "oracle-host")
+DEFAULT_REMOTE_HOST = os.environ.get("CHONKCRAFT_ORACLE_HOST", "i9beef")
 COMPARE = Path(__file__).with_name("bne_compare.py")
 INDEX_SCHEMA = 1
 SURVEY_SCHEMA = 1

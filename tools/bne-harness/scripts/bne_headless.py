@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -101,10 +102,40 @@ def container_command(args: argparse.Namespace, root: Path) -> list[str]:
         command.extend(["--detach", "--name", args.name])
     if getattr(args, "trace_internal_orders", False):
         command.extend(["--env", "CHONK_BNE_TRACE_INTERNAL_ORDERS=1"])
+    if getattr(args, "trace_ai_build_state", False):
+        command.extend(["--env", "CHONK_BNE_TRACE_AI_BUILD_STATE=1"])
     if getattr(args, "trace_unit", None) is not None:
         command.extend(["--env", f"CHONK_BNE_TRACE_UNIT={args.trace_unit}"])
     command.append(args.image)
     return command
+
+
+def output_ownership_command(args: argparse.Namespace, root: Path,
+                             container_output: Path) -> list[str]:
+    """Return captured evidence to the unprivileged oracle operator.
+
+    The game must run as root in the existing Wine prefix, but a fixture is
+    sealed mode 0600.  Leaving that inode owned by container root makes a
+    successful native capture unusable over SSH and used to fool doctor into
+    reporting READY.  Normalize only the already-validated output subtree.
+    """
+    return [
+        args.docker, "run", "--rm", "--network=none",
+        "--security-opt=no-new-privileges",
+        "--volume", f"{root}:/oracle",
+        args.image,
+        "sh", "-c",
+        'chown -R "$1:$2" "$3" && chmod -R u+rwX,go-rwx "$3"',
+        "normalize-output", str(os.getuid()), str(os.getgid()),
+        str(container_output),
+    ]
+
+
+def normalize_output_ownership(args: argparse.Namespace, root: Path,
+                               container_output: Path) -> int:
+    return subprocess.run(
+        output_ownership_command(args, root, container_output),
+        check=False).returncode
 
 
 def run(args: argparse.Namespace) -> int:
@@ -177,7 +208,11 @@ def run(args: argparse.Namespace) -> int:
             "--branch-ready", str(ready),
             "--branch-resume", str(resume),
         ])
-    return subprocess.run(command, check=False).returncode
+    result = subprocess.run(command, check=False)
+    normalized = normalize_output_ownership(args, root, container_output)
+    if normalized != 0:
+        return normalized
+    return result.returncode
 
 
 def _wait_for_file(path: Path, timeout: float) -> None:
@@ -390,6 +425,8 @@ def branch_capture(args: argparse.Namespace) -> int:
             [args.docker, "rm", "--force", args.name],
             check=False, capture_output=True, text=True,
         )
+        if normalize_output_ownership(args, root, container_output) != 0:
+            raise RuntimeError("could not return branch evidence to oracle operator")
 
 
 def decision_capture(args: argparse.Namespace) -> int:
@@ -533,6 +570,8 @@ def decision_capture(args: argparse.Namespace) -> int:
             [args.docker, "rm", "--force", args.name],
             check=False, capture_output=True, text=True,
         )
+        if normalize_output_ownership(args, root, container_output) != 0:
+            raise RuntimeError("could not return decision evidence to oracle operator")
 
 
 def snapshot_capture(args: argparse.Namespace) -> int:
@@ -679,6 +718,8 @@ def snapshot_capture(args: argparse.Namespace) -> int:
             [args.docker, "rm", "--force", args.name],
             check=False, capture_output=True, text=True,
         )
+        if normalize_output_ownership(args, root, container_output) != 0:
+            raise RuntimeError("could not return snapshot evidence to oracle operator")
 
 
 def corpus(args: argparse.Namespace) -> int:
@@ -719,7 +760,9 @@ def corpus(args: argparse.Namespace) -> int:
         "/oracle/source-manifest.json",
     ]
     result = subprocess.run(command, check=False)
-    return result.returncode
+    container_output = Path("/oracle/output") / relative_output
+    normalized = normalize_output_ownership(args, root, container_output)
+    return normalized if normalized != 0 else result.returncode
 
 
 def parser() -> argparse.ArgumentParser:
@@ -747,6 +790,9 @@ def parser() -> argparse.ArgumentParser:
         help="cycle-sorted command script that must stay below --oracle-root",
     )
     run_parser.add_argument("--trace-internal-orders", action="store_true")
+    run_parser.add_argument("--trace-ai-build-state", action="store_true",
+                            help="emit all active computer AIPlayerState rows "
+                                 "at every committed gameplay cycle")
     run_parser.add_argument("--trace-unit", type=int)
     run_parser.add_argument("--branch-pause-cycle", type=int)
     run_parser.set_defaults(func=run)

@@ -190,7 +190,7 @@ class BneJavaAdapterTest(unittest.TestCase):
             "doctor", "--no-remote", "--need", "capture",
         ])
         self.assertTrue(args.no_remote)
-        self.assertEqual("oracle-host", args.remote_host)
+        self.assertEqual("i9beef", args.remote_host)
         self.assertEqual("capture", args.need)
 
     def test_cli_exposes_contrastive_decision_pipeline(self):

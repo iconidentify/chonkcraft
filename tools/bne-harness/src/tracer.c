@@ -113,6 +113,8 @@ static DWORD replay_schedule_consumed = 0;
 static BOOL replay_schedule_requested = FALSE;
 static BOOL replay_schedule_valid = FALSE;
 
+static void trace_ai_build_boundaries(const char *phase, LONG phase_index);
+
 #pragma pack(push, 1)
 typedef struct state_file_header {
     BYTE magic[8];
@@ -1779,6 +1781,11 @@ static void snapshot_cycle(void) {
             (unsigned long) *BNE_202_RANDOM_SEED);
     trace_write("# bne-trace event=async-seed cycle=%ld seed=%lu",
             cycle, (unsigned long) *BNE_202_ASYNC_RANDOM_SEED);
+    /* The warmup and first game-before dumps prove initialisation only.  The
+       per-cycle after-state is the actual AI decision oracle: it lets the
+       normalizer diff the 48-byte state at the same committed simulation
+       boundary as units, banks, commands, and projectiles. */
+    trace_ai_build_boundaries("game-after", cycle);
     if (cycle == 1) {
         /* The per-type flag word decides which behaviour the computer's
            assigner hands a unit, and it lives in .bss, so it cannot be read
@@ -2097,8 +2104,11 @@ static void __cdecl traced_game_tick(void) {
                 (unsigned long) pool_count,
                 (unsigned long) *BNE_202_ASYNC_RANDOM_SEED);
         trace_critter_scheduler_state(pool, pool_count);
-        trace_ai_build_boundaries("game-before", traced_cycles + 1);
     }
+    /* Pair every committed after-state with its own pre-tick state.  Emitting
+       this only for cycle one made later write ledgers infer from the previous
+       after-state and hid transient writes that returned a byte to itself. */
+    trace_ai_build_boundaries("game-before", traced_cycles + 1);
     apply_commands(traced_cycles + 1);
     branch_pause_before_cycle(traced_cycles + 1);
     original_game_tick();
