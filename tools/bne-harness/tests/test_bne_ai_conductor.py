@@ -407,6 +407,16 @@ class FleetPlanTest(unittest.TestCase):
                     with conductor.local_lease(store):
                         pass
 
+    def test_java_ledger_must_bind_the_pack_ai_bin(self):
+        ai = ai_bytes()
+        ledger = {"schema": "chonkcraft-bne-ai-decision-ledger-1"}
+        bound = conductor._bind_java_ai_bin(ledger, ai)
+        self.assertEqual(hashlib.sha256(ai).hexdigest(), bound["ai_bin_sha256"])
+        self.assertEqual(len(ai), bound["ai_bin_bytes"])
+        with self.assertRaisesRegex(conductor.EvidenceError, "different ai.bin"):
+            conductor._bind_java_ai_bin(
+                {**bound, "ai_bin_sha256": "0" * 64}, ai)
+
     def test_certification_requires_all_52_and_full_telemetry(self):
         runs = []
         for row in conductor.load_fleet_requirements():

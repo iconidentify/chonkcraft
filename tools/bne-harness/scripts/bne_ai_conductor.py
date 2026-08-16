@@ -796,6 +796,20 @@ def _current_java_proof(repository: Path, pack: Path) \
     return proof, engine
 
 
+def _bind_java_ai_bin(value: dict[str, Any], ai_bin: bytes) -> dict[str, Any]:
+    """Stamp the pack's pinned ai.bin identity onto a current-head Java ledger."""
+    identity = _identity(ai_bin)
+    bound = dict(value)
+    existing_sha = bound.get("ai_bin_sha256")
+    existing_bytes = bound.get("ai_bin_bytes")
+    if existing_sha not in (None, identity["sha256"]) \
+            or existing_bytes not in (None, identity["bytes"]):
+        raise EvidenceError("Java adapter bound a different ai.bin than the pack")
+    bound["ai_bin_sha256"] = identity["sha256"]
+    bound["ai_bin_bytes"] = identity["bytes"]
+    return bound
+
+
 JavaEmitter = Callable[[RemoteArtifact, Path, list[int]], dict[str, Any]]
 
 
@@ -824,6 +838,10 @@ def java_emitter(repository: Path, pack: Path, jar: Path) -> JavaEmitter:
         if value.get("schema") != decision.LEDGER_SCHEMA \
                 or value.get("authority_sha256") != PINNED:
             raise EvidenceError("Java adapter emitted the wrong ledger authority")
+        # The adapter ran against this pack's pinned ai.bin.  Bind that
+        # identity here so a retained twin cannot later claim a different
+        # program.  The adapter may already have written the same fields.
+        value = _bind_java_ai_bin(value, _extract_ai_bin(pack, require_pinned=True))
         try:
             person = int(value["person_player"])
             computers = sorted(int(player)

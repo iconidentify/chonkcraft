@@ -45,8 +45,11 @@ the oracle, changes Docker state, or kills unrelated containers.
 
 The Java adapter selects the map's actual `PERSON` slot (`GameData.personIn`),
 including expansion missions where that slot is not zero. Its output binds the
-selected person, every computer player, map, seed, and cycle limit. A native
-state roster and Java roster disagreement fails before field comparison.
+selected person, every computer player, map, seed, and cycle limit. The
+conductor then stamps the pack's pinned `ai.bin` identity onto that ledger
+before the twin is retained, so a later checkout cannot claim a different
+program. A native state roster and Java roster disagreement fails before field
+comparison.
 
 `--skip-build` is fail-closed. A successful conductor build writes a receipt
 beside the app JAR. Reuse is allowed only while the generic engine closure,

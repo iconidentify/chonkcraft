@@ -5,6 +5,7 @@ target/
 *.iml
 tmp/
 /.bne-artifacts/
+/.bne-ai-evidence/
 /.bne-lab/
 /.bne-counterfactual/
 /.bne-branch-witness/
