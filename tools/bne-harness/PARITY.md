@@ -95,9 +95,9 @@ that the enemy chose what retail BNE chose.
 
 The XOrc 9 identity correction, world-local UGRD overlays, and replay prefix
 through dispatcher record 3,935 remain valid accomplishments from the prior
-checkpoint. Historical frontier pointers and ignored `CHECKPOINT.md` files are
-not fresh-context handoffs unless their producer identity matches the current
-source.
+checkpoint. Historical frontier pointers and ignored local checkpoint files
+are not fresh-context handoffs unless their producer identity matches the
+current source.
 
 ## Current integration checkpoint — 2026-08-08 visual/spatial round
 
