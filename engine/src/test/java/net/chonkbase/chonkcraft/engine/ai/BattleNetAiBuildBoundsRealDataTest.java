@@ -26,9 +26,11 @@ import org.junit.jupiter.api.Test;
  * to {@code 45,5f,5f,38} and Orc 4 to {@code 00,1a,07,00} after the
  * newest-first land walk and pad -5/+8. A 128-tile computer whose
  * signed min never moves pads {@code 0x80-5} to 123, so Human 5 is
- * {@code 7b,36,75,7b} and Orc 12 is {@code 7b,4d,3b,7b}. Sea and
- * shore buildings stay out. A computer with no gold depot must not
- * receive a building rectangle.
+ * {@code 7b,36,75,7b} and Orc 12 is {@code 7b,4d,3b,7b}. Native
+ * 0x44c260 re-runs that walk on the fifty-cycle beat, so Human 8
+ * becomes {@code 3e,16,56,00} at 199 and Human 5 becomes
+ * {@code 7b,31,75,7b} at 1649. Sea and shore buildings stay out. A
+ * computer with no gold depot must not receive a building rectangle.
  */
 class BattleNetAiBuildBoundsRealDataTest {
 
@@ -133,6 +135,25 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
+    @DisplayName("a human 8 computer rewrites the land-building box on the fifty-cycle beat")
+    void aHuman8ComputerRewritesTheLandBuildingBoxOnTheFiftyCycleBeat() {
+        // Native writes 3e165600 at fixture 199. Java's extra hall is
+        // already up at the 149 beat, so the same rectangle lands there.
+        // 148 is the cycle before that beat and must keep the install box.
+        assertBuildBox("campaigns/human/level08h", 0, 148, 0x3e, 0x16, 0x4f, 0x00);
+        assertBuildBox("campaigns/human/level08h", 0, 149, 0x3e, 0x16, 0x56, 0x00);
+    }
+
+    @Test
+    @DisplayName("a human 5 computer rewrites the land-building box on a later fifty-cycle beat")
+    void aHuman5ComputerRewritesTheLandBuildingBoxOnALaterFiftyCycleBeat() {
+        // Native seed-1 shrinks at 1649. Java's counted building leaves a
+        // beat later, so the same 7b31757b rectangle lands at 1699.
+        assertBuildBox("campaigns/human/level05h", 0, 1698, 0x7b, 0x36, 0x75, 0x7b);
+        assertBuildBox("campaigns/human/level05h", 0, 1699, 0x7b, 0x31, 0x75, 0x7b);
+    }
+
+    @Test
     @DisplayName("a person-only map does not invent a build box")
     void aPersonOnlyMapDoesNotInventABuildBox() {
         World world = new World(new GameMap(32, 32, new Tileset()));
@@ -143,17 +164,24 @@ class BattleNetAiBuildBoundsRealDataTest {
 
     private static void assertBuildBox(String map, int player,
             int minY, int maxX, int maxY, int minX) {
+        assertBuildBox(map, player, 1, minY, maxX, maxY, minX);
+    }
+
+    private static void assertBuildBox(String map, int player, int fixtureCycle,
+            int minY, int maxX, int maxY, int minX) {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission(map, 0);
+        Mission mission = data.loadMission(map, 0, 1);
         Assumptions.assumeTrue(mission != null, map + " is not in the pack");
         World world = mission.world();
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        mission.tick();
+        for (int cycle = 1; cycle <= fixtureCycle; cycle++) {
+            mission.tick();
+        }
         AiPlayer ai = world.ais().get(player);
         assertTrue(ai != null, map + " has no computer player " + player);
         byte[] packed = ai.packDecisionState();

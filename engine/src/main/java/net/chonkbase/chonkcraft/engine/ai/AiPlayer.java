@@ -435,18 +435,37 @@ public final class AiPlayer {
         // a watch tower, so the box used to become a tower rectangle and
         // retail keeps the inverted map-size box, which is why the depot
         // probe has to win before any land building is allowed to expand.
-        if (world.map() != null) {
-            if (hasGoldDepot(world)) {
-                BattleNetAiBytecode.expandLandBuildBounds(
-                        battleNetAiState, world.map().width(),
-                        landBuildingTilesNewestFirst(world));
-            } else {
-                BattleNetAiBytecode.installEmptyBuildBounds(
-                        battleNetAiState, world.map().width());
-            }
-        }
+        writeBuildBounds(world);
         if (BattleNetAiBytecode.waitCounter(battleNetAiState) > 8) {
             battleNetTickBytecode(world);
+        }
+    }
+
+    /**
+     * Re-runs the 0x4273e0 land-building walk.
+     *
+     * <p>Native 0x44c260 decrements word 0x4be130 each cycle and, on
+     * zero, stores 50 and calls 0x4273e0. That is the same 49 / 99 /
+     * 149 beat as launch consume. A town used to keep its install
+     * rectangle after a hall finished or a counted building died,
+     * which is why Human 8 stayed {@code 3e164f} through 199 and
+     * Human 5 stayed {@code 7b3675} through 1649.
+     */
+    public void battleNetRefreshBuildBounds(World world) {
+        writeBuildBounds(world);
+    }
+
+    private void writeBuildBounds(World world) {
+        if (battleNetAiState == null || world == null || world.map() == null) {
+            return;
+        }
+        if (hasGoldDepot(world)) {
+            BattleNetAiBytecode.expandLandBuildBounds(
+                    battleNetAiState, world.map().width(),
+                    landBuildingTilesNewestFirst(world));
+        } else {
+            BattleNetAiBytecode.installEmptyBuildBounds(
+                    battleNetAiState, world.map().width());
         }
     }
 

@@ -98,10 +98,18 @@ fixture cycle 1; retail still holds wait 1 through warmup-2 and is
 wait 0 at PC 561 on game-after 1. A long opening WAIT still gets one
 cycle-zero decrement so Human 1 / Orc 2 stay 65532. Human 5 is now
 state-identical through 200 (cycle-2 player-5 telemetry still omits
-the native PC-pointer write). That is still not every computer on
-every mission. A later independent choice that is not opcode 3, or a
-launch the boundary snapshots never hook, remains telemetry debt. Do
-not change engine behavior to invent those events.
+the native PC-pointer write).
+
+Native 0x44c260 decrements word 0x4be130 and, on zero, stores 50 and
+calls 0x4273e0 -- the same 49 / 99 / 149 beat as launch consume.
+Human 8 player 0 rewrites `3e164f` to `3e1656` on that beat; Human 5
+player 0 rewrites `7b3675` to `7b3175`. Java now walks again there.
+A counted building that dies a beat later in Java (Human 5 seed 1 at
+1699 vs native 1649) is combat timing, not a second box rule. That is
+still not every computer on every mission. A later independent
+choice that is not opcode 3, or a launch the boundary snapshots never
+hook, remains telemetry debt. Do not change engine behavior to invent
+those events.
 
 `scripts/deploy-bne-tracer.sh` is the only rollout path for the DLL and remote
 headless driver. New captures are chowned back to the SSH operator by the

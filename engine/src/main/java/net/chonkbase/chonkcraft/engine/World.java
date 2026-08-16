@@ -8275,8 +8275,11 @@ public final class World {
             }
             // FUN_0044c260 consumes ai.bin's pending ground/naval/air launch
             // bytes on the same fifty-cycle cadence as retail (49, 99...).
+            // The same zero of word 0x4be130 calls 0x4273e0, so the
+            // land-building box is rewritten on that beat too.
             if (cycle > 2 && (cycle - 2) % 50 == 49) {
                 ai.battleNetRunPeriodicForces(this);
+                ai.battleNetRefreshBuildBounds(this);
             }
         }
         java.util.Arrays.fill(battleNetHelpPromotedThisCycle, false);
