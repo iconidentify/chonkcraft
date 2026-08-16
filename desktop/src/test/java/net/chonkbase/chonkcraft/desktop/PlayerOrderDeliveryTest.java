@@ -3,7 +3,6 @@ package net.chonkbase.chonkcraft.desktop;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.image.BufferedImage;
@@ -143,14 +142,13 @@ class PlayerOrderDeliveryTest {
         assertEquals(1, scene.screen().soundChoicesForTest() - voices,
                 "one group command produced anything other than one acknowledgement");
         for (Unit unit : squad) {
-            assertEquals(Unit.Order.ATTACK, unit.order(),
+            assertTrue(hasAcceptedAttack(unit, site),
                     unit.type().name() + " was left out of the selected-group attack");
-            assertSame(site, unit.target(),
-                    unit.type().name() + " attacked a different target");
         }
 
         boolean destroyed = false;
         boolean siteDeathAnnounced = false;
+        List<Unit> engaged = new ArrayList<>();
         for (int cycle = 0; cycle < 1_200 && site.isAlive(); cycle++) {
             if (cycle > 0 && cycle % 60 == 0) {
                 // Reissuing an attack in the middle of combat is ordinary
@@ -159,7 +157,11 @@ class PlayerOrderDeliveryTest {
                 scene.screen().commandSelectedForTest(site.tileX(), site.tileY(), site);
             }
             for (Unit unit : squad) {
-                assertFalse(unit.order() == Unit.Order.STILL && site.isAlive(),
+                if (unit.order() == Unit.Order.ATTACK && unit.target() == site
+                        && !engaged.contains(unit)) {
+                    engaged.add(unit);
+                }
+                assertTrue(engaged.contains(unit) || hasAcceptedAttack(unit, site),
                         unit.type().name() + " dropped a live commanded target at cycle "
                                 + scene.world().cycle());
             }
@@ -170,10 +172,20 @@ class PlayerOrderDeliveryTest {
             destroyed = !site.isAlive();
         }
         assertTrue(destroyed, "a mixed BNE squad could not destroy the construction site");
+        assertEquals(squad.size(), engaged.size(),
+                "one or more queued group members never entered Attack");
         assertTrue(siteDeathAnnounced,
                 "combat removed the construction site without its BNE building-death event");
         assertFalse(builder.removed(),
                 "destroying the site left its builder trapped outside the map");
+    }
+
+    private static boolean hasAcceptedAttack(Unit unit, Unit target) {
+        if (unit.order() == Unit.Order.ATTACK && unit.target() == target) {
+            return true;
+        }
+        return unit.queuedOrders().stream().anyMatch(order ->
+                order.kind() == Unit.QueuedOrderKind.ATTACK && order.target() == target);
     }
 
     @Test

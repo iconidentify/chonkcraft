@@ -1033,7 +1033,7 @@ class LockstepTest {
     }
 
     @Test
-    void aRefusedReplacementDoesNotEraseTheExistingOrderLifecycle() {
+    void aSoldierRepairClickBecomesMoveAndFlushesTheExistingOrderLifecycle() {
         World world = new World(grass(40), twoPlayers());
         UnitType type = soldier();
         Unit unit = world.createUnit(type, 0, 5, 5);
@@ -1047,15 +1047,15 @@ class LockstepTest {
         unit.setSavedMoveRange(3);
         unit.setSavedAttackScanSleep(4);
         unit.setSavedAttackMoveOpening(false);
-        Unit.PendingOrderState before = unit.snapshotPendingOrders();
-
-        assertFalse(applier.apply(GameCommand.repair(0, unit.id(), friend.id())),
-                "a soldier must refuse a worker-only repair command");
+        assertTrue(applier.apply(GameCommand.repair(0, unit.id(), friend.id())),
+                "retail GiveOrder 27 on a soldier must become a walk");
 
         assertEquals(Unit.Order.MOVE, unit.order(),
-                "the refused replacement interrupted the active march");
-        assertEquals(before, unit.snapshotPendingOrders(),
-                "the refused replacement ate a waypoint or resume state");
+                "the soldier tried to repair instead of walking to the clicked unit");
+        assertEquals(friend.tileX(), unit.orderTargetX());
+        assertEquals(friend.tileY(), unit.orderTargetY());
+        assertFalse(unit.hasQueuedOrders(),
+                "the accepted BNE replacement retained an obsolete group waypoint");
     }
 
     @Test

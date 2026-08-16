@@ -1407,10 +1407,15 @@ final class BattleNetCombatSystem {
         int offsetAfter = unit.battleNetSequenceOffset();
         int timerAfter = unit.battleNetAnimationTimer();
         boolean readyAfter = unit.battleNetChaseStepReady();
-        // Borrowed MOVE leftover used to promote Attack Ground and leave
-        // it stuck, because only MOVE/STILL were restored. Attack-1/00
-        // stayed Attack Ground from leftover-land through the window.
-        if (unit.order() != Unit.Order.DYING) {
+        // Borrowed MOVE leftover under Attack used to promote Attack Ground
+        // and leave it stuck, because only MOVE/STILL were restored.
+        // Restore that specific chase transition as Attack. Other saved
+        // orders must not overwrite a real order transition made by
+        // stepMove: doing so trapped a replayed Attack-Move peon and made
+        // later player Move/Attack clicks acknowledge without progressing.
+        if (unit.order() == Unit.Order.MOVE || unit.order() == Unit.Order.STILL
+                || (saved == Unit.Order.ATTACK
+                        && unit.order() == Unit.Order.ATTACK_GROUND)) {
             unit.setOrder(saved);
         }
         unit.setBattleNetSequenceOffset(offsetAfter);

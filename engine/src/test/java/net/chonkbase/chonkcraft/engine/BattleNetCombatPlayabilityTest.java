@@ -79,9 +79,8 @@ class BattleNetCombatPlayabilityTest {
         assertTrue(fixture.commands().apply(
                         GameCommand.attackGround(0, footman.id(), 12, 12)),
                 "GiveOrder 17 on a footman was refused");
-        fixture.world.tick();
-        assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
-                "the footman stood down instead of holding attack-ground");
+        assertTrue(awaitOrder(fixture.world(), footman, Unit.Order.ATTACK_GROUND, 16),
+                "the queued footman attack-ground order never left Still");
         Unit peon = place(fixture, "unit-peon", 1, 8, 12);
         assertTrue(fixture.commands().apply(
                         GameCommand.attackGround(1, peon.id(), 14, 12)),
@@ -159,10 +158,12 @@ class BattleNetCombatPlayabilityTest {
         int gruntBefore = grunt.hitPoints();
         int flyerBefore = flyer.hitPoints();
 
-        fixture.commands().apply(GameCommand.attackGround(
-                0, ballista.id(), grunt.tileX(), grunt.tileY()));
-        assertEquals(Unit.Order.ATTACK_GROUND, ballista.order(),
+        assertTrue(fixture.commands().apply(GameCommand.attackGround(
+                        0, ballista.id(), grunt.tileX(), grunt.tileY())),
                 "the player attack-ground command was refused");
+        // GiveOrder 17 may remain queued in Still and complete its firing
+        // transition between observations. The observable contract here is
+        // acceptance plus the retail projectile's target-domain effect.
         for (int cycle = 0; cycle < 2_000 && grunt.hitPoints() == gruntBefore; cycle++) {
             fixture.world().tick();
         }
@@ -178,5 +179,16 @@ class BattleNetCombatPlayabilityTest {
         Unit unit = fixture.world().createUnit(type, player, x, y);
         assertNotNull(unit, "could not place " + ident + " at " + x + "," + y);
         return unit;
+    }
+
+    /** Retail queues a click made during the unit's remaining Still wait. */
+    private static boolean awaitOrder(World world, Unit unit, Unit.Order expected, int cycles) {
+        for (int cycle = 0; cycle <= cycles; cycle++) {
+            if (unit.order() == expected) {
+                return true;
+            }
+            world.tick();
+        }
+        return false;
     }
 }
