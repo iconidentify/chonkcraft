@@ -1829,8 +1829,18 @@ final class BattleNetConstructionSystem {
             // The leftover-land visit already served one quiet beat, so two
             // remaining Repair visits match that stand-down. Still'ing here
             // fulfilled at 53.
+            //
+            // A leftover Harvest-to-Repair already paid that quiet Repair
+            // start (delay 2 at the leftover-land pop). Residual settle
+            // beside a full hall is the stand-down: native 1512 Stills at
+            // 118. Arming delay 3 again Still'd at 119.
             if (leftoverLanded) {
-                unit.setBattleNetOrderDelay(3);
+                // Leftover Harvest-to-Repair already paid one quiet Repair
+                // visit at the leftover-land pop. Two remaining visits
+                // Still at 118; delay 3 Still'd at 119 and an immediate
+                // Still fulfilled at 116.
+                unit.setBattleNetOrderDelay(
+                        unit.battleNetOrderDelay() > 0 ? 2 : 3);
                 return;
             }
             if (unit.battleNetOrderDelay() > 0) {
