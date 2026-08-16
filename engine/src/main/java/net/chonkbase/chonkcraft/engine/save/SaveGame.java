@@ -644,6 +644,12 @@ public final class SaveGame {
         state.append(" progress = ").append(unit.progress()).append(",");
         state.append(" progressGoal = ").append(unit.progressGoal()).append(",");
         state.append(" wait = ").append(unit.waitCycles()).append(",");
+        // Human 2's delayed victory is RESCUED_NEAR. Reloading an elf as
+        // just another person-owned archer used to restart the 120-cycle
+        // wait, because the trigger no longer saw a rescued unit.
+        if (unit.wasRescued()) {
+            state.append(" rescuedFrom = ").append(unit.rescuedFrom()).append(",");
+        }
         if (unit.battleNetSequenceOffset() >= 0) {
             state.append(" battleNetSequenceOffset = ")
                     .append(unit.battleNetSequenceOffset()).append(",");

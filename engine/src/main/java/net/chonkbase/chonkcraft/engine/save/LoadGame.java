@@ -678,6 +678,9 @@ public final class LoadGame {
         if (state.rawGet("wait") != null) {
             unit.setWaitCycles(integer(state.rawGet("wait")));
         }
+        if (state.rawGet("rescuedFrom") != null) {
+            unit.setRescuedFrom(integer(state.rawGet("rescuedFrom")));
+        }
         if (state.rawGet("battleNetSequenceOffset") != null) {
             unit.setBattleNetSequenceOffset(
                     integer(state.rawGet("battleNetSequenceOffset")));

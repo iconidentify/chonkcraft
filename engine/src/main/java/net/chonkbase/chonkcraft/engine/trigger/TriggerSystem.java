@@ -495,13 +495,17 @@ public final class TriggerSystem {
             return false;
         }
         for (Unit centre : world.units()) {
-            if (!centre.isAlive() || centre.type() == null
+            // Native IsAlive is !Destroyed && action != Die. Java isAlive()
+            // also requires hit-points, which a Circle of Power never has
+            // after a save reloads the catalog type. Human 2's delayed
+            // victory used to go deaf on resume.
+            if (!centre.isPointable() || centre.type() == null
                     || !centreType.equals(centre.type().ident())) {
                 continue;
             }
             int found = 0;
             for (Unit near : world.units()) {
-                if (near == centre || !near.isAlive() || near.type() == null
+                if (near == centre || !near.isPointable() || near.type() == null
                         || (rescuedOnly && !near.wasRescued())
                         || (!"any".equals(type) && !type.equals(near.type().ident()))
                         || !owner.test(near.player())) {
