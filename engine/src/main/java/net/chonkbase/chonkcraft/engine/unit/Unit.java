@@ -623,6 +623,20 @@ public final class Unit {
     private boolean attackMoveOpening;
 
     /**
+     * GiveOrder 8 dest-path dest-arm hold. The dest walk waits this out
+     * after install; leftover chase delays must not use it.
+     */
+    public boolean destPathOpeningHold() {
+        return destPathOpeningHold;
+    }
+
+    public void setDestPathOpeningHold(boolean destPathOpeningHold) {
+        this.destPathOpeningHold = destPathOpeningHold;
+    }
+
+    private boolean destPathOpeningHold;
+
+    /**
      * How far from its destination a move order will settle, and it grows.
      *
      * <p>{@code COrder_Move::Range} upstream. It starts at nought and

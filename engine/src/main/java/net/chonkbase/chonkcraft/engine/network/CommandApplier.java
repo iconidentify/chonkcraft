@@ -218,7 +218,7 @@ public final class CommandApplier {
             case ATTACK_GROUND -> accepted = world.orderAttackGround(
                     unit, command.x(), command.y(), true);
             case ATTACK_MOVE -> accepted = world.orderAttackMove(
-                    unit, command.x(), command.y());
+                    unit, command.x(), command.y(), true);
             // The position is where the player pointed; zero means "here",
             // which is what the coast shortcut on the button sends.
             case UNLOAD -> accepted = world.orderUnload(unit,

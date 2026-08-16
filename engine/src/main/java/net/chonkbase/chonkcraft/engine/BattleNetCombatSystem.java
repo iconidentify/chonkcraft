@@ -2515,6 +2515,17 @@ final class BattleNetCombatSystem {
         if (stepBattleNetAttackSequence(unit)) {
             return;
         }
+        if (unit.destPathOpeningHold() && unit.battleNetOrderDelay() > 0) {
+            // Dest-path GiveOrder 8 dest-arms two visits after install:
+            // Human 1 1588 at fixture 8, Orc 1 1592 at fixture 12 after the
+            // Still pop. Without this hold the march first-progressed on the
+            // issue visit. Later chase delays are not this opening hold.
+            unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            if (unit.battleNetOrderDelay() == 0) {
+                unit.setDestPathOpeningHold(false);
+            }
+            return;
+        }
         String attackStateTrace = System.getenv("CHONKCRAFT_TRACE_ATTACKSTATE");
         if (attackStateTrace != null
                 && unit.id() == Integer.parseInt(attackStateTrace)) {

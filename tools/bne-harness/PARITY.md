@@ -60,7 +60,7 @@ have no dual-engine execution. Exactness is also concentrated in movement;
 repair, return-goods, patrol, attack-ground, queued commands, true group
 transactions, stand-ground, and production remain thin or open. Attack-move
 now has a dest-path injector and commanded dual-adapter cells; first-progress
-cadence is still open.
+matches the sealed dest-path Still wait, and terminal is still one cycle late.
 
 Use `bne_playtest_explorer.py worklist` to turn the flat ledger into ranked
 systemic clusters, fixed-family counts, current-source authentication, and a

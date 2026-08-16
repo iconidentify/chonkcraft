@@ -24,9 +24,10 @@ are materially different, with zero infrastructure failures:
 
 This is **126/131 comparable**, not 126/240 complete. Attack-move now has a
 native injector (GiveOrder table 8 dest path) and commanded dual-adapter
-cells; the first Orc 1 and Human 1 ground clicks both settle on the clicked
-square and still diverge on first-progress cadence. Stand-ground and train
-remain generated without native execution. There are no authenticated
+cells. The Orc 1 and Human 1 ground clicks settle on the clicked square and
+match first-progress (fixture 12 after a Still wait, fixture 8 from the
+Still marker). Terminal is still one cycle late on Java. Stand-ground and
+train remain generated without native execution. There are no authenticated
 queued-command cells and no authenticated group transaction.
 
 The first real AI-cycle proof is better than the old coarse AI counter: Orc 1

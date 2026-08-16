@@ -466,7 +466,48 @@ public final class World {
 
     /** @see BattleNetCombatSystem#orderAttackMove */
     public boolean orderAttackMove(Unit unit, int tileX, int tileY) {
-        return combat.orderAttackMove(unit, tileX, tileY);
+        return orderAttackMove(unit, tileX, tileY, false);
+    }
+
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder dest click: Still keeps
+     *     the current order through the remaining Still wait, then dest-arms
+     *     two visits after the dest-attack installs
+     */
+    public boolean orderAttackMove(Unit unit, int tileX, int tileY,
+            boolean fromPlayer) {
+        if (fromPlayer && unit != null && unit.order() == Unit.Order.STILL
+                && battleNetSequence != null) {
+            int[] waits = movement.playerCommandWaits(unit);
+            if (waits[1] > 0) {
+                // Native GiveOrder 8 dest from Still writes next_order 10 and
+                // keeps Still: Orc 1 grunt 1592 queueWait 4 through fixture 8,
+                // dest-attack at 9. Installing the march on the issue cycle
+                // first-progressed at 5.
+                unit.setOrderTarget(tileX, tileY);
+                unit.setAttackMove(tileX, tileY);
+                unit.enqueueOrder(new Unit.QueuedOrder(
+                        Unit.QueuedOrderKind.ATTACK_MOVE,
+                        tileX, tileY, null, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setDestPathOpeningHold(true);
+                unit.setBattleNetOrderDelay(waits[1] + 1);
+                return true;
+            }
+        }
+        boolean accepted = combat.orderAttackMove(unit, tileX, tileY);
+        if (accepted && fromPlayer && battleNetSequence != null
+                && unit.order() == Unit.Order.ATTACK_MOVE
+                && unit.battleNetOrderDelay() == 0) {
+            // Issue-visit dest-attack dest-arms at fixture 8: Human 1 soldier
+            // 1588 installs order 10 at 5 and first walks at 8. The issue
+            // visit still decrements, so delay 3 dest-arms at 8; delay 2
+            // dest-armed at 7. Live-target Attack on the same marker dest-arms
+            // immediately; this delay is dest-path only.
+            unit.setDestPathOpeningHold(true);
+            unit.setBattleNetOrderDelay(3);
+        }
+        return accepted;
     }
 
     /** @see BattleNetCombatSystem#hit */
@@ -8187,7 +8228,9 @@ public final class World {
                 // at 12. attack-1/00 without it dest-armed at 10 and finished
                 // two pixels early. An issue-visit Attack (queueWait 0)
                 // dest-arms on that visit.
-                if (queued.kind() == Unit.QueuedOrderKind.ATTACK) {
+                if (queued.kind() == Unit.QueuedOrderKind.ATTACK
+                        || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
+                                && unit.destPathOpeningHold())) {
                     unit.setBattleNetOrderDelay(2);
                 }
                 return;
