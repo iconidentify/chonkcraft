@@ -18,6 +18,35 @@ import org.junit.jupiter.api.Test;
 class PlayerIntentJournalTest {
 
     @Test
+    @DisplayName("one group click keeps every fanned-out order in one transaction")
+    void oneGroupClickKeepsEveryFannedOutOrderInOneTransaction() {
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        World world = world();
+        java.util.ArrayList<GameCommand> delivered = new java.util.ArrayList<>();
+        CommandSink recording = journal.wrap(delivered::add, world::cycle,
+                () -> List.of(7, 9), world);
+
+        long transaction = journal.beginGesture(42, "field", "right-click",
+                320, 240, 12, 13, "shift", null, "open-ground", List.of(7, 9));
+        try {
+            recording.issue(GameCommand.move(0, 7, 12, 13).withQueued(true));
+            recording.issue(GameCommand.move(0, 9, 12, 13).withQueued(true));
+        } finally {
+            journal.endGesture(transaction);
+        }
+
+        List<PlayerIntentJournal.Entry> entries = journal.snapshot();
+        assertEquals(3, entries.size(), "the gesture and two orders must all be retained");
+        assertEquals("gesture", entries.get(0).event());
+        assertEquals("field", entries.get(0).gesture().origin());
+        assertEquals("shift", entries.get(0).gesture().modifiers());
+        assertEquals(transaction, entries.get(1).transactionId());
+        assertEquals(transaction, entries.get(2).transactionId());
+        assertTrue(entries.get(1).command().queued());
+        assertTrue(entries.get(2).command().queued());
+    }
+
+    @Test
     void recordsSelectionCommandAndAcceptanceWithoutChangingDelivery() {
         PlayerIntentJournal journal = new PlayerIntentJournal();
         AtomicLong cycle = new AtomicLong(42);

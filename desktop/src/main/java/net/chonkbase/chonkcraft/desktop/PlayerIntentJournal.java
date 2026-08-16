@@ -16,11 +16,18 @@ final class PlayerIntentJournal {
     static final int LIMIT = 512;
     static final long OUTCOME_WINDOW = 600;
 
-    record Entry(long id, long cycle, String event, List<Integer> selectedUnitIds,
-            GameCommand command, Boolean accepted) {}
+    /** The physical input that began a player transaction. */
+    record Gesture(String origin, String detail, int screenX, int screenY,
+            int tileX, int tileY, String modifiers, Integer targetId,
+            String targetShape) {}
+
+    record Entry(long id, long transactionId, long cycle, String event,
+            List<Integer> selectedUnitIds, GameCommand command, Boolean accepted,
+            Gesture gesture) {}
 
     /** The causal result of one submitted unit command at the latest observed cycle. */
-    record Outcome(long intentId, long submittedCycle, int unitId, String command,
+    record Outcome(long intentId, long transactionId, long submittedCycle,
+            int unitId, String command,
             Boolean accepted, Long firstProgressCycle, Long terminalCycle,
             String terminalReason, int tileX, int tileY, int offsetX, int offsetY,
             String order,
@@ -64,6 +71,7 @@ final class PlayerIntentJournal {
 
     private static final class Tracking {
         private final long intentId;
+        private final long transactionId;
         private final long submittedCycle;
         private final GameCommand command;
         private final Boolean accepted;
@@ -75,9 +83,11 @@ final class PlayerIntentJournal {
         private String terminalReason;
         private State latest;
 
-        private Tracking(long intentId, long submittedCycle, GameCommand command,
+        private Tracking(long intentId, long transactionId, long submittedCycle,
+                GameCommand command,
                 Boolean accepted, State submitted, State targetSubmitted, Goal goal) {
             this.intentId = intentId;
+            this.transactionId = transactionId;
             this.submittedCycle = submittedCycle;
             this.command = command;
             this.accepted = accepted;
@@ -91,10 +101,39 @@ final class PlayerIntentJournal {
     private final ArrayDeque<Entry> entries = new ArrayDeque<>(LIMIT);
     private final ArrayDeque<Tracking> outcomes = new ArrayDeque<>(LIMIT);
     private long nextIntentId = 1;
+    private Long activeTransactionId;
+
+    /**
+     * Starts one physical player transaction.
+     *
+     * <p>The commands produced by a nine-unit right click are nine wire
+     * records but one player action. Keeping that common id is what lets the
+     * BNE comparison prove ordered group fan-out rather than nine unrelated
+     * single-unit commands.
+     */
+    synchronized long beginGesture(long cycle, String origin, String detail,
+            int screenX, int screenY, int tileX, int tileY, String modifiers,
+            Integer targetId, String targetShape, List<Integer> selectedUnitIds) {
+        long id = nextIntentId++;
+        activeTransactionId = id;
+        add(new Entry(id, id, cycle, "gesture", List.copyOf(selectedUnitIds),
+                null, null, new Gesture(origin, detail, screenX, screenY,
+                        tileX, tileY, modifiers, targetId, targetShape)));
+        return id;
+    }
+
+    /** Ends the named gesture without disturbing a newer nested transaction. */
+    synchronized void endGesture(long id) {
+        if (activeTransactionId != null && activeTransactionId == id) {
+            activeTransactionId = null;
+        }
+    }
 
     synchronized void selection(long cycle, List<Integer> selectedUnitIds) {
-        add(new Entry(nextIntentId++, cycle, "selection",
-                List.copyOf(selectedUnitIds), null, null));
+        long id = nextIntentId++;
+        long transactionId = activeTransactionId == null ? id : activeTransactionId;
+        add(new Entry(id, transactionId, cycle, "selection",
+                List.copyOf(selectedUnitIds), null, null, null));
     }
 
     CommandSink wrap(CommandSink destination, LongSupplier cycle,
@@ -133,7 +172,9 @@ final class PlayerIntentJournal {
             GameCommand command, Boolean accepted, State submitted,
             State targetSubmitted, State delivered, Goal goal, World world) {
         long id = nextIntentId++;
-        add(new Entry(id, cycle, "order", List.copyOf(selectedUnitIds), command, accepted));
+        long transactionId = activeTransactionId == null ? id : activeTransactionId;
+        add(new Entry(id, transactionId, cycle, "order", List.copyOf(selectedUnitIds),
+                command, accepted, null));
         if (submitted == null || command.unitId() == 0) {
             return;
         }
@@ -152,7 +193,7 @@ final class PlayerIntentJournal {
                 }
             }
         }
-        Tracking tracking = new Tracking(id, cycle, command, accepted,
+        Tracking tracking = new Tracking(id, transactionId, cycle, command, accepted,
                 submitted, targetSubmitted, goal);
         tracking.latest = delivered == null ? submitted : delivered;
         if (Boolean.FALSE.equals(accepted)) {
@@ -445,7 +486,8 @@ final class PlayerIntentJournal {
         List<Outcome> result = new ArrayList<>(outcomes.size());
         for (Tracking tracking : outcomes) {
             State latest = tracking.latest == null ? absent() : tracking.latest;
-            result.add(new Outcome(tracking.intentId, tracking.submittedCycle,
+            result.add(new Outcome(tracking.intentId, tracking.transactionId,
+                    tracking.submittedCycle,
                     tracking.command.unitId(), tracking.command.kind().name(),
                     tracking.accepted, tracking.firstProgressCycle,
                     tracking.terminalCycle, tracking.terminalReason,

@@ -1287,11 +1287,19 @@ final class GameScreen extends JPanel {
     private void clickMinimap(int x, int y, boolean rightButton, Modifiers keys) {
         int[] tile = SidePanel.tileAt(toDesign(x), toDesign(y),
                 world.map().width(), world.map().height());
-        if (rightButton) {
-            commandSelected(tile[0], tile[1], keys);
-            clickFeedback(tile[0], tile[1]);
-        } else {
-            centreOn(tile[0], tile[1]);
+        Unit under = world.unitAt(tile[0], tile[1]);
+        long transaction = beginPlayerGesture("minimap",
+                rightButton ? "right-click" : "left-click",
+                x, y, tile[0], tile[1], keys, under);
+        try {
+            if (rightButton) {
+                commandSelected(tile[0], tile[1], under, keys);
+                clickFeedback(tile[0], tile[1]);
+            } else {
+                centreOn(tile[0], tile[1]);
+            }
+        } finally {
+            intents.endGesture(transaction);
         }
     }
 
@@ -1394,20 +1402,27 @@ final class GameScreen extends JPanel {
                                     || shown.upgradingTo() != null)
                             && SidePanel.productionBounds().contains(
                                     toDesign(event.getX()), toDesign(event.getY()))) {
-                        // Through the sink, like the three cancel buttons in
-                        // the command grid that mean the same three things.
-                        if (shown.producing() != null) {
-                            commands.issue(GameCommand.cancelTraining(
-                                    localPlayer, shown.id()));
-                            status = "Training cancelled.";
-                        } else if (shown.upgradingTo() != null) {
-                            commands.issue(GameCommand.cancelUpgradeTo(
-                                    localPlayer, shown.id()));
-                            status = "Upgrade cancelled.";
-                        } else {
-                            commands.issue(GameCommand.cancelResearch(
-                                    localPlayer, shown.id()));
-                            status = "Research cancelled.";
+                        long transaction = beginPlayerGesture("command-panel",
+                                "production-slot", event.getX(), event.getY(),
+                                -1, -1, Modifiers.of(event), shown);
+                        try {
+                            // Through the sink, like the three cancel buttons in
+                            // the command grid that mean the same three things.
+                            if (shown.producing() != null) {
+                                commands.issue(GameCommand.cancelTraining(
+                                        localPlayer, shown.id()));
+                                status = "Training cancelled.";
+                            } else if (shown.upgradingTo() != null) {
+                                commands.issue(GameCommand.cancelUpgradeTo(
+                                        localPlayer, shown.id()));
+                                status = "Upgrade cancelled.";
+                            } else {
+                                commands.issue(GameCommand.cancelResearch(
+                                        localPlayer, shown.id()));
+                                status = "Research cancelled.";
+                            }
+                        } finally {
+                            intents.endGesture(transaction);
                         }
                         repaint();
                         return;
@@ -1441,9 +1456,16 @@ final class GameScreen extends JPanel {
                         Unit aboard = commandPanel.cargoAt(
                                 toDesign(event.getX()), toDesign(event.getY()));
                         if (aboard != null && selected != null) {
-                            commands.issue(GameCommand.unloadOne(
-                                    localPlayer, selected.id(), aboard.id()));
-                            status = "";
+                            long transaction = beginPlayerGesture("command-panel",
+                                    "passenger", event.getX(), event.getY(),
+                                    -1, -1, Modifiers.of(event), aboard);
+                            try {
+                                commands.issue(GameCommand.unloadOne(
+                                        localPlayer, selected.id(), aboard.id()));
+                                status = "";
+                            } finally {
+                                intents.endGesture(transaction);
+                            }
                             repaint();
                             return;
                         }
@@ -1453,7 +1475,14 @@ final class GameScreen extends JPanel {
                             // Control, or command on a Mac keyboard that has
                             // no comfortable control: KeyModifiers &
                             // ModifierControl in DoClicked_SpellCast.
-                            press(button, event.isControlDown() || event.isMetaDown());
+                            long transaction = beginPlayerGesture("command-panel",
+                                    button.action(), event.getX(), event.getY(),
+                                    -1, -1, Modifiers.of(event), selected);
+                            try {
+                                press(button, event.isControlDown() || event.isMetaDown());
+                            } finally {
+                                intents.endGesture(transaction);
+                            }
                             repaint();
                         }
                     }
@@ -1468,7 +1497,14 @@ final class GameScreen extends JPanel {
                 // it lands.
                 if (event.isAltDown()
                         && !javax.swing.SwingUtilities.isRightMouseButton(event)) {
-                    ping(tileX, tileY);
+                    long transaction = beginPlayerGesture("field", "ping",
+                            event.getX(), event.getY(), tileX, tileY,
+                            Modifiers.of(event), unitUnder(event.getX(), event.getY()));
+                    try {
+                        ping(tileX, tileY);
+                    } finally {
+                        intents.endGesture(transaction);
+                    }
                     repaint();
                     return;
                 }
@@ -1489,14 +1525,36 @@ final class GameScreen extends JPanel {
                             commandPanel.resetLevel();
                         }
                     } else {
-                        commandSelected(tileX, tileY,
-                                unitUnder(event.getX(), event.getY()), Modifiers.of(event));
+                        Unit under = unitUnder(event.getX(), event.getY());
+                        Modifiers modifiers = Modifiers.of(event);
+                        long transaction = beginPlayerGesture("field", "right-click",
+                                event.getX(), event.getY(), tileX, tileY,
+                                modifiers, under);
+                        try {
+                            commandSelected(tileX, tileY, under, modifiers);
+                        } finally {
+                            intents.endGesture(transaction);
+                        }
                     }
                 } else if (placing != null) {
-                    placeBuilding(tileX, tileY, event.isShiftDown());
+                    long transaction = beginPlayerGesture("field", "place-building",
+                            event.getX(), event.getY(), tileX, tileY,
+                            Modifiers.of(event), unitUnder(event.getX(), event.getY()));
+                    try {
+                        placeBuilding(tileX, tileY, event.isShiftDown());
+                    } finally {
+                        intents.endGesture(transaction);
+                    }
                 } else if (pendingAction != null) {
-                    aimPendingAction(tileX, tileY,
-                            unitUnder(event.getX(), event.getY()), event.isShiftDown());
+                    Unit under = unitUnder(event.getX(), event.getY());
+                    long transaction = beginPlayerGesture("field", "aim-" + pendingAction,
+                            event.getX(), event.getY(), tileX, tileY,
+                            Modifiers.of(event), under);
+                    try {
+                        aimPendingAction(tileX, tileY, under, event.isShiftDown());
+                    } finally {
+                        intents.endGesture(transaction);
+                    }
                 } else {
                     bandStartX = event.getX();
                     bandStartY = event.getY();
@@ -1511,12 +1569,20 @@ final class GameScreen extends JPanel {
                     // toggles the type into the selection rather than
                     // replacing it, which is ToggleUnitsByType.
                     boolean control = event.isControlDown() || event.isMetaDown();
-                    if (event.getClickCount() >= 2 || control) {
-                        selectAllOfTypeOnScreen(unitUnder(event.getX(), event.getY()),
-                                event.isShiftDown());
-                    } else {
-                        selectUnit(unitUnder(event.getX(), event.getY()),
-                                event.isShiftDown());
+                    Unit under = unitUnder(event.getX(), event.getY());
+                    long transaction = beginPlayerGesture("field",
+                            event.getClickCount() >= 2 ? "double-select"
+                                    : control ? "type-select" : "select",
+                            event.getX(), event.getY(), tileX, tileY,
+                            Modifiers.of(event), under);
+                    try {
+                        if (event.getClickCount() >= 2 || control) {
+                            selectAllOfTypeOnScreen(under, event.isShiftDown());
+                        } else {
+                            selectUnit(under, event.isShiftDown());
+                        }
+                    } finally {
+                        intents.endGesture(transaction);
                     }
                 }
                 repaint();
@@ -1531,7 +1597,16 @@ final class GameScreen extends JPanel {
                 java.awt.Rectangle dragged = band;
                 band = null;
                 if (dragged != null && dragged.width > 4 && dragged.height > 4) {
-                    selectWithin(dragged, event.isShiftDown());
+                    int tileX = worldX(event.getX()) / TILE;
+                    int tileY = worldY(event.getY()) / TILE;
+                    long transaction = beginPlayerGesture("field", "band-select",
+                            event.getX(), event.getY(), tileX, tileY,
+                            Modifiers.of(event), null);
+                    try {
+                        selectWithin(dragged, event.isShiftDown());
+                    } finally {
+                        intents.endGesture(transaction);
+                    }
                 }
                 repaint();
             }
@@ -3082,6 +3157,65 @@ final class GameScreen extends JPanel {
         }
     }
 
+    /** Starts the causal receipt for one physical input before it can fan out. */
+    private long beginPlayerGesture(String origin, String detail,
+            int screenX, int screenY, int tileX, int tileY, Modifiers keys,
+            Unit target) {
+        return intents.beginGesture(world.cycle(), origin, detail,
+                screenX, screenY, tileX, tileY, modifierLabel(keys),
+                target == null ? null : target.id(), targetShape(tileX, tileY, target),
+                selectedIds());
+    }
+
+    private String targetShape(int tileX, int tileY, Unit target) {
+        if (target != null && target.type() != null) {
+            if (target.type().wall()) {
+                return "wall";
+            }
+            if (target.type().ident().contains("oil-patch")) {
+                return "oil-patch";
+            }
+            if (target.type().maxOnBoard() > 0) {
+                return "transport";
+            }
+            return target.type().building() ? "building" : "unit";
+        }
+        if (!world.map().contains(tileX, tileY)) {
+            return "chrome";
+        }
+        var field = world.map().field(tileX, tileY);
+        if (field.isForest()) {
+            return "trees";
+        }
+        if (field.isWall()) {
+            return "wall";
+        }
+        if (field.hasFlag(net.chonkbase.chonkcraft.engine.map.TileFlag.COAST_ALLOWED)) {
+            return "shore";
+        }
+        if (field.isWaterPassable()) {
+            return "water";
+        }
+        return field.isOccupied() ? "occupied-ground" : "open-ground";
+    }
+
+    private static String modifierLabel(Modifiers keys) {
+        if (keys == null || !keys.shift() && !keys.control() && !keys.alt()) {
+            return "plain";
+        }
+        java.util.List<String> held = new java.util.ArrayList<>(3);
+        if (keys.shift()) {
+            held.add("shift");
+        }
+        if (keys.control()) {
+            held.add("control");
+        }
+        if (keys.alt()) {
+            held.add("alt");
+        }
+        return String.join("+", held);
+    }
+
     private String rightClick(Unit unit, int tileX, int tileY, Unit under, Modifiers keys) {
         boolean queued = keys.shift();
         // The three modifier branches, in upstream's order and at the top of
@@ -3909,7 +4043,7 @@ final class GameScreen extends JPanel {
             var result = PlaytestEvidence.write(new PlaytestEvidence.Request(
                     world, captureFrame(), selected, localPlayer, cameraX, cameraY,
                     focusX, focusY, saveMapPath, saveCampaign, saveMission,
-                    triggers == null ? null : triggers.armedTriggers(),
+                    triggers == null ? null : triggers.savedState(),
                     evidenceDirectory(), java.time.Instant.now(), intents.snapshot(),
                     intents.outcomeSnapshot()));
             return "evidence saved " + result.directory().getFileName()
@@ -4587,8 +4721,12 @@ final class GameScreen extends JPanel {
         }
         try {
             java.nio.file.Path file = saveDirectory().resolve(saveName() + SaveGame.SUFFIX);
-            SaveGame.write(world, saveMapPath, saveCampaign, saveMission,
-                    triggers == null ? null : triggers.armedTriggers(), file);
+            if (triggers == null) {
+                SaveGame.write(world, saveMapPath, saveCampaign, saveMission, file);
+            } else {
+                SaveGame.writeWithTriggers(world, saveMapPath, saveCampaign, saveMission,
+                        triggers.savedState(), file);
+            }
             return "saved to " + file.getFileName();
         } catch (java.io.IOException e) {
             return "could not save: " + e.getMessage();

@@ -412,6 +412,20 @@ class SelectionChangeTest {
                 "a right click on the minimap moved the camera");
         assertEquals(cameraYAfterLeft, scene.screen().cameraY(),
                 "a right click on the minimap moved the camera");
+
+        List<PlayerIntentJournal.Entry> journal = scene.screen().intentEntriesForTest();
+        List<PlayerIntentJournal.Entry> minimap = journal.stream()
+                .filter(entry -> entry.gesture() != null
+                        && "minimap".equals(entry.gesture().origin()))
+                .toList();
+        assertEquals(2, minimap.size(),
+                "both physical minimap clicks must be retained as transactions");
+        PlayerIntentJournal.Entry order = journal.stream()
+                .filter(entry -> entry.command() != null)
+                .reduce((first, second) -> second).orElseThrow();
+        assertEquals(minimap.get(1).transactionId(), order.transactionId(),
+                "the minimap gesture and its fanned-out order were disconnected");
+        assertEquals("plain", minimap.get(1).gesture().modifiers());
     }
 
     /** Clicks near the far corner of the real minimap through the screen listener. */

@@ -16,6 +16,7 @@ import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.MapField;
 import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.save.SaveGame;
+import net.chonkbase.chonkcraft.engine.trigger.TriggerSystem;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 
 /** Writes the complete, resumable evidence bundle behind the playtest hotkey. */
@@ -32,7 +33,7 @@ final class PlaytestEvidence {
     record Request(World world, BufferedImage screenshot, Unit selected,
             int localPlayer, int cameraX, int cameraY, int focusX, int focusY,
             String mapPath, String campaign, int mission,
-            List<Integer> armedTriggers, Path root, Instant createdAt,
+            TriggerSystem.SavedState triggerState, Path root, Instant createdAt,
             List<PlayerIntentJournal.Entry> playerIntents,
             List<PlayerIntentJournal.Outcome> playerOutcomes) {}
 
@@ -53,8 +54,13 @@ final class PlaytestEvidence {
         if (!ImageIO.write(request.screenshot(), "png", screenshot.toFile())) {
             throw new IOException("PNG writer unavailable");
         }
-        SaveGame.write(request.world(), request.mapPath(), request.campaign(), request.mission(),
-                request.armedTriggers(), save);
+        if (request.triggerState() == null) {
+            SaveGame.write(request.world(), request.mapPath(), request.campaign(),
+                    request.mission(), save);
+        } else {
+            SaveGame.writeWithTriggers(request.world(), request.mapPath(), request.campaign(),
+                    request.mission(), request.triggerState(), save);
+        }
 
         List<Unit> units = nearbyUnits(request);
         List<Missile> missiles = nearbyMissiles(request);
@@ -160,9 +166,26 @@ final class PlaytestEvidence {
         for (int index = 0; index < safe.size(); index++) {
             PlayerIntentJournal.Entry entry = safe.get(index);
             out.append("    {\"intent_id\": ").append(entry.id())
+                    .append(", \"transaction_id\": ").append(entry.transactionId())
                     .append(", \"cycle\": ").append(entry.cycle())
                     .append(", \"event\": ").append(quote(entry.event()))
                     .append(", \"selected_unit_ids\": ").append(entry.selectedUnitIds());
+            if (entry.gesture() != null) {
+                var gesture = entry.gesture();
+                out.append(", \"gesture\": {\"origin\": ")
+                        .append(quote(gesture.origin()))
+                        .append(", \"detail\": ").append(quote(gesture.detail()))
+                        .append(", \"screen_x\": ").append(gesture.screenX())
+                        .append(", \"screen_y\": ").append(gesture.screenY())
+                        .append(", \"tile_x\": ").append(gesture.tileX())
+                        .append(", \"tile_y\": ").append(gesture.tileY())
+                        .append(", \"modifiers\": ").append(quote(gesture.modifiers()))
+                        .append(", \"target_id\": ")
+                        .append(gesture.targetId() == null ? "null" : gesture.targetId())
+                        .append(", \"target_shape\": ")
+                        .append(quote(gesture.targetShape()))
+                        .append('}');
+            }
             if (entry.command() != null) {
                 var command = entry.command();
                 out.append(", \"command\": {\"kind\": ")
@@ -173,7 +196,9 @@ final class PlaytestEvidence {
                         .append(", \"y\": ").append(command.y())
                         .append(", \"target_id\": ").append(command.targetId())
                         .append(", \"type_index\": ").append(command.typeIndex())
-                        .append(", \"queued\": ").append(command.queued()).append('}');
+                        .append(", \"queued\": ").append(command.queued())
+                        .append(", \"wire_hex\": ").append(quote(wireHex(command)))
+                        .append('}');
             }
             if (entry.accepted() != null) {
                 out.append(", \"accepted\": ").append(entry.accepted());
@@ -190,6 +215,7 @@ final class PlaytestEvidence {
         for (int index = 0; index < safe.size(); index++) {
             PlayerIntentJournal.Outcome outcome = safe.get(index);
             out.append("    {\"intent_id\": ").append(outcome.intentId())
+                    .append(", \"transaction_id\": ").append(outcome.transactionId())
                     .append(", \"submitted_cycle\": ").append(outcome.submittedCycle())
                     .append(", \"unit_id\": ").append(outcome.unitId())
                     .append(", \"command\": ").append(quote(outcome.command()))
@@ -210,6 +236,19 @@ final class PlaytestEvidence {
                     .append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
         }
         out.append("  ]");
+    }
+
+    /** The exact ChonkCraft lockstep record retained beside the normalized fields. */
+    private static String wireHex(
+            net.chonkbase.chonkcraft.engine.network.GameCommand command) {
+        java.nio.ByteBuffer bytes = java.nio.ByteBuffer.allocate(
+                net.chonkbase.chonkcraft.engine.network.GameCommand.WIRE_BYTES);
+        command.writeTo(bytes);
+        StringBuilder hex = new StringBuilder(bytes.position() * 2);
+        for (int index = 0; index < bytes.position(); index++) {
+            hex.append(String.format("%02x", bytes.array()[index] & 0xff));
+        }
+        return hex.toString();
     }
 
     private static void appendUnit(StringBuilder out, World world, Unit unit) {
