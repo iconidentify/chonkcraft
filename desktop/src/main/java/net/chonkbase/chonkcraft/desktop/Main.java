@@ -885,7 +885,7 @@ public final class Main {
             // lose the same mission on a condition it has already spent, so
             // the save's list of survivors is put back before anything else
             // runs.
-            mission.triggers().retainArmed(LoadGame.armedTriggers(script));
+            mission.triggers().restoreState(LoadGame.triggerState(script));
             // The mission script populated the world from the map; the save is
             // about to say where everything actually stands, so clear it.
             clearUnits(mission.world());

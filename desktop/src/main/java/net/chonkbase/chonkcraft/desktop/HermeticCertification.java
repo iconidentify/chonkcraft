@@ -72,10 +72,10 @@ public final class HermeticCertification {
         check(running.triggers().failures().isEmpty(), "mission trigger failed while ticking");
 
         StringWriter saved = new StringWriter();
-        SaveGame.write(saveSubject.world(), "campaigns/human/level01h", "human", 1,
-                saveSubject.triggers().armedTriggers(), saved);
+        SaveGame.writeWithTriggers(saveSubject.world(), "campaigns/human/level01h", "human", 1,
+                saveSubject.triggers().savedState(), saved);
         String document = saved.toString();
-        check(document.startsWith("SaveFormat(\"chonkcraft-save\", 3)"),
+        check(document.startsWith("SaveFormat(\"chonkcraft-save\", 4)"),
                 "native save schema missing");
         LoadGame.Header header = require(LoadGame.header(document), "save header");
         check("campaigns/human/level01h".equals(header.mapPath()), "save map changed");
