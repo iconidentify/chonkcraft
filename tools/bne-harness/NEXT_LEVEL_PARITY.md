@@ -54,11 +54,14 @@ mouse/key/minimap gesture
 `PlayerIntentJournal` now assigns one transaction ID across every command in a
 group fan-out. `GameScreen` records field, minimap and command-panel origins,
 modifiers, screen/tile coordinates, target shape, selection order and wire
-bytes. Keyboard button dispatch does not yet begin a gesture, so the manifest
-names it as required hook debt and overall certification remains red; aimed
-hotkeys also need the transaction to remain open through the later field
-click. Pre-wire production refusal journaling is a second required hook debt.
-These debts stay RED even if every currently observable cell compares exact.
+bytes. A command hotkey begins a `keyboard` gesture and keeps that same
+transaction open through an aimed field click. Build, train, research and
+upgrade-to refusals that never reach a wire command now journal the family,
+`queued=false`, reason and Notify acknowledgement. Coverage retires those two
+required-route debts only when receipts actually contain those observations;
+the 532-cell matrix is unchanged. Native layered hooks for the same two
+routes, plus target, wire, progress and terminal layers on field/plain/move,
+remain open, so certification stays red.
 `bne_player_transaction.py` compiles observed facts without silently
 turning a per-unit order into proof of a physical transaction. Schema 2 names
 all eight layers independently. The older native `DoRightButton` hook proves

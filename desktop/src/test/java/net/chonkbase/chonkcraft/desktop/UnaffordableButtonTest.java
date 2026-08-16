@@ -280,6 +280,55 @@ class UnaffordableButtonTest {
     }
 
     @Test
+    @DisplayName("a command hotkey begins one player transaction")
+    void aCommandHotkeyBeginsOnePlayerTransaction() {
+        Scene scene = scene();
+        Unit hall = find(scene, "unit-town-hall");
+        scene.screen().selectForTest(hall);
+        grid(scene);
+        UnitButton train = button(scene, hall, "train-unit", "unit-peasant");
+        assertNotNull(train.key(), "the shipped peasant button has no hotkey");
+
+        assertTrue(scene.screen().typed(train.key().charAt(0)),
+                "the peasant hotkey did not reach the command panel");
+
+        List<PlayerIntentJournal.Entry> journal = scene.screen().intentEntriesForTest();
+        assertTrue(journal.stream().anyMatch(entry ->
+                        "gesture".equals(entry.event())
+                                && entry.gesture() != null
+                                && "keyboard".equals(entry.gesture().origin())),
+                "typing the train key must begin a keyboard transaction, not a "
+                        + "silent press: " + journal);
+    }
+
+    @Test
+    @DisplayName("an unaffordable train hotkey journals the pre-wire refusal")
+    void anUnaffordableTrainHotkeyJournalsThePreWireRefusal() {
+        Scene scene = scene();
+        Unit hall = find(scene, "unit-town-hall");
+        broke(scene, 0);
+        scene.screen().selectForTest(hall);
+        grid(scene);
+        UnitButton train = button(scene, hall, "train-unit", "unit-peasant");
+        assertTrue(scene.screen().typed(train.key().charAt(0)),
+                "the peasant hotkey was ignored");
+
+        List<PlayerIntentJournal.Decision> decisions = scene.screen().intentDecisionsForTest();
+        List<PlayerIntentJournal.Feedback> feedback = scene.screen().intentFeedbackForTest();
+        assertEquals(1, decisions.size(),
+                "the refused train must be journaled without a wire command: "
+                        + decisions);
+        assertEquals("train", decisions.getFirst().family());
+        assertEquals(false, decisions.getFirst().accepted());
+        assertEquals(false, decisions.getFirst().queued());
+        assertEquals(recovered(scene, NOT_ENOUGH_GOLD), decisions.getFirst().reason());
+        assertEquals(1, feedback.size(), "CheckCosts Notify is the acknowledgement");
+        assertEquals(true, feedback.getFirst().acknowledged());
+        assertTrue(scene.screen().intentOutcomesForTest().isEmpty(),
+                "a pre-wire refusal must not invent a unit order");
+    }
+
+    @Test
     @DisplayName("the status line never claims a simulation-rejected training order")
     void aRejectedTrainingCommandIsNotReportedAsAccepted() {
         Scene scene = scene();

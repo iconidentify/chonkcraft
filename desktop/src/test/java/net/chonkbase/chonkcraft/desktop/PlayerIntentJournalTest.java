@@ -18,6 +18,31 @@ import org.junit.jupiter.api.Test;
 class PlayerIntentJournalTest {
 
     @Test
+    @DisplayName("a pre-wire refusal stays on the open transaction")
+    void aPreWireRefusalStaysOnTheOpenTransaction() {
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        long transaction = journal.beginGesture(42, "command-panel", "train-unit",
+                600, 400, -1, -1, "plain", 7, "building", List.of(7));
+        journal.recordDecision(42, false, "train", false,
+                "Not enough gold...mine more gold.");
+        journal.recordFeedback(42, true, "voice",
+                "Not enough gold...mine more gold.");
+        journal.endGesture(transaction);
+
+        List<PlayerIntentJournal.Decision> decisions = journal.decisionSnapshot();
+        List<PlayerIntentJournal.Feedback> feedback = journal.feedbackSnapshot();
+        assertEquals(1, decisions.size(), "the refused train must stay on the journal");
+        assertEquals(transaction, decisions.getFirst().transactionId());
+        assertEquals("train", decisions.getFirst().family());
+        assertEquals(false, decisions.getFirst().accepted());
+        assertEquals(false, decisions.getFirst().queued());
+        assertEquals("Not enough gold...mine more gold.", decisions.getFirst().reason());
+        assertEquals(1, feedback.size(), "retail Notify is the acknowledgement");
+        assertEquals(true, feedback.getFirst().acknowledged());
+        assertEquals("voice", feedback.getFirst().mode());
+    }
+
+    @Test
     @DisplayName("one group click keeps every fanned-out order in one transaction")
     void oneGroupClickKeepsEveryFannedOutOrderInOneTransaction() {
         PlayerIntentJournal journal = new PlayerIntentJournal();

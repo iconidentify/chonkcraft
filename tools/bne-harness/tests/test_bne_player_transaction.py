@@ -524,6 +524,95 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertEqual("blocked-on-hook", blocked["status"])
         self.assertTrue(any("minimap" in debt for debt in blocked["hook_debt"]))
 
+    def test_required_route_debt_clears_only_when_the_hooks_are_observed(self):
+        requirements = production_requirements()
+        empty = transaction.coverage(
+            [transaction.compile_evidence(evidence(second_unit=False), source="java")],
+            requirements)
+        self.assertEqual(
+            ["keyboard-command-hotkeys", "production-prewire-refusal-decision"],
+            [item["id"] for item in empty["capture_plan"]["required_route_hook_debt"]],
+            "invented coverage must not drop the required keyboard or pre-wire hooks")
+        self.assertEqual(532, empty["fixed_cell_count"])
+
+        keyboard = evidence(second_unit=False)
+        keyboard["player_intents"][0]["gesture"]["origin"] = "keyboard"
+        keyboard["player_intents"][0]["gesture"]["detail"] = "hotkey-s"
+        keyboard_report = transaction.coverage(
+            [transaction.compile_evidence(keyboard, source="java")], requirements)
+        self.assertEqual(
+            ["production-prewire-refusal-decision"],
+            [item["id"] for item in
+             keyboard_report["capture_plan"]["required_route_hook_debt"]],
+            "a keyboard-origin gesture is the hotkey hook, not the pre-wire refusal")
+
+        refusal = {
+            "authority": authority("java"),
+            "map_path": "maps/test.pud",
+            "campaign": None,
+            "mission": 0,
+            "player_intents": [{
+                "intent_id": 1,
+                "transaction_id": 1,
+                "cycle": 10,
+                "event": "gesture",
+                "selected_unit_ids": [7],
+                "gesture": {
+                    "origin": "command-panel",
+                    "detail": "train-unit",
+                    "screen_x": 600,
+                    "screen_y": 400,
+                    "tile_x": -1,
+                    "tile_y": -1,
+                    "modifiers": "plain",
+                    "target_id": 7,
+                    "target_shape": "building",
+                },
+            }],
+            "player_decisions": [{
+                "transaction_id": 1,
+                "accepted": False,
+                "family": "train",
+                "queued": False,
+                "reason": "Not enough gold...mine more gold.",
+                "cycle": 10,
+            }],
+            "player_feedback": [{
+                "intent_id": 1,
+                "transaction_id": 1,
+                "cycle": 10,
+                "acknowledged": True,
+                "mode": "voice",
+                "detail": "Not enough gold...mine more gold.",
+            }],
+            "player_outcomes": [],
+            "unit_identities": {
+                "schema": transaction.UNIT_IDENTITY_SCHEMA,
+                "units": [{
+                    "local_id": 7,
+                    "generation": 0,
+                    "identity": {
+                        "origin": "initial", "owner": 0,
+                        "type": "town-hall", "x": 10,
+                        "y": 11, "ordinal": 0,
+                    },
+                }],
+            },
+        }
+        both = evidence(second_unit=False)
+        both["player_intents"][0]["gesture"]["origin"] = "keyboard"
+        both_receipts = [
+            transaction.compile_evidence(both, source="java"),
+            transaction.compile_evidence(refusal, source="java"),
+        ]
+        closed = transaction.coverage(both_receipts, requirements)
+        self.assertEqual(
+            [],
+            closed["capture_plan"]["required_route_hook_debt"],
+            "observed keyboard dispatch and a pre-wire production refusal must "
+            "retire those two hook debts without shrinking the 532-cell matrix")
+        self.assertEqual(532, closed["fixed_cell_count"])
+
     def test_native_capture_import_is_content_addressed(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)

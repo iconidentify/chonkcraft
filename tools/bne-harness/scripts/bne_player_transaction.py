@@ -1505,6 +1505,38 @@ def _requirements_cells(requirements: dict[str, Any]) \
     return cells
 
 
+_PREWIRE_REFUSAL_FAMILIES = frozenset({
+    "build", "train", "research", "upgrade-to",
+})
+
+
+def _required_route_observed(route: dict[str, Any],
+        transactions: list[dict[str, Any]],
+        gestures: list[dict[str, Any]]) -> bool:
+    """Return whether receipts already prove one required observation hook."""
+    route_id = route.get("id")
+    if route_id == "keyboard-command-hotkeys":
+        return any(item.get("origin") == "keyboard" for item in gestures)
+    if route_id == "production-prewire-refusal-decision":
+        for transaction in transactions:
+            decision = transaction.get("decision")
+            if not isinstance(decision, dict):
+                continue
+            reason = decision.get("reason")
+            feedback = transaction.get("feedback")
+            acknowledged = isinstance(feedback, dict) \
+                and feedback.get("acknowledged") is True
+            if decision.get("accepted") is False \
+                    and decision.get("queued") is False \
+                    and decision.get("family") in _PREWIRE_REFUSAL_FAMILIES \
+                    and isinstance(reason, str) and reason \
+                    and acknowledged \
+                    and not (transaction.get("commands") or ()):
+                return True
+        return False
+    return False
+
+
 def _transaction_cell_key(transaction: dict[str, Any]) \
         -> tuple[Any, ...] | None:
     gesture = transaction.get("gesture")
@@ -1642,11 +1674,14 @@ def coverage(receipts: list[dict[str, Any]], requirements: dict[str, Any], *,
             or not isinstance(item.get("required_hook"), str)
             for item in required_route_debt):
         raise ValueError("player requirements have invalid required route debt")
-    # These routes are product requirements, but not fixed cells until a real
-    # begin/end gesture hook exists.  Keeping them separate prevents invented
-    # keyboard rows from filling the physical matrix while also ensuring the
-    # overall certification cannot turn green by quietly omitting hotkeys.
-    missing["required_routes"] = list(required_route_debt)
+    # These routes stay off the 532-cell matrix so a keyboard row cannot
+    # invent coverage.  They still have to be observed: a receipt that never
+    # began a hotkey transaction, or never journaled a pre-wire production
+    # refusal, leaves the matching debt in place.
+    missing["required_routes"] = [
+        item for item in required_route_debt
+        if not _required_route_observed(item, transactions, gestures)
+    ]
     incomplete = [item["transaction_id"] for item in transactions
                   if item.get("commands") and not item["coverage"]["terminal"]]
     gestureless = [item["transaction_id"] for item in transactions

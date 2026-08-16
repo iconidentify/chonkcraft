@@ -787,6 +787,16 @@ final class GameScreen extends JPanel {
     private volatile String pendingSpell;
 
     /**
+     * The keyboard transaction still waiting for its aimed field click.
+     *
+     * <p>A hotkey must begin the receipt and keep it open through the later
+     * ground click. Starting a second field gesture here used to split one
+     * player action into two, so the physical lane could never prove the
+     * keyboard route.
+     */
+    private Long retainedKeyboardTransaction;
+
+    /**
      * Spell identifiers in the order the command layer numbers them.
      *
      * <p>A cast travels the wire as an index into this list, so both sides
@@ -1537,23 +1547,23 @@ final class GameScreen extends JPanel {
                         }
                     }
                 } else if (placing != null) {
-                    long transaction = beginPlayerGesture("field", "place-building",
+                    long transaction = continueOrBeginGesture("field", "place-building",
                             event.getX(), event.getY(), tileX, tileY,
                             Modifiers.of(event), unitUnder(event.getX(), event.getY()));
                     try {
                         placeBuilding(tileX, tileY, event.isShiftDown());
                     } finally {
-                        intents.endGesture(transaction);
+                        finishGesture(transaction);
                     }
                 } else if (pendingAction != null) {
                     Unit under = unitUnder(event.getX(), event.getY());
-                    long transaction = beginPlayerGesture("field", "aim-" + pendingAction,
+                    long transaction = continueOrBeginGesture("field", "aim-" + pendingAction,
                             event.getX(), event.getY(), tileX, tileY,
                             Modifiers.of(event), under);
                     try {
                         aimPendingAction(tileX, tileY, under, event.isShiftDown());
                     } finally {
-                        intents.endGesture(transaction);
+                        finishGesture(transaction);
                     }
                 } else {
                     bandStartX = event.getX();
@@ -1885,6 +1895,7 @@ final class GameScreen extends JPanel {
                 String cannotPay = what == null ? null : shortfall(what.costs());
                 if (cannotPay != null) {
                     status = cannotPay;
+                    recordProductionRefusal("build", cannotPay);
                 } else {
                     placing = what;
                     status = placing == null ? "" : "Place " + placing.name() + ".";
@@ -1916,8 +1927,10 @@ final class GameScreen extends JPanel {
                 }
                 if (index < 0) {
                     status = "Cannot train that now.";
+                    recordProductionRefusal("train", status);
                 } else if (refused != null) {
                     status = refused;
+                    recordProductionRefusal("train", refused);
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.train(localPlayer, unit.id(), index));
@@ -1934,8 +1947,10 @@ final class GameScreen extends JPanel {
                 String cannotPay = what == null ? null : shortfall(what.costs());
                 if (index < 0) {
                     status = "Cannot upgrade now.";
+                    recordProductionRefusal("upgrade-to", status);
                 } else if (cannotPay != null) {
                     status = cannotPay;
+                    recordProductionRefusal("upgrade-to", cannotPay);
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.upgradeTo(localPlayer, unit.id(), index));
@@ -1955,8 +1970,10 @@ final class GameScreen extends JPanel {
                 String cannotPay = upgrade == null ? null : shortfall(upgrade.costs());
                 if (index < 0) {
                     status = "Cannot research that now.";
+                    recordProductionRefusal("research", status);
                 } else if (cannotPay != null) {
                     status = cannotPay;
+                    recordProductionRefusal("research", cannotPay);
                 } else {
                     boolean accepted = commands.issueAccepted(
                             GameCommand.research(localPlayer, unit.id(), index));
@@ -2632,6 +2649,7 @@ final class GameScreen extends JPanel {
             // building stays on the cursor, as it does upstream, so the player
             // can gather what is missing and put it down.
             status = cannotPay;
+            recordProductionRefusal("build", cannotPay);
             return;
         }
         // On behalf of this worker, not of nobody. An on-top rule turns down a
@@ -3167,6 +3185,41 @@ final class GameScreen extends JPanel {
                 selectedIds());
     }
 
+    /**
+     * Reuses a live keyboard transaction so an aimed hotkey and its later
+     * field click stay one player action.
+     */
+    private long continueOrBeginGesture(String origin, String detail,
+            int screenX, int screenY, int tileX, int tileY, Modifiers keys,
+            Unit target) {
+        if (retainedKeyboardTransaction != null) {
+            return retainedKeyboardTransaction;
+        }
+        return beginPlayerGesture(origin, detail, screenX, screenY, tileX, tileY,
+                keys, target);
+    }
+
+    private void finishGesture(long transaction) {
+        if (retainedKeyboardTransaction != null
+                && retainedKeyboardTransaction == transaction) {
+            intents.endGesture(transaction);
+            retainedKeyboardTransaction = null;
+            return;
+        }
+        if (retainedKeyboardTransaction == null) {
+            intents.endGesture(transaction);
+        }
+    }
+
+    /**
+     * Journals a build/train/research/upgrade refusal that never reached
+     * the wire. Retail Notify is the acknowledgement.
+     */
+    private void recordProductionRefusal(String family, String reason) {
+        intents.recordDecision(world.cycle(), false, family, false, reason);
+        intents.recordFeedback(world.cycle(), true, "voice", reason);
+    }
+
     private String targetShape(int tileX, int tileY, Unit target) {
         if (target != null && target.type() != null) {
             if (target.type().wall()) {
@@ -3451,6 +3504,10 @@ final class GameScreen extends JPanel {
      * nothing at all on its root page.
      */
     boolean typed(char character) {
+        return typed(character, Modifiers.NONE);
+    }
+
+    boolean typed(char character, Modifiers keys) {
         if (commandPanel == null) {
             return false;
         }
@@ -3458,7 +3515,27 @@ final class GameScreen extends JPanel {
         if (button == null) {
             return false;
         }
-        press(button);
+        if (retainedKeyboardTransaction != null) {
+            intents.endGesture(retainedKeyboardTransaction);
+            retainedKeyboardTransaction = null;
+        }
+        long transaction = beginPlayerGesture("keyboard",
+                "hotkey-" + Character.toLowerCase(character),
+                0, 0,
+                selected == null ? -1 : selected.tileX(),
+                selected == null ? -1 : selected.tileY(),
+                keys == null ? Modifiers.NONE : keys, selected);
+        boolean retain = false;
+        try {
+            press(button, keys != null && keys.control());
+            retain = placing != null || pendingAction != null || pendingSpell != null;
+        } finally {
+            if (retain) {
+                retainedKeyboardTransaction = transaction;
+            } else {
+                intents.endGesture(transaction);
+            }
+        }
         repaint();
         return true;
     }
@@ -3563,6 +3640,14 @@ final class GameScreen extends JPanel {
         return intents.outcomeSnapshot();
     }
 
+    java.util.List<PlayerIntentJournal.Decision> intentDecisionsForTest() {
+        return intents.decisionSnapshot();
+    }
+
+    java.util.List<PlayerIntentJournal.Feedback> intentFeedbackForTest() {
+        return intents.feedbackSnapshot();
+    }
+
     /** Samples the causal result of every command after the world advances. */
     void observePlayerIntents() {
         intents.observe(world.cycle(), world);
@@ -3575,6 +3660,10 @@ final class GameScreen extends JPanel {
      * a key that sits next to the ones used for scrolling.
      */
     void cancelPending() {
+        if (retainedKeyboardTransaction != null) {
+            intents.endGesture(retainedKeyboardTransaction);
+            retainedKeyboardTransaction = null;
+        }
         if (placing == null && pendingAction == null) {
             commandPanel.resetLevel();
             return;
@@ -3909,7 +3998,7 @@ final class GameScreen extends JPanel {
         // Then a command hotkey: the panel's keys take precedence over
         // scrolling, so pressing "s" on a selected unit stops it rather than
         // scrolling south.
-        if (typed(event.getKeyChar())) {
+        if (typed(event.getKeyChar(), new Modifiers(event.isShiftDown(), control, alt))) {
             return true;
         }
         keyDown(code, true);

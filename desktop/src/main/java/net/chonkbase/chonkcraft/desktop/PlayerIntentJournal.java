@@ -21,6 +21,17 @@ final class PlayerIntentJournal {
             int tileX, int tileY, String modifiers, Integer targetId,
             String targetShape) {}
 
+    /**
+     * A pre-wire UI decision, such as refusing to train because the bank
+     * cannot pay. Those clicks never become a {@link GameCommand}.
+     */
+    record Decision(long transactionId, long cycle, boolean accepted,
+            String family, boolean queued, String reason) {}
+
+    /** Voice or status acknowledgement attached to one intent. */
+    record Feedback(long intentId, long transactionId, long cycle,
+            boolean acknowledged, String mode, String detail) {}
+
     record Entry(long id, long transactionId, long cycle, String event,
             List<Integer> selectedUnitIds, GameCommand command, Boolean accepted,
             Gesture gesture) {}
@@ -100,6 +111,8 @@ final class PlayerIntentJournal {
 
     private final ArrayDeque<Entry> entries = new ArrayDeque<>(LIMIT);
     private final ArrayDeque<Tracking> outcomes = new ArrayDeque<>(LIMIT);
+    private final ArrayDeque<Decision> decisions = new ArrayDeque<>(LIMIT);
+    private final ArrayDeque<Feedback> feedbacks = new ArrayDeque<>(LIMIT);
     private long nextIntentId = 1;
     private Long activeTransactionId;
 
@@ -127,6 +140,50 @@ final class PlayerIntentJournal {
         if (activeTransactionId != null && activeTransactionId == id) {
             activeTransactionId = null;
         }
+    }
+
+    /** The transaction still waiting for an aimed click, or {@code null}. */
+    synchronized Long activeTransaction() {
+        return activeTransactionId;
+    }
+
+    /**
+     * Records a UI decision that never became a wire command.
+     *
+     * <p>DoClicked_Train / Research / UpgradeTo / Build notify and return
+     * before SendCommand when the bank or the food table refuses. The
+     * physical lane needs that refusal on the same transaction as the
+     * button or hotkey, not a later invented wire row.
+     */
+    synchronized void recordDecision(long cycle, boolean accepted, String family,
+            boolean queued, String reason) {
+        if (activeTransactionId == null || family == null || family.isBlank()) {
+            return;
+        }
+        while (decisions.size() >= LIMIT) {
+            decisions.removeFirst();
+        }
+        decisions.addLast(new Decision(activeTransactionId, cycle, accepted,
+                family, queued, reason == null ? "" : reason));
+    }
+
+    /**
+     * Records the voice or status acknowledgement for the open transaction.
+     *
+     * <p>Retail {@code Notify} is how CheckCosts and CheckLimits talk. A
+     * missing acknowledgement would make a pre-wire refusal look like the
+     * click vanished.
+     */
+    synchronized void recordFeedback(long cycle, boolean acknowledged, String mode,
+            String detail) {
+        if (activeTransactionId == null) {
+            return;
+        }
+        while (feedbacks.size() >= LIMIT) {
+            feedbacks.removeFirst();
+        }
+        feedbacks.addLast(new Feedback(activeTransactionId, activeTransactionId,
+                cycle, acknowledged, mode, detail));
     }
 
     synchronized void selection(long cycle, List<Integer> selectedUnitIds) {
@@ -488,6 +545,14 @@ final class PlayerIntentJournal {
 
     synchronized List<Entry> snapshot() {
         return List.copyOf(new ArrayList<>(entries));
+    }
+
+    synchronized List<Decision> decisionSnapshot() {
+        return List.copyOf(new ArrayList<>(decisions));
+    }
+
+    synchronized List<Feedback> feedbackSnapshot() {
+        return List.copyOf(new ArrayList<>(feedbacks));
     }
 
     synchronized List<Outcome> outcomeSnapshot() {
