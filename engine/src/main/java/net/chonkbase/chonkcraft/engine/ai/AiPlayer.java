@@ -721,10 +721,6 @@ public final class AiPlayer {
 
     /**
      * Opcode-3 predicates from the retail table at {@code 0x0049d8a4}.
-     * Only the worker and building gates needed for early-horizon wants are
-     * exact; force-size gates stay false until the native force counters are
-     * ported, which correctly leaves the program blocked after writing the
-     * land-force wants.
      */
     boolean battleNetPredicate(World world, int predicate, byte[] state) {
         return switch (predicate) {
@@ -740,12 +736,16 @@ public final class AiPlayer {
             case 3 -> // 0x4addcc family word >= state[0x13]
                     world.battleNetWorkerFamilyCount(playerIndex)
                             >= (state[BattleNetAiBytecode.OFF_WANTED_WORKERS] & 0xff);
-            // Native force-size gates read the assigned-force counters, not
-            // the live unit census. Counting soldiers used to pass
-            // 0x0d*0x0e when the multiplier was still 0, so Orc 5 player 1
-            // walked past WAIT-UNTIL 4 (PC 7091) while retail stays on
-            // 7089 and fails the gate every independent choice through 200.
-            case 4, 5, 6 -> false;
+            // Native 0x424ce0 / 0x424d10 / 0x424d40 compare the assigned
+            // domain word to state[0x0d]*[0x0e] (and the naval/air pairs).
+            // 0x4175e0 adds that word only for a fighter whose PUD marker
+            // bit at +0x5f is clear. Counting every live soldier used to
+            // open Orc 5's WAIT-UNTIL 4 -- those seven are map guards --
+            // while Orc 11's four unmarked home-base archers are why
+            // retail leaves 4275.
+            case 4, 5, 6 -> battleNetAssignedForce(world, predicate)
+                    >= battleNetForceTarget(state, forceCountOffset(predicate),
+                            forceMultiplierOffset(predicate));
             case 7 -> // any non-allied player has a worker
                     battleNetEnemyHasWorker(world);
             default -> false;
@@ -820,13 +820,42 @@ public final class AiPlayer {
         return (state[count] & 0xff) * (state[multiplier] & 0xff);
     }
 
-    private int battleNetCountForce(World world, int predicate) {
+    private static int forceCountOffset(int predicate) {
+        return switch (predicate) {
+            case 4 -> BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT;
+            case 5 -> BattleNetAiBytecode.OFF_NAVAL_FORCE_COUNT;
+            case 6 -> BattleNetAiBytecode.OFF_AIR_FORCE_COUNT;
+            default -> BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT;
+        };
+    }
+
+    private static int forceMultiplierOffset(int predicate) {
+        return switch (predicate) {
+            case 4 -> BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER;
+            case 5 -> BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER;
+            case 6 -> BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER;
+            default -> BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER;
+        };
+    }
+
+    /**
+     * Units that 0x4175e0 would add to the assigned-force word.
+     *
+     * <p>Retail skips a fighter whose PUD loader set {@code +0x5f} bit 2
+     * -- the same marker Java keeps as ready-suppressed. Map-guard
+     * towns therefore stay below the 0x0d*0x0e product even when the
+     * live roster is large.
+     */
+    private int battleNetAssignedForce(World world, int predicate) {
         int count = 0;
         for (Unit candidate : world.playerUnits(playerIndex)) {
-            if (candidate.hitPoints() > 0
-                    && battleNetCountsForForce(candidate.type(), predicate)) {
-                count++;
+            if (candidate == null || candidate.hitPoints() <= 0
+                    || !candidate.isOnMap()
+                    || candidate.battleNetReadySuppressed()
+                    || !battleNetCountsForForce(candidate.type(), predicate)) {
+                continue;
             }
+            count++;
         }
         return count;
     }

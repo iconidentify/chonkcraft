@@ -48,12 +48,16 @@ class BattleNetAiForcePredicateTest {
     }
 
     @Test
-    void forceSizeGatesStayClosedUntilAssignedForceCountersExist() {
+    void forceSizeGatesIgnoreMapGuardsAndCountUnmarkedFighters() {
         World world = world();
-        world.createUnit(fighter("unit-footman", false, false), 0, 2, 2);
-        world.createUnit(fighter("unit-archer", false, false), 0, 3, 2);
-        world.createUnit(fighter("unit-human-destroyer", true, false), 0, 4, 2);
-        world.createUnit(fighter("unit-gryphon-rider", false, true), 0, 5, 2);
+        var home = world.createUnit(fighter("unit-footman", false, false), 0, 2, 2);
+        var second = world.createUnit(fighter("unit-archer", false, false), 0, 3, 2);
+        var guard = world.createUnit(fighter("unit-knight", false, false), 0, 4, 2);
+        var ship = world.createUnit(fighter("unit-human-destroyer", true, false), 0, 5, 2);
+        var flyer = world.createUnit(fighter("unit-gryphon-rider", false, true), 0, 6, 2);
+        guard.setBattleNetReadySuppressed(true);
+        ship.setBattleNetReadySuppressed(true);
+        flyer.setBattleNetReadySuppressed(true);
         AiPlayer ai = world.enableAi(0);
         byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
         state[BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT] = 1;
@@ -62,15 +66,20 @@ class BattleNetAiForcePredicateTest {
         state[BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER] = 1;
         state[BattleNetAiBytecode.OFF_AIR_FORCE_COUNT] = 1;
         state[BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER] = 1;
+        assertTrue(ai.battleNetPredicate(world, 4, state),
+                "two unmarked home-base fighters meet a land-force product of 2");
+        home.setBattleNetReadySuppressed(true);
         assertFalse(ai.battleNetPredicate(world, 4, state),
-                "a live soldier census must not pass WAIT-UNTIL 4");
+                "a lone unmarked archer is not enough once the footman is a map guard");
         assertFalse(ai.battleNetPredicate(world, 5, state),
-                "a live ship census must not pass WAIT-UNTIL 5");
+                "a marked destroyer does not pass WAIT-UNTIL 5");
         assertFalse(ai.battleNetPredicate(world, 6, state),
-                "a live flyer census must not pass WAIT-UNTIL 6");
+                "a marked gryphon does not pass WAIT-UNTIL 6");
         assertTrue(AiPlayer.battleNetCountsForForce(
                 fighter("unit-footman", false, false), 4),
                 "a footman still belongs to the ground force domain");
+        assertTrue(second.isAlive(),
+                "the second unmarked fighter must still be on the map for the open gate");
     }
 
     @Test
