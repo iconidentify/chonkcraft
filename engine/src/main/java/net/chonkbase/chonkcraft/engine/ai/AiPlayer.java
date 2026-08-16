@@ -740,21 +740,12 @@ public final class AiPlayer {
             case 3 -> // worker count >= state[0x13]
                     battleNetCountWorkers(world)
                             >= (state[BattleNetAiBytecode.OFF_WANTED_WORKERS] & 0xff);
-            case 4 -> // ground fighters >= state[0x0d] * state[0x0e]
-                    battleNetCountForce(world, predicate)
-                            >= battleNetForceTarget(state,
-                                    BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT,
-                                    BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER);
-            case 5 -> // naval fighters >= state[0x0f] * state[0x10]
-                    battleNetCountForce(world, predicate)
-                            >= battleNetForceTarget(state,
-                                    BattleNetAiBytecode.OFF_NAVAL_FORCE_COUNT,
-                                    BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER);
-            case 6 -> // air fighters >= state[0x11] * state[0x12]
-                    battleNetCountForce(world, predicate)
-                            >= battleNetForceTarget(state,
-                                    BattleNetAiBytecode.OFF_AIR_FORCE_COUNT,
-                                    BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER);
+            // Native force-size gates read the assigned-force counters, not
+            // the live unit census. Counting soldiers used to pass
+            // 0x0d*0x0e when the multiplier was still 0, so Orc 5 player 1
+            // walked past WAIT-UNTIL 4 (PC 7091) while retail stays on
+            // 7089 and fails the gate every independent choice through 200.
+            case 4, 5, 6 -> false;
             case 7 -> // any non-allied player has a worker
                     battleNetEnemyHasWorker(world);
             default -> false;

@@ -48,7 +48,7 @@ class BattleNetAiForcePredicateTest {
     }
 
     @Test
-    void forcePredicatesCompareTheirDomainCountToBothStateFactors() {
+    void forceSizeGatesStayClosedUntilAssignedForceCountersExist() {
         World world = world();
         world.createUnit(fighter("unit-footman", false, false), 0, 2, 2);
         world.createUnit(fighter("unit-archer", false, false), 0, 3, 2);
@@ -56,20 +56,21 @@ class BattleNetAiForcePredicateTest {
         world.createUnit(fighter("unit-gryphon-rider", false, true), 0, 5, 2);
         AiPlayer ai = world.enableAi(0);
         byte[] state = new byte[BattleNetAiBytecode.STATE_BYTES];
-
         state[BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT] = 1;
         state[BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER] = 2;
-        assertTrue(ai.battleNetPredicate(world, 4, state));
-        state[BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT] = 3;
-        assertFalse(ai.battleNetPredicate(world, 4, state));
-
         state[BattleNetAiBytecode.OFF_NAVAL_FORCE_COUNT] = 1;
         state[BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER] = 1;
-        assertTrue(ai.battleNetPredicate(world, 5, state));
-
         state[BattleNetAiBytecode.OFF_AIR_FORCE_COUNT] = 1;
         state[BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER] = 1;
-        assertTrue(ai.battleNetPredicate(world, 6, state));
+        assertFalse(ai.battleNetPredicate(world, 4, state),
+                "a live soldier census must not pass WAIT-UNTIL 4");
+        assertFalse(ai.battleNetPredicate(world, 5, state),
+                "a live ship census must not pass WAIT-UNTIL 5");
+        assertFalse(ai.battleNetPredicate(world, 6, state),
+                "a live flyer census must not pass WAIT-UNTIL 6");
+        assertTrue(AiPlayer.battleNetCountsForForce(
+                fighter("unit-footman", false, false), 4),
+                "a footman still belongs to the ground force domain");
     }
 
     @Test

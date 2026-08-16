@@ -113,7 +113,14 @@ island used to open the box; Human 7 player 5 and Human 9 player 1
 keep the inverted 96-tile rectangle, while Human 7 player 2 still
 expands. Human 9 and Human 12 are exact through 200; Human 7 is
 state-identical (cycle-49 telemetry still records native's box
-rewrite bytes). That is still not every computer on every mission. A later independent
+rewrite bytes).
+
+Opcode-3 predicates 4/5/6 are assigned-force counters, not a live
+soldier census. Counting units used to pass `0x0d*0x0e` when the
+multiplier was still 0, so Orc 5 player 1 walked to PC 7091 while
+retail stays on WAIT-UNTIL 4 at 7089 (99 native fails, 0 successes
+through 200). Orc 5 is now state-identical on both computers.
+That is still not every computer on every mission. A later independent
 choice that is not opcode 3, or a launch the boundary snapshots never
 hook, remains telemetry debt. Do not change engine behavior to invent
 those events.

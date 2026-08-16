@@ -120,6 +120,23 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("an orc 5 land computer stays on the force-size wait-until")
+    void anOrc5LandComputerStaysOnTheForceSizeWaitUntil() {
+        List<AiDecisionLedger.Row> rows = emit("campaigns/orc/level05o", 4);
+        List<AiDecisionLedger.Row> player1 = rowsFor(rows, 1);
+        assertTrue(player1.size() >= 4,
+                "Orc 5 player 1 must emit the first four gameplay cycles");
+        assertEquals(7080, player1.get(0).pcOffset(),
+                "Orc 5 player 1 game-after 1 is still on the force-want SETs");
+        assertEquals(7089, player1.get(1).pcOffset(),
+                "Orc 5 player 1 stays on WAIT-UNTIL 4 after the SETs");
+        assertEquals(1, player1.get(1).waitCount(),
+                "Orc 5 player 1 yields one tick on the failed force gate");
+        assertEquals(7089, player1.get(3).pcOffset(),
+                "Orc 5 player 1 is still on WAIT-UNTIL 4 at game-after 4");
+    }
+
+    @Test
     @DisplayName("an orc 5 computer still holds the wait-until yield at cycle 1")
     void anOrc5ComputerStillHoldsTheWaitUntilYieldAtCycle1() {
         List<AiDecisionLedger.Row> rows = emit("campaigns/orc/level05o", 2);
