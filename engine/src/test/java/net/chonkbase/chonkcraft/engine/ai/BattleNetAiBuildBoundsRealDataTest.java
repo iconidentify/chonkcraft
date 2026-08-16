@@ -163,6 +163,27 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
+    @DisplayName("an expansion computer keeps the land box while its newest tanker is inside a platform")
+    void anExpansionComputerKeepsTheLandBoxWhileItsNewestTankerIsInsideAPlatform() {
+        assertBuildBox("campaigns/human-exp/levelx03h", 3, 699,
+                0x7b, 0x7e, 0x32, 0x7b);
+    }
+
+    @Test
+    @DisplayName("an expansion computer keeps the land box while its newest peon is inside a mine")
+    void anExpansionComputerKeepsTheLandBoxWhileItsNewestPeonIsInsideAMine() {
+        assertBuildBox("campaigns/human-exp/levelx03h", 0, 1049,
+                0x7b, 0x77, 0x57, 0x7b);
+    }
+
+    @Test
+    @DisplayName("an expansion computer whose newest unit shares the hall island still expands")
+    void anExpansionComputerWhoseNewestUnitSharesTheHallIslandStillExpands() {
+        assertBuildBox("campaigns/human-exp/levelx03h", 4, 699,
+                0x7b, 0x82, 0x7a, 0x7b);
+    }
+
+    @Test
     @DisplayName("a human 5 computer rewrites the land-building box on a later fifty-cycle beat")
     void aHuman5ComputerRewritesTheLandBuildingBoxOnALaterFiftyCycleBeat() {
         // Native seed-1 shrinks at 1649. Java's counted building leaves a

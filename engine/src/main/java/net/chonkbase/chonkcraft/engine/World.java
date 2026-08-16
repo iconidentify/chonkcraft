@@ -4740,13 +4740,17 @@ public final class World {
     /**
      * Whether two units share the 0x4ad650 map-component label.
      *
-     * <p>Native 0x438510 compares those words. 0x439ce0 uses that test
-     * when the unit-list head is a land piece, so a hall on another
-     * island does not open the 0x4273e0 box.
+     * <p>Native 0x438510 compares those words at the units' tiles.
+     * 0x439ce0 uses that test when the unit-list head is a land piece,
+     * so a hall on another island does not open the 0x4273e0 box. A
+     * worker inside a mine or hall is off the map but still carries the
+     * container's tile, which is why a harvest stay used to invert a
+     * box that retail kept.
      */
     public boolean battleNetSameMapComponent(Unit a, Unit b) {
-        if (a == null || b == null || !a.isOnMap() || !b.isOnMap()
-                || a.type() == null) {
+        if (a == null || b == null || a.type() == null
+                || !map.contains(a.tileX(), a.tileY())
+                || !map.contains(b.tileX(), b.tileY())) {
             return false;
         }
         boolean[] cell = battleNetConnectivityCell(a);

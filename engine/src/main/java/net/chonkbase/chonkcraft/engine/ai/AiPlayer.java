@@ -486,12 +486,19 @@ public final class AiPlayer {
      * head's type flags include {@code 0xa}, the same 0x4ad650
      * component as the head. A hall on another island used to open
      * the box; retail keeps the inverted map-size rectangle.
+     *
+     * <p>Native IsAlive is {@code !Destroyed && action != Die}. A peon
+     * inside a mine or a tanker inside a platform stays the list head,
+     * which is why a harvest stay used to invert the box: Java
+     * {@code isAlive()} also requires the unit to be on the map, so the
+     * walk fell back to an older land piece on another island.
      */
     private boolean hasGoldDepot(World world) {
         Unit head = null;
         for (Unit unit : world.units()) {
             if (unit != null && unit.player() == playerIndex
-                    && unit.isAlive()) {
+                    && unit.type() != null && !unit.destroyed()
+                    && unit.order() != Unit.Order.DYING) {
                 head = unit;
             }
         }

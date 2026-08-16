@@ -111,7 +111,11 @@ A counted building that dies a beat later in Java (Human 5 seed 1 at
 component (sea and air heads skip that test). A hall on another
 island used to open the box; Human 7 player 5 and Human 9 player 1
 keep the inverted 96-tile rectangle, while Human 7 player 2 still
-expands. Human 9 and Human 12 are exact through 200; Human 7 is
+expands. The list head is native IsAlive (`!Destroyed && action !=
+Die`), so a peon inside a mine or a tanker inside a platform stays
+the head; 0x438510 still compares that unit's stored tile. Skipping
+Removed heads used to invert XHuman 3 player 3 at 699 and player 0
+at 1049. Human 9 and Human 12 are exact through 200; Human 7 is
 state-identical (cycle-49 telemetry still records native's box
 rewrite bytes).
 
