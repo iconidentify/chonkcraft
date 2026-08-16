@@ -110,8 +110,17 @@ consumed.
 
 Human 1 and Human 4 computers SET `+0x0c=0` during install. Native
 `0x428160` already reads that byte as the builder-scan latch and skips the
-map walk when it is zero. Java now arms the latch after install. Human 4
-player 0 is exact through 200 cycles; Orc 1 player 1 stays exact.
+map walk when it is zero. Java now arms the latch after install. The current
+head conductor store materializes all 14 classic Human missions plus Orc 1
+through 1,800 cycles under one proof: Human 1, 2, 3, 6, 9, 10 and Orc 1
+are state and telemetry exact; Human 7 and 12 are state exact with
+telemetry-only first misses. The ranked state frontier is Human 13 player 0
+at 466, then Human 4 player 0 at 1,414: both are opcode-3 predicate 3
+succeeding so the PC advances two bytes while native still fails the
+wait-until. That is extra completed family-word workers, not a second
+predicate rule -- do not invert pred 3. Human 8 player 0 at 149 already has
+the `3e1656` box rewrite while native still holds `3e164f`. Human 5 player 5
+is still telemetry-only at cycle 2.
 
 The 0x4273e0 pad after the land walk is 8-bit wrapping minus 5 / plus 8,
 then a signed clamp. A 128-tile computer whose signed min never moves
