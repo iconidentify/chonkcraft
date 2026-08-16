@@ -20,10 +20,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Authenticated game-before dumps (BNE 2.02b, seed 1,
  * {@code CHONK_BNE_TRACE_AI_BUILD_STATE=1}): Orc 1 / Human 1 computers
- * have no land building and keep {@code 20,ff,ff,20}. Human 4 expands
+ * have no land building and keep {@code 20,ff,ff,20}. Orc 2 / Human 2
+ * computers have only a watch tower, so {@code 0x439ce0} returns null
+ * and the 64-tile box stays {@code 40,ff,ff,40}. Human 4 expands
  * to {@code 45,5f,5f,38} and Orc 4 to {@code 00,1a,07,00} after the
  * newest-first land walk and pad -5/+8. Sea and shore buildings stay
- * out. A computer with no land building must not receive a hall
+ * out. A computer with no gold depot must not receive a building
  * rectangle.
  */
 class BattleNetAiBuildBoundsRealDataTest {
@@ -74,6 +76,24 @@ class BattleNetAiBuildBoundsRealDataTest {
     @DisplayName("an orc 4 computer expands the land-building box")
     void anOrc4ComputerExpandsTheLandBuildingBox() {
         assertBuildBox("campaigns/orc/level04o", 1, 0, 26, 7, 0);
+    }
+
+    @Test
+    @DisplayName("an orc 2 computer keeps the inverted 64-tile build box")
+    void anOrc2ComputerKeepsTheInverted64TileBuildBox() {
+        assertBuildBox("campaigns/orc/level02o", 1, 0x40, 0xff, 0xff, 0x40);
+    }
+
+    @Test
+    @DisplayName("a human 2 computer keeps the inverted 64-tile build box")
+    void aHuman2ComputerKeepsTheInverted64TileBuildBox() {
+        assertBuildBox("campaigns/human/level02h", 0, 0x40, 0xff, 0xff, 0x40);
+    }
+
+    @Test
+    @DisplayName("a human 3 computer with farms and no hall keeps the inverted box")
+    void aHuman3ComputerWithFarmsAndNoHallKeepsTheInvertedBox() {
+        assertBuildBox("campaigns/human/level03h", 0, 0x40, 0xff, 0xff, 0x40);
     }
 
     @Test

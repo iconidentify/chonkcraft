@@ -110,10 +110,10 @@ public final class BattleNetAiBytecode {
 
     /**
      * Writes the inverted 0x4273e0 build box used when the player has no
-     * first building. Native loads map size into AL and 0xff into BL, then
+     * gold depot. Native loads map size into AL and 0xff into BL, then
      * stores minX=minY=size and maxX=maxY=-1. Orc 1 and Human 1 have no
-     * 0x4be264 head at match-ready, so the box stays 32,-1,-1,32. Human 4
-     * later expands around its hall; that walk is a separate rule.
+     * 0x4be264 hall, so the box stays 32,-1,-1,32. Orc 2 and Human 2 keep
+     * the 64-tile inverted box because their only building is a tower.
      */
     public static void installEmptyBuildBounds(byte[] state, int mapSize) {
         if (state == null || state.length < STATE_BYTES) {
@@ -130,13 +130,15 @@ public final class BattleNetAiBytecode {
     /**
      * Expands the 0x4273e0 box around land buildings, newest first.
      *
-     * <p>Native walks {@code 0x4be264[player]} (unit pool inserted at the
-     * head, so reverse creation order). A unit is skipped unless flags
-     * {@code +0x1e} are clear, type flag {@code 0x20} (building) is set, and
-     * type flags {@code 0x10800} are clear -- sea, shore, and water-sited
-     * oil platforms stay out. Updating a min skips the max on that axis.
-     * After the walk, min
-     * subtracts 5 and max adds 8, clamped to {@code [0, mapSize-1]}.
+     * <p>Native only reaches this walk when {@code 0x439ce0} finds a
+     * type-flag {@code 0x1000} hall on the player's list. It then walks
+     * {@code 0x4be264[player]} (unit pool inserted at the head, so reverse
+     * creation order). A unit is skipped unless flags {@code +0x1e} are
+     * clear, type flag {@code 0x20} (building) is set, and type flags
+     * {@code 0x10800} are clear -- sea, shore, and water-sited oil
+     * platforms stay out. Updating a min skips the max on that axis.
+     * After the walk, min subtracts 5 and max adds 8, clamped to
+     * {@code [0, mapSize-1]}.
      *
      * @param tilesNewestFirst land-building origins, newest first
      */

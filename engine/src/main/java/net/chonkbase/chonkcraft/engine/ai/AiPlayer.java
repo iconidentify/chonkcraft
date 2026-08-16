@@ -422,14 +422,21 @@ public final class AiPlayer {
         if (battleNetAiState == null || world == null) {
             return;
         }
-        // Native 0x4273e0 writes the inverted build box, then expands
-        // around land buildings when the player has a unit list. Orc 1 /
-        // Human 1 computers have no land building, so the box stays
-        // 32,-1,-1,32. Human 4 / Orc 4 expand and pad -5/+8.
+        // Native 0x4273e0 writes the inverted build box, then calls
+        // 0x439ce0 on the unit-list head. That walk requires a type-flag
+        // 0x1000 hall (CanStore gold). Orc 2 / Human 2 computers have only
+        // a watch tower, so the box used to become a tower rectangle and
+        // retail keeps the inverted map-size box, which is why the depot
+        // probe has to win before any land building is allowed to expand.
         if (world.map() != null) {
-            BattleNetAiBytecode.expandLandBuildBounds(
-                    battleNetAiState, world.map().width(),
-                    landBuildingTilesNewestFirst(world));
+            if (hasGoldDepot(world)) {
+                BattleNetAiBytecode.expandLandBuildBounds(
+                        battleNetAiState, world.map().width(),
+                        landBuildingTilesNewestFirst(world));
+            } else {
+                BattleNetAiBytecode.installEmptyBuildBounds(
+                        battleNetAiState, world.map().width());
+            }
         }
         for (int step = 0; step < 32; step++) {
             int waitBefore = BattleNetAiBytecode.waitCounter(battleNetAiState);
@@ -449,6 +456,31 @@ public final class AiPlayer {
                 return;
             }
         }
+    }
+
+    /**
+     * Whether native 0x439ce0 accepts this type as a gold depot.
+     * Type flag 0x1000 is the six-hall line; Java's CanStore gold
+     * set is exactly those six types.
+     */
+    private static boolean isGoldDepot(UnitType type) {
+        return type != null && type.storesResource(UnitType.Resource.GOLD);
+    }
+
+    /**
+     * Whether native 0x4273e0 will leave the inverted box. A computer
+     * with only a tower or farm used to expand anyway; retail's
+     * 0x439ce0 probe returns null until a live hall is on the list.
+     */
+    private boolean hasGoldDepot(World world) {
+        for (Unit unit : world.units()) {
+            if (unit == null || unit.player() != playerIndex
+                    || !unit.isAlive() || !isGoldDepot(unit.type())) {
+                continue;
+            }
+            return true;
+        }
+        return false;
     }
 
     /**
