@@ -14,6 +14,7 @@ import net.chonkbase.chonkcraft.engine.ai.AiPlayer;
 import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import net.chonkbase.chonkcraft.engine.trigger.TriggerSystem;
 
 /**
  * Reads a saved game back.
@@ -110,10 +111,18 @@ public final class LoadGame {
      *     and means "keep what the script gave you"
      */
     public static java.util.List<Integer> armedTriggers(String script) {
+        TriggerSystem.SavedState state = triggerState(script);
+        return state == null ? null : state.armed();
+    }
+
+    /** Reads the complete mutable trigger checkpoint from a version-four save. */
+    public static TriggerSystem.SavedState triggerState(String script) {
         requireSupportedFormat(script);
         NativeSaveReader reader = new NativeSaveReader();
         stubEverything(reader);
         java.util.List<Integer>[] found = new java.util.List[1];
+        java.util.List<String>[] flags = new java.util.List[1];
+        java.util.List<TriggerSystem.SavedDelay>[] delays = new java.util.List[1];
         reader.register("SetArmedTriggers", args -> {
             if (args.length > 0 && args[0] instanceof SaveTable table) {
                 java.util.List<Integer> armed = new java.util.ArrayList<>();
@@ -124,8 +133,40 @@ public final class LoadGame {
             }
             return new Object[0];
         });
+        reader.register("SetTriggerFlags", args -> {
+            if (args.length > 0 && args[0] instanceof SaveTable table) {
+                java.util.List<String> values = new java.util.ArrayList<>();
+                for (Object value : table.array()) {
+                    values.add(string(value));
+                }
+                flags[0] = values;
+            }
+            return new Object[0];
+        });
+        reader.register("SetTriggerDelays", args -> {
+            if (args.length > 0 && args[0] instanceof SaveTable table) {
+                if (table.array().size() % 2 != 0) {
+                    throw new IllegalArgumentException("odd saved trigger delay table");
+                }
+                java.util.List<TriggerSystem.SavedDelay> values =
+                        new java.util.ArrayList<>();
+                for (int index = 0; index < table.array().size(); index += 2) {
+                    values.add(new TriggerSystem.SavedDelay(
+                            integer(table.array().get(index)),
+                            integer(table.array().get(index + 1))));
+                }
+                delays[0] = values;
+            }
+            return new Object[0];
+        });
         run(reader, script);
-        return found[0];
+        if (found[0] == null && flags[0] == null && delays[0] == null) {
+            return null;
+        }
+        return new TriggerSystem.SavedState(
+                found[0] == null ? java.util.List.of() : found[0],
+                flags[0] == null ? java.util.List.of() : flags[0],
+                delays[0] == null ? java.util.List.of() : delays[0]);
     }
 
     /**
@@ -320,6 +361,12 @@ public final class LoadGame {
             return new Object[0];
         });
 
+        reader.register("SetDiplomacy", args -> {
+            if (args.length >= 3) {
+                world.setDiplomacy(integer(args[0]), string(args[1]), integer(args[2]));
+            }
+            return new Object[0];
+        });
         reader.register("SetPlayerData", args -> {
             // SetPlayerData(player, "Resources", "gold", amount)
             int index = integer(args.length > 0 ? args[0] : null);
@@ -838,7 +885,7 @@ public final class LoadGame {
         // Unknown calls are ignored by NativeSaveReader for forward compatibility.
     }
 
-    /** Accepts schema 3 plus historical schemas 1 and 2 for migration. */
+    /** Accepts schema 4 plus historical schemas 1–3 for migration. */
     private static void requireSupportedFormat(String source) {
         NativeSaveReader reader = new NativeSaveReader();
         int[] version = {1};
@@ -850,7 +897,8 @@ public final class LoadGame {
             return new Object[0];
         });
         reader.run(source);
-        if (version[0] != 1 && version[0] != 2 && version[0] != 3) {
+        if (version[0] != 1 && version[0] != 2 && version[0] != 3
+                && version[0] != 4) {
             throw new IllegalArgumentException("unsupported save format version " + version[0]);
         }
     }

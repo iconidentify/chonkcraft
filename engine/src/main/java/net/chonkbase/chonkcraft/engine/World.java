@@ -4087,6 +4087,31 @@ public final class World {
         return player == other || allied[clampPlayer(player)][clampPlayer(other)];
     }
 
+    /**
+     * The four-state standing {@code SetDiplomacy} writes.
+     *
+     * <p>A TRUE opening trigger can turn two rescue-active slots into
+     * enemies. Reloading from player types alone used to drop that war, so
+     * a saved Human 8 siege forgot who it was attacking.
+     */
+    public String diplomacyStance(int player, int other) {
+        if (player == other) {
+            return "allied";
+        }
+        boolean foes = isEnemyPlayer(player, other);
+        boolean friends = isAllied(player, other);
+        if (foes && friends) {
+            return "crazy";
+        }
+        if (foes) {
+            return "enemy";
+        }
+        if (friends) {
+            return "allied";
+        }
+        return "neutral";
+    }
+
     /** Whether {@code controller} may issue orders to {@code owner}'s units. */
     public boolean canControl(int controller, int owner) {
         if (controller == owner) {
@@ -8110,6 +8135,16 @@ public final class World {
 
     /** Starts the next viable shifted command once the current order finishes. */
     private void beginNextQueuedOrder(Unit unit) {
+        // HandleUnitAction cannot pop Orders[1] until the committed animation
+        // span releases. Calling an order constructor here while Unbreakable
+        // is still set only queues the same replacement again. The while loop
+        // then polls it again without advancing animation or time and pins the
+        // simulation thread forever. A large showcase made this reachable by
+        // retargeting a Still unit on the final committed frame, but it is a
+        // general player-command queue invariant, not a showcase exception.
+        if (unit.animation().unbreakable()) {
+            return;
+        }
         while (unit.order() == Unit.Order.STILL && unit.isOnMap()) {
             Unit.QueuedOrder queued = unit.pollQueuedOrder();
             if (queued == null) {

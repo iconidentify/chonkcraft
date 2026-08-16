@@ -21,6 +21,25 @@ import net.chonkbase.chonkcraft.engine.unit.Unit;
  */
 public final class TriggerSystem {
 
+    /** One armed delayed action whose countdown has already started. */
+    public record SavedDelay(int trigger, int remaining) {
+        public SavedDelay {
+            if (trigger < 0 || remaining < 0) {
+                throw new IllegalArgumentException("invalid saved trigger delay");
+            }
+        }
+    }
+
+    /** All mutable trigger state needed to resume the same mission timeline. */
+    public record SavedState(List<Integer> armed, List<String> flags,
+            List<SavedDelay> delays) {
+        public SavedState {
+            armed = List.copyOf(armed == null ? List.of() : armed);
+            flags = List.copyOf(flags == null ? List.of() : flags);
+            delays = List.copyOf(delays == null ? List.of() : delays);
+        }
+    }
+
     /** One interpreter-free postfix condition and typed action declaration. */
     public record ProgramSpec(String condition, String action) {
         public ProgramSpec {
@@ -173,6 +192,21 @@ public final class TriggerSystem {
         return armed;
     }
 
+    /** Captures survivor identity, one-shot flags, and in-flight countdowns. */
+    public SavedState savedState() {
+        List<Integer> armed = armedTriggers();
+        List<String> flags = new ArrayList<>(nativeFlags);
+        java.util.Collections.sort(flags);
+        List<SavedDelay> delays = new ArrayList<>();
+        for (NativeTrigger trigger : nativeTriggers) {
+            if (trigger.remaining >= 0) {
+                delays.add(new SavedDelay(trigger.installedAt, trigger.remaining));
+            }
+        }
+        delays.sort(java.util.Comparator.comparingInt(SavedDelay::trigger));
+        return new SavedState(armed, flags, delays);
+    }
+
     /**
      * Drops every trigger the save says had already fired.
      *
@@ -187,6 +221,45 @@ public final class TriggerSystem {
         }
         java.util.Set<Integer> keep = new java.util.HashSet<>(armed);
         nativeTriggers.removeIf(trigger -> !keep.contains(trigger.installedAt));
+    }
+
+    /**
+     * Restores a complete version-four trigger checkpoint after the mission
+     * script has recreated its original program list.
+     *
+     * <p>Unknown or duplicate trigger indices fail closed. Silently applying
+     * a countdown to a different program is worse than refusing the save: it
+     * changes which condition wins the campaign.</p>
+     */
+    public void restoreState(SavedState state) {
+        if (state == null) {
+            return;
+        }
+        java.util.Map<Integer, NativeTrigger> byIndex = new java.util.HashMap<>();
+        for (NativeTrigger trigger : nativeTriggers) {
+            byIndex.put(trigger.installedAt, trigger);
+        }
+        java.util.Set<Integer> armed = new java.util.HashSet<>();
+        for (int index : state.armed()) {
+            if (!byIndex.containsKey(index) || !armed.add(index)) {
+                throw new IllegalArgumentException(
+                        "saved trigger index is unknown or duplicated: " + index);
+            }
+        }
+        nativeTriggers.removeIf(trigger -> !armed.contains(trigger.installedAt));
+        nativeFlags.clear();
+        nativeFlags.addAll(state.flags());
+        java.util.Set<Integer> restoredDelays = new java.util.HashSet<>();
+        for (SavedDelay delay : state.delays()) {
+            NativeTrigger trigger = byIndex.get(delay.trigger());
+            if (trigger == null || !armed.contains(delay.trigger())
+                    || !restoredDelays.add(delay.trigger())) {
+                throw new IllegalArgumentException(
+                        "saved trigger delay is unknown, spent, or duplicated: "
+                                + delay.trigger());
+            }
+            trigger.remaining = delay.remaining();
+        }
     }
 
     /** Runs the triggers, as every cycle does. */

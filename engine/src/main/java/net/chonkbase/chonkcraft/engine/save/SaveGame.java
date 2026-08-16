@@ -20,6 +20,7 @@ import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.missile.MissileClass;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import net.chonkbase.chonkcraft.engine.trigger.TriggerSystem;
 
 /**
  * Writes a game in ChonkCraft's readable, versioned native save schema.
@@ -89,7 +90,35 @@ public final class SaveGame {
     /** The same, naming the triggers the mission has not used yet. */
     public static void write(World world, String mapPath, String campaign, int mission,
             java.util.List<Integer> armedTriggers, Writer out) throws IOException {
-        out.write("SaveFormat(\"chonkcraft-save\", 3)\n\n");
+        writeDocument(world, mapPath, campaign, mission,
+                armedTriggers == null ? null
+                        : new TriggerSystem.SavedState(armedTriggers, java.util.List.of(),
+                                java.util.List.of()),
+                out, 3);
+    }
+
+    /** Writes a version-four save carrying every mutable trigger field. */
+    public static void writeWithTriggers(World world, String mapPath, String campaign,
+            int mission, TriggerSystem.SavedState triggerState, Path file) throws IOException {
+        Files.createDirectories(file.toAbsolutePath().getParent());
+        try (OutputStream raw = Files.newOutputStream(file);
+                OutputStream gzip = new GZIPOutputStream(raw);
+                Writer out = new OutputStreamWriter(gzip, StandardCharsets.UTF_8)) {
+            writeWithTriggers(world, mapPath, campaign, mission, triggerState, out);
+        }
+    }
+
+    /** Stream form of {@link #writeWithTriggers(World, String, String, int,
+     * TriggerSystem.SavedState, Path)}. */
+    public static void writeWithTriggers(World world, String mapPath, String campaign,
+            int mission, TriggerSystem.SavedState triggerState, Writer out) throws IOException {
+        writeDocument(world, mapPath, campaign, mission, triggerState, out, 4);
+    }
+
+    private static void writeDocument(World world, String mapPath, String campaign,
+            int mission, TriggerSystem.SavedState triggerState, Writer out,
+            int version) throws IOException {
+        out.write("SaveFormat(\"chonkcraft-save\", " + version + ")\n\n");
 
         out.write("SavedGameInfo({\n");
         out.write("  SaveFile = " + quote(mapPath) + ",\n");
@@ -107,12 +136,23 @@ public final class SaveGame {
 
         out.write("GameCycle = " + world.cycle() + "\n\n");
 
-        if (armedTriggers != null) {
+        if (triggerState != null) {
             StringBuilder armed = new StringBuilder("SetArmedTriggers({");
-            for (int index : armedTriggers) {
+            for (int index : triggerState.armed()) {
                 armed.append(index).append(", ");
             }
             out.write(armed.append("})\n\n").toString());
+            StringBuilder flags = new StringBuilder("SetTriggerFlags({");
+            for (String flag : triggerState.flags()) {
+                flags.append(quote(flag)).append(", ");
+            }
+            out.write(flags.append("})\n\n").toString());
+            StringBuilder delays = new StringBuilder("SetTriggerDelays({");
+            for (TriggerSystem.SavedDelay delay : triggerState.delays()) {
+                delays.append(delay.trigger()).append(", ")
+                        .append(delay.remaining()).append(", ");
+            }
+            out.write(delays.append("})\n\n").toString());
         }
 
         writeTerrain(world, out);
@@ -260,7 +300,30 @@ public final class SaveGame {
             out.write("SetPlayerData(" + index + ", \"TotalRazings\", "
                     + player.totalRazings() + ")\n");
         }
+        writeDiplomacy(world, out);
         out.write("\n");
+    }
+
+    /**
+     * Every directed standing, including ones a trigger wrote over the
+     * type-derived table. Missing this used to make a Human 8 resume forget
+     * that slot four had been told to hate the town it was already besieging.
+     */
+    private static void writeDiplomacy(World world, Writer out) throws IOException {
+        Player[] players = world.players();
+        for (int player = 0; player < players.length; player++) {
+            if (players[player] == null) {
+                continue;
+            }
+            for (int other = 0; other < players.length; other++) {
+                if (player == other || players[other] == null) {
+                    continue;
+                }
+                out.write("SetDiplomacy(" + player + ", "
+                        + quote(world.diplomacyStance(player, other))
+                        + ", " + other + ")\n");
+            }
+        }
     }
 
     private static void writeUpgrades(World world, Writer out) throws IOException {

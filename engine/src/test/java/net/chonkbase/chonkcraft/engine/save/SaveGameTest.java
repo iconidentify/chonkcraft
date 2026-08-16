@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine.save;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -39,6 +40,130 @@ import org.junit.jupiter.api.io.TempDir;
  * comes back must be the game that went in.
  */
 class SaveGameTest {
+
+    @Test
+    @DisplayName("version four preserves trigger flags and an in-flight victory countdown")
+    void mutableTriggerStateSurvivesSaveAndResume() throws IOException {
+        World world = new World(new GameMap(8, 8, new Tileset()));
+        TriggerSystem before = new TriggerSystem(world, 0, List.of(
+                new TriggerSystem.ProgramSpec("TRUE", "SET_FLAG Qb2lsX3JlYWR5"),
+                new TriggerSystem.ProgramSpec("TRUE", "DELAYED_VICTORY 5 0"),
+                new TriggerSystem.ProgramSpec("FALSE", "DEFEAT")));
+        before.evaluate();
+        before.evaluate();
+        TriggerSystem.SavedState checkpoint = before.savedState();
+        assertEquals(List.of(1, 2), checkpoint.armed());
+        assertEquals(List.of("oil_ready"), checkpoint.flags());
+        assertEquals(List.of(new TriggerSystem.SavedDelay(1, 3)), checkpoint.delays());
+
+        StringWriter out = new StringWriter();
+        SaveGame.writeWithTriggers(world, "test-map", "orc", 2, checkpoint, out);
+        String script = out.toString();
+        assertTrue(script.startsWith("SaveFormat(\"chonkcraft-save\", 4)"));
+        assertEquals(checkpoint, LoadGame.triggerState(script));
+
+        TriggerSystem resumed = new TriggerSystem(world, 0, List.of(
+                new TriggerSystem.ProgramSpec("TRUE", "SET_FLAG Qb2lsX3JlYWR5"),
+                new TriggerSystem.ProgramSpec("TRUE", "DELAYED_VICTORY 5 0"),
+                new TriggerSystem.ProgramSpec("FALSE", "DEFEAT")));
+        resumed.restoreState(LoadGame.triggerState(script));
+        assertEquals(checkpoint, resumed.savedState());
+        resumed.evaluate();
+        resumed.evaluate();
+        assertEquals(TriggerSystem.Outcome.RUNNING, resumed.outcome());
+        resumed.evaluate();
+        assertEquals(TriggerSystem.Outcome.VICTORY, resumed.outcome(),
+                "loading restarted or shortened the native countdown");
+    }
+
+    @Test
+    @DisplayName("a diplomacy trigger's war survives save and resume")
+    void aDiplomacyTriggerWarSurvivesSaveAndResume() throws IOException {
+        World before = rescueWorld();
+        before.establishDiplomacy();
+        assertFalse(before.isEnemyPlayer(4, 2),
+                "two rescue-active slots are not born enemies");
+        TriggerSystem triggers = new TriggerSystem(before, 0, List.of(
+                new TriggerSystem.ProgramSpec(
+                        "TRUE", "DIPLOMACY 4 QZW5lbXk 2 2 QZW5lbXk 4")));
+        triggers.evaluate();
+        assertTrue(before.isEnemyPlayer(4, 2),
+                "the TRUE diplomacy action must be in force after one evaluate");
+        assertTrue(before.isEnemyPlayer(2, 4));
+        assertEquals(List.of(), triggers.armedTriggers(),
+                "a spent diplomacy trigger must not re-fire after resume");
+
+        StringWriter out = new StringWriter();
+        SaveGame.writeWithTriggers(before, "test-map", "human", 8,
+                triggers.savedState(), out);
+        String script = out.toString();
+        assertTrue(script.contains("SetDiplomacy(4, \"enemy\", 2)"),
+                "the save must carry the trigger's directed war, not just player types");
+
+        World after = rescueWorld();
+        after.establishDiplomacy();
+        LoadGame.apply(after, script, java.util.Map.of());
+        TriggerSystem resumed = new TriggerSystem(after, 0, List.of(
+                new TriggerSystem.ProgramSpec(
+                        "TRUE", "DIPLOMACY 4 QZW5lbXk 2 2 QZW5lbXk 4")));
+        resumed.restoreState(LoadGame.triggerState(script));
+        assertEquals(List.of(), resumed.armedTriggers());
+        assertTrue(after.isEnemyPlayer(4, 2),
+                "reloading from player types alone used to drop the siege's war");
+        assertTrue(after.isEnemyPlayer(2, 4));
+        assertFalse(after.isEnemyPlayer(4, 6),
+                "a pair the trigger never named must stay type-derived");
+    }
+
+    @Test
+    @DisplayName("human 8's opening siege still hates the town after save and resume")
+    void humanEightOpeningSiegeSurvivesSaveAndResume() throws IOException {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        GameData data = new GameData(assets);
+        var continuous = data.loadMission("campaigns/human/level08h");
+        Assumptions.assumeTrue(continuous != null, "human 8 did not load from the pack");
+        continuous.tick();
+        assertTrue(continuous.world().isEnemyPlayer(4, 2),
+                "the opening diplomacy trigger must fire before any unit acts");
+        assertTrue(continuous.world().isEnemyPlayer(4, 6));
+        assertEquals(List.of(1, 2),
+                continuous.triggers().armedTriggers(),
+                "the spent opening trigger must not remain armed");
+
+        StringWriter out = new StringWriter();
+        SaveGame.writeWithTriggers(continuous.world(), "campaigns/human/level08h",
+                "human", 8, continuous.triggers().savedState(), out);
+        String script = out.toString();
+
+        var resumed = data.loadMission("campaigns/human/level08h");
+        for (Unit unit : new ArrayList<>(resumed.world().units())) {
+            resumed.world().remove(unit);
+        }
+        LoadGame.apply(resumed.world(), script, data.unitTypes().types());
+        resumed.triggers().restoreState(LoadGame.triggerState(script));
+        assertTrue(resumed.world().isEnemyPlayer(4, 2),
+                "reloading human 8 from player types used to drop the siege");
+        assertTrue(resumed.world().isEnemyPlayer(4, 6));
+        assertEquals(continuous.triggers().armedTriggers(),
+                resumed.triggers().armedTriggers());
+        assertEquals(continuous.world().diplomacyStance(4, 2),
+                resumed.world().diplomacyStance(4, 2));
+        assertEquals(continuous.world().diplomacyStance(2, 4),
+                resumed.world().diplomacyStance(2, 4));
+    }
+
+    @Test
+    @DisplayName("a mismatched trigger program cannot silently consume saved state")
+    void triggerStateFailsClosedAgainstDifferentMissionProgram() {
+        World world = new World(new GameMap(8, 8, new Tileset()));
+        TriggerSystem system = new TriggerSystem(world, 0, List.of(
+                new TriggerSystem.ProgramSpec("FALSE", "NOOP")));
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+                () -> system.restoreState(new TriggerSystem.SavedState(
+                        List.of(7), List.of(), List.of())));
+    }
 
     @Test
     @DisplayName("the Human 6 saved assault resumes and partial wood remains cargo")
@@ -945,6 +1070,18 @@ class SaveGameTest {
         triggers.system().retainArmed(LoadGame.armedTriggers("GameCycle = 1\n"));
         assertEquals(3, triggers.system().triggerCount(),
                 "an older save must not be read as saying every trigger had fired");
+    }
+
+    /** Two rescue-active slots that are not born enemies. */
+    private static World rescueWorld() {
+        Player[] players = new Player[Player.MAX];
+        for (int index = 0; index < players.length; index++) {
+            PudMap.PlayerType type = (index == 2 || index == 4)
+                    ? PudMap.PlayerType.RESCUE_ACTIVE
+                    : PudMap.PlayerType.NOBODY;
+            players[index] = new Player(index, type, PudMap.Race.HUMAN);
+        }
+        return new World(new GameMap(8, 8, new Tileset()), players);
     }
 
     /** Each living unit as a comparable line. */
