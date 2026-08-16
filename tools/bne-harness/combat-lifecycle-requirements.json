@@ -1,0 +1,68 @@
+{
+  "schema": "chonkcraft-bne-combat-lifecycle-requirements-1",
+  "encounters": [
+    {
+      "id": "melee-infantry",
+      "attacker": "footman-or-grunt",
+      "defender": "grunt-or-footman",
+      "stances": ["still", "attack", "attack-move", "patrol", "stand-ground"],
+      "phases": ["acquire", "chase", "swing", "damage", "retaliation", "death", "free"]
+    },
+    {
+      "id": "ranged-infantry",
+      "attacker": "archer-or-axethrower",
+      "defender": "ground-unit",
+      "stances": ["still", "attack", "stand-ground"],
+      "phases": ["acquire", "chase", "swing", "projectile-create", "projectile-flight", "damage", "retaliation", "death", "free"]
+    },
+    {
+      "id": "siege",
+      "attacker": "ballista-or-catapult",
+      "defender": "unit-or-building",
+      "stances": ["still", "attack", "attack-ground"],
+      "phases": ["acquire", "chase", "swing", "projectile-create", "projectile-flight", "impact", "splash-damage", "death", "free"]
+    },
+    {
+      "id": "tower",
+      "attacker": "guard-or-cannon-tower",
+      "defender": "ground-or-air-unit",
+      "stances": ["automatic"],
+      "phases": ["acquire", "swing", "projectile-create", "projectile-flight", "damage", "retaliation", "death", "free"]
+    },
+    {
+      "id": "naval",
+      "attacker": "destroyer-or-battleship",
+      "defender": "ship-unit-or-shore-building",
+      "stances": ["still", "attack", "patrol"],
+      "phases": ["acquire", "chase", "swing", "projectile-create", "projectile-flight", "impact", "damage", "retaliation", "death", "free"]
+    },
+    {
+      "id": "air",
+      "attacker": "gryphon-or-dragon",
+      "defender": "air-or-ground-unit",
+      "stances": ["still", "attack", "patrol"],
+      "phases": ["acquire", "chase", "swing", "projectile-create", "projectile-flight", "impact", "damage", "retaliation", "death", "free"]
+    },
+    {
+      "id": "direct-spell",
+      "attacker": "mage-or-death-knight",
+      "defender": "legal-and-illegal-targets",
+      "stances": ["cast"],
+      "phases": ["accept-or-refuse", "walk-to-range", "mana-debit", "cast", "projectile-create", "projectile-flight", "effect", "damage", "death", "free"]
+    },
+    {
+      "id": "persistent-spell",
+      "attacker": "mage-or-death-knight",
+      "defender": "area-target",
+      "stances": ["cast"],
+      "phases": ["accept-or-refuse", "walk-to-range", "mana-debit", "cast", "effect", "pulse", "expiry", "death", "free"]
+    },
+    {
+      "id": "building-destruction",
+      "attacker": "melee-ranged-siege-or-naval",
+      "defender": "complete-and-under-construction-building",
+      "stances": ["attack"],
+      "phases": ["acquire", "chase", "swing", "damage", "death", "effect", "sound", "free", "occupancy-release"]
+    }
+  ]
+}

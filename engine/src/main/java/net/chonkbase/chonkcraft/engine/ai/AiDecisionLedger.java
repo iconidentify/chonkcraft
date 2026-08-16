@@ -20,7 +20,11 @@ public final class AiDecisionLedger {
 
     public record Row(int cycle, int player, int profile, int waitCount,
             int pcOffset, int listOffset, int thresholdOffset,
-            String nonPointerHex, String classification) {
+            String nonPointerHex,
+            List<AiPlayer.DecisionPredicate> predicates,
+            List<AiPlayer.DecisionWrite> writes,
+            List<AiPlayer.DecisionLaunch> launches,
+            String classification) {
     }
 
     private AiDecisionLedger() {
@@ -47,7 +51,8 @@ public final class AiDecisionLedger {
         }
         return new Row(cycle, ai.playerIndex(), ai.battleNetBuildProfileId(),
                 BattleNetAiBytecode.waitCounter(packed), pc, list, threshold,
-                nonPointerHex(packed),
+                nonPointerHex(packed), ai.battleNetDecisionPredicates(),
+                ai.battleNetDecisionWrites(), ai.battleNetDecisionLaunches(),
                 ai.battleNetLastTickIndependent()
                         ? "independent-choice" : "fallout");
     }
@@ -86,7 +91,39 @@ public final class AiDecisionLedger {
                     .append(",\"list_offset\":").append(row.listOffset())
                     .append(",\"threshold_offset\":").append(row.thresholdOffset())
                     .append(",\"non_pointer_hex\":\"").append(row.nonPointerHex())
-                    .append("\",\"predicates\":[],\"writes\":[],\"launches\":[]")
+                    .append("\",\"predicates\":[");
+            for (int event = 0; event < row.predicates().size(); event++) {
+                if (event > 0) {
+                    out.append(',');
+                }
+                var predicate = row.predicates().get(event);
+                out.append("{\"id\":").append(predicate.id())
+                        .append(",\"result\":").append(predicate.result()).append('}');
+            }
+            out.append("],\"writes\":[");
+            for (int event = 0; event < row.writes().size(); event++) {
+                if (event > 0) {
+                    out.append(',');
+                }
+                var write = row.writes().get(event);
+                out.append("{\"offset\":").append(write.offset())
+                        .append(",\"before\":").append(write.before())
+                        .append(",\"after\":").append(write.after()).append('}');
+            }
+            out.append("],\"launches\":[");
+            for (int event = 0; event < row.launches().size(); event++) {
+                if (event > 0) {
+                    out.append(',');
+                }
+                var launch = row.launches().get(event);
+                out.append("{\"domain\":\"").append(launch.domain())
+                        .append("\",\"requested\":").append(launch.requested())
+                        .append(",\"assigned\":").append(launch.assigned())
+                        .append(",\"target_id\":")
+                        .append(launch.targetId() == null ? "null" : launch.targetId())
+                        .append('}');
+            }
+            out.append(']')
                     .append(",\"classification\":\"")
                     .append(row.classification()).append("\"}");
         }

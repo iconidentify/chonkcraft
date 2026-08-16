@@ -141,6 +141,21 @@ public final class AiPlayer {
      */
     private boolean battleNetLastTickIndependent;
 
+    /** One opcode-3 question asked during the most recent AI tick. */
+    public record DecisionPredicate(int id, boolean result) {}
+
+    /** One changed byte in the 48-byte AIPlayerState. */
+    public record DecisionWrite(int offset, int before, int after) {}
+
+    /** One periodic force-launch request and what it actually assigned. */
+    public record DecisionLaunch(String domain, int requested, int assigned,
+            Integer targetId) {}
+
+    private final List<DecisionPredicate> battleNetDecisionPredicates = new ArrayList<>();
+    private final List<DecisionWrite> battleNetDecisionWrites = new ArrayList<>();
+    private final List<DecisionLaunch> battleNetDecisionLaunches = new ArrayList<>();
+    private long battleNetDecisionCycle = -1;
+
     /**
      * Entry-277 word1 offset of the per-PUD-type action-33 threshold table
      * (native {@code AIState.profilePointer2}). Limits are read as
@@ -352,16 +367,34 @@ public final class AiPlayer {
      * cycle-16 peon on XHuman 12.
      */
     public void battleNetTickBytecode(World world) {
+        battleNetDecisionPredicates.clear();
+        battleNetDecisionWrites.clear();
+        battleNetDecisionLaunches.clear();
+        battleNetDecisionCycle = world == null ? -1 : world.cycle();
         if (battleNetAiState == null || battleNetAiProfileData == null
                 || battleNetAiPc < 0 || world == null) {
             battleNetLastTickIndependent = false;
             return;
         }
+        byte[] before = battleNetAiState.clone();
         battleNetLastTickIndependent =
                 BattleNetAiBytecode.waitCounter(battleNetAiState) == 0;
         battleNetAiPc = BattleNetAiBytecode.tick(
                 battleNetAiProfileData, battleNetAiState, battleNetAiPc,
-                (predicate, state) -> battleNetPredicate(world, predicate, state));
+                (predicate, state) -> {
+                    boolean result = battleNetPredicate(world, predicate, state);
+                    battleNetDecisionPredicates.add(
+                            new DecisionPredicate(predicate, result));
+                    return result;
+                });
+        for (int offset = 0; offset < battleNetAiState.length; offset++) {
+            int oldValue = before[offset] & 0xff;
+            int newValue = battleNetAiState[offset] & 0xff;
+            if (oldValue != newValue) {
+                battleNetDecisionWrites.add(
+                        new DecisionWrite(offset, oldValue, newValue));
+            }
+        }
         syncBattleNetWantsFromState();
         int bound = battleNetAiState[BattleNetAiBytecode.OFF_LIST_BOUND] & 0xff;
         if (bound != 0xff) {
@@ -452,15 +485,15 @@ public final class AiPlayer {
         if (battleNetAiState == null || world == null) {
             return;
         }
-        battleNetConsumeLaunch(world, 4,
+        battleNetConsumeLaunch(world, "ground", 4,
                 BattleNetAiBytecode.OFF_LAUNCH_GROUND,
                 BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT,
                 BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER);
-        battleNetConsumeLaunch(world, 5,
+        battleNetConsumeLaunch(world, "naval", 5,
                 BattleNetAiBytecode.OFF_LAUNCH_NAVAL,
                 BattleNetAiBytecode.OFF_NAVAL_FORCE_COUNT,
                 BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER);
-        battleNetConsumeLaunch(world, 6,
+        battleNetConsumeLaunch(world, "air", 6,
                 BattleNetAiBytecode.OFF_LAUNCH_AIR,
                 BattleNetAiBytecode.OFF_AIR_FORCE_COUNT,
                 BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER);
@@ -483,7 +516,7 @@ public final class AiPlayer {
         battleNetAiState[BattleNetAiBytecode.OFF_LAUNCH_AIR] = 0;
     }
 
-    private void battleNetConsumeLaunch(World world, int predicate,
+    private void battleNetConsumeLaunch(World world, String domain, int predicate,
             int pendingOffset, int groupSizeOffset, int groupCountOffset) {
         if ((battleNetAiState[pendingOffset] & 0xff) == 0) {
             return;
@@ -504,6 +537,7 @@ public final class AiPlayer {
             }
         }
         int cursor = 0;
+        Integer targetId = null;
         for (int group = 0; group < groupCount && cursor < available.size(); group++) {
             int end = Math.min(available.size(), cursor + groupSize);
             if (end <= cursor) {
@@ -514,6 +548,9 @@ public final class AiPlayer {
             Unit enemy = battleNetForceEnemy(world, leader, predicate);
             if (enemy == null) {
                 break;
+            }
+            if (targetId == null) {
+                targetId = enemy.id();
             }
             int goalX = enemy.tileX();
             int goalY = enemy.tileY();
@@ -531,6 +568,8 @@ public final class AiPlayer {
             }
             cursor = end;
         }
+        battleNetDecisionLaunches.add(new DecisionLaunch(domain,
+                groupSize * groupCount, cursor, targetId));
         battleNetAiState[pendingOffset] = 0;
     }
 
@@ -837,6 +876,22 @@ public final class AiPlayer {
 
     public boolean battleNetLastTickIndependent() {
         return battleNetLastTickIndependent;
+    }
+
+    public long battleNetDecisionCycle() {
+        return battleNetDecisionCycle;
+    }
+
+    public List<DecisionPredicate> battleNetDecisionPredicates() {
+        return List.copyOf(battleNetDecisionPredicates);
+    }
+
+    public List<DecisionWrite> battleNetDecisionWrites() {
+        return List.copyOf(battleNetDecisionWrites);
+    }
+
+    public List<DecisionLaunch> battleNetDecisionLaunches() {
+        return List.copyOf(battleNetDecisionLaunches);
     }
 
     public byte[] battleNetAiProfileData() {

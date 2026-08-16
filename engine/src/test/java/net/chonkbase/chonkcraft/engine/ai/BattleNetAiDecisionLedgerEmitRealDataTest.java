@@ -49,6 +49,8 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
                             || "fallout".equals(row.classification()),
                     "a row must say whether this cycle chose or followed");
         }
+        assertTrue(rows.stream().anyMatch(row -> !row.writes().isEmpty()),
+                "the live ledger must report real AI state mutations, not only snapshots");
     }
 
     @Test
@@ -72,7 +74,8 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
         AiDecisionLedger.Row shifted = new AiDecisionLedger.Row(
                 first.cycle(), first.player(), first.profile(), first.waitCount(),
                 first.pcOffset() + 8, first.listOffset(), first.thresholdOffset(),
-                first.nonPointerHex(), first.classification());
+                first.nonPointerHex(), first.predicates(), first.writes(),
+                first.launches(), first.classification());
         List<AiDecisionLedger.Row> mutated = new ArrayList<>(rows);
         mutated.set(0, shifted);
         String left = AiDecisionLedger.toJson(rows);
