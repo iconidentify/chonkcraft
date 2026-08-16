@@ -202,7 +202,7 @@ public final class CommandApplier {
             }
             case PATROL -> {
                 unit.setBattleNetScoutPatrol(false);
-                accepted = world.orderPatrol(unit, command.x(), command.y());
+                accepted = world.orderPatrol(unit, command.x(), command.y(), true);
             }
             case REPAIR -> {
                 Unit target = findUnit(command.targetId());

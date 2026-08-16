@@ -8,8 +8,8 @@ it is not the roadmap.
 ## Honest starting point
 
 The current authenticated command fleet contains 240 generated cells. Both
-production adapters have executed 134 of them. Of those, 129 are exact and five
-are materially different, with zero infrastructure failures:
+production adapters have executed 134 of them. Of those, 131 are exact and
+three are materially different, with zero infrastructure failures:
 
 | Family | Exact / comparable | Current debt |
 | --- | ---: | --- |
@@ -17,19 +17,19 @@ are materially different, with zero infrastructure failures:
 | Stop | 5 / 5 | add group and queued transactions |
 | Attack-ground | 4 / 4 | add gesture/target shapes |
 | Attack-move | 3 / 3 | expand physical gestures and groups |
+| Patrol | 3 / 3 | expand physical gestures and groups |
 | Attack | 3 / 4 | one residual-offset result |
 | Harvest | 3 / 4 | one resource-lifecycle result |
 | Repair | 4 / 5 | one terminal-delay result |
 | Return goods | 4 / 5 | one progress/terminal result |
-| Patrol | 1 / 3 | two cadence results |
 
-This is **129/134 comparable**, not 129/240 complete. Attack-move now has a
-native injector (GiveOrder table 8 dest path) and commanded dual-adapter
-cells. The Orc 1 and Human 1 ground clicks settle on the clicked square and
-match first-progress and terminal (fixture 12/92 after a Still wait, fixture
-8/72 from the Still marker). Stand-ground and train remain generated
-without native execution. There are no authenticated queued-command cells
-and no authenticated group transaction.
+This is **131/134 comparable**, not 131/240 complete. A player Patrol click
+from Still keeps Still through the remaining idle, dest-arms after the
+player command wait, walks the Bresenham leftover (type-two assault leftover
+exhaust does not apply), and turns around on the land visit instead of
+paying PF_WAIT 10. Stand-ground and train remain generated without native
+execution. There are no authenticated queued-command cells and no
+authenticated group transaction.
 
 The first real AI-cycle proof is better than the old coarse AI counter: Orc 1
 player 1 has exact committed `ai.bin` state and exact recovered wait/predicate

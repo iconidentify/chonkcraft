@@ -2590,7 +2590,8 @@ public final class Unit {
      * <p>Orc 11's type-two land assault pack (knight 1558 and archers
      * 1559/1560/1563) discards leftover path after a trailing run of three
      * identical headings -- not after a fixed {@code stepsTaken} count
-     * (the knight took NW then three NE). Cleared on {@link #setPath} /
+     * (the knight took NW then three NE). A player GiveOrder 5 dest-arm
+     * keeps its Bresenham leftover. Cleared on {@link #setPath} /
      * {@link #clearPath}.
      */
     public int battleNetSameHeadingRun() {

@@ -311,6 +311,7 @@ class PureMoveResidualFreeCompassTest {
 
         Unit archer = world.createUnit(archer(), 0, 10, 20);
         assertTrue(archer != null, "archer places");
+        archer.setBattleNetAiBehavior(2);
         assertTrue(world.orderPatrol(archer, 5, 5),
                 "archer accepts patrol toward the assault home");
 
@@ -337,6 +338,7 @@ class PureMoveResidualFreeCompassTest {
 
         Unit knight = world.createUnit(archer(), 0, 10, 20);
         assertTrue(knight != null, "unit places");
+        knight.setBattleNetAiBehavior(2);
         assertTrue(world.orderPatrol(knight, 5, 5),
                 "unit accepts patrol");
 
@@ -352,6 +354,35 @@ class PureMoveResidualFreeCompassTest {
         takePatrolTileSteps(world, knight, 1);
         assertEquals(0, knight.pathLength(),
                 "third consecutive NE (fourth tile step) discards leftover");
+    }
+
+    @Test
+    @DisplayName("a player patrol keeps bresenham leftover after three ne steps")
+    void aPlayerPatrolKeepsBresenhamLeftoverAfterThreeNeSteps() {
+        // Player GiveOrder 5 dest-arm is NE,NE,NE,N,NE. Type-two assault
+        // leftover exhaust must not discard the N,NE tail: native last
+        // heading is NE onto dest, not a replan NE,N from the south.
+        GameMap map = grass(40);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.restoreRandom(1, 0);
+
+        Unit grunt = world.createUnit(archer(), 0, 18, 23);
+        assertTrue(grunt != null, "grunt places");
+        assertTrue(world.orderPatrol(grunt, 22, 18),
+                "a player patrol click is accepted");
+
+        grunt.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {NE, N, NE, NE, NE}));
+        grunt.setPathGoal(-1, -1);
+
+        takePatrolTileSteps(world, grunt, 3);
+        assertEquals(21, grunt.tileX(), "three NE from 18,23 lands x 21");
+        assertEquals(20, grunt.tileY(), "three NE from 18,23 lands y 20");
+        assertEquals(2, grunt.pathLength(),
+                "player dest-arm keeps leftover N,NE after three NE");
+        assertEquals(N, grunt.peekHeading(),
+                "leftover next heading is N onto 21,19, not a discarded replan");
     }
 
     @Test

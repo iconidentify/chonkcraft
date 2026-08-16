@@ -8229,6 +8229,7 @@ public final class World {
                 // two pixels early. An issue-visit Attack (queueWait 0)
                 // dest-arms on that visit.
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
+                        || queued.kind() == Unit.QueuedOrderKind.PATROL
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
                                 && unit.destPathOpeningHold())) {
                     unit.setBattleNetOrderDelay(2);
@@ -11228,6 +11229,26 @@ public final class World {
         // stepMove reads the order it is given, so a patrolling unit has to
         // borrow the move order for the duration of the step and give it back.
         movement.walkTowards(unit, unit.orderTargetX(), unit.orderTargetY());
+        // Residual of leftover dest-arm can settle inside walkTowards. The
+        // dest-reached exchange above saw isMoving and skipped; do it now
+        // so the land visit turns around instead of waiting for the next
+        // free visit.
+        if (unit.pathLength() == 0 && !unit.isMoving()
+                && unit.tileX() == unit.orderTargetX()
+                && unit.tileY() == unit.orderTargetY()) {
+            int backX = unit.patrolX();
+            int backY = unit.patrolY();
+            if (backX != unit.orderTargetX() || backY != unit.orderTargetY()) {
+                unit.setPatrol(unit.orderTargetX(), unit.orderTargetY());
+                unit.setOrderTarget(backX, backY);
+                // BNE's patrol action returns after exchanging its two
+                // endpoints. The following two action visits advance the
+                // new movement animation; only the third can take a
+                // logical tile step.
+                unit.setBattleNetOrderDelay(2);
+                return;
+            }
+        }
         if (patrolOp0 && battleNetStandingPatrolSequence(unit)
                 && unit.order() == Unit.Order.PATROL) {
             // One stride per OP0. Drop leftover headings so the Move body
@@ -12316,15 +12337,48 @@ public final class World {
 
     /** Sends a unit to walk a beat between where it stands and a square. */
     public boolean orderPatrol(Unit unit, int toX, int toY) {
+        return orderPatrol(unit, toX, toY, false);
+    }
+
+    /**
+     * @param fromPlayer {@code true} for a GiveOrder 5 click: Still keeps
+     *     the current order through the remaining Still wait, then dest-arms
+     *     two visits after Patrol installs. Marker-ready installs now and
+     *     dest-arms after the player command wait.
+     */
+    public boolean orderPatrol(Unit unit, int toX, int toY, boolean fromPlayer) {
         if (unit == null || !unit.isAlive() || unit.type().speed() <= 0
                 || !map.contains(toX, toY)) {
             return false;
+        }
+        // Native GiveOrder 5 from Still with remaining Still wait writes
+        // next_order 5 and keeps Still: Orc 1 grunt 1592 queueWait 4
+        // through fixture 8, Patrol at 9, dest-arms at 12. Installing
+        // Patrol on the issue cycle first-progressed at 5.
+        if (fromPlayer && unit.order() == Unit.Order.STILL
+                && battleNetSequence != null) {
+            int[] waits = movement.playerCommandWaits(unit);
+            if (waits[1] > 0) {
+                unit.setPatrol(unit.tileX(), unit.tileY());
+                unit.setOrderTarget(toX, toY);
+                unit.enqueueOrder(new Unit.QueuedOrder(
+                        Unit.QueuedOrderKind.PATROL, toX, toY, null, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setBattleNetOrderDelay(waits[1] + 1);
+                return true;
+            }
         }
         unit.clearPath();
         unit.setPatrol(unit.tileX(), unit.tileY());
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);
         armBattleNetPatrolSequence(unit);
+        if (fromPlayer && battleNetSequence != null
+                && unit.battleNetOrderDelay() == 0) {
+            // Issue-visit Patrol dest-arms at fixture 8: peon 1594
+            // installs at 5 timer 3 and first walks at 8.
+            unit.setBattleNetOrderDelay(3);
+        }
         return true;
     }
 

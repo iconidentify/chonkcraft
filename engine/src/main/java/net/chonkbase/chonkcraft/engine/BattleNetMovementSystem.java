@@ -1010,6 +1010,15 @@ final class BattleNetMovementSystem {
             }
         }
         if (worker.pathLength() == 0 && !worker.isMoving()) {
+            // Patrol leftover dest-arm that lands on dest is the endpoint
+            // exchange, not PF_WAIT 10. Native peon 1594 residual-settles
+            // on 22,18 and turns around; the empty ten left it on 23,18
+            // at the commanded window.
+            if (worker.order() == Unit.Order.PATROL
+                    && worker.tileX() == tileX && worker.tileY() == tileY) {
+                worker.setRouteSpent(false);
+                return;
+            }
             // The spent route is served here too; see the building form
             // below for the measurement.
             if (spendTheEmptyRoute(worker)) {
@@ -3956,20 +3965,22 @@ final class BattleNetMovementSystem {
             }
             unit.setLastStepHeading(heading);
             unit.turnTo(heading);
-            // Ground-patrol free-prefix after three consecutive identical
+            // Type-two land assault leftover after three consecutive identical
             // headings: native writes route_index 20 and drains residual
             // without taking the fourth (Orc 11 archers 1559/1560/1563 and
-            // knight 1558's NW+NE+NE+NE trailing run). The route-index rule
-            // is not used by the doubled movement lattice: Human 12's
-            // commanded zeppelin keeps E,E,E,E,NE and takes the diagonal on
-            // fixture 134. Applying the ground rule there cleared the route
-            // after its third east leg, and the replacement route postponed
-            // that north-east leg by one full twenty-cycle flight beat.
+            // knight 1558's NW+NE+NE+NE trailing run). A player GiveOrder 5
+            // dest-arm keeps the Bresenham leftover: Orc 1 grunt 1592 is
+            // NE,NE,NE,N,NE and last-steps NE onto 22,18. Discarding that
+            // leftover after the third NE replanned NE,N and arrived from
+            // the south. The route-index rule is not used by the doubled
+            // movement lattice: Human 12's commanded zeppelin keeps
+            // E,E,E,E,NE and takes the diagonal on fixture 134.
             if (!unit.battleNetDoubleStep()
                     && unit.pathLength() > 0
                     && unit.battleNetSameHeadingRun() >= 3
                     && unit.battleNetBorrowedMoveForStep()
                     && unit.patrolX() >= 0
+                    && unit.battleNetAiBehavior() == 2
                     && unit.resourceUnit() == null) {
                 unit.clearPath();
                 unit.setBattleNetPatrolStraightRunExhausted(true);
