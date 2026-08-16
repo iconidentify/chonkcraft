@@ -13688,14 +13688,66 @@ public final class World {
 
     /** Orders a unit to hold its ground. */
     public void orderStandGround(Unit unit) {
+        orderStandGround(unit, false);
+    }
+
+    /**
+     * Orders a unit to hold its ground.
+     *
+     * @param fromPlayer {@code true} for a GiveOrder click. Native
+     *     {@code 0x453130} writes next-order 15 and leaves a walk running;
+     *     an idle unit pops 15 with animation 4 / timer 3, then 13. Order
+     *     13 ticks the same still handler as idle but its flag word is
+     *     {@code 0x0082} (no {@code 0x1000}), so a person does not chase.
+     */
+    public void orderStandGround(Unit unit, boolean fromPlayer) {
         if (unit == null || !unit.isAlive()) {
             return;
         }
         projectiles.interruptPendingAttack(unit);
+        if (fromPlayer && unit.order() == Unit.Order.STILL) {
+            int[] waits = movement.playerCommandWaits(unit);
+            if (waits[1] > 0) {
+                unit.enqueueOrder(new Unit.QueuedOrder(
+                        Unit.QueuedOrderKind.STAND_GROUND,
+                        0, 0, null, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setBattleNetOrderDelay(waits[1] + 1);
+                return;
+            }
+        }
+        if (fromPlayer && movement.leftoverWalkBearing(
+                unit.currentAction(), unit)) {
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.STAND_GROUND,
+                    0, 0, null, null, null));
+            unit.setQueuedReplacementPending(true);
+            return;
+        }
+        installStandGroundHold(unit, fromPlayer);
+    }
+
+    /**
+     * Pops stand-ground: order 15's three-tick opening, then the order-13
+     * hold. Java keeps {@link Unit.Order#STAND_GROUND} for that hold --
+     * dropping to Still used to let a person chase.
+     */
+    void installStandGroundHold(Unit unit, boolean fromPlayer) {
         unit.clearPath();
         unit.setTarget(null);
         unit.setFighting(false);
         unit.setOrder(Unit.Order.STAND_GROUND);
+        if (battleNetSequence != null) {
+            int start = idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.ATTACK_ANIMATION);
+            if (start >= 0) {
+                unit.setBattleNetSequenceOffset(start);
+                unit.setBattleNetAnimationTimer(3);
+            }
+            if (fromPlayer && unit.battleNetOrderDelay() == 0) {
+                unit.setBattleNetOrderDelay(3);
+            }
+        }
     }
 
     /**

@@ -47,7 +47,9 @@ ORDER_NAMES = {
     # 8-12 are the attack-family dest and chase bytes named ATTACK in
     # bne_202_layout.h. 11 is the dest-accepted ground click from table 8.
     8: "ATTACK", 9: "ATTACK", 10: "ATTACK", 11: "ATTACK", 12: "ATTACK",
-    13: "STILL", 14: "STILL", 15: "STAND_GROUND", 16: "ATTACK",
+    # 13 is the hold-still after 0x4368b0's three-tick order-15 opening.
+    # Flag word 0x0082 has no 0x1000, so a person does not chase.
+    13: "STAND_GROUND", 14: "STILL", 15: "STAND_GROUND", 16: "ATTACK",
     17: "ATTACK_GROUND", 18: "ATTACK_MOVE",
     22: "BUILD", 23: "HARVEST", 24: "RETURN_GOODS", 25: "HARVEST",
     26: "HARVEST", 27: "REPAIR", 28: "BUILD", 29: "UNLOAD",
@@ -386,6 +388,10 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
                     "settled" if kind in {
                         "move", "attack-move", "patrol", "follow"}
                     else "fulfilled")
+                break
+            if kind == "stand-ground" and now.get("order") == "STAND_GROUND":
+                terminal_cycle = cycle
+                terminal_reason = "fulfilled"
                 break
             if cycle >= window:
                 terminal_cycle = cycle

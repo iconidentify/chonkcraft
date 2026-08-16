@@ -160,7 +160,35 @@ final class BattleNetMovementSystem {
         if (promoteQueuedPlayerMoveAfterLeftover(unit)) {
             return true;
         }
+        if (promoteQueuedStandGroundAfterLeftover(unit)) {
+            return true;
+        }
         return promoteQueuedRepairAfterLeftover(unit);
+    }
+
+    /**
+     * After leftover dest-arm pixels land, native pops queued stand-ground
+     * as order 15 with timer 3. The leftover-land visit already paid one
+     * quiet call, so two remain.
+     */
+    boolean promoteQueuedStandGroundAfterLeftover(Unit unit) {
+        if (unit == null || !unit.queuedReplacementPending()
+                || !unit.hasQueuedOrders() || unit.isMoving()) {
+            return false;
+        }
+        if (unit.residualX() != 0 || unit.residualY() != 0) {
+            return false;
+        }
+        Unit.QueuedOrder next = unit.queuedOrders().getFirst();
+        if (next.kind() != Unit.QueuedOrderKind.STAND_GROUND) {
+            return false;
+        }
+        unit.pollQueuedOrder();
+        unit.setQueuedReplacementPending(false);
+        world.installStandGroundHold(unit, false);
+        unit.setBattleNetOrderDelay(2);
+        unit.setActionBeforeQueued(null);
+        return true;
     }
 
     /**

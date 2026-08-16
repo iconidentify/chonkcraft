@@ -158,6 +158,7 @@ class DefendOrderTest {
         UnitType type = soldier("unit-footman");
         World world = world(type);
         Unit guard = world.createUnit(type, 0, 4, 4);
+        guard.setBattleNetAnimationTimer(1);
         CommandApplier applier = new CommandApplier(world, List.of(type));
         assertTrue(applier.apply(GameCommand.standGround(0, guard.id())),
                 "stand-ground was refused");

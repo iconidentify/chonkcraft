@@ -221,8 +221,16 @@ static const char *bne_order_name(unsigned int order) {
      * manufactured hundreds of cycle-one parity failures for towers which
      * were doing exactly the same thing in both engines.
      */
-    if (order == 2 || order == 13 || order == 14 || order == 32
+    if (order == 2 || order == 14 || order == 32
             || order == 33 || order == 58 || order == 60) return "STILL";
+    /*
+     * 13 is the hold-still that 0x4368b0's order-15 opening becomes after
+     * its three animation ticks. Same 0x40b010 tick as idle Still, but the
+     * flag word is 0x0082 -- no 0x1000 -- so a person does not take the
+     * 0x4368c0 chase. Calling it STILL made a stand-ground click look
+     * idle at the window.
+     */
+    if (order == 13 || order == 15) return "STAND_GROUND";
     if (order == 3 || order == 36 || order == 59) return "MOVE";
     if (order == 4 || order == 5) return "PATROL";
     if (order == 6 || order == 7) return "FOLLOW";

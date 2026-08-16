@@ -201,6 +201,14 @@ final class PlayerIntentJournal {
             tracking.terminalReason = "rejected";
         } else {
             State targetNow = stateOf(world, command.targetId());
+            // Native stand-ground first-progress is the Still-to-hold pop on
+            // the issue visit. Fulfilled used to fire from delivered state
+            // without recording that change, so progress_delay stayed empty.
+            if (tracking.firstProgressCycle == null
+                    && progressed(command, submitted, tracking.latest,
+                            targetSubmitted, targetNow)) {
+                tracking.firstProgressCycle = cycle;
+            }
             String terminal = terminalReason(tracking, tracking.latest, targetNow,
                     cycle, world, unit);
             if (terminal != null) {
