@@ -1,30 +1,52 @@
 package net.chonkbase.chonkcraft.desktop;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.map.MapField;
+import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 
 /** Builds a deterministic, camera-ready battle from retail game units. */
 final class BattleShowcase {
 
-    static final int DEFAULT_UNITS = 240;
+    static final int DEFAULT_UNITS = 480;
     static final int MIN_UNITS = 40;
     static final int MAX_UNITS = 800;
     private static final int DIRECTOR_INTERVAL = 90;
 
+    /*
+     * Every mobile land or air class a player can field in a normal match is
+     * represented. Repetition supplies the ranks: infantry forms the mass,
+     * cavalry and ogres the shock line, ranged troops the second line, and
+     * siege, demolition, spellcasters and flyers remain plainly visible.
+     * Ships need water and belong in a naval showcase rather than sailing
+     * across grass for the sake of claiming a larger list.
+     */
     private static final List<String> HUMAN_ROSTER = List.of(
-            "unit-footman", "unit-footman", "unit-knight", "unit-archer",
-            "unit-footman", "unit-ranger", "unit-paladin", "unit-archer",
-            "unit-ballista", "unit-knight", "unit-mage", "unit-gryphon-rider");
+            "unit-footman", "unit-footman", "unit-footman", "unit-footman",
+            "unit-knight", "unit-knight", "unit-paladin",
+            "unit-archer", "unit-archer", "unit-ranger",
+            "unit-ballista", "unit-dwarves", "unit-mage",
+            "unit-gryphon-rider", "unit-peasant", "unit-balloon");
     private static final List<String> ORC_ROSTER = List.of(
-            "unit-grunt", "unit-grunt", "unit-ogre", "unit-axethrower",
-            "unit-grunt", "unit-berserker", "unit-ogre-mage", "unit-axethrower",
-            "unit-catapult", "unit-ogre", "unit-death-knight", "unit-dragon");
+            "unit-grunt", "unit-grunt", "unit-grunt", "unit-grunt",
+            "unit-ogre", "unit-ogre", "unit-ogre-mage",
+            "unit-axethrower", "unit-axethrower", "unit-berserker",
+            "unit-catapult", "unit-goblin-sappers", "unit-death-knight",
+            "unit-skeleton", "unit-dragon", "unit-peon", "unit-zeppelin",
+            "unit-eye-of-vision");
+
+    static final Set<String> HUMAN_FIELD_TYPES = Set.copyOf(HUMAN_ROSTER);
+    static final Set<String> ORC_FIELD_TYPES = Set.copyOf(ORC_ROSTER);
 
     private BattleShowcase() {
     }
@@ -86,6 +108,7 @@ final class BattleShowcase {
         for (Unit unit : List.copyOf(world.unitsSnapshot())) {
             world.remove(unit);
         }
+        flattenArena(world);
 
         Player human = world.player(0);
         Player orc = world.player(1);
@@ -95,8 +118,7 @@ final class BattleShowcase {
         human.setType(net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.PERSON);
         orc.setType(net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER);
 
-        UnitType humanProbe = required(types, "unit-footman");
-        int[] centre = bestBattlefield(world, humanProbe, wanted / 2);
+        int[] centre = {world.map().width() / 2, world.map().height() / 2};
         List<int[]> leftCells = formationCells(world, centre[0], centre[1], true);
         List<int[]> rightCells = formationCells(world, centre[0], centre[1], false);
         List<Unit> left = placeArmy(world, types, 0, HUMAN_ROSTER,
@@ -111,12 +133,8 @@ final class BattleShowcase {
         world.fireBattleNetReadyForAll();
         int leftGoal = Math.min(world.map().width() - 2, centre[0] + 10);
         int rightGoal = Math.max(1, centre[0] - 10);
-        for (Unit unit : left) {
-            world.orderAttackMove(unit, leftGoal, centre[1]);
-        }
-        for (Unit unit : right) {
-            world.orderAttackMove(unit, rightGoal, centre[1]);
-        }
+        orderCharge(world, left, right, leftGoal, centre[1]);
+        orderCharge(world, right, left, rightGoal, centre[1]);
         world.recalculateSupply();
 
         List<Unit> all = new ArrayList<>(left.size() + right.size());
@@ -126,12 +144,93 @@ final class BattleShowcase {
                 centre[0], centre[1], List.copyOf(all));
     }
 
+    /**
+     * Turns the loaded retail map into a purpose-built open parade ground.
+     * The most common ordinary ground picture is retained, so the arena uses
+     * the selected pack's real tileset art, while every wall, tree, rock,
+     * coast, resource value and stale occupancy bit is removed. The source
+     * map and pack are never modified.
+     */
+    private static void flattenArena(World world) {
+        GameMap map = world.map();
+        Map<Integer, Integer> frequency = new HashMap<>();
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                MapField field = map.field(x, y);
+                long flags = field.flags();
+                if (field.isLandPassable()
+                        && (flags & (TileFlag.FOREST | TileFlag.ROCKS
+                                | TileFlag.WALL | TileFlag.COAST_ALLOWED
+                                | TileFlag.UNPASSABLE)) == 0) {
+                    frequency.merge(field.tile(), 1, Integer::sum);
+                }
+            }
+        }
+        if (frequency.isEmpty()) {
+            throw new IllegalStateException("showcase map has no ordinary open-ground tile");
+        }
+        int groundTile = frequency.entrySet().stream()
+                .max(Map.Entry.<Integer, Integer>comparingByValue()
+                        .thenComparing(Map.Entry.comparingByKey()))
+                .orElseThrow().getKey();
+        long groundFlags = map.tileset().flagsFor(groundTile)
+                & ~(GameMap.OCCUPANCY_FLAGS | TileFlag.FOREST | TileFlag.ROCKS
+                        | TileFlag.WALL | TileFlag.UNPASSABLE | TileFlag.OPAQUE
+                        | TileFlag.SUBTILES_UNPASSABLE_MASK);
+        groundFlags |= TileFlag.LAND_ALLOWED;
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                MapField field = map.field(x, y);
+                field.setTile(groundTile);
+                field.setFlags(groundFlags);
+                field.setValue(0);
+            }
+        }
+        map.recordLoadedTerrain();
+    }
+
+    /** Starts one synchronized charge using only ordinary player orders. */
+    private static void orderCharge(World world, List<Unit> army, List<Unit> enemies,
+            int x, int y) {
+        for (int index = 0; index < army.size(); index++) {
+            Unit unit = army.get(index);
+            if (unit.type().canAttack()) {
+                // Spread opening targets across the opposing formation. A
+                // single attack-move destination made hundreds of units
+                // converge on the same square and left the rear ranks
+                // technically moving but visibly idle behind the jam.
+                if (!attackFirstCompatible(world, unit, enemies, index)) {
+                    world.orderAttackMove(unit, x, y);
+                }
+            } else {
+                // Flying machines and zeppelins cannot attack. They still
+                // join the charge as scouts rather than remaining statues.
+                world.orderMove(unit, x, y);
+            }
+        }
+    }
+
+    private static boolean attackFirstCompatible(World world, Unit attacker,
+            List<Unit> enemies, int offset) {
+        for (int step = 0; step < enemies.size(); step++) {
+            Unit target = enemies.get((offset + step) % enemies.size());
+            if (target.isAlive() && target.isOnMap()
+                    && world.orderAttack(attacker, target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static List<Unit> placeArmy(World world, Map<String, UnitType> types,
             int player, List<String> roster, List<int[]> cells, int wanted) {
         List<Unit> placed = new ArrayList<>();
+        Set<String> missing = new LinkedHashSet<>(roster);
         int cursor = 0;
         for (int index = 0; index < wanted; index++) {
-            UnitType type = required(types, roster.get(index % roster.size()));
+            String ident = index < roster.size()
+                    ? roster.get(index) : roster.get(index % roster.size());
+            UnitType type = required(types, ident);
             Unit made = null;
             while (cursor < cells.size() && made == null) {
                 int[] cell = cells.get(cursor++);
@@ -144,6 +243,10 @@ final class BattleShowcase {
                 break;
             }
             placed.add(made);
+            missing.remove(ident);
+        }
+        if (wanted >= roster.size() && !missing.isEmpty()) {
+            throw new IllegalStateException("showcase could not stage " + missing);
         }
         return placed;
     }
@@ -160,37 +263,6 @@ final class BattleShowcase {
             throw new IllegalStateException("asset pack has no " + ident);
         }
         return type;
-    }
-
-    private static int[] bestBattlefield(World world, UnitType probe, int perSide) {
-        int width = world.map().width();
-        int height = world.map().height();
-        int bestX = width / 2;
-        int bestY = height / 2;
-        int bestScore = -1;
-        int step = Math.max(2, Math.min(width, height) / 24);
-        for (int y = Math.min(12, height / 4); y < height - Math.min(12, height / 4); y += step) {
-            for (int x = Math.min(18, width / 4); x < width - Math.min(18, width / 4); x += step) {
-                int score = openCells(world, probe, formationCells(world, x, y, true), perSide)
-                        + openCells(world, probe, formationCells(world, x, y, false), perSide);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestX = x;
-                    bestY = y;
-                }
-            }
-        }
-        return new int[] {bestX, bestY};
-    }
-
-    private static int openCells(World world, UnitType type, List<int[]> cells, int limit) {
-        int open = 0;
-        for (int[] cell : cells) {
-            if (fits(world, type, cell[0], cell[1]) && ++open >= limit) {
-                break;
-            }
-        }
-        return open;
     }
 
     /** Front ranks first, alternating above and below the camera centre. */
@@ -229,11 +301,12 @@ final class BattleShowcase {
      * surviving pockets otherwise reach their destination and correctly go
      * still while enemies remain elsewhere on the map.
      *
-     * <p>The director does not deal damage, move pieces, or choose targets.
-     * Every few seconds it gives only idle survivors another ordinary
-     * attack-move toward the opposing army's current centre. Everything that
-     * follows is still the normal movement, acquisition, projectile, spell,
-     * damage, death and rendering machinery.
+     * <p>The director does not deal damage or move pieces. Every few seconds
+     * it gives each disengaged survivor an ordinary attack command against
+     * the nearest compatible enemy, falling back to attack-move only when no
+     * unit target is legal. Everything that follows is still the normal
+     * movement, acquisition, projectile, spell, damage, death and rendering
+     * machinery.
      */
     static final class Director {
         private final World world;
@@ -270,8 +343,8 @@ final class BattleShowcase {
                         human.alive(), orc.alive(), 0);
             }
             nextReview = world.cycle() + DIRECTOR_INTERVAL;
-            int redirected = redirectIdle(human.units(), orc.x(), orc.y())
-                    + redirectIdle(orc.units(), human.x(), human.y());
+            int redirected = engageDisengaged(human.units(), orc.units(), orc.x(), orc.y())
+                    + engageDisengaged(orc.units(), human.units(), human.x(), human.y());
             String message = redirected > 0
                     ? "Battle raging — Human " + human.alive() + " · Orc " + orc.alive()
                     : null;
@@ -279,13 +352,38 @@ final class BattleShowcase {
                     human.alive(), orc.alive(), redirected);
         }
 
-        private int redirectIdle(List<Unit> units, int x, int y) {
+        private int engageDisengaged(List<Unit> units, List<Unit> enemies, int x, int y) {
             int redirected = 0;
             for (Unit unit : units) {
-                if (unit.isAlive() && unit.isOnMap()
-                        && unit.order() == Unit.Order.STILL
-                        && world.orderAttackMove(unit, x, y)) {
-                    redirected++;
+                if (!unit.isAlive() || !unit.isOnMap()) {
+                    continue;
+                }
+                Unit target = unit.target();
+                boolean fightingLiveTarget = unit.order() == Unit.Order.ATTACK
+                        && target != null && target.isAlive() && target.isOnMap();
+                boolean committedOrQueued = unit.animation().unbreakable()
+                        || unit.queuedReplacementPending() || unit.hasQueuedOrders();
+                if (!fightingLiveTarget && !committedOrQueued) {
+                    boolean accepted;
+                    if (unit.type().canAttack()) {
+                        // An exhausted or congestion-blocked ATTACK_MOVE is
+                        // not engagement. Give it a concrete nearby enemy so
+                        // every surviving rank keeps trying to fight.
+                        List<Unit> nearest = enemies.stream()
+                                .filter(enemy -> enemy.isAlive() && enemy.isOnMap())
+                                .sorted(java.util.Comparator.comparingInt(unit::distanceTo))
+                                .toList();
+                        accepted = attackFirstCompatible(world, unit, nearest, 0);
+                        if (!accepted) {
+                            accepted = world.orderAttackMove(unit, x, y);
+                        }
+                    } else {
+                        accepted = unit.order() == Unit.Order.STILL
+                                && world.orderMove(unit, x, y);
+                    }
+                    if (accepted) {
+                        redirected++;
+                    }
                 }
             }
             return redirected;

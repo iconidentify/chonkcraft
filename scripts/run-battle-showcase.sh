@@ -2,7 +2,7 @@
 #
 # Launch a deterministic, camera-ready battle using the normal game engine.
 #
-#   scripts/run-battle-showcase.sh                 # 240 units, visual
+#   scripts/run-battle-showcase.sh                 # 480 units, visual
 #   scripts/run-battle-showcase.sh 400             # 400 units, visual
 #   scripts/run-battle-showcase.sh --benchmark     # 400 units, 1800 cycles
 #   scripts/run-battle-showcase.sh --benchmark 600 3600
@@ -14,7 +14,7 @@ mode="${1:-}"
 
 if [[ "${mode}" != "--benchmark" ]]; then
   export CHONKCRAFT_SHOWCASE=1
-  export CHONKCRAFT_SHOWCASE_UNITS="${1:-240}"
+  export CHONKCRAFT_SHOWCASE_UNITS="${1:-480}"
   exec "${repo_root}/scripts/run-game.sh"
 fi
 

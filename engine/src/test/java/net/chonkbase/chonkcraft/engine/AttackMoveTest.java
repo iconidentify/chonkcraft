@@ -2025,4 +2025,35 @@ class AttackMoveTest {
         assertNull(marcher.offeredTarget(),
                 "offeredTarget belongs to COrder_Attack, not to CUnit");
     }
+
+    @Test
+    @DisplayName("a queued attack waits for an unbreakable Still animation to release")
+    void queuedAttackDoesNotRequeueForeverDuringCommittedStill() {
+        World world = twoSideField();
+        UnitType attackerType = soldier("unit-committed-grunt");
+        Unit attacker = world.createUnit(attackerType, 0, 5, 10);
+        Unit target = world.createUnit(soldier("unit-target-footman"), 1, 10, 10);
+        attacker.setOrder(Unit.Order.STILL);
+        attacker.animation().restore(
+                attackerType.animationSet().get(AnimationSet.State.STILL),
+                0, 4, true);
+        attacker.enqueueOrder(new Unit.QueuedOrder(
+                Unit.QueuedOrderKind.ATTACK,
+                target.tileX(), target.tileY(), target, null, null));
+        attacker.setQueuedReplacementPending(true);
+
+        world.tick();
+
+        assertEquals(Unit.Order.STILL, attacker.order(),
+                "the committed animation was interrupted");
+        assertTrue(attacker.hasQueuedOrders(),
+                "the replacement was consumed before Unbreakable released");
+
+        attacker.animation().clearUnbreakable();
+        world.tick();
+
+        assertEquals(Unit.Order.ATTACK, attacker.order());
+        assertSame(target, attacker.target());
+        assertFalse(attacker.hasQueuedOrders());
+    }
 }
