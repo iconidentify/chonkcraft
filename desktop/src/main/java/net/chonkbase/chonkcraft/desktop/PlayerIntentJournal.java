@@ -34,7 +34,7 @@ final class PlayerIntentJournal {
 
     record Entry(long id, long transactionId, long cycle, String event,
             List<Integer> selectedUnitIds, GameCommand command, Boolean accepted,
-            Gesture gesture) {}
+            Gesture gesture, Integer fanoutOrdinal) {}
 
     /** The causal result of one submitted unit command at the latest observed cycle. */
     record Outcome(long intentId, long transactionId, long submittedCycle,
@@ -115,6 +115,8 @@ final class PlayerIntentJournal {
     private final ArrayDeque<Feedback> feedbacks = new ArrayDeque<>(LIMIT);
     private long nextIntentId = 1;
     private Long activeTransactionId;
+    private long lastOrderIntentId;
+    private int nextFanoutOrdinal;
 
     /**
      * Starts one physical player transaction.
@@ -129,9 +131,12 @@ final class PlayerIntentJournal {
             Integer targetId, String targetShape, List<Integer> selectedUnitIds) {
         long id = nextIntentId++;
         activeTransactionId = id;
+        lastOrderIntentId = 0;
+        nextFanoutOrdinal = 0;
         add(new Entry(id, id, cycle, "gesture", List.copyOf(selectedUnitIds),
                 null, null, new Gesture(origin, detail, screenX, screenY,
-                        tileX, tileY, modifiers, targetId, targetShape)));
+                        tileX, tileY, modifiers, targetId, targetShape),
+                null));
         return id;
     }
 
@@ -186,11 +191,50 @@ final class PlayerIntentJournal {
                 cycle, acknowledged, mode, detail));
     }
 
+    /**
+     * Attaches acknowledgement to the most recent order in the open
+     * transaction. Retail plays one voice for a group and keeps the rest
+     * silent; the receipt has to name which intent spoke.
+     */
+    synchronized void recordLastOrderFeedback(long cycle, boolean acknowledged,
+            String mode, String detail) {
+        if (activeTransactionId == null || lastOrderIntentId <= 0) {
+            recordFeedback(cycle, acknowledged, mode, detail);
+            return;
+        }
+        while (feedbacks.size() >= LIMIT) {
+            feedbacks.removeFirst();
+        }
+        feedbacks.addLast(new Feedback(lastOrderIntentId, activeTransactionId,
+                cycle, acknowledged, mode, detail == null ? "" : detail));
+    }
+
+    /**
+     * Records that the open gesture fanned out at least one accepted order.
+     */
+    synchronized void recordAcceptedFanout(long cycle, boolean queued) {
+        if (activeTransactionId == null) {
+            return;
+        }
+        String family = null;
+        for (Entry entry : entries) {
+            if (entry.transactionId() == activeTransactionId
+                    && "order".equals(entry.event()) && entry.command() != null) {
+                family = entry.command().kind().name().toLowerCase(java.util.Locale.ROOT)
+                        .replace('_', '-');
+                break;
+            }
+        }
+        if (family != null) {
+            recordDecision(cycle, true, family, queued, "give-order");
+        }
+    }
+
     synchronized void selection(long cycle, List<Integer> selectedUnitIds) {
         long id = nextIntentId++;
         long transactionId = activeTransactionId == null ? id : activeTransactionId;
         add(new Entry(id, transactionId, cycle, "selection",
-                List.copyOf(selectedUnitIds), null, null, null));
+                List.copyOf(selectedUnitIds), null, null, null, null));
     }
 
     CommandSink wrap(CommandSink destination, LongSupplier cycle,
@@ -230,8 +274,10 @@ final class PlayerIntentJournal {
             State targetSubmitted, State delivered, Goal goal, World world) {
         long id = nextIntentId++;
         long transactionId = activeTransactionId == null ? id : activeTransactionId;
+        lastOrderIntentId = id;
+        int fanout = nextFanoutOrdinal++;
         add(new Entry(id, transactionId, cycle, "order", List.copyOf(selectedUnitIds),
-                command, accepted, null));
+                command, accepted, null, fanout));
         if (submitted == null || command.unitId() == 0) {
             return;
         }
@@ -311,14 +357,17 @@ final class PlayerIntentJournal {
         if (before == null || now == null) {
             return before != now;
         }
-        boolean tileMoved = before.tileX != now.tileX || before.tileY != now.tileY;
         // Still leftover bobs every cycle. Native first_progress is the first
         // walk pixel, not that bob -- counting it made every attack and patrol
-        // look several cycles early.
-        boolean leftoverMoved = (before.offsetX != now.offsetX
-                || before.offsetY != now.offsetY)
+        // look several cycles early. Human 1's footman also updates its tile
+        // field at cycle 9 to 22,6 while IX/IY stay 672,160 (offset -32);
+        // that pop is not movement.
+        int beforePixelX = before.tileX * Unit.TILE_PIXELS + before.offsetX;
+        int beforePixelY = before.tileY * Unit.TILE_PIXELS + before.offsetY;
+        int nowPixelX = now.tileX * Unit.TILE_PIXELS + now.offsetX;
+        int nowPixelY = now.tileY * Unit.TILE_PIXELS + now.offsetY;
+        boolean moved = (beforePixelX != nowPixelX || beforePixelY != nowPixelY)
                 && !"STILL".equals(now.order);
-        boolean moved = tileMoved || leftoverMoved;
         boolean targetChanged = targetBefore != null && targetNow != null
                 && (targetBefore.hitPoints != targetNow.hitPoints
                         || targetBefore.alive != targetNow.alive

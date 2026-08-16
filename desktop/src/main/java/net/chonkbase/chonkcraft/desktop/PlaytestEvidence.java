@@ -35,7 +35,9 @@ final class PlaytestEvidence {
             String mapPath, String campaign, int mission,
             TriggerSystem.SavedState triggerState, Path root, Instant createdAt,
             List<PlayerIntentJournal.Entry> playerIntents,
-            List<PlayerIntentJournal.Outcome> playerOutcomes) {}
+            List<PlayerIntentJournal.Outcome> playerOutcomes,
+            List<PlayerIntentJournal.Decision> playerDecisions,
+            List<PlayerIntentJournal.Feedback> playerFeedback) {}
 
     record Result(Path directory, int units, int missiles, int terrainTiles) {}
 
@@ -135,6 +137,10 @@ final class PlaytestEvidence {
 
         appendPlayerIntents(out, request.playerIntents());
         out.append(",\n");
+        appendPlayerDecisions(out, request.playerDecisions());
+        out.append(",\n");
+        appendPlayerFeedback(out, request.playerFeedback());
+        out.append(",\n");
         appendPlayerOutcomes(out, request.playerOutcomes());
         out.append(",\n");
 
@@ -157,6 +163,40 @@ final class PlaytestEvidence {
         out.append('\n');
         Files.writeString(evidence, out, StandardCharsets.UTF_8);
         return terrainTiles;
+    }
+
+    private static void appendPlayerDecisions(StringBuilder out,
+            List<PlayerIntentJournal.Decision> decisions) {
+        out.append("  \"player_decisions\": [\n");
+        List<PlayerIntentJournal.Decision> safe = decisions == null ? List.of() : decisions;
+        for (int index = 0; index < safe.size(); index++) {
+            PlayerIntentJournal.Decision decision = safe.get(index);
+            out.append("    {\"transaction_id\": ").append(decision.transactionId())
+                    .append(", \"cycle\": ").append(decision.cycle())
+                    .append(", \"accepted\": ").append(decision.accepted())
+                    .append(", \"family\": ").append(quote(decision.family()))
+                    .append(", \"queued\": ").append(decision.queued())
+                    .append(", \"reason\": ").append(quote(decision.reason()))
+                    .append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
+        }
+        out.append("  ]");
+    }
+
+    private static void appendPlayerFeedback(StringBuilder out,
+            List<PlayerIntentJournal.Feedback> feedback) {
+        out.append("  \"player_feedback\": [\n");
+        List<PlayerIntentJournal.Feedback> safe = feedback == null ? List.of() : feedback;
+        for (int index = 0; index < safe.size(); index++) {
+            PlayerIntentJournal.Feedback item = safe.get(index);
+            out.append("    {\"intent_id\": ").append(item.intentId())
+                    .append(", \"transaction_id\": ").append(item.transactionId())
+                    .append(", \"cycle\": ").append(item.cycle())
+                    .append(", \"acknowledged\": ").append(item.acknowledged())
+                    .append(", \"mode\": ").append(quote(item.mode()))
+                    .append(", \"detail\": ").append(quote(item.detail()))
+                    .append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
+        }
+        out.append("  ]");
     }
 
     private static void appendPlayerIntents(StringBuilder out,
@@ -198,6 +238,9 @@ final class PlaytestEvidence {
                         .append(", \"type_index\": ").append(command.typeIndex())
                         .append(", \"queued\": ").append(command.queued())
                         .append(", \"wire_hex\": ").append(quote(wireHex(command)))
+                        .append(", \"fanout_ordinal\": ")
+                        .append(entry.fanoutOrdinal() == null
+                                ? "null" : entry.fanoutOrdinal())
                         .append('}');
             }
             if (entry.accepted() != null) {
@@ -227,12 +270,15 @@ final class PlaytestEvidence {
                     .append(quote(outcome.terminalReason()))
                     .append(", \"tile_x\": ").append(outcome.tileX())
                     .append(", \"tile_y\": ").append(outcome.tileY())
+                    .append(", \"offset_x\": ").append(outcome.offsetX())
+                    .append(", \"offset_y\": ").append(outcome.offsetY())
                     .append(", \"order\": ").append(quote(outcome.order()))
                     .append(", \"target_id\": ").append(outcome.targetId())
                     .append(", \"hit_points\": ").append(outcome.hitPoints())
                     .append(", \"carried\": ").append(outcome.carried())
                     .append(", \"alive\": ").append(outcome.alive())
                     .append(", \"on_map\": ").append(outcome.onMap())
+                    .append(", \"missile_count\": ").append(outcome.missileCount())
                     .append('}').append(index + 1 < safe.size() ? ",\n" : "\n");
         }
         out.append("  ]");

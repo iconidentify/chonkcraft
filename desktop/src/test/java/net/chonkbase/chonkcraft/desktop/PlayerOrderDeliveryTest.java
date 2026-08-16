@@ -189,6 +189,35 @@ class PlayerOrderDeliveryTest {
     }
 
     @Test
+    @DisplayName("a field right-click journals the gesture, voice and one move")
+    void aFieldRightClickJournalsTheGestureVoiceAndOneMove() {
+        Scene scene = scene();
+        Unit footman = make(scene, "unit-footman", 0, 5, 5);
+        scene.screen().selectForTest(List.of(footman));
+        scene.screen().fieldRightClickForTest(12, 8, null);
+
+        List<PlayerIntentJournal.Entry> entries = scene.screen().intentEntriesForTest();
+        PlayerIntentJournal.Entry gesture = entries.stream()
+                .filter(entry -> "gesture".equals(entry.event()))
+                .findFirst().orElseThrow();
+        assertEquals("field", gesture.gesture().origin(),
+                "the mouse handler starts a field transaction before fan-out");
+        assertEquals("open-ground", gesture.gesture().targetShape(),
+                "empty land is open-ground after the click, not before it");
+        PlayerIntentJournal.Entry order = entries.stream()
+                .filter(entry -> "order".equals(entry.event()))
+                .findFirst().orElseThrow();
+        assertEquals(0, order.fanoutOrdinal());
+        assertEquals(GameCommand.Kind.MOVE, order.command().kind());
+        List<PlayerIntentJournal.Feedback> feedback =
+                scene.screen().intentFeedbackForTest();
+        assertEquals(1, feedback.size(), "one selected footman keeps the voice");
+        assertEquals("voice", feedback.getFirst().mode());
+        assertEquals(order.id(), feedback.getFirst().intentId());
+        assertEquals("move", scene.screen().intentDecisionsForTest().getFirst().family());
+    }
+
+    @Test
     @DisplayName("retail's ordered nine-unit selection is the command fan-out order")
     void orderedSelectionIsBoundedAndDrivesEveryRecipient() {
         Scene scene = scene();
@@ -206,7 +235,7 @@ class PlayerOrderDeliveryTest {
         assertEquals(expected, scene.screen().selectedIdsForTest(),
                 "selection lost insertion order or exceeded the native nine-slot packet");
 
-        scene.screen().commandSelectedForTest(24, 24, null);
+        scene.screen().fieldRightClickForTest(24, 24, null);
         List<Integer> recipients = scene.screen().intentEntriesForTest().stream()
                 .filter(entry -> entry.command() != null
                         && entry.command().kind() == GameCommand.Kind.MOVE)

@@ -69,6 +69,38 @@ class PlayerIntentJournalTest {
         assertEquals(transaction, entries.get(2).transactionId());
         assertTrue(entries.get(1).command().queued());
         assertTrue(entries.get(2).command().queued());
+        assertEquals(0, entries.get(1).fanoutOrdinal(),
+                "the first selected unit is fan-out ordinal zero");
+        assertEquals(1, entries.get(2).fanoutOrdinal(),
+                "the second selected unit is fan-out ordinal one");
+    }
+
+    @Test
+    @DisplayName("a group click journals one voice and silent followers")
+    void aGroupClickJournalsOneVoiceAndSilentFollowers() {
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        World world = world();
+        CommandSink recording = journal.wrap(command -> { }, world::cycle,
+                () -> List.of(7, 9), world);
+        long transaction = journal.beginGesture(10, "field", "right-click",
+                320, 240, 12, 13, "plain", null, "open-ground", List.of(7, 9));
+        try {
+            recording.issue(GameCommand.move(0, 7, 12, 13));
+            journal.recordLastOrderFeedback(10, true, "voice", "ack");
+            recording.issue(GameCommand.move(0, 9, 12, 13));
+            journal.recordLastOrderFeedback(10, true, "silent", "group-suppressed");
+            journal.recordAcceptedFanout(10, false);
+        } finally {
+            journal.endGesture(transaction);
+        }
+        List<PlayerIntentJournal.Feedback> feedback = journal.feedbackSnapshot();
+        assertEquals(2, feedback.size(), "each fanned-out order keeps its acknowledgement");
+        assertEquals("voice", feedback.get(0).mode());
+        assertEquals(journal.snapshot().get(1).id(), feedback.get(0).intentId(),
+                "the voice belongs to the first order, not the gesture");
+        assertEquals("silent", feedback.get(1).mode());
+        assertEquals("move", journal.decisionSnapshot().getFirst().family());
+        assertEquals(true, journal.decisionSnapshot().getFirst().accepted());
     }
 
     @Test

@@ -129,13 +129,22 @@ origin/modifier/family cell. An executable cell carries the real
 `blocked-on-hook` with the exact native hook debt. A GiveOrder fixture can
 never satisfy this physical-UI lane.
 
-The first causal mismatch on that same walk is not an engine edit. Native
-settles at cycle 393 with 46 hit points after first progress at 10. The Java
-CommandApplier twin of the same Human 1 footman first progresses at cycle 9
-and settles at cycle 415 with 49 hit points. Java still has no physical
-DoRightButton receipt, so certification stays 0/532 paired. The work order
-stays evidence-open: cycle-level Java traces are required before a pixel-
-versus-tile progress rule or a combat-on-the-walk rule can be written.
+`BnePhysicalAdapter` now drives `GameScreen.fieldRightClickForTest` -- the
+same gesture plus `commandSelected` path the mouse handler uses -- and writes
+a compile-ready player receipt plus a cycle-level unit log. A Human 1 field
+click of the starting footman fills the same size-1 cell on the Java side.
+First progress 10 vs 9 was observation: both engines pop the tile field to
+`(22,6)` at cycle 9 while pixels stay `672,160` until cycle 10. The journal
+now records first progress from pixel, so both receipts say 10. The first
+simulation mismatch is later: tiles still match through 152, then at 153
+native is `(24,14)` and Java is `(23,13)`. Native first takes damage at 281
+(`26,22`, 53 hp) while Java is still 60 hp on `(26,21)`, and they settle at
+393/46 vs 415/49. A two-wide click is a separate command-construction gap:
+retail dest-spreads to `(25,27)` and `(25,29)`; Java sends both footmen to
+the clicked `(25,28)`. Certification stays 0/532 paired -- the shared cell
+is not exact (0x13 wire vs lockstep bytes, then the path split).
+`engine_edit_allowed` stays false until dest-spread and the cycle-153 walk
+each have two independent native witnesses plus a held-out.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

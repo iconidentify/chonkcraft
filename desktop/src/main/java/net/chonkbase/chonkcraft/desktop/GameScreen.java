@@ -90,6 +90,7 @@ final class GameScreen extends JPanel {
 
     /** Recent causal input included when the player captures evidence. */
     private final PlayerIntentJournal intents = new PlayerIntentJournal();
+    private java.util.function.LongSupplier intentCycle = () -> 0;
 
     private volatile String status = "";
 
@@ -924,10 +925,12 @@ final class GameScreen extends JPanel {
         this.cyclingTerrain = terrain;
         this.commandPanel = commandPanel;
         this.applier = applier;
-        this.commands = intents.wrap(commands, world::cycle, this::selectedIds, world);
+        this.commands = intents.wrap(commands, () -> intentCycle.getAsLong(),
+                this::selectedIds, world);
         this.audio = audio;
         this.panel = panel;
         this.world = world;
+        this.intentCycle = world::cycle;
         this.data = data;
         this.terrain = terrain;
         this.palette = palette;
@@ -3079,8 +3082,16 @@ final class GameScreen extends JPanel {
             status = said;
             if (!acknowledged) {
                 playUnit(unit, "acknowledge", this::chooseSample);
+                intents.recordLastOrderFeedback(intentCycle.getAsLong(), true,
+                        "voice", "ack");
                 acknowledged = true;
+            } else {
+                intents.recordLastOrderFeedback(intentCycle.getAsLong(), true,
+                        "silent", "group-suppressed");
             }
+        }
+        if (acknowledged) {
+            intents.recordAcceptedFanout(intentCycle.getAsLong(), keys.shift());
         }
     }
 
@@ -3179,7 +3190,7 @@ final class GameScreen extends JPanel {
     private long beginPlayerGesture(String origin, String detail,
             int screenX, int screenY, int tileX, int tileY, Modifiers keys,
             Unit target) {
-        return intents.beginGesture(world.cycle(), origin, detail,
+        return intents.beginGesture(intentCycle.getAsLong(), origin, detail,
                 screenX, screenY, tileX, tileY, modifierLabel(keys),
                 target == null ? null : target.id(), targetShape(tileX, tileY, target),
                 selectedIds());
@@ -3216,8 +3227,8 @@ final class GameScreen extends JPanel {
      * the wire. Retail Notify is the acknowledgement.
      */
     private void recordProductionRefusal(String family, String reason) {
-        intents.recordDecision(world.cycle(), false, family, false, reason);
-        intents.recordFeedback(world.cycle(), true, "voice", reason);
+        intents.recordDecision(intentCycle.getAsLong(), false, family, false, reason);
+        intents.recordFeedback(intentCycle.getAsLong(), true, "voice", reason);
     }
 
     private String targetShape(int tileX, int tileY, Unit target) {
@@ -3558,6 +3569,25 @@ final class GameScreen extends JPanel {
         commandSelected(tileX, tileY, under, Modifiers.NONE);
     }
 
+    /**
+     * The field right-click the mouse handler runs: one gesture, then the
+     * ordered selection walks {@code commandSelected}.
+     */
+    void fieldRightClickForTest(int tileX, int tileY, Unit under) {
+        long transaction = beginPlayerGesture("field", "right-click",
+                -1, -1, tileX, tileY, Modifiers.NONE, under);
+        try {
+            commandSelected(tileX, tileY, under, Modifiers.NONE);
+        } finally {
+            finishGesture(transaction);
+        }
+    }
+
+    /** Names journal cycles from a fixture loop instead of {@link World#cycle()}. */
+    void setIntentCycleForTest(java.util.function.LongSupplier cycle) {
+        intentCycle = cycle == null ? () -> world.cycle() : cycle;
+    }
+
     GameCursors.Kind kindAtForTest(int screenX, int screenY) {
         return kindAt(screenX, screenY);
     }
@@ -3650,7 +3680,7 @@ final class GameScreen extends JPanel {
 
     /** Samples the causal result of every command after the world advances. */
     void observePlayerIntents() {
-        intents.observe(world.cycle(), world);
+        intents.observe(intentCycle.getAsLong(), world);
     }
 
     /**
@@ -4134,7 +4164,8 @@ final class GameScreen extends JPanel {
                     focusX, focusY, saveMapPath, saveCampaign, saveMission,
                     triggers == null ? null : triggers.savedState(),
                     evidenceDirectory(), java.time.Instant.now(), intents.snapshot(),
-                    intents.outcomeSnapshot()));
+                    intents.outcomeSnapshot(), intents.decisionSnapshot(),
+                    intents.feedbackSnapshot()));
             return "evidence saved " + result.directory().getFileName()
                     + " (" + result.units() + " units, " + result.missiles() + " missiles)";
         } catch (java.io.IOException | RuntimeException failed) {
