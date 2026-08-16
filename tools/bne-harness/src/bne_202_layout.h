@@ -58,6 +58,16 @@
 #define BNE_202_OPTION_FLAGS ((DWORD *) 0x004d6b50)
 #define BNE_202_OPTION_SHOW_TIPS 0x00000100UL
 #define BNE_202_CAMPAIGN_SELECTOR ((WORD *) 0x004ad350)
+/* Human 2 phase-2 circle-units table: word[player] at +0x004ad354.
+ * Phase 1 waits for RESCUED_UNITS (0x004acc30) then compares this
+ * against word 0x004abc7c and stores F_WIN into 0x004c0d88. */
+#define BNE_202_CIRCLE_UNITS ((WORD *) 0x004ad354)
+#define BNE_202_WIN ((BYTE *) 0x00459ac0)
+#define BNE_202_LOSE ((BYTE *) 0x00459be0)
+/* Word 0x004c0d84 decrements each tick; on zero it stores 200 and
+ * jumps through 0x004c0d88 (the current objective checker). */
+#define BNE_202_OBJECTIVE_COUNTDOWN ((WORD *) 0x004c0d84)
+#define BNE_202_OBJECTIVE_CHECKER ((void **) 0x004c0d88)
 #define BNE_202_CAMPAIGN_RESOURCE ((WORD *) 0x004abda2)
 #define BNE_202_CAMPAIGN_ORC ((BYTE *) 0x004abb7c)
 #define BNE_202_CUSTOM_GAME_FLAG ((BYTE *) 0x004acc2e)
