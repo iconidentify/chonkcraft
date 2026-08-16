@@ -46,7 +46,8 @@ from bne_routes import (  # noqa: E402
 )
 
 
-SCHEMA = 1
+SCHEMA = 2
+UNIVERSE_SCHEMA = "chonkcraft-bne-field-parity-universe-1"
 
 #: One `JBNEFIELD` column, as `World.battleNetFieldParity` prints them.
 COLUMN = re.compile(r"(\S+?)=(\S*)")
@@ -150,12 +151,15 @@ def _decision(before: tuple[dict, dict], now: tuple[dict, dict]) -> str:
     return "agreed"
 
 
-def score_case(state: Path, stderr: Path, through: int) -> dict[str, Any]:
+def score_case(state: Path, stderr: Path, through: int,
+               frozen_pairs: dict[int, int] | None = None) -> dict[str, Any]:
     """One case's paired unit-cycles and decision histogram."""
     native = native_cycles(state, through)
     java = java_cycles(stderr, through)
-    pairs = pair_by_first_cycle(native, java)
+    pairs = frozen_pairs if frozen_pairs is not None \
+        else pair_by_first_cycle(native, java)
     paired = in_place = 0
+    missing_samples = 0
     decisions: Counter = Counter()
     for slot, ident in pairs.items():
         before = None
@@ -163,9 +167,19 @@ def score_case(state: Path, stderr: Path, through: int) -> dict[str, Any]:
         for cycle in range(1, through + 1):
             here = native.get(cycle, {}).get(slot)
             there = java.get(cycle, {}).get(ident)
-            if here is None or there is None:
-                break
+            # Native presence defines the frozen sample universe. A Java unit
+            # that disappears early is a disagreement, not permission to make
+            # the denominator smaller. Once retail removes its unit there is
+            # no longer a native position sample to compare.
+            if here is None:
+                before = None
+                continue
             paired += 1
+            if there is None:
+                missing_samples += 1
+                parted = True
+                before = None
+                continue
             agrees = (here["x"], here["y"]) == (there["x"], there["y"])
             if agrees:
                 in_place += 1
@@ -178,7 +192,8 @@ def score_case(state: Path, stderr: Path, through: int) -> dict[str, Any]:
                 parted = True
             before = (here, there)
     return {"paired": paired, "in_place": in_place, "pairs": len(pairs),
-            "decisions": decisions}
+            "pair_map": dict(sorted(pairs.items())),
+            "missing_samples": missing_samples, "decisions": decisions}
 
 
 def sealed_state(sealed: Path, cache: Path) -> Path:
@@ -192,7 +207,8 @@ def sealed_state(sealed: Path, cache: Path) -> Path:
 
 
 def run_field_parity(survey: Path, cases: Path, through: int,
-                     cache: Path) -> dict[str, Any]:
+                     cache: Path, universe: dict[str, Any] | None = None) \
+        -> dict[str, Any]:
     """Score every case in a survey output directory against its capture."""
     scored: dict[str, dict[str, Any]] = {}
     paired = in_place = 0
@@ -204,15 +220,33 @@ def run_field_parity(survey: Path, cases: Path, through: int,
         if not sealed.exists():
             missing.append(case)
             continue
-        got = score_case(sealed_state(sealed, cache), stderr, through)
+        frozen = None
+        if universe is not None:
+            raw = (universe.get("cases") or {}).get(case)
+            if raw is None:
+                missing.append(case + " (not in frozen universe)")
+                continue
+            frozen = {int(slot): int(ident) for slot, ident in raw.items()}
+        got = score_case(sealed_state(sealed, cache), stderr, through, frozen)
         scored[case] = {"paired": got["paired"], "in_place": got["in_place"],
-                        "pairs": got["pairs"]}
+                        "pairs": got["pairs"],
+                        "missing_samples": got["missing_samples"],
+                        "pair_map": got["pair_map"]}
         paired += got["paired"]
         in_place += got["in_place"]
         decisions.update(got["decisions"])
     return {"schema": SCHEMA, "through": through, "paired": paired,
             "in_place": in_place, "cases": scored, "missing": missing,
             "decisions": dict(decisions)}
+
+
+def freeze_universe(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema": UNIVERSE_SCHEMA,
+        "through": result["through"],
+        "cases": {case: {str(slot): ident for slot, ident in got["pair_map"].items()}
+                  for case, got in sorted(result["cases"].items())},
+    }
 
 
 def render(result: dict[str, Any]) -> str:
@@ -225,7 +259,9 @@ def render(result: dict[str, Any]) -> str:
         short = got["paired"] - got["in_place"]
         if short:
             lines.append(f"  {case:28s} {got['in_place']:7d} /"
-                         f" {got['paired']:7d}  short {short}")
+                         f" {got['paired']:7d}  short {short}"
+                         + (f" missing {got.get('missing_samples', 0)}"
+                            if got.get("missing_samples") else ""))
     for case in result["missing"]:
         lines.append(f"  {case:28s} no sealed capture")
     paired = max(result["paired"], 1)
@@ -259,10 +295,26 @@ def main(argv: list[str] | None = None) -> int:
                             str(Path.home()
                                 / ".chonkcraft/work/bne-oracle/state-cache"))))
     parser.add_argument("--json-output", type=Path)
+    parser.add_argument("--universe", type=Path,
+                        help="frozen baseline native-slot to Java-id pairing")
+    parser.add_argument("--freeze-universe", type=Path,
+                        help="write the current pairing once for later candidates")
     args = parser.parse_args(argv)
 
+    universe = None
+    if args.universe is not None:
+        universe = json.loads(args.universe.read_text(encoding="utf-8"))
+        if universe.get("schema") != UNIVERSE_SCHEMA:
+            raise ValueError("unsupported field-parity universe")
+        if int(universe.get("through", 0)) < args.through:
+            raise ValueError("frozen field-parity universe is shorter than the score")
     result = run_field_parity(args.survey, args.cases, args.through,
-                              args.cache)
+                              args.cache, universe)
+    if args.freeze_universe is not None:
+        args.freeze_universe.parent.mkdir(parents=True, exist_ok=True)
+        args.freeze_universe.write_text(
+            json.dumps(freeze_universe(result), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
     if args.json_output is not None:
         args.json_output.write_text(
             json.dumps(result, indent=2, sort_keys=True) + "\n",

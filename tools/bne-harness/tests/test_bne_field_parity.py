@@ -133,6 +133,32 @@ class FieldParityTest(unittest.TestCase):
                          "the port put the unit on a different square for "
                          "three of the four cycles and they were not counted")
 
+    def test_a_java_unit_that_disappears_counts_as_missing_not_less_work(self):
+        state = written(stream([
+            {7: unit(x=2, y=2)},
+            {7: unit(x=2, y=2)},
+            {7: unit(x=2, y=2)},
+        ]), ".state.bin")
+        stderr = dumped([
+            {100: (2, 2, "-")},
+            {},
+            {},
+        ])
+        got = bne_field_parity.score_case(
+            state, stderr, through=3, frozen_pairs={7: 100})
+        self.assertEqual(3, got["paired"])
+        self.assertEqual(1, got["in_place"])
+        self.assertEqual(2, got["missing_samples"])
+
+    def test_frozen_pairing_cannot_be_recomputed_around_a_startup_regression(self):
+        state = written(stream([{7: unit(x=2, y=2)}]), ".state.bin")
+        stderr = dumped([{101: (2, 2, "-")}])
+        got = bne_field_parity.score_case(
+            state, stderr, through=1, frozen_pairs={7: 100})
+        self.assertEqual(1, got["paired"])
+        self.assertEqual(0, got["in_place"])
+        self.assertEqual(1, got["missing_samples"])
+
     def test_two_units_on_one_square_are_left_unpaired(self):
         state = written(stream([
             {7: unit(x=2, y=2), 9: unit(x=2, y=2)},
