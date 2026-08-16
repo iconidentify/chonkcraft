@@ -120,6 +120,30 @@ class BattleNetBuildingPlacementTest {
     }
 
     @Test
+    @DisplayName("the farm ring will not sit on another building's body")
+    void theFarmRingWillNotSitOnAnotherBuildingsBody() {
+        World world = new World(land(64), computer());
+        UnitType hallType = building("unit-great-hall", 4);
+        hallType.stores().add(UnitType.Resource.GOLD);
+        assertNotNull(world.createUnit(hallType, 0, 40, 40),
+                "the hall is the depot the farm ring walks around");
+        UnitType farmType = building("unit-pig-farm", 2);
+        assertNotNull(world.createUnit(farmType, 0, 41, 45),
+                "an existing farm body has to occupy its four tiles");
+        Unit peon = world.createUnit(worker(), 0, 30, 30);
+        assertNotNull(peon, "the peon asks for the next farm");
+
+        int[] site = world.aiFindBattleNetFoodPlace(peon, farmType);
+        assertNotNull(site, "open ground around the hall must still yield a farm");
+        boolean overlaps = site[0] < 41 + 2 && site[0] + 2 > 41
+                && site[1] < 45 + 2 && site[1] + 2 > 45;
+        assertTrue(!overlaps,
+                "native 0x416c40 refuses every tile that already carries a "
+                        + "building, so the next farm cannot cover 41,45; got "
+                        + site[0] + "," + site[1]);
+    }
+
+    @Test
     @DisplayName("a map too small to hold even the first ring gets no site rather "
             + "than a wrong one")
     void theSearchRefusesAMapShorterThanItsOpeningRing() {

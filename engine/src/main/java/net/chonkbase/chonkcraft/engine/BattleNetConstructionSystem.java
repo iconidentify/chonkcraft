@@ -176,6 +176,20 @@ final class BattleNetConstructionSystem {
                             "native-no-build@" + x + "," + y);
                     return false;
                 }
+                // Native 0x416c40's default mask 0x09DE includes bit 0x0800,
+                // the occupancy 0x439de0 reads from 0x4ad610 across the
+                // whole footprint. Player CheckCanBuild only refuses a
+                // solid origin -- that is why Garden of War's blacksmith
+                // packet still founds on the hall body -- but the AI ring
+                // used to accept Human 8's overlapping farm at 66,14
+                // (body of the pig-farm at 65,13) while retail keeps
+                // walking to 62,14.
+                MapField field = world.map.fieldOrNull(x, y);
+                if (field != null && field.hasFlag(TileFlag.BUILDING)) {
+                    traceBattleNetBuildRejection(builder, what, tileX, tileY,
+                            "building-body@" + x + "," + y);
+                    return false;
+                }
             }
         }
         return true;
