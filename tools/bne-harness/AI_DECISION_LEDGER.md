@@ -91,9 +91,17 @@ then a signed clamp. A 128-tile computer whose signed min never moves
 used to pad 128 down to 0 in wider integer arithmetic; retail wraps
 `0x80-5` to 123 and can leave a wrapped max of 134. Human 5 player 0,
 Orc 12 player 1, and Human 13 (all three computers) now match that box.
-That is still not every computer on every mission. A later independent
-choice that is not opcode 3, or a launch the boundary snapshots never hook,
-remains telemetry debt. Do not change engine behavior to invent those events.
+
+Post-placement bootstrap must not drain a wait-until yield. Human 5
+player 5 used to succeed predicate 3 there and run WAIT 6000 before
+fixture cycle 1; retail still holds wait 1 through warmup-2 and is
+wait 0 at PC 561 on game-after 1. A long opening WAIT still gets one
+cycle-zero decrement so Human 1 / Orc 2 stay 65532. Human 5 is now
+state-identical through 200 (cycle-2 player-5 telemetry still omits
+the native PC-pointer write). That is still not every computer on
+every mission. A later independent choice that is not opcode 3, or a
+launch the boundary snapshots never hook, remains telemetry debt. Do
+not change engine behavior to invent those events.
 
 `scripts/deploy-bne-tracer.sh` is the only rollout path for the DLL and remote
 headless driver. New captures are chowned back to the SSH operator by the

@@ -414,9 +414,16 @@ public final class AiPlayer {
     }
 
     /**
-     * Post-placement drain of short wait-until gates so land-force wants are
-     * written before the first action-33 pulse. Caps the loop so a force-size
-     * until (always false until those counters are ported) cannot spin.
+     * Writes the 0x4273e0 build box after units are placed. Install already
+     * stopped on the first wait; gameplay ticks own the opening wait-until
+     * yield.
+     *
+     * <p>Human 5 player 5 used to succeed predicate 3 during this pass and
+     * run the following WAIT 6000 before fixture cycle 1. Retail's warmup-2
+     * still holds that yield (wait 1) and game-after 1 is wait 0 at PC 561,
+     * which is why a wait-until drain cannot stay. A long opening WAIT still
+     * needs the one cycle-zero decrement that makes Human 1 / Orc 2 report
+     * 65532 at game-before 1.
      */
     public void battleNetBootstrapBytecode(World world) {
         if (battleNetAiState == null || world == null) {
@@ -438,23 +445,8 @@ public final class AiPlayer {
                         battleNetAiState, world.map().width());
             }
         }
-        for (int step = 0; step < 32; step++) {
-            int waitBefore = BattleNetAiBytecode.waitCounter(battleNetAiState);
-            int pcBefore = battleNetAiPc;
+        if (BattleNetAiBytecode.waitCounter(battleNetAiState) > 8) {
             battleNetTickBytecode(world);
-            int waitAfter = BattleNetAiBytecode.waitCounter(battleNetAiState);
-            // Long WAIT (e.g. profile 65's 65000) -- wants are live.
-            if (waitAfter > 8) {
-                return;
-            }
-            // Stuck on the same wait-until (force-size predicates).
-            if (waitAfter == 1 && battleNetAiPc == pcBefore && step > 0) {
-                return;
-            }
-            // Idle with no wait and no pc move.
-            if (waitAfter == 0 && battleNetAiPc == pcBefore && waitBefore == 0) {
-                return;
-            }
         }
     }
 

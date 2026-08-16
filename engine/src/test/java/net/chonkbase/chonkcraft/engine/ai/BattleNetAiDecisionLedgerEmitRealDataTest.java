@@ -101,6 +101,42 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("a human 5 computer still holds the wait-until yield at cycle 1")
+    void aHuman5ComputerStillHoldsTheWaitUntilYieldAtCycle1() {
+        List<AiDecisionLedger.Row> rows = emit("campaigns/human/level05h", 2);
+        List<AiDecisionLedger.Row> player5 = rowsFor(rows, 5);
+        assertTrue(player5.size() >= 2,
+                "Human 5 player 5 must emit the first two gameplay cycles");
+        assertEquals(0, player5.get(0).waitCount(),
+                "Human 5 player 5 game-after 1 is wait 0 after the yield");
+        assertEquals(561, player5.get(0).pcOffset(),
+                "Human 5 player 5 is still on the SETs that follow predicate 3");
+        assertEquals(6000, player5.get(1).waitCount(),
+                "Human 5 player 5 writes WAIT 6000 on game-after 2");
+        assertEquals(575, player5.get(1).pcOffset(),
+                "Human 5 player 5 is past WAIT 6000 on game-after 2");
+        assertEquals(65532, rowsFor(rows, 0).get(0).waitCount(),
+                "Human 5 player 0 still keeps its long opening WAIT");
+    }
+
+    @Test
+    @DisplayName("an orc 5 computer still holds the wait-until yield at cycle 1")
+    void anOrc5ComputerStillHoldsTheWaitUntilYieldAtCycle1() {
+        List<AiDecisionLedger.Row> rows = emit("campaigns/orc/level05o", 2);
+        List<AiDecisionLedger.Row> player0 = rowsFor(rows, 0);
+        assertTrue(player0.size() >= 2,
+                "Orc 5 player 0 must emit the first two gameplay cycles");
+        assertEquals(0, player0.get(0).waitCount(),
+                "Orc 5 player 0 game-after 1 is wait 0 after the yield");
+        assertEquals(3059, player0.get(0).pcOffset(),
+                "Orc 5 player 0 is still on the SETs that follow predicate 3");
+        assertEquals(6000, player0.get(1).waitCount(),
+                "Orc 5 player 0 writes WAIT 6000 on game-after 2");
+        assertEquals(3073, player0.get(1).pcOffset(),
+                "Orc 5 player 0 is past WAIT 6000 on game-after 2");
+    }
+
+    @Test
     @DisplayName("a computer whose install stored zero still arms the builder-scan latch")
     void aComputerWhoseInstallStoredZeroStillArmsTheBuilderScanLatch() {
         // Human 1 profile 1 and Human 4 profile 3 both SET +0x0c=0. Native
@@ -130,6 +166,17 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
                     map + " player " + row.player()
                             + " must keep +0x0c armed for the 0x428160 builder scan");
         }
+    }
+
+    private static List<AiDecisionLedger.Row> rowsFor(
+            List<AiDecisionLedger.Row> rows, int player) {
+        List<AiDecisionLedger.Row> found = new ArrayList<>();
+        for (AiDecisionLedger.Row row : rows) {
+            if (row.player() == player) {
+                found.add(row);
+            }
+        }
+        return found;
     }
 
     private static int firstWait(String map, int player) {
