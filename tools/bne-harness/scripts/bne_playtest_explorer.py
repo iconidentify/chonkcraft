@@ -1021,6 +1021,15 @@ def split_command_report(ledger: dict[str, Any], *,
         else:
             materially_divergent += 1
             divergent_sources.append(source)
+    # Dual-adapter execution is never enough. Completeness is only the
+    # generated denominator fully comparable, exact, and infrastructure-clean.
+    complete = (
+        generated > 0
+        and exact_parity == generated
+        and comparable == generated
+        and infrastructure_failure == 0
+        and materially_divergent == 0
+    )
     return {
         "schema": "chonkcraft-bne-command-split-report-1",
         "generated": generated,
@@ -1030,9 +1039,11 @@ def split_command_report(ledger: dict[str, Any], *,
         "exact_parity": exact_parity,
         "materially_divergent": materially_divergent,
         "infrastructure_failure": infrastructure_failure,
-        "complete": False,
-        "parity": False,
+        "complete": complete,
+        "parity": complete,
         "meaning": (
+            "generated denominator is dual-adapter exact"
+            if complete else
             "both adapters executed is not complete and is not parity"
         ),
         "divergent_sources": divergent_sources,

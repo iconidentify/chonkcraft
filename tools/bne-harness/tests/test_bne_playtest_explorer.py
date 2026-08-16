@@ -731,6 +731,24 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(split["complete"])
         self.assertFalse(split["parity"])
 
+    def test_split_report_is_complete_only_when_the_generated_denominator_is_exact(self):
+        scenario = explorer.generate_scenarios(
+            self.seed(), max_scenarios=1)[0]
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        row = explorer.execution_ledger_row(
+            scenario, native, java, source="only.bnefx")
+        split = explorer.split_command_report(
+            explorer.execution_ledger([row]), generated_scenarios=1)
+        self.assertTrue(split["complete"],
+                        "exact_parity == generated is the only complete signal")
+        self.assertTrue(split["parity"])
+        still_short = explorer.split_command_report(
+            explorer.execution_ledger([row]), generated_scenarios=2)
+        self.assertFalse(still_short["complete"],
+                         "a short executed set must not complete a larger "
+                         "generated denominator")
+
     def test_split_report_separates_an_accepted_mismatch(self):
         scenario = explorer.generate_scenarios(
             self.seed(), max_scenarios=1)[0]
