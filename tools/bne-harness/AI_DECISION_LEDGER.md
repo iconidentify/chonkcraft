@@ -115,6 +115,12 @@ expands. Human 9 and Human 12 are exact through 200; Human 7 is
 state-identical (cycle-49 telemetry still records native's box
 rewrite bytes).
 
+Opcode-3 predicate 3 reads the per-player word at `0x4addcc`, which
+`0x417700` increments for a completed peasant, peon, attack-peasant
+or attack-peon. A live gatherer walk used to count tankers that
+retail's family word never accepted. Hall peon trains use the same
+word for the `(workers-1)/2+1` reserved-train quota.
+
 Opcode-3 predicates 4/5/6 are assigned-force counters, not a live
 soldier census. Counting units used to pass `0x0d*0x0e` when the
 multiplier was still 0, so Orc 5 player 1 walked to PC 7091 while

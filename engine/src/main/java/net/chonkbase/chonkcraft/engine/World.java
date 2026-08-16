@@ -746,6 +746,15 @@ public final class World {
     private final List<List<Unit>> playerUnitOrder;
 
     /**
+     * Per-player word native {@code 0x417700} increments at {@code 0x4addcc}
+     * when a completed peasant, peon, attack-peasant or attack-peon is
+     * added. Opcode-3 predicate 3 and hall peon trains read this word, not
+     * a live gatherer walk: a tanker or an in-progress train used to fill
+     * a computer's worker gate before retail's family counter had moved.
+     */
+    private final int[] battleNetWorkerFamilyCount;
+
+    /**
      * Units covering each map square, indexed by {@code x + y * width}.
      *
      * <p>Implements {@code CMap::Insert}, {@code CMap::Remove}, and
@@ -1139,6 +1148,7 @@ public final class World {
                 Math.multiplyExact(map.width(), map.height())];
         this.players = players;
         this.playerUnitOrder = new ArrayList<>(players.length);
+        this.battleNetWorkerFamilyCount = new int[players.length];
         for (int i = 0; i < players.length; i++) {
             this.playerUnitOrder.add(new ArrayList<>());
         }
@@ -1155,6 +1165,50 @@ public final class World {
             return List.of();
         }
         return Collections.unmodifiableList(playerUnitOrder.get(player));
+    }
+
+    /**
+     * Retail's {@code 0x4addcc} worker-family word for one player.
+     *
+     * <p>Native {@code 0x417700} increments that word when a completed
+     * peasant, peon, attack-peasant or attack-peon is inserted. Predicate 3
+     * at {@code 0x424c70} and the hall train quota at {@code 0x439000} read
+     * it. A live gatherer walk used to count tankers and still-queued
+     * trainees that retail's family word had not yet accepted.
+     */
+    public int battleNetWorkerFamilyCount(int player) {
+        if (player < 0 || player >= battleNetWorkerFamilyCount.length) {
+            return 0;
+        }
+        return battleNetWorkerFamilyCount[player];
+    }
+
+    /**
+     * Whether this type shares the {@code 0x4addcc} word: PUD types 2, 3,
+     * 16 and 17.
+     */
+    public static boolean battleNetWorkerFamilyType(UnitType type) {
+        if (type == null) {
+            return false;
+        }
+        int code = PudUnitTypes.code(type.ident());
+        return code == 2 || code == 3 || code == 16 || code == 17;
+    }
+
+    private void adjustBattleNetWorkerFamilyCount(Unit unit, int delta) {
+        if (unit == null || !battleNetWorkerFamilyType(unit.type())) {
+            return;
+        }
+        if (unit.order() == Unit.Order.UNDER_CONSTRUCTION
+                || unit.currentAction() == Unit.Order.UNDER_CONSTRUCTION) {
+            return;
+        }
+        int player = unit.player();
+        if (player < 0 || player >= battleNetWorkerFamilyCount.length) {
+            return;
+        }
+        int next = battleNetWorkerFamilyCount[player] + delta;
+        battleNetWorkerFamilyCount[player] = Math.max(0, next);
     }
 
     /** {@code CPlayer::AddUnit}, excluding scenery types AssignToPlayer skips. */
@@ -1184,6 +1238,7 @@ public final class World {
             roster.set(index, roster.get(last));
         }
         roster.remove(last);
+        adjustBattleNetWorkerFamilyCount(unit, -1);
     }
 
     /**
@@ -3129,6 +3184,7 @@ public final class World {
             snapshot = List.copyOf(units);
         }
         registerPlayerUnit(unit);
+        adjustBattleNetWorkerFamilyCount(unit, 1);
         markOccupancy(unit, true);
         initializeBattleNetAiHome(unit);
         construction.markBattleNetExistingBuildingReservation(unit);

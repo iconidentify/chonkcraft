@@ -737,8 +737,8 @@ public final class AiPlayer {
             case 2 -> // owns castle/fortress
                     battleNetCountBuildings(world,
                             "unit-castle", "unit-fortress") > 0;
-            case 3 -> // worker count >= state[0x13]
-                    battleNetCountWorkers(world)
+            case 3 -> // 0x4addcc family word >= state[0x13]
+                    world.battleNetWorkerFamilyCount(playerIndex)
                             >= (state[BattleNetAiBytecode.OFF_WANTED_WORKERS] & 0xff);
             // Native force-size gates read the assigned-force counters, not
             // the live unit census. Counting soldiers used to pass
@@ -750,29 +750,6 @@ public final class AiPlayer {
                     battleNetEnemyHasWorker(world);
             default -> false;
         };
-    }
-
-    private int battleNetCountWorkers(World world) {
-        int workers = 0;
-        // Walk the full unit list: playerUnitOrder is not guaranteed to be
-        // fully populated at the post-placement bytecode bootstrap, and a
-        // zero worker count left profile 65 stuck with empty land wants.
-        for (Unit candidate : world.units()) {
-            if (candidate.player() != playerIndex
-                    || candidate.type() == null || candidate.hitPoints() <= 0) {
-                continue;
-            }
-            String ident = candidate.type().ident();
-            if ("unit-peasant".equals(ident) || "unit-peon".equals(ident)
-                    || (candidate.type().canGather()
-                        && (candidate.type().gathering().containsKey(
-                                UnitType.Resource.GOLD)
-                            || candidate.type().gathering().containsKey(
-                                    UnitType.Resource.WOOD)))) {
-                workers++;
-            }
-        }
-        return workers;
     }
 
     private int battleNetCountBuildings(World world, String... idents) {
@@ -2068,25 +2045,22 @@ public final class AiPlayer {
         }
         List<Unit> owned = world.playerUnits(playerIndex);
         UnitType workerType = null;
-        int workers = 0;
+        int workers = world.battleNetWorkerFamilyCount(playerIndex);
         int training = 0;
         for (Unit candidate : owned) {
             if (candidate.type() == null || candidate.hitPoints() <= 0) {
                 continue;
             }
-            if (candidate.type().canGather()
-                    && (candidate.type().gathering().containsKey(UnitType.Resource.GOLD)
-                        || candidate.type().gathering().containsKey(UnitType.Resource.WOOD))) {
-                workers++;
-                if (workerType == null) {
-                    workerType = candidate.type();
-                }
+            if (World.battleNetWorkerFamilyType(candidate.type())
+                    && workerType == null) {
+                workerType = candidate.type();
             }
-            if (candidate.producing() != null && candidate.producing().canGather()) {
+            if (candidate.producing() != null
+                    && World.battleNetWorkerFamilyType(candidate.producing())) {
                 training++;
             }
             for (UnitType queued : candidate.trainingQueue()) {
-                if (queued.canGather()) {
+                if (World.battleNetWorkerFamilyType(queued)) {
                     training++;
                 }
             }
