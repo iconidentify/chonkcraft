@@ -1167,20 +1167,46 @@ final class BattleNetHarvestSystem {
      * loop; this boundary is the computer ready callback at {@code 0x439280}.</p>
      */
     private boolean pauseOilForReadyDispatch(Unit worker, ResourceInfo info) {
+        if (info.resource() != UnitType.Resource.OIL) {
+            return false;
+        }
+        if (!pauseComputerForReadyDispatch(worker)) {
+            return false;
+        }
+        worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
+        worker.setBattleNetOilActionTicks(0);
+        return true;
+    }
+
+    /**
+     * Lets a computer peasant pass through the same Still/ready boundary
+     * after banking gold or wood.
+     *
+     * <p>This is only the hall-exit arm. Leaving a mine with a load still
+     * walks home; pausing there would let 0x438a50 spend the cargo on a
+     * farm before the bank sees it. Oil may pause at a platform because a
+     * tanker cannot found a farm.</p>
+     */
+    private boolean pauseLandForReadyDispatch(Unit worker, ResourceInfo info) {
+        if (info.resource() != UnitType.Resource.GOLD
+                && info.resource() != UnitType.Resource.WOOD) {
+            return false;
+        }
+        return pauseComputerForReadyDispatch(worker);
+    }
+
+    private boolean pauseComputerForReadyDispatch(Unit worker) {
         Player owner = world.player(worker.player());
         boolean computer = owner != null
                 && (owner.type()
                         == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
                     || owner.type()
                         == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE);
-        if (info.resource() != UnitType.Resource.OIL || !computer
-                || !world.ais.containsKey(worker.player())) {
+        if (!computer || !world.ais.containsKey(worker.player())) {
             return false;
         }
         worker.setReturningToDepot(false);
         worker.setOrder(Unit.Order.STILL);
-        worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
-        worker.setBattleNetOilActionTicks(0);
         return true;
     }
 
@@ -3067,7 +3093,14 @@ final class BattleNetHarvestSystem {
         // 732, 743, 754 afresh; a port that carried the old rungs across
         // the visit shoved at 732, twenty-two cycles early.
         worker.setResourceWaitLadder(0);
-        if (pauseOilForReadyDispatch(worker, info)) {
+        // Native WaitInDepot surfaces Still after the hall visit so
+        // 0x439280 can assign the next job. A computer peasant used to
+        // stay on Harvest, walk straight back to the mine, and never
+        // spend a ready marker on a farm: Human 11 player 4 kept 720
+        // gold through 1399 while retail founded 72,12 and rewrote the
+        // land box. Player-issued resource orders keep their loop.
+        if (pauseOilForReadyDispatch(worker, info)
+                || pauseLandForReadyDispatch(worker, info)) {
             return;
         }
         if (noWoodLeft
