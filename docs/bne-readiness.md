@@ -136,7 +136,7 @@ Grade: **GREEN**.
 
 Automated driver: Player wire commands move retail land, naval and air units through authenticated maps and unit data.
 
-Success means: Real units complete formation detours and terrain-domain passages while 87 large-footprint, congestion and refusal checks pass with zero skips.
+Success means: Real units complete formation detours and terrain-domain passages while 99 large-footprint, congestion and refusal checks pass with zero skips.
 
 Implementation:
 
@@ -162,7 +162,7 @@ Automated checks:
 Retail evidence:
 
 - The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.
-- The movement gate runs 100 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
+- The movement gate runs 99 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
 - Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes.
 
 Known blockers:
