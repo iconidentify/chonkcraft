@@ -3032,7 +3032,30 @@ public final class AiPlayer {
                 return world.orderReturnGoods(unit);
             }
             Unit platform = world.findBattleNetReadyOilPlatform(unit);
-            return platform != null && world.orderHarvest(unit, platform);
+            if (platform != null) {
+                return world.orderHarvest(unit, platform);
+            }
+            // Native 0x439bb6: no harvest target, so found the nearest
+            // oil-patch to the 0x438f40 depot and, if 0x40dcd0 said the
+            // bank covered a platform, issued action 28 on that patch.
+            // A ready tanker with no platform used to idle, which is why
+            // Human 14's 105,49 patch stayed empty through 750 while
+            // retail founded there at 675.
+            Unit patch = world.findBattleNetReadyOilPatch(unit);
+            if (patch == null) {
+                return false;
+            }
+            int tankerCode = PudUnitTypes.code(unit.type().ident());
+            if (tankerCode < 0) {
+                return false;
+            }
+            UnitType platformType = registeredType(world,
+                    PudUnitTypes.name((tankerCode & 1) | 0x56));
+            if (platformType == null || !player.canAfford(platformType.costs())) {
+                return false;
+            }
+            return world.orderBattleNetAiBuild(
+                    unit, platformType, patch.tileX(), patch.tileY());
         }
 
         if (!unit.type().gathering().containsKey(UnitType.Resource.GOLD)

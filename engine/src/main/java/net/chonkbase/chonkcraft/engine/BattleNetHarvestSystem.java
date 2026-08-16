@@ -2600,6 +2600,59 @@ final class BattleNetHarvestSystem {
 
 
     /**
+     * The oil patch 0x439bb6 founds a platform on when the harvest walk
+     * found none.
+     *
+     * <p>Native finds the shipyard/refinery with {@code 0x438f40}, then
+     * walks the global list for type {@code 0x5d} (oil-patch), keeps the
+     * strictly nearer patch to that depot's origin, and if {@code 0x40dcd0}
+     * says the bank covers an oil platform, issues action 28
+     * ({@code 0x436a80}) on the patch. Human 14's refinery at 93,71
+     * therefore sends the first tanker to 105,49, not the western patch
+     * at 15,57. A tanker that already has a reachable platform never
+     * reaches this walk.
+     */
+    Unit findBattleNetReadyOilPatch(Unit tanker) {
+        if (tanker == null || !tanker.isAlive() || !tanker.isOnMap()) {
+            return null;
+        }
+        boolean[] component = world.battleNetConnectivityCell(tanker);
+        Unit base = null;
+        int baseDistance = Integer.MAX_VALUE;
+        for (Unit candidate : world.playerUnits(tanker.player())) {
+            if (!candidate.isAlive() || !candidate.isOnMap()
+                    || !World.isBattleNetNavalBase(candidate.type().ident())
+                    || !world.battleNetFootprintTouchesComponent(
+                            candidate, component)) {
+                continue;
+            }
+            int distance = candidate.distanceTo(tanker.tileX(), tanker.tileY());
+            if (distance <= baseDistance) {
+                base = candidate;
+                baseDistance = distance;
+            }
+        }
+        if (base == null) {
+            return null;
+        }
+        Unit best = null;
+        int bestDistance = 0xffff;
+        for (Unit candidate : world.units) {
+            if (!candidate.isAlive() || !candidate.isOnMap()
+                    || !"unit-oil-patch".equals(candidate.type().ident())) {
+                continue;
+            }
+            int distance = candidate.distanceTo(base.tileX(), base.tileY());
+            if (distance < bestDistance) {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+
+    /**
      * The resource order's own look for another mine.
      *
      * <p>{@code UnitFindResource(unit, unit, 15, resource, AiEnabled)}: seeded at the worker, no depot in the

@@ -382,6 +382,11 @@ public final class World {
         return harvest.findBattleNetReadyOilPlatform(tanker);
     }
 
+    /** @see BattleNetHarvestSystem#findBattleNetReadyOilPatch */
+    public Unit findBattleNetReadyOilPatch(Unit tanker) {
+        return harvest.findBattleNetReadyOilPatch(tanker);
+    }
+
     /** @see BattleNetHarvestSystem#restoreHarvestState */
     public void restoreHarvestState(Unit worker, Unit resource, int tileX, int tileY,
             boolean returningToDepot, int waitCycles) {
