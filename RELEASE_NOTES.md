@@ -1,9 +1,10 @@
-# ChonkCraft 0.1.1-beta20 -- Responsive Orders and Smarter Opposition
+# Smarter Armies, Faithful Orders, and Reliable Campaigns
 
-- Fixed rejected commands erasing a unit's valid movement queue, group waypoint, or attack-move resume state. Units now keep following their prior orders when an incompatible or stale replacement command is refused.
-- Restored the ordinary skirmish computer's resource, construction, force-formation, and attack scheduler, closing forty known AI behavior failures.
-- Kept retail campaign opponents exclusively controlled by their Battle.net Edition `ai.bin` personalities, including profiles whose bytecode is only partially decoded, so a second generic AI cannot spend their resources or move their units.
-- Restored Human mission 6 assault movement when a bounded patrol route reaches an empty prefix, preventing computer attackers from freezing beside valid targets.
-- Preserved AI assault behavior, home coordinates, and carried-resource state across saves so loaded opponents and workers resume the job they had before saving.
-- Added authenticated player-intent capture and replay-outcome certification across 27 retail multiplayer replays, covering 168,788 commands and 22,518 multi-unit selections.
-- Added exact regression coverage for refused command transactions, queued replacements, retail-AI isolation, Human 6 assault recovery, and save/load cargo continuity.
+- Brought 203 of 206 authenticated player-command scenarios into exact retail behavior, including every captured Attack, Attack Move, Patrol, Repair, Train and Stop scenario.
+- Corrected attack, patrol, repair and stand-ground timing so units honor their current animation, finish residual movement and settle on the same beat as retail.
+- Expanded command coverage from 134 to 206 dual-engine scenarios, including training, stand-ground and larger command selections.
+- Improved computer base awareness, force counting, worker quotas and construction placement so opponents recognize their real home army, avoid occupied building sites and rebuild their operating area correctly.
+- Fixed several computer economy stalls: tankers can establish the nearest oil platform, workers pause correctly at the hall, and workers inside mines or platforms no longer make the computer forget its town.
+- Prevented vanishing vision markers and buildings on other islands from corrupting the computer's home-area calculations.
+- Preserved Human mission 2's rescued-unit victory countdown across save and reload.
+- Added per-cycle native AI comparison across additional campaign opponents, with several computer players now matching retail state through 1,800 simulation cycles.
