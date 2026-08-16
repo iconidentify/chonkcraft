@@ -4676,6 +4676,23 @@ public final class World {
         return false;
     }
 
+    /**
+     * Whether two units share the 0x4ad650 map-component label.
+     *
+     * <p>Native 0x438510 compares those words. 0x439ce0 uses that test
+     * when the unit-list head is a land piece, so a hall on another
+     * island does not open the 0x4273e0 box.
+     */
+    public boolean battleNetSameMapComponent(Unit a, Unit b) {
+        if (a == null || b == null || !a.isOnMap() || !b.isOnMap()
+                || a.type() == null) {
+            return false;
+        }
+        boolean[] cell = battleNetConnectivityCell(a);
+        int index = b.tileX() + b.tileY() * map.width();
+        return index >= 0 && index < cell.length && cell[index];
+    }
+
     /** Reconstructs BNE's fixed terrain-component label for one worker. */
     boolean[] battleNetConnectivityCell(Unit worker) {
         int width = map.width();

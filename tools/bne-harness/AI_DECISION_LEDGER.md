@@ -105,8 +105,15 @@ calls 0x4273e0 -- the same 49 / 99 / 149 beat as launch consume.
 Human 8 player 0 rewrites `3e164f` to `3e1656` on that beat; Human 5
 player 0 rewrites `7b3675` to `7b3175`. Java now walks again there.
 A counted building that dies a beat later in Java (Human 5 seed 1 at
-1699 vs native 1649) is combat timing, not a second box rule. That is
-still not every computer on every mission. A later independent
+1699 vs native 1649) is combat timing, not a second box rule.
+
+0x439ce0 only accepts a hall on the newest unit's 0x4ad650 map
+component (sea and air heads skip that test). A hall on another
+island used to open the box; Human 7 player 5 and Human 9 player 1
+keep the inverted 96-tile rectangle, while Human 7 player 2 still
+expands. Human 9 and Human 12 are exact through 200; Human 7 is
+state-identical (cycle-49 telemetry still records native's box
+rewrite bytes). That is still not every computer on every mission. A later independent
 choice that is not opcode 3, or a launch the boundary snapshots never
 hook, remains telemetry debt. Do not change engine behavior to invent
 those events.

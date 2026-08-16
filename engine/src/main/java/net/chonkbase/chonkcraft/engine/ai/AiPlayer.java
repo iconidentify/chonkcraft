@@ -479,17 +479,34 @@ public final class AiPlayer {
     }
 
     /**
-     * Whether native 0x4273e0 will leave the inverted box. A computer
-     * with only a tower or farm used to expand anyway; retail's
-     * 0x439ce0 probe returns null until a live hall is on the list.
+     * Whether native 0x439ce0 will return a hall for this computer.
+     *
+     * <p>0x4273e0 pushes the 0x4be264 list head (newest unit) into
+     * 0x439ce0. That walk requires type flag 0x1000 and, unless the
+     * head's type flags include {@code 0xa}, the same 0x4ad650
+     * component as the head. A hall on another island used to open
+     * the box; retail keeps the inverted map-size rectangle.
      */
     private boolean hasGoldDepot(World world) {
+        Unit head = null;
+        for (Unit unit : world.units()) {
+            if (unit != null && unit.player() == playerIndex
+                    && unit.isAlive()) {
+                head = unit;
+            }
+        }
+        if (head == null || head.type() == null) {
+            return false;
+        }
+        boolean skipComponent = head.type().seaUnit() || head.type().airUnit();
         for (Unit unit : world.units()) {
             if (unit == null || unit.player() != playerIndex
                     || !unit.isAlive() || !isGoldDepot(unit.type())) {
                 continue;
             }
-            return true;
+            if (skipComponent || world.battleNetSameMapComponent(head, unit)) {
+                return true;
+            }
         }
         return false;
     }

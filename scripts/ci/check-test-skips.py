@@ -139,7 +139,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # hermetic. The player-intent batch adds two more authenticated save
         # assertions and two authenticated desktop order-delivery assertions;
         # all four correctly join the data-free skip inventory.
-        "engine": (1366, 439),
+        "engine": (1369, 442),
         "desktop": (298, 233),
         "matchmaker-server": (4, 0),
     },
@@ -184,7 +184,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Three exact-save regressions need the operator's local Human 6 saves.
         # They are intentionally additional authenticated playtest coverage,
         # not artifacts derived from the mounted retail installation.
-        "engine": (1366, 5),
+        "engine": (1369, 5),
         "desktop": (298, 6),
         "matchmaker-server": (4, 0),
     },

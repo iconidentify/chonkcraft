@@ -101,6 +101,24 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
+    @DisplayName("a human 7 passive computer keeps the inverted box when its hall is on another island")
+    void aHuman7PassiveComputerKeepsTheInvertedBoxWhenItsHallIsOnAnotherIsland() {
+        assertBuildBox("campaigns/human/level07h", 5, 0x60, 0xff, 0xff, 0x60);
+    }
+
+    @Test
+    @DisplayName("a human 9 computer keeps the inverted box when its newest unit cannot reach the hall")
+    void aHuman9ComputerKeepsTheInvertedBoxWhenItsNewestUnitCannotReachTheHall() {
+        assertBuildBox("campaigns/human/level09h", 1, 0x60, 0xff, 0xff, 0x60);
+    }
+
+    @Test
+    @DisplayName("a human 7 computer whose newest farm shares the hall's island still expands")
+    void aHuman7ComputerWhoseNewestFarmSharesTheHallsIslandStillExpands() {
+        assertBuildBox("campaigns/human/level07h", 2, 0x1d, 0x5f, 0x5f, 0x28);
+    }
+
+    @Test
     @DisplayName("a human 5 computer pads the unused 128-tile min to 123")
     void aHuman5ComputerPadsTheUnused128TileMinTo123() {
         assertBuildBox("campaigns/human/level05h", 0, 0x7b, 0x36, 0x75, 0x7b);
