@@ -116,6 +116,11 @@ The Java save/load bug found while building this lane is closed:
 - Orc 2 flag and Human 2 countdown state have focused resume coverage; and
 - ordinary older saves remain readable through the schema-3 armed-list path.
 
+Human 8's opening TRUE DIPLOMACY trigger now survives save and resume: schema 4
+writes every directed standing, so the siege does not forget the town it was
+already attacking. That is one mutable action's Java save/resume fork, not the
+137-cell pinned-native proof.
+
 Inventory generation is not proof. Campaign GREEN requires all 137 action
 paths and authenticated victory/defeat contracts for all 52 missions through
 the released app and ChonkPack.
