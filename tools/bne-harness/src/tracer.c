@@ -246,6 +246,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_RETURN_GOODS 6
 #define SCRIPT_COMMAND_REPAIR 7
 #define SCRIPT_COMMAND_ATTACK_GROUND 8
+#define SCRIPT_COMMAND_ATTACK_MOVE 9
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -874,6 +875,17 @@ static BOOL read_command_file(void) {
                      * order 17, or order 18 when that action is refused. */
                     action = SCRIPT_COMMAND_ATTACK_GROUND;
                 } else {
+                extra = '\0';
+                fields = sscanf(cursor,
+                        "cycle %lu attack-move unit %lu x %lu y %lu %c",
+                        &cycle, &slot, &x, &y, &extra);
+                if (fields == 4) {
+                    /* Attack on empty ground is the dest path of table 8,
+                     * not table 17. Constructor 0x004366f0 jumps to
+                     * 0x00436714 when [unit+0x88] is null, then dest-check
+                     * 0x00416bc0 installs order 11 or order 10 if refused. */
+                    action = SCRIPT_COMMAND_ATTACK_MOVE;
+                } else {
                 char action_name[16];
 
                 extra = '\0';
@@ -922,6 +934,7 @@ static BOOL read_command_file(void) {
                         target = SCRIPT_NO_TARGET;
                     }
                 }
+            }
             }
             }
         }
@@ -1412,6 +1425,9 @@ static const char *script_action_name(BYTE action) {
     if (action == SCRIPT_COMMAND_ATTACK_GROUND) {
         return "attack-ground";
     }
+    if (action == SCRIPT_COMMAND_ATTACK_MOVE) {
+        return "attack-move";
+    }
     return "unknown";
 }
 
@@ -1448,6 +1464,9 @@ static unsigned int script_order_function_index(BYTE action) {
     }
     if (action == SCRIPT_COMMAND_ATTACK_GROUND) {
         return 17;
+    }
+    if (action == SCRIPT_COMMAND_ATTACK_MOVE) {
+        return 8;
     }
     return 0xff;
 }

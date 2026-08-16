@@ -58,7 +58,9 @@ infrastructure failures. This is a substantial improvement over the prior
 57/131 exact checkpoint, but it is not 126/240 parity: the remaining 109 rows
 have no dual-engine execution. Exactness is also concentrated in movement;
 repair, return-goods, patrol, attack-ground, queued commands, true group
-transactions, attack-move, stand-ground, and production remain thin or open.
+transactions, stand-ground, and production remain thin or open. Attack-move
+now has a dest-path injector and commanded dual-adapter cells; first-progress
+cadence is still open.
 
 Use `bne_playtest_explorer.py worklist` to turn the flat ledger into ranked
 systemic clusters, fixed-family counts, current-source authentication, and a

@@ -525,6 +525,46 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertTrue(java_result["observations"][0]["accepted"],
                          "GiveOrder 17 walks a peon toward the clicked grass")
 
+    def test_both_adapters_accept_a_commanded_grunt_attack_move(self):
+        pack = Path.home() / (
+            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/attack-move-1/00.bnefx"
+        )
+        if not fixture.is_file() or not pack.is_file():
+            self.skipTest("commanded grunt attack-move fixture or BNE pack missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        native_result = native.run_from_fixture(
+            scenario, fixture, PINNED, "a" * 64)
+        explorer.validate_result(native_result, scenario, "native")
+        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+        with tempfile.TemporaryDirectory() as directory:
+            adapter = explorer.Adapter("java", [
+                sys.executable, str(script),
+                "--scenario", "{scenario}", "--output", "{output}",
+                "--asset-pack", str(pack), "--skip-build",
+            ], timeout=180.0)
+            java_result = adapter.run(scenario, Path(directory))
+        explorer.validate_result(java_result, scenario, "java")
+        self.assertEqual(5, scenario["commands"][0]["issue_cycle"],
+                         "the ground attack is issued on the commanded cycle")
+        self.assertTrue(native_result["observations"][0]["accepted"],
+                        "GiveOrder table 8 dest path applied the grunt ground click")
+        self.assertTrue(java_result["observations"][0]["accepted"],
+                        "Java must take the paired grunt ground click")
+        self.assertEqual(
+            (22, 18),
+            (native_result["observations"][0]["state"]["tile_x"],
+             native_result["observations"][0]["state"]["tile_y"]),
+            "the grunt must settle on the clicked grass")
+        self.assertEqual(
+            (22, 18),
+            (java_result["observations"][0]["state"]["tile_x"],
+             java_result["observations"][0]["state"]["tile_y"]),
+            "Java must settle the grunt on the same clicked grass")
+
 
 if __name__ == "__main__":
     unittest.main()

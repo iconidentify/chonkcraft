@@ -6,6 +6,7 @@ HOST="${CHONKCRAFT_ORACLE_HOST:-i9beef}"
 REMOTE_ROOT="${CHONKCRAFT_ORACLE_ROOT:-.local/share/chonkcraft-bne-oracle}"
 DLL="$ROOT/tools/bne-harness/build/bne-trace.dll"
 HEADLESS="$ROOT/tools/bne-harness/scripts/bne_headless.py"
+ORACLE="$ROOT/tools/bne-harness/scripts/bne_oracle.py"
 
 cmake --build "$ROOT/tools/bne-harness/build" --target bne-trace -j "${BNE_BUILD_JOBS:-8}"
 local_sha="$(shasum -a 256 "$DLL" | awk '{print $1}')"
@@ -15,8 +16,11 @@ for harness in harness harness-branch-witness; do
   temporary="$remote.next"
   scp -q "$DLL" "$HOST:$temporary"
   ssh "$HOST" "test -f '$remote' && cp -p '$remote' '$remote.previous' || true; mv '$temporary' '$remote'; chmod 755 '$remote'"
-  scp -q "$HEADLESS" "$HOST:$REMOTE_ROOT/$harness/scripts/bne_headless.py.next"
-  ssh "$HOST" "mv '$REMOTE_ROOT/$harness/scripts/bne_headless.py.next' '$REMOTE_ROOT/$harness/scripts/bne_headless.py'; chmod 755 '$REMOTE_ROOT/$harness/scripts/bne_headless.py'"
+  for script in "$HEADLESS" "$ORACLE"; do
+    name="$(basename "$script")"
+    scp -q "$script" "$HOST:$REMOTE_ROOT/$harness/scripts/$name.next"
+    ssh "$HOST" "mv '$REMOTE_ROOT/$harness/scripts/$name.next' '$REMOTE_ROOT/$harness/scripts/$name'; chmod 755 '$REMOTE_ROOT/$harness/scripts/$name'"
+  done
 done
 
 for harness in harness harness-branch-witness; do

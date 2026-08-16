@@ -60,7 +60,7 @@ REPLACE_FAMILY_RANK = {
     "harvest": 3, "cast": 3, "build": 4,
 }
 INJECTOR_MOVE = re.compile(
-    r"cycle (\d+) (move|patrol|attack-ground) unit (\d+) x (\d+) y (\d+)\Z")
+    r"cycle (\d+) (move|patrol|attack-ground|attack-move) unit (\d+) x (\d+) y (\d+)\Z")
 INJECTOR_STANCE = re.compile(
     r"cycle (\d+) (stop|stand-ground|return-goods) unit (\d+)\Z")
 REGISTRY_SCHEMA = "chonkcraft-bne-native-command-registry-1"
@@ -139,6 +139,33 @@ NATIVE_FAMILY_EVIDENCE = {
         "arguments": ["issue_cycle", "unit_id", "target_id"],
         "supported_variants": ["unit-target"],
         "unsupported_variants": ["ground-click-without-target"],
+    },
+    "attack-move": {
+        "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
+        "evidence_hashes": {
+            "executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+            "order_function_index": 8,
+            "give_order": "0x00451070",
+            "dispatcher": "0x00475f80",
+            "constructor": "0x004366f0",
+            "dest_path": "0x00436714",
+            "dest_check": "0x00416bc0",
+            "dest_check_nonzero_order": 11,
+            "dest_check_zero_order": 10,
+        },
+        "encoding": (
+            "GiveOrder through the guarded campaign injector; script line "
+            "cycle N attack-move unit SLOT x X y Y. Retail 0x13 packets "
+            "carry function index 8 with dest xy and target -1. Constructor "
+            "0x004366f0 takes the dest path at 0x00436714 when the unit "
+            "target pointer is null: dest-check 0x00416bc0 then installs "
+            "order 11, or order 10 when that check returns zero. Order 10 "
+            "is still the dest walk, not a rejected click. Table 17 is "
+            "attack-ground, not this click."
+        ),
+        "arguments": ["issue_cycle", "unit_id", "x", "y"],
+        "supported_variants": ["open-ground"],
+        "unsupported_variants": ["queued-follow-up"],
     },
     "harvest": {
         "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
@@ -1445,7 +1472,7 @@ def native_command_registry(ledger: dict[str, Any] | None = None) -> dict[str, A
         dual = counts.get(name, 0)
         injector = name in {
             "move", "stop", "attack", "harvest", "patrol", "return-goods",
-            "repair", "attack-ground",
+            "repair", "attack-ground", "attack-move",
         }
         families[name] = {
             "evidence_authority": evidence["evidence_authority"],
@@ -1749,7 +1776,7 @@ def native_command_script(scenario: dict[str, Any]) -> str:
         f"# scenario-sha256 {scenario['scenario_sha256']}",
     ]
     for command in scenario["commands"]:
-        if command["kind"] in {"move", "patrol", "attack-ground"}:
+        if command["kind"] in {"move", "patrol", "attack-ground", "attack-move"}:
             if not all(isinstance(command.get(key), int) for key in ("x", "y")):
                 raise ValueError(f"{command['kind']} command has no integer destination")
             lines.append(

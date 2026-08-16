@@ -197,6 +197,18 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertIn("attack-ground unit", script)
         self.assertIn(" x ", script)
 
+    def test_native_direct_injector_emits_attack_move(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["attack-move"]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "attack-move"
+                   for command in item["commands"]))
+        script = explorer.native_command_script(scenario)
+        self.assertIn("attack-move unit", script)
+        self.assertIn(" x ", script)
+        self.assertNotIn("target", script)
+
     def test_native_direct_injector_emits_repair(self):
         seed = self.seed()
         seed["actors"][0]["capabilities"] = ["repair"]
@@ -258,6 +270,14 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertFalse(
             registry["families"]["attack-ground"]["native_execution_works"],
             "attack-ground stays fail-closed until both adapters execute it")
+        self.assertEqual(8, registry["families"]["attack-move"][
+            "evidence_hashes"]["order_function_index"])
+        self.assertEqual(
+            "0x004366f0",
+            registry["families"]["attack-move"]["evidence_hashes"]["constructor"])
+        self.assertFalse(
+            registry["families"]["attack-move"]["native_execution_works"],
+            "attack-move stays fail-closed until both adapters execute it")
 
     def test_native_command_registry_counts_only_ledger_executions(self):
         ledger = {
@@ -300,6 +320,22 @@ class PlaytestExplorerTest(unittest.TestCase):
         scenario = next(
             item for item in explorer.generate_scenarios(seed, max_scenarios=80)
             if all(command["kind"] == "attack-ground"
+                   for command in item["commands"]))
+        native = self.result(scenario, "native")
+        java = self.result(scenario, "java")
+        self.assertEqual(0, explorer.compare_results(
+            native, java, scenario)["difference_count"])
+        java["observations"][0]["accepted"] = not java["observations"][0]["accepted"]
+        report = explorer.compare_results(native, java, scenario)
+        self.assertGreater(report["difference_count"], 0)
+        self.assertEqual("accepted", report["first_difference"]["fields"][0])
+
+    def test_comparison_catches_a_mutated_attack_move_result(self):
+        seed = self.seed()
+        seed["actors"][0]["capabilities"] = ["attack-move"]
+        scenario = next(
+            item for item in explorer.generate_scenarios(seed, max_scenarios=80)
+            if all(command["kind"] == "attack-move"
                    for command in item["commands"]))
         native = self.result(scenario, "native")
         java = self.result(scenario, "java")

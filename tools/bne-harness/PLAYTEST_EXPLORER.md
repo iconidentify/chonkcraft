@@ -57,12 +57,14 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-fixture \
 ```
 
 Each generated movement, stop, patrol, attack, harvest, return-goods,
-repair or attack-ground scenario can be encoded directly for the guarded
-native command injector.
+repair, attack-ground or attack-move scenario can be encoded directly
+for the guarded native command injector.
 Those families use the same `GiveOrder` entry as the authenticated `0x13`
 dispatcher, with table indices 3, 2, 5, 8, 23, 24, 27 and 17. Return-goods packets
 carry dest `0,0` and target `-1`. Repair packets carry a live building or
-transport target. Other command families fail closed here
+transport target. Attack-move uses the dest-only shape of table 8 (dest xy,
+target `-1`); table 17 remains attack-ground. Other command families fail
+closed here
 and must use the authenticated replay-packet adapter; they are never guessed
 into native order-function calls.
 

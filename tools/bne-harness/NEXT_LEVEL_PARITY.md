@@ -22,9 +22,12 @@ are materially different, with zero infrastructure failures:
 | Return goods | 4 / 5 | one progress/terminal result |
 | Patrol | 1 / 3 | two cadence results |
 
-This is **126/131 comparable**, not 126/240 complete. Attack-move,
-stand-ground, and train are generated but have no native execution. There are
-no authenticated queued-command cells and no authenticated group transaction.
+This is **126/131 comparable**, not 126/240 complete. Attack-move now has a
+native injector (GiveOrder table 8 dest path) and commanded dual-adapter
+cells; the first Orc 1 and Human 1 ground clicks both settle on the clicked
+square and still diverge on first-progress cadence. Stand-ground and train
+remain generated without native execution. There are no authenticated
+queued-command cells and no authenticated group transaction.
 
 The first real AI-cycle proof is better than the old coarse AI counter: Orc 1
 player 1 has exact committed `ai.bin` state and exact recovered wait/predicate

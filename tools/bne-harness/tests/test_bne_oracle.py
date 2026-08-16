@@ -69,13 +69,15 @@ class OracleIdentityTest(unittest.TestCase):
             path = Path(directory) / "commands.txt"
             path.write_text(
                 "cycle 5 patrol unit 1592 x 22 y 18\n"
-                "cycle 10 attack-ground unit 1519 x 13 y 65\n",
+                "cycle 10 attack-ground unit 1519 x 13 y 65\n"
+                "cycle 15 attack-move unit 1592 x 22 y 18\n",
                 encoding="ascii")
             commands = bne_oracle.parse_command_script(path)
-        self.assertEqual(["patrol", "attack-ground"],
+        self.assertEqual(["patrol", "attack-ground", "attack-move"],
                          [command["action"] for command in commands])
         self.assertEqual((22, 18), (commands[0]["x"], commands[0]["y"]))
         self.assertEqual((13, 65), (commands[1]["x"], commands[1]["y"]))
+        self.assertEqual((22, 18), (commands[2]["x"], commands[2]["y"]))
 
     def test_parses_attack_and_harvest_command_scripts(self):
         with tempfile.TemporaryDirectory() as directory:

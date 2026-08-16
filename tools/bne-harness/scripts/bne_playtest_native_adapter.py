@@ -44,6 +44,9 @@ DEFAULT_EXECUTABLES = (
 ORDER_NAMES = {
     1: "DYING",
     2: "STILL", 3: "MOVE", 4: "PATROL", 5: "PATROL", 6: "FOLLOW", 7: "FOLLOW",
+    # 8-12 are the attack-family dest and chase bytes named ATTACK in
+    # bne_202_layout.h. 11 is the dest-accepted ground click from table 8.
+    8: "ATTACK", 9: "ATTACK", 10: "ATTACK", 11: "ATTACK", 12: "ATTACK",
     13: "STILL", 14: "STILL", 15: "STAND_GROUND", 16: "ATTACK",
     17: "ATTACK_GROUND", 18: "ATTACK_MOVE",
     22: "BUILD", 23: "HARVEST", 24: "RETURN_GOODS", 25: "HARVEST",

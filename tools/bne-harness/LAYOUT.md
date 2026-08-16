@@ -216,7 +216,8 @@ recorded as their named cycle. Both supported actions use the 2.02b routine at
 and the selected handler's executable mapping are checked at the moment of use.
 
 `move` reads entry 3 of the stock order-function table at `0x00495fcc`. `stop`
-reads entry 2, `patrol` entry 5, `attack` entry 8, `harvest` entry 23,
+reads entry 2, `patrol` entry 5, `attack` and `attack-move` entry 8,
+`harvest` entry 23,
 `return-goods` entry 24, `repair` entry 27, and `attack-ground` entry 17. Those indices are the same byte the synchronized
 `0x13` dispatcher at `0x00475f80` loads as `ORDER_FUNCTIONS[packet[7]]` before
 it calls `GiveOrder` at `0x0047617f`. Replay-pack-1 has 88 stop packets (dest
@@ -232,7 +233,10 @@ installs order 27 when the target type flags carry `0x20` (building) or
 `0x0400` (transport) and otherwise falls through to MOVE. The dispatcher does
 not special-case that index. Index 17's constructor at `0x004367a0`
 clears the unit target and installs order 17, or order 18 when that
-action is refused.
+action is refused. Index 8's constructor at `0x004366f0` installs the live
+target as order 9; a null target takes the dest path at `0x00436714`,
+where dest-check `0x00416bc0` installs order 11 or order 10 when the
+square is refused. That dest path is the scripted attack-move click.
 
 The harness does not write the order, target, or path fields directly. It
 passes BNE the live unit pointer, tile coordinates, null unit target, and BNE's
