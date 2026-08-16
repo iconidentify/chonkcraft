@@ -139,12 +139,16 @@ now records first progress from pixel, so both receipts say 10. The first
 simulation mismatch is later: tiles still match through 152, then at 153
 native is `(24,14)` and Java is `(23,13)`. Native first takes damage at 281
 (`26,22`, 53 hp) while Java is still 60 hp on `(26,21)`, and they settle at
-393/46 vs 415/49. A two-wide click is a separate command-construction gap:
-retail dest-spreads to `(25,27)` and `(25,29)`; Java sends both footmen to
-the clicked `(25,28)`. Certification stays 0/532 paired -- the shared cell
-is not exact (0x13 wire vs lockstep bytes, then the path split).
-`engine_edit_allowed` stays false until dest-spread and the cycle-153 walk
-each have two independent native witnesses plus a held-out.
+393/46 vs 415/49. A two-wide open-ground click dest-spreads on both sides:
+`DoRightButton` `0x43e330`/`0x43e530` write each soldier's dest as its tile
+plus `click - mean` on any axis whose selection span is at most three, and
+Java's field right-click now does the same, so Human 1 footmen at `(21,5)`
+and `(17,7)` onto `(25,28)` both name `(25,27)` and `(25,29)`. A three-wide
+click of those two plus `(10,13)` keeps `(25,28)` because both spans exceed
+three. Certification stays 0/532 paired -- the shared cell is not exact
+(0x13 wire vs lockstep bytes, then the cycle-153 path split).
+`engine_edit_allowed` stays false for the cycle-153 walk until that walk
+has two independent native witnesses plus a held-out.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

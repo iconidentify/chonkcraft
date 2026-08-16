@@ -41,6 +41,17 @@
 #define BNE_202_SELECTED_CURSOR ((BYTE *) 0x004bb720)
 #define BNE_202_UI_PLAYER ((BYTE *) 0x004b4984)
 #define BNE_SELECTION_LIMIT 9
+/* DoRightButton dest-spread. 0x43e330 measures the selection box and
+ * writes flags at 0x4bb848 (bit0 = x, bit1 = y), x-add 0x4bb724, y-add
+ * 0x4bb722. 0x43e530 then dest = unit.tile + add, clamped to map size.
+ * Dest-spread is skipped when 0x416bc0(click, 0xc) is nonzero. */
+#define BNE_202_DEST_SPREAD_MEASURE ((BYTE *) 0x0043e330)
+#define BNE_202_DEST_SPREAD_APPLY ((BYTE *) 0x0043e530)
+#define BNE_202_DEST_SPREAD_FLAGS ((BYTE *) 0x004bb848)
+#define BNE_202_DEST_SPREAD_X_ADD ((WORD *) 0x004bb724)
+#define BNE_202_DEST_SPREAD_Y_ADD ((WORD *) 0x004bb722)
+#define BNE_202_SQUARE_MASK_TEST ((BYTE *) 0x00416bc0)
+#define BNE_DEST_SPREAD_MAX_SPAN 3
 /* 0x4368b0 is not in ORDER_FUNCTIONS. It is the order-15 installer
  * 0x0D stand-ground reaches: push 0x0f; call 0x453130. */
 #define BNE_202_STAND_GROUND_ORDER ((BYTE *) 0x004368b0)

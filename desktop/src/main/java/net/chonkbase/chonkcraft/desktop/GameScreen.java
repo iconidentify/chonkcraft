@@ -3064,7 +3064,17 @@ final class GameScreen extends JPanel {
         // assigned, not accumulated.
         blink(under);
         boolean acknowledged = false;
-        for (Unit unit : selectedUnits()) {
+        java.util.List<Unit> group = selectedUnits();
+        // DoRightButton 0x43b870 calls 0x43e330 once, then 0x43e530 per
+        // soldier, so a compact group on open ground walks in formation
+        // instead of stacking. Used to send every selected footman to the
+        // clicked square, which is why two Human 1 soldiers stacked on
+        // 25,28 instead of spreading onto 25,27 and 25,29.
+        DestSpread spread = under == null
+                ? DestSpread.of(group, tileX, tileY,
+                        world.map().width(), world.map().height())
+                : DestSpread.none();
+        for (Unit unit : group) {
             // A building that makes units cannot be told to walk anywhere, so
             // a right click on the map is the one thing it can mean: where
             // what it makes should go. World.setRallyPoint has worked and been
@@ -3074,7 +3084,8 @@ final class GameScreen extends JPanel {
             if (setRallyPoint(unit, tileX, tileY)) {
                 continue;
             }
-            String said = rightClick(unit, tileX, tileY, under, keys);
+            String said = rightClick(unit, spread.destX(unit, tileX),
+                    spread.destY(unit, tileY), under, keys);
             if (said == null) {
                 // This kind of unit does not take orders.
                 continue;

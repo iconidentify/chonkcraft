@@ -314,6 +314,27 @@ both values whenever either changes. These addresses and the extended-player
 arrays were cross-checked against direct references in the authoritative
 binary, rather than transplanted from a shifted third-party data layout.
 
+### DoRightButton dest-spread
+
+`DoRightButton` at `0x0043b870` calls `0x0043e330` once with the clicked tile,
+then `0x0043e530` per selected unit before `GiveOrder`. `0x0043e330` first
+asks `0x00416bc0(click, 0xc)` -- a square-flags mask of the word at
+`0x004ad610` -- and returns without writing flags when that mask is nonzero.
+Otherwise it walks the nine-slot selection at `0x004bb728`, records min/max
+and sum, and if the click is outside that box it sets:
+
+- flag bit 0 and word `0x004bb724` when `max_x - min_x <= 3`, with
+  `x_add = click_x - (sum_x / count)`
+- flag bit 1 and word `0x004bb722` when `max_y - min_y <= 3`, with
+  `y_add = click_y - (sum_y / count)`
+
+`0x0043e530` then replaces dest on each armed axis with
+`unit.tile + add`, clamped to `[0, word 0x004acc2c - 1]`. A click inside the
+box, or an axis wider than three tiles, leaves dest as the click. Human 1
+footmen at `(21,5)` and `(17,7)` onto `(25,28)` therefore dest-spread to
+`(25,27)` and `(25,29)`; adding the third at `(10,13)` makes both spans
+greater than three and all three dests stay `(25,28)`.
+
 ### Projectile constructor and motion RNG
 
 The fixed-position projectile constructor at `0x0040fdc0` reaches the damage
