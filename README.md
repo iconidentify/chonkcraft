@@ -64,27 +64,33 @@ straight into a map instead of the launcher.
 
 ### Massive battle showcase
 
-For video capture or a repeatable stress run, the showcase replaces Garden of
-War's opening with two mixed armies and immediately sends them toward one
-another. It uses the normal BNE movement, targeting, combat, projectile,
-animation, sound and death paths; it is not a pre-rendered scene.
+For video capture or a repeatable stress run, the showcase turns Garden of
+War into a completely open parade ground, stages every Human and Orc land/air
+battlefield class in opposing formations, and immediately sounds a synchronized
+charge. Footmen, grunts, knights, ogres, archers, axethrowers, upgraded troops,
+siege engines, demolition teams, workers, spellcasters, scouts and flyers are
+all present. It uses the normal BNE movement, targeting, combat, projectile,
+animation, sound and death paths; it is not a pre-rendered scene and never
+modifies the source map or graphics pack.
 
 ```bash
-scripts/run-battle-showcase.sh                 # visual, 240 combatants
+scripts/run-battle-showcase.sh                 # visual, 480 combatants
 scripts/run-battle-showcase.sh 400             # visual, heavier battle
 scripts/run-battle-showcase.sh --benchmark     # 400 units, 1,800 headless cycles
 scripts/run-battle-showcase.sh --benchmark 600 3600
 ```
 
-The visual run opens on the clash for capture. The benchmark reports simulation
+The visual run opens on the centre of the clash for capture. Naval classes are
+deliberately reserved for a water arena instead of making ships sail over
+grass. The benchmark reports simulation
 throughput, casualties and damaged survivors, and fails if the armies never
 engage or the map cannot hold at least 75% of the requested force. Once the
-opening formations cross, a small showcase director periodically gives idle
-survivors another normal attack-move toward the opposing army. It does not move
-units or deal damage itself; it prevents a capture from ending in a silent
-ceasefire merely because there is no human or AI issuing the next command. The
-status line reports the remaining forces and clearly names the winner when one
-side is eliminated.
+opening formations cross, a small showcase director periodically gives every
+disengaged survivor a normal attack command against its nearest compatible
+enemy. It does not move units or deal damage itself; it prevents congestion or
+an exhausted attack-move from looking like a silent ceasefire merely because
+there is no human issuing the next command. The status line reports the
+remaining forces and clearly names the winner when one side is eliminated.
 
 The number is the combined force size and is clamped to 40–800. For a clean
 capture, close any other running ChonkCraft game first, then launch the visual
