@@ -123,8 +123,12 @@ def output_ownership_command(args: argparse.Namespace, root: Path,
         args.docker, "run", "--rm", "--network=none",
         "--security-opt=no-new-privileges",
         "--volume", f"{root}:/oracle",
+        # Do not depend on the oracle image's normal entrypoint forwarding
+        # arbitrary commands.  Ownership recovery is a maintenance operation,
+        # not a Wine capture, and must keep working if that entrypoint changes.
+        "--entrypoint", "sh",
         args.image,
-        "sh", "-c",
+        "-c",
         'chown -R "$1:$2" "$3" && chmod -R u+rwX,go-rwx "$3"',
         "normalize-output", str(os.getuid()), str(os.getgid()),
         str(container_output),
@@ -136,6 +140,43 @@ def normalize_output_ownership(args: argparse.Namespace, root: Path,
     return subprocess.run(
         output_ownership_command(args, root, container_output),
         check=False).returncode
+
+
+def verify_output_ownership(host_output: Path, *, uid: int | None = None,
+                            gid: int | None = None) -> None:
+    """Fail closed if a capture was not returned to its operator.
+
+    A successful chown command is not evidence that the bind-mounted inode is
+    usable.  Check the actual host tree before a receipt is sealed so a remote
+    capture cannot leave a root-owned trace that only *looks* successful.
+    """
+    uid = os.getuid() if uid is None else uid
+    gid = os.getgid() if gid is None else gid
+    paths = [host_output]
+    if host_output.is_dir():
+        paths.extend(host_output.rglob("*"))
+    wrong = []
+    links = []
+    for path in paths:
+        # Do not follow an unexpected link outside the already validated
+        # output subtree.
+        if path.is_symlink():
+            links.append(str(path))
+            if len(links) == 5:
+                break
+            continue
+        status = path.lstat()
+        if status.st_uid != uid or status.st_gid != gid:
+            wrong.append(f"{path} ({status.st_uid}:{status.st_gid})")
+            if len(wrong) == 5:
+                break
+    if wrong:
+        raise RuntimeError(
+            "capture output is not owned by the oracle operator: "
+            + ", ".join(wrong))
+    if links:
+        raise RuntimeError(
+            "capture output contains symbolic links: " + ", ".join(links))
 
 
 def run(args: argparse.Namespace) -> int:
@@ -652,6 +693,7 @@ def snapshot_capture(args: argparse.Namespace) -> int:
     container_id = started.stdout.strip()
     if not container_id:
         raise RuntimeError("Docker did not return a snapshot-capture container id")
+    primary_failure: BaseException | None = None
     try:
         _wait_for_file(host_ready, args.timeout)
         ready = dict(part.split("=", 1)
@@ -703,6 +745,13 @@ def snapshot_capture(args: argparse.Namespace) -> int:
                 capture_output=True, text=True,
             )
             raise RuntimeError("snapshot oracle failed: " + logs.stderr[-2000:])
+        # GDB and Wine run privileged on the remote worker.  Return every
+        # inode before the unprivileged process reads and seals the capture;
+        # doing this only in ``finally`` made failed captures recoverable but
+        # let successful sealing depend on world-readable root files.
+        if normalize_output_ownership(args, root, container_output) != 0:
+            raise RuntimeError("could not return snapshot evidence to oracle operator")
+        verify_output_ownership(host_output)
         snapshot_path, manifest_path = seal_snapshot_capture(
             specification, host_history, sealed_root,
             executable=game / "Warcraft II BNE.exe",
@@ -713,13 +762,32 @@ def snapshot_capture(args: argparse.Namespace) -> int:
         print(f"sealed native snapshot: {snapshot_path}")
         print(f"snapshot manifest: {manifest_path}")
         return 0
+    except BaseException as failure:
+        primary_failure = failure
+        raise
     finally:
-        subprocess.run(
-            [args.docker, "rm", "--force", args.name],
-            check=False, capture_output=True, text=True,
-        )
-        if normalize_output_ownership(args, root, container_output) != 0:
-            raise RuntimeError("could not return snapshot evidence to oracle operator")
+        cleanup_failures: list[BaseException] = []
+        try:
+            subprocess.run(
+                [args.docker, "rm", "--force", args.name],
+                check=False, capture_output=True, text=True,
+            )
+        except BaseException as failure:
+            cleanup_failures.append(failure)
+        try:
+            if normalize_output_ownership(args, root, container_output) != 0:
+                cleanup_failures.append(RuntimeError(
+                    "could not return snapshot evidence to oracle operator"))
+        except BaseException as failure:
+            cleanup_failures.append(failure)
+        if cleanup_failures:
+            if primary_failure is None:
+                first, *rest = cleanup_failures
+                for failure in rest:
+                    first.add_note(f"additional cleanup failure: {failure}")
+                raise first
+            for failure in cleanup_failures:
+                primary_failure.add_note(f"cleanup failure: {failure}")
 
 
 def corpus(args: argparse.Namespace) -> int:

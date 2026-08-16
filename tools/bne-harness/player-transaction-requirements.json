@@ -1,88 +1,1733 @@
 {
-  "schema": "chonkcraft-bne-player-transaction-requirements-1",
-  "minimum_transactions": 240,
-  "minimum_group_transactions": 24,
+  "schema": "chonkcraft-bne-player-transaction-requirements-2",
+  "fixed_cell_count": 532,
+  "cell_format": "origin|modifiers|selection-size|target-shape|family|queued-or-immediate|accepted-or-rejected",
+  "required_layers": [
+    "gesture",
+    "ordered-selection",
+    "target-interpretation",
+    "wire-fanout",
+    "acceptance",
+    "acknowledgement",
+    "first-progress",
+    "terminal-outcome"
+  ],
+  "feedback_modes": [
+    "voice",
+    "silent"
+  ],
+  "required_uninstrumented_routes": [
+    {
+      "id": "keyboard-command-hotkeys",
+      "origin": "keyboard",
+      "required_hook": "begin and retain one player transaction from the hotkey through immediate command dispatch; aimed hotkeys also require continuity through the later field click"
+    },
+    {
+      "id": "production-prewire-refusal-decision",
+      "origin": "field-and-command-panel",
+      "required_hook": "emit authenticated family, queued=false, refusal reason and acknowledgement on both Java and native when build/train/research/upgrade is refused before any wire command"
+    }
+  ],
   "origins": [
-    "field",
-    "minimap",
     "command-panel",
-    "keyboard"
+    "field",
+    "minimap"
   ],
   "modifiers": [
+    "alt",
+    "control",
+    "control+alt",
     "plain",
     "shift",
-    "control",
-    "alt",
-    "control+alt"
+    "shift+alt",
+    "shift+control",
+    "shift+control+alt"
   ],
-  "selection_sizes": [1, 2, 9],
+  "selection_sizes": [
+    1,
+    2,
+    9
+  ],
   "target_shapes": [
-    "open-ground",
-    "occupied-ground",
-    "unit",
     "building",
-    "wall",
-    "trees",
-    "shore",
-    "water",
+    "occupied-ground",
     "oil-patch",
-    "transport"
+    "open-ground",
+    "shore",
+    "transport",
+    "trees",
+    "unit",
+    "wall",
+    "water"
   ],
   "families": [
-    "move",
     "attack",
-    "stop",
-    "harvest",
+    "attack-ground",
+    "attack-move",
+    "autocast",
+    "board",
     "build",
-    "train",
-    "research",
+    "cancel-build",
+    "cancel-research",
+    "cancel-train",
+    "cancel-upgrade-to",
     "cast",
+    "defend",
+    "dismiss",
+    "explore",
+    "follow",
+    "harvest",
+    "move",
     "patrol",
     "repair",
-    "explore",
+    "research",
     "return-goods",
     "stand-ground",
-    "attack-ground",
+    "stop",
+    "train",
     "unload",
     "unload-one",
-    "board",
-    "autocast",
-    "follow",
-    "upgrade-to",
-    "cancel-train",
-    "cancel-research",
-    "cancel-upgrade-to",
-    "cancel-build",
-    "dismiss",
-    "attack-move",
-    "defend"
+    "upgrade-to"
   ],
   "queueable_families": [
-    "move",
     "attack",
+    "attack-ground",
+    "attack-move",
+    "board",
+    "build",
+    "cast",
+    "defend",
+    "follow",
     "harvest",
+    "move",
     "patrol",
     "repair",
-    "return-goods",
-    "stand-ground",
-    "attack-ground",
-    "board",
-    "follow",
-    "attack-move",
-    "defend"
+    "return-goods"
   ],
   "rejection_families": [
-    "move",
     "attack",
-    "harvest",
-    "build",
-    "train",
-    "research",
-    "cast",
-    "repair",
-    "return-goods",
-    "unload",
+    "attack-ground",
     "board",
+    "build",
+    "cast",
+    "harvest",
+    "move",
+    "patrol",
+    "research",
+    "train",
     "upgrade-to"
+  ],
+  "route_capabilities": [
+    {
+      "id": "world-right-click",
+      "gesture": "right-click",
+      "origins": [
+        "field",
+        "minimap"
+      ],
+      "selection_sizes": [
+        1,
+        2,
+        9
+      ],
+      "queue_rule": "shift-modifier",
+      "variants": [
+        {
+          "modifiers": "plain",
+          "target_shape": "open-ground",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "occupied-ground",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "shore",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "water",
+          "family": "move",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "attack",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "attack",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "trees",
+          "family": "harvest",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "oil-patch",
+          "family": "harvest",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "repair",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "repair",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "return-goods",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "transport",
+          "family": "board",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "follow",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "wall",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "open-ground",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "occupied-ground",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "shore",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "water",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "unit",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "building",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "unit",
+          "family": "attack",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "building",
+          "family": "attack",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "trees",
+          "family": "harvest",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "oil-patch",
+          "family": "harvest",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "unit",
+          "family": "repair",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "building",
+          "family": "repair",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "building",
+          "family": "return-goods",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "transport",
+          "family": "board",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "unit",
+          "family": "follow",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "wall",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "unit",
+          "family": "follow",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "building",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "open-ground",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "occupied-ground",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "shore",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "water",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "trees",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "unit",
+          "family": "follow",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "building",
+          "family": "move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "open-ground",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "occupied-ground",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "shore",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "water",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control",
+          "target_shape": "trees",
+          "family": "attack-move",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "alt",
+          "target_shape": "unit",
+          "family": "defend",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "alt",
+          "target_shape": "building",
+          "family": "defend",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+alt",
+          "target_shape": "unit",
+          "family": "defend",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+alt",
+          "target_shape": "building",
+          "family": "defend",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "open-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "occupied-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "unit",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "building",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "wall",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "trees",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "shore",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "water",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "oil-patch",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control+alt",
+          "target_shape": "transport",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "open-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "occupied-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "unit",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "building",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "wall",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "trees",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "shore",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "water",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "oil-patch",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift+control+alt",
+          "target_shape": "transport",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "field-aimed-command",
+      "gesture": "aim-command",
+      "origins": [
+        "field"
+      ],
+      "selection_sizes": [
+        1,
+        2,
+        9
+      ],
+      "queue_rule": "shift-modifier",
+      "variants": [
+        {
+          "modifiers": "plain",
+          "target_shape": "open-ground",
+          "family": "patrol",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "open-ground",
+          "family": "patrol",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "open-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "open-ground",
+          "family": "attack-ground",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "cast",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "unit",
+          "family": "cast",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "cast",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "building",
+          "family": "cast",
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "shore",
+          "family": "unload",
+          "dispositions": [
+            "accepted"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "field-building-placement",
+      "gesture": "place-building",
+      "origins": [
+        "field"
+      ],
+      "selection_sizes": [
+        1
+      ],
+      "queue_rule": "shift-modifier",
+      "variants": [
+        {
+          "modifiers": "plain",
+          "target_shape": "open-ground",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "shore",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "oil-patch",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "open-ground",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "shore",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "shift",
+          "target_shape": "oil-patch",
+          "family": "build",
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "field-critter-dismiss",
+      "gesture": "select",
+      "origins": [
+        "field"
+      ],
+      "selection_sizes": [
+        1
+      ],
+      "queue_rule": "never",
+      "variants": [
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "dismiss",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "command-panel-direct",
+      "gesture": "button-or-slot",
+      "origins": [
+        "command-panel"
+      ],
+      "selection_sizes": [
+        1
+      ],
+      "queue_rule": "never",
+      "variants": [
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stop",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stop",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stop",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stand-ground",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stand-ground",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "stand-ground",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "explore",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "explore",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "explore",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "return-goods",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "return-goods",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "return-goods",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "cast",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "cast",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "cast",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "unit",
+          "family": "autocast",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "unit",
+          "family": "autocast",
+          "selection_sizes": [
+            2
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "control",
+          "target_shape": "unit",
+          "family": "autocast",
+          "selection_sizes": [
+            9
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "train",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "research",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "upgrade-to",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "cancel-train",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "cancel-research",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "cancel-upgrade-to",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "building",
+          "family": "cancel-build",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "transport",
+          "family": "unload",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        },
+        {
+          "modifiers": "plain",
+          "target_shape": "unit",
+          "family": "unload-one",
+          "selection_sizes": [
+            1
+          ],
+          "dispositions": [
+            "accepted"
+          ]
+        }
+      ]
+    }
+  ],
+  "cells": [
+    "field|plain|1|open-ground|move|immediate|accepted",
+    "field|plain|2|open-ground|move|immediate|accepted",
+    "field|plain|9|open-ground|move|immediate|accepted",
+    "minimap|plain|1|open-ground|move|immediate|accepted",
+    "minimap|plain|2|open-ground|move|immediate|accepted",
+    "minimap|plain|9|open-ground|move|immediate|accepted",
+    "field|plain|1|occupied-ground|move|immediate|accepted",
+    "field|plain|2|occupied-ground|move|immediate|accepted",
+    "field|plain|9|occupied-ground|move|immediate|accepted",
+    "minimap|plain|1|occupied-ground|move|immediate|accepted",
+    "minimap|plain|2|occupied-ground|move|immediate|accepted",
+    "minimap|plain|9|occupied-ground|move|immediate|accepted",
+    "field|plain|1|shore|move|immediate|accepted",
+    "field|plain|2|shore|move|immediate|accepted",
+    "field|plain|9|shore|move|immediate|accepted",
+    "minimap|plain|1|shore|move|immediate|accepted",
+    "minimap|plain|2|shore|move|immediate|accepted",
+    "minimap|plain|9|shore|move|immediate|accepted",
+    "field|plain|1|water|move|immediate|accepted",
+    "field|plain|1|water|move|immediate|rejected",
+    "field|plain|2|water|move|immediate|accepted",
+    "field|plain|2|water|move|immediate|rejected",
+    "field|plain|9|water|move|immediate|accepted",
+    "field|plain|9|water|move|immediate|rejected",
+    "minimap|plain|1|water|move|immediate|accepted",
+    "minimap|plain|1|water|move|immediate|rejected",
+    "minimap|plain|2|water|move|immediate|accepted",
+    "minimap|plain|2|water|move|immediate|rejected",
+    "minimap|plain|9|water|move|immediate|accepted",
+    "minimap|plain|9|water|move|immediate|rejected",
+    "field|plain|1|unit|move|immediate|accepted",
+    "field|plain|2|unit|move|immediate|accepted",
+    "field|plain|9|unit|move|immediate|accepted",
+    "minimap|plain|1|unit|move|immediate|accepted",
+    "minimap|plain|2|unit|move|immediate|accepted",
+    "minimap|plain|9|unit|move|immediate|accepted",
+    "field|plain|1|building|move|immediate|accepted",
+    "field|plain|2|building|move|immediate|accepted",
+    "field|plain|9|building|move|immediate|accepted",
+    "minimap|plain|1|building|move|immediate|accepted",
+    "minimap|plain|2|building|move|immediate|accepted",
+    "minimap|plain|9|building|move|immediate|accepted",
+    "field|plain|1|unit|attack|immediate|accepted",
+    "field|plain|2|unit|attack|immediate|accepted",
+    "field|plain|9|unit|attack|immediate|accepted",
+    "minimap|plain|1|unit|attack|immediate|accepted",
+    "minimap|plain|2|unit|attack|immediate|accepted",
+    "minimap|plain|9|unit|attack|immediate|accepted",
+    "field|plain|1|building|attack|immediate|accepted",
+    "field|plain|1|building|attack|immediate|rejected",
+    "field|plain|2|building|attack|immediate|accepted",
+    "field|plain|2|building|attack|immediate|rejected",
+    "field|plain|9|building|attack|immediate|accepted",
+    "field|plain|9|building|attack|immediate|rejected",
+    "minimap|plain|1|building|attack|immediate|accepted",
+    "minimap|plain|1|building|attack|immediate|rejected",
+    "minimap|plain|2|building|attack|immediate|accepted",
+    "minimap|plain|2|building|attack|immediate|rejected",
+    "minimap|plain|9|building|attack|immediate|accepted",
+    "minimap|plain|9|building|attack|immediate|rejected",
+    "field|plain|1|trees|harvest|immediate|accepted",
+    "field|plain|1|trees|harvest|immediate|rejected",
+    "field|plain|2|trees|harvest|immediate|accepted",
+    "field|plain|2|trees|harvest|immediate|rejected",
+    "field|plain|9|trees|harvest|immediate|accepted",
+    "field|plain|9|trees|harvest|immediate|rejected",
+    "minimap|plain|1|trees|harvest|immediate|accepted",
+    "minimap|plain|1|trees|harvest|immediate|rejected",
+    "minimap|plain|2|trees|harvest|immediate|accepted",
+    "minimap|plain|2|trees|harvest|immediate|rejected",
+    "minimap|plain|9|trees|harvest|immediate|accepted",
+    "minimap|plain|9|trees|harvest|immediate|rejected",
+    "field|plain|1|oil-patch|harvest|immediate|accepted",
+    "field|plain|2|oil-patch|harvest|immediate|accepted",
+    "field|plain|9|oil-patch|harvest|immediate|accepted",
+    "minimap|plain|1|oil-patch|harvest|immediate|accepted",
+    "minimap|plain|2|oil-patch|harvest|immediate|accepted",
+    "minimap|plain|9|oil-patch|harvest|immediate|accepted",
+    "field|plain|1|unit|repair|immediate|accepted",
+    "field|plain|2|unit|repair|immediate|accepted",
+    "field|plain|9|unit|repair|immediate|accepted",
+    "minimap|plain|1|unit|repair|immediate|accepted",
+    "minimap|plain|2|unit|repair|immediate|accepted",
+    "minimap|plain|9|unit|repair|immediate|accepted",
+    "field|plain|1|building|repair|immediate|accepted",
+    "field|plain|2|building|repair|immediate|accepted",
+    "field|plain|9|building|repair|immediate|accepted",
+    "minimap|plain|1|building|repair|immediate|accepted",
+    "minimap|plain|2|building|repair|immediate|accepted",
+    "minimap|plain|9|building|repair|immediate|accepted",
+    "field|plain|1|building|return-goods|immediate|accepted",
+    "field|plain|2|building|return-goods|immediate|accepted",
+    "field|plain|9|building|return-goods|immediate|accepted",
+    "minimap|plain|1|building|return-goods|immediate|accepted",
+    "minimap|plain|2|building|return-goods|immediate|accepted",
+    "minimap|plain|9|building|return-goods|immediate|accepted",
+    "field|plain|1|transport|board|immediate|accepted",
+    "field|plain|1|transport|board|immediate|rejected",
+    "field|plain|2|transport|board|immediate|accepted",
+    "field|plain|2|transport|board|immediate|rejected",
+    "field|plain|9|transport|board|immediate|accepted",
+    "field|plain|9|transport|board|immediate|rejected",
+    "minimap|plain|1|transport|board|immediate|accepted",
+    "minimap|plain|1|transport|board|immediate|rejected",
+    "minimap|plain|2|transport|board|immediate|accepted",
+    "minimap|plain|2|transport|board|immediate|rejected",
+    "minimap|plain|9|transport|board|immediate|accepted",
+    "minimap|plain|9|transport|board|immediate|rejected",
+    "field|plain|1|unit|follow|immediate|accepted",
+    "field|plain|2|unit|follow|immediate|accepted",
+    "field|plain|9|unit|follow|immediate|accepted",
+    "minimap|plain|1|unit|follow|immediate|accepted",
+    "minimap|plain|2|unit|follow|immediate|accepted",
+    "minimap|plain|9|unit|follow|immediate|accepted",
+    "field|plain|1|wall|attack-ground|immediate|accepted",
+    "field|plain|2|wall|attack-ground|immediate|accepted",
+    "field|plain|9|wall|attack-ground|immediate|accepted",
+    "minimap|plain|1|wall|attack-ground|immediate|accepted",
+    "minimap|plain|2|wall|attack-ground|immediate|accepted",
+    "minimap|plain|9|wall|attack-ground|immediate|accepted",
+    "field|shift|1|open-ground|move|queued|accepted",
+    "field|shift|2|open-ground|move|queued|accepted",
+    "field|shift|9|open-ground|move|queued|accepted",
+    "minimap|shift|1|open-ground|move|queued|accepted",
+    "minimap|shift|2|open-ground|move|queued|accepted",
+    "minimap|shift|9|open-ground|move|queued|accepted",
+    "field|shift|1|occupied-ground|move|queued|accepted",
+    "field|shift|2|occupied-ground|move|queued|accepted",
+    "field|shift|9|occupied-ground|move|queued|accepted",
+    "minimap|shift|1|occupied-ground|move|queued|accepted",
+    "minimap|shift|2|occupied-ground|move|queued|accepted",
+    "minimap|shift|9|occupied-ground|move|queued|accepted",
+    "field|shift|1|shore|move|queued|accepted",
+    "field|shift|2|shore|move|queued|accepted",
+    "field|shift|9|shore|move|queued|accepted",
+    "minimap|shift|1|shore|move|queued|accepted",
+    "minimap|shift|2|shore|move|queued|accepted",
+    "minimap|shift|9|shore|move|queued|accepted",
+    "field|shift|1|water|move|queued|accepted",
+    "field|shift|2|water|move|queued|accepted",
+    "field|shift|9|water|move|queued|accepted",
+    "minimap|shift|1|water|move|queued|accepted",
+    "minimap|shift|2|water|move|queued|accepted",
+    "minimap|shift|9|water|move|queued|accepted",
+    "field|shift|1|unit|move|queued|accepted",
+    "field|shift|2|unit|move|queued|accepted",
+    "field|shift|9|unit|move|queued|accepted",
+    "minimap|shift|1|unit|move|queued|accepted",
+    "minimap|shift|2|unit|move|queued|accepted",
+    "minimap|shift|9|unit|move|queued|accepted",
+    "field|shift|1|building|move|queued|accepted",
+    "field|shift|2|building|move|queued|accepted",
+    "field|shift|9|building|move|queued|accepted",
+    "minimap|shift|1|building|move|queued|accepted",
+    "minimap|shift|2|building|move|queued|accepted",
+    "minimap|shift|9|building|move|queued|accepted",
+    "field|shift|1|unit|attack|queued|accepted",
+    "field|shift|2|unit|attack|queued|accepted",
+    "field|shift|9|unit|attack|queued|accepted",
+    "minimap|shift|1|unit|attack|queued|accepted",
+    "minimap|shift|2|unit|attack|queued|accepted",
+    "minimap|shift|9|unit|attack|queued|accepted",
+    "field|shift|1|building|attack|queued|accepted",
+    "field|shift|2|building|attack|queued|accepted",
+    "field|shift|9|building|attack|queued|accepted",
+    "minimap|shift|1|building|attack|queued|accepted",
+    "minimap|shift|2|building|attack|queued|accepted",
+    "minimap|shift|9|building|attack|queued|accepted",
+    "field|shift|1|trees|harvest|queued|accepted",
+    "field|shift|2|trees|harvest|queued|accepted",
+    "field|shift|9|trees|harvest|queued|accepted",
+    "minimap|shift|1|trees|harvest|queued|accepted",
+    "minimap|shift|2|trees|harvest|queued|accepted",
+    "minimap|shift|9|trees|harvest|queued|accepted",
+    "field|shift|1|oil-patch|harvest|queued|accepted",
+    "field|shift|2|oil-patch|harvest|queued|accepted",
+    "field|shift|9|oil-patch|harvest|queued|accepted",
+    "minimap|shift|1|oil-patch|harvest|queued|accepted",
+    "minimap|shift|2|oil-patch|harvest|queued|accepted",
+    "minimap|shift|9|oil-patch|harvest|queued|accepted",
+    "field|shift|1|unit|repair|queued|accepted",
+    "field|shift|2|unit|repair|queued|accepted",
+    "field|shift|9|unit|repair|queued|accepted",
+    "minimap|shift|1|unit|repair|queued|accepted",
+    "minimap|shift|2|unit|repair|queued|accepted",
+    "minimap|shift|9|unit|repair|queued|accepted",
+    "field|shift|1|building|repair|queued|accepted",
+    "field|shift|2|building|repair|queued|accepted",
+    "field|shift|9|building|repair|queued|accepted",
+    "minimap|shift|1|building|repair|queued|accepted",
+    "minimap|shift|2|building|repair|queued|accepted",
+    "minimap|shift|9|building|repair|queued|accepted",
+    "field|shift|1|building|return-goods|queued|accepted",
+    "field|shift|2|building|return-goods|queued|accepted",
+    "field|shift|9|building|return-goods|queued|accepted",
+    "minimap|shift|1|building|return-goods|queued|accepted",
+    "minimap|shift|2|building|return-goods|queued|accepted",
+    "minimap|shift|9|building|return-goods|queued|accepted",
+    "field|shift|1|transport|board|queued|accepted",
+    "field|shift|2|transport|board|queued|accepted",
+    "field|shift|9|transport|board|queued|accepted",
+    "minimap|shift|1|transport|board|queued|accepted",
+    "minimap|shift|2|transport|board|queued|accepted",
+    "minimap|shift|9|transport|board|queued|accepted",
+    "field|shift|1|unit|follow|queued|accepted",
+    "field|shift|2|unit|follow|queued|accepted",
+    "field|shift|9|unit|follow|queued|accepted",
+    "minimap|shift|1|unit|follow|queued|accepted",
+    "minimap|shift|2|unit|follow|queued|accepted",
+    "minimap|shift|9|unit|follow|queued|accepted",
+    "field|shift|1|wall|attack-ground|queued|accepted",
+    "field|shift|2|wall|attack-ground|queued|accepted",
+    "field|shift|9|wall|attack-ground|queued|accepted",
+    "minimap|shift|1|wall|attack-ground|queued|accepted",
+    "minimap|shift|2|wall|attack-ground|queued|accepted",
+    "minimap|shift|9|wall|attack-ground|queued|accepted",
+    "field|control|1|unit|follow|immediate|accepted",
+    "field|control|2|unit|follow|immediate|accepted",
+    "field|control|9|unit|follow|immediate|accepted",
+    "minimap|control|1|unit|follow|immediate|accepted",
+    "minimap|control|2|unit|follow|immediate|accepted",
+    "minimap|control|9|unit|follow|immediate|accepted",
+    "field|control|1|building|move|immediate|accepted",
+    "field|control|2|building|move|immediate|accepted",
+    "field|control|9|building|move|immediate|accepted",
+    "minimap|control|1|building|move|immediate|accepted",
+    "minimap|control|2|building|move|immediate|accepted",
+    "minimap|control|9|building|move|immediate|accepted",
+    "field|control|1|open-ground|attack-move|immediate|accepted",
+    "field|control|2|open-ground|attack-move|immediate|accepted",
+    "field|control|9|open-ground|attack-move|immediate|accepted",
+    "minimap|control|1|open-ground|attack-move|immediate|accepted",
+    "minimap|control|2|open-ground|attack-move|immediate|accepted",
+    "minimap|control|9|open-ground|attack-move|immediate|accepted",
+    "field|control|1|occupied-ground|attack-move|immediate|accepted",
+    "field|control|2|occupied-ground|attack-move|immediate|accepted",
+    "field|control|9|occupied-ground|attack-move|immediate|accepted",
+    "minimap|control|1|occupied-ground|attack-move|immediate|accepted",
+    "minimap|control|2|occupied-ground|attack-move|immediate|accepted",
+    "minimap|control|9|occupied-ground|attack-move|immediate|accepted",
+    "field|control|1|shore|attack-move|immediate|accepted",
+    "field|control|2|shore|attack-move|immediate|accepted",
+    "field|control|9|shore|attack-move|immediate|accepted",
+    "minimap|control|1|shore|attack-move|immediate|accepted",
+    "minimap|control|2|shore|attack-move|immediate|accepted",
+    "minimap|control|9|shore|attack-move|immediate|accepted",
+    "field|control|1|water|attack-move|immediate|accepted",
+    "field|control|2|water|attack-move|immediate|accepted",
+    "field|control|9|water|attack-move|immediate|accepted",
+    "minimap|control|1|water|attack-move|immediate|accepted",
+    "minimap|control|2|water|attack-move|immediate|accepted",
+    "minimap|control|9|water|attack-move|immediate|accepted",
+    "field|control|1|trees|attack-move|immediate|accepted",
+    "field|control|2|trees|attack-move|immediate|accepted",
+    "field|control|9|trees|attack-move|immediate|accepted",
+    "minimap|control|1|trees|attack-move|immediate|accepted",
+    "minimap|control|2|trees|attack-move|immediate|accepted",
+    "minimap|control|9|trees|attack-move|immediate|accepted",
+    "field|shift+control|1|unit|follow|queued|accepted",
+    "field|shift+control|2|unit|follow|queued|accepted",
+    "field|shift+control|9|unit|follow|queued|accepted",
+    "minimap|shift+control|1|unit|follow|queued|accepted",
+    "minimap|shift+control|2|unit|follow|queued|accepted",
+    "minimap|shift+control|9|unit|follow|queued|accepted",
+    "field|shift+control|1|building|move|queued|accepted",
+    "field|shift+control|2|building|move|queued|accepted",
+    "field|shift+control|9|building|move|queued|accepted",
+    "minimap|shift+control|1|building|move|queued|accepted",
+    "minimap|shift+control|2|building|move|queued|accepted",
+    "minimap|shift+control|9|building|move|queued|accepted",
+    "field|shift+control|1|open-ground|attack-move|queued|accepted",
+    "field|shift+control|2|open-ground|attack-move|queued|accepted",
+    "field|shift+control|9|open-ground|attack-move|queued|accepted",
+    "minimap|shift+control|1|open-ground|attack-move|queued|accepted",
+    "minimap|shift+control|2|open-ground|attack-move|queued|accepted",
+    "minimap|shift+control|9|open-ground|attack-move|queued|accepted",
+    "field|shift+control|1|occupied-ground|attack-move|queued|accepted",
+    "field|shift+control|2|occupied-ground|attack-move|queued|accepted",
+    "field|shift+control|9|occupied-ground|attack-move|queued|accepted",
+    "minimap|shift+control|1|occupied-ground|attack-move|queued|accepted",
+    "minimap|shift+control|2|occupied-ground|attack-move|queued|accepted",
+    "minimap|shift+control|9|occupied-ground|attack-move|queued|accepted",
+    "field|shift+control|1|shore|attack-move|queued|accepted",
+    "field|shift+control|2|shore|attack-move|queued|accepted",
+    "field|shift+control|9|shore|attack-move|queued|accepted",
+    "minimap|shift+control|1|shore|attack-move|queued|accepted",
+    "minimap|shift+control|2|shore|attack-move|queued|accepted",
+    "minimap|shift+control|9|shore|attack-move|queued|accepted",
+    "field|shift+control|1|water|attack-move|queued|accepted",
+    "field|shift+control|2|water|attack-move|queued|accepted",
+    "field|shift+control|9|water|attack-move|queued|accepted",
+    "minimap|shift+control|1|water|attack-move|queued|accepted",
+    "minimap|shift+control|2|water|attack-move|queued|accepted",
+    "minimap|shift+control|9|water|attack-move|queued|accepted",
+    "field|shift+control|1|trees|attack-move|queued|accepted",
+    "field|shift+control|2|trees|attack-move|queued|accepted",
+    "field|shift+control|9|trees|attack-move|queued|accepted",
+    "minimap|shift+control|1|trees|attack-move|queued|accepted",
+    "minimap|shift+control|2|trees|attack-move|queued|accepted",
+    "minimap|shift+control|9|trees|attack-move|queued|accepted",
+    "field|alt|1|unit|defend|immediate|accepted",
+    "field|alt|2|unit|defend|immediate|accepted",
+    "field|alt|9|unit|defend|immediate|accepted",
+    "minimap|alt|1|unit|defend|immediate|accepted",
+    "minimap|alt|2|unit|defend|immediate|accepted",
+    "minimap|alt|9|unit|defend|immediate|accepted",
+    "field|alt|1|building|defend|immediate|accepted",
+    "field|alt|2|building|defend|immediate|accepted",
+    "field|alt|9|building|defend|immediate|accepted",
+    "minimap|alt|1|building|defend|immediate|accepted",
+    "minimap|alt|2|building|defend|immediate|accepted",
+    "minimap|alt|9|building|defend|immediate|accepted",
+    "field|shift+alt|1|unit|defend|queued|accepted",
+    "field|shift+alt|2|unit|defend|queued|accepted",
+    "field|shift+alt|9|unit|defend|queued|accepted",
+    "minimap|shift+alt|1|unit|defend|queued|accepted",
+    "minimap|shift+alt|2|unit|defend|queued|accepted",
+    "minimap|shift+alt|9|unit|defend|queued|accepted",
+    "field|shift+alt|1|building|defend|queued|accepted",
+    "field|shift+alt|2|building|defend|queued|accepted",
+    "field|shift+alt|9|building|defend|queued|accepted",
+    "minimap|shift+alt|1|building|defend|queued|accepted",
+    "minimap|shift+alt|2|building|defend|queued|accepted",
+    "minimap|shift+alt|9|building|defend|queued|accepted",
+    "field|control+alt|1|open-ground|attack-ground|immediate|accepted",
+    "field|control+alt|2|open-ground|attack-ground|immediate|accepted",
+    "field|control+alt|9|open-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|open-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|open-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|open-ground|attack-ground|immediate|accepted",
+    "field|control+alt|1|occupied-ground|attack-ground|immediate|accepted",
+    "field|control+alt|2|occupied-ground|attack-ground|immediate|accepted",
+    "field|control+alt|9|occupied-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|occupied-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|occupied-ground|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|occupied-ground|attack-ground|immediate|accepted",
+    "field|control+alt|1|unit|attack-ground|immediate|accepted",
+    "field|control+alt|2|unit|attack-ground|immediate|accepted",
+    "field|control+alt|9|unit|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|unit|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|unit|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|unit|attack-ground|immediate|accepted",
+    "field|control+alt|1|building|attack-ground|immediate|accepted",
+    "field|control+alt|2|building|attack-ground|immediate|accepted",
+    "field|control+alt|9|building|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|building|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|building|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|building|attack-ground|immediate|accepted",
+    "field|control+alt|1|wall|attack-ground|immediate|accepted",
+    "field|control+alt|2|wall|attack-ground|immediate|accepted",
+    "field|control+alt|9|wall|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|wall|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|wall|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|wall|attack-ground|immediate|accepted",
+    "field|control+alt|1|trees|attack-ground|immediate|accepted",
+    "field|control+alt|2|trees|attack-ground|immediate|accepted",
+    "field|control+alt|9|trees|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|trees|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|trees|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|trees|attack-ground|immediate|accepted",
+    "field|control+alt|1|shore|attack-ground|immediate|accepted",
+    "field|control+alt|2|shore|attack-ground|immediate|accepted",
+    "field|control+alt|9|shore|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|shore|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|shore|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|shore|attack-ground|immediate|accepted",
+    "field|control+alt|1|water|attack-ground|immediate|accepted",
+    "field|control+alt|2|water|attack-ground|immediate|accepted",
+    "field|control+alt|9|water|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|water|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|water|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|water|attack-ground|immediate|accepted",
+    "field|control+alt|1|oil-patch|attack-ground|immediate|accepted",
+    "field|control+alt|2|oil-patch|attack-ground|immediate|accepted",
+    "field|control+alt|9|oil-patch|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|oil-patch|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|oil-patch|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|oil-patch|attack-ground|immediate|accepted",
+    "field|control+alt|1|transport|attack-ground|immediate|accepted",
+    "field|control+alt|2|transport|attack-ground|immediate|accepted",
+    "field|control+alt|9|transport|attack-ground|immediate|accepted",
+    "minimap|control+alt|1|transport|attack-ground|immediate|accepted",
+    "minimap|control+alt|2|transport|attack-ground|immediate|accepted",
+    "minimap|control+alt|9|transport|attack-ground|immediate|accepted",
+    "field|shift+control+alt|1|open-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|open-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|open-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|open-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|open-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|open-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|occupied-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|occupied-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|occupied-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|occupied-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|occupied-ground|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|occupied-ground|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|unit|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|unit|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|unit|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|unit|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|unit|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|unit|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|building|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|building|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|building|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|building|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|building|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|building|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|wall|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|wall|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|wall|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|wall|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|wall|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|wall|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|trees|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|trees|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|trees|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|trees|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|trees|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|trees|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|shore|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|shore|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|shore|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|shore|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|shore|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|shore|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|water|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|water|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|water|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|water|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|water|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|water|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|oil-patch|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|oil-patch|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|oil-patch|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|oil-patch|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|oil-patch|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|oil-patch|attack-ground|queued|accepted",
+    "field|shift+control+alt|1|transport|attack-ground|queued|accepted",
+    "field|shift+control+alt|2|transport|attack-ground|queued|accepted",
+    "field|shift+control+alt|9|transport|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|1|transport|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|2|transport|attack-ground|queued|accepted",
+    "minimap|shift+control+alt|9|transport|attack-ground|queued|accepted",
+    "field|plain|1|open-ground|patrol|immediate|accepted",
+    "field|plain|1|open-ground|patrol|immediate|rejected",
+    "field|plain|2|open-ground|patrol|immediate|accepted",
+    "field|plain|2|open-ground|patrol|immediate|rejected",
+    "field|plain|9|open-ground|patrol|immediate|accepted",
+    "field|plain|9|open-ground|patrol|immediate|rejected",
+    "field|shift|1|open-ground|patrol|queued|accepted",
+    "field|shift|1|open-ground|patrol|queued|rejected",
+    "field|shift|2|open-ground|patrol|queued|accepted",
+    "field|shift|2|open-ground|patrol|queued|rejected",
+    "field|shift|9|open-ground|patrol|queued|accepted",
+    "field|shift|9|open-ground|patrol|queued|rejected",
+    "field|plain|1|open-ground|attack-ground|immediate|accepted",
+    "field|plain|1|open-ground|attack-ground|immediate|rejected",
+    "field|plain|2|open-ground|attack-ground|immediate|accepted",
+    "field|plain|2|open-ground|attack-ground|immediate|rejected",
+    "field|plain|9|open-ground|attack-ground|immediate|accepted",
+    "field|plain|9|open-ground|attack-ground|immediate|rejected",
+    "field|shift|1|open-ground|attack-ground|queued|accepted",
+    "field|shift|1|open-ground|attack-ground|queued|rejected",
+    "field|shift|2|open-ground|attack-ground|queued|accepted",
+    "field|shift|2|open-ground|attack-ground|queued|rejected",
+    "field|shift|9|open-ground|attack-ground|queued|accepted",
+    "field|shift|9|open-ground|attack-ground|queued|rejected",
+    "field|plain|1|unit|cast|immediate|accepted",
+    "field|plain|1|unit|cast|immediate|rejected",
+    "field|plain|2|unit|cast|immediate|accepted",
+    "field|plain|2|unit|cast|immediate|rejected",
+    "field|plain|9|unit|cast|immediate|accepted",
+    "field|plain|9|unit|cast|immediate|rejected",
+    "field|shift|1|unit|cast|queued|accepted",
+    "field|shift|1|unit|cast|queued|rejected",
+    "field|shift|2|unit|cast|queued|accepted",
+    "field|shift|2|unit|cast|queued|rejected",
+    "field|shift|9|unit|cast|queued|accepted",
+    "field|shift|9|unit|cast|queued|rejected",
+    "field|plain|1|building|cast|immediate|accepted",
+    "field|plain|2|building|cast|immediate|accepted",
+    "field|plain|9|building|cast|immediate|accepted",
+    "field|shift|1|building|cast|queued|accepted",
+    "field|shift|2|building|cast|queued|accepted",
+    "field|shift|9|building|cast|queued|accepted",
+    "field|plain|1|shore|unload|immediate|accepted",
+    "field|plain|2|shore|unload|immediate|accepted",
+    "field|plain|9|shore|unload|immediate|accepted",
+    "field|plain|1|open-ground|build|immediate|accepted",
+    "field|plain|1|open-ground|build|immediate|rejected",
+    "field|plain|1|shore|build|immediate|accepted",
+    "field|plain|1|shore|build|immediate|rejected",
+    "field|plain|1|oil-patch|build|immediate|accepted",
+    "field|plain|1|oil-patch|build|immediate|rejected",
+    "field|shift|1|open-ground|build|queued|accepted",
+    "field|shift|1|open-ground|build|queued|rejected",
+    "field|shift|1|shore|build|queued|accepted",
+    "field|shift|1|shore|build|queued|rejected",
+    "field|shift|1|oil-patch|build|queued|accepted",
+    "field|shift|1|oil-patch|build|queued|rejected",
+    "field|plain|1|unit|dismiss|immediate|accepted",
+    "command-panel|plain|1|unit|stop|immediate|accepted",
+    "command-panel|plain|2|unit|stop|immediate|accepted",
+    "command-panel|plain|9|unit|stop|immediate|accepted",
+    "command-panel|plain|1|unit|stand-ground|immediate|accepted",
+    "command-panel|plain|2|unit|stand-ground|immediate|accepted",
+    "command-panel|plain|9|unit|stand-ground|immediate|accepted",
+    "command-panel|plain|1|unit|explore|immediate|accepted",
+    "command-panel|plain|2|unit|explore|immediate|accepted",
+    "command-panel|plain|9|unit|explore|immediate|accepted",
+    "command-panel|plain|1|unit|return-goods|immediate|accepted",
+    "command-panel|plain|2|unit|return-goods|immediate|accepted",
+    "command-panel|plain|9|unit|return-goods|immediate|accepted",
+    "command-panel|plain|1|unit|cast|immediate|accepted",
+    "command-panel|plain|2|unit|cast|immediate|accepted",
+    "command-panel|plain|9|unit|cast|immediate|accepted",
+    "command-panel|control|1|unit|autocast|immediate|accepted",
+    "command-panel|control|2|unit|autocast|immediate|accepted",
+    "command-panel|control|9|unit|autocast|immediate|accepted",
+    "command-panel|plain|1|building|train|immediate|accepted",
+    "command-panel|plain|1|building|train|immediate|rejected",
+    "command-panel|plain|1|building|research|immediate|accepted",
+    "command-panel|plain|1|building|research|immediate|rejected",
+    "command-panel|plain|1|building|upgrade-to|immediate|accepted",
+    "command-panel|plain|1|building|upgrade-to|immediate|rejected",
+    "command-panel|plain|1|building|cancel-train|immediate|accepted",
+    "command-panel|plain|1|building|cancel-research|immediate|accepted",
+    "command-panel|plain|1|building|cancel-upgrade-to|immediate|accepted",
+    "command-panel|plain|1|building|cancel-build|immediate|accepted",
+    "command-panel|plain|1|transport|unload|immediate|accepted",
+    "command-panel|plain|1|unit|unload-one|immediate|accepted"
   ]
 }

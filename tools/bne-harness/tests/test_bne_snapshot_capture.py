@@ -190,7 +190,15 @@ class SnapshotCaptureScriptTest(unittest.TestCase):
                               f"the invocation cannot be replayed or checked")
             self.assertIn(f"BNESNAPSHOTMEM phase={phase} label=data", text,
                           f"the {phase} phase did not dump the data region")
-        self.assertLess(text.index("record btrace bts"), text.index("finish"),
+        self.assertIn("set $bne_return_pc = *(unsigned int*)$esp", text,
+                      "the return PC was not read from the real entry stack")
+        self.assertIn("tbreak *$bne_return_pc", text,
+                      "the capture still depends on debugger frame unwind")
+        self.assertNotIn("\nfinish\n", text,
+                         "the default capture still uses GDB finish, which "
+                         "fails on Wine's outermost frame")
+        self.assertLess(text.index("record btrace bts"),
+                        text.index("tbreak *$bne_return_pc"),
                         "the branch history was recorded after the "
                         "invocation had already run")
 
@@ -237,6 +245,8 @@ class SnapshotDraftTest(unittest.TestCase):
     def artifact(self):
         return {
             "case": "retail-xhuman-12-idle", "cycle": 23,
+            "fixture_id": "b" * 64,
+            "scenario": "Campaign\\XHuman\\Human12.pud", "seed": 1,
             "top_branch": {"address": 0x00437646, "instruction": "jle",
                            "taken": True},
             "writer": {"address": 0x00402451, "field": "x"},
@@ -245,6 +255,9 @@ class SnapshotDraftTest(unittest.TestCase):
 
     def test_a_draft_is_a_specification_the_capture_agent_accepts(self):
         draft = capture.specification_from_branch_witness(self.artifact())
+        # The branch witness knows the unit slot but not which live register
+        # carries its record.  This is the required human review step.
+        draft["focus"] = {"native_slot": 12, "register": "esi"}
         loaded = capture.load_specification(draft)
         self.assertEqual(0x00437646, loaded["entry"],
                          "the draft captures somewhere other than the branch "
@@ -252,6 +265,7 @@ class SnapshotDraftTest(unittest.TestCase):
         self.assertEqual(23, loaded["cycle"],
                          "the draft does not carry the cycle the oracle has "
                          "to be paused at")
+        self.assertEqual("b" * 64, loaded["identity"]["fixture_id"])
 
     def test_a_draft_says_what_the_evidence_could_not_decide(self):
         draft = capture.specification_from_branch_witness(self.artifact())
@@ -496,12 +510,60 @@ class SnapshotSealTest(unittest.TestCase):
             document = specification()
             document["executable_sha256"] = capture.BNE_202_SHA256
             document["entry"] = capture.BNE_TEXT_START
+            document["focus"] = {"native_slot": 12, "register": "esi"}
+            document["identity"] = {
+                "case": "synthetic-decide", "fixture_id": "c" * 64,
+                "scenario": "Campaign\\Human\\Human01.pud", "seed": 1,
+                "cycle": 23, "subject": {"native_slot": 12},
+                "pc": capture.BNE_TEXT_START,
+            }
             with self.assertRaises(capture.CaptureError) as raised:
                 capture.seal_capture(document, log, directory / "run",
                                      executable=other)
             self.assertIn("pinned", str(raised.exception),
                           "a capture was sealed against an executable that is "
                           "not the build the game runs")
+
+    def test_native_spec_refuses_identity_that_names_another_pc(self):
+        document = specification()
+        document["executable_sha256"] = capture.BNE_202_SHA256
+        document["entry"] = capture.BNE_TEXT_START
+        document["focus"] = {"native_slot": 12, "register": "esi"}
+        document["identity"] = {
+            "case": "synthetic-decide", "fixture_id": "d" * 64,
+            "scenario": "Campaign\\Human\\Human01.pud", "seed": 1,
+            "cycle": 23, "subject": {"native_slot": 12},
+            "pc": capture.BNE_TEXT_START + 1,
+        }
+        with self.assertRaisesRegex(capture.CaptureError, "entry"):
+            capture.load_specification(document)
+
+    def test_sealing_refuses_symbolic_link_capture_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            real = directory / "real.log"
+            real.write_text(capture_log(), encoding="utf-8")
+            linked = directory / "linked.log"
+            linked.symlink_to(real)
+            with self.assertRaisesRegex(capture.CaptureError, "symbolic link"):
+                capture.seal_capture(
+                    specification(), linked, directory / "run",
+                    expect_pinned_executable=False)
+
+    def test_sealing_refuses_a_symbolic_link_in_existing_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            log = directory / "capture-log.txt"
+            log.write_text(capture_log(), encoding="utf-8")
+            output = directory / "run"
+            output.mkdir()
+            outside = directory / "outside"
+            outside.mkdir()
+            (output / "blobs").symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(capture.CaptureError, "symbolic link"):
+                capture.seal_capture(
+                    specification(), log, output,
+                    expect_pinned_executable=False)
 
 
 if __name__ == "__main__":

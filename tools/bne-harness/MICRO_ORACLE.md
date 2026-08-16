@@ -177,6 +177,12 @@ deterministic importer then rebuilds the snapshot from that log alone, so a
 capture can be re-imported and argued with long after the oracle that produced
 it has moved on.
 
+New capture plans stop at the return address read from the real entry stack:
+the script saves the caller PC at `[esp]`, installs a guarded temporary
+breakpoint there, and continues. They do not use GDB `finish`. Wine can present
+the attached decision as the debugger's outermost frame, where `finish` fails
+even though the machine has an unambiguous return address.
+
 The specification is the reviewed part.  It names the address to stop at, which
 activation of it, the guard that says this is the unit the divergence is about,
 every region of memory to save, what the reviewed inputs are called, and a stub
@@ -237,24 +243,38 @@ disposable networkless container of its own, pauses it before the tick the
 decision is in, attaches GDB once, and seals the result against the pinned
 executable and that run's own manifest.
 
+A native capture is one closed identity, not merely a snapshot filename. The
+reviewed specification, imported snapshot, sealing manifest and retained
+oracle-run manifest must agree on case, fixture SHA-256, retail scenario,
+initialization seed, cycle, native unit slot and program counter. The run
+manifest must cover that cycle and pin the retail executable. Symlinked inputs,
+outputs and retained artifacts are refused. These checks prevent a perfectly
+real machine state from being attributed to the wrong fixture or decision.
+
+Wine and host GDB run privileged on `i9beef`. Before sealing, the runner
+returns the bounded output subtree to the unprivileged operator and checks the
+ownership of the actual host inodes. The same recovery runs after failure. A
+successful container exit with root-owned evidence is therefore an error, not
+a capture nobody can reuse.
+
 ## Limitations
 
-- **No native decision has been replayed yet.** The capture agent exists and is
-  proved end to end offline -- a hand-written capture log of a synthetic
-  function becomes a snapshot that loads, reproduces exactly, and answers
-  variations -- but it has never been run against the retail oracle, so no
-  number here has yet come from the game. Running it is the next thing to do,
-  and it needs the oracle.
+- **No retail decision has produced an accepted replay receipt yet.** The
+  capture agent is proved end to end offline -- a hand-written capture log of
+  a synthetic function becomes a snapshot that loads, reproduces exactly, and
+  answers variations. A retail smoke has reached the native entry/return flow;
+  sealing a complete BTS history and reproducing it remains the next proof.
 - Completed Branch Witness artifacts cannot be replayed from. They record a
   branch history and the writer it controls; they never saved the machine,
   because they had no reason to. `micro-oracle-plan` enumerates exactly what is
   missing: registers, stack, code, data, and the captured outcome.
-- The pinned executable is not present on this machine, so the code bytes of a
-  native snapshot must come from the capture.
-- The capture stops the invocation with GDB's `finish`, which unwinds a frame.
-  A 1999 optimized build omits frame pointers in places, so a specification can
-  name the caller address instead and stop there with the stack checked.
-  Neither route has been exercised against retail.
+- The pinned executable is available locally and on `i9beef`, but the bytes in
+  each accepted snapshot still come from that snapshot's authenticated capture
+  rather than from an ambient checkout.
+- New capture plans read the caller PC from the entry stack and stop at a
+  guarded temporary breakpoint after ESP has unwound beyond the entry frame.
+  Legacy reviewed `finish` plans remain readable, but are not generated; Wine
+  may expose the decision as GDB's outermost frame, where `finish` cannot work.
 - A code region that starts in the middle of an instruction decodes as
   something else all the way down, so the replay and the capture disagree about
   which addresses are branches. It shows up as a failed reproduction rather

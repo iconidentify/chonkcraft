@@ -35,8 +35,9 @@ Garden of War startup and executes the proved command subset in the Java
 engine. The current certified floor is 3,935 dispatcher records, 543 decoded
 commands, 189 submitted unit orders, 159 dispatcher acceptances, 154 orders
 with a physical effect or proved blocked-goal settlement, and 153 fulfilled
-objectives across 37 bound native
-units. Execution stops fail-closed at native unit 1526's first unsupported
+objectives across 37 bound native units. Those figures describe the retained
+Garden of War prefix gate, not complete replay-corpus outcome certification.
+Execution stops fail-closed at native unit 1526's first unsupported
 identity at record 3,935; moving that proved boundary forward is an
 improvement, while any earlier stop fails the gate.
 
@@ -111,18 +112,18 @@ boundary, participant range, packet length, and exact end-of-file checks.
 Validate one replay and print its immutable identities:
 
 ```sh
-python3 scripts/bne_replay.py inspect /path/to/match.wir --records 3
+python3 tools/bne-harness/scripts/bne_replay.py inspect /path/to/match.wir --records 3
 ```
 
 Build reproducible collection metadata without copying any replay into the
 repository:
 
 ```sh
-python3 scripts/bne_replay.py inventory /path/to/replay-pack-1 \
+python3 tools/bne-harness/scripts/bne_replay.py inventory /path/to/replay-pack-1 \
   --collection-id war2ru-replay-pack-1 \
   --source-url https://downloads.war2.ru/war2/Replays/replay_pack_1.zip \
   --archive-sha256 0dbccf0a82a465bad41b667ec5d25b2d49ec2ba6f162a25b7af14613ab99264b \
-  --output work/replays/war2ru-replay-pack-1.json
+  --output tools/bne-harness/work/replays/war2ru-replay-pack-1.json
 ```
 
 The inventory fingerprints the original compressed replay, decompressed
@@ -153,29 +154,32 @@ executable other than the authenticated 2.02b binary is rejected.
 Compile one replay into a stable plan and its compact native schedule:
 
 ```sh
-python3 scripts/bne_replay_outcome.py plan /path/to/match.wir \
+python3 tools/bne-harness/scripts/bne_replay_outcome.py plan /path/to/match.wir \
   --asset-pack "$HOME/.chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack" \
-  --output work/replays/match.plan.json
-python3 scripts/bne_replay_outcome.py native-schedule \
-  work/replays/match.plan.json --output work/replays/match.schedule.bin
+  --output tools/bne-harness/work/replays/match.plan.json
+python3 tools/bne-harness/scripts/bne_replay_outcome.py native-schedule \
+  tools/bne-harness/work/replays/match.plan.json \
+  --output tools/bne-harness/work/replays/match.schedule.bin
 ```
 
 After a native playback, authenticate that every packet was injected in order:
 
 ```sh
-python3 scripts/bne_replay_outcome.py verify-native \
-  work/replays/match.plan.json --trace work/replays/match.trace.txt \
-  --output work/replays/match.native-proof.json
+python3 tools/bne-harness/scripts/bne_replay_outcome.py verify-native \
+  tools/bne-harness/work/replays/match.plan.json \
+  --trace tools/bne-harness/work/replays/match.trace.txt \
+  --output tools/bne-harness/work/replays/match.native-proof.json
 ```
 
 The normal oracle runner performs that authentication automatically when given
 the paired plan and schedule:
 
 ```sh
-python3 scripts/bne_oracle.py run --game-dir /path/to/verified/BNE \
-  --scenario human:1 --cycles 1800 --output work/replays/native \
-  --replay-plan work/replays/match.plan.json \
-  --replay-schedule work/replays/match.schedule.bin
+python3 tools/bne-harness/scripts/bne_oracle.py run --game-dir /path/to/verified/BNE \
+  --scenario human:1 --cycles 1800 \
+  --output tools/bne-harness/work/replays/native \
+  --replay-plan tools/bne-harness/work/replays/match.plan.json \
+  --replay-schedule tools/bne-harness/work/replays/match.schedule.bin
 ```
 
 The example's campaign scenario is only illustrative: a replay capture is
@@ -189,6 +193,71 @@ producer builds. It then compares each `(record, command, selected unit)`
 through submission, acceptance, first progress, and terminal outcome, grouping
 differences into fan-out, no-progress, cadence, destination/congestion,
 attack/chase, boarding, harvesting, and placement families.
+
+Allocator ids are not unit identities. A mandatory
+`chonkcraft-bne-replay-unit-lifecycle-1` table maps every local
+`(unit, generation)` lifetime to a stable initial identity
+`(owner, type, starting square, duplicate ordinal)` or a stable spawn identity
+`(owner, type, birth record, producer identity, birth ordinal)`. The comparator
+requires the table on both sides, rejects overlapping generations, impossible
+birth/death bounds, duplicate stable identities and unknown or dead producer
+lifetimes, and joins outcomes by stable identity. Every non-selection replay
+command contributes exactly one required outcome per ordered selected unit.
+Missing outcomes, unexpected outcomes, an empty outcome list and unresolved
+lifetimes therefore remain explicit denominator failures; none can pass as an
+empty comparison. This prevents a freed native slot and a reused Java id from
+being paired merely because their integers happen to match.
+
+Java traces and the 27-replay aggregate certification bind both the current
+engine-input SHA-256 and the wider program-input SHA-256 covering desktop input
+interpretation, adapters, build inputs and pack-facing code. Aggregate output
+also seals the pinned retail executable identity and every comparison receipt
+content hash.
+
+When a completed pair differs, seal the smallest schedule prefix that still
+reproduces the difference:
+
+```sh
+python3 tools/bne-harness/scripts/bne_replay_outcome.py divergence-packet \
+  tools/bne-harness/work/replays/match.plan.json \
+  --native tools/bne-harness/work/replays/match.native.json \
+  --java tools/bne-harness/work/replays/match.java.json \
+  --native-prefix-command 'native-prefix-adapter --plan {plan} --output {output}' \
+  --java-prefix-command 'java-prefix-adapter --plan {plan} --output {output}' \
+  --output-dir tools/bne-harness/work/replays/divergences
+```
+
+Replace the two adapter names with the real producer commands. Templates are
+split as argv without a shell and must consume `{plan}` and write `{output}`;
+`{records}` is also available. The command compares the full authenticated
+traces, freshly executes both engines for every binary-search probe, proves the
+immediately preceding prefix exact, and writes `<packet-sha256>/packet.json`.
+Filtering a full-run trace is explicitly `projected-non-certifying`: a later
+command may have superseded and changed an earlier terminal outcome. The
+packet therefore contains fresh native and Java prefix receipts, the lifecycle
+bridge, first causal difference and every bisection receipt. Successful packet
+creation exits zero even when it found a divergence; add
+`--fail-on-divergence` when a CI caller wants exit 2. `prefix-plan --records N`
+only seals a schedule; it becomes proof after both producers execute that plan.
+Its output remains consumable by `native-schedule`, so a minimized packet is a
+runnable proof rather than a report-only summary.
+
+`certify-corpus` accepts all comparison receipts in one invocation and joins
+them to the frozen 27-replay identity and its fixed totals: 764,756 records and
+168,788 commands. It reports semantic `content_exact` diagnostics, but a
+detached comparison summary cannot prove that either producer trace actually
+ran. `complete` therefore stays false until a retained proof-store validator
+reopens every plan plus its native and Java trace and recomputes `compare()`.
+A missing replay, stale program/engine identity, incomplete selected-unit
+denominator, mixed producer, duplicated receipt or divergent outcome also
+keeps the certification red.
+
+The next-level gate must receive the frozen corpus through
+`BNE_REPLAY_CORPUS` and producer comparison receipts through the
+colon-separated `BNE_REPLAY_REPORTS`. A detached `BNE_REPLAY_CERTIFICATION`
+summary is diagnostic only and cannot certify the lane. A filtered full-run
+prefix is likewise `projected-non-certifying`; only fresh native and Java
+executions of the sealed prefix can contribute proof.
 
 The active boundary is deterministic initial-game reconstruction. Static
 analysis of InSight's playback routine proves it does not restore a mid-game

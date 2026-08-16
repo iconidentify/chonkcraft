@@ -4,6 +4,8 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 
 SCRIPTS = Path(__file__).parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
@@ -15,6 +17,7 @@ SPEC = importlib.util.spec_from_file_location(
 outcome = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(outcome)
+PROGRAM_SHA256 = outcome._current_program_input_sha256()
 
 REPLAY_TEST = Path(__file__).with_name("test_bne_replay.py")
 REPLAY_SPEC = importlib.util.spec_from_file_location("replay_test", REPLAY_TEST)
@@ -45,16 +48,42 @@ class ReplayOutcomeTest(unittest.TestCase):
         return plan
 
     def trace(self, plan, side, outcomes):
+        normalized = []
+        for value in outcomes:
+            item = dict(value)
+            item.setdefault("unit_generation", 0)
+            phases = dict(item.get("phases") or {})
+            phases.setdefault("submitted", {"record": item["record"]})
+            phases.setdefault("accepted", True)
+            phases.setdefault("progress", None)
+            phases.setdefault("terminal", None)
+            item["phases"] = phases
+            normalized.append(item)
+        selected = []
+        for record in plan["records"]:
+            for command in record["commands"]:
+                if command["name"] == "selection":
+                    continue
+                for local_id in command["selected_unit_ids"]:
+                    if local_id not in selected:
+                        selected.append(local_id)
+        units = [self.initial_unit(
+            local_id, ordinal=ordinal, x=10 + ordinal)
+            for ordinal, local_id in enumerate(selected)]
+        producer = {
+            "name": side,
+            "build_sha256": (
+                outcome.PINNED_BNE_EXECUTABLE_SHA256
+                if side == "native" else "a" * 64),
+        }
+        if side == "java":
+            producer["engine_input_sha256"] = "a" * 64
+            producer["program_input_sha256"] = PROGRAM_SHA256
         return {
             "schema": outcome.TRACE_SCHEMA,
             "side": side,
             "identity": outcome._trace_identity(plan),
-            "producer": {
-                "name": side,
-                "build_sha256": (
-                    outcome.PINNED_BNE_EXECUTABLE_SHA256
-                    if side == "native" else "a" * 64),
-            },
+            "producer": producer,
             "initial_state": {
                 "status": "verified",
                 "consumed_sha256": plan["replay"]["snapshot_sha256"],
@@ -66,8 +95,72 @@ class ReplayOutcomeTest(unittest.TestCase):
                 "consumed_records": len(plan["records"]),
                 "consumed_sha256": plan["schedule_sha256"],
             },
-            "outcomes": outcomes,
+            "unit_lifecycle": {
+                "schema": outcome.LIFECYCLE_SCHEMA,
+                "units": units,
+            },
+            "outcomes": normalized,
         }
+
+    @staticmethod
+    def initial_unit(local_id, generation=0, *, x=10, y=11,
+                     owner=0, unit_type="footman", ordinal=0):
+        return {
+            "local_id": local_id,
+            "generation": generation,
+            "origin": "initial",
+            "owner": owner,
+            "type": unit_type,
+            "x": x,
+            "y": y,
+            "ordinal": ordinal,
+            "death_record": None,
+        }
+
+    def with_lifecycle(self, trace, units):
+        trace["unit_lifecycle"] = {
+            "schema": outcome.LIFECYCLE_SCHEMA,
+            "units": units,
+        }
+        return trace
+
+    def complete_outcomes(self, plan, overrides=None, *, unit_map=None):
+        """One explicit outcome for every selected unit in every command."""
+        overrides = overrides or {}
+        unit_map = unit_map or {}
+        values = []
+        for record in plan["records"]:
+            for command in record["commands"]:
+                if command["name"] == "selection":
+                    continue
+                for local_id in command["selected_unit_ids"]:
+                    key = (record["index"], command["index"], local_id)
+                    phases = {
+                        "submitted": {"record": record["index"]},
+                        "accepted": True,
+                        "progress": {"cycle": record["index"] + 1},
+                        "terminal": {"cycle": record["index"] + 2},
+                    }
+                    phases.update(overrides.get(key, {}))
+                    values.append({
+                        "record": record["index"],
+                        "command": command["index"],
+                        "unit": unit_map.get(local_id, local_id),
+                        "unit_generation": 0,
+                        "phases": phases,
+                    })
+        return values
+
+    def prefix_runner(self, *, native_overrides=None, java_overrides=None):
+        """Test double for two genuine executions of each supplied prefix."""
+        def run(prefix):
+            return (
+                self.trace(prefix, "native", self.complete_outcomes(
+                    prefix, native_overrides)),
+                self.trace(prefix, "java", self.complete_outcomes(
+                    prefix, java_overrides)),
+            )
+        return run
 
     def test_plan_preserves_packet_order_and_ordered_selection(self):
         plan = self.plan()
@@ -207,19 +300,14 @@ class ReplayOutcomeTest(unittest.TestCase):
 
     def test_group_fanout_and_no_progress_are_clustered(self):
         plan = self.plan()
-        native_outcomes = [
-            {"record": 0, "command": 1, "unit": 42, "phases": {
-                "accepted": True, "progress": {"cycle": 3, "x": 11, "y": 10},
-                "terminal": {"cycle": 20, "x": 18, "y": 16}}},
-            {"record": 0, "command": 1, "unit": 7, "phases": {
-                "accepted": True, "progress": {"cycle": 4, "x": 10, "y": 11},
-                "terminal": {"cycle": 22, "x": 18, "y": 16}}},
-        ]
-        java_outcomes = [
-            {"record": 0, "command": 1, "unit": 42, "phases": {
-                "accepted": True, "progress": None,
-                "terminal": {"cycle": 20, "x": 10, "y": 10}}},
-        ]
+        native_outcomes = self.complete_outcomes(plan)
+        java_outcomes = self.complete_outcomes(plan, {
+            (0, 1, 42): {"progress": None},
+        })
+        java_outcomes = [item for item in java_outcomes
+                         if not (item["record"] == 0
+                                 and item["command"] == 1
+                                 and item["unit"] == 7)]
         report = outcome.compare(
             plan,
             self.trace(plan, "native", native_outcomes),
@@ -234,14 +322,283 @@ class ReplayOutcomeTest(unittest.TestCase):
 
     def test_identical_outcomes_pass(self):
         plan = self.plan()
-        values = [{"record": 1, "command": 0, "unit": 42, "phases": {
-            "accepted": True, "progress": {"cycle": 2, "order": "ATTACK"},
-            "terminal": {"cycle": 8, "target_hp": 0}}}]
+        values = self.complete_outcomes(plan)
         report = outcome.compare(
             plan, self.trace(plan, "native", values),
             self.trace(plan, "java", values))
         self.assertEqual(0, report["difference_count"])
         self.assertIsNone(report["first_difference"])
+
+    def test_lifecycle_identity_pairs_different_allocator_ids(self):
+        plan = self.plan()
+        native_values = self.complete_outcomes(plan)
+        java_values = self.complete_outcomes(
+            plan, unit_map={42: 900, 7: 901})
+        native = self.with_lifecycle(
+            self.trace(plan, "native", native_values),
+            [self.initial_unit(42, ordinal=0, x=10),
+             self.initial_unit(7, ordinal=1, x=11)])
+        java = self.with_lifecycle(
+            self.trace(plan, "java", java_values),
+            [self.initial_unit(900, ordinal=0, x=10),
+             self.initial_unit(901, ordinal=1, x=11)])
+        report = outcome.compare(plan, native, java)
+        self.assertEqual(0, report["difference_count"])
+        self.assertEqual("lifecycle-v1", report["identity_bridge"]["mode"])
+        pair = next(item for item in report["identity_bridge"]["pairs"]
+                    if item["native_unit"]["local_id"] == 42)
+        self.assertEqual({"local_id": 900, "generation": 0},
+                         pair["java_unit"])
+
+    def test_lifecycle_allows_local_id_reuse_but_requires_generation(self):
+        plan = self.plan()
+        first = self.initial_unit(42, 0)
+        first["death_record"] = 1
+        producer_unit = self.initial_unit(99, 0, x=20, y=20, ordinal=0)
+        producer = outcome._stable_unit_identity(producer_unit)["stable_sha256"]
+        units = [first, self.initial_unit(7, 0, x=11, ordinal=1),
+                 producer_unit, {
+            "local_id": 42, "generation": 1, "origin": "spawn",
+            "owner": 0, "type": "footman", "birth_record": 1,
+            "producer": producer, "ordinal": 0, "death_record": None,
+        }]
+        trace = self.with_lifecycle(self.trace(plan, "native", []), units)
+        indexed = outcome.lifecycle_index(trace, "native")
+        self.assertEqual(4, len(indexed["by_local"]))
+        trace["outcomes"] = [{
+            "record": 1, "command": 0, "unit": 42,
+            "unit_generation": 2,
+            "phases": {"submitted": {"record": 1}, "accepted": True,
+                       "progress": None, "terminal": None},
+        }]
+        java = self.with_lifecycle(
+            self.trace(plan, "java", []),
+            [self.initial_unit(900)])
+        with self.assertRaisesRegex(ValueError, "no matching unit lifecycle"):
+            outcome.compare(plan, trace, java)
+
+    def test_duplicate_stable_lifecycle_identity_is_rejected(self):
+        plan = self.plan()
+        trace = self.with_lifecycle(
+            self.trace(plan, "native", []),
+            [self.initial_unit(42), self.initial_unit(43)])
+        with self.assertRaisesRegex(ValueError, "repeats stable identity"):
+            outcome.lifecycle_index(trace, "native")
+
+    def test_prefix_bisection_seals_first_divergent_record(self):
+        plan = self.plan()
+        native_values = self.complete_outcomes(plan)
+        java_overrides = {
+            (1, 0, 42): {"progress": None},
+        }
+        java_values = self.complete_outcomes(plan, java_overrides)
+        packet = outcome.divergence_packet(
+            plan, self.trace(plan, "native", native_values),
+            self.trace(plan, "java", java_values),
+            self.prefix_runner(java_overrides=java_overrides))
+        self.assertFalse(packet["exact"])
+        self.assertEqual(2, packet["minimal_prefix_records"])
+        self.assertEqual(1, packet["last_exact_prefix_records"])
+        self.assertEqual(1, packet["report"]["first_difference"]["record"])
+        self.assertEqual(64, len(packet["packet_sha256"]))
+        self.assertEqual(
+            packet["packet_sha256"],
+            outcome.divergence_packet(
+                plan, self.trace(plan, "native", native_values),
+                self.trace(plan, "java", java_values),
+                self.prefix_runner(java_overrides=java_overrides))[
+                    "packet_sha256"])
+        encoded = outcome.native_schedule_bytes(packet["plan"])
+        self.assertEqual(2, outcome.parse_native_schedule(encoded)["record_count"])
+
+    def test_projected_prefix_is_non_certifying_and_fresh_receipts_win(self):
+        plan = self.plan()
+        changed = {(0, 1, 42): {
+            "terminal": {"cycle": 2, "reason": "superseded"},
+        }}
+        native = self.trace(plan, "native", self.complete_outcomes(plan))
+        java = self.trace(plan, "java", self.complete_outcomes(plan, changed))
+        prefix = outcome.plan_prefix(plan, 1)
+        projected = outcome.trace_prefix(java, prefix)
+        self.assertEqual(
+            "projected-non-certifying", projected["schedule"]["status"])
+        with self.assertRaisesRegex(ValueError, "complete packet schedule"):
+            outcome.compare(
+                prefix, outcome.trace_prefix(native, prefix), projected)
+
+        calls = []
+        def observed(prefix_plan):
+            calls.append(len(prefix_plan["records"]))
+            prefix_change = changed if len(prefix_plan["records"]) == 2 else {}
+            return self.prefix_runner(java_overrides=prefix_change)(prefix_plan)
+
+        packet = outcome.divergence_packet(plan, native, java, observed)
+        self.assertEqual(2, packet["minimal_prefix_records"])
+        self.assertEqual(1, packet["last_exact_prefix_records"])
+        self.assertIn(1, calls)
+        self.assertIn(2, calls)
+
+    def test_divergent_bisection_refuses_full_run_projection(self):
+        plan = self.plan()
+        native = self.trace(plan, "native", self.complete_outcomes(plan))
+        java = self.trace(plan, "java", self.complete_outcomes(plan, {
+            (0, 1, 42): {"accepted": False},
+        }))
+        with self.assertRaisesRegex(ValueError, "fresh native and Java"):
+            outcome.divergence_packet(plan, native, java)
+
+    def test_content_addressed_packet_is_idempotent(self):
+        plan = self.plan()
+        native = self.trace(plan, "native", self.complete_outcomes(plan))
+        java = self.trace(plan, "java", self.complete_outcomes(plan, {
+            (0, 1, 42): {"accepted": False},
+        }))
+        java_overrides = {(0, 1, 42): {"accepted": False}}
+        packet = outcome.divergence_packet(
+            plan, native, java,
+            self.prefix_runner(java_overrides=java_overrides))
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        first = outcome.write_divergence_packet(Path(temporary.name), packet)
+        second = outcome.write_divergence_packet(Path(temporary.name), packet)
+        self.assertEqual(first, second)
+        self.assertEqual(packet, json.loads(first.read_text(encoding="utf-8")))
+        packet["report"]["difference_count"] += 1
+        with self.assertRaisesRegex(ValueError, "identity changed"):
+            outcome.write_divergence_packet(Path(temporary.name), packet)
+
+    def test_successful_divergence_packet_cli_is_zero_unless_requested(self):
+        args = SimpleNamespace(
+            plan=Path("plan.json"), native=Path("native.json"),
+            java=Path("java.json"), output_dir=Path("packets"),
+            native_prefix_command=None, java_prefix_command=None,
+            fail_on_divergence=False,
+        )
+        with mock.patch.object(outcome, "_load_json",
+                               side_effect=[{}, {}, {}, {}, {}, {}]), \
+                mock.patch.object(outcome, "divergence_packet",
+                                  return_value={"exact": False}), \
+                mock.patch.object(outcome, "write_divergence_packet",
+                                  return_value=Path("packet.json")):
+            self.assertEqual(0, outcome.divergence_packet_command(args))
+            args.fail_on_divergence = True
+            self.assertEqual(2, outcome.divergence_packet_command(args))
+
+    def test_corpus_certification_uses_a_frozen_record_denominator(self):
+        plan = self.plan()
+        values = self.complete_outcomes(plan)
+        report = outcome.compare(
+            plan, self.trace(plan, "native", values),
+            self.trace(plan, "java", values))
+        entry = {
+            "path": "commands.wir",
+            **report["identity"],
+            "record_count": 2,
+            "command_count": 3,
+        }
+        corpus = {
+            "schema": outcome.CORPUS_SCHEMA,
+            "corpus_sha256": "1" * 64,
+            "outcome_corpus_sha256": "2" * 64,
+            "replay_count": 1,
+            "snapshot_bytes": 1,
+            "record_count": 2,
+            "command_count": 3,
+            "entries": [entry],
+        }
+        totals = {"replay_count": 1, "snapshot_bytes": 1,
+                  "record_count": 2, "command_count": 3}
+        with mock.patch.object(outcome, "AUTHENTICATED_CORPUS_SHA256",
+                               "1" * 64), \
+                mock.patch.object(
+                    outcome, "AUTHENTICATED_OUTCOME_CORPUS_SHA256",
+                    "2" * 64), \
+                mock.patch.object(outcome, "AUTHENTICATED_CORPUS_TOTALS",
+                                  totals):
+            certified = outcome.certify_corpus(
+                corpus, [report],
+                current_java_engine_input_sha256="a" * 64,
+                current_java_program_input_sha256=PROGRAM_SHA256)
+            missing = outcome.certify_corpus(corpus, [])
+        self.assertTrue(certified["content_exact"])
+        self.assertFalse(certified["complete"])
+        self.assertEqual((2, 3), (certified["exact_records"],
+                                 certified["exact_commands"]))
+        self.assertFalse(missing["complete"])
+        self.assertEqual(0, missing["exact_records"])
+        self.assertEqual("missing", missing["rows"][0]["status"])
+
+    def test_detached_comparison_summaries_cannot_certify_producers(self):
+        plan = self.plan()
+        values = self.complete_outcomes(plan)
+        report = outcome.compare(
+            plan, self.trace(plan, "native", values),
+            self.trace(plan, "java", values))
+        corpus = {
+            "schema": outcome.CORPUS_SCHEMA,
+            "corpus_sha256": "1" * 64,
+            "outcome_corpus_sha256": "2" * 64,
+            "replay_count": 1, "snapshot_bytes": 1,
+            "record_count": 2, "command_count": 3,
+            "entries": [{"path": "commands.wir", **report["identity"],
+                         "record_count": 2, "command_count": 3}],
+        }
+        totals = {"replay_count": 1, "snapshot_bytes": 1,
+                  "record_count": 2, "command_count": 3}
+        with mock.patch.object(outcome, "AUTHENTICATED_CORPUS_SHA256",
+                               "1" * 64), \
+                mock.patch.object(
+                    outcome, "AUTHENTICATED_OUTCOME_CORPUS_SHA256",
+                    "2" * 64), \
+                mock.patch.object(outcome, "AUTHENTICATED_CORPUS_TOTALS",
+                                  totals):
+            certified = outcome.certify_corpus(
+                corpus, [report],
+                current_java_engine_input_sha256="a" * 64,
+                current_java_program_input_sha256=PROGRAM_SHA256)
+        self.assertTrue(certified["content_exact"])
+        self.assertFalse(certified["complete"])
+        self.assertFalse(certified["producer_reports_verified"])
+
+    def test_corpus_certification_rejects_unpinned_native_receipt(self):
+        plan = self.plan()
+        values = self.complete_outcomes(plan)
+        report = outcome.compare(
+            plan, self.trace(plan, "native", values),
+            self.trace(plan, "java", values))
+        report["producers"]["native"]["build_sha256"] = "b" * 64
+        corpus = {
+            "schema": outcome.CORPUS_SCHEMA,
+            "corpus_sha256": "1" * 64,
+            "outcome_corpus_sha256": "2" * 64,
+            "replay_count": 1,
+            "snapshot_bytes": 1,
+            "record_count": 2,
+            "command_count": 3,
+            "entries": [{"path": "commands.wir", **report["identity"],
+                         "record_count": 2, "command_count": 3}],
+        }
+        totals = {"replay_count": 1, "snapshot_bytes": 1,
+                  "record_count": 2, "command_count": 3}
+        with mock.patch.object(outcome, "AUTHENTICATED_CORPUS_SHA256",
+                               "1" * 64), \
+                mock.patch.object(
+                    outcome, "AUTHENTICATED_OUTCOME_CORPUS_SHA256",
+                    "2" * 64), \
+                mock.patch.object(outcome, "AUTHENTICATED_CORPUS_TOTALS",
+                                  totals):
+            with self.assertRaisesRegex(ValueError, "pinned BNE"):
+                outcome.certify_corpus(corpus, [report])
+
+    def test_empty_outcomes_cannot_certify_a_nonempty_replay(self):
+        plan = self.plan()
+        report = outcome.compare(
+            plan, self.trace(plan, "native", []),
+            self.trace(plan, "java", []))
+        self.assertFalse(report["complete"])
+        self.assertFalse(report["exact"])
+        self.assertEqual(4, report["required_outcomes"])
+        self.assertEqual(4, report["difference_count"])
 
 
 if __name__ == "__main__":

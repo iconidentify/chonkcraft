@@ -35,6 +35,10 @@ the recovery of the native record's transitions across that window, read
 [`STATE_MACHINE.md`](STATE_MACHINE.md).
 For replaying one bounded native decision offline and measuring what it would
 have answered with other inputs, read [`MICRO_ORACLE.md`](MICRO_ORACLE.md).
+For compiling a normalized mismatch into one content-addressed native decision
+work order -- causal prefix, authenticated capture, static function slice,
+micro-oracle result, witnesses and the 185/137 certification routes -- read
+[`DIVERGENCE_COMPILER.md`](DIVERGENCE_COMPILER.md).
 For which slot a shot was built in, when it came free, and which later shot
 took it, read [`PROJECTILE_LEDGER.md`](PROJECTILE_LEDGER.md).
 For whether a native capture that would answer the question is already on this

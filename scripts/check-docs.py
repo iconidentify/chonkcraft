@@ -80,6 +80,7 @@ EXTERNAL_DOCS = {
     "frontier.md",
     "ROUTES.md",
     "WHY-CHAIN.md",
+    "FLEET.md",
     # Invented inside the harness tests to prove that prose is not an engine
     # input and cannot travel inside a source capsule. Nothing writes them.
     "fixture-prose.md",

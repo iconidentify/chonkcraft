@@ -1,0 +1,370 @@
+{
+  "schema": "chonkcraft-bne-ai-fleet-requirements-1",
+  "authority_sha256": "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807",
+  "required_scenarios": [
+    {
+      "id": "human-01",
+      "native_scenario": "Campaign\\Human\\Human01.pud",
+      "java_map": "campaigns/human/level01h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-02",
+      "native_scenario": "Campaign\\Human\\Human02.pud",
+      "java_map": "campaigns/human/level02h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-03",
+      "native_scenario": "Campaign\\Human\\Human03.pud",
+      "java_map": "campaigns/human/level03h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-04",
+      "native_scenario": "Campaign\\Human\\Human04.pud",
+      "java_map": "campaigns/human/level04h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-05",
+      "native_scenario": "Campaign\\Human\\Human05.pud",
+      "java_map": "campaigns/human/level05h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-06",
+      "native_scenario": "Campaign\\Human\\Human06.pud",
+      "java_map": "campaigns/human/level06h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-07",
+      "native_scenario": "Campaign\\Human\\Human07.pud",
+      "java_map": "campaigns/human/level07h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-08",
+      "native_scenario": "Campaign\\Human\\Human08.pud",
+      "java_map": "campaigns/human/level08h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-09",
+      "native_scenario": "Campaign\\Human\\Human09.pud",
+      "java_map": "campaigns/human/level09h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-10",
+      "native_scenario": "Campaign\\Human\\Human10.pud",
+      "java_map": "campaigns/human/level10h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-11",
+      "native_scenario": "Campaign\\Human\\Human11.pud",
+      "java_map": "campaigns/human/level11h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-12",
+      "native_scenario": "Campaign\\Human\\Human12.pud",
+      "java_map": "campaigns/human/level12h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-13",
+      "native_scenario": "Campaign\\Human\\Human13.pud",
+      "java_map": "campaigns/human/level13h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "human-14",
+      "native_scenario": "Campaign\\Human\\Human14.pud",
+      "java_map": "campaigns/human/level14h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-01",
+      "native_scenario": "Campaign\\Orc\\Orc01.pud",
+      "java_map": "campaigns/orc/level01o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-02",
+      "native_scenario": "Campaign\\Orc\\Orc02.pud",
+      "java_map": "campaigns/orc/level02o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-03",
+      "native_scenario": "Campaign\\Orc\\Orc03.pud",
+      "java_map": "campaigns/orc/level03o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-04",
+      "native_scenario": "Campaign\\Orc\\Orc04.pud",
+      "java_map": "campaigns/orc/level04o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-05",
+      "native_scenario": "Campaign\\Orc\\Orc05.pud",
+      "java_map": "campaigns/orc/level05o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-06",
+      "native_scenario": "Campaign\\Orc\\Orc06.pud",
+      "java_map": "campaigns/orc/level06o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-07",
+      "native_scenario": "Campaign\\Orc\\Orc07.pud",
+      "java_map": "campaigns/orc/level07o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-08",
+      "native_scenario": "Campaign\\Orc\\Orc08.pud",
+      "java_map": "campaigns/orc/level08o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-09",
+      "native_scenario": "Campaign\\Orc\\Orc09.pud",
+      "java_map": "campaigns/orc/level09o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-10",
+      "native_scenario": "Campaign\\Orc\\Orc10.pud",
+      "java_map": "campaigns/orc/level10o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-11",
+      "native_scenario": "Campaign\\Orc\\Orc11.pud",
+      "java_map": "campaigns/orc/level11o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-12",
+      "native_scenario": "Campaign\\Orc\\Orc12.pud",
+      "java_map": "campaigns/orc/level12o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-13",
+      "native_scenario": "Campaign\\Orc\\Orc13.pud",
+      "java_map": "campaigns/orc/level13o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "orc-14",
+      "native_scenario": "Campaign\\Orc\\Orc14.pud",
+      "java_map": "campaigns/orc/level14o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-01",
+      "native_scenario": "Campaign\\XHuman\\2XHum01.pud",
+      "java_map": "campaigns/human-exp/levelx01h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-02",
+      "native_scenario": "Campaign\\XHuman\\2XHum02.pud",
+      "java_map": "campaigns/human-exp/levelx02h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-03",
+      "native_scenario": "Campaign\\XHuman\\2XHum03.pud",
+      "java_map": "campaigns/human-exp/levelx03h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-04",
+      "native_scenario": "Campaign\\XHuman\\2XHum04.pud",
+      "java_map": "campaigns/human-exp/levelx04h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-05",
+      "native_scenario": "Campaign\\XHuman\\2XHum05.pud",
+      "java_map": "campaigns/human-exp/levelx05h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-06",
+      "native_scenario": "Campaign\\XHuman\\2XHum06.pud",
+      "java_map": "campaigns/human-exp/levelx06h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-07",
+      "native_scenario": "Campaign\\XHuman\\2XHum07.pud",
+      "java_map": "campaigns/human-exp/levelx07h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-08",
+      "native_scenario": "Campaign\\XHuman\\2XHum08.pud",
+      "java_map": "campaigns/human-exp/levelx08h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-09",
+      "native_scenario": "Campaign\\XHuman\\2XHum09.pud",
+      "java_map": "campaigns/human-exp/levelx09h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-10",
+      "native_scenario": "Campaign\\XHuman\\2XHum10.pud",
+      "java_map": "campaigns/human-exp/levelx10h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-11",
+      "native_scenario": "Campaign\\XHuman\\2XHum11.pud",
+      "java_map": "campaigns/human-exp/levelx11h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xhuman-12",
+      "native_scenario": "Campaign\\XHuman\\2XHum12.pud",
+      "java_map": "campaigns/human-exp/levelx12h",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-01",
+      "native_scenario": "Campaign\\XOrc\\2XOrc01.pud",
+      "java_map": "campaigns/orc-exp/levelx01o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-02",
+      "native_scenario": "Campaign\\XOrc\\2XOrc02.pud",
+      "java_map": "campaigns/orc-exp/levelx02o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-03",
+      "native_scenario": "Campaign\\XOrc\\2XOrc03.pud",
+      "java_map": "campaigns/orc-exp/levelx03o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-04",
+      "native_scenario": "Campaign\\XOrc\\2XOrc04.pud",
+      "java_map": "campaigns/orc-exp/levelx04o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-05",
+      "native_scenario": "Campaign\\XOrc\\2XOrc05.pud",
+      "java_map": "campaigns/orc-exp/levelx05o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-06",
+      "native_scenario": "Campaign\\XOrc\\2XOrc06.pud",
+      "java_map": "campaigns/orc-exp/levelx06o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-07",
+      "native_scenario": "Campaign\\XOrc\\2XOrc07.pud",
+      "java_map": "campaigns/orc-exp/levelx07o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-08",
+      "native_scenario": "Campaign\\XOrc\\2XOrc08.pud",
+      "java_map": "campaigns/orc-exp/levelx08o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-09",
+      "native_scenario": "Campaign\\XOrc\\2XOrc09.pud",
+      "java_map": "campaigns/orc-exp/levelx09o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-10",
+      "native_scenario": "Campaign\\XOrc\\2XOrc10.pud",
+      "java_map": "campaigns/orc-exp/levelx10o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-11",
+      "native_scenario": "Campaign\\XOrc\\2XOrc11.pud",
+      "java_map": "campaigns/orc-exp/levelx11o",
+      "seed": 1,
+      "cycles": 1800
+    },
+    {
+      "id": "xorc-12",
+      "native_scenario": "Campaign\\XOrc\\2XOrc12.pud",
+      "java_map": "campaigns/orc-exp/levelx12o",
+      "seed": 1,
+      "cycles": 1800
+    }
+  ]
+}

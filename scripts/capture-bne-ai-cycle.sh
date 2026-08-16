@@ -57,7 +57,7 @@ test -f "$APP_JAR" || {
 }
 CHONKCRAFT_ASSET_PACK="$PACK" "$ROOT/scripts/jbr/with-jbr-25.sh" java \
   -cp "$APP_JAR" net.chonkbase.chonkcraft.desktop.BneAiDecisionAdapter \
-  --map "$JAVA_MAP" --player 0 --seed "$SEED" --cycles "$CYCLES" \
+  --map "$JAVA_MAP" --seed "$SEED" --cycles "$CYCLES" \
   --output "$OUT/java.json"
 
 set +e

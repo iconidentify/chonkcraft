@@ -29,6 +29,33 @@ the Java ledger, and reports the first committed-state and telemetry mismatch:
 scripts/capture-bne-ai-cycle.sh
 ```
 
+Fleet work uses the content-addressed
+[AI evidence conductor](AI_EVIDENCE_CONDUCTOR.md). Its default is read-only
+remote discovery; `--materialize` imports only authenticated manifests and
+normalized ledgers, executes current-engine Java twins, enforces a fixed
+player/cycle denominator, and writes ranked `NEXT.json` / `NEXT.md` results:
+
+```sh
+python3 tools/bne-harness/scripts/bne_java.py ai-conductor
+python3 tools/bne-harness/scripts/bne_java.py ai-conductor \
+  --materialize --case ai-orc01-1800 --limit 1 --jobs 1
+python3 tools/bne-harness/scripts/bne_java.py ai-conductor --validate-store
+```
+
+The conductor does not copy the remote trace or manage Docker containers.
+Use this path for repeated campaign-wide work; keep the shell script as the
+explicit capture producer and one-case diagnostic.
+
+The fixed denominator comes from the independently authenticated `state.bin`
+controller table—not from whichever AI rows happened to be traced. The Java
+adapter automatically uses the map's real `PERSON` slot and records that seat
+plus every computer slot in its ledger. Fleet certification is deliberately
+stricter than one exact window: all 52 missions must be materialized under the
+same current build/pack proof and both state and telemetry must be exact
+through cycle 1,800.
+The validator recomputes the current proof and every retained object/twin
+relationship; a detached `RUN.json` or summary is never certification.
+
 Change the window without editing the script:
 
 ```sh

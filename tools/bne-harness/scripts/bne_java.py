@@ -1540,6 +1540,32 @@ def ai_decision_ledger_command(args: argparse.Namespace) -> int:
     return 0 if report["identical"] else 1
 
 
+def ai_conductor_command(args: argparse.Namespace) -> int:
+    """Discover or materialize authenticated remote/current-Java AI twins."""
+    from bne_ai_conductor import main as conductor_main
+
+    forwarded = [
+        "--host", args.host, "--ssh", args.ssh,
+        "--remote-root", args.remote_root,
+        "--repository", str(args.repository),
+        "--artifact-root", str(args.artifact_root),
+        "--asset-pack", str(args.asset_pack),
+        "--limit", str(args.limit), "--jobs", str(args.jobs),
+        "--lease-timeout", str(args.lease_timeout),
+    ]
+    for case in args.case:
+        forwarded.extend(("--case", case))
+    for enabled, flag in (
+            (args.materialize, "--materialize"),
+            (args.all_captures, "--all-captures"),
+            (args.skip_build, "--skip-build"),
+            (args.gc_dry_run, "--gc-dry-run"),
+            (args.validate_store, "--validate-store")):
+        if enabled:
+            forwarded.append(flag)
+    return conductor_main(forwarded)
+
+
 def projectile_ledger_command(args: argparse.Namespace) -> int:
     from bne_projectile_ledger import run_projectile_ledger
 
@@ -2523,6 +2549,33 @@ def parser() -> argparse.ArgumentParser:
     ai_decision_ledger.add_argument("left", type=Path)
     ai_decision_ledger.add_argument("right", type=Path)
     ai_decision_ledger.set_defaults(func=ai_decision_ledger_command)
+
+    ai_conductor = subcommands.add_parser(
+        "ai-conductor",
+        help=("discover authenticated i9beef AI captures or explicitly build "
+              "content-addressed current-Java twins"),
+    )
+    ai_conductor.add_argument("--host", default=DEFAULT_REMOTE_HOST)
+    ai_conductor.add_argument("--ssh", default="ssh")
+    ai_conductor.add_argument(
+        "--remote-root", default=".local/share/chonkcraft-bne-oracle")
+    ai_conductor.add_argument("--repository", type=Path, default=ROOT)
+    ai_conductor.add_argument(
+        "--artifact-root", type=Path, default=ROOT / ".bne-ai-evidence")
+    ai_conductor.add_argument(
+        "--asset-pack", type=Path,
+        default=(Path.home() / ".chonkcraft" / "packs" /
+                 "warcraft-ii-battle-net-edition-usa.chonkpack"))
+    ai_conductor.add_argument("--case", action="append", default=[])
+    ai_conductor.add_argument("--limit", type=int, default=0)
+    ai_conductor.add_argument("--jobs", type=int, choices=(1, 2), default=1)
+    ai_conductor.add_argument("--lease-timeout", type=float, default=0.0)
+    ai_conductor.add_argument("--materialize", action="store_true")
+    ai_conductor.add_argument("--all-captures", action="store_true")
+    ai_conductor.add_argument("--skip-build", action="store_true")
+    ai_conductor.add_argument("--gc-dry-run", action="store_true")
+    ai_conductor.add_argument("--validate-store", action="store_true")
+    ai_conductor.set_defaults(func=ai_conductor_command)
 
     projectile_ledger = subcommands.add_parser(
         "projectile-ledger",

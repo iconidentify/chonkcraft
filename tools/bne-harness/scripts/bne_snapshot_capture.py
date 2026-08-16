@@ -63,6 +63,7 @@ MAXIMUM_INSTRUCTIONS = 65536
 
 SAFE_LABEL = re.compile(r"^[A-Za-z0-9_.-]{1,48}$")
 REGISTER = re.compile(r"^e(?:ax|bx|cx|dx|si|di|bp|sp)$")
+HEX256 = re.compile(r"^[0-9a-f]{64}$")
 
 ENTRY_MARKER = re.compile(
     r"BNESNAPSHOT phase=entry entry=(?P<entry>0x[0-9a-fA-F]+) "
@@ -91,6 +92,49 @@ class CaptureError(ValueError):
     """The capture cannot be believed.  Never downgraded to a warning."""
 
 
+def normalize_scenario(value: str) -> str:
+    return value.replace("/", "\\").casefold()
+
+
+def load_evidence_identity(document: object) -> dict[str, Any]:
+    """Validate the identity shared by a mismatch and every native proof."""
+    if not isinstance(document, dict):
+        raise CaptureError("native evidence needs one identity object")
+    case = document.get("case")
+    fixture_id = document.get("fixture_id")
+    scenario = document.get("scenario")
+    seed = document.get("seed")
+    cycle = document.get("cycle")
+    subject = document.get("subject")
+    pc = document.get("pc")
+    if not isinstance(case, str) or not SAFE_LABEL.fullmatch(case):
+        raise CaptureError("native evidence identity needs a safe case")
+    if not isinstance(fixture_id, str) or not HEX256.fullmatch(fixture_id):
+        raise CaptureError("native evidence identity needs a fixture SHA-256")
+    if not isinstance(scenario, str) or not scenario.strip():
+        raise CaptureError("native evidence identity needs the retail scenario")
+    if not isinstance(seed, int) or isinstance(seed, bool) \
+            or not 0 <= seed <= 0xffffffff:
+        raise CaptureError("native evidence identity needs a 32-bit seed")
+    if not isinstance(cycle, int) or isinstance(cycle, bool) or cycle < 0:
+        raise CaptureError("native evidence identity needs a cycle")
+    if not isinstance(subject, dict) \
+            or not isinstance(subject.get("native_slot"), int) \
+            or isinstance(subject.get("native_slot"), bool) \
+            or int(subject["native_slot"]) < 0:
+        raise CaptureError(
+            "native evidence identity needs the subject native slot")
+    if not isinstance(pc, int) or isinstance(pc, bool) \
+            or not BNE_TEXT_START <= pc < BNE_TEXT_END:
+        raise CaptureError("native evidence identity needs a pinned-text PC")
+    return {
+        "case": case, "fixture_id": fixture_id, "scenario": scenario,
+        "seed": seed, "cycle": cycle,
+        "subject": {"native_slot": int(subject["native_slot"])},
+        "pc": pc,
+    }
+
+
 def _write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
@@ -110,6 +154,25 @@ def _write_text(path: Path, value: str) -> None:
 
 def _write_json(path: Path, value: object) -> None:
     _write_text(path, json.dumps(value, indent=2, sort_keys=True) + "\n")
+
+
+def _regular_file(path: Path, label: str) -> Path:
+    path = path.expanduser()
+    if path.is_symlink() or not path.is_file():
+        raise CaptureError(f"{label} is missing or is a symbolic link: {path}")
+    return path.resolve()
+
+
+def _reject_symlink_tree(root: Path, label: str) -> None:
+    """Refuse a pre-existing output tree that can redirect sealed bytes."""
+    if not root.exists():
+        return
+    if not root.is_dir():
+        raise CaptureError(f"{label} is not a directory: {root}")
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise CaptureError(
+                f"{label} contains a symbolic link: {path}")
 
 
 # --------------------------------------------------------------------------
@@ -206,12 +269,36 @@ def load_specification(document: dict[str, Any]) -> dict[str, Any]:
             raise CaptureError("a focus guard needs the native unit slot")
         if not isinstance(register, str) or not REGISTER.fullmatch(register):
             raise CaptureError("a focus guard needs the register holding the unit")
-    ret = document.get("return") or {"mode": "finish"}
+    evidence_identity = document.get("identity")
+    if native:
+        evidence_identity = load_evidence_identity(evidence_identity)
+        expected = {
+            "case": case, "cycle": document.get("cycle"), "pc": entry,
+        }
+        if any(evidence_identity.get(key) != value
+               for key, value in expected.items()):
+            raise CaptureError(
+                "snapshot identity disagrees with its case/cycle/entry")
+        if not focus or evidence_identity["subject"]["native_slot"] \
+                != focus.get("native_slot"):
+            raise CaptureError(
+                "snapshot identity subject disagrees with its focus guard")
+    elif evidence_identity is not None:
+        # Synthetic importer tests may carry no retail identity.  If a caller
+        # does supply one, do not silently accept a malformed tuple.
+        evidence_identity = load_evidence_identity(evidence_identity)
+    # GDB's ``finish`` is not usable when Wine presents the attached thread as
+    # the outermost frame (the first real i9beef capture hit exactly that
+    # failure).  The machine already gives us a stronger return witness: the
+    # caller PC is the dword at entry ESP.  Stop on that PC after the stack has
+    # unwound past the entry frame instead of asking GDB to understand Wine's
+    # frame chain.
+    ret = document.get("return") or {"mode": "stack-return"}
     mode = ret.get("mode")
     if mode == "address":
         if not isinstance(ret.get("address"), int):
             raise CaptureError("an address return needs the caller address")
-    elif mode != "finish":
+    elif mode not in ("stack-return", "finish"):
         raise CaptureError(f"unsupported capture return mode: {mode!r}")
     for stub in document.get("stubs", []) or []:
         if not isinstance(stub, dict) or not isinstance(stub.get("address"), int):
@@ -231,6 +318,7 @@ def load_specification(document: dict[str, Any]) -> dict[str, Any]:
         "entry": entry,
         "hit": hit,
         "focus": dict(focus) if focus else {},
+        "identity": dict(evidence_identity) if evidence_identity else None,
         "regions": regions,
         "return": {"mode": mode, "address": ret.get("address")},
         "inputs": list(document.get("inputs", []) or []),
@@ -286,6 +374,21 @@ def specification_from_branch_witness(artifact: dict[str, Any], *,
         review.append(
             f"add the region holding native slot {slot}: {unit_bytes} bytes "
             f"followed from whichever register carries the unit record")
+    identity = {
+        "case": case or artifact.get("case"),
+        "fixture_id": artifact.get("fixture_id"),
+        "scenario": artifact.get("scenario"),
+        "seed": artifact.get("seed"),
+        "cycle": artifact.get("cycle"),
+        "subject": {"native_slot": slot},
+        "pc": entry,
+    }
+    try:
+        identity = load_evidence_identity(identity)
+    except CaptureError as failure:
+        # A draft may expose missing upstream identity, but it must not be
+        # accepted for capture until the exact tuple has been supplied.
+        review.append(str(failure))
     return {
         "schema": SCHEMA,
         "case": case or artifact.get("case"),
@@ -293,8 +396,9 @@ def specification_from_branch_witness(artifact: dict[str, Any], *,
         "entry": entry,
         "hit": 1,
         "focus": {},
+        "identity": identity,
         "regions": regions,
-        "return": {"mode": "finish"},
+        "return": {"mode": "stack-return"},
         "inputs": [],
         "stubs": [],
         "executable_sha256": BNE_202_SHA256,
@@ -388,6 +492,7 @@ def gdb_commands(specification: dict[str, Any], *, history_log: Path,
         f"printf \"BNESNAPSHOT phase=entry entry=0x%08x hit={specification['hit']}"
         "\\n\", (unsigned int)$pc",
         "set $bne_entry_esp = (unsigned int)$esp",
+        "set $bne_return_pc = *(unsigned int*)$esp",
     ])
     for index, region in enumerate(regions):
         commands.append(
@@ -404,7 +509,15 @@ def gdb_commands(specification: dict[str, Any], *, history_log: Path,
             "(unsigned int)$esp > $bne_entry_esp",
             "continue",
         ])
+    elif specification["return"]["mode"] == "stack-return":
+        commands.extend([
+            "tbreak *$bne_return_pc if (unsigned int)$esp > $bne_entry_esp",
+            "continue",
+        ])
     else:
+        # Legacy reviewed plans remain readable, but newly compiled plans use
+        # stack-return so Wine's incomplete unwind metadata cannot strand the
+        # capture at the outermost frame.
         commands.append("finish")
     commands.append(
         "printf \"BNESNAPSHOTRET address=0x%08x esp=0x%08x\\n\", "
@@ -752,6 +865,7 @@ def snapshot_from_gdb_log(specification: dict[str, Any], text: str) \
         stubs=tuple(specification["stubs"]),
         provenance={
             "kind": "native-gdb-capture",
+            "identity": specification["identity"],
             "case": specification["case"],
             "cycle": specification["cycle"],
             "entry": entry,
@@ -793,26 +907,60 @@ def seal_capture(specification: dict[str, Any], history_log: Path,
     fails here rather than three commands later.
     """
     specification = load_specification(specification)
-    history_log = history_log.expanduser().resolve()
-    output_root = output_root.expanduser().resolve()
+    history_log = _regular_file(history_log, "snapshot capture log")
+    raw_output_root = output_root.expanduser()
+    if raw_output_root.is_symlink():
+        raise CaptureError("snapshot output root must not be a symbolic link")
+    _reject_symlink_tree(raw_output_root, "snapshot output root")
+    output_root = raw_output_root.resolve()
     if not network_disabled:
         raise CaptureError("snapshot capture requires a network-disabled runtime")
     if expect_pinned_executable:
         if executable is None:
             raise CaptureError(
                 "sealing a native snapshot needs the executable it came from")
+        executable = _regular_file(executable, "native executable")
         identity = file_identity(executable)
         if identity["sha256"] != specification["executable_sha256"]:
             raise CaptureError(
                 "snapshot sealing refuses an executable that is not the one "
                 "the specification pinned")
+    run_manifest_path = None
+    run_manifest_raw = None
     if oracle_run_manifest is not None:
-        run = json.loads(oracle_run_manifest.read_text(encoding="utf-8"))
+        run_manifest_path = _regular_file(
+            oracle_run_manifest, "oracle run manifest")
+        run_manifest_raw = run_manifest_path.read_text(encoding="utf-8")
+        run = json.loads(run_manifest_raw)
         if run.get("oracle", {}).get("executable", {}).get("sha256") \
                 != specification["executable_sha256"]:
             raise CaptureError("oracle run manifest does not pin the executable")
         if run.get("runtime", {}).get("network_disabled") is not True:
             raise CaptureError("oracle run manifest lacks the offline run")
+        if expect_pinned_executable:
+            evidence_identity = specification["identity"]
+            validation = run.get("run", {}).get("validation", {})
+            fixture = run.get("fixture", {})
+            runtime = run.get("runtime", {})
+            run_identity = {
+                "fixture_id": fixture.get("id"),
+                "scenario": validation.get("scenario"),
+                "seed": validation.get("initialization_seed"),
+            }
+            if run_identity["fixture_id"] != evidence_identity["fixture_id"] \
+                    or normalize_scenario(str(run_identity["scenario"])) \
+                    != normalize_scenario(evidence_identity["scenario"]) \
+                    or run_identity["seed"] != evidence_identity["seed"]:
+                raise CaptureError(
+                    "oracle run manifest differs from the snapshot identity")
+            pause = runtime.get("branch_witness_pause_cycle")
+            if pause != evidence_identity["cycle"] \
+                    or int(validation.get("cycles", -1)) \
+                    < evidence_identity["cycle"]:
+                raise CaptureError(
+                    "oracle run does not cover the snapshot identity cycle")
+    elif expect_pinned_executable:
+        raise CaptureError("native snapshot sealing needs its oracle run manifest")
     document = snapshot_from_gdb_log(
         specification, history_log.read_text(encoding="utf-8", errors="replace"))
     output_root.mkdir(parents=True, exist_ok=True)
@@ -837,6 +985,11 @@ def seal_capture(specification: dict[str, Any], history_log: Path,
     _write_text(log_copy, history_log.read_text(encoding="utf-8",
                                                 errors="replace"))
     artifacts = [snapshot_path, specification_path, log_copy]
+    run_manifest_copy = None
+    if run_manifest_raw is not None:
+        run_manifest_copy = output_root / "oracle-run-manifest.json"
+        _write_text(run_manifest_copy, run_manifest_raw)
+        artifacts.append(run_manifest_copy)
     if blobs.is_dir():
         artifacts.append(blobs)
     manifest = {
@@ -845,6 +998,7 @@ def seal_capture(specification: dict[str, Any], history_log: Path,
         "case": specification["case"],
         "cycle": specification["cycle"],
         "entry": specification["entry"],
+        "identity": specification["identity"],
         "specification_sha256": canonical_digest(specification),
         "snapshot_sha256": canonical_digest(document),
         "capture": {
@@ -853,6 +1007,10 @@ def seal_capture(specification: dict[str, Any], history_log: Path,
             "importer": {"path": str(Path(__file__).resolve()),
                          **file_identity(Path(__file__).resolve())},
             "log": {"path": str(history_log), **file_identity(history_log)},
+            "oracle_run_manifest": (
+                {"source": str(run_manifest_path),
+                 **file_identity(run_manifest_copy)}
+                if run_manifest_copy is not None else None),
         },
         "executable": {"sha256": specification["executable_sha256"]},
         "outcome": {

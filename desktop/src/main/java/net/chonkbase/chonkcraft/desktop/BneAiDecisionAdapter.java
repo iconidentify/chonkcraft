@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
@@ -33,8 +34,11 @@ public final class BneAiDecisionAdapter {
             require(assets.isBattleNetEdition(),
                     "AI decision evidence requires Battle.net Edition media");
             GameData data = new GameData(assets);
+            var source = require(data.campaignMap(parsed.map),
+                    "campaign map will not load: " + parsed.map);
+            int person = GameData.personIn(source);
             Mission mission = require(data.loadMission(
-                    parsed.map, parsed.player, parsed.seed),
+                    parsed.map, person, parsed.seed),
                     "mission will not load: " + parsed.map);
             for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
                 mission.tick();
@@ -51,7 +55,10 @@ public final class BneAiDecisionAdapter {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(parsed.output, AiDecisionLedger.toJson(rows) + "\n",
+            List<Integer> computers = mission.world().ais().keySet().stream()
+                    .sorted(Comparator.naturalOrder()).toList();
+            Files.writeString(parsed.output,
+                    evidenceJson(rows, parsed, person, computers) + "\n",
                     StandardCharsets.UTF_8);
             System.out.println("AI decision ledger: " + rows.size()
                     + " rows -> " + parsed.output);
@@ -65,12 +72,36 @@ public final class BneAiDecisionAdapter {
         return value;
     }
 
-    private record Arguments(String map, int player, int seed, int cycles,
+    static String evidenceJson(List<AiDecisionLedger.Row> rows, Arguments parsed,
+            int person, List<Integer> computers) {
+        String ledger = AiDecisionLedger.toJson(rows);
+        StringBuilder out = new StringBuilder(ledger.length() + 160);
+        out.append(ledger, 0, ledger.length() - 1)
+                .append(",\"map\":\"").append(json(parsed.map)).append('"')
+                .append(",\"seed\":").append(parsed.seed)
+                .append(",\"cycles\":").append(parsed.cycles)
+                .append(",\"person_player\":").append(person)
+                .append(",\"computer_players\":[");
+        for (int index = 0; index < computers.size(); index++) {
+            if (index > 0) {
+                out.append(',');
+            }
+            out.append(computers.get(index));
+        }
+        return out.append("]}").toString();
+    }
+
+    private static String json(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"")
+                .replace("\n", "\\n").replace("\r", "\\r")
+                .replace("\t", "\\t");
+    }
+
+    record Arguments(String map, int seed, int cycles,
             Path output) {
 
         private static Arguments parse(String[] args) {
             String map = "campaigns/orc/level01o";
-            int player = 0;
             int seed = 1;
             int cycles = 12;
             Path output = null;
@@ -82,7 +113,6 @@ public final class BneAiDecisionAdapter {
                 String value = args[++index];
                 switch (flag) {
                     case "--map" -> map = value;
-                    case "--player" -> player = Integer.parseInt(value);
                     case "--seed" -> seed = Integer.parseInt(value);
                     case "--cycles" -> cycles = Integer.parseInt(value);
                     case "--output" -> output = Path.of(value);
@@ -96,7 +126,7 @@ public final class BneAiDecisionAdapter {
             if (output == null) {
                 throw new IllegalArgumentException("--output is required");
             }
-            return new Arguments(map, player, seed, cycles, output);
+            return new Arguments(map, seed, cycles, output);
         }
     }
 }
