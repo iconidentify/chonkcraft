@@ -176,5 +176,3 @@ current.
    switch lanes. Never spend the whole run grinding one uncertain case.
 10. Continue player -> AI/combat -> campaign rounds until the scorecard is
     certified, not until a context window is tired.
-
-The copy/paste long-running agent goal is in `GROK_NEXT_LEVEL_GOAL.md`.
