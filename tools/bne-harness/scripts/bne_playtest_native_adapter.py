@@ -137,19 +137,19 @@ def snapshot(raw: bytes | None, missiles: int) -> dict[str, Any]:
 def progressed(before: dict[str, Any], now: dict[str, Any], kind: str) -> bool:
     if not before.get("alive") or not now.get("alive"):
         return before.get("alive") != now.get("alive")
-    tile_moved = (
-        before.get("tile_x") != now.get("tile_x")
-        or before.get("tile_y") != now.get("tile_y")
-    )
     # Still leftover bobs on the standing square. The first walk pixel is
     # progress; the idle bob is not. Counting it made every attack and
-    # patrol look several cycles earlier than the sealed fixture.
-    leftover_moved = (
+    # patrol look several cycles earlier than the sealed fixture. The route
+    # executor also reserves its next tile one visit before IX/IY changes.
+    # That reservation is not visible movement either: batch-1/01 changes
+    # 20,31 -> 21,30 at cycle 8 while its physical position remains
+    # 640,992 in both engines. Java's journal compares that same physical
+    # position, so the native side must not call the reservation progress.
+    moved = (
         now.get("order") != "STILL"
         and (before.get("px") != now.get("px")
              or before.get("py") != now.get("py"))
     )
-    moved = tile_moved or leftover_moved
     if kind in {"move", "attack-move", "patrol", "follow"}:
         return moved
     if kind in {"stop", "stand-ground"}:

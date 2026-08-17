@@ -150,16 +150,20 @@ public final class BnePlaytestAdapter {
         if (javaId == null) {
             return false;
         }
-        // Human 1's person is owner 1. A hardcoded player==0 test used to
-        // drop that click before CommandApplier saw it, so a native
-        // field-move looked like a Java refusal.
-        int player = actorPlayer(scenario, number(command.get("unit_id"), "unit id"));
+        // This adapter twins the native fixture injector, not the campaign UI.
+        // The injector guards GiveOrder with BNE_202_LOCAL_PLAYER, which stays
+        // slot 0 even when BNE_202_UI_PLAYER (the visible campaign person) is
+        // another slot. Using the actor's owner made an enemy Orc 1 archer's
+        // patrol/stop command pass on Java after retail rejected it; using the
+        // campaign person made retail-accepted slot-0 commands fail on Human
+        // maps. Slot 0 is therefore part of this evidence protocol.
+        int nativeLocalPlayer = 0;
         Unit actor = unit(world, javaId);
-        if (actor == null || !world.canControl(player, actor.player())) {
+        if (actor == null || !world.canControl(nativeLocalPlayer, actor.player())) {
             return false;
         }
         GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario,
-                pudToRoster);
+                pudToRoster, nativeLocalPlayer);
         if (order == null) {
             return false;
         }
@@ -168,8 +172,7 @@ public final class BnePlaytestAdapter {
 
     private static GameCommand toGameCommand(Map<String, Object> command, int javaId,
             Map<Integer, Integer> nativeToJava, Map<String, Object> scenario,
-            Map<Integer, Integer> pudToRoster) {
-        int player = actorPlayer(scenario, number(command.get("unit_id"), "unit id"));
+            Map<Integer, Integer> pudToRoster, int player) {
         boolean queued = Boolean.TRUE.equals(command.get("queued"));
         String kind = string(command.get("kind"), "command kind");
         int x = optionalNumber(command.get("x"), 0);
@@ -377,16 +380,6 @@ public final class BnePlaytestAdapter {
 
     private static int cycleOf(Map<String, Object> command) {
         return number(command.get("issue_cycle"), "issue cycle");
-    }
-
-    private static int actorPlayer(Map<String, Object> scenario, int nativeId) {
-        for (Object value : array(scenario.get("actors"), "actors")) {
-            Map<String, Object> actor = object(value, "actor");
-            if (number(actor.get("id"), "actor id") == nativeId) {
-                return optionalNumber(actor.get("player"), 0);
-            }
-        }
-        return 0;
     }
 
     private static int actorTypeIndex(Map<String, Object> scenario, int nativeId) {

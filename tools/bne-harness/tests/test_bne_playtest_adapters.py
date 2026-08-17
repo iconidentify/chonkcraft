@@ -67,12 +67,31 @@ class PlaytestAdapterTest(unittest.TestCase):
         observation = result["observations"][0]
         self.assertTrue(observation["accepted"],
                         "the peon accepted the commanded move")
-        self.assertEqual(8, observation["first_progress_cycle"],
-                         "the peon first changes tile on retail cycle 8")
+        self.assertEqual(9, observation["first_progress_cycle"],
+                         "the peon's cycle-8 route reservation is not a visible "
+                         "step; its first physical pixel moves on retail cycle 9")
         self.assertEqual("settled", observation["terminal_reason"])
         self.assertEqual(27, observation["state"]["tile_x"])
         self.assertEqual(17, observation["state"]["tile_y"])
         self.assertEqual("STILL", observation["state"]["order"])
+
+    def test_native_progress_ignores_a_tile_reservation_without_a_pixel_step(self):
+        before = {
+            "alive": True, "tile_x": 20, "tile_y": 31,
+            "px": 640, "py": 992, "order": "MOVE", "hit_points": 60,
+        }
+        reserved = {
+            **before, "tile_x": 21, "tile_y": 30,
+        }
+        stepped = {
+            **reserved, "px": 643, "py": 989,
+        }
+
+        self.assertFalse(native.progressed(before, reserved, "move"),
+                         "a route reservation with unchanged IX/IY is telemetry, "
+                         "not player-visible progress")
+        self.assertTrue(native.progressed(before, stepped, "move"),
+                        "the first physical pixel is visible progress")
 
     def test_native_adapter_counts_in_flight_shots_on_the_terminal_cycle(self):
         fixture = (
