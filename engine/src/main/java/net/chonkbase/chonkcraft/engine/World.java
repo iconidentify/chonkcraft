@@ -13353,6 +13353,16 @@ public final class World {
                     Math.abs(other.tileY() - mover.tileY())) > band) {
                 continue;
             }
+            // Native 0x40b010 only scans on that unit's own Still marker.
+            // This helper exists because Java may visit a person defender
+            // before the mover dest-arms in the same cycle (XHuman 10
+            // archer 1470 at 84,94). Computer Still units wait for their
+            // next OP0: Human 1 grunt 1591's last marker at 215 missed
+            // dist 7, so it stays Still until 220 even though the walk
+            // enters react at dest-arm 217.
+            if (!isPerson(other.player())) {
+                continue;
+            }
             battleNetAutoAttack(other);
         }
     }

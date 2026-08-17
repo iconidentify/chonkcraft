@@ -164,8 +164,14 @@ three. GiveOrder 3 from Still writes dest and `next_order` MOVE through
 `0x453130` and keeps the current Still program: Human 1 1598 is Still with
 next=MOVE at cycle 5 and MOVE at 6, dest-arm at 9; 1597 stays Still through
 the shared 4985 body until 9 and dest-arms at 12. Java used to install MOVE
-on the issue visit. Certification stays 0/532 paired -- the shared cell is
-not exact (0x13 wire vs lockstep bytes). The leftover-27 walk is closed.
+on the issue visit. Computer Still scan is the unit's own Still marker
+(`0x40b010` / `0x40a830`). Human 1 grunt 1591 stays Still when the walk
+enters react at dest-arm 217 and acquires at 220, dest-arming the chase
+at 223; the first blow is dest-arm 281 on 26,22. Java's neighbour dest-arm
+helper used to acquire at 217. That helper remains only for person
+visit-order (XHuman 10 archer 1470). Certification stays 0/532 paired --
+the shared cell is not exact (0x13 wire vs lockstep bytes). The leftover-27
+walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 
