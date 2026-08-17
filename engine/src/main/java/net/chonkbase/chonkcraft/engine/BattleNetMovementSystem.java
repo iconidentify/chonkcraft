@@ -1955,16 +1955,18 @@ final class BattleNetMovementSystem {
     /**
      * A melee leftover residual that already stands in weapon range, with
      * its last heading naming the quarry's occupied square, dest-arms into
-     * Attack once leftover debt is at most a quarter-tile. The same 8-pixel
-     * "nearly settled" gate already owns ranged leftover residual. Native
-     * XHuman 9 enters Attack@1188 at leftover 0 on fixture 46; Java's
-     * leftover is still 8 at that fixture because the chase opened later,
-     * and waiting for leftover 0 pushed opcode ten past 55.
+     * Attack at its native arrival band. A continuous chase uses the ordinary
+     * eight-pixel occupied-square band (XHuman 9 Attack@1188 fixture 46).
+     * A route rebuilt after an AttackTarget swing owns its leftover through
+     * zero (Human 1 dest-arm 401 lands 417); treating that refill as the
+     * ordinary band landed at 413 and struck at 423 instead of retail's 427.
      */
     private boolean arriveMeleeLeftoverOnOccupiedQuarry(Unit unit) {
         if (unit == null || unit.type() == null
                 || unit.type().maxAttackRange() != 1
-                || unit.pathLength() != 1
+                || (unit.pathLength() != 1
+                        && !(unit.battleNetAttackWaitRefillResidual()
+                                && unit.pathLength() == 0))
                 || unit.target() == null
                 || World.battleNetRangedChaseUnit(unit)
                 || (unit.order() != Unit.Order.ATTACK
@@ -1973,10 +1975,17 @@ final class BattleNetMovementSystem {
             return false;
         }
         int debt = Math.max(Math.abs(unit.offsetX()), Math.abs(unit.offsetY()));
-        if (debt > 8) {
+        // A normal MoveToTarget consult reports the occupied final square at
+        // the native eight-pixel arrival band (XHuman 9 skeleton 1431 at
+        // fixture 46). A route rebuilt on the visit an AttackTarget swing
+        // ended owns a borrowed leftover instead; native drains that buffer
+        // to zero (Human 1 grunt 1591, fixtures 413 through 417).
+        boolean attackWaitRefill = unit.battleNetAttackWaitRefillResidual();
+        if (debt > (attackWaitRefill ? 0 : 8)) {
             return false;
         }
-        int heading = unit.peekHeading();
+        int heading = unit.pathLength() == 1
+                ? unit.peekHeading() : unit.lastStepHeading();
         int nextX = unit.tileX() + Direction.deltaX(heading);
         int nextY = unit.tileY() + Direction.deltaY(heading);
         Unit quarry = world.unitAt(nextX, nextY);
@@ -1988,6 +1997,7 @@ final class BattleNetMovementSystem {
         unit.setRouteSpent(false);
         unit.setBattleNetCollisionCounter(0);
         unit.setBattleNetChaseEmptyRouteReplan(false);
+        unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setChasing(false);
         unit.setFighting(true);
         unit.setBattleNetResidualEmptyRouteSettle(false);

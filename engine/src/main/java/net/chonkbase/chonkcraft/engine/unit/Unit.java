@@ -2251,6 +2251,13 @@ public final class Unit {
     }
 
     public void setTarget(Unit target) {
+        if (this.target != target) {
+            // A post-swing route refill is evidence about one particular
+            // quarry. It cannot survive AutoSelectTarget replacing that
+            // quarry: the replacement's first approach is an ordinary chase
+            // with the native eight-pixel arrival band.
+            battleNetAttackWaitRefillResidual = false;
+        }
         this.target = target;
         if (target == null) {
             attackRequiresVisibility = false;
@@ -2727,6 +2734,21 @@ public final class Unit {
     }
 
     private boolean battleNetChaseLegOpensCold;
+
+    /**
+     * An exhausted AttackTarget swing rebuilt its chase route on that same
+     * visit. The resulting borrowed Move leftover remains owned by that
+     * refill until all of its pixels are spent.
+     */
+    public boolean battleNetAttackWaitRefillResidual() {
+        return battleNetAttackWaitRefillResidual;
+    }
+
+    public void setBattleNetAttackWaitRefillResidual(boolean residual) {
+        battleNetAttackWaitRefillResidual = residual;
+    }
+
+    private boolean battleNetAttackWaitRefillResidual;
 
     /**
      * Combat chase just rebuilt from an empty/exhausted route (not a mid-route

@@ -757,6 +757,12 @@ public final class LoadGame {
         if (state.rawGet("target") != null) {
             unit.setTarget(byId.get(integer(state.rawGet("target"))));
         }
+        // Restore this after the target. Unit.setTarget deliberately clears a
+        // marker inherited from a different quarry.
+        if (state.rawGet("attackWaitRefillResidual") != null) {
+            unit.setBattleNetAttackWaitRefillResidual(
+                    truthy(state.rawGet("attackWaitRefillResidual")));
+        }
         if (truthy(state.rawGet("burning"))) {
             unit.setBurning(true);
         }

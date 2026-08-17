@@ -690,7 +690,8 @@ final class BattleNetCombatSystem {
                     boolean meleeResidualOpen = world.actionMoveWalked
                             && unit.type() != null
                             && unit.type().maxAttackRange() <= 1
-                            && ((unit.pathLength() >= 2
+                            && (unit.battleNetAttackWaitRefillResidual()
+                                    || (unit.pathLength() >= 2
                                     && (onBattleNetChaseMoveBody(unit)
                                             || unit.battleNetSequenceOffset()
                                                     == world.idle.battleNetSequenceStart(
@@ -713,6 +714,7 @@ final class BattleNetCombatSystem {
                     if (meleeResidualOpen) {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, true);
+                        unit.setBattleNetAttackWaitRefillResidual(false);
                     } else if (rangedResidualOpen) {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, false);
@@ -1193,6 +1195,15 @@ final class BattleNetCombatSystem {
             if (reached != null && world.targets.inAttackRange(unit, reached)) {
                 unit.setChasing(false);
                 unit.setFighting(true);
+                if (unit.battleNetAttackWaitRefillResidual()) {
+                    // A spent AttackTarget visit rebuilt this route and its
+                    // final borrowed leftover has just answered PF_REACHED.
+                    // Retail opens the next Attack body past OP0 now, not on
+                    // the following Execute (Human 1 grunt 1591: land 417,
+                    // opcode-ten blow 427).
+                    world.openBattleNetAttackAfterChaseResidual(unit, true);
+                    unit.setBattleNetAttackWaitRefillResidual(false);
+                }
                 // First in-range action: native FUN_004234b0 may debit SyncRand
                 // here for table-0x27 melee types (not only on a later attack
                 // animation marker). Deferring until the marker left Human 13
@@ -1260,7 +1271,9 @@ final class BattleNetCombatSystem {
             boolean stale = unit.pathGoalX() != target.tileX()
                     || unit.pathGoalY() != target.tileY();
             boolean refilled = false;
+            boolean exhaustedRefill = false;
             if (!unit.isMoving() && (unit.pathLength() == 0 || stale)) {
+                exhaustedRefill = unit.pathLength() == 0;
                 unit.clearPath();
                 if (!world.movement.moveTowards(unit, target)) {
                     unit.setChasing(false);
@@ -1268,6 +1281,10 @@ final class BattleNetCombatSystem {
                     return;
                 }
                 refilled = true;
+                // Bind the marker below, after the first movement consult has
+                // told us whether this is a borrowed leftover or a buffered
+                // multi-step route. It must never leak from an older leg.
+                unit.setBattleNetAttackWaitRefillResidual(false);
             }
             unit.setFighting(false);
             unit.setChasing(true);
@@ -1279,6 +1296,15 @@ final class BattleNetCombatSystem {
             // 27,21 at 321 while native dest-armed 26,22.
             if (!walked && (!swung || refilled)) {
                 stepMoveTowardsTarget(unit);
+                // AttackTarget has already spent this visit's swing wait.
+                // Only an exhausted-route refill owns its borrowed movement
+                // residual through zero. A stale-goal replan still owns a
+                // buffered route and uses the ordinary eight-pixel occupied-
+                // quarry band. This is route state, not a unit or fixture
+                // exception.
+                if (refilled && exhaustedRefill && swung && unit.isMoving()) {
+                    unit.setBattleNetAttackWaitRefillResidual(true);
+                }
             }
             return;
         }
@@ -1309,6 +1335,14 @@ final class BattleNetCombatSystem {
             stepMoveTowardsTarget(unit);
             return;
         }
+
+        // The refill marker belongs to one out-of-range chase leg. If the
+        // target walks back into range before that leg reaches its occupied
+        // quarry, the leg is over and the marker must not leak into a later
+        // chase. Human 8's moving peasant does exactly that before leaving
+        // range again; retaining the old marker made the later, ordinary
+        // approach drain past retail's eight-pixel arrival band.
+        unit.setBattleNetAttackWaitRefillResidual(false);
 
         // In range: take ATTACK_TARGET, turn to the target -- and stop there.
         // Upstream's arm is
@@ -2489,6 +2523,7 @@ final class BattleNetCombatSystem {
         // so a fresh one starts at nought.
         unit.setMoveRange(0);
         unit.setOrder(Unit.Order.ATTACK_MOVE);
+        unit.setBattleNetAttackWaitRefillResidual(false);
         return true;
     }
 

@@ -3877,6 +3877,7 @@ public final class World {
             }
         }
         unit.setTarget(target);
+        unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setAttackGoal(target.tileX(), target.tileY());
         // A real click or automatic choice can only name something currently
         // visible, and that target must be released when it leaves sight.
@@ -9085,6 +9086,7 @@ public final class World {
         unit.setFighting(false);
         unit.setBattleNetStationaryAttack(false);
         unit.setBattleNetStationaryRecoveryHeld(false);
+        unit.setBattleNetAttackWaitRefillResidual(false);
         // RestoreOrder swaps COrder objects only. PathFinderInput/Output live
         // on CUnit and survive the swap; the restored order's first movement
         // call invalidates them if its effective goal differs. Keeping them

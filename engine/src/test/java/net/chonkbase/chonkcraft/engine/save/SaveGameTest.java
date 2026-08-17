@@ -634,6 +634,26 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("an exhausted attack refill keeps its target-bound residual")
+    void attackWaitRefillResidualRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-footman"), 1, 10, 12);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setBattleNetAttackWaitRefillResidual(true);
+
+        Unit loaded = find(reload(bench), "unit-grunt");
+
+        assertNotNull(loaded.target());
+        assertEquals("unit-footman", loaded.target().type().ident());
+        assertTrue(loaded.battleNetAttackWaitRefillResidual(),
+                "a save during the borrowed leftover must not land four cycles early");
+    }
+
+    @Test
     @DisplayName("a tanker resumes the same native oil action and cadence")
     void tankerOilStateRoundTrips() throws IOException {
         Bench bench = bench();
