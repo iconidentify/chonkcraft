@@ -177,9 +177,13 @@ to steal `FUN_00418370`'s first remainder, so the 281 blow was 5 (60 to
 A finished dest walk does not keep `HitUnit`'s offer: native 1598's
 first post-settle Still OP0 at 396 stays Still (1591 at dist 2) and
 Attacks in place on 25,28 when that grunt dest-arms adjacent. The walk's
-offer used to make that OP0 chase onto 25,27. Certification stays 0/532
-paired -- the shared cell is not exact (0x13 wire vs lockstep bytes).
-The leftover-27 walk is closed.
+offer used to make that OP0 chase onto 25,27. After leftover spent and
+the Attack 2562 wait expires, `0x437c80` dest-arms the first leftover
+the same visit `0x44fbd0` answers: native 1591 dest-arms 26,22 at 321
+and 25,27 at 401. Java rebuilt path=2 at 321 and dest-armed at 322
+because the swing-end visit skipped `DoActionMove`. Certification stays
+0/532 paired -- the shared cell is not exact (0x13 wire vs lockstep
+bytes). The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

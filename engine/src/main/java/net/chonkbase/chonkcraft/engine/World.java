@@ -170,6 +170,12 @@ public final class World {
      */
     private final boolean[] battleNetHelpPromotedThisCycle =
             new boolean[Player.MAX];
+    /**
+     * Units whose scheduler visit has already begun this cycle. Dest-arm
+     * acquire must not steal a later Still OP0 that is already due.
+     */
+    private final Set<Unit> battleNetVisitedThisCycle =
+            Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     /** Person help staggers one quiet cycle after the first promote only. */
     private final int[] battleNetPersonHelpLastPromoteCycle =
             new int[Player.MAX];
@@ -8381,6 +8387,7 @@ public final class World {
             }
         }
         java.util.Arrays.fill(battleNetHelpPromotedThisCycle, false);
+        battleNetVisitedThisCycle.clear();
         if (PathFinder.tracingAsks()) {
             pathFinder.setTraceCycle(cycle);
         }
@@ -8460,6 +8467,7 @@ public final class World {
             if (unit.destroyed()) {
                 continue;
             }
+            battleNetVisitedThisCycle.add(unit);
             // The two combat counters run down for every unit every cycle,
             // wherever it is and whatever it is doing, as HandleBuffsEachCycle
             // does. Threshold is how long a unit refuses to re-aim; UnderAttack
@@ -13361,6 +13369,16 @@ public final class World {
             // dist 7, so it stays Still until 220 even though the walk
             // enters react at dest-arm 217.
             if (!isPerson(other.player())) {
+                continue;
+            }
+            // A later Still visit whose wait is already 1 will OP0 this
+            // cycle. Native 0x40b010 installs Attack 2539 timer 3 on that
+            // marker (Human 1 1598 at dest-arm 401). Pulling the scan
+            // forward here spent the construction tick and landed the
+            // first stand-and-fight blow at 413 instead of 414. A person
+            // whose marker is not due still needs the helper (XHuman 10).
+            if (!battleNetVisitedThisCycle.contains(other)
+                    && other.battleNetAnimationTimer() == 1) {
                 continue;
             }
             battleNetAutoAttack(other);

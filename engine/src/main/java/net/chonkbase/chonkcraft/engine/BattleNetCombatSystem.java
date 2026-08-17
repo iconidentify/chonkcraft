@@ -1259,6 +1259,7 @@ final class BattleNetCombatSystem {
             // its quarry used to be, and only looked again once it got there.
             boolean stale = unit.pathGoalX() != target.tileX()
                     || unit.pathGoalY() != target.tileY();
+            boolean refilled = false;
             if (!unit.isMoving() && (unit.pathLength() == 0 || stale)) {
                 unit.clearPath();
                 if (!world.movement.moveTowards(unit, target)) {
@@ -1266,15 +1267,17 @@ final class BattleNetCombatSystem {
                     world.finishAttackOrder(unit);
                     return;
                 }
+                refilled = true;
             }
             unit.setFighting(false);
             unit.setChasing(true);
-            // Not on the cycle a swing ended. {@code AttackTarget}'s
-            // out-of-range arm is three lines -- {@code unit.Frame = 0},
-            // {@code State |= MOVE_TO_TARGET}, {@code TurnToTarget} -- and
-            // then it returns. The
-            // step belongs to {@code MoveToTarget}, which is the next cycle.
-            if (!walked && !swung) {
+            // A live leftover on swing-end still belongs to the next
+            // MoveToTarget visit. A spent buffer that just asked 0x44fbd0
+            // dest-arms now: native 0x437c80 writes the first leftover the
+            // same visit the pathfinder answers. Skipping that dest-arm
+            // because a swing had just ended left Human 1 grunt 1591 on
+            // 27,21 at 321 while native dest-armed 26,22.
+            if (!walked && (!swung || refilled)) {
                 stepMoveTowardsTarget(unit);
             }
             return;

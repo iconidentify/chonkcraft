@@ -19,8 +19,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Authenticated field walk: 1598 is Still on 25,28 at 393 with 46 hp.
  * Native's first post-settle Still OP0 at 396 leaves it Still (grunt 1591
- * still at 25,26, dist 2). Attack (order 16) starts on 25,28 when that
- * grunt dest-arms 25,27. The settled footman first lands on the grunt at
+ * still at 25,26, dist 2). Attack (order 16) starts on 25,28 at 401 when
+ * that grunt dest-arms 25,27. The settled footman first lands on the grunt at
  * 414 (60 to 55) and never leaves dest. Hits taken on the walk used to
  * leave an offer, so Java chased at 396 and was already on 25,27 taking
  * 7 at 412.
@@ -108,7 +108,7 @@ class BattleNetSettleStandAndFightRealDataTest {
                 "retail is Still on dest at cycle 393, not " + at393);
         assertEquals(Unit.Order.STILL, at396,
                 "retail's first post-settle Still OP0 stays Still, not " + at396);
-        assertEquals(402, opened,
+        assertEquals(401, opened,
                 "retail opens Attack when the grunt dest-arms adjacent, not "
                         + opened);
         assertEquals(25, openedX,
