@@ -8451,7 +8451,19 @@ public final class World {
                                 && unit.destPathOpeningHold())
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
                                 && unit.destPathOpeningHold())) {
-                    unit.setBattleNetOrderDelay(2);
+                    int popDelay = 2;
+                    if (queued.kind() == Unit.QueuedOrderKind.MOVE
+                            && unit.destPathOpeningHold()) {
+                        // The cold Still body is type data, not a universal
+                        // three-call pause. Most units yield two visits after
+                        // this pop, but Human 13 daemon 1556's script.bin
+                        // body yields five. The latter first changes physical
+                        // position at fixture 15 and settles at 62; the old
+                        // constant produced 12/59.
+                        popDelay = Math.max(0,
+                                movement.playerCommandWaits(unit)[0] - 1);
+                    }
+                    unit.setBattleNetOrderDelay(popDelay);
                 }
                 if (queued.kind() == Unit.QueuedOrderKind.MOVE
                         && unit.destPathOpeningHold()) {

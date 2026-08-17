@@ -458,6 +458,56 @@ class BattleNetMovementPlayabilityTest {
     }
 
     @Test
+    @DisplayName("a human-13 daemon uses its asset-defined cold move wait")
+    void aHuman13DaemonUsesItsAssetDefinedColdMoveWait() {
+        // Pinned commanded fixture c1d74bda: player Move at fixture 5 from
+        // 82,6 toward the occupied 86,4 point. Retail first changes physical
+        // position at 15 and stands on the stride-neighbour 86,2 at 62.
+        GameData data = data();
+        String map = "campaigns/human/level13h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        CommandApplier commands = new CommandApplier(mission.world(),
+                new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+
+        Unit daemon = mission.world().unitsSnapshot().stream()
+                .filter(Unit::isAlive)
+                .filter(Unit::isOnMap)
+                .filter(unit -> unit.player() == 0)
+                .filter(unit -> unit.tileX() == 82 && unit.tileY() == 6)
+                .filter(unit -> "unit-daemon".equals(unit.type().ident()))
+                .findFirst().orElse(null);
+        assertNotNull(daemon, "Human 13 has no player daemon on 82,6");
+
+        mission.tick();
+        mission.tick();
+        int startX = daemon.pixelX();
+        int startY = daemon.pixelY();
+        Integer firstProgress = null;
+        Integer settled = null;
+        for (int cycle = 1; cycle <= 80; cycle++) {
+            if (cycle == 5) {
+                assertTrue(commands.apply(GameCommand.move(
+                        0, daemon.id(), 86, 4)));
+            }
+            mission.tick();
+            if (firstProgress == null
+                    && (daemon.pixelX() != startX || daemon.pixelY() != startY)) {
+                firstProgress = cycle;
+            }
+            if (daemon.order() == Unit.Order.STILL
+                    && daemon.tileX() == 86 && daemon.tileY() == 2) {
+                settled = cycle;
+                break;
+            }
+        }
+        assertEquals(15, firstProgress);
+        assertEquals(62, settled);
+    }
+
+    @Test
     @DisplayName("a human-12 scout zeppelin stands down at 50,4")
     void aHuman12ScoutZeppelinStandsDownAtItsFirstScoutPoint() {
         // i9beef retail-human-12-idle, pinned 2.02b. The zeppelin that
