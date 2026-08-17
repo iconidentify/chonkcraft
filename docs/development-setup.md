@@ -584,5 +584,5 @@ discovering them one at a time.
    install them now.
 
    A second job was added on a self-hosted runner that has the game data, so
-   the `full` profile is asserted too: 20 of 2,421 tests skip, so 2,401 tests
+   the `full` profile is asserted too: 23 of 2,421 tests skip, so 2,398 tests
    actually run. See [the self-hosted runner](ci.md#the-self-hosted-runner).

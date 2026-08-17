@@ -9,7 +9,7 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2421 tests,  20 skipped
+    authenticated inputs       2421 tests,  23 skipped
     no external input          2421 tests, 876 skipped
 
 Both can be green.
@@ -91,11 +91,11 @@ MODULES = (
 
 # Expected (tests run, skipped) per module, per profile.
 #
-# Measured on macOS 27 aarch64, JBR 25.0.2, against chonkcraft at
-# v3.3.2-145-gcde1a071 and a 1995 DOS install of Tides of Darkness.
+# Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
+# Battle.net Edition installation and pack.
 #
-# Twenty skip even in `full`. Nineteen of them want something other than
-# game data; the twentieth wants a different release of it, and is described
+# Twenty-three skip even in `full`. Twenty-two of them want something other than
+# game data; the twenty-third wants a different release of it, and is described
 # at the `full` profile below.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
@@ -153,38 +153,37 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # this project's FLAC and Ogg writers against the reference decoders. Both
     # CI jobs install them; see .github/workflows/tests.yml.
     #
-    # Re-measured 7 August 2026 against a real 1995 installation, the first
-    # time this profile has been measured since the suite grew past 1,694
-    # tests. It had expected 893 engine tests where there are 1,274. The
-    # twenty that skip are: five CELT encoder tests wanting a music fixture
+    # Re-measured 17 August 2026 against the authenticated Battle.net Edition
+    # installation and its derived pack. The twenty-three that skip are: five
+    # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
     # tests in runtime and desktop, four fixture-sensitive ones in
     # FacingCountTest, AutoAttackTest, AutoCastToggleTest and
-    # CommandSinkGuardTest, three local playtest-save regression referees, and
-    # one release-dependent test described below.
+    # CommandSinkGuardTest, four custom-map referees whose maps are not in the
+    # retail pack, two local playtest-save regression referees, and one
+    # release-dependent test described below.
     #
-    # ONE OF THE TWENTY DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
+    # ONE OF THE TWENTY-THREE DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
     # is the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
-    # baseline was measured on a Tides of Darkness installation, so it counts
-    # that skip and `data` reads (130, 1). On a Battle.net Edition
-    # installation -- which is this port's parity oracle -- the test runs
-    # instead, `data` reads (130, 0), and the total is 19. That is a correct
-    # run reporting one fewer skip, not a regression. Nothing here can tell
+    # baseline is measured on Battle.net Edition, so that test runs. A classic
+    # Tides of Darkness installation skips it and reports one additional skip.
+    # That is a correct release-dependent difference, not a regression. Nothing here can tell
     # the two apart, because the profile is a pair of numbers per module and
     # the release is not an input the profile knows about.
     "full": {
         "assetpack": (256, 5),
         "runtime": (99, 3),
-        "data": (138, 1),
+        "data": (138, 3),
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
-        # Three exact-save regressions need the operator's local Human 6 saves.
-        # They are intentionally additional authenticated playtest coverage,
-        # not artifacts derived from the mounted retail installation.
-        "engine": (1541, 5),
+        # Two exact-save regressions need the operator's local Human 6 saves;
+        # the other fixture skips here name custom maps absent from the retail
+        # pack. They are additional authenticated coverage, not artifacts
+        # derived from the mounted retail installation.
+        "engine": (1541, 6),
         "desktop": (326, 6),
         "matchmaker-server": (4, 0),
     },

@@ -57,10 +57,11 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **20 skips of 2,421**, updated after the player-intent
-coverage additions against a real 1995 installation. One of the twenty depends
-on which release the installation is -- a Battle.net Edition sees 19, which is correct and not a
-regression; `scripts/ci/check-test-skips.py` explains it at the profile.
+Asserts the `full` profile: **23 skips of 2,421**, updated after the player-intent
+coverage additions against the runner's authenticated Battle.net Edition installation.
+One of the twenty-three depends on which release the installation is: the
+Battle.net Edition runner sees 23, while a classic installation sees 24.
+`scripts/ci/check-test-skips.py` explains the release-dependent assertion.
 About nine minutes.
 
 It builds an asset pack from the mounted installation and runs the whole suite
@@ -88,14 +89,14 @@ in the first place, one at a time, with nothing objecting.
 | Profile | Inputs | Skips |
 |---|---|---|
 | `data-free` | none | 876 |
-| `full` | installation, pack, Opus vectors | 20 |
+| `full` | installation, pack, Opus vectors | 23 |
 
-The twenty that skip even in `full` want nothing anyone should have to
+The twenty-three that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
-(`-Dopus.music`) that this project does not ask anybody for, and four are
-fixture-sensitive behaviours absent from the pinned installation and scripts.
-Three exact-save referees additionally need the operator's private playtest saves,
-and one video assertion depends on which retail release is mounted.
+(`-Dopus.music`) that this project does not ask anybody for, four are
+fixture-sensitive behaviours, four need custom maps absent from the retail pack,
+and two exact-save referees need the operator's private playtest saves. One video
+assertion depends on which retail release is mounted.
 
 ## The failure gate
 
