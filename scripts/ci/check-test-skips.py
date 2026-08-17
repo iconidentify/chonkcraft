@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2202 tests,  20 skipped
-    no external input          2202 tests, 718 skipped
+    authenticated inputs       2421 tests,  20 skipped
+    no external input          2421 tests, 876 skipped
 
 Both can be green.
 
@@ -126,7 +126,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     "data-free": {
         "assetpack": (256, 26),
         "runtime": (99, 3),
-        "data": (131, 21),
+        "data": (138, 26),
         "extractor": (9, 3),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
@@ -139,8 +139,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # hermetic. The player-intent batch adds two more authenticated save
         # assertions and two authenticated desktop order-delivery assertions;
         # all four correctly join the data-free skip inventory.
-        "engine": (1373, 443),
-        "desktop": (298, 233),
+        "engine": (1541, 567),
+        "desktop": (326, 251),
         "matchmaker-server": (4, 0),
     },
     # Everything configured. What a developer with the game data should see on
@@ -177,15 +177,15 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     "full": {
         "assetpack": (256, 5),
         "runtime": (99, 3),
-        "data": (131, 1),
+        "data": (138, 1),
         "extractor": (9, 0),
         "launcher": (46, 0),
         "matchmaking": (2, 0),
         # Three exact-save regressions need the operator's local Human 6 saves.
         # They are intentionally additional authenticated playtest coverage,
         # not artifacts derived from the mounted retail installation.
-        "engine": (1373, 5),
-        "desktop": (298, 6),
+        "engine": (1541, 5),
+        "desktop": (326, 6),
         "matchmaker-server": (4, 0),
     },
 }

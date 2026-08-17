@@ -844,7 +844,8 @@ class LockstepTest {
                 GameCommand.DepartureReason.LEFT)));
         assertTrue(applier.apply(GameCommand.move(1, departed.id(), 30, 30)));
 
-        assertEquals(Unit.Order.MOVE, departed.order());
+        assertTrue(reachesOrder(world, departed, Unit.Order.MOVE),
+                "the shared-control command never left retail's Still handoff");
         assertEquals(0, departed.player(), "shared control must not recolour or convert the unit");
         assertTrue(world.sharesVisionWith(1, 0),
                 "a controller cannot use forces hidden by the departed slot's fog");
@@ -1004,8 +1005,9 @@ class LockstepTest {
         CommandApplier applier = new CommandApplier(world, List.of(soldier()));
 
         Unit unit = world.units().getFirst();
-        applier.apply(GameCommand.move(0, unit.id(), 20, 20));
-        assertEquals(Unit.Order.MOVE, unit.order());
+        assertTrue(applier.apply(GameCommand.move(0, unit.id(), 20, 20)));
+        assertTrue(reachesOrder(world, unit, Unit.Order.MOVE),
+                "the accepted command never left retail's Still handoff");
     }
 
     @Test
@@ -1050,7 +1052,7 @@ class LockstepTest {
         assertTrue(applier.apply(GameCommand.repair(0, unit.id(), friend.id())),
                 "retail GiveOrder 27 on a soldier must become a walk");
 
-        assertEquals(Unit.Order.MOVE, unit.order(),
+        assertTrue(reachesOrder(world, unit, Unit.Order.MOVE),
                 "the soldier tried to repair instead of walking to the clicked unit");
         assertEquals(friend.tileX(), unit.orderTargetX());
         assertEquals(friend.tileY(), unit.orderTargetY());
@@ -1071,6 +1073,8 @@ class LockstepTest {
 
         assertTrue(applier.apply(GameCommand.move(0, unit.id(), 30, 30)));
 
+        assertTrue(reachesOrder(world, unit, Unit.Order.MOVE),
+                "the replacement never left retail's Still handoff");
         assertFalse(unit.hasQueuedOrders(),
                 "an accepted fresh click left an obsolete group waypoint behind it");
         assertEquals(30, unit.orderTargetX());
@@ -1086,5 +1090,21 @@ class LockstepTest {
         assertEquals(0, applier.indexOf(type));
         assertEquals(type, applier.typeAt(0));
         assertEquals(null, applier.typeAt(99), "an out-of-range index must not throw");
+    }
+
+    /**
+     * A serialized BNE command may be accepted while CurrentAction remains
+     * Still for the rest of the native action-program wait. Network tests must
+     * prove that handoff completes rather than requiring the old eager order
+     * rewrite on the submission cycle.
+     */
+    private static boolean reachesOrder(World world, Unit unit, Unit.Order order) {
+        for (int cycle = 0; cycle < 32; cycle++) {
+            if (unit.order() == order) {
+                return true;
+            }
+            world.tick();
+        }
+        return unit.order() == order;
     }
 }
