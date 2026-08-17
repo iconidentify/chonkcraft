@@ -532,12 +532,13 @@ final class BattleNetMovementSystem {
             // empty replan promoted Still after only five of them.
             if (battleNetOccupiedPointRefusal(unit)) {
                 unit.setRouteSpent(false);
-            } else if (playerMoveLastStepReady(unit)) {
-                // Leftover dest-arm landed one or two tiles short of the
-                // click. Native batch-1/26 takes the last heading onto
-                // 32,7 at fixture 36; batch-1/31 leftover-lands on 73,92
-                // two short of 75,91 and is Still there at 73. The empty
-                // ten dest-armed that last tile only after fixture 71.
+            } else if (battleNetEmptyRouteRefillsImmediately(unit)) {
+                // A spent 20-byte buffer used to pay PF_WAIT 10 before
+                // 0x44fbd0, which is why a Human 1 walk sat 27 cycles on
+                // 23,13 and 19,12 while native dest-armed at 16. 0x437c80
+                // calls the pathfinder on the same visit 0x44fab0 fails
+                // (cursor >= 20). The last-one-or-two-tile exception was
+                // that refill seen only next to dest.
                 unit.setRouteSpent(false);
             } else if (spendTheEmptyRoute(unit)) {
                 // Every PF_WAIT runs the blocker test, the count-born one
@@ -1751,20 +1752,22 @@ final class BattleNetMovementSystem {
         return true;
     }
 
-    private boolean playerMoveLastStepReady(Unit unit) {
-        if (!unit.battleNetPlayerCommandMove() || !unit.routeSpent()
-                || battleNetCommandPointReached(unit)) {
+    /**
+     * Whether a spent 20-byte route should ask {@code 0x44fbd0} now.
+     *
+     * <p>Native {@code 0x44fab0} fails when {@code unit+0x7e >= 20}.
+     * {@code 0x437c80} then pathfinds on that visit unless {@code 0x4374a0}
+     * says the order point is already in range. Critters keep the empty
+     * Still path at {@code 0x4376c0}.
+     */
+    private boolean battleNetEmptyRouteRefillsImmediately(Unit unit) {
+        if (!unit.routeSpent() || battleNetCommandPointReached(unit)) {
             return false;
         }
-        int destX = unit.orderTargetX();
-        int destY = unit.orderTargetY();
-        if (!world.map.contains(destX, destY)) {
+        if (unit.type() != null && "unit-critter".equals(unit.type().ident())) {
             return false;
         }
-        int chebyshev = Math.max(Math.abs(unit.tileX() - destX),
-                Math.abs(unit.tileY() - destY));
-        return chebyshev >= 1 && chebyshev <= 2
-                && world.canEnter(unit, destX, destY);
+        return world.map.contains(unit.orderTargetX(), unit.orderTargetY());
     }
 
     /** Whether a spent point route terminates in a live occupied step. */

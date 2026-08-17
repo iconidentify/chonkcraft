@@ -9,9 +9,12 @@ it is not the roadmap.
 
 The current authenticated **resolved-command matrix** contains 240 generated
 cells. Both production adapters have executed and made 206 cells comparable:
-203 are exact, three are materially divergent, 34 remain unexecuted, and none
-failed because of infrastructure. This is **203/206 comparable**, not 203/240
-complete.
+45 are exact, 161 are materially divergent, 34 remain unexecuted, and none
+failed because of infrastructure. This is **45/206 comparable**, not 45/240
+complete. The drop from 203/206 is mostly Java first-progress following walk
+pixels (`ed13c104`) against native tile-field pops, plus two PERSON/canControl
+over-accepts; it is not a walk-tile regression. Do not restore 203 by counting
+matching rejections as exact.
 
 That 240-cell matrix begins after a command has already been resolved. It is
 deliberately separate from the **532-cell physical gesture transaction**
@@ -135,35 +138,30 @@ a compile-ready player receipt plus a cycle-level unit log. A Human 1 field
 click of the starting footman fills the same size-1 cell on the Java side.
 First progress 10 vs 9 was observation: both engines pop the tile field to
 `(22,6)` at cycle 9 while pixels stay `672,160` until cycle 10. The journal
-now records first progress from pixel, so both receipts say 10. The first
-simulation mismatch is later: tiles still match through 152, then at 153
-native is `(24,14)` and Java is `(23,13)`. That is not a different corridor.
-Both engines walk the same tiles `21,5 -> 22,6 -> 23,6 -> 24,7 -> 25,8 ->
-25,9 -> 25,10 -> 24,11 -> 24,12 -> 23,13 -> 24,14`; native keeps a 16-cycle
-leftover on every tile after the first, while Java sits on `23,13` for 27
-cycles (137 to 164) and only then takes the same next square. Native first
-takes damage at 281 (`26,22`, 53 hp) while Java is still 60 hp on `(26,21)`,
-and they settle at 393/46 vs 415/49.
+now records first progress from pixel, so both receipts say 10. After the
+first dest-arm, a spent 20-byte route that has not reached dest dest-arms
+the next leftover on the same visit. Native `0x44fab0` fails when
+`unit+0x7e >= 20`; `0x437c80` then calls `0x44fbd0` immediately. Java used
+to pay PF_WAIT 10 there, which is why the Human 1 walk sat 27 cycles on
+`23,13` and the second footman sat 27 on `19,12`. Both physical twins now
+keep the 16-cycle leftover through those tiles (`137->153` and `76->92`).
+The held-out walk to `(25,12)` still settles at 121. Native first takes
+damage at 281 (`26,22`, 53 hp). Later HP and Still-after-progress
+settlement remain open; they are not this leftover timer.
 
-Two independent native walks plus a held-out close the cycle-153 special
-case. Human 1 footman 1597 from `(17,7)` onto `(25,28)` (sealed
-`human01-1597-2528-20260816T234813Z`, dest wire `1319001c00ffff03`) keeps
-native 16-cycle leftovers; Java inserts the same 27-cycle leftover after
-`(19,12)` and first splits at cycle 92 (`18,11` vs `19,12`). The held-out
-is the same starting footman onto `(25,12)` -- dest on the earlier corridor
-before `23,13` (sealed `human01-1598-2512-20260816T234813Z`, dest wire
-`1319000c00ffff03`): tiles match through settle at 121/137, so "always
-stall at cycle 153" and "always stall on 23,13" are both false. The walk
-debt is one leftover step taking 27 cycles instead of 16.
-`engine_edit_allowed` stays false for that leftover until the 16-cycle
-step timer is transcribed from the pinned binary. A two-wide open-ground click dest-spreads on both sides:
+Two independent native walks plus a held-out closed the cycle-153 special
+case before the refill was implemented. Human 1 footman 1597 from `(17,7)`
+onto `(25,28)` (sealed `human01-1597-2528-20260816T234813Z`, dest wire
+`1319001c00ffff03`) and the starting footman onto `(25,12)` (sealed
+`human01-1598-2512-20260816T234813Z`, dest wire `1319000c00ffff03`) are
+the positive and negative witnesses. A two-wide open-ground click dest-spreads on both sides:
 `DoRightButton` `0x43e330`/`0x43e530` write each soldier's dest as its tile
 plus `click - mean` on any axis whose selection span is at most three, and
 Java's field right-click now does the same, so Human 1 footmen at `(21,5)`
 and `(17,7)` onto `(25,28)` both name `(25,27)` and `(25,29)`. A three-wide
 click of those two plus `(10,13)` keeps `(25,28)` because both spans exceed
 three. Certification stays 0/532 paired -- the shared cell is not exact
-(0x13 wire vs lockstep bytes, then the leftover-27 walk).
+(0x13 wire vs lockstep bytes). The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 
