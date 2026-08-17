@@ -783,6 +783,15 @@ final class BattleNetMovementSystem {
         unit.setWaitCycles(0);
         unit.clearPath();
         unit.setBattleNetPlayerCommandMove(false);
+        // The dest-path opening hold is the walk that just landed. Leaving
+        // it armed made a later Attack-Move think it still owed dest-arm.
+        unit.setDestPathOpeningHold(false);
+        // Hits taken on the walk used to leave HitUnit's offer, so the first
+        // post-settle Still OP0 chased (Human 1 1598 Attack@396 dest-arm@399
+        // onto 25,27) instead of staying Still. Native 396 is 4983 Still
+        // with 1591 at dist 2; Attack in place only when that grunt
+        // dest-arms adjacent at 401.
+        unit.setOfferedTarget(null);
         world.finishOrder(unit);
         unit.setActionBeforeQueued(null);
         if (world.battleNetSequence != null) {
