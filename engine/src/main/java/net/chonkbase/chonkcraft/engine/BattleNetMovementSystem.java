@@ -322,6 +322,28 @@ final class BattleNetMovementSystem {
         int[] waits = playerCommandWaits(unit);
         int actionWait = waits[0];
         int queueWait = waits[1];
+        // Native GiveOrder 3 from Still writes dest and next_order 3:
+        // Human 1 1598 queueWait 1 is Still at cycle 5 and MOVE at 6;
+        // 1597 queueWait 4 stays Still through the 4985 body until 9.
+        // Installing MOVE on the issue visit showed MOVE at cycle 5.
+        if (before == Unit.Order.STILL && queueWait > 0) {
+            int[] dest = projectPlayerMovePoint(unit, toX, toY);
+            unit.setPathGoal(dest[0], dest[1]);
+            unit.setOrderTarget(dest[0], dest[1]);
+            unit.setMoveRange(0);
+            unit.clearPath();
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.MOVE, dest[0], dest[1],
+                    null, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.setBattleNetPlayerCommandMove(true);
+            unit.setDestPathOpeningHold(true);
+            // The issue visit still decrements this delay, so add the
+            // beat native spends writing next_order instead of counting
+            // down.
+            unit.setBattleNetOrderDelay(queueWait + 1);
+            return true;
+        }
         // Script.bin Still is already on OP0 (queueWait 0) while a slow
         // siege engine's presentation Still still has a wait. Native 413
         // OP0 continues into the shared 4985 Still body -- remaining timer

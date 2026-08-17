@@ -97,5 +97,22 @@ class BnePhysicalAdapterTest {
                         .get("first_progress_cycle")).intValue(),
                 "first progress is the first walk pixel, not the cycle-9 tile pop");
         assertTrue(Files.size(cycleLog) > 0, "the cycle twin log must not be empty");
+        String five = null;
+        String six = null;
+        for (String line : Files.readString(cycleLog, StandardCharsets.UTF_8)
+                .split("\n")) {
+            if (line.contains("\"cycle\":5")) {
+                five = line;
+            }
+            if (line.contains("\"cycle\":6")) {
+                six = line;
+            }
+        }
+        assertNotNull(five, "the cycle twin log must contain fixture 5");
+        assertNotNull(six, "the cycle twin log must contain fixture 6");
+        assertTrue(five.contains("\"order\":\"STILL\""),
+                "retail is Still with next Move at cycle 5, not " + five);
+        assertTrue(six.contains("\"order\":\"MOVE\""),
+                "retail promotes the queued Move at cycle 6, not " + six);
     }
 }

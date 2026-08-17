@@ -8328,9 +8328,18 @@ public final class World {
                 // dest-arms on that visit.
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
                         || queued.kind() == Unit.QueuedOrderKind.PATROL
+                        || (queued.kind() == Unit.QueuedOrderKind.MOVE
+                                && unit.destPathOpeningHold())
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
                                 && unit.destPathOpeningHold())) {
                     unit.setBattleNetOrderDelay(2);
+                }
+                if (queued.kind() == Unit.QueuedOrderKind.MOVE
+                        && unit.destPathOpeningHold()) {
+                    // orderMove clears the player-click mark. Without it
+                    // a spent leftover pays PF_WAIT 10 instead of dest-arming
+                    // the next buffer -- Human 1 1597 sat 27 on 19,12.
+                    unit.setBattleNetPlayerCommandMove(true);
                 }
                 return;
             }

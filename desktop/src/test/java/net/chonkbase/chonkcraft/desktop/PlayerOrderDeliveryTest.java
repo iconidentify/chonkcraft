@@ -243,7 +243,9 @@ class PlayerOrderDeliveryTest {
         assertEquals(expected, recipients,
                 "one click was not delivered in the ordered selection's exact order");
         for (Unit unit : requested.subList(0, 9)) {
-            assertEquals(Unit.Order.MOVE, unit.order(),
+            assertTrue(unit.order() == Unit.Order.MOVE
+                            || unit.hasQueuedOrders()
+                            || unit.queuedReplacementPending(),
                     unit.id() + " was selected but did not receive the move");
         }
         for (Unit unit : requested.subList(9, requested.size())) {

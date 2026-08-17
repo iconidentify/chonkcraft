@@ -68,11 +68,15 @@ class BattleNetNavalLegalityRealDataTest {
                     world, new ArrayList<>(data.unitTypes().types().values()));
             commands.apply(GameCommand.move(
                     person, ship.id(), passage.targetX(), passage.targetY()));
-            assertEquals(Unit.Order.MOVE, ship.order(),
+            assertTrue(ship.order() == Unit.Order.MOVE
+                            || ship.hasQueuedOrders()
+                            || ship.queuedReplacementPending(),
                     passage.ident() + " refused the player move");
 
             int movingCycles = 0;
-            for (int cycle = 0; cycle < 3_000 && ship.order() != Unit.Order.STILL; cycle++) {
+            for (int cycle = 0; cycle < 3_000 && (ship.order() != Unit.Order.STILL
+                    || ship.hasQueuedOrders()
+                    || ship.queuedReplacementPending()); cycle++) {
                 world.tick();
                 assertLegalAnchor(world, ship, cycle);
                 if (ship.tileX() != startX || ship.tileY() != startY) {

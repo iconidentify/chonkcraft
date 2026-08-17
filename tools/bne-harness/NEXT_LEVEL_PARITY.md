@@ -160,8 +160,12 @@ plus `click - mean` on any axis whose selection span is at most three, and
 Java's field right-click now does the same, so Human 1 footmen at `(21,5)`
 and `(17,7)` onto `(25,28)` both name `(25,27)` and `(25,29)`. A three-wide
 click of those two plus `(10,13)` keeps `(25,28)` because both spans exceed
-three. Certification stays 0/532 paired -- the shared cell is not exact
-(0x13 wire vs lockstep bytes). The leftover-27 walk is closed.
+three. GiveOrder 3 from Still writes dest and `next_order` MOVE through
+`0x453130` and keeps the current Still program: Human 1 1598 is Still with
+next=MOVE at cycle 5 and MOVE at 6, dest-arm at 9; 1597 stays Still through
+the shared 4985 body until 9 and dest-arms at 12. Java used to install MOVE
+on the issue visit. Certification stays 0/532 paired -- the shared cell is
+not exact (0x13 wire vs lockstep bytes). The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

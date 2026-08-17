@@ -69,12 +69,25 @@ class BattleNetMovementPlayabilityTest {
         return unit;
     }
 
+    private static boolean playerMoveInFlight(Unit unit) {
+        return unit.order() == Unit.Order.MOVE
+                || unit.hasQueuedOrders()
+                || unit.queuedReplacementPending();
+    }
+
+    private static void assertAcceptedMove(Unit unit, String message) {
+        assertTrue(unit.order() == Unit.Order.MOVE || playerMoveInFlight(unit),
+                message);
+    }
+
     private static void runToRest(World world, Unit unit, int limit) {
-        for (int cycle = 0; cycle < limit && unit.order() != Unit.Order.STILL; cycle++) {
+        for (int cycle = 0; cycle < limit && playerMoveInFlight(unit); cycle++) {
             world.tick();
         }
         assertEquals(Unit.Order.STILL, unit.order(),
                 "the player move never reached a completed state");
+        assertTrue(!unit.hasQueuedOrders() && !unit.queuedReplacementPending(),
+                "the player move never popped its queued dest");
     }
 
     @Test
@@ -91,7 +104,7 @@ class BattleNetMovementPlayabilityTest {
         Unit footman = place(fixture, "unit-footman", 8, 16);
 
         fixture.commands().apply(GameCommand.move(0, footman.id(), 24, 16));
-        assertEquals(Unit.Order.MOVE, footman.order(), "the wire move command was refused");
+        assertAcceptedMove(footman, "the wire move command was refused");
         runToRest(fixture.world(), footman, 4_000);
 
         assertTrue(footman.tileX() >= 24,
@@ -106,7 +119,7 @@ class BattleNetMovementPlayabilityTest {
         Fixture naval = fixture(sea);
         Unit destroyer = place(naval, "unit-human-destroyer", 4, 8);
         naval.commands().apply(GameCommand.move(0, destroyer.id(), 24, 16));
-        assertEquals(Unit.Order.MOVE, destroyer.order(), "the destroyer move was refused");
+        assertAcceptedMove(destroyer, "the destroyer move was refused");
         runToRest(naval.world(), destroyer, 4_000);
         assertTrue(destroyer.tileX() >= 22 && destroyer.tileY() >= 14,
                 "the destroyer did not complete its commanded sea passage");
@@ -121,7 +134,7 @@ class BattleNetMovementPlayabilityTest {
         // Retail large movers use an even lattice; command an even anchor so
         // completion, rather than the odd-goal widening policy, is measured.
         air.commands().apply(GameCommand.move(0, gryphon.id(), 24, 8));
-        assertEquals(Unit.Order.MOVE, gryphon.order(), "the gryphon move was refused");
+        assertAcceptedMove(gryphon, "the gryphon move was refused");
         runToRest(air.world(), gryphon, 4_000);
         assertTrue(gryphon.tileX() >= 24,
                 "the aircraft treated an impassable ground wall as flight terrain: "
