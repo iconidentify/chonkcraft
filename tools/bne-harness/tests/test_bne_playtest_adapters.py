@@ -327,6 +327,10 @@ class PlaytestAdapterTest(unittest.TestCase):
                         "GiveOrder table 24 applied after the peon mined")
         self.assertTrue(java_result["observations"][1]["accepted"],
                         "Java must send the laden peon home")
+        self.assertEqual("fulfilled",
+                         native_result["observations"][1]["terminal_reason"])
+        self.assertEqual(native_result["observations"][1]["terminal_cycle"],
+                         java_result["observations"][1]["terminal_cycle"])
         self.assertEqual((22, 22), (
             java_result["observations"][1]["state"]["tile_x"],
             java_result["observations"][1]["state"]["tile_y"]),

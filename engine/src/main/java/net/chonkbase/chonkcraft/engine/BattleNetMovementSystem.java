@@ -1272,7 +1272,9 @@ final class BattleNetMovementSystem {
                 return true;
             }
             if (depotRingDestArm(worker, building)) {
-                int[] entry = world.battleNetDepotEntryPoint(worker, building);
+                int[] entry = worker.carried() > 0
+                        ? world.battleNetDepotPathPoint(worker, building)
+                        : world.battleNetDepotEntryPoint(worker, building);
                 int heading = Direction.fromDelta(
                         Integer.signum(entry[0] - worker.tileX()),
                         Integer.signum(entry[1] - worker.tileY()));
@@ -1677,19 +1679,24 @@ final class BattleNetMovementSystem {
 
     private boolean depotRingReady(Unit worker, Unit building, boolean action25) {
         if (worker == null || building == null || !worker.returningToDepot()
-                || worker.carried() != 0 || worker.pathLength() > 0
+                || worker.pathLength() > 0
                 || worker.isMoving()) {
             return false;
         }
         if (action25) {
-            if (!worker.routeSpent() || worker.battleNetResourceApproachStaged()) {
+            boolean landedLadenRoute = worker.carried() > 0
+                    && worker.stepDrained();
+            if ((!worker.routeSpent() && !landedLadenRoute)
+                    || worker.battleNetResourceApproachStaged()) {
                 return false;
             }
         } else if (worker.routeSpent() || worker.battleNetOrderDelay() > 0
                 || !worker.battleNetResourceApproachStaged()) {
             return false;
         }
-        int[] entry = world.battleNetDepotEntryPoint(worker, building);
+        int[] entry = worker.carried() > 0
+                ? world.battleNetDepotPathPoint(worker, building)
+                : world.battleNetDepotEntryPoint(worker, building);
         if (worker.tileX() == entry[0] && worker.tileY() == entry[1]) {
             return false;
         }
@@ -4491,6 +4498,7 @@ final class BattleNetMovementSystem {
         }
         return unit.battleNetDoubleStep()
                 || unit.battleNetRepairStride()
+                || unit.returningToDepot() && unit.carried() > 0
                 || "unit-critter".equals(unit.type().ident())
                 || siegeUsesScriptBinMovePace(unit);
     }
@@ -4555,8 +4563,18 @@ final class BattleNetMovementSystem {
             unit.setBattleNetMovePaceOffset(-1);
             return -1;
         }
+        int timer = tick.timer();
+        if (tick.inclusiveMovementWait()
+                && unit.returningToDepot() && unit.carried() > 0) {
+            // Retail's laden peon return uses opcode 12 as an inclusive wait:
+            // op5 3 / op12 2 ends at timer 3, then counts 2,1 before the next
+            // movement beat. Other residual-pace users retain the ordinary
+            // opcode timer used by their authenticated repair/ship/siege
+            // journeys.
+            timer = (timer + 1) & 0xff;
+        }
         unit.setBattleNetMovePaceOffset(tick.offset());
-        unit.setBattleNetMovePaceTimer(tick.timer());
+        unit.setBattleNetMovePaceTimer(timer);
         int pixels = tick.pixels();
         if (pixels > 0 && unit.battleNetDoubleStep()) {
             // script.bin ships emit op13 1 for each residual beat; the doubled

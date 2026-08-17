@@ -424,12 +424,13 @@ final class BattleNetHarvestSystem {
             // ten cycles before the other engine had it.
             if (world.movement.isStepping(worker) || worker.isMoving()) {
                 world.movement.walkPixels(worker);
-                if (world.movement.isStepping(worker) || worker.isMoving()
-                        || worker.carried() != 0) {
-                    // Laden leftover-land still starts PF_WAIT next visit.
-                    // Falling through here used to bank one cycle early.
+                if (world.movement.isStepping(worker) || worker.isMoving()) {
                     return;
                 }
+                // A laden return that settles on the depot ring enters action
+                // 25 on this same visit. Orc 1 peon 1594 settles at fixture
+                // 369, waits 3/2/1, and dest-arms at 372; deferring merely
+                // because cargo remained advanced that whole state a cycle.
             }
             if (world.movement.depotRingAction25(worker, depot)) {
                 // Empty leftover-land on the hall ring. Native stands
@@ -1249,6 +1250,9 @@ final class BattleNetHarvestSystem {
         if (pauseOilForReadyDispatch(worker, info)) {
             return;
         }
+        if (pausePlayerMinerForReturnDispatch(worker, info, home)) {
+            return;
+        }
         beginReturnToDepot(worker, info);
 
         // Execute falls through from SUB_STOP_GATHERING into MoveToDepot on
@@ -1259,6 +1263,40 @@ final class BattleNetHarvestSystem {
         if (home != null && worker.isOnMap()) {
             stepHarvest(worker);
         }
+    }
+
+    /**
+     * Preserves the ready animation between a player's mine exit and its
+     * automatic walk home.
+     *
+     * <p>Retail does not turn the hidden gold action 26 directly into action
+     * 24. Authenticated {@code return-goods-1/02} surfaces peon 1594 at
+     * fixture 209 as Still with Return-Goods queued and timer 25, promotes
+     * action 24 at 234, and takes its first step at 237. Starting the depot
+     * walk from the mine-exit call skipped that physical ready boundary and
+     * banked the load nearly a hundred cycles early. Computer workers keep
+     * their AI dispatch path; this is the player-owned automatic resource
+     * continuation.</p>
+     */
+    private boolean pausePlayerMinerForReturnDispatch(Unit worker,
+            ResourceInfo info, Unit home) {
+        if (info.resource() != UnitType.Resource.GOLD
+                || home == null || world.battleNetSequence == null
+                || world.ais.containsKey(worker.player())) {
+            return false;
+        }
+        beginReturnToDepot(worker, info);
+        worker.clearPath();
+        worker.setOrder(Unit.Order.STILL);
+        worker.setOrderTarget(home.tileX(), home.tileY());
+        worker.enqueueOrder(new Unit.QueuedOrder(
+                Unit.QueuedOrderKind.RETURN_GOODS,
+                home.tileX(), home.tileY(), home, null, null));
+        worker.setQueuedReplacementPending(true);
+        // The queue is visited once more at the bottom of this same unit
+        // tick, so store 26 to leave the authenticated end-of-cycle 25.
+        worker.setBattleNetOrderDelay(26);
+        return true;
     }
 
 
@@ -2928,7 +2966,7 @@ final class BattleNetHarvestSystem {
         if (resource == null) {
             return false;
         }
-        int[] spot = world.placeBeside(worker, resource, towards);
+        int[] spot = world.placeResourceBeside(worker, resource, towards);
         if (spot == null) {
             return false;
         }

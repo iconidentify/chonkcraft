@@ -85,6 +85,22 @@ class BattleNetSequenceTest {
     }
 
     @Test
+    void opcodeTwelveIdentifiesItsInclusiveMovementDelay() {
+        byte[] program = new byte[40];
+        putWord(program, 0, 16);
+        putWord(program, 20, 32);
+        program[32] = 5;
+        program[33] = 3;
+        program[34] = 12;
+        program[35] = 2;
+
+        BattleNetSequence.Tick tick = new BattleNetSequence(program).tick(32, 1);
+
+        assertEquals(new BattleNetSequence.Tick(36, 2, false, false, true, 3, true),
+                tick);
+    }
+
+    @Test
     void preservesTheNativeUnsignedTimerWrapAndRejectsBadData() {
         byte[] program = new byte[32];
         putWord(program, 0, 16);

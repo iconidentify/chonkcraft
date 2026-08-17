@@ -129,6 +129,18 @@ public final class CommandApplier {
             }
             return queued != null;
         }
+        // ReleaseOrders normally flushes every pending command before the
+        // constructor sees this click. Retail makes one idempotent exception:
+        // Return Goods during the mine-exit ready animation leaves the
+        // already-identical automatic Return-Goods continuation and its
+        // countdown intact (return-goods-1/02, fixture 220).
+        if (!command.queued() && command.kind() == GameCommand.Kind.RETURN_GOODS
+                && unit.order() == Unit.Order.STILL && unit.returningToDepot()
+                && unit.hasQueuedOrders()
+                && unit.queuedOrders().getFirst().kind()
+                        == Unit.QueuedOrderKind.RETURN_GOODS) {
+            return true;
+        }
         Unit.PendingOrderState pendingBefore = null;
         if (!command.queued() && isQueueable(command.kind())) {
             // ReleaseOrders flushes the old queue before it installs a fresh

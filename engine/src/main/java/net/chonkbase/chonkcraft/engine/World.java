@@ -4868,6 +4868,31 @@ public final class World {
                 left + width - 1, top + height - 1, width, height);
     }
 
+    /**
+     * Exact point handed to the unit-sized pathfinder for a laden depot walk.
+     *
+     * <p>The visible order point remains the near edge (Orc 1 records 25,22),
+     * but {@code 0x41f5f0} contracts the target rectangle by the mover before
+     * routing. For a one-tile worker on the east face of a four-tile hall that
+     * makes the path point 24,22. It produces retail's initial south-west
+     * step and its straight column down x=24 instead of a diagonal cut toward
+     * the hall origin.</p>
+     */
+    int[] battleNetDepotPathPoint(Unit worker, Unit depot) {
+        int[] edge = battleNetDepotEntryPoint(worker, depot);
+        int centerX = depot.tileX()
+                + (Math.max(1, depot.type().tileWidth()) - 1) / 2;
+        int centerY = depot.tileY()
+                + (Math.max(1, depot.type().tileHeight()) - 1) / 2;
+        int bottom = depot.tileY() + Math.max(1, depot.type().tileHeight()) - 1;
+        if (worker.tileY() < depot.tileY() || worker.tileY() > bottom) {
+            edge[0] -= Integer.signum(edge[0] - centerX);
+        } else {
+            edge[1] -= Integer.signum(edge[1] - centerY);
+        }
+        return edge;
+    }
+
     private static int[] battleNetNearEdgePoint(Unit worker, int left, int top,
             int right, int bottom, int width, int height) {
         int x = left;
@@ -6329,6 +6354,18 @@ public final class World {
                 unit.tileX(), unit.tileY());
     }
 
+    /** Resource-container emergence uses retail's face-first search. */
+    int[] placeResourceBeside(Unit unit, Unit container, Unit towards) {
+        if (towards == null) {
+            return dropOutOnSide(unit.type(), LOOKING_WEST, container,
+                    unit.tileX(), unit.tileY());
+        }
+        int[] goal = centreOf(towards);
+        return dropOutNearestOnSide(unit.type(), goal[0], goal[1],
+                BattleNetMovementSystem.headingTowards(container, towards),
+                container, unit.tileX(), unit.tileY());
+    }
+
     /**
      * The references relevant to the AI's depot-congestion threshold.
      *
@@ -7440,6 +7477,80 @@ public final class World {
     }
 
     /**
+     * Finds the nearest free square on the face pointing toward a goal.
+     *
+     * <p>Resource drop-out is face-directed before it is distance-directed.
+     * A south-west goal belongs to the west face under retail's asymmetric
+     * heading bands; the closest square on that face wins. Only when the
+     * whole face is blocked does the spiral continue around the next face.
+     * This distinction excludes a geometrically closer diagonal corner:
+     * Orc 1's mine at 26,13 surfaces its peon on 25,15, not 25,16.</p>
+     */
+    private int[] dropOutNearestOnSide(UnitType type, int goalX, int goalY,
+            int heading, Unit container, int startX, int startY) {
+        long mask = Unit.movementMaskFor(type);
+        long blocking = Unit.blockingFlagsFor(type);
+        int width = Math.max(1, type.tileWidth());
+        int height = Math.max(1, type.tileHeight());
+        int x = container.tileX() - (width - 1);
+        int y = container.tileY() - (height - 1);
+        int addx = Math.max(1, container.type().tileWidth()) + width - 1;
+        int addy = Math.max(1, container.type().tileHeight()) + height - 1;
+        int leg;
+        switch (sideOf(heading)) {
+            case LEG_NORTH -> {
+                x += addx - 1;
+                y -= 1;
+                leg = LEG_NORTH;
+            }
+            case LEG_EAST -> {
+                x += addx;
+                y += addy - 1;
+                leg = LEG_EAST;
+            }
+            case LEG_SOUTH -> {
+                y += addy;
+                leg = LEG_SOUTH;
+            }
+            default -> {
+                x -= 1;
+                leg = LEG_WEST;
+            }
+        }
+
+        for (int step = 0; step < maxRings() * 4; step++) {
+            int[] best = null;
+            int bestDistance = Integer.MAX_VALUE;
+            int count = leg == LEG_WEST || leg == LEG_EAST ? addy : addx;
+            for (int i = count; i-- > 0;) {
+                if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                    int distance = squareDistance(goalX, goalY, x, y);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new int[] {x, y};
+                    }
+                }
+                switch (leg) {
+                    case LEG_WEST -> y++;
+                    case LEG_SOUTH -> x++;
+                    case LEG_EAST -> y--;
+                    default -> x--;
+                }
+            }
+            if (best != null) {
+                return best;
+            }
+            if (leg == LEG_WEST || leg == LEG_EAST) {
+                addx++;
+            } else {
+                addy++;
+            }
+            leg = (leg + 1) & 3;
+        }
+        return null;
+    }
+
+    /**
      * Where a unit appears beside another, as close as it can get to a point.
      *
      * <p>Implements {@code DropOutNearest}. The same ring
@@ -8335,6 +8446,7 @@ public final class World {
                 // dest-arms on that visit.
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
                         || queued.kind() == Unit.QueuedOrderKind.PATROL
+                        || queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
                         || (queued.kind() == Unit.QueuedOrderKind.MOVE
                                 && unit.destPathOpeningHold())
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
@@ -12736,6 +12848,17 @@ public final class World {
             cargo = depotResource;
         }
         Unit.Order before = unit.order();
+        // Clicking Return Goods while the mine-exit ready animation already
+        // owns that same queued continuation is idempotent in retail. The
+        // authenticated click at fixture 220 leaves Still/timer 14 and
+        // next-order 24 untouched; replacing the head immediately made Java
+        // start walking fourteen cycles early.
+        if (fromPlayer && before == Unit.Order.STILL
+                && unit.returningToDepot() && unit.hasQueuedOrders()
+                && unit.queuedOrders().getFirst().kind()
+                        == Unit.QueuedOrderKind.RETURN_GOODS) {
+            return true;
+        }
         // NewActionReturnGoods copies CUnit::CurrentResource, not the
         // resource named by the order being replaced. Those values differ
         // while a laden chopper has been redirected to a mine but has not

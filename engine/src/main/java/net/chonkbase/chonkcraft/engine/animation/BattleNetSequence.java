@@ -54,15 +54,22 @@ public final class BattleNetSequence {
      *               doubled movement-delta table when unit+0x1c bit 2 is set.
      */
     public record Tick(int offset, int timer, boolean actionMarker,
-            boolean inlineActionMarker, boolean valid, int pixels) {
+            boolean inlineActionMarker, boolean valid, int pixels,
+            boolean inclusiveMovementWait) {
         /** Compatibility constructor for callers that ignore pixel motion. */
         public Tick(int offset, int timer, boolean actionMarker,
                 boolean inlineActionMarker, boolean valid) {
-            this(offset, timer, actionMarker, inlineActionMarker, valid, 0);
+            this(offset, timer, actionMarker, inlineActionMarker, valid, 0, false);
+        }
+
+        /** Compatibility constructor for callers that inspect pixel motion. */
+        public Tick(int offset, int timer, boolean actionMarker,
+                boolean inlineActionMarker, boolean valid, int pixels) {
+            this(offset, timer, actionMarker, inlineActionMarker, valid, pixels, false);
         }
 
         private static Tick invalid() {
-            return new Tick(-1, 0, false, false, false, 0);
+            return new Tick(-1, 0, false, false, false, 0, false);
         }
     }
 
@@ -178,7 +185,7 @@ public final class BattleNetSequence {
 
         int nextTimer = (timer - 1) & 0xff;
         if (nextTimer != 0) {
-            return new Tick(offset, nextTimer, false, false, true, 0);
+            return new Tick(offset, nextTimer, false, false, true, 0, false);
         }
 
         int cursor = offset;
@@ -196,21 +203,29 @@ public final class BattleNetSequence {
                     // FUN_00402440 increments the just-expired timer, leaving
                     // one call before the instruction following the marker.
                     return new Tick(cursor + 1, 1, true,
-                            inlineActionMarker, true, pixels);
+                            inlineActionMarker, true, pixels, false);
                 }
-                case 1, 7, 8, 9, 12 -> {
+                case 1, 7, 8, 9 -> {
                     if (!contains(cursor, 2)) {
                         return Tick.invalid();
                     }
                     return new Tick(cursor + 2,
                             Byte.toUnsignedInt(program[cursor + 1]), false,
-                            inlineActionMarker, true, pixels);
+                            inlineActionMarker, true, pixels, false);
+                }
+                case 12 -> {
+                    if (!contains(cursor, 2)) {
+                        return Tick.invalid();
+                    }
+                    return new Tick(cursor + 2,
+                            Byte.toUnsignedInt(program[cursor + 1]), false,
+                            inlineActionMarker, true, pixels, true);
                 }
                 case 2 -> {
                     // Zero is meaningful in the native byte field: its next
                     // decrement wraps to 255 rather than immediately acting.
                     return new Tick(cursor + 1, 0, false,
-                            inlineActionMarker, true, pixels);
+                            inlineActionMarker, true, pixels, false);
                 }
                 case 3 -> {
                     if (!contains(cursor, 3)) {

@@ -327,6 +327,11 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
         issued = int(command["issue_cycle"])
         slot = int(command["unit_id"])
         kind = command["kind"]
+        laden_return = kind == "return-goods" and any(
+            prior.get("kind") == "harvest"
+            and int(prior.get("unit_id") or -1) == slot
+            for prior in scenario["commands"][:index]
+        )
         # settle_cycles is the tail after the scenario's final command, not a
         # separate tail added to every command. Every earlier command remains
         # observable through that same sealed run horizon. Using issued+tail
@@ -382,6 +387,16 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
             if first_progress is None and progressed(baseline, now, kind):
                 first_progress = cycle
                 accepted = True
+            # Judge successful objectives that deliberately remove the actor
+            # before the generic liveness terminal. A worker inside its depot
+            # is unavailable to field commands, but a Return Goods command
+            # whose cargo reached zero was fulfilled, exactly as the paired
+            # Java journal classifies it.
+            if (laden_return and first_progress is not None
+                    and not now.get("on_map")):
+                terminal_cycle = cycle
+                terminal_reason = "fulfilled"
+                break
             if not now.get("alive") or not now.get("on_map"):
                 terminal_cycle = cycle
                 terminal_reason = "unit-unavailable"

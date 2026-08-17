@@ -368,9 +368,14 @@ final class BattleNetConstructionSystem {
             boolean goldFreePrefixReplan) {
         // Empty send-home walks GiveOrder 27's ring (26,21 / 45,59).
         // Aiming 0x41f430 or the connected origin leftover-landed 22,21.
-        int[] point = worker.returningToDepot() && worker.carried() == 0
-                ? world.battleNetRepairApproachPoint(worker, target)
-                : world.battleNetApproachPoint(worker, target);
+        int[] point;
+        if (worker.returningToDepot()) {
+            point = worker.carried() == 0
+                    ? world.battleNetRepairApproachPoint(worker, target)
+                    : world.battleNetDepotPathPoint(worker, target);
+        } else {
+            point = world.battleNetApproachPoint(worker, target);
+        }
         if (target.type().givesResource() != null) {
             java.util.List<Unit> softBlockers = new ArrayList<>();
             boolean goldResource = target.type().givesResource()
