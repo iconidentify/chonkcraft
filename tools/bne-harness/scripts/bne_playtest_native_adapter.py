@@ -327,7 +327,12 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
         issued = int(command["issue_cycle"])
         slot = int(command["unit_id"])
         kind = command["kind"]
-        window = issued + int(scenario.get("settle_cycles") or 600)
+        # settle_cycles is the tail after the scenario's final command, not a
+        # separate tail added to every command. Every earlier command remains
+        # observable through that same sealed run horizon. Using issued+tail
+        # ended move+stand-ground's first observation at 65 while the paired
+        # Java run and the authenticated fixture both end at 80.
+        window = last_cycle
         pre = by_cycle.get(issued - 1) or by_cycle.get(min(by_cycle))
         if issued not in by_cycle:
             raise ValueError(

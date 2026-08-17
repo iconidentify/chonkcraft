@@ -282,12 +282,17 @@ final class PlayerIntentJournal {
             return;
         }
         Unit unit = find(world, command.unitId());
-        // Stop behind dest-arm leftover is next_order, not a replacement.
-        // Native stop-1/00 keeps the Move settled when leftover lands.
-        boolean leftoverStop = command.kind() == GameCommand.Kind.STOP
+        // Stop and stand-ground behind dest-arm leftover are next_order, not
+        // immediate replacements. Native stop-1/00 settles the Move when the
+        // pixels land; stand-ground-1/01 and /02 do the same before popping
+        // order 15. Calling the old Move superseded on the click cycle made
+        // otherwise exact physical lifecycles appear divergent.
+        boolean leftoverReplacement = (command.kind() == GameCommand.Kind.STOP
+                || command.kind() == GameCommand.Kind.STAND_GROUND)
                 && unit != null
-                && (unit.battleNetStopAfterLeftover() || unit.isMoving());
-        if (!leftoverStop) {
+                && (unit.battleNetStopAfterLeftover()
+                        || unit.queuedReplacementPending() || unit.isMoving());
+        if (!leftoverReplacement) {
             for (Tracking previous : outcomes) {
                 if (previous.terminalCycle == null
                         && previous.command.unitId() == command.unitId()) {

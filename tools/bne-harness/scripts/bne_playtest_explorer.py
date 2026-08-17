@@ -849,6 +849,7 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             for command in commands):
         raise ValueError("commanded fixture produced an empty seed")
     start_cycle = min(command["issue_cycle"] for command in commands)
+    last_issue_cycle = max(command["issue_cycle"] for command in commands)
     cycle_limit = int(run.get("cycle_limit") or 160)
     targets: dict[int, dict[str, Any]] = {}
     for command in commands:
@@ -885,7 +886,11 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             "cycle_limit": cycle_limit,
         },
         "start_cycle": start_cycle,
-        "settle_cycles": max(1, cycle_limit - start_cycle),
+        # Settle is measured from the final command. Using the first command
+        # made a multi-command Java twin run beyond the sealed native fixture
+        # by the gap between its orders (stand-ground-1 ran through 95 while
+        # the authenticated fixture ends at 80).
+        "settle_cycles": max(1, cycle_limit - last_issue_cycle),
         "actors": [actors[key] for key in sorted(actors)],
         "targets": [targets[key] for key in sorted(targets)],
         "points": [points[key] for key in sorted(points)],

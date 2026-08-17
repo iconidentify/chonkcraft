@@ -740,6 +740,8 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertEqual(["move", "stop"], kinds)
         self.assertEqual(1594, scenario["commands"][1]["unit_id"])
         self.assertEqual(20, scenario["commands"][1]["issue_cycle"])
+        self.assertEqual(60, scenario["settle_cycles"],
+                         "the twin must end at the fixture's cycle-80 seal")
 
     def test_a_commanded_seed_becomes_the_exact_captured_scenario(self):
         fixture = (

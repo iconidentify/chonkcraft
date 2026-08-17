@@ -13847,8 +13847,16 @@ public final class World {
                 return;
             }
         }
-        if (fromPlayer && movement.leftoverWalkBearing(
-                unit.currentAction(), unit)) {
+        if (fromPlayer && (movement.leftoverWalkBearing(
+                unit.currentAction(), unit)
+                || (unit.order() == Unit.Order.MOVE && unit.isMoving()))) {
+            // GiveOrder writes next_order 15 and replaces the old order point.
+            // It does not let the remaining route run to its destination: only
+            // the pixels already committed by the current step may land. The
+            // commanded Orc 1 peon is midway through 25,18 -> 24,18 at cycle
+            // 20; retail lands on 24,18 and pops 15 at 24. Keeping the old
+            // path made Java continue all the way to 22,18 and hold at 56.
+            unit.clearPath();
             unit.enqueueOrder(new Unit.QueuedOrder(
                     Unit.QueuedOrderKind.STAND_GROUND,
                     0, 0, null, null, null));

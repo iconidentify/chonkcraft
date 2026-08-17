@@ -93,6 +93,22 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertTrue(native.progressed(before, stepped, "move"),
                         "the first physical pixel is visible progress")
 
+    def test_native_sequence_observes_each_command_through_the_sealed_horizon(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/stand-ground-1/01.bnefx"
+        )
+        if not fixture.is_file():
+            self.skipTest("authenticated move-then-hold fixture is missing")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        scenario = explorer.scenario_from_commanded_seed(seed)
+        result = native.run_from_fixture(scenario, fixture, PINNED, "a" * 64)
+
+        self.assertEqual(80, result["observations"][0]["terminal_cycle"],
+                         "the first command must retain the sequence's sealed horizon")
+        self.assertEqual(24, result["observations"][1]["terminal_cycle"],
+                         "the replacement itself still fulfills when order 15 pops")
+
     def test_native_adapter_counts_in_flight_shots_on_the_terminal_cycle(self):
         fixture = (
             Path(__file__).resolve().parents[1]
