@@ -960,6 +960,16 @@ final class BattleNetIdleSystem {
                         }
                         return;
                     }
+                    if (unit.destPathOpeningHold() && unit.hasQueuedOrders()
+                            && unit.battleNetOrderDelay() == 1) {
+                        // Native 0x452ef0 promotes next_order Move from the
+                        // expired 4985 body. The Still loop does not run the
+                        // following OP0, which is why Human 1 1598's first
+                        // grunt blow is 7 (00418412 seed 64151463 remainder
+                        // 3) and used to be 5 after this visit spent
+                        // 0040AD58. Live-target Attack still draws first.
+                        return;
+                    }
                     int phase = unit.battleNetIdlePhase();
                     unit.setBattleNetIdlePhase(phase + 1);
                     dispatchBattleNetIdleMarker(unit,

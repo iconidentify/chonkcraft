@@ -169,9 +169,13 @@ on the issue visit. Computer Still scan is the unit's own Still marker
 enters react at dest-arm 217 and acquires at 220, dest-arming the chase
 at 223; the first blow is dest-arm 281 on 26,22. Java's neighbour dest-arm
 helper used to acquire at 217. That helper remains only for person
-visit-order (XHuman 10 archer 1470). Certification stays 0/532 paired --
-the shared cell is not exact (0x13 wire vs lockstep bytes). The leftover-27
-walk is closed.
+visit-order (XHuman 10 archer 1470). A dest-path Move queued through the
+Still 4985 body promotes from the expired wait without the following Still
+OP0 (`0x452ef0` installs Move 2477; no `0040AD58`). That extra draw used
+to steal `FUN_00418370`'s first remainder, so the 281 blow was 5 (60 to
+55) instead of native 7 (60 to 53) and settle 393 was 47 instead of 46.
+Certification stays 0/532 paired -- the shared cell is not exact (0x13
+wire vs lockstep bytes). The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 
