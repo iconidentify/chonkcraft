@@ -9352,6 +9352,7 @@ public final class World {
         unit.setBattleNetStationaryAttack(false);
         unit.setBattleNetStationaryRecoveryHeld(false);
         unit.setBattleNetAttackWaitRefillResidual(false);
+        unit.setBattleNetAttackWrapDestArmPending(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
         // EndActionAttack destroys that order whether it restores a saved
         // order or falls back to Still, so the offered reference releases at

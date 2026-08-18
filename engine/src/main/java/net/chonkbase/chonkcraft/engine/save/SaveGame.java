@@ -696,6 +696,9 @@ public final class SaveGame {
         if (unit.battleNetAttackWaitRefillResidual()) {
             state.append(" attackWaitRefillResidual = true,");
         }
+        if (unit.battleNetAttackWrapDestArmPending()) {
+            state.append(" attackWrapDestArmPending = true,");
+        }
         if (unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             state.append(" oilAction = ")
                     .append(quote(unit.battleNetOilAction().name())).append(",");

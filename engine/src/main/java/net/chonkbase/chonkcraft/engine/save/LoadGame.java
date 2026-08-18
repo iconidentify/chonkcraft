@@ -767,6 +767,10 @@ public final class LoadGame {
             unit.setBattleNetAttackWaitRefillResidual(
                     truthy(state.rawGet("attackWaitRefillResidual")));
         }
+        if (state.rawGet("attackWrapDestArmPending") != null) {
+            unit.setBattleNetAttackWrapDestArmPending(
+                    truthy(state.rawGet("attackWrapDestArmPending")));
+        }
         if (truthy(state.rawGet("burning"))) {
             unit.setBurning(true);
         }

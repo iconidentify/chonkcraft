@@ -2546,6 +2546,21 @@ public final class Unit {
     private boolean battleNetAttackOp0OutOfRange;
 
     /**
+     * Melee Attack tail wrap named an out-of-range quarry after the old one
+     * died. Construction 3,2,1 stays on Attack start; the next OP0 dest-arms
+     * leftover instead of walking into windup or Still.
+     */
+    public boolean battleNetAttackWrapDestArmPending() {
+        return battleNetAttackWrapDestArmPending;
+    }
+
+    public void setBattleNetAttackWrapDestArmPending(boolean pending) {
+        battleNetAttackWrapDestArmPending = pending;
+    }
+
+    private boolean battleNetAttackWrapDestArmPending;
+
+    /**
      * Action-16 out-of-range recovery already spent its one-visit hold
      * (XHuman 2 footman 1548). Cleared when a new attack order arms.
      */

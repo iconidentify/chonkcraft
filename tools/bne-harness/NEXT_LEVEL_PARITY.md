@@ -296,6 +296,15 @@ chipped ogre 1482 at 51 instead of Attack start 1922/3 then 54. Death
 is still 214 vs 223 and free is 1520 vs 1530, so those two ranged cells
 stay open. Chase is not observed -- the thrower is already in range.
 
+The same Attack-loop boundary now covers a dying melee quarry. Human 13
+ogre 1511 finishes its swing loop after knight 1500 begins dying, scans the
+next live knight while wrapping onto Attack construction 3, holds the full
+3,2,1 countdown, and then hands the retained SW,S route directly to movement.
+The first heading commits on that route-selection visit, putting the ogre on
+119,27 at fixture 118 with one heading left, exactly as retail does. This is
+an action-state rule: it is not keyed to a mission, unit identifier, or tile,
+and the pending loop-to-movement handoff is durable across save/load.
+
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.
 Knight 1490 dest-arms south-east onto 125,31 around the ogre sitting two

@@ -352,7 +352,19 @@ final class BattleNetCombatSystem {
             Unit acquired = unit.target();
             if (unit.canMove()
                     && !world.targets.inAttackRange(unit, acquired)) {
+                boolean wrapDestArm = unit.battleNetAttackWrapDestArmPending();
                 world.movement.moveTowards(unit, acquired);
+                if (wrapDestArm && unit.pathLength() > 0) {
+                    // This is not a cold Move order. Attack's completed loop
+                    // has already paid the action visit that asks for the
+                    // replacement route, and retail hands the first leftover
+                    // straight to DoActionMove on that same visit. Keeping
+                    // Java's finished Attack presentation installed makes
+                    // stepMove's animation gate defer the logical SW step one
+                    // fixture (Human 13 ogre 1511: native 119,27 at 118).
+                    unit.animation().clearCurrent();
+                }
+                unit.setBattleNetAttackWrapDestArmPending(false);
             }
             Unit offered = unit.offeredTarget();
             if (!offered.isAlive() || offered.isDying() || !offered.isOnMap()) {
@@ -4159,6 +4171,20 @@ final class BattleNetCombatSystem {
                 }
             }
         }
+        // Construction 3,2,1 after a melee tail wrap onto an out-of-range
+        // quarry is already spent. The next Attack-start OP0 dest-arms
+        // leftover via the dest-arm leftover acquire arm instead of walking
+        // OP0 into windup (Human 13 ogre 1511: 643/1 at 117, dest-arm SW,S
+        // onto 119,27 at 118).
+        if (unit.battleNetAttackWrapDestArmPending()
+                && attackStart >= 0
+                && offset == attackStart
+                && unit.battleNetAnimationTimer() == 1
+                && sequenceTarget != null
+                && sequenceTarget.isAlive()
+                && !world.targets.inAttackRange(unit, sequenceTarget)) {
+            return false;
+        }
         BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
                 unit.battleNetAnimationTimer());
         if (World.BNE_IDLE_TRACE) {
@@ -4197,35 +4223,75 @@ final class BattleNetCombatSystem {
         // this covers tail -> OP0. Human 13 axethrower 1486 changes knight
         // 1490 to wise-man 1496 at fixture 71, holds attackStart 3,2,1,63,
         // and therefore does not invent a second axe at fixture 81.
+        //
+        // The scan is not ranged-only. Human 13 knight 1493 wraps 1945/1
+        // onto Attack@1922/3 and names ogre 1511 once that ogre is adjacent.
+        // Wrap without an in-range replacement still walks OP0 (1923/1 at
+        // 98). When the quarry is already dying, the wrap still names a new
+        // quarry: ogre 1511 wraps 666/1 onto 643/3 and names knight 1493 at
+        // 115 even though 1493 is two tiles off, then dest-arms leftover
+        // SW,S onto 119,27 at 118. Java used to finish Attack to Still at
+        // 644/1 and leave 1511 on 120,26, so 1493's wrap could not see it.
         if (tick.actionMarker()
-                && rangedOp0
                 && attackStart >= 0
                 && offset != attackStart
                 && unit.canMove()
-                && sequenceTarget != null
-                && sequenceTarget.isAlive()) {
-            int reactRange = Math.max(
-                    unit.type().reactRange(world.isPerson(unit.player())),
-                    Math.max(1, unit.type().maxAttackRange()));
-            Unit candidate = world.targets.findBattleNetHostile(
-                    unit, reactRange, null);
-            if (candidate != null && candidate != sequenceTarget
-                    && candidate.isAlive()
-                    && world.targets.inAttackRange(unit, candidate)) {
-                setAutoTarget(unit, candidate);
-                unit.setBattleNetSequenceOffset(attackStart);
-                unit.setBattleNetAnimationTimer(3);
-                world.turnToTarget(unit, candidate, 0, 0);
-                unit.setBattleNetAttackResumeFromMove(true);
-                unit.setBattleNetAttackOp0OutOfRange(true);
-                unit.setBattleNetRangedFreeScanHoldPending(true);
-                if (World.BNE_IDLE_TRACE) {
-                    System.err.printf("JBNEATTACKLOOPRETARGET cycle=%d unit=%d "
-                                    + "from=%d to=%d timer=3%n",
-                            world.cycle, unit.id(), sequenceTarget.id(),
-                            candidate.id());
+                && unit.type() != null) {
+            boolean quarryGone = sequenceTarget == null
+                    || !sequenceTarget.isAlive()
+                    || sequenceTarget.isDying();
+            boolean scanWrap = rangedOp0
+                    ? sequenceTarget != null && sequenceTarget.isAlive()
+                    : true;
+            if (scanWrap) {
+                int reactRange = Math.max(
+                        unit.type().reactRange(world.isPerson(unit.player())),
+                        Math.max(1, unit.type().maxAttackRange()));
+                Unit candidate = world.targets.findBattleNetHostile(
+                        unit, reactRange, null);
+                boolean inRange = candidate != null && candidate.isAlive()
+                        && world.targets.inAttackRange(unit, candidate);
+                boolean takeOutOfRange = quarryGone
+                        && candidate != null && candidate.isAlive()
+                        && !inRange
+                        && unit.type().maxAttackRange() <= 1;
+                if (candidate != null && candidate != sequenceTarget
+                        && candidate.isAlive()
+                        && (inRange || takeOutOfRange)) {
+                    setAutoTarget(unit, candidate);
+                    unit.setBattleNetSequenceOffset(attackStart);
+                    unit.setBattleNetAnimationTimer(3);
+                    world.turnToTarget(unit, candidate, 0, 0);
+                    if (inRange) {
+                        unit.setBattleNetAttackResumeFromMove(true);
+                        unit.setBattleNetAttackOp0OutOfRange(true);
+                        if (rangedOp0) {
+                            unit.setBattleNetRangedFreeScanHoldPending(true);
+                        }
+                        if (World.BNE_IDLE_TRACE) {
+                            System.err.printf("JBNEATTACKLOOPRETARGET cycle=%d "
+                                            + "unit=%d from=%d to=%d timer=3%n",
+                                    world.cycle, unit.id(),
+                                    sequenceTarget == null ? -1
+                                            : sequenceTarget.id(),
+                                    candidate.id());
+                        }
+                        return !rangedOp0;
+                    }
+                    unit.setOfferedTarget(candidate);
+                    unit.setFighting(false);
+                    unit.setChasing(false);
+                    unit.setBattleNetAttackWrapDestArmPending(true);
+                    if (World.BNE_IDLE_TRACE) {
+                        System.err.printf("JBNEATTACKLOOPDESTARM cycle=%d "
+                                        + "unit=%d from=%d to=%d timer=3%n",
+                                world.cycle, unit.id(),
+                                sequenceTarget == null ? -1
+                                        : sequenceTarget.id(),
+                                candidate.id());
+                    }
+                    return true;
                 }
-                return false;
             }
         }
         // Human 13 knight 1490: splash during Attack OP0 (fixture 35, hp
@@ -4357,6 +4423,16 @@ final class BattleNetCombatSystem {
         }
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());
+        // Keep dest-arm leftover construction on Attack start through 3,2,1
+        // so stepAttack does not dest-arm on the same visits (Human 13 ogre
+        // 1511 holds 120,26 at 115-117).
+        if (unit.battleNetAttackWrapDestArmPending()
+                && attackStart >= 0
+                && unit.battleNetSequenceOffset() == attackStart
+                && unit.battleNetAnimationTimer() >= 1
+                && !tick.actionMarker()) {
+            return true;
+        }
         // Attack animation loop re-seed: after the first 0x4234b0 debit the
         // unit+0xb arm runs every twenty-five cycles while the unit stays on
         // its Attack sequence (Human 5 grunt 1531: fixture 6 then 31; chasers

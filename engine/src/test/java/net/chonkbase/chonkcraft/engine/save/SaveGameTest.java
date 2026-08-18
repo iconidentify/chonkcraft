@@ -705,6 +705,26 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("an attack-loop retarget keeps its pending dest-arm across a save")
+    void attackWrapDestArmPendingRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-footman"), 1, 10, 12);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setBattleNetAttackWrapDestArmPending(true);
+
+        Unit loaded = find(reload(bench), "unit-grunt");
+
+        assertNotNull(loaded.target());
+        assertEquals("unit-footman", loaded.target().type().ident());
+        assertTrue(loaded.battleNetAttackWrapDestArmPending(),
+                "a save during Attack 3,2,1 must still dest-arm on the next OP0");
+    }
+
+    @Test
     @DisplayName("a tanker resumes the same native oil action and cadence")
     void tankerOilStateRoundTrips() throws IOException {
         Bench bench = bench();
