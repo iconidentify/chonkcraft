@@ -308,4 +308,134 @@ class BattleNetAttackResumeHoldTest {
                 "timer 63 is the dest-arm/approach hold, not the first "
                         + "in-range swing");
     }
+
+    @Test
+    @DisplayName("a dest-arm leftover residual ogre stalls on attack-start with the body wait")
+    void aDestArmLeftoverResidualOgreStallsOnAttackStartWithTheBodyWait()
+            throws Exception {
+        // Human 13 ogre 1491 dest-arms leftover toward knight 1500, lands
+        // on 118,27, free-scans onto 1493, and native stays on 643 with
+        // construction 3 then bodyWaitSum-1 (23). Java used to walk OP0
+        // into opcode 10 at fixture 53.
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        int moveStart = sequence.sequenceStart(
+                7, BattleNetSequence.MOVE_ANIMATION);
+        assumeTrue(attackStart == 643,
+                "retail ogre Attack must start at script offset 643");
+        assumeTrue(moveStart >= 0, "retail ogre Move sequence must resolve");
+        int bodySum = sequence.attackBodyWaitSum(attackStart);
+        assumeTrue(bodySum == 24,
+                "ogre Attack body waits 3+3+5+3+10 so the OP0 hold is 23");
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 8);
+        Unit target = world.createUnit(prey(), 1, 11, 8);
+        assumeTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.targets.inAttackRange(attacker, target),
+                "the dest-arm residual lands already in weapon range");
+        assertTrue(world.orderAttack(attacker, target),
+                "ogre must accept the in-range attack order");
+
+        attacker.setChasing(true);
+        attacker.setFighting(false);
+        attacker.clearPath();
+        attacker.setBattleNetSequenceOffset(moveStart + 4);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetAttackResumeFromMove(false);
+        attacker.setBattleNetAttackOp0OutOfRange(false);
+
+        int hold = bodySum - 1;
+        int hpBefore = target.hitPoints();
+        int guard = 0;
+        while (attacker.battleNetAnimationTimer() != hold && guard++ < 16) {
+            world.tick();
+        }
+        assertEquals(attackStart, attacker.battleNetSequenceOffset(),
+                "dest-arm leftover residual must remain on attack-start, "
+                        + "not walk into the windup/OP10");
+        assertEquals(hold, attacker.battleNetAnimationTimer(),
+                "native Human 13 ogre 1491 seals bodyWaitSum-1 after dest-arm "
+                        + "leftover residual lands in range");
+        assertEquals(hpBefore, target.hitPoints(),
+                "the stall must not land the first melee during the body hold");
+    }
+
+    @Test
+    @DisplayName("an already in-range ogre walks the opening attack wait")
+    void anAlreadyInRangeOgreWalksTheOpeningAttackWait() throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 643,
+                "retail ogre Attack must start at script offset 643");
+        int hold = sequence.attackBodyWaitSum(attackStart) - 1;
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 8);
+        Unit target = world.createUnit(prey(), 1, 11, 8);
+        assumeTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.orderAttack(attacker, target),
+                "ogre must accept the in-range attack order");
+        attacker.setBattleNetSequenceOffset(attackStart);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setChasing(false);
+        attacker.setBattleNetAttackResumeFromMove(false);
+        attacker.setBattleNetAttackOp0OutOfRange(false);
+
+        int guard = 0;
+        while (attacker.battleNetSequenceOffset() == attackStart
+                && attacker.battleNetAnimationTimer() != hold
+                && guard++ < 16) {
+            world.tick();
+        }
+        assertTrue(attacker.battleNetSequenceOffset() > attackStart,
+                "a cold in-range first melee must walk past attack-start "
+                        + "into the windup, not seal the dest-arm body hold");
+    }
+
+    private static UnitType meleeOgre() {
+        UnitType type = new UnitType("unit-ogre");
+        type.setTileSize(1, 1);
+        type.setBoxSize(31, 31);
+        type.setHitPoints(90);
+        type.setSpeed(13);
+        type.setLandUnit(true);
+        type.setCanAttack(true);
+        type.setCanTargetLand(true);
+        type.setBasicDamage(8);
+        type.setPiercingDamage(4);
+        type.setMaxAttackRange(1);
+        type.setSightRange(5);
+        type.setReactRangeComputer(6);
+        type.setReactRangePerson(4);
+        type.setNumDirections(8);
+        AnimationSet set = new AnimationSet("ogre");
+        set.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        set.put(AnimationSet.State.MOVE, Animation.parse("move", List.of(
+                "unbreakable begin", "frame 0", "move 16", "wait 1",
+                "frame 5", "move 16", "unbreakable end", "wait 1")));
+        set.put(AnimationSet.State.ATTACK, Animation.parse("attack", List.of(
+                "frame 0", "wait 3", "attack", "wait 1")));
+        type.setAnimationSet(set);
+        return type;
+    }
 }

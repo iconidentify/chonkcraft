@@ -4197,6 +4197,46 @@ final class BattleNetCombatSystem {
                 return false;
             }
         }
+        // Human 13 ogre 1491 dest-arms leftover toward knight 1500, lands
+        // that residual on 118,27, free-scans onto knight 1493, and native
+        // parks Attack@643 with construction 3,2,1 then bodyWaitSum-1 (23).
+        // Java consumed that start OP0 and walked into opcode 10 at fixture
+        // 53 -- eight extra melee on 1493, twenty-three cycles early.
+        // Construction timer 3 is not the start wait. Multi-step chase
+        // residual-open already leaves the cursor past OP0, so those first
+        // blows still land (Human 13 ogre 1510).
+        if (tick.actionMarker()
+                && attackStart >= 0
+                && offset == attackStart
+                && unit.battleNetAttackResumeFromMove()
+                && unit.type() != null
+                && !unit.type().firesMissile()
+                && unit.canMove()) {
+            Unit tgt = unit.target();
+            if (tgt != null && tgt.isAlive() && world.targets.inAttackRange(unit, tgt)
+                    && !unit.isMoving()
+                    && (tgt.type() == null || !tgt.type().building())) {
+                int bodySum = world.battleNetSequence.attackBodyWaitSum(attackStart);
+                int hold = bodySum > 0 ? bodySum - 1 : 0;
+                if (hold > 0) {
+                    unit.setBattleNetAttackResumeFromMove(false);
+                    unit.setBattleNetAttackOp0OutOfRange(false);
+                    unit.setBattleNetSequenceOffset(attackStart);
+                    unit.setBattleNetAnimationTimer(hold);
+                    if (unit.chasing() && unit.pathLength() == 0) {
+                        unit.setChasing(false);
+                        unit.setFighting(true);
+                    }
+                    if (World.BNE_PEND_TRACE) {
+                        System.err.printf("JBNEATTACKHOLD cycle=%d unit=%d "
+                                        + "melee-resume bodySum=%d hold=%d%n",
+                                world.cycle, unit.id(), bodySum, hold);
+                    }
+                    world.battleNetAttackMarkers.add(unit);
+                    return false;
+                }
+            }
+        }
         if (tick.actionMarker()) {
             Unit tgt = unit.target();
             boolean inRange = tgt != null && tgt.isAlive()

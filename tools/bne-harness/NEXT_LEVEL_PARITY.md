@@ -277,9 +277,13 @@ consumer (`0x0041834b` / `battleNetProjectileDamage`). After that first
 swing, dest-arm leftover residual used to walk Attack start into opcode
 10: ambient axe 1505 constructed at c38 and added a third live shot.
 Native keeps construction timer 3 then the start wait 63 on 887, so that
-axe never throws through fixture 42. Death is still 214 vs 216 and free
-is 1520 vs 1523, so those two ranged cells stay open. Chase is not
-observed -- the thrower is already in range.
+axe never throws through fixture 42. The next chip was melee: ogre 1491
+dest-arms leftover onto 118,27, free-scans onto knight 1493, and native
+parks Attack@643 with construction 3 then bodyWaitSum-1 (23) so the
+first blow is fixture 76. Java used to walk that OP0 and land eight
+damage at 53. Death is still 214 vs 226 and free is 1520 vs 1532, so
+those two ranged cells stay open. Chase is not observed -- the thrower
+is already in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.
