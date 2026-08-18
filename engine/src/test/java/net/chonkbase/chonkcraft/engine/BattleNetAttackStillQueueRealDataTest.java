@@ -11,6 +11,7 @@ import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
+import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,41 @@ class BattleNetAttackStillQueueRealDataTest {
         assertTrue(Math.floorMod(grunt.offsetX(), 32) > 10,
                 "retail leftover west residual is still draining, not offset "
                         + grunt.offsetX());
+    }
+
+    @Test
+    @DisplayName("a ranged attack reissue commits timer three without consuming it")
+    void aRangedAttackReissueCommitsTimerThreeWithoutConsumingIt() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h",
+                GameData.personIn(data.campaignMap("campaigns/human/level13h")), 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+        CommandApplier commands = new CommandApplier(
+                world, new ArrayList<>(data.unitTypes().types().values()));
+        data.configureCommands(commands);
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit axe = atTile(world, 118, 29);
+        Unit knight = atTile(world, 120, 29);
+        assertNotNull(axe, "Human 13 has no axethrower on 118,29");
+        assertNotNull(knight, "Human 13 has no knight on 120,29");
+        while (fixtureCycle(world) < 4) {
+            mission.tick();
+        }
+        assertTrue(commands.apply(GameCommand.attack(
+                        axe.player(), axe.id(), knight.id())),
+                "the in-range ranged attack must be accepted");
+        mission.tick();
+        assertEquals(3, axe.battleNetAnimationTimer(),
+                "retail commits the GiveOrder visit at timer three");
+        assertTrue(axe.type().animationSet().get(AnimationSet.State.ATTACK)
+                        == axe.animation().current(),
+                "the attack program owns presentation on the same visit");
     }
 
     private static int fixtureCycle(World world) {

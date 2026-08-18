@@ -960,16 +960,25 @@ final class BattleNetIdleSystem {
                         }
                         return;
                     }
-                    if (unit.destPathOpeningHold() && unit.hasQueuedOrders()
+                    if (unit.hasQueuedOrders()
                             && unit.battleNetOrderDelay() == 1) {
-                        // Native 0x452ef0 promotes next_order Move from the
-                        // expired 4985 body. The Still loop does not run the
-                        // following OP0, which is why Human 1 1598's first
-                        // grunt blow is 7 (00418412 seed 64151463 remainder
-                        // 3) and used to be 5 after this visit spent
-                        // 0040AD58. Live-target Attack still draws first.
-                        return;
+                        Unit.QueuedOrder next = unit.queuedOrders().getFirst();
+                        if (unit.destPathOpeningHold()
+                                || next.kind()
+                                        == Unit.QueuedOrderKind.ATTACK) {
+                            // Native 0x452ef0 promotes a replacement from the
+                            // expired 4985 body without running the following
+                            // OP0. This is true both for a point/dest order
+                            // and for a live-target Attack. In the pinned Orc
+                            // 1 fight, grunt 1592 promotes Attack at fixture 9
+                            // without spending 0040AD58; Java's extra idle
+                            // draw shifted the damage roll at 214 onto every
+                            // later idle unit. The same boundary previously
+                            // fixed Human 1's queued point command.
+                            return;
+                        }
                     }
+                    world.markBattleNetIdleMarker(unit);
                     int phase = unit.battleNetIdlePhase();
                     unit.setBattleNetIdlePhase(phase + 1);
                     dispatchBattleNetIdleMarker(unit,
@@ -1022,6 +1031,7 @@ final class BattleNetIdleSystem {
         unit.setBattleNetAnimationTimer(
                 critter && phase + 1 < actionMarkers ? 1 : 5);
 
+        world.markBattleNetIdleMarker(unit);
         dispatchBattleNetIdleMarker(unit, type, phase);
     }
 

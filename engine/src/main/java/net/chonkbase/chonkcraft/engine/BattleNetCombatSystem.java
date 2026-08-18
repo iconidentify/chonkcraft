@@ -2225,6 +2225,19 @@ final class BattleNetCombatSystem {
             }
             return;
         }
+        boolean wall = world.map.field(toX, toY).isWall();
+        // Saves made before attack-ground Move provenance was explicit can
+        // contain this corrupt state: a normal player Move inherited an old
+        // attackGoal, was promoted to ATTACK_GROUND, and now points at empty
+        // terrain. Let an already-committed swing drain above, then heal the
+        // order. A real GiveOrder 17 walk carries battleNetAttackGroundMove;
+        // newly issued direct Attack Ground clears playerCommandMove.
+        if (direct && !wall && unit.battleNetPlayerCommandMove()
+                && !unit.battleNetAttackGroundMove()) {
+            unit.setBattleNetPlayerCommandMove(false);
+            world.finishOrder(unit);
+            return;
+        }
         // Melee GiveOrder 17 on grass is a real order: the Orc 1 grunt
         // stays in ATTACK_GROUND beside 22,23. Java used to stand down on
         // the first step, so the commanded fixture never held the label.
@@ -2251,6 +2264,14 @@ final class BattleNetCombatSystem {
             int dy = Integer.signum(toY - unit.tileY());
             if (dx != 0 || dy != 0) {
                 unit.setHeading(Direction.fromDelta(dx, dy));
+            }
+            // Native retains the Attack Ground order label on empty grass,
+            // but there is nothing to strike: the unit faces the square and
+            // presents its idle animation. Only a wall runs the melee attack
+            // program and receives hitWall at the action marker.
+            if (!wall) {
+                world.idle.stepIdle(unit);
+                return;
             }
             AnimationSet set = unit.type().animationSet();
             if (set == null) {

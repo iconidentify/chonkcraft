@@ -9,12 +9,10 @@ it is not the roadmap.
 
 The current authenticated **resolved-command matrix** contains 240 generated
 cells. Both production adapters have executed and made 206 cells comparable:
-45 are exact, 161 are materially divergent, 34 remain unexecuted, and none
-failed because of infrastructure. This is **45/206 comparable**, not 45/240
-complete. The drop from 203/206 is mostly Java first-progress following walk
-pixels (`ed13c104`) against native tile-field pops, plus two PERSON/canControl
-over-accepts; it is not a walk-tile regression. Do not restore 203 by counting
-matching rejections as exact.
+all **206/206 are exact**, 34 remain unexecuted, and none failed because of
+infrastructure. This is 100% of the comparable post-resolution rows, not
+240/240 completion. The missing rows remain real coverage debt and the
+separate physical-gesture layer below remains RED.
 
 That 240-cell matrix begins after a command has already been resolved. It is
 deliberately separate from the **532-cell physical gesture transaction**
@@ -265,6 +263,27 @@ player-visible lifecycle phase. `bne_combat_lifecycle.py` refuses to certify a
 cell without native observation, Java observation, exact result and exact
 causal order. Existing Java projectile tests are useful coverage but cannot
 fill a pinned-native proof row by themselves.
+
+The first complete native/Java transaction is now certified: Orc 1 grunt 1592
+attacking footman 1595 is exact at acquire c9, chase c13, retaliation c160,
+swing c204, damage c214, death c439 and free c1345, including the exact melee
+damage RNG consumer. That is **7/185 certified**, not a claim that combat as a
+whole is complete.
+
+The first ranged causal shot is also observable end to end. In authenticated
+Human 13, a commanded axethrower creates its axe on c18, the shot is in flight
+on c19, and it impacts and damages on c25 on both engines. The struck knight
+retaliates on c30 and starts its swing on c33 on both engines. Those seven
+phase times are exact, but the row remains uncertified because the surrounding
+asynchronous RNG order is not yet exact. The gate deliberately distinguishes
+"this shot's lifecycle matches" from "the whole causal prefix matches."
+
+Native projectile receipts now carry the constructor cycle, source slot and
+fixed-pool slot. The adapter combines that authenticated source pointer with
+the 152-byte unit stride to resolve the target pointer in `AUXL`; Java emits
+the same create/flight/removal lifecycle with stable creation identities. This
+also corrected an earlier ledger label reversal: projectile `+0x30` is source
+and `+0x2c` is target at the captured constructor boundary.
 
 `bne_divergence_compiler.py` routes each normalized mismatch into candidate
 cells (or an exact cell when `coverage_target.combat` is supplied) and carries

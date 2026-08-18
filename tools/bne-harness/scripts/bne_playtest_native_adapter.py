@@ -27,6 +27,7 @@ from bne_fixture import (
     CHUNK_HEADER, CYCLE_HEADER, PLAYER_SIM_RECORD, STATE_HEADER,
 )
 from bne_routes import UNIT_FLAGS, UNIT_FREE_OR_DEAD, UNIT_ORDER, read_state_stream
+from bne_causal import parse_native_trace
 
 
 PINNED_BNE_EXECUTABLE_SHA256 = explorer.PINNED_BNE_EXECUTABLE_SHA256
@@ -276,6 +277,105 @@ def projectile_counts_by_cycle(fixture: Path) -> dict[int, int]:
     return counts
 
 
+def projectile_states_by_cycle(fixture: Path) \
+        -> dict[int, list[dict[str, Any]]]:
+    """Rebuild every live projectile identity and state at each native tick.
+
+    The AUXL stream supplies slot generations and exact 64-byte records. The
+    constructor hook supplies the otherwise-missing source-unit relationship.
+    Old fixtures without the cycle/slot hook remain usable, but their source is
+    deliberately null and therefore cannot certify a source-specific phase.
+    """
+    with zipfile.ZipFile(fixture) as archive:
+        payload = archive.read("state.bin")
+        trace = (archive.read("trace.txt").decode("utf-8", "replace")
+                 if "trace.txt" in archive.namelist() else "")
+    sources: dict[tuple[int, int], int] = {}
+    for event in parse_native_trace(trace):
+        if event.kind != "projectile.create" or event.cycle is None:
+            continue
+        slot = event.fields.get("projectile-slot")
+        source = event.fields.get("unit")
+        if isinstance(slot, int) and slot >= 0 and isinstance(source, int):
+            sources[(event.cycle, slot)] = source
+
+    cursor = io.BytesIO(payload)
+    state_header = cursor.read(STATE_HEADER.size)
+    if len(state_header) != STATE_HEADER.size:
+        raise ValueError("native projectile state header is truncated")
+    players = STATE_HEADER.unpack(state_header)[6]
+    cycle = 0
+    records: dict[int, tuple[int, bytes, int | None, int | None]] = {}
+    result: dict[int, list[dict[str, Any]]] = {}
+    while True:
+        header = cursor.read(CHUNK_HEADER.size)
+        if not header:
+            break
+        if len(header) != CHUNK_HEADER.size:
+            raise ValueError("native projectile chunk header is truncated")
+        tag, payload_bytes = CHUNK_HEADER.unpack(header)
+        chunk = cursor.read(payload_bytes)
+        if len(chunk) != payload_bytes:
+            raise ValueError("native projectile chunk payload is truncated")
+        body = io.BytesIO(chunk)
+        if tag == b"CYCL":
+            cycle = CYCLE_HEADER.unpack(body.read(CYCLE_HEADER.size))[0]
+            continue
+        if tag != b"AUXL":
+            continue
+        _aux, bullet_count, changed, _map, _tiles = AUX_HEADER.unpack(
+            body.read(AUX_HEADER.size))
+        body.read(players * PLAYER_SIM_RECORD.size)
+        for _ in range(changed):
+            slot, generation = BULLET_DELTA_HEADER.unpack(
+                body.read(BULLET_DELTA_HEADER.size))
+            raw = body.read(BULLET_BYTES)
+            if len(raw) != BULLET_BYTES:
+                raise ValueError("native projectile delta is truncated")
+            previous = records.get(slot)
+            source = sources.get((cycle, slot))
+            target = None
+            if source is not None:
+                source_pointer = _uint(raw, 0x30, 4)
+                target_pointer = _uint(raw, 0x2c, 4)
+                if source_pointer and target_pointer:
+                    unit_pool_base = source_pointer - source * 152
+                    delta = target_pointer - unit_pool_base
+                    if delta >= 0 and delta % 152 == 0 \
+                            and delta // 152 < 1600:
+                        target = delta // 152
+            if source is None and previous is not None \
+                    and previous[0] == generation:
+                source = previous[2]
+                target = previous[3]
+            records[slot] = (generation, raw, source, target)
+        visible = []
+        for slot in sorted(records):
+            if slot >= bullet_count:
+                continue
+            generation, raw, source, target = records[slot]
+            if not active_projectile_count(raw):
+                continue
+            visible.append({
+                "cycle": cycle,
+                "kind": "combat-projectile",
+                "projectile_id": f"{slot}:{generation}",
+                "present": True,
+                "source_id": source,
+                "target_id": target,
+                "type": None,
+                "type_code": raw[0x34],
+                "x": _uint(raw, 0),
+                "y": _uint(raw, 2),
+                "frame": raw[0x09],
+                "remaining": int.from_bytes(
+                    raw[0x20:0x22], "little", signed=True),
+                "pool_slot": slot,
+            })
+        result[cycle] = visible
+    return result
+
+
 def load_frames(fixture: Path) -> list[dict[str, Any]]:
     with zipfile.ZipFile(fixture) as archive:
         payload = archive.read("state.bin")
@@ -289,8 +389,10 @@ def load_frames(fixture: Path) -> list[dict[str, Any]]:
     if not frames:
         raise ValueError("native fixture state stream is empty")
     counts = projectile_counts_by_cycle(fixture)
+    projectiles = projectile_states_by_cycle(fixture)
     for frame in frames:
         frame["missile_count"] = counts.get(int(frame["cycle"]), 0)
+        frame["projectiles"] = projectiles.get(int(frame["cycle"]), [])
     return frames
 
 
@@ -441,6 +543,60 @@ def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
                 )
             },
         })
+    requested = scenario.get("combat_observation")
+    if requested is not None:
+        ids = requested.get("unit_ids") if isinstance(requested, dict) else None
+        if not isinstance(ids, list) or not ids or not all(
+                isinstance(value, int) for value in ids):
+            raise ValueError("combat observation has no integer unit_ids")
+        if len(ids) != len(set(ids)):
+            raise ValueError("combat observation repeats a unit id")
+        for frame in frames:
+            cycle = int(frame["cycle"])
+            for slot in ids:
+                raw = frame["units"].get(slot)
+                state = snapshot(raw, int(frame.get("missile_count") or 0))
+                semantic_alive = (state["alive"]
+                                  and state["order"] != "DYING")
+                events.append({
+                    "cycle": cycle,
+                    "kind": "combat-state",
+                    "unit_id": slot,
+                    "present": raw is not None,
+                    # The pool's allocated/live flag remains set while the
+                    # native death program runs. Java isAlive() turns false
+                    # when DYING begins. Normalize the semantic lifecycle
+                    # boundary here and retain allocation separately in
+                    # present, otherwise an exact death looks Java-only.
+                    "alive": semantic_alive,
+                    "on_map": state["on_map"],
+                    "x": state["tile_x"],
+                    "y": state["tile_y"],
+                    "offset_x": 0 if raw is None else _uint(raw, 0, 2),
+                    "offset_y": 0 if raw is None else _uint(raw, 2, 2),
+                    "order": state["order"],
+                    "hit_points": state["hit_points"],
+                    "sequence": -1 if raw is None else _uint(raw, 4, 2),
+                    "animation_timer": 0 if raw is None else raw[7],
+                    "animation_state": (None if raw is None else {
+                        1: "DEATH", 2: "STILL", 3: "MOVE", 4: "ATTACK",
+                    }.get(raw[8], f"BNE_{raw[8]}")),
+                    "target_id": None,
+                    "missile_count": state["missile_count"],
+                })
+            current = {
+                item["projectile_id"]: item
+                for item in frame.get("projectiles") or []
+            }
+            previous = ({item["projectile_id"]: item
+                         for item in frames[cycle - 2].get("projectiles") or []}
+                        if cycle > 1 and cycle - 2 < len(frames) else {})
+            events.extend(current.values())
+            for projectile_id in sorted(set(previous) - set(current)):
+                removed = dict(previous[projectile_id])
+                removed["cycle"] = cycle
+                removed["present"] = False
+                events.append(removed)
     return observations, events
 
 

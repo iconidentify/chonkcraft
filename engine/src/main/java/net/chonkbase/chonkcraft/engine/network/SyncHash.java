@@ -55,6 +55,7 @@ public final class SyncHash {
             hash = mix(hash, unit.battleNetOrderDelay());
             hash = mix(hash, unit.actionBeforeQueuedReleaseDelay());
             hash = mix(hash, unit.battleNetPlayerCommandMove() ? 1 : 0);
+            hash = mix(hash, unit.battleNetAttackGroundMove() ? 1 : 0);
             hash = mix(hash, unit.battleNetStopAfterLeftover() ? 1 : 0);
             hash = mix(hash, unit.savedOrder() == null ? -1 : unit.savedOrder().ordinal());
             hash = mix(hash, unit.attackMoveX());

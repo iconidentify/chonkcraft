@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.List;
 import java.util.Map;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
+import net.chonkbase.chonkcraft.engine.animation.AnimationCatalog;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
@@ -44,6 +45,23 @@ import org.junit.jupiter.api.Test;
  * afterwards differed. That map's first divergence moved from cycle 120 to 158.
  */
 class CorpseTest {
+
+    @Test
+    @DisplayName("BNE infantry bodies hold four visible decay intervals")
+    void generatedInfantryBodiesUseTheRetailDecayProgram() {
+        AnimationCatalog catalog = AnimationCatalog.generated();
+        for (String name : List.of("animations-human-dead-body", "animations-orc-dead-body")) {
+            Animation death = catalog.sets().get(name).get(AnimationSet.State.DEATH);
+            long longHolds = death.instructions().stream()
+                    .filter(instruction -> instruction.kind() == Animation.Kind.WAIT
+                            && instruction.value() == 200)
+                    .count();
+            assertEquals(4, longHolds,
+                    name + " held its final displayed frame for a fifth 200-cycle interval");
+            assertEquals(801, death.cycles(),
+                    name + " no longer matches BNE's four decay intervals plus tail tick");
+        }
+    }
 
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());
@@ -311,6 +329,36 @@ class CorpseTest {
                         + " after its own death animation had finished");
         assertEquals(List.of(tail), world.unitsSnapshot(),
                 "both corpseless units should be swap-released, leaving only the tail");
+    }
+
+    @Test
+    @DisplayName("finishing an attack releases its offered-target reference")
+    void anOfferedTargetDoesNotSurviveTheAttackOrder() {
+        World world = world();
+        UnitType type = peasant();
+        type.setCorpse(null);
+        Unit victim = world.createUnit(type, 3, 4, 5);
+        Unit attacker = world.createUnit(type, 4, 8, 5);
+        Unit tail = world.createUnit(type, 3, 12, 5);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(victim);
+        attacker.setOfferedTarget(victim);
+
+        world.kill(victim);
+        world.finishAttackOrder(attacker);
+
+        assertEquals(null, attacker.offeredTarget(),
+                "EndActionAttack destroyed COrder_Attack but retained the order-owned"
+                        + " offeredTarget CUnitPtr");
+        for (int cycle = 0; cycle < 80 && world.unitsSnapshot().contains(victim); cycle++) {
+            world.tick();
+        }
+
+        assertFalse(world.unitsSnapshot().contains(victim),
+                "the dead attack target stayed in the action table after its last real"
+                        + " order reference had gone");
+        assertEquals(List.of(tail, attacker), world.unitsSnapshot(),
+                "the final CUnitPtr release must swap the action table's tail into the hole");
     }
 
     @Test

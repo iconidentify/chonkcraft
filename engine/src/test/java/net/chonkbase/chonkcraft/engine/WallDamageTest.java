@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -156,6 +157,61 @@ class WallDamageTest {
                 "a melee attacker should stop beside the wall rather than stand in it");
         assertTrue(field.hasFlag(TileFlag.LAND_ALLOWED),
                 "the breach left by a melee blow is walkable land");
+    }
+
+    @Test
+    @DisplayName("melee attack-ground on empty grass faces without swinging")
+    void meleeFacesEmptyAttackGroundWithoutSwinging() {
+        GameMap map = walledField(20);
+        World world = new World(map);
+        Unit footman = world.createUnit(melee("unit-footman"), 0, 10, 10);
+
+        assertTrue(world.orderAttackGround(footman, 11, 10));
+        for (int cycle = 0; cycle < 40; cycle++) {
+            world.tick();
+            assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
+                    "retail holds GiveOrder 17 on grass");
+            assertSame(footman.type().animationSet().get(AnimationSet.State.STILL),
+                    footman.animation().current(),
+                    "empty ground started a visible attack swing");
+            assertFalse(footman.animation().unbreakable(),
+                    "empty ground committed an invisible-enemy blow");
+        }
+    }
+
+    @Test
+    @DisplayName("a legacy stale-goal attack-ground state heals to still")
+    void legacyStaleGoalAttackGroundHeals() {
+        World world = new World(walledField(20));
+        Unit footman = world.createUnit(melee("unit-footman"), 0, 10, 10);
+        footman.setAttackGoal(11, 10);
+        footman.setOrderTarget(11, 10);
+        footman.setOrder(Unit.Order.ATTACK_GROUND);
+        footman.setBattleNetPlayerCommandMove(true);
+        footman.setBattleNetAttackGroundMove(false);
+
+        world.tick();
+
+        assertEquals(Unit.Order.STILL, footman.order(),
+                "the pre-fix save state kept fighting empty ground");
+        assertFalse(footman.battleNetAttackGroundMove());
+    }
+
+    @Test
+    @DisplayName("an ordinary move cannot promote a stale attack goal")
+    void ordinaryMoveDoesNotPromoteAStaleAttackGoal() {
+        World world = new World(walledField(30));
+        Unit footman = world.createUnit(melee("unit-footman"), 0, 5, 10);
+        footman.setAttackGoal(6, 9);
+
+        assertTrue(world.orderCommandMove(footman, 20, 10));
+        assertFalse(footman.battleNetAttackGroundMove(),
+                "an ordinary move inherited GiveOrder 17 provenance");
+        for (int cycle = 0; cycle < 400; cycle++) {
+            world.tick();
+            assertFalse(footman.order() == Unit.Order.ATTACK_GROUND,
+                    "the move was rewritten to attack stale empty ground at cycle " + cycle);
+        }
     }
 
     @Test

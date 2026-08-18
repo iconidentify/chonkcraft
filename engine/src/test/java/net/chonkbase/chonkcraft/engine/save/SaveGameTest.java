@@ -218,6 +218,55 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("the Human 5 footman stops fighting empty ground after load")
+    void humanFiveInvisibleEnemyStateHealsAfterLoad() throws IOException {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
+        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
+                "human-mission-5.sav.gz");
+        Assumptions.assumeTrue(Files.isRegularFile(save),
+                "the Human 5 playtest save is not installed");
+
+        GameData data = new GameData(assets);
+        String script = LoadGame.read(save);
+        LoadGame.Header header = LoadGame.header(script);
+        assertNotNull(header);
+        var mission = data.loadMission(header.mapPath());
+        assertNotNull(mission);
+        for (Unit unit : new ArrayList<>(mission.world().units())) {
+            mission.world().remove(unit);
+        }
+        LoadGame.apply(mission.world(), script, data.unitTypes().types());
+        Unit footman = mission.world().units().stream()
+                .filter(unit -> unit.type() != null
+                        && "unit-footman".equals(unit.type().ident())
+                        && unit.order() == Unit.Order.ATTACK_GROUND
+                        && unit.orderTargetX() == 45 && unit.orderTargetY() == 103)
+                .findFirst().orElse(null);
+        assertNotNull(footman, "saved footman fighting 45,103 is missing");
+        assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
+                "the regression save no longer contains its diagnostic state");
+        assertTrue(footman.battleNetPlayerCommandMove());
+        assertFalse(footman.battleNetAttackGroundMove(),
+                "a pre-fix save cannot claim the new provenance marker");
+
+        int healedAt = -1;
+        for (int cycle = 1; cycle <= 80; cycle++) {
+            mission.tick();
+            if (footman.order() != Unit.Order.ATTACK_GROUND) {
+                healedAt = cycle;
+                break;
+            }
+        }
+
+        assertTrue(healedAt > 0,
+                "the footman kept fighting the empty square at 45,103");
+        assertEquals(Unit.Order.STILL, footman.order(),
+                "the corrupt empty-ground order did not terminate cleanly");
+    }
+
+    @Test
     @DisplayName("the Human expansion 6 battleships can reach every saved shipyard")
     void humanExpansionSixBattleshipsReachEverySavedShipyard() throws IOException {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -624,6 +673,7 @@ class SaveGameTest {
         unit.setBattleNetOrderDelay(7);
         unit.rememberActionBeforeQueued(Unit.Order.STILL, 6);
         unit.setBattleNetPlayerCommandMove(true);
+        unit.setBattleNetAttackGroundMove(true);
 
         Unit loaded = find(reload(bench), "unit-footman");
 
@@ -631,6 +681,7 @@ class SaveGameTest {
         assertEquals(Unit.Order.STILL, loaded.currentAction());
         assertEquals(6, loaded.actionBeforeQueuedReleaseDelay());
         assertTrue(loaded.battleNetPlayerCommandMove());
+        assertTrue(loaded.battleNetAttackGroundMove());
     }
 
     @Test

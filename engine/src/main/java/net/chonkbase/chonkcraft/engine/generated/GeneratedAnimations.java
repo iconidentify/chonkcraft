@@ -3192,8 +3192,6 @@ public final class GeneratedAnimations {
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 20, "20"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 200, "200"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 25, "25"),
-            new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 200, "200"),
-            new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 25, "25"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.UNBREAKABLE_END, 0, "end"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 1, "1")
         )));
@@ -4132,8 +4130,6 @@ public final class GeneratedAnimations {
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 15, "15"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 200, "200"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 20, "20"),
-            new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 200, "200"),
-            new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 25, "25"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.WAIT, 200, "200"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.FRAME, 25, "25"),
             new net.chonkbase.chonkcraft.engine.animation.Animation.Instruction(net.chonkbase.chonkcraft.engine.animation.Animation.Kind.UNBREAKABLE_END, 0, "end"),

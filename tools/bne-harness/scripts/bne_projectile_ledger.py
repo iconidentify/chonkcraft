@@ -64,8 +64,13 @@ PROJECTILE_STEP_FLAGS = 0x1F
 PROJECTILE_REMAINING = 0x20   # verified in LAYOUT.md: signed remaining distance
 PROJECTILE_AIM_X = 0x28       # verified in LAYOUT.md: packed aim
 PROJECTILE_AIM_Y = 0x2A
-PROJECTILE_SOURCE_PTR = 0x2C  # derived: congruent mod 152 across the corpus
-PROJECTILE_TARGET_PTR = 0x30  # derived: congruent mod 152 across the corpus
+# The constructor hook can convert +0x30 back to the unit slot it was called
+# for. A live Human 13 capture proves +0x30 is the source; using that exact
+# pool base converts +0x2c to the attacked unit. Earlier versions of this
+# ledger had these two labels reversed because stride congruence alone proves
+# only that both are unit pointers, not which role either pointer owns.
+PROJECTILE_TARGET_PTR = 0x2C
+PROJECTILE_SOURCE_PTR = 0x30
 PROJECTILE_TYPE = 0x34        # derived: correlates with the 0x00494e6c speed table
 PROJECTILE_ACTION = 0x36      # derived: constant per motion action
 

@@ -1892,6 +1892,9 @@ def normalize_result(result: dict[str, Any], scenario: dict[str, Any]) -> dict[s
             continue
         events.append({key: event.get(key) for key in (
             "cycle", "kind", "unit_id", "target_id", "x", "y", "value",
+            "present", "alive", "on_map", "offset_x", "offset_y", "order",
+            "hit_points", "missile_count", "sequence", "animation_timer",
+            "animation_state",
         ) if key in event})
     return {"observations": observations, "events": events}
 

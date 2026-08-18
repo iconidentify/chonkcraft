@@ -291,6 +291,63 @@ class ChasePaceTest {
     }
 
     @Test
+    @DisplayName("a melee arrival pays every borrowed walk pixel before attack owns the unit")
+    void aMeleeArrivalPaysEveryBorrowedWalkPixelBeforeAttackOwnsTheUnit()
+            throws Exception {
+        // Pinned Orc 1 commanded fight, grunt 1592 versus footman 1595:
+        // native carries ten final approach pixels at fixture 200, drains
+        // 10,7,4,1,0, and opens the visible Attack animation at 204. The old
+        // eight-pixel arrival band snapped that debt and opened at 201.
+        byte[] script = retailScriptBin();
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+
+        UnitType attackerType = knight();
+        UnitType preyType = new UnitType("unit-footman");
+        preyType.setTileSize(1, 1);
+        preyType.setHitPoints(60);
+        preyType.setLandUnit(true);
+        Unit attacker = world.createUnit(attackerType, 0, 10, 10);
+        Unit prey = world.createUnit(preyType, 1, 11, 10);
+        assertTrue(attacker != null && prey != null, "fighters must place");
+        assertTrue(world.orderAttack(attacker, prey), "attack accepted");
+
+        int east = net.chonkbase.chonkcraft.engine.map.Direction.fromDelta(1, 0);
+        attacker.setPath(new net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Path(
+                net.chonkbase.chonkcraft.engine.pathfinder.PathFinder.Result.FOUND,
+                new int[] {east}));
+        attacker.setPathGoal(prey.tileX(), prey.tileY());
+        attacker.setChasing(true);
+        attacker.setFighting(false);
+        attacker.setOffset(-8, 0);
+        attacker.animation().switchTo(
+                attacker.type().animationSet().get(AnimationSet.State.MOVE));
+
+        world.movement.stepMove(attacker, false);
+        assertTrue(attacker.chasing() && !attacker.fighting(),
+                "a nonzero approach residual must remain owned by Move");
+        assertTrue(attacker.offsetX() != 0,
+                "the approach must not snap an eight-pixel residual to zero");
+
+        // Model the retail residual-zero consult directly. The transition is
+        // the property under test; animation pacing owns how the debt reached
+        // zero and is covered independently above.
+        attacker.setOffset(0, 0);
+        world.movement.stepMove(attacker, false);
+        assertTrue(attacker.fighting() && !attacker.chasing(),
+                "the zero-debt consult must transfer action ownership");
+        assertEquals(attacker.type().animationSet().get(AnimationSet.State.ATTACK),
+                attacker.animation().current(),
+                "the visible Attack animation changes on the ownership beat");
+        assertEquals(0, attacker.pathLength(),
+                "the occupied quarry heading is consumed at attack handoff");
+    }
+
+    @Test
     @DisplayName("a chaser crosses a square in the cycles its own move animation asks for")
     void aChaseKeepsTheAnimationsPace() {
         GameMap map = grass(40);

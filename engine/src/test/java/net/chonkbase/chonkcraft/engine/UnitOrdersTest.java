@@ -1,7 +1,9 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
@@ -10,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.pathfinder.PathFinder;
@@ -537,10 +540,18 @@ class UnitOrdersTest {
                 fixture.x(), fixture.y());
         // GiveOrder table 17 installs the order even when there is nothing
         // to throw: commanded Orc 1 grunt 1592 held ATTACK_GROUND on grass.
-        assertTrue(world.orderAttackGround(footman, fixture.x() + 4, fixture.y()),
+        assertTrue(world.orderAttackGround(footman, fixture.x() + 1, fixture.y()),
                 "a footman was refused attack-ground on open ground");
-        run(world, 8);
-        assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
-                "the footman stood down instead of holding attack-ground");
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+            assertEquals(Unit.Order.ATTACK_GROUND, footman.order(),
+                    "the footman stood down instead of holding attack-ground");
+            assertSame(footman.type().animationSet().get(
+                            AnimationSet.State.STILL),
+                    footman.animation().current(),
+                    "the footman visibly fought an enemy that does not exist");
+            assertFalse(footman.animation().unbreakable(),
+                    "empty grass started an attack swing");
+        }
     }
 }

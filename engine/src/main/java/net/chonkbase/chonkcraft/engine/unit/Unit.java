@@ -330,6 +330,16 @@ public final class Unit {
     private boolean battleNetPlayerCommandMove;
 
     /**
+     * This player Move is the walking half of retail GiveOrder 17.
+     *
+     * <p>A melee attack-ground click into unenterable terrain first installs
+     * Move and promotes back to Attack Ground after its final leftover lands.
+     * Ordinary Move orders must never make that promotion merely because an
+     * older attack left an attack-goal coordinate behind.</p>
+     */
+    private boolean battleNetAttackGroundMove;
+
+    /**
      * A Stop click arrived while dest-arm leftover pixels were still
      * draining. Native keeps Move until those pixels land.
      */
@@ -2799,6 +2809,14 @@ public final class Unit {
 
     public void setBattleNetPlayerCommandMove(boolean playerCommandMove) {
         battleNetPlayerCommandMove = playerCommandMove;
+    }
+
+    public boolean battleNetAttackGroundMove() {
+        return battleNetAttackGroundMove;
+    }
+
+    public void setBattleNetAttackGroundMove(boolean attackGroundMove) {
+        battleNetAttackGroundMove = attackGroundMove;
     }
 
     public boolean battleNetStopAfterLeftover() {

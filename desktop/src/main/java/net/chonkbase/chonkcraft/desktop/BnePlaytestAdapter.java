@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,6 +19,8 @@ import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 
 /**
  * Executes a playtest scenario the way a player order enters the game:
@@ -85,6 +88,15 @@ public final class BnePlaytestAdapter {
                 nativeToJava.putAll(pairActors(
                         array(scenario.get("targets"), "targets"), world));
             }
+            List<Integer> lifecycleUnits = lifecycleUnits(scenario, nativeToJava);
+            List<Map<String, Object>> lifecycleEvents = new ArrayList<>();
+            Map<Integer, Integer> javaToNative = new HashMap<>();
+            nativeToJava.forEach((nativeId, javaId) ->
+                    javaToNative.put(javaId, nativeId));
+            Map<Missile, Integer> projectileIds = new IdentityHashMap<>();
+            Map<Missile, Map<String, Object>> previousProjectiles =
+                    new IdentityHashMap<>();
+            int nextProjectileId = 0;
 
             List<Object> commands = array(scenario.get("commands"), "commands");
             int settle = optionalNumber(scenario.get("settle_cycles"), DEFAULT_SETTLE);
@@ -109,6 +121,39 @@ public final class BnePlaytestAdapter {
                 }
                 mission.tick();
                 journal.observe(cycle, world);
+                for (int nativeId : lifecycleUnits) {
+                    lifecycleEvents.add(lifecycleState(cycle, nativeId,
+                            unit(world, nativeToJava.get(nativeId)), world));
+                }
+                if (!lifecycleUnits.isEmpty()) {
+                    for (Missile missile : world.missiles().stream()
+                            .filter(world::battleNetProjectileConstructed).toList()) {
+                        if (!projectileIds.containsKey(missile)) {
+                            projectileIds.put(missile, nextProjectileId++);
+                        }
+                    }
+                    Map<Missile, Map<String, Object>> current =
+                            new IdentityHashMap<>();
+                    for (Missile missile : world.missiles().stream()
+                            .filter(world::battleNetProjectileConstructed).toList()) {
+                        Map<String, Object> event = projectileState(cycle,
+                                projectileIds.get(missile), missile,
+                                javaToNative, true);
+                        lifecycleEvents.add(event);
+                        current.put(missile, event);
+                    }
+                    for (Map.Entry<Missile, Map<String, Object>> entry
+                            : previousProjectiles.entrySet()) {
+                        if (current.containsKey(entry.getKey())) {
+                            continue;
+                        }
+                        Map<String, Object> event = new LinkedHashMap<>(entry.getValue());
+                        event.put("cycle", cycle);
+                        event.put("present", false);
+                        lifecycleEvents.add(event);
+                    }
+                    previousProjectiles = current;
+                }
             }
 
             Map<Long, PlayerIntentJournal.Outcome> byIntent = new HashMap<>();
@@ -136,7 +181,7 @@ public final class BnePlaytestAdapter {
             producer.put("map", javaMap);
             result.put("producer", producer);
             result.put("observations", observations);
-            result.put("events", List.of());
+            result.put("events", lifecycleEvents);
             Files.createDirectories(parsed.output.getParent());
             Files.writeString(parsed.output, Json.write(result), StandardCharsets.UTF_8);
         }
@@ -303,6 +348,111 @@ public final class BnePlaytestAdapter {
         state.put("missile_count", world.missiles().size());
         state.put("cargo_count", unit.cargo().size());
         return state;
+    }
+
+    private static List<Integer> lifecycleUnits(Map<String, Object> scenario,
+            Map<Integer, Integer> nativeToJava) {
+        Object requested = scenario.get("combat_observation");
+        if (!(requested instanceof Map<?, ?> raw)) {
+            return List.of();
+        }
+        Object ids = raw.get("unit_ids");
+        require(ids instanceof List<?>, "combat observation unit_ids is not an array");
+        List<Integer> result = new ArrayList<>();
+        for (Object value : (List<?>) ids) {
+            int nativeId = number(value, "combat observation unit id");
+            require(nativeToJava.containsKey(nativeId),
+                    "combat observation unit " + nativeId + " is not paired");
+            require(!result.contains(nativeId),
+                    "combat observation repeats native unit " + nativeId);
+            result.add(nativeId);
+        }
+        require(!result.isEmpty(), "combat observation has no units");
+        return List.copyOf(result);
+    }
+
+    private static Map<String, Object> lifecycleState(int cycle, int nativeId,
+            Unit unit, net.chonkbase.chonkcraft.engine.World world) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("cycle", cycle);
+        event.put("kind", "combat-state");
+        event.put("unit_id", nativeId);
+        event.put("present", unit != null);
+        event.put("alive", unit != null && unit.isAlive());
+        event.put("on_map", unit != null && unit.isOnMap());
+        event.put("x", unit == null ? -1 : unit.tileX());
+        event.put("y", unit == null ? -1 : unit.tileY());
+        event.put("offset_x", unit == null ? 0
+                : unit.tileX() * Unit.TILE_PIXELS + unit.offsetX());
+        event.put("offset_y", unit == null ? 0
+                : unit.tileY() * Unit.TILE_PIXELS + unit.offsetY());
+        event.put("order", unit == null || unit.order() == null
+                ? null : unit.order().name());
+        event.put("hit_points", unit == null ? 0 : unit.hitPoints());
+        event.put("sequence", unit == null ? -1 : unit.battleNetSequenceOffset());
+        event.put("animation_timer", unit == null ? 0
+                : unit.battleNetAnimationTimer());
+        event.put("animation_state", animationState(unit));
+        // The native state stream stores a process pointer here. A stable slot
+        // mapping needs a separately authenticated pointer-table observation;
+        // do not pretend a Java id and a retail pointer are comparable.
+        event.put("target_id", null);
+        event.put("missile_count", world.missiles().size());
+        return event;
+    }
+
+    private static String animationState(Unit unit) {
+        if (unit == null || unit.type() == null
+                || unit.type().animationSet() == null) {
+            return null;
+        }
+        AnimationSet animations = unit.type().animationSet();
+        for (AnimationSet.State state : AnimationSet.State.values()) {
+            if (animations.get(state) == unit.animation().current()) {
+                return state.name();
+            }
+        }
+        return null;
+    }
+
+    private static Map<String, Object> projectileState(int cycle, int id,
+            Missile missile, Map<Integer, Integer> javaToNative,
+            boolean present) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("cycle", cycle);
+        event.put("kind", "combat-projectile");
+        event.put("projectile_id", id);
+        event.put("present", present);
+        event.put("source_id", nativeUnitId(missile.source(), javaToNative));
+        event.put("target_id", nativeUnitId(missile.target(), javaToNative));
+        event.put("type", missile.type() == null ? null : missile.type().ident());
+        event.put("type_code", projectileTypeCode(missile));
+        event.put("x", (int) Math.round(missile.x()));
+        event.put("y", (int) Math.round(missile.y()));
+        event.put("frame", missile.frame());
+        event.put("remaining", missile.battleNetRemaining());
+        event.put("pool_slot", missile.battleNetPoolSlot());
+        return event;
+    }
+
+    private static Integer nativeUnitId(Unit unit,
+            Map<Integer, Integer> javaToNative) {
+        return unit == null ? null : javaToNative.get(unit.id());
+    }
+
+    private static int projectileTypeCode(Missile missile) {
+        if (missile.type() == null || missile.type().ident() == null) {
+            return -1;
+        }
+        return switch (missile.type().ident()) {
+            case "missile-catapult-rock" -> 13;
+            case "missile-ballista-bolt" -> 14;
+            case "missile-arrow", "missile-arrow-super" -> 15;
+            case "missile-axe" -> 16;
+            case "missile-impact" -> 21;
+            case "missile-small-cannon", "missile-small-cannon-super" -> 24;
+            default -> -1;
+        };
     }
 
     private static Map<Integer, Integer> pairActors(List<Object> actors,

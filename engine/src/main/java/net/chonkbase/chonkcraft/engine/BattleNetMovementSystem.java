@@ -292,6 +292,21 @@ final class BattleNetMovementSystem {
 
     /** Applies a serialized player/network move at the retail command boundary. */
     boolean orderCommandMove(Unit unit, int toX, int toY) {
+        if (unit.type().building() || unit.type().speed() <= 0
+                || !world.map.contains(toX, toY)) {
+            return false;
+        }
+        // A new ordinary Move supersedes any GiveOrder 17 walk provenance.
+        // The attack-ground constructor sets it again only after its projected
+        // Move has actually been accepted.
+        unit.setBattleNetAttackGroundMove(false);
+        // ReleaseOrders replaces the attack even when Move must first wait
+        // behind the current Still body or drain a residual heading. Cancel
+        // its presentation-ahead projectile at the command boundary, not
+        // only in the immediate orderMove arm. Otherwise a restored siege
+        // placeholder survives a queued move at its old muzzle and can wake
+        // up during a later attack.
+        world.projectiles.interruptPendingAttack(unit);
         Unit.Order before = unit.currentAction();
         // A dest-arm leftover already owns a heading. Native writes
         // next_order=MOVE and the new order point, then keeps draining that
@@ -1767,6 +1782,7 @@ final class BattleNetMovementSystem {
      */
     boolean promoteGiveOrderAttackGroundAfterLeftover(Unit unit) {
         if (unit == null || !unit.battleNetPlayerCommandMove()
+                || !unit.battleNetAttackGroundMove()
                 || unit.order() != Unit.Order.MOVE
                 || unit.pathLength() != 1) {
             return false;
@@ -1962,11 +1978,14 @@ final class BattleNetMovementSystem {
     /**
      * A melee leftover residual that already stands in weapon range, with
      * its last heading naming the quarry's occupied square, dest-arms into
-     * Attack at its native arrival band. A continuous chase uses the ordinary
-     * eight-pixel occupied-square band (XHuman 9 Attack@1188 fixture 46).
-     * A route rebuilt after an AttackTarget swing owns its leftover through
-     * zero (Human 1 dest-arm 401 lands 417); treating that refill as the
-     * ordinary band landed at 413 and struck at 423 instead of retail's 427.
+     * Attack only after the borrowed movement residual is fully paid. Weapon
+     * range is a tile-space decision, but it does not erase pixel-space debt:
+     * in the pinned Orc 1 commanded fight, retail walks the final ten pixels
+     * over fixtures 200 through 204 before opening Attack. Snapping at an
+     * eight-pixel "arrival band" opened Java's swing at 201 and its first
+     * damage at 210, four fixtures before retail. A route rebuilt after an
+     * AttackTarget swing has the same ownership rule (Human 1 dest-arm 401
+     * drains through fixture 417).
      */
     private boolean arriveMeleeLeftoverOnOccupiedQuarry(Unit unit) {
         if (unit == null || unit.type() == null
@@ -1982,13 +2001,10 @@ final class BattleNetMovementSystem {
             return false;
         }
         int debt = Math.max(Math.abs(unit.offsetX()), Math.abs(unit.offsetY()));
-        // A normal MoveToTarget consult reports the occupied final square at
-        // the native eight-pixel arrival band (XHuman 9 skeleton 1431 at
-        // fixture 46). A route rebuilt on the visit an AttackTarget swing
-        // ended owns a borrowed leftover instead; native drains that buffer
-        // to zero (Human 1 grunt 1591, fixtures 413 through 417).
-        boolean attackWaitRefill = unit.battleNetAttackWaitRefillResidual();
-        if (debt > (attackWaitRefill ? 0 : 8)) {
+        // MoveToTarget may already be in weapon range while its last route
+        // element still owns pixels. Retail lets the Move program drain that
+        // debt; only the zero-debt consult transfers action ownership.
+        if (debt > 0) {
             return false;
         }
         int heading = unit.pathLength() == 1

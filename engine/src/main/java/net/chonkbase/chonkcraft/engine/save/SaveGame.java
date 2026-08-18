@@ -687,6 +687,9 @@ public final class SaveGame {
         if (unit.battleNetPlayerCommandMove()) {
             state.append(" playerCommandMove = true,");
         }
+        if (unit.battleNetAttackGroundMove()) {
+            state.append(" attackGroundMove = true,");
+        }
         if (unit.battleNetStopAfterLeftover()) {
             state.append(" stopAfterLeftover = true,");
         }

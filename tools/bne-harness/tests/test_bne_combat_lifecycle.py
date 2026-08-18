@@ -16,6 +16,14 @@ REQUIREMENTS = ROOT / "tools/bne-harness/combat-lifecycle-requirements.json"
 
 class CombatLifecycleTest(unittest.TestCase):
 
+    @staticmethod
+    def proof(rows):
+        item = {"path": "evidence.json", "bytes": 1, "sha256": "a" * 64}
+        return combat.seal_proof(rows, {
+            "fixture": item, "native_receipt": item,
+            "java_receipt": item, "scenario": item,
+        })
+
     def test_matrix_has_every_player_visible_combat_domain(self):
         required = combat.load_requirements(REQUIREMENTS)
         self.assertEqual(9, required["encounters"])
@@ -29,9 +37,7 @@ class CombatLifecycleTest(unittest.TestCase):
 
     def test_generated_matrix_is_not_native_proof(self):
         required = combat.load_requirements(REQUIREMENTS)
-        report = combat.coverage(required, {
-            "schema": combat.PROOF_SCHEMA, "rows": [],
-        })
+        report = combat.coverage(required, self.proof([]))
         self.assertFalse(report["complete"])
         self.assertEqual(0, report["exact"])
         self.assertEqual(required["required_cells"], len(report["debts"]))
@@ -45,12 +51,166 @@ class CombatLifecycleTest(unittest.TestCase):
             "exact": True,
             "causal_order_exact": False,
         } for item in required["cells"]]
-        report = combat.coverage(required, {
-            "schema": combat.PROOF_SCHEMA, "rows": rows,
-        })
+        report = combat.coverage(required, self.proof(rows))
         self.assertFalse(report["complete"])
         self.assertTrue(all("causal-order-not-exact" in item["reasons"]
                             for item in report["debts"]))
+
+    def test_proof_identity_rejects_a_changed_checkbox(self):
+        proof = self.proof([])
+        proof["rows"].append({"encounter": "melee-infantry",
+                              "stance": "attack", "phase": "acquire"})
+        with self.assertRaisesRegex(ValueError, "identity changed"):
+            combat.validate_proof(proof)
+
+    def test_lifecycle_derives_only_observed_exact_causal_phases(self):
+        def result(side, changed=False):
+            events = []
+            for cycle, x, order, hp in (
+                    (4, 10, "STILL", 60),
+                    (5, 10, "ATTACK", 60),
+                    (6, 11, "ATTACK", 60),
+                    (7, 11, "ATTACK", 55)):
+                events.extend([
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 10,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": x, "y": 2, "offset_x": x * 32,
+                     "offset_y": 64, "order": order, "hit_points": 60,
+                     "target_id": None, "missile_count": 0},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 20,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 12, "y": 2, "offset_x": 384,
+                     "offset_y": 64, "order": "STILL",
+                     "hit_points": hp - (1 if changed and cycle == 7 else 0),
+                     "target_id": None, "missile_count": 0},
+                ])
+            return {"side": side, "events": events}
+
+        rows = combat.derive_rows(
+            result("native"), result("java"), encounter="melee-infantry",
+            stance="attack", attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="b" * 64)
+        by_phase = {row["phase"]: row for row in rows}
+        self.assertTrue(by_phase["acquire"]["causal_order_exact"])
+        self.assertTrue(by_phase["chase"]["causal_order_exact"])
+        self.assertTrue(by_phase["damage"]["causal_order_exact"])
+        self.assertNotIn("swing", by_phase)
+
+        divergent = combat.derive_rows(
+            result("native"), result("java", changed=True),
+            encounter="melee-infantry", stance="attack", attacker=10,
+            defender=20, issue_cycle=5, evidence_sha256="c" * 64)
+        self.assertFalse({row["phase"]: row for row in divergent}[
+            "damage"]["exact"])
+
+    def test_native_dying_order_is_the_death_boundary(self):
+        def result(side, dying_cycle):
+            events = []
+            for cycle in range(4, 9):
+                events.extend([
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 10,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 10, "y": 2, "offset_x": 320, "offset_y": 64,
+                     "order": "ATTACK", "hit_points": 60,
+                     "target_id": None, "missile_count": 0},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 20,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 11, "y": 2, "offset_x": 352, "offset_y": 64,
+                     "order": "DYING" if cycle >= dying_cycle else "ATTACK",
+                     "hit_points": 4, "target_id": None,
+                     "missile_count": 0},
+                ])
+            return {"side": side, "events": events}
+
+        rows = combat.derive_rows(
+            result("native", 7), result("java", 8),
+            encounter="melee-infantry", stance="attack",
+            attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="d" * 64)
+        death = {row["phase"]: row for row in rows}["death"]
+        self.assertTrue(death["native_observed"])
+        self.assertTrue(death["java_observed"])
+        self.assertEqual(7, death["native_cycle"])
+        self.assertEqual(8, death["java_cycle"])
+        self.assertFalse(death["exact"])
+
+    def test_damage_rng_diagnosis_names_the_crossed_consumers(self):
+        # Both traces contain the same two legal LCG transitions, but damage
+        # and idle spend them in opposite order.
+        native = "\n".join([
+            "# bne-trace event=async-random cycle=214 caller=00418412 "
+            "before=3157976727 after=2458500932 result=4745",
+            "# bne-trace event=async-random cycle=214 caller=0040AD58 "
+            "before=2458500932 after=3501412629 result=20659",
+        ])
+        java = "\n".join([
+            '{"schema":1,"side":"java","kind":"rng.async.draw",'
+            '"cycle":213,"fields":{"before":3157976727,'
+            '"after":2458500932,"result":4745,'
+            '"caller":"BattleNetIdleSystem.dispatchBattleNetIdleMarker"}}',
+            '{"schema":1,"side":"java","kind":"rng.async.draw",'
+            '"cycle":216,"fields":{"before":2458500932,'
+            '"after":3501412629,"result":20659,'
+            '"caller":"World.battleNetMeleeDamage"}}',
+        ])
+        report = combat.damage_rng_diagnosis(native, java)
+        self.assertFalse(report["exact"])
+        self.assertEqual("damage-consumer-order-mismatch",
+                         report["classification"])
+        self.assertIn("IdleSystem", report[
+            "java_consumer_of_native_damage_seed"]["caller"])
+        self.assertEqual("0x0040ad58", report[
+            "native_consumer_of_java_damage_seed"]["caller"])
+
+    def test_projectile_phases_require_the_commanded_attacker(self):
+        def result(side, create=20, move=21, source=10):
+            events = []
+            for cycle in range(4, 24):
+                events.extend([
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 10,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 1, "y": 1, "offset_x": 32, "offset_y": 32,
+                     "order": "ATTACK", "hit_points": 40,
+                     "target_id": None, "missile_count": int(cycle >= create)},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 20,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 5, "y": 1, "offset_x": 160, "offset_y": 32,
+                     "order": "STILL", "hit_points": 40,
+                     "target_id": None, "missile_count": int(cycle >= create)},
+                ])
+            events.extend([
+                {"cycle": create, "kind": "combat-projectile",
+                 "projectile_id": "local", "present": True,
+                 "source_id": source, "target_id": 20, "type_code": 15,
+                 "x": 40, "y": 40, "frame": 0, "remaining": 96},
+                {"cycle": move, "kind": "combat-projectile",
+                 "projectile_id": "local", "present": True,
+                 "source_id": source, "target_id": 20, "type_code": 15,
+                 "x": 52, "y": 40, "frame": 0, "remaining": 84},
+                {"cycle": 22, "kind": "combat-projectile",
+                 "projectile_id": "local", "present": False,
+                 "source_id": source, "target_id": 20, "type_code": 15,
+                 "x": 52, "y": 40, "frame": 0, "remaining": -1},
+            ])
+            return {"side": side, "events": events}
+
+        rows = combat.derive_rows(
+            result("native"), result("java"), encounter="ranged-infantry",
+            stance="attack", attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="e" * 64)
+        phases = {row["phase"]: row for row in rows}
+        self.assertTrue(phases["projectile-create"]["causal_order_exact"])
+        self.assertTrue(phases["projectile-flight"]["causal_order_exact"])
+        self.assertTrue(phases["impact"]["causal_order_exact"])
+
+        absent = combat.derive_rows(
+            result("native", source=99), result("java"),
+            encounter="ranged-infantry", stance="attack", attacker=10,
+            defender=20, issue_cycle=5, evidence_sha256="f" * 64)
+        projectile = {row["phase"]: row for row in absent}[
+            "projectile-create"]
+        self.assertFalse(projectile["native_observed"])
+        self.assertFalse(projectile["exact"])
 
 
 if __name__ == "__main__":

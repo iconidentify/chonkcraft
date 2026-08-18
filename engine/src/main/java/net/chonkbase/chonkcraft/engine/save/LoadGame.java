@@ -723,6 +723,10 @@ public final class LoadGame {
             unit.setBattleNetPlayerCommandMove(
                     truthy(state.rawGet("playerCommandMove")));
         }
+        if (state.rawGet("attackGroundMove") != null) {
+            unit.setBattleNetAttackGroundMove(
+                    truthy(state.rawGet("attackGroundMove")));
+        }
         if (state.rawGet("stopAfterLeftover") != null) {
             unit.setBattleNetStopAfterLeftover(
                     truthy(state.rawGet("stopAfterLeftover")));

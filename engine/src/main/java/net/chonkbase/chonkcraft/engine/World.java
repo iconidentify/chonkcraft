@@ -176,6 +176,9 @@ public final class World {
      */
     private final Set<Unit> battleNetVisitedThisCycle =
             Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    /** Units whose Still program actually emitted its action marker this cycle. */
+    private final Set<Unit> battleNetIdleMarkerThisCycle =
+            Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     /** Person help staggers one quiet cycle after the first promote only. */
     private final int[] battleNetPersonHelpLastPromoteCycle =
             new int[Player.MAX];
@@ -1092,6 +1095,11 @@ public final class World {
      */
     public List<Missile> missiles() {
         return missileSnapshot;
+    }
+
+    /** Whether the retail projectile constructor boundary has been observed. */
+    public boolean battleNetProjectileConstructed(Missile missile) {
+        return missile != null && battleNetProjectileCausalOrdinals.containsKey(missile);
     }
 
     /** Published for the renderer; see {@link #missiles()}. */
@@ -3909,10 +3917,25 @@ public final class World {
             int attack = idle.battleNetSequenceStart(unit,
                     BattleNetSequence.ATTACK_ANIMATION);
             if (attack >= 0) {
+                boolean inRange = targets.inAttackRange(unit, target);
                 unit.setBattleNetSequenceOffset(attack);
                 // FUN_00452ef0 gives a freshly selected native action three
-                // calls before its first binary animation instruction.
-                unit.setBattleNetAnimationTimer(3);
+                // calls before its first binary animation instruction. A
+                // direct in-range GiveOrder is installed before this Java
+                // tick, while retail's new action does not consume its first
+                // timer beat on that same visit. Seed four there so the
+                // committed after-state is timer three. A chase still uses
+                // three: its first visit belongs to movement, and adding a
+                // beat regresses the proven ranged retarget hold.
+                unit.setBattleNetAnimationTimer(fromPlayer && inRange ? 4 : 3);
+                if (inRange) {
+                    AnimationSet set = unit.type().animationSet();
+                    Animation visible = set == null ? null
+                            : set.get(AnimationSet.State.ATTACK);
+                    if (visible != null && unit.animation().current() != visible) {
+                        unit.animation().switchTo(visible);
+                    }
+                }
             }
             // Melee table 0x27 only: first in-range Attack marker runs
             // 0x4234b0 (SyncRand into unit+0xb). Chasers that step before
@@ -8364,6 +8387,7 @@ public final class World {
             return;
         }
         projectiles.interruptPendingAttack(unit);
+        unit.setBattleNetAttackGroundMove(false);
         unit.setPendingHarvest(-1, -1);
         unit.clearQueuedOrders();
         unit.setSavedOrder(null);
@@ -8513,6 +8537,7 @@ public final class World {
         }
         java.util.Arrays.fill(battleNetHelpPromotedThisCycle, false);
         battleNetVisitedThisCycle.clear();
+        battleNetIdleMarkerThisCycle.clear();
         if (PathFinder.tracingAsks()) {
             pathFinder.setTraceCycle(cycle);
         }
@@ -9211,6 +9236,14 @@ public final class World {
         unit.setBattleNetStationaryAttack(false);
         unit.setBattleNetStationaryRecoveryHeld(false);
         unit.setBattleNetAttackWaitRefillResidual(false);
+        // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
+        // EndActionAttack destroys that order whether it restores a saved
+        // order or falls back to Still, so the offered reference releases at
+        // this boundary too. Keeping the Java projection after the target
+        // died retained its expired corpse forever: the attacker had already
+        // returned to Still, but UnitManager still saw a live reference from
+        // an order that no longer existed.
+        unit.setOfferedTarget(null);
         // RestoreOrder swaps COrder objects only. PathFinderInput/Output live
         // on CUnit and survive the swap; the restored order's first movement
         // call invalidates them if its effective goal differs. Keeping them
@@ -12948,6 +12981,7 @@ public final class World {
                 || !map.contains(toX, toY)) {
             return false;
         }
+        unit.setBattleNetAttackGroundMove(false);
         unit.setSavedOrder(null);
         if (unit.animation().unbreakable()) {
             // The same flush-on command boundary as unit and position
@@ -12981,9 +13015,11 @@ public final class World {
             boolean accepted = movement.orderCommandMove(unit, dest[0], dest[1]);
             if (accepted) {
                 unit.setAttackGoal(toX, toY);
+                unit.setBattleNetAttackGroundMove(true);
             }
             return accepted;
         }
+        unit.setBattleNetPlayerCommandMove(false);
         unit.clearPath();
         unit.setTarget(null);
         unit.setAttackGoal(toX, toY);
@@ -13404,6 +13440,17 @@ public final class World {
             unit.setBattleNetSequenceOffset(attackStart);
             unit.setBattleNetAnimationTimer(1);
         }
+        // The action program and the visible animation change ownership on
+        // the same retail beat. Merely opening the script cursor left Java's
+        // presentation on MOVE until the following cycle even though its
+        // sequence, position, and eventual OP10 damage were already exact.
+        // Switch without advancing: the first Attack instruction still runs
+        // on the next simulation cycle.
+        AnimationSet set = unit.type() == null ? null : unit.type().animationSet();
+        Animation attack = set == null ? null : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
         if (markMeleeLeftover) {
             unit.setBattleNetMultiLeftoverMelee(true);
         } else {
@@ -13508,18 +13555,35 @@ public final class World {
             if (!isPerson(other.player())) {
                 continue;
             }
-            // A later Still visit whose wait is already 1 will OP0 this
-            // cycle. Native 0x40b010 installs Attack 2539 timer 3 on that
-            // marker (Human 1 1598 at dest-arm 401). Pulling the scan
-            // forward here spent the construction tick and landed the
-            // first stand-and-fight blow at 413 instead of 414. A person
-            // whose marker is not due still needs the helper (XHuman 10).
-            if (!battleNetVisitedThisCycle.contains(other)
+            // An offered hit response belongs to the defender's own OP0. A
+            // quiet WAIT countdown can leave timer one, but retail does not
+            // promote the remembered attacker until the following marker.
+            // Human 13 knight 1493 is the compact witness: the axe lands at
+            // c25, the knight counts down through c29, then attacks on c30.
+            //
+            // Ordinary person acquisition still needs the ordering bridge:
+            // Java and retail walk their pools oppositely, so XHuman 10's
+            // archer must see a grunt that steps into range later in Java's
+            // same cycle. Preserve that proven scan, but never use it to pull
+            // a remembered damage source across the marker boundary.
+            boolean markerFired = battleNetIdleMarkerThisCycle.contains(other);
+            if (other.offeredTarget() != null && !markerFired) {
+                continue;
+            }
+            // A defender not yet visited whose timer is one will fire OP0 and
+            // scan normally later in this cycle; doing it here spends that
+            // marker's construction tick early.
+            if (!markerFired && !battleNetVisitedThisCycle.contains(other)
                     && other.battleNetAnimationTimer() == 1) {
                 continue;
             }
             battleNetAutoAttack(other);
         }
+    }
+
+    /** Records the exact Still action-marker visits used by arrival rescans. */
+    void markBattleNetIdleMarker(Unit unit) {
+        battleNetIdleMarkerThisCycle.add(unit);
     }
 
     /**
@@ -14107,6 +14171,7 @@ public final class World {
         // prevents attack-ground, weak auto-target, and queued replacements
         // from leaking presentation-ahead missiles through a different exit.
         projectiles.interruptPendingAttack(unit);
+        unit.setBattleNetAttackGroundMove(false);
         unit.rememberActionBeforeQueued(unit.order());
         unit.setOrder(Unit.Order.STILL);
         unit.setRandomMoveSleep(0);

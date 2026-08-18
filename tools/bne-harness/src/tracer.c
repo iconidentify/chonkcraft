@@ -2442,17 +2442,26 @@ static void __cdecl traced_idle(BYTE *unit) {
 
 static BYTE *__cdecl traced_projectile(BYTE *unit) {
     BYTE *pool = *BNE_202_UNIT_POOL_POINTER;
+    BYTE *bullet_pool = *BNE_202_BULLET_POOL_POINTER;
+    DWORD bullet_count = *BNE_202_BULLET_POOL_COUNT;
     DWORD slot = (pool == NULL || unit == NULL || unit < pool)
             ? 0xffffffffUL : (DWORD) ((unit - pool) / BNE_UNIT_BYTES);
     DWORD seed = *BNE_202_ASYNC_RANDOM_SEED;
     WORD sequence = unit == NULL ? 0 : read_word(unit, BNE_UNIT_SEQUENCE);
     BYTE *result = original_projectile(unit);
+    DWORD bullet_slot = (bullet_pool == NULL || result == NULL
+            || result < bullet_pool
+            || result >= bullet_pool + bullet_count * BNE_BULLET_BYTES)
+            ? 0xffffffffUL
+            : (DWORD) ((result - bullet_pool) / BNE_BULLET_BYTES);
+    LONG cycle = match_ready ? traced_cycles + 1 : 0;
 
     if (trace_async_random_calls) {
-        trace_write("# bne-trace event=projectile-created unit=%lu type=%u "
+        trace_write("# bne-trace event=projectile-created cycle=%ld unit=%lu "
+                "projectile-slot=%lu type=%u "
                 "animation=%u timer=%u sequence=%u sequence-flags=%u "
                 "seed-before=%lu seed-after=%lu result=%p",
-                (unsigned long) slot,
+                cycle, (unsigned long) slot, (unsigned long) bullet_slot,
                 (unsigned int) (unit == NULL ? 0xff : unit[BNE_UNIT_TYPE]),
                 (unsigned int) (unit == NULL ? 0xff
                         : unit[BNE_UNIT_ANIMATION]),

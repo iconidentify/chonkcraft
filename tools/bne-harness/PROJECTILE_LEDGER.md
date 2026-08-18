@@ -23,12 +23,14 @@ scanned, and it says nothing about the order BNE updated the slots. The ledger
 states this in every report rather than letting ascending slot order be
 mistaken for an execution order.
 
-The same caution applies to source and target. Both are raw addresses into the
-unit pool, and the fixture never records where that pool starts. Every pointer
-observed across the corpus is a whole number of 152-byte unit records from
-every other one, which is what proves they are unit pointers -- but without a
-base, no absolute unit slot follows. The ledger reports the relative index and
-refuses to name a slot.
+The `AUXL` snapshot alone cannot name source and target. Both are raw addresses
+into the unit pool, and the state stream does not record that pool's base. A
+capture with the projectile-constructor hook can: the hook records the source
+unit slot and projectile slot at the exact constructor boundary. Its source
+pointer establishes the base, after which the 152-byte unit stride resolves
+the target pointer fail-closed. A live Human 13 capture proved the field names:
+projectile `+0x30` is source and `+0x2c` is target. Without that hook evidence,
+the ledger continues to report only relative pointer relationships.
 
 ## Fields it decodes
 
@@ -44,8 +46,8 @@ is named but never justified is the defect this repository keeps rediscovering.
 ## Running it
 
 ```sh
-python3 scripts/bne_java.py projectile-ledger \
-  --fixture work/corpus/campaign-1800/cases/retail-xhuman-10-idle.bnefx \
+python3 tools/bne-harness/scripts/bne_java.py projectile-ledger \
+  --fixture tools/bne-harness/work/corpus/campaign-1800/cases/retail-xhuman-10-idle.bnefx \
   --through 50 \
   --case retail-xhuman-10-idle
 ```
@@ -121,14 +123,16 @@ opcode ten leaves no missile or occupied pool slot. A live troll firing at a
 for the entire flight, lands, and damages the ship. This prevents a sound-only
 attack from being accepted as visual lifecycle coverage.
 
-Nothing in the engine emits a per-missile create or free. `bne_causal.py`
-carries a native `projectile-created` kind and no Java counterpart at all, and
-`BattleNetProjectileSystem` emits only `JBNEPEND` for the pending-attack flush.
-So a run without `--java-causal` reports `unknown-correspondence` and names the
-gap, rather than pairing Java against native by slot -- which would be a
-fabricated correspondence, since Java has no slots.
+The opt-in playtest adapter now emits one semantic row for every constructed
+missile on every cycle and one final `present=false` row when it leaves the
+pool. Each row carries cycle, stable creation identity, type, source, target,
+position, frame and remaining distance. Pending presentation placeholders are
+excluded until the retail constructor boundary is actually crossed.
 
-Closing the gap needs one opt-in trace line per missile create and free,
-carrying cycle, creation ordinal, type, source and target, and remaining
-distance, plus a `JBNEMISSILE` entry in `bne_causal.py`'s `JAVA_KIND`. The
-natural emit sites are `Missile` and `BattleNetProjectileSystem`.
+Native uses fixed slot plus generation as its local identity; Java uses a
+creation ordinal. The combat compiler canonicalizes both by birth order only
+after source/target/type are authenticated, so allocator-local numbers never
+become a false parity requirement. Human 13 now proves an axethrower shot at
+create c18, first flight c19 and impact/damage c25 on both engines. The larger
+asynchronous RNG prefix still differs, so that ranged lifecycle is reported as
+phase-exact but not yet certified.
