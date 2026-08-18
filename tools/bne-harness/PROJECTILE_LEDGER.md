@@ -138,3 +138,12 @@ exact native/Java observation, result and causal order. Older
 `projectile-created` lines omit the pool slot; those births pair to newly
 occupied constructor types in slot order, and a hooked birth's `+0x30`
 establishes the unit-pool base that names later unhooked tower arrows.
+
+Type 21, the catapult/ballista impact sprite, is live from slot occupancy
+until FREE. Its remaining distance is 0 for the whole hold. Flag `0x04` is
+not the live bit: Human 13 sets it two cycles after birth, and Human 7 never
+sets it. Persistent occupants of types 19, 20 and 28 stay allocated from
+cycle 1 with remaining 0 and the same `0x00`/`0x02` flags; they are not live
+shots. Counting only remaining-distance or `0x04` hid Human 7's impact and
+made the sealed pool look empty at fixture 34 while Java still held the
+constructed sprite.

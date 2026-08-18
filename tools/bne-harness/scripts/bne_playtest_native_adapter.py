@@ -225,18 +225,31 @@ def resolve_fixture(scenario: dict[str, Any], explicit: Path | None) -> Path:
         "native adapter has no authenticated commanded fixture for this scenario")
 
 
+# Weapon type bytes written by the ordinary / mobile constructors. Impact
+# sprites (type 21) are a later detonation object and must not steal a
+# constructor source.
+_CONSTRUCTOR_PROJECTILE_TYPES = {13, 14, 15, 16, 24}
+_IMPACT_PROJECTILE_TYPE = 21
+
+
 def active_projectile_count(raw: bytes) -> bool:
     """Whether this 64-byte slot is an in-flight shot or impact sprite.
 
     Remaining distance lives at projectile +0x20. Flag 0x04 is set on a
-    detonating rock and on type-21 impact. Three Human 13 pool occupants
-    stay allocated from cycle 1 with remaining 0 and flags 0x00/0x02;
-    they are not live shots. Counting them made the sealed pool look
-    like five missiles at fixture 40 while Java held the two shots
-    native still has in slots 4 and 5.
+    detonating rock and, two cycles after birth, on Human 13's type-21
+    impact. Human 7's type-21 impact never sets 0x04: remaining stays 0
+    and flags go 0x02 then 0x00 until FREE. Counting only rem!=0 or 0x04
+    hid that sprite, so the sealed pool looked empty at fixture 34 while
+    Java still held the constructed impact. Persistent occupants of types
+    19, 20 and 28 stay allocated from cycle 1 with remaining 0 and flags
+    0x00/0x02; they are not live shots. Counting them made the sealed
+    pool look like five missiles at fixture 40 while Java held the two
+    shots native still has in slots 4 and 5.
     """
     if raw[BULLET_FLAGS] & BULLET_FREE:
         return False
+    if raw[0x34] == _IMPACT_PROJECTILE_TYPE:
+        return True
     remaining = int.from_bytes(raw[0x20:0x22], "little", signed=True)
     return remaining != 0 or (raw[BULLET_FLAGS] & 0x04) != 0
 
@@ -275,12 +288,6 @@ def projectile_counts_by_cycle(fixture: Path) -> dict[int, int]:
                     active += 1
             counts[cycle] = active
     return counts
-
-
-# Weapon type bytes written by the ordinary / mobile constructors. Impact
-# sprites (type 21) are a later detonation object and must not steal a
-# constructor source.
-_CONSTRUCTOR_PROJECTILE_TYPES = {13, 14, 15, 16, 24}
 
 
 def _constructor_sources(trace: str) \

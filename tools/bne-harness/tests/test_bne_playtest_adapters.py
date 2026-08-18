@@ -38,6 +38,14 @@ COMMANDED = (
 PINNED = explorer.PINNED_BNE_EXECUTABLE_SHA256
 
 
+def _slot(*, typ: int, remaining: int, flags: int) -> bytes:
+    raw = bytearray(native.BULLET_BYTES)
+    raw[0x20:0x22] = remaining.to_bytes(2, "little", signed=True)
+    raw[0x34] = typ
+    raw[native.BULLET_FLAGS] = flags
+    return bytes(raw)
+
+
 class PlaytestAdapterTest(unittest.TestCase):
 
     def test_commanded_fixture_becomes_an_exact_move_seed(self):
@@ -157,6 +165,92 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertEqual(2, observation["state"]["missile_count"],
                          "retail still has the landed rock and its impact "
                          "sprite at that Still visit, not an empty pool")
+
+    def test_type_21_is_live_until_free_even_without_flag_04(self):
+        # Human 7's impact sprite is rem=0, flags 0x02 then 0x00, never
+        # 0x04. Human 13's three persistent occupants use the same rem
+        # and flag pattern on types 19/20/28 and are not live shots.
+        self.assertTrue(native.active_projectile_count(
+            _slot(typ=21, remaining=0, flags=0x02)),
+            "type 21 is live from occupancy, including the 0x02 birth visit")
+        self.assertTrue(native.active_projectile_count(
+            _slot(typ=21, remaining=0, flags=0x00)),
+            "type 21 stays live after the birth flag drops")
+        self.assertTrue(native.active_projectile_count(
+            _slot(typ=21, remaining=0, flags=0x04)),
+            "type 21 is still live when Human 13 later sets 0x04")
+        self.assertFalse(native.active_projectile_count(
+            _slot(typ=21, remaining=0, flags=native.BULLET_FREE)),
+            "FREE ends the impact sprite")
+        self.assertFalse(native.active_projectile_count(
+            _slot(typ=19, remaining=0, flags=0x00)),
+            "type 19 is a persistent occupant, not a live shot")
+        self.assertFalse(native.active_projectile_count(
+            _slot(typ=20, remaining=0, flags=0x00)),
+            "type 20 is a persistent occupant, not a live shot")
+        self.assertFalse(native.active_projectile_count(
+            _slot(typ=28, remaining=0, flags=0x02)),
+            "type 28 is a persistent occupant, not a live shot")
+        self.assertTrue(native.active_projectile_count(
+            _slot(typ=13, remaining=-2, flags=0x00)),
+            "a landed rock with remaining distance is still live")
+        self.assertTrue(native.active_projectile_count(
+            _slot(typ=13, remaining=0, flags=0x04)),
+            "a detonating rock is live by flag 0x04")
+
+    def test_human07_impact_sprite_is_live_from_birth(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/playtest-explorer/commanded/attack-ground-1/00.bnefx"
+        )
+        self.assertTrue(fixture.is_file(),
+                        "authenticated Human 7 attack-ground fixture")
+        counts = native.projectile_counts_by_cycle(fixture)
+        self.assertGreater(len(counts), 0, "the sealed fixture has AUXL cycles")
+        self.assertEqual(1, counts[33],
+                         "the eastern rock is still occupying the pool")
+        self.assertEqual(1, counts[34],
+                         "retail replaces that rock with a type-21 impact "
+                         "sprite on the same cycle")
+        self.assertEqual(1, counts[47],
+                         "the impact sprite stays allocated through its "
+                         "final visible hold")
+        self.assertEqual(0, counts[48],
+                         "FREE on the next cycle empties the live pool")
+        born = [
+            item for item in native.projectile_states_by_cycle(fixture).get(34, [])
+            if item.get("type_code") == 21 and item.get("present")
+        ]
+        self.assertEqual(1, len(born),
+                         "cycle 34's live occupant is the impact sprite")
+        self.assertIsNone(born[0]["source_id"],
+                          "Human 7's impact has no source pointer")
+        self.assertEqual((432, 2096), (born[0]["x"], born[0]["y"]),
+                         "the impact sits on the rock's last pixel")
+        self.assertEqual(0, born[0]["remaining"],
+                         "type 21 remaining is 0 from birth")
+
+    def test_human13_impact_is_live_before_flag_04(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/combat-lifecycle/native/combat-ranged-human13-1800.bnefx"
+        )
+        self.assertTrue(fixture.is_file(), "authenticated Human 13 ranged fixture")
+        counts = native.projectile_counts_by_cycle(fixture)
+        self.assertEqual(0, counts[1],
+                         "types 19/20/28 occupy the pool from cycle 1 "
+                         "and are not live shots")
+        born = [
+            item for item in native.projectile_states_by_cycle(fixture).get(35, [])
+            if item.get("type_code") == 21 and item.get("present")
+        ]
+        self.assertEqual(1, len(born),
+                         "Human 13's type-21 impact is live at birth, "
+                         "two cycles before flag 0x04")
+        self.assertEqual((3984, 968), (born[0]["x"], born[0]["y"]),
+                         "the impact sits on catapult 1479's last rock pixel")
+        self.assertEqual(0, born[0]["remaining"],
+                         "type 21 remaining is 0 from birth")
 
     def test_native_adapter_refuses_a_mismatched_command_stream(self):
         self.assertTrue(COMMANDED.is_file(), "authenticated Orc 1 move fixture")

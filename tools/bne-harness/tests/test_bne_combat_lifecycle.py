@@ -327,6 +327,68 @@ class CombatLifecycleTest(unittest.TestCase):
             defender=20, issue_cycle=5, evidence_sha256="h" * 64)
         self.assertNotIn("splash-damage", {row["phase"] for row in lonely})
 
+    def test_an_unreported_impact_sprite_breaks_the_causal_prefix(self):
+        # Human 7's rock leaves at 34 and a type-21 sprite occupies the
+        # pool on that same cycle. Hiding the sprite makes missile_count
+        # and the projectile prefix diverge even when the rock's removal
+        # cycle already matches.
+        def result(side, include_impact=True):
+            events = []
+            for cycle in range(12, 36):
+                count = 1 if cycle < 34 or include_impact else 0
+                events.extend([
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 10,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 9, "y": 65, "offset_x": 288, "offset_y": 2080,
+                     "order": "ATTACK_GROUND", "hit_points": 110,
+                     "target_id": None, "missile_count": count},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 20,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 15, "y": 65, "offset_x": 480, "offset_y": 2080,
+                     "order": "STILL", "hit_points": 60,
+                     "target_id": None, "missile_count": count},
+                ])
+            events.extend([
+                {"cycle": 13, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": True,
+                 "source_id": 10, "target_id": None, "type_code": 13,
+                 "x": 300, "y": 2080, "remaining": 96},
+                {"cycle": 14, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": True,
+                 "source_id": 10, "target_id": None, "type_code": 13,
+                 "x": 308, "y": 2080, "remaining": 88},
+                {"cycle": 34, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": False,
+                 "source_id": 10, "target_id": None, "type_code": 13,
+                 "x": 432, "y": 2096, "remaining": -2},
+            ])
+            if include_impact:
+                events.append({
+                    "cycle": 34, "kind": "combat-projectile",
+                    "projectile_id": "impact", "present": True,
+                    "source_id": None, "target_id": None, "type_code": 21,
+                    "x": 432, "y": 2096, "remaining": 0,
+                })
+            return {"side": side, "events": events}
+
+        matched = combat.derive_rows(
+            result("native"), result("java"), encounter="siege",
+            stance="attack-ground", attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="i" * 64)
+        self.assertTrue({row["phase"]: row for row in matched}[
+            "impact"]["causal_order_exact"])
+
+        hidden = combat.derive_rows(
+            result("native", include_impact=False), result("java"),
+            encounter="siege", stance="attack-ground", attacker=10,
+            defender=20, issue_cycle=5, evidence_sha256="j" * 64)
+        impact = {row["phase"]: row for row in hidden}["impact"]
+        self.assertTrue(impact["exact"],
+                        "the rock still leaves on both sides at 34")
+        self.assertFalse(impact["causal_order_exact"],
+                         "hiding type 21 empties native's pool while Java "
+                         "still holds the impact sprite")
+
 
 if __name__ == "__main__":
     unittest.main()

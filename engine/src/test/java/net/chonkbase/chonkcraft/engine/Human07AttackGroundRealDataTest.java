@@ -69,6 +69,60 @@ class Human07AttackGroundRealDataTest {
                         + " pending " + catapult.pendingRotation());
     }
 
+    @Test
+    @DisplayName("human 7's eastern rock leaves a type-21 impact on fixture 34")
+    void human7sEasternRockLeavesAType21ImpactOnFixture34() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level07h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 7 is not in the pack");
+        World world = mission.world();
+        List<UnitType> roster = List.copyOf(data.unitTypes().types().values());
+        CommandApplier applier = new CommandApplier(world, roster);
+        data.configureCommands(applier);
+
+        Unit catapult = unitAt(world, "unit-catapult", 9, 65);
+        assertNotNull(catapult, "Human 7 has no catapult on 9,65");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 34; fixture++) {
+            if (fixture == 5) {
+                assertTrue(applier.apply(GameCommand.attackGround(
+                        0, catapult.id(), 13, 65)),
+                        "the eastern ground click must be accepted");
+            }
+            mission.tick();
+        }
+
+        int rocks = 0;
+        int impacts = 0;
+        for (Missile missile : world.missiles()) {
+            if (!world.battleNetProjectileConstructed(missile)
+                    || missile.type() == null) {
+                continue;
+            }
+            if ("missile-catapult-rock".equals(missile.type().ident())
+                    && missile.source() == catapult) {
+                rocks++;
+            }
+            if ("missile-impact".equals(missile.type().ident())) {
+                impacts++;
+                assertEquals(432, Math.round(missile.x()),
+                        "the impact sits on the rock's last pixel");
+                assertEquals(2096, Math.round(missile.y()),
+                        "the impact sits on the rock's last pixel");
+            }
+        }
+        assertEquals(0, rocks,
+                "the eastern rock has already left the pool at fixture 34");
+        assertEquals(1, impacts,
+                "retail replaces that rock with a type-21 impact sprite");
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null

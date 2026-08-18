@@ -284,11 +284,12 @@ cell is not causal-exact. Splash has no second observed HP drop on the
 impact cycle.
 
 Human 7 catapult 1519's eastern Attack Ground click is certified at acquire
-c9, projectile-create c13 and projectile-flight c14. Native opens the Attack
-program while the piece is still face 7; Java used to hold the cursor at -1
-until leftover rotation fell below 30 and constructed at 44. Impact is exact
-at c34 but the impact sprite still differs in the pool count. That is
-**19/185 certified**, not a claim that combat as a whole is complete.
+c9, projectile-create c13, projectile-flight c14 and impact c34. Type 21 is
+live from occupancy until FREE: remaining is 0 for the whole hold, and flag
+`0x04` is not the live bit -- Human 13 sets it two cycles after birth, and
+Human 7 never sets it. Counting only remaining-distance or `0x04` hid that
+sprite. Splash has no second observed HP drop on the impact cycle. That is
+**20/185 certified**, not a claim that combat as a whole is complete.
 
 Native projectile receipts now carry the constructor cycle, source slot and
 fixed-pool slot. The adapter combines that authenticated source pointer with
