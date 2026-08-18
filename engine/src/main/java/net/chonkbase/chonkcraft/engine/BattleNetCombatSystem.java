@@ -4010,16 +4010,20 @@ final class BattleNetCombatSystem {
         // rather than mid-windup. Without this re-arm Java walks OP0 into
         // windup one visit early and the splash lands on 1927.
         //
-        // Ranged free-scan only on the OP0 fire visit (timer 1). XHuman 10
-        // archer 98 free-scans 80,89 → 80,87 at fixture 23, re-arms timer 3,
-        // then seals timer 63 on the next OP0. Scanning every mid-wait tick
-        // retargeted early and shifted the async stream. Melee keeps the
-        // broader timer>0 window (Human 13 knight 1490).
+        // Ranged free-scan on the OP0 fire visit (timer 1) or the dest-arm
+        // leftover residual-open that just installed construction timer 3.
+        // Human 13 axe 1483 lands that residual and names the wise-man on
+        // the same visit native opens Attack@887/3; waiting for timer 1
+        // re-armed construction and delayed the axe three cycles (99 vs 102).
+        // Scanning every mid-wait tick still retargets early (XHuman 10
+        // archer 98). Melee keeps the broader timer>0 window (Human 13
+        // knight 1490).
         boolean rangedOp0 = unit.type() != null
                 && unit.type().maxAttackRange() > 1
                 && unit.type().firesMissile();
         boolean freeScanWindow = unit.battleNetAnimationTimer() > 0
-                && (!rangedOp0 || unit.battleNetAnimationTimer() == 1);
+                && (!rangedOp0 || unit.battleNetAnimationTimer() == 1
+                        || resumedFromMove);
         if (attackStart >= 0
                 && offset == attackStart
                 && freeScanWindow
@@ -4036,23 +4040,36 @@ final class BattleNetCombatSystem {
                     && candidate.isAlive()
                     && world.targets.inAttackRange(unit, candidate)) {
                 setAutoTarget(unit, candidate);
-                unit.setBattleNetSequenceOffset(attackStart);
-                unit.setBattleNetAnimationTimer(3);
                 world.turnToTarget(unit, candidate, 0, 0);
-                // Ranged post-retarget OP0 stalls like approach+resume.
+                // Construction-open retarget keeps the 3,2,1 countdown.
+                // Re-arming timer 3 here is only for a true OP0 fire visit.
+                boolean restartConstruction = !rangedOp0
+                        || (unit.battleNetAnimationTimer() == 1
+                                && !resumedFromMove);
+                if (restartConstruction) {
+                    unit.setBattleNetSequenceOffset(attackStart);
+                    unit.setBattleNetAnimationTimer(3);
+                }
                 if (rangedOp0) {
                     unit.setBattleNetAttackResumeFromMove(true);
                     unit.setBattleNetAttackOp0OutOfRange(true);
-                    unit.setBattleNetRangedFreeScanHoldPending(true);
+                    if (restartConstruction) {
+                        unit.setBattleNetRangedFreeScanHoldPending(true);
+                    }
                 }
                 if (World.BNE_IDLE_TRACE) {
                     System.err.printf("JBNEATTACKOP0RETARGET cycle=%d unit=%d "
-                                    + "from=%d to=%d timer=3 ranged=%d%n",
+                                    + "from=%d to=%d timer=%d restart=%d "
+                                    + "ranged=%d%n",
                             world.cycle, unit.id(),
                             sequenceTarget.id(), candidate.id(),
+                            unit.battleNetAnimationTimer(),
+                            restartConstruction ? 1 : 0,
                             rangedOp0 ? 1 : 0);
                 }
-                return false;
+                if (restartConstruction) {
+                    return false;
+                }
             }
         }
         BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,

@@ -194,4 +194,103 @@ class RangedOp0FreeScanRetargetHoldTest {
                 "presentation during post-retarget hold must not launch an "
                         + "arrow while the sequence is still on attack-start");
     }
+
+    @Test
+    @DisplayName("a dest-arm residual free-scan keeps the construction timer")
+    void aDestArmResidualFreeScanKeepsTheConstructionTimer() throws Exception {
+        // Human 13 axe 1483 lands dest-arm leftover and names the wise-man
+        // on the Attack@887/3 open. Re-arming construction there delayed
+        // the first axe from fixture 99 to 102.
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                9, BattleNetSequence.ATTACK_ANIMATION);
+        int moveStart = sequence.sequenceStart(
+                9, BattleNetSequence.MOVE_ANIMATION);
+        assumeTrue(attackStart == 887,
+                "retail axe Attack must start at script offset 887");
+        assumeTrue(moveStart >= 0, "retail axe Move sequence must resolve");
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(axethrower(), 0, 12, 12);
+        Unit first = world.createUnit(grunt(), 1, 8, 16);
+        Unit second = world.createUnit(grunt(), 1, 8, 14);
+        assumeTrue(attacker != null && first != null && second != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, first),
+                "axe must accept the first attack order");
+
+        attacker.setChasing(true);
+        attacker.setFighting(false);
+        attacker.clearPath();
+        attacker.setBattleNetSequenceOffset(moveStart + 4);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetAttackResumeFromMove(false);
+        attacker.setBattleNetAttackOp0OutOfRange(false);
+
+        int guard = 0;
+        int constructionVisits = 0;
+        boolean sawConstruction = false;
+        while (attacker.battleNetAnimationTimer() != 63 && guard++ < 16) {
+            world.tick();
+            if (attacker.battleNetSequenceOffset() == attackStart
+                    && attacker.battleNetAnimationTimer() >= 1
+                    && attacker.battleNetAnimationTimer() <= 3
+                    && attacker.target() != null) {
+                sawConstruction = true;
+                constructionVisits++;
+            }
+        }
+        assertTrue(sawConstruction,
+                "dest-arm residual must open Attack construction");
+        assertTrue(constructionVisits <= 3,
+                "naming a new quarry on the construction-open visit must "
+                        + "keep the 3,2,1 countdown, not restart it; "
+                        + "visits=" + constructionVisits);
+        assertEquals(attackStart, attacker.battleNetSequenceOffset(),
+                "post-residual OP0 must remain on attack-start");
+        assertEquals(63, attacker.battleNetAnimationTimer(),
+                "native Human 13 axe 1483 seals timer 63 three visits after "
+                        + "the dest-arm residual opens Attack");
+        assertNotEquals(first, attacker.target(),
+                "the construction-open free-scan must name the other grunt");
+    }
+
+    private static UnitType axethrower() {
+        UnitType type = new UnitType("unit-axethrower");
+        type.setTileSize(1, 1);
+        type.setBoxSize(36, 36);
+        type.setHitPoints(40);
+        type.setSpeed(10);
+        type.setLandUnit(true);
+        type.setCanAttack(true);
+        type.setCanTargetLand(true);
+        type.setBasicDamage(3);
+        type.setPiercingDamage(6);
+        type.setMaxAttackRange(4);
+        type.setSightRange(5);
+        type.setReactRangeComputer(7);
+        type.setReactRangePerson(5);
+        type.setNumDirections(8);
+        type.setMissile("missile-axe");
+        AnimationSet set = new AnimationSet("axe");
+        set.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        set.put(AnimationSet.State.MOVE, Animation.parse("move", List.of(
+                "unbreakable begin", "frame 0", "move 16", "wait 1",
+                "frame 5", "move 16", "unbreakable end", "wait 1")));
+        set.put(AnimationSet.State.ATTACK, Animation.parse("attack", List.of(
+                "unbreakable begin", "frame 25", "wait 3", "frame 30", "wait 3",
+                "frame 35", "wait 3", "frame 40", "attack", "wait 12",
+                "frame 0", "wait 52", "unbreakable end", "wait 1")));
+        type.setAnimationSet(set);
+        return type;
+    }
 }

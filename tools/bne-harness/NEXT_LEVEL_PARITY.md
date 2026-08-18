@@ -281,9 +281,12 @@ axe never throws through fixture 42. The next chip was melee: ogre 1491
 dest-arms leftover onto 118,27, free-scans onto knight 1493, and native
 parks Attack@643 with construction 3 then bodyWaitSum-1 (23) so the
 first blow is fixture 76. Java used to walk that OP0 and land eight
-damage at 53. Death is still 214 vs 226 and free is 1520 vs 1532, so
-those two ranged cells stay open. Chase is not observed -- the thrower
-is already in range.
+damage at 53. The next live-shot gap was dest-arm axe 1483: native names
+the wise-man on the Attack@887/3 open and throws at fixture 99. Java
+waited for the later OP0 fire visit, re-armed construction, and threw
+at 102. Death is still 214 vs 226 and free is 1520 vs 1532, so those two
+ranged cells stay open. Chase is not observed -- the thrower is already
+in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.
