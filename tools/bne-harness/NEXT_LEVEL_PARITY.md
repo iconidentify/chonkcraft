@@ -281,8 +281,14 @@ Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5 and projectile-flight c6. Impact is exact
 at c35 but the struck knight's dest-arm tile still differs at c29, so that
 cell is not causal-exact. Splash has no second observed HP drop on the
-impact cycle. That is **16/185 certified**, not a claim that combat as a
-whole is complete.
+impact cycle.
+
+Human 7 catapult 1519's eastern Attack Ground click is certified at acquire
+c9, projectile-create c13 and projectile-flight c14. Native opens the Attack
+program while the piece is still face 7; Java used to hold the cursor at -1
+until leftover rotation fell below 30 and constructed at 44. Impact is exact
+at c34 but the impact sprite still differs in the pool count. That is
+**19/185 certified**, not a claim that combat as a whole is complete.
 
 Native projectile receipts now carry the constructor cycle, source slot and
 fixed-pool slot. The adapter combines that authenticated source pointer with

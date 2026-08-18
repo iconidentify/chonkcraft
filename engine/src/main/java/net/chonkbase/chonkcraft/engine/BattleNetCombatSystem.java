@@ -2326,26 +2326,17 @@ final class BattleNetCombatSystem {
             return;
         }
 
-        // A fresh coordinate attack turns before entering the firing program.
-        // A slow siege turn is itself an unbreakable animation; leave the
-        // native cursor unopened until that branch releases, or opcode ten
-        // would throw the rock while the catapult was still facing away.
+        // Human 07 catapult 1519 is still face 7 (NW) when native opens
+        // Attack at fixture 9 (seq 503 timer 3). It snaps to face 2 at 12
+        // and constructs at 13. Calling TurnToTarget first wrote R=72 and
+        // held the cursor at -1 until leftover rotation fell below 30, so
+        // the rock was born at 44. The Attack program owns the facing snap;
+        // do not pre-aim or gate the cursor on Anim.Rotate.
         AnimationRunner.Step presentation = null;
         if (unit.battleNetSequenceOffset() < 0) {
             if (unit.animation().current() != attack) {
-                world.turnToTarget(unit, null, toX, toY);
-                int afterOneTurnBeat = Math.max(0,
-                        Math.abs(unit.pendingRotation())
-                                - Math.max(0, unit.type().rotationSpeed()));
-                boolean turnBranch = afterOneTurnBeat >= 30;
-                if (!turnBranch) {
-                    openBattleNetGroundAttack(unit);
-                }
+                openBattleNetGroundAttack(unit);
                 unit.animation().switchTo(attack);
-                presentation = world.advance(unit);
-                if (turnBranch) {
-                    return;
-                }
             }
             int attackBody = attack.labelIndex("go");
             boolean stillInTurnBranch = unit.animation().unbreakable()

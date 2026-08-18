@@ -161,6 +161,11 @@ class BattleNetSiegeCadenceTest {
     @Test
     @DisplayName("a siege engine completes its slow turn before attack-ground opcode ten")
     void attackGroundWaitsForTheRetailSiegeTurn() {
+        // Human 07 1519 opens Attack while still face 7 and constructs at
+        // fixture 13. The old R>=30 cursor gate delayed that rock to 44.
+        // A west-facing ground click therefore uses the same program beat
+        // as a pre-aligned one; the script snaps facing, it does not hold
+        // the native cursor at -1.
         Fixture fixture = fixture();
         Unit catapult = place(fixture, "unit-catapult", 0, 10, 10);
         catapult.setDirection(net.chonkbase.chonkcraft.engine.missile.Missile
@@ -171,10 +176,9 @@ class BattleNetSiegeCadenceTest {
         List<Integer> shots = shotCycles(
                 fixture.world(), "missile-catapult-rock", 80);
 
-        assertEquals(1, shots.size());
-        assertTrue(shots.get(0) >= 35,
-                "opcode ten fired at " + shots.get(0)
-                        + " while the 30-cycle turn animation still owned the unit");
+        assertEquals(List.of(4), shots,
+                "attack-ground must open the Attack program on the first "
+                        + "visit the way Human 07 does, not wait out Anim.Rotate");
     }
 
     @Test
