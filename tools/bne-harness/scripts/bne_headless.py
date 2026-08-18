@@ -253,7 +253,42 @@ def run(args: argparse.Namespace) -> int:
     normalized = normalize_output_ownership(args, root, container_output)
     if normalized != 0:
         return normalized
+    expected_applied = getattr(args, "require_commands_applied", None)
+    expected_rejected = getattr(args, "require_commands_rejected", None)
+    if result.returncode == 0 and (expected_applied is not None
+            or expected_rejected is not None):
+        validate_command_outcomes(
+            host_output / f"{args.case_id}.manifest.json",
+            expected_applied,
+            expected_rejected,
+        )
     return result.returncode
+
+
+def validate_command_outcomes(manifest_path: Path,
+        expected_applied: int | None, expected_rejected: int | None) -> None:
+    """Fail a diagnostic run whose injected command did not take effect.
+
+    Rejected commands are valid evidence when a refusal is the subject, so
+    this is opt-in and checks exact declared counts.  Diagnostic callers that
+    intend an accepted order should always request ``applied=1,rejected=0``.
+    """
+    if not manifest_path.is_file():
+        raise RuntimeError(f"missing run manifest: {manifest_path}")
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    validation = payload.get("run", {}).get("validation", {})
+    actual_applied = validation.get("commands_applied")
+    actual_rejected = validation.get("commands_rejected")
+    if expected_applied is not None and actual_applied != expected_applied:
+        raise RuntimeError(
+            "native command outcome mismatch: expected "
+            f"{expected_applied} applied, observed {actual_applied!r}"
+        )
+    if expected_rejected is not None and actual_rejected != expected_rejected:
+        raise RuntimeError(
+            "native command outcome mismatch: expected "
+            f"{expected_rejected} rejected, observed {actual_rejected!r}"
+        )
 
 
 def _wait_for_file(path: Path, timeout: float) -> None:
@@ -856,6 +891,14 @@ def parser() -> argparse.ArgumentParser:
     run_parser.add_argument(
         "--commands", type=Path,
         help="cycle-sorted command script that must stay below --oracle-root",
+    )
+    run_parser.add_argument(
+        "--require-commands-applied", type=int,
+        help="fail unless the sealed manifest reports this exact applied count",
+    )
+    run_parser.add_argument(
+        "--require-commands-rejected", type=int,
+        help="fail unless the sealed manifest reports this exact rejected count",
     )
     run_parser.add_argument("--trace-internal-orders", action="store_true")
     run_parser.add_argument("--trace-ai-build-state", action="store_true",

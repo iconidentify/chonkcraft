@@ -364,7 +364,16 @@ final class BattleNetCombatSystem {
                     // fixture (Human 13 ogre 1511: native 119,27 at 118).
                     unit.animation().clearCurrent();
                 }
-                unit.setBattleNetAttackWrapDestArmPending(false);
+                // Keep the wrap marker across the leftover itself.  Retail
+                // already paid Attack's construction 3,2,1 before asking
+                // for this route; when the leftover lands in range it
+                // enters the attack body immediately.  Clearing the marker
+                // here made the generic Move->Attack seam charge the same
+                // construction a second time (Human 13 ogre 1511: native
+                // Attack@644 on fixture 130, Java stayed on 643/3,2,1).
+                if (!wrapDestArm || unit.pathLength() == 0) {
+                    unit.setBattleNetAttackWrapDestArmPending(false);
+                }
             }
             Unit offered = unit.offeredTarget();
             if (!offered.isAlive() || offered.isDying() || !offered.isOnMap()) {
@@ -695,14 +704,31 @@ final class BattleNetCombatSystem {
                 int leftoverAttackStart = world.idle.battleNetSequenceStart(unit,
                         BattleNetSequence.ATTACK_ANIMATION);
                 if (leftoverAttackStart >= 0) {
+                    boolean paidWrapConstruction =
+                            unit.battleNetAttackWrapDestArmPending();
                     unit.setBattleNetSequenceOffset(leftoverAttackStart);
-                    unit.setBattleNetAnimationTimer(3);
+                    unit.setBattleNetAnimationTimer(
+                            paidWrapConstruction ? 1 : 3);
+                    if (paidWrapConstruction) {
+                        unit.setBattleNetAttackWrapDestArmPending(false);
+                    }
                     AnimationSet set = unit.type() == null
                             ? null : unit.type().animationSet();
                     Animation attack = set == null
                             ? null : set.get(AnimationSet.State.ATTACK);
                     if (attack != null && unit.animation().current() != attack) {
                         unit.animation().switchTo(attack);
+                    }
+                    if (paidWrapConstruction) {
+                        // The native Move completion returns through the
+                        // already-open Attack OP0 in this same scheduler
+                        // visit.  Let the ordinary sequence interpreter run
+                        // that marker now so all target, hold and SyncRand
+                        // side effects remain centralized.  Merely parking
+                        // at attackStart/1 inserted an otherwise impossible
+                        // extra cycle before the body (Human 13 ogre 1511:
+                        // native 644/1 at fixture 130, Java 643/1).
+                        stepBattleNetAttackSequence(unit);
                     }
                     return;
                 }
@@ -1793,9 +1819,9 @@ final class BattleNetCombatSystem {
                     && (!onPreOp10Wait || allowPreOp10Collapse)) {
                 attacker.setBattleNetAnimationTimer(1);
                 Unit pend = world.battleNetPendingMeleeHits.remove(attacker);
-                if (pend != null && pend.isAlive()) {
-                    world.battleNetNativeMeleeDamage.add(attacker);
-                    applyDamage(attacker, pend, 1);
+                if (pend != null && (pend.isAlive()
+                        || pend.order() == Unit.Order.DYING)) {
+                    applyBattleNetSequenceMeleeDamage(attacker, pend);
                     // This is the blow for the current sequence. OP10 still
                     // must not strike again.
                     attacker.setBattleNetSequenceMeleeLanded(true);
@@ -4049,14 +4075,42 @@ final class BattleNetCombatSystem {
                 && sequenceTarget != null
                 && sequenceTarget.isAlive()
                 && world.targets.inAttackRange(unit, sequenceTarget);
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        // A ranged approach hold is a committed pause, not permission to
+        // finish the rest of the attack body against empty air.  Human 13
+        // axethrower 1505 seals Attack@887/63 while knight 1493 is in range.
+        // The knight walks away during that pause; on the 887/1 visit retail
+        // changes directly to Move@833 and takes its next chase step.  Java
+        // had cleared chasing when it armed the hold, so it walked offsets
+        // 888..900 for ten extra cycles before noticing the same distance.
+        boolean rangedHoldExpiredOutOfRange = unit.battleNetAttackResumeHoldActive()
+                && attackStart >= 0
+                && unit.battleNetSequenceOffset() == attackStart
+                && unit.battleNetAnimationTimer() == 1
+                && unit.type() != null
+                && unit.type().firesMissile()
+                && sequenceTarget != null
+                && sequenceTarget.isAlive()
+                && !settledInRange;
+        if (rangedHoldExpiredOutOfRange) {
+            // Keep ResumeHoldActive across this one chase leg. It records
+            // that the committed hold has been paid; the in-range OP0 after
+            // arrival must enter the firing body instead of charging 63
+            // cycles again. The ordinary action-marker cleanup below clears
+            // it once that OP0 has advanced.
+            unit.setBattleNetRangedFreeScanHoldActive(false);
+            unit.setBattleNetRangedFreeScanHoldPending(false);
+            unit.setBattleNetAttackOp0OutOfRange(true);
+            unit.setFighting(false);
+            unit.setChasing(true);
+        }
         if ((unit.chasing() && !chaseDecision && !completedMeleeArrival
                 && !settledInRange)
                 || unit.isMoving()) {
             return false;
         }
         int offset = unit.battleNetSequenceOffset();
-        int attackStart = world.idle.battleNetSequenceStart(unit,
-                BattleNetSequence.ATTACK_ANIMATION);
         int moveStart = world.idle.battleNetSequenceStart(unit,
                 BattleNetSequence.MOVE_ANIMATION);
         // In-range and settled (chase flag optional): the Attack program owns
@@ -4070,14 +4124,19 @@ final class BattleNetCombatSystem {
         boolean resumedFromMove = false;
         if (standingInRange && attackStart >= 0 && moveStart >= 0
                 && offset >= moveStart && offset < attackStart) {
+            boolean paidWrapConstruction =
+                    unit.battleNetAttackWrapDestArmPending();
             offset = attackStart;
             unit.setBattleNetSequenceOffset(offset);
-            unit.setBattleNetAnimationTimer(3);
+            unit.setBattleNetAnimationTimer(paidWrapConstruction ? 1 : 3);
             // Human 13 axe 1483 re-enters Attack from the Move body then
             // stalls on the opening OP0 (timer 63). Mark the resume so the
             // next in-range OP0 can match that pre-fire hold.
-            resumedFromMove = true;
-            unit.setBattleNetAttackResumeFromMove(true);
+            resumedFromMove = !paidWrapConstruction;
+            unit.setBattleNetAttackResumeFromMove(!paidWrapConstruction);
+            if (paidWrapConstruction) {
+                unit.setBattleNetAttackWrapDestArmPending(false);
+            }
         }
         if (completedMeleeArrival && offset != attackStart) {
             if (attackStart < 0) {
@@ -4334,6 +4393,7 @@ final class BattleNetCombatSystem {
                 && attackStart >= 0
                 && offset == attackStart
                 && unit.battleNetAttackResumeFromMove()
+                && !unit.battleNetAttackResumeHoldActive()
                 && unit.type() != null
                 && unit.type().firesMissile()
                 && unit.canMove()) {
@@ -4453,9 +4513,9 @@ final class BattleNetCombatSystem {
                         "inline-op10", queued);
             }
             if (meleeTarget != null) {
-                if (meleeTarget.isAlive()) {
-                    world.battleNetNativeMeleeDamage.add(unit);
-                    applyDamage(unit, meleeTarget, 1);
+                if (meleeTarget.isAlive()
+                        || meleeTarget.order() == Unit.Order.DYING) {
+                    applyBattleNetSequenceMeleeDamage(unit, meleeTarget);
                 }
             } else if (shot != null) {
                 // Presentation may already have spent constructor draws;
@@ -4482,11 +4542,12 @@ final class BattleNetCombatSystem {
                 // those blows and kept knight 1500 alive past fixture 97.
                 unit.setBattleNetMultiLeftoverMelee(false);
                 Unit sequenceVictim = unit.target();
-                if (sequenceVictim != null && sequenceVictim.isAlive()
+                if (sequenceVictim != null
+                        && (sequenceVictim.isAlive()
+                                || sequenceVictim.order() == Unit.Order.DYING)
                         && !unit.isMoving()
                         && world.targets.inAttackRange(unit, sequenceVictim)) {
-                    world.battleNetNativeMeleeDamage.add(unit);
-                    applyDamage(unit, sequenceVictim, 1);
+                    applyBattleNetSequenceMeleeDamage(unit, sequenceVictim);
                     // Block a later presentation hit for this same swing.
                     unit.setBattleNetSequenceMeleeLanded(true);
                 } else {
@@ -4592,5 +4653,27 @@ final class BattleNetCombatSystem {
         unit.setBattleNetSequenceOffset(world.idle.battleNetSequenceStart(unit,
                 BattleNetSequence.ATTACK_ANIMATION));
         unit.setBattleNetAnimationTimer(3);
+    }
+
+    /**
+     * Completes retail script.bin opcode ten for a melee swing.
+     *
+     * <p>A target that entered Die after the swing was committed is no longer
+     * hittable, but BNE still calls {@code FUN_00418370} at opcode ten.  The
+     * returned damage is discarded.  This matters because that helper owns an
+     * asynchronous RNG draw: Human 13 has three independent late attackers on
+     * dying knight 1500 (slots 1501, 1519 and 1507).  Cancelling those swings
+     * reassigned every later damage roll in every fight on the map.</p>
+     */
+    private void applyBattleNetSequenceMeleeDamage(Unit attacker, Unit target) {
+        world.battleNetNativeMeleeDamage.add(attacker);
+        if (!target.isAlive()) {
+            int discarded = world.damageFor(attacker, target, 1, null);
+            world.causalTrace.event(world.cycle, "combat.damage.discarded",
+                    target.id(), "attacker", attacker.id(), "target", target.id(),
+                    "damage", discarded, "reason", "target-dying");
+            return;
+        }
+        applyDamage(attacker, target, 1);
     }
 }

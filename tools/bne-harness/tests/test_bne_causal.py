@@ -64,6 +64,20 @@ class BneCausalTest(unittest.TestCase):
                          [event.kind for event in events])
         self.assertEqual(16838, events[1].fields["result"])
 
+    def test_mobile_damage_keeps_the_source_target_and_seed(self):
+        events = bne_causal.parse_native_trace(
+            "# bne-trace event=mobile-damage cycle=126 carrier=melee "
+            "source=1491 target=1493 source-type=0 target-type=6 "
+            "damage=7 hp-before=68 seed-before=4069355774 "
+            "seed-after=117557399\n"
+        )
+        self.assertEqual(1, len(events))
+        self.assertEqual("combat.damage", events[0].kind)
+        self.assertEqual("source:1491", events[0].subject)
+        self.assertEqual(1493, events[0].fields["target"])
+        self.assertEqual(7, events[0].fields["damage"])
+        self.assertEqual(4069355774, events[0].fields["seed-before"])
+
     def test_packet_observations_report_field_difference(self):
         packet = {"semantic": {"24": {"focus": [{
             "native_slot": 17, "java_id": 3,

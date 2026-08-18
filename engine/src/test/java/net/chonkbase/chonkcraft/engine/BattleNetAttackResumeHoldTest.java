@@ -262,6 +262,78 @@ class BattleNetAttackResumeHoldTest {
     }
 
     @Test
+    @DisplayName("an axe resumes chasing when its quarry leaves during the 63-cycle hold")
+    void anAxeResumesChasingWhenItsQuarryLeavesDuringTheHold()
+            throws Exception {
+        // Human 13 axe 1505: knight 1493 is in range when the hold opens at
+        // native cycle 28, but has left the four-square ring by cycle 90.
+        // Retail changes Attack@887/1 directly to Move@833 at cycle 91.
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                9, BattleNetSequence.ATTACK_ANIMATION);
+        int moveStart = sequence.sequenceStart(
+                9, BattleNetSequence.MOVE_ANIMATION);
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(axethrower(), 0, 10, 8);
+        Unit target = world.createUnit(prey(), 1, 12, 8);
+        assumeTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.orderAttack(attacker, target),
+                "axe must accept the in-range attack order");
+
+        attacker.setChasing(true);
+        attacker.setFighting(false);
+        attacker.clearPath();
+        attacker.setBattleNetSequenceOffset(moveStart + 4);
+        attacker.setBattleNetAnimationTimer(1);
+
+        int guard = 0;
+        while (attacker.battleNetAnimationTimer() != 63 && guard++ < 12) {
+            world.tick();
+        }
+        assertEquals(attackStart, attacker.battleNetSequenceOffset());
+        assertTrue(attacker.battleNetAttackResumeHoldActive());
+
+        // Five squares away: the first chase step lands back in range, just
+        // as native 1505's SW step at cycle 91 does.
+        target.setTile(15, 9);
+        for (int i = 0; i < 62; i++) {
+            world.tick();
+        }
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "the committed hold must be allowed to drain in full");
+        world.tick();
+
+        assertTrue(attacker.chasing(),
+                "the first visit after the hold must resume the chase");
+        assertTrue(attacker.battleNetSequenceOffset() >= moveStart
+                        && attacker.battleNetSequenceOffset() < attackStart,
+                "retail changes from Attack start directly into the Move body");
+
+        boolean enteredAttackBody = false;
+        for (int i = 0; i < 40; i++) {
+            world.tick();
+            assertTrue(attacker.battleNetAnimationTimer() != 63,
+                    "the hold was already paid before this chase leg; "
+                            + "arrival must not charge it a second time");
+            if (attacker.battleNetSequenceOffset() > attackStart) {
+                enteredAttackBody = true;
+                break;
+            }
+        }
+        assertTrue(enteredAttackBody,
+                "after its one-tile chase the axe must enter the firing body");
+    }
+
+    @Test
     @DisplayName("an already in-range axe walks the opening attack wait")
     void anAlreadyInRangeAxeWalksTheOpeningAttackWait() throws Exception {
         // Human 13's first commanded axe starts in range and must still

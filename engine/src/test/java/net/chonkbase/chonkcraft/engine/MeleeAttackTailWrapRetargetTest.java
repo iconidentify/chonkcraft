@@ -137,6 +137,16 @@ class MeleeAttackTailWrapRetargetTest {
         return -1;
     }
 
+    private static int firstOpcode(byte[] script, int start, int wanted) {
+        for (int cursor = start; cursor < start + 64 && cursor < script.length;
+                cursor++) {
+            if (Byte.toUnsignedInt(script[cursor]) == wanted) {
+                return cursor;
+            }
+        }
+        return -1;
+    }
+
     private static World armedWorld(byte[] script) {
         GameMap map = grass(32);
         World world = new World(map);
@@ -146,6 +156,40 @@ class MeleeAttackTailWrapRetargetTest {
         world.setBattleNetSequenceData(script);
         world.restoreRandom(1, 0);
         return world;
+    }
+
+    @Test
+    @DisplayName("an opcode-ten swing still spends its damage roll after the quarry starts dying")
+    void anOpcodeTenSwingStillRollsDamageAgainstADyingQuarry() throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        int opcodeTen = firstOpcode(script, attackStart, 10);
+        assumeTrue(opcodeTen >= 0, "ogre Attack must contain opcode ten");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 10);
+        Unit dying = world.createUnit(prey("unit-knight", 0x37), 1, 11, 10);
+        assertTrue(world.orderAttack(attacker, dying));
+        dying.setOrder(Unit.Order.DYING);
+        attacker.setTarget(dying);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(opcodeTen);
+        attacker.setBattleNetAnimationTimer(1);
+
+        int seedBefore = world.battleNetRandomSeed();
+        int hpBefore = dying.hitPoints();
+        world.tick();
+
+        assertNotEquals(seedBefore, world.battleNetRandomSeed(),
+                "retail spends FUN_00418370 even though HitUnit discards the"
+                        + " already-committed swing against Die");
+        assertEquals(hpBefore, dying.hitPoints(),
+                "a late swing may spend its roll but cannot damage the corpse");
+        assertEquals(Unit.Order.DYING, dying.order(),
+                "the discarded swing must not restart or replace Die");
     }
 
     @Test
@@ -213,6 +257,28 @@ class MeleeAttackTailWrapRetargetTest {
                 "dest-arm leftover remaining is one heading after the dest-arm");
         assertSame(next, attacker.target(),
                 "the dest-arm leftover still belongs to the wrap-named knight");
+
+        // The tail wrap already paid construction 3,2,1 before it asked for
+        // this leftover.  Once the residual settles in range, retail enters
+        // 644/1 directly; it does not charge another 643/3,2,1.  Human 13
+        // ogre 1511 is the full-corpus witness (native damage at fixture
+        // 137, formerly Java 140).
+        int guard = 0;
+        boolean repeatedConstruction = false;
+        while (attacker.isMoving() && guard++ < 24) {
+            world.tick();
+            if (!attacker.isMoving()
+                    && attacker.battleNetSequenceOffset() == attackStart
+                    && attacker.battleNetAnimationTimer() == 3) {
+                repeatedConstruction = true;
+            }
+        }
+        assertTrue(!repeatedConstruction,
+                "a tail-wrap leftover must not pay Attack construction twice");
+        assertEquals(attackStart + 1, attacker.battleNetSequenceOffset(),
+                "the paid tail-wrap leftover must cross OP0 on its arrival visit");
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "the first attack-body byte begins with the native timer");
     }
 
     @Test

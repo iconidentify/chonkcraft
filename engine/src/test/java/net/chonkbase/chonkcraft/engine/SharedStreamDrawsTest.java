@@ -63,27 +63,41 @@ class SharedStreamDrawsTest {
         type.setHitPoints(1);
         type.setIndestructible(true);
         type.setNumDirections(1);
+        type.setRevealer(true);
         return type;
     }
 
     @Test
-    @DisplayName("a unit that faces more than one way draws its opening heading")
-    void makingAUnitCostsAHeadingDraw() {
+    @DisplayName("an implementation-side death revealer costs no native async draw")
+    void makingADeathRevealerDoesNotDebitTheNativeStream() {
         World world = new World(grass(20));
 
-        int before = world.randomSeed();
-        world.createUnit(footman(), 0, 5, 5);
-        assertNotEquals(before, world.randomSeed(),
-                "CUnit::Init gives anything that faces more than one way a random opening"
-                        + " heading -- Direction = (SyncRand() >> 8) & 0xFF, unit.cpp:599-604"
-                        + " -- and the draw comes out of the shared stream");
+        int before = world.battleNetRandomSeed();
+        world.createUnit(revealer(), 1, 5, 6);
 
-        // A building has one construction direction and is excluded by name in
-        // the same condition, so it must not spend one.
-        int afterFootman = world.randomSeed();
+        assertEquals(before, world.battleNetRandomSeed(),
+                "the Java sight carrier spent a native construction draw even though the"
+                        + " authenticated Human 13 ledger has no constructor call when the"
+                        + " corresponding death vision appears");
+    }
+
+    @Test
+    @DisplayName("mobile and building constructors debit the native async stream")
+    void nativeConstructorsDebitTheirTypeSpecificDraws() {
+        World world = new World(grass(20));
+
+        long before = world.battleNetRandomDraws();
+        world.createUnit(footman(), 0, 5, 5);
+        assertEquals(before + 2, world.battleNetRandomDraws(),
+                "FUN_00451b50 gives a mobile its opening heading and idle timer");
+
+        // BNE buildings do not draw a heading. They draw one of six building
+        // animation variants and then their idle timer, also from the async
+        // stream.
+        long afterFootman = world.battleNetRandomDraws();
         world.createUnit(farm(), 0, 10, 10);
-        assertEquals(afterFootman, world.randomSeed(),
-                "a building drew a heading it has no use for");
+        assertEquals(afterFootman + 2, world.battleNetRandomDraws(),
+                "the building constructor did not debit variant plus timer");
     }
 
     @Test

@@ -514,9 +514,20 @@ ssh "$CHONKCRAFT_ORACLE_HOST" '
     --case-id diag-human13-unit1404 \
     --output output/diagnostics-move \
     --scenario "Campaign\\Human\\Human13.pud" \
-    --cycles 30 --seed 1 --trace-unit 1404
+    --cycles 30 --seed 1 --trace-unit 1404 \
+    --commands commands/human13-attack.txt \
+    --require-commands-applied 1 --require-commands-rejected 0
 '
 ```
+
+When a diagnostic is intended to exercise an accepted command, the two
+`--require-commands-*` assertions are mandatory. A sealed fixture can
+legitimately contain a rejected command (refusal parity needs those fixtures),
+so sealing alone does not prove that the requested attack, move, or harvest
+actually ran. The assertions inspect the sealed manifest and fail the command
+after capture if its exact applied/rejected counts differ. This prevents a
+valid native idle trace from being mistaken for evidence about a command that
+never reached a unit.
 
 Add a hook only at a guarded address in the pinned executable. Validate the
 original bytes before patching, log the return address/caller and before/after
@@ -2280,6 +2291,43 @@ retail-human-03-idle clean through 5  (must stay clean under critter gate)
 30. Critter phase-2 re-aim skips building-footprint goals so empty-FOUND Still
     lands on the third delayed visit (XOrc 2 1580 Still@7). Occupied walkable
     tiles still re-aim (Human 13 constructor marker).
+
+### Closed this pass (committed combat work is paid once)
+
+Three related delays were symptoms of the same native rule: once an Attack
+program commits work, changing range or losing the quarry does not make that
+work disappear or charge it a second time.
+
+- A committed melee opcode-10 visit still consumes its async damage roll when
+  the named target has entered DYING; retail discards the result instead of
+  damaging another target. Human 13 supplies three independent post-mortem
+  swing witnesses. Java now consumes and discards the same roll.
+- A ranged unit whose 63-cycle approach hold expires after the quarry has
+  walked out of range chases immediately and remembers that the hold was
+  paid. It does not walk the remaining empty Attack body or charge a second
+  63-cycle hold after the chase step. Human 13 axethrower 1505 now creates its
+  projectile at fixture 120 on both engines.
+- A melee Attack-tail wrap pays construction 3,2,1 before dest-arming the
+  leftover route. When that route lands in range, Move completion returns
+  through the already-open Attack OP0 in the same scheduler visit. Human 13
+  ogre 1511 is state-exact through the route and arrival: native and Java are
+  both Attack@644/1 on fixture 130 and consume seed 4005032846 for the damage
+  roll at fixture 137 in the same unit-pass position.
+
+The fixed-denominator 52-case score through cycle 200 moved from 1,344,470 to
+**1,344,591 of 1,369,366** paired unit-cycles in place (+121), and decision
+agreements moved from 1,325,538 to **1,325,609 of 1,331,620** (+71). Differing
+steps did not increase. The 52x1,800 semantic-v1 gate remained 8 clean / 44
+divergent with no earlier divergence; the final same-visit OP0 correction only
+touches Human 13, whose first semantic divergence remains cycle 39. The combat
+RNG/callsite ledger is now exact through fixture 160; the next independent
+causal mismatch is knight 1493's OP0 retarget/hold transition at fixture 161.
+
+Focused regressions:
+`BattleNetAttackResumeHoldTest`, `MeleeAttackTailWrapRetargetTest`,
+`Human13Ogre1511WrapDestArmRealDataTest`,
+`Human13OgreDestArmHoldRealDataTest`, and
+`RangedOp0FreeScanRetargetHoldTest`.
 
 ### In-progress/provisional code
 

@@ -1,5 +1,6 @@
 from pathlib import Path
 import argparse
+import json
 import sys
 import tempfile
 import unittest
@@ -56,6 +57,40 @@ class HeadlessOutputOwnershipTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "symbolic links"):
                 bne_headless.verify_output_ownership(
                     root, uid=status.st_uid, gid=status.st_gid)
+
+
+class HeadlessCommandOutcomeTest(unittest.TestCase):
+
+    def test_exact_applied_and_rejected_counts_pass(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "run.manifest.json"
+            manifest.write_text(json.dumps({
+                "run": {"validation": {
+                    "commands_applied": 1,
+                    "commands_rejected": 0,
+                }},
+            }), encoding="utf-8")
+            bne_headless.validate_command_outcomes(manifest, 1, 0)
+
+    def test_rejected_acceptance_diagnostic_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "run.manifest.json"
+            manifest.write_text(json.dumps({
+                "run": {"validation": {
+                    "commands_applied": 0,
+                    "commands_rejected": 1,
+                }},
+            }), encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "expected 1 applied"):
+                bne_headless.validate_command_outcomes(manifest, 1, 0)
+
+    def test_missing_outcome_fields_do_not_default_to_zero(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            manifest = Path(temporary) / "run.manifest.json"
+            manifest.write_text('{"run":{"validation":{}}}',
+                                encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "observed None"):
+                bne_headless.validate_command_outcomes(manifest, 0, 0)
 
 
 if __name__ == "__main__":

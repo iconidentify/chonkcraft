@@ -38,6 +38,7 @@ NATIVE_KIND = {
     "command-unit-state": "state.command-unit",
     "idle-dispatch": "animation.idle",
     "projectile-created": "projectile.create",
+    "mobile-damage": "combat.damage",
     "unit-build-candidate": "build.candidate",
     "unit-find-ai-wood": "resource.wood-search",
     "unit-ai-home-enter": "ai.home.enter",
@@ -109,7 +110,8 @@ def parse_fields(text: str) -> dict[str, Any]:
 
 
 def _subject(fields: dict[str, Any]) -> str | None:
-    for key in ("unit", "worker", "attacker", "tower", "ship", "player"):
+    for key in ("unit", "worker", "attacker", "source", "tower", "ship",
+                "player"):
         value = fields.get(key)
         if isinstance(value, (int, str)):
             return f"{key}:{value}"

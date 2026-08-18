@@ -20,6 +20,7 @@ typedef int (__cdecl *sync_random_function)(void);
 typedef int (__cdecl *async_random_function)(void);
 typedef void (__cdecl *idle_function)(BYTE *);
 typedef BYTE *(__cdecl *projectile_function)(BYTE *);
+typedef int (__cdecl *mobile_damage_function)(BYTE *);
 typedef void (__cdecl *give_order_function)(
         BYTE *, int, int, BYTE *, void *);
 typedef void (__cdecl *do_right_button_function)(
@@ -73,7 +74,10 @@ static BOOL trace_ai_build_state = FALSE;
 static BOOL trace_no_build = FALSE;
 static LONG trace_unit_slot = -1;
 static idle_function original_idle = NULL;
+/* Observation-only context while FUN_0040ad30 dispatches one unit. */
+static LONG active_idle_slot = -1;
 static projectile_function original_projectile = NULL;
+static mobile_damage_function original_mobile_damage = NULL;
 static give_order_function original_internal_give_order = NULL;
 static give_order_function original_give_order = NULL;
 static ai_home_function original_ai_home = NULL;
@@ -1691,7 +1695,10 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
     DWORD hostile_slot = 0xffffffffUL;
     DWORD auto_target_slot = 0xffffffffUL;
     int hostile_score = 0;
+    int auto_target_score = 0;
     unsigned int owner;
+    DWORD spatial_count;
+    DWORD spatial_index;
 
     if (trace_unit_slot < 0 || pool == NULL
             || (DWORD) trace_unit_slot >= pool_count || components == NULL
@@ -1783,6 +1790,10 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
         hostile_score = ((target_score_function) (void *)
                 BNE_202_TARGET_SCORE)((BYTE *) unit, (BYTE *) hostile);
     }
+    if (auto_target != NULL) {
+        auto_target_score = ((target_score_function) (void *)
+                BNE_202_TARGET_SCORE)((BYTE *) unit, (BYTE *) auto_target);
+    }
     if (depot != NULL && depot >= pool
             && depot < pool + pool_count * BNE_UNIT_BYTES
             && (DWORD) (depot - pool) % BNE_UNIT_BYTES == 0) {
@@ -1798,8 +1809,66 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
             && (DWORD) (auto_target - pool) % BNE_UNIT_BYTES == 0) {
         auto_target_slot = (DWORD) ((auto_target - pool) / BNE_UNIT_BYTES);
     }
+    spatial_count = *BNE_202_SPATIAL_UNIT_COUNT;
+    if (spatial_count > BNE_UNIT_LIMIT) {
+        spatial_count = BNE_UNIT_LIMIT;
+    }
+    for (spatial_index = 0; spatial_index < spatial_count; spatial_index++) {
+        const BYTE *entry = BNE_202_SPATIAL_UNITS[spatial_index];
+        DWORD entry_slot;
+        int pixel_delta;
+        int entry_score;
+        if (entry == NULL || entry < pool
+                || entry >= pool + pool_count * BNE_UNIT_BYTES
+                || (DWORD) (entry - pool) % BNE_UNIT_BYTES != 0) {
+            continue;
+        }
+        entry_slot = (DWORD) ((entry - pool) / BNE_UNIT_BYTES);
+        pixel_delta = (int) (short) read_word(entry, BNE_UNIT_PIXEL_Y)
+                - (int) (short) read_word(unit, BNE_UNIT_PIXEL_Y);
+        if (pixel_delta < -16 * 32 || pixel_delta > 16 * 32) {
+            continue;
+        }
+        entry_score = ((target_score_function) (void *)
+                BNE_202_TARGET_SCORE)((BYTE *) unit, (BYTE *) entry);
+        trace_write("# bne-trace event=unit-spatial-index cycle=%ld "
+                "unit=%ld index=%lu entry=%lu type=%u owner=%u hp=%u "
+                "pixel-x=%d pixel-y=%d tile-x=%u tile-y=%u "
+                "offset-y=%d removed=%u score=%d",
+                cycle, trace_unit_slot,
+                (unsigned long) spatial_index, (unsigned long) entry_slot,
+                (unsigned int) entry[BNE_UNIT_TYPE],
+                (unsigned int) entry[BNE_UNIT_OWNER],
+                (unsigned int) read_word(entry, BNE_UNIT_HP),
+                (int) (short) read_word(entry, BNE_UNIT_PIXEL_X),
+                (int) (short) read_word(entry, BNE_UNIT_PIXEL_Y),
+                (unsigned int) read_word(entry, BNE_UNIT_X),
+                (unsigned int) read_word(entry, BNE_UNIT_Y),
+                (int) (short) read_word(entry, BNE_UNIT_PIXEL_Y)
+                        - (int) read_word(entry, BNE_UNIT_Y) * BNE_TILE_PIXELS,
+                (unsigned int) (entry[BNE_UNIT_FLAGS3] & 7U), entry_score);
+    }
     unit_x = read_word(unit, BNE_UNIT_X);
     unit_y = read_word(unit, BNE_UNIT_Y);
+    trace_write("# bne-trace event=unit-action-state cycle=%ld unit=%ld "
+            "sequence=%u sequence-flags=%u animation-timer=%u "
+            "animation=%u frame=%u face=%u order=%u next-order=%u "
+            "movement-path=%u route-index=%u pixel-x=%d pixel-y=%d "
+            "tile-x=%u tile-y=%u",
+            cycle, trace_unit_slot,
+            (unsigned int) read_word(unit, BNE_UNIT_SEQUENCE),
+            (unsigned int) unit[BNE_UNIT_SEQUENCE_FLAGS],
+            (unsigned int) unit[BNE_UNIT_ANIMATION_TIMER],
+            (unsigned int) unit[BNE_UNIT_ANIMATION],
+            (unsigned int) unit[BNE_UNIT_FRAME],
+            (unsigned int) unit[BNE_UNIT_FACE],
+            (unsigned int) unit[BNE_UNIT_ORDER],
+            (unsigned int) unit[BNE_UNIT_NEXT_ORDER],
+            (unsigned int) unit[BNE_UNIT_MOVEMENT_PATH],
+            (unsigned int) unit[BNE_UNIT_ROUTE_INDEX],
+            (int) (short) read_word(unit, BNE_UNIT_PIXEL_X),
+            (int) (short) read_word(unit, BNE_UNIT_PIXEL_Y),
+            (unsigned int) unit_x, (unsigned int) unit_y);
     trace_write("# bne-trace event=unit-type-data cycle=%ld unit=%ld "
             "type=%u react-computer=%u react-person=%u sight=%u "
             "target-mask=%02x priority=%u type-flags=%08lx",
@@ -1811,10 +1880,12 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
             (unsigned int) BNE_202_UNIT_PRIORITY[unit[BNE_UNIT_TYPE]],
             (unsigned long) BNE_202_UNIT_TYPE_FLAGS[unit[BNE_UNIT_TYPE]]);
     trace_write("# bne-trace event=unit-auto-target cycle=%ld unit=%ld "
-            "nearest=%lu nearest-score=%d selected=%lu nearest-size=%u,%u "
+            "nearest=%lu nearest-score=%d selected=%lu selected-score=%d "
+            "nearest-size=%u,%u "
             "nearest-flags=%08lx",
             cycle, trace_unit_slot, (unsigned long) hostile_slot,
             hostile_score, (unsigned long) auto_target_slot,
+            auto_target_score,
             hostile == NULL ? 0xffffU : (unsigned int)
                     BNE_202_UNIT_TILE_WIDTH[hostile[BNE_UNIT_TYPE] * 2],
             hostile == NULL ? 0xffffU : (unsigned int)
@@ -2407,8 +2478,9 @@ static int __cdecl traced_async_random(void) {
     *BNE_202_ASYNC_RANDOM_SEED = after;
     if (trace_async_random_calls) {
         trace_write("# bne-trace event=async-random cycle=%ld caller=%p "
-                "before=%lu after=%lu result=%d", cycle,
+                "unit=%ld before=%lu after=%lu result=%d", cycle,
                 __builtin_return_address(0),
+                active_idle_slot,
                 (unsigned long) before, (unsigned long) after, result);
     }
     return result;
@@ -2422,7 +2494,9 @@ static void __cdecl traced_idle(BYTE *unit) {
     WORD before_x = read_word(unit, BNE_UNIT_X);
     WORD before_y = read_word(unit, BNE_UNIT_Y);
 
+    active_idle_slot = (LONG) slot;
     original_idle(unit);
+    active_idle_slot = -1;
     if (trace_async_random_calls) {
         trace_write("# bne-trace event=idle-dispatch unit=%lu type=%u "
                 "seed-before=%lu seed-after=%lu timer=%u sequence=%u "
@@ -2474,6 +2548,47 @@ static BYTE *__cdecl traced_projectile(BYTE *unit) {
                 (unsigned long) *BNE_202_ASYNC_RANDOM_SEED, result);
     }
     return result;
+}
+
+/* Record who owns every asynchronous mobile damage draw.  The RNG hook can
+ * prove the seed transition, but a return address alone cannot distinguish
+ * two simultaneous melee attacks.  Both authenticated callers pass the
+ * source unit; the calculator reads its live target pointer at +0x88. */
+static int trace_mobile_damage(BYTE *unit, const char *carrier) {
+    BYTE *pool = *BNE_202_UNIT_POOL_POINTER;
+    DWORD pool_count = *BNE_202_UNIT_POOL_COUNT;
+    BYTE *target = NULL;
+    DWORD source_slot = unit_slot_of(pool, pool_count, unit);
+    DWORD target_slot;
+    DWORD seed_before = *BNE_202_ASYNC_RANDOM_SEED;
+    int result;
+    LONG cycle = match_ready ? traced_cycles + 1 : 0;
+
+    if (unit != NULL) {
+        memcpy(&target, unit + BNE_UNIT_TARGET, sizeof(target));
+    }
+    target_slot = unit_slot_of(pool, pool_count, target);
+    result = original_mobile_damage(unit);
+    trace_write("# bne-trace event=mobile-damage cycle=%ld carrier=%s "
+            "source=%lu target=%lu source-type=%u target-type=%u "
+            "damage=%d hp-before=%u seed-before=%lu seed-after=%lu",
+            cycle, carrier, (unsigned long) source_slot,
+            (unsigned long) target_slot,
+            unit == NULL ? 0xffU : (unsigned int) unit[BNE_UNIT_TYPE],
+            target == NULL ? 0xffU : (unsigned int) target[BNE_UNIT_TYPE],
+            result,
+            target == NULL ? 0U : (unsigned int) read_word(target, BNE_UNIT_HP),
+            (unsigned long) seed_before,
+            (unsigned long) *BNE_202_ASYNC_RANDOM_SEED);
+    return result;
+}
+
+static int __cdecl traced_melee_damage(BYTE *unit) {
+    return trace_mobile_damage(unit, "melee");
+}
+
+static int __cdecl traced_projectile_damage(BYTE *unit) {
+    return trace_mobile_damage(unit, "projectile");
 }
 
 static void __cdecl traced_internal_give_order(BYTE *unit, int x, int y,
@@ -3646,6 +3761,96 @@ static BOOL install_projectile_hook(void) {
     return TRUE;
 }
 
+static BOOL install_mobile_damage_hooks(void) {
+    static const BYTE melee_expected[] = {0xe8, 0x4d, 0xe4, 0x00, 0x00};
+    static const BYTE projectile_expected[] = {0xe8, 0x84, 0x87, 0x00, 0x00};
+    BYTE melee_replacement[sizeof(melee_expected)];
+    BYTE projectile_replacement[sizeof(projectile_expected)];
+    int32_t melee_old_relative;
+    int32_t projectile_old_relative;
+    int32_t relative;
+    DWORD melee_protection;
+    DWORD projectile_protection;
+    mobile_damage_function melee_target;
+    mobile_damage_function projectile_target;
+
+    if (!executable_page_contains(BNE_202_MELEE_DAMAGE_CALL)
+            || !executable_page_contains(BNE_202_PROJECTILE_DAMAGE_CALL)
+            || memcmp(BNE_202_MELEE_DAMAGE_CALL, melee_expected,
+                    sizeof(melee_expected)) != 0
+            || memcmp(BNE_202_PROJECTILE_DAMAGE_CALL, projectile_expected,
+                    sizeof(projectile_expected)) != 0) {
+        trace_write("# bne-trace event=mobile-damage-hooks-rejected "
+                "reason=signature");
+        return FALSE;
+    }
+    memcpy(&melee_old_relative, BNE_202_MELEE_DAMAGE_CALL + 1,
+            sizeof(melee_old_relative));
+    memcpy(&projectile_old_relative, BNE_202_PROJECTILE_DAMAGE_CALL + 1,
+            sizeof(projectile_old_relative));
+    melee_target = (mobile_damage_function) (void *)
+            (BNE_202_MELEE_DAMAGE_CALL + sizeof(melee_expected)
+                    + melee_old_relative);
+    projectile_target = (mobile_damage_function) (void *)
+            (BNE_202_PROJECTILE_DAMAGE_CALL + sizeof(projectile_expected)
+                    + projectile_old_relative);
+    if ((BYTE *) (void *) melee_target != BNE_202_MOBILE_DAMAGE_TARGET
+            || (BYTE *) (void *) projectile_target
+                    != BNE_202_MOBILE_DAMAGE_TARGET) {
+        trace_write("# bne-trace event=mobile-damage-hooks-rejected "
+                "reason=target");
+        return FALSE;
+    }
+    original_mobile_damage = melee_target;
+
+    melee_replacement[0] = 0xe8;
+    relative = (int32_t) ((BYTE *) (void *) traced_melee_damage
+            - (BNE_202_MELEE_DAMAGE_CALL + sizeof(melee_replacement)));
+    memcpy(melee_replacement + 1, &relative, sizeof(relative));
+    projectile_replacement[0] = 0xe8;
+    relative = (int32_t) ((BYTE *) (void *) traced_projectile_damage
+            - (BNE_202_PROJECTILE_DAMAGE_CALL
+                    + sizeof(projectile_replacement)));
+    memcpy(projectile_replacement + 1, &relative, sizeof(relative));
+
+    if (!VirtualProtect(BNE_202_MELEE_DAMAGE_CALL,
+            sizeof(melee_replacement), PAGE_EXECUTE_READWRITE,
+            &melee_protection)) {
+        original_mobile_damage = NULL;
+        trace_write("# bne-trace event=mobile-damage-hooks-rejected "
+                "reason=melee-virtual-protect");
+        return FALSE;
+    }
+    if (!VirtualProtect(BNE_202_PROJECTILE_DAMAGE_CALL,
+            sizeof(projectile_replacement), PAGE_EXECUTE_READWRITE,
+            &projectile_protection)) {
+        VirtualProtect(BNE_202_MELEE_DAMAGE_CALL,
+                sizeof(melee_replacement), melee_protection,
+                &melee_protection);
+        original_mobile_damage = NULL;
+        trace_write("# bne-trace event=mobile-damage-hooks-rejected "
+                "reason=projectile-virtual-protect");
+        return FALSE;
+    }
+    memcpy(BNE_202_MELEE_DAMAGE_CALL, melee_replacement,
+            sizeof(melee_replacement));
+    memcpy(BNE_202_PROJECTILE_DAMAGE_CALL, projectile_replacement,
+            sizeof(projectile_replacement));
+    FlushInstructionCache(GetCurrentProcess(), BNE_202_MELEE_DAMAGE_CALL,
+            sizeof(melee_replacement));
+    FlushInstructionCache(GetCurrentProcess(),
+            BNE_202_PROJECTILE_DAMAGE_CALL,
+            sizeof(projectile_replacement));
+    VirtualProtect(BNE_202_PROJECTILE_DAMAGE_CALL,
+            sizeof(projectile_replacement), projectile_protection,
+            &projectile_protection);
+    VirtualProtect(BNE_202_MELEE_DAMAGE_CALL, sizeof(melee_replacement),
+            melee_protection, &melee_protection);
+    trace_write("# bne-trace event=mobile-damage-hooks-installed "
+            "melee=0x00409f1e projectile=0x0040fbe7 target=0x00418370");
+    return TRUE;
+}
+
 static BOOL install_give_order_hook(void) {
     static const BYTE expected[] = {0x8b, 0x44, 0x24, 0x04, 0x33, 0xc9};
     BYTE replacement[sizeof(expected)];
@@ -4203,6 +4408,7 @@ __declspec(dllexport) DWORD WINAPI bne_trace_init(LPVOID unused) {
     install_sync_random_hook();
     install_async_random_hook();
     install_projectile_hook();
+    install_mobile_damage_hooks();
     install_idle_hook();
     install_give_order_hook();
     install_internal_order_hook();

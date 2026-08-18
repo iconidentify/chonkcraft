@@ -27,6 +27,13 @@
 #define BNE_202_IDLE_TARGET ((BYTE *) 0x0040ad30)
 #define BNE_202_PROJECTILE_CALL ((BYTE *) 0x00409f14)
 #define BNE_202_PROJECTILE_TARGET ((BYTE *) 0x0040fb10)
+/* Mobile damage calculation has two authenticated callers.  The action-29
+ * arm at 0x00409f1e is the direct/melee hit; the mobile projectile
+ * constructor reaches the same calculator at 0x0040fbe7 before storing the
+ * damage byte on the new projectile. */
+#define BNE_202_MELEE_DAMAGE_CALL ((BYTE *) 0x00409f1e)
+#define BNE_202_PROJECTILE_DAMAGE_CALL ((BYTE *) 0x0040fbe7)
+#define BNE_202_MOBILE_DAMAGE_TARGET ((BYTE *) 0x00418370)
 #define BNE_202_INTERNAL_GIVE_ORDER ((BYTE *) 0x004513d0)
 #define BNE_202_GIVE_ORDER ((BYTE *) 0x00451070)
 #define BNE_202_ORDER_FUNCTIONS ((void **) 0x00495fcc)
@@ -112,6 +119,11 @@
 #define BNE_202_PLAYER_UPGRADE_SCOUTING ((BYTE *) 0x004acbdc)
 #define BNE_202_UNIT_POOL_POINTER ((BYTE **) 0x004aec94)
 #define BNE_202_UNIT_POOL_COUNT ((DWORD *) 0x004ae270)
+/* Persistent pixel-Y target-acquisition index. 0x00453ae0 stable-sorts this
+ * pointer table after the complete unit-action pass; 0x0040a2b0 binary
+ * searches its tile-Y fields during the next pass. */
+#define BNE_202_SPATIAL_UNITS ((BYTE **) 0x004bf1d8)
+#define BNE_202_SPATIAL_UNIT_COUNT ((DWORD *) 0x004c0adc)
 #define BNE_202_BULLET_POOL_POINTER ((BYTE **) 0x004aec98)
 #define BNE_202_BULLET_POOL_COUNT ((DWORD *) 0x004ae268)
 #define BNE_202_MAP_SIZE ((WORD *) 0x004acc2c)

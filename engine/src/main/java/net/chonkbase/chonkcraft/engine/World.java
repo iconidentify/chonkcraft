@@ -3224,6 +3224,20 @@ public final class World {
                 && (unit.type().airUnit()
                     || unit.type().tileWidth() > 1
                     || unit.type().tileHeight() > 1));
+        // Dead-vision and spell revealers are implementation-side sight
+        // carriers, not retail unit constructions.  Native can leave the
+        // fallen unit's sight behind without running FUN_00451b50 again;
+        // representing that sight as a short-lived Unit must therefore not
+        // debit FUN_00479820.  Human 13 is the decisive fleet witness: its
+        // first death marker appears at fixture 113.  Java used to spend one
+        // constructor-timer draw there while the authenticated native ledger
+        // has no constructor call, shifting every later damage roll.
+        if (unit.type().revealer()) {
+            unit.setBattleNetAnimationTimer(1);
+            unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetIdlePhase(0);
+            return;
+        }
         if (type >= 0 && type < 58) {
             unit.setHeading(battleNetRand() & 7);
         }
@@ -8733,6 +8747,7 @@ public final class World {
             if (unit.destroyed()) {
                 continue;
             }
+            battleNetActiveActionUnit = unit;
             battleNetVisitedThisCycle.add(unit);
             // The two combat counters run down for every unit every cycle,
             // wherever it is and whatever it is doing, as HandleBuffsEachCycle
@@ -8968,19 +8983,33 @@ public final class World {
                     && unit.id() == Integer.parseInt(tracedUnitBeforeWait)) {
                 System.err.printf("JUNITPRE cycle=%d unit=%d order=%s current=%s"
                                 + " wait=%d unbreak=%d anim=%d await=%d moving=%d"
+                                + " bna-seq=%d bna-timer=%d"
+                                + " chasing=%d fighting=%d in-range=%d"
+                                + " wrap-pending=%d resume-move=%d"
                                 + " path=%d spent=%d pos=%d,%d ix=%d iy=%d"
                                 + " residual=%d,%d resource=%d depot=%d"
-                                + " worksite=%d returning=%d carried=%d%n",
+                                + " worksite=%d returning=%d carried=%d"
+                                + " target=%d offered=%d%n",
                         cycle, unit.id(), unit.order(), unit.currentAction(),
                         unit.waitCycles(), unit.animation().unbreakable() ? 1 : 0,
                         unit.animation().index(), unit.animation().waitCycles(),
-                        unit.walkHolding() ? 1 : 0, unit.pathLength(),
+                        unit.walkHolding() ? 1 : 0,
+                        unit.battleNetSequenceOffset(),
+                        unit.battleNetAnimationTimer(),
+                        unit.chasing() ? 1 : 0, unit.fighting() ? 1 : 0,
+                        unit.target() != null
+                                && targets.inAttackRange(unit, unit.target()) ? 1 : 0,
+                        unit.battleNetAttackWrapDestArmPending() ? 1 : 0,
+                        unit.battleNetAttackResumeFromMove() ? 1 : 0,
+                        unit.pathLength(),
                         unit.routeSpent() ? 1 : 0, unit.tileX(), unit.tileY(),
                         unit.offsetX(), unit.offsetY(), unit.residualX(), unit.residualY(),
                         unit.resourceUnit() == null ? -1 : unit.resourceUnit().id(),
                         unit.returnDepotGoal() == null ? -1 : unit.returnDepotGoal().id(),
                         unit.worksite() == null ? -1 : unit.worksite().id(),
-                        unit.returningToDepot() ? 1 : 0, unit.carried());
+                        unit.returningToDepot() ? 1 : 0, unit.carried(),
+                        unit.target() == null ? -1 : unit.target().id(),
+                        unit.offeredTarget() == null ? -1 : unit.offeredTarget().id());
             }
             // Waiting belongs to the actions that call COrder::IsWaiting.
             // Die does not: COrder_Die::Execute goes straight to
@@ -9088,6 +9117,7 @@ public final class World {
             }
             releaseUnreferencedDestroyedUnits();
         }
+        battleNetActiveActionUnit = null;
         // Player and AI commands may replace an attack between its early
         // presentation frame and BNE opcode ten. Cancel that order-owned
         // placeholder before cycle-end constructor debits can turn it into a
@@ -10834,10 +10864,12 @@ public final class World {
         battleNetRandomDraws++;
         if (causalTrace.enabled()) {
             CausalCallsite site = CausalCallsite.resolve();
+            Unit activeUnit = battleNetActiveActionUnit;
             causalTrace.event(cycle, "rng.async.draw", null,
                     "before", Integer.toUnsignedLong(seedBefore),
                     "after", Integer.toUnsignedLong(battleNetRandomSeed),
                     "result", value, "draw", battleNetRandomDraws,
+                    "unit", activeUnit == null ? null : activeUnit.id(),
                     "caller", site.caller(), "caller_chain", site.chain(),
                     "caller_line", site.line(),
                     "context", randContext);
@@ -10882,6 +10914,9 @@ public final class World {
 
     /** Who is asking, for the ledger's damage lines; null otherwise. */
     private String randContext;
+
+    /** Observation-only owner of asynchronous draws during the unit pass. */
+    private Unit battleNetActiveActionUnit;
 
     /**
      * Java-side counterpart to the native return address in causal events.
