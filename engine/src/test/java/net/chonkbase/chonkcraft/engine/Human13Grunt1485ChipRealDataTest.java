@@ -17,20 +17,21 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Human 13's dest-arm ogre does not land its first melee at fixture 53.
+ * Human 13's leftover grunt first chips the wise-man at fixture 54.
  *
- * <p>The ogre that starts on 115,30 dest-arms leftover toward the north
- * knight, lands on 118,27, and free-scans onto the knight now on 119,28.
- * Native parks Attack on its start wait (body wait 23) and first chips
- * that knight at fixture 76. Java used to walk into opcode 10 at 53.
+ * <p>The grunt that starts on 122,33 dest-arms leftover onto 122,31, keeps
+ * one leftover heading through Attack start 3,2,1, and native first chips
+ * 1496 at fixture 54 (84 to 80). Java used to pay the out-of-range replan
+ * Attack-four delay after that residual landed in range, then re-arm
+ * construction and land the blow at 57.
  */
-class Human13OgreDestArmHoldRealDataTest {
+class Human13Grunt1485ChipRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
-    @DisplayName("human 13's dest-arm ogre first chips the landed knight at fixture 76")
-    void human13sDestArmOgreFirstChipsTheLandedKnightAtFixture76() {
+    @DisplayName("human 13's leftover grunt first chips the wise-man at fixture 54")
+    void human13sLeftoverGruntFirstChipsTheWiseManAtFixture54() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No Warcraft II installation configured (-Dwc2.install.dir). ");
@@ -42,47 +43,49 @@ class Human13OgreDestArmHoldRealDataTest {
         CommandApplier applier = new CommandApplier(world, roster);
         data.configureCommands(applier);
 
-        Unit ogre = unitAt(world, "unit-ogre", 115, 30);
-        Unit knight = unitAt(world, "unit-knight", 120, 29);
+        Unit grunt = unitAt(world, "unit-grunt", 122, 33);
+        Unit wise = unitAt(world, "unit-wise-man", 123, 28);
         Unit thrower = unitAt(world, "unit-axethrower", 118, 29);
-        assertNotNull(ogre, "Human 13 has no dest-arm ogre on 115,30");
-        assertNotNull(knight, "Human 13 has no knight on 120,29");
+        Unit knight = unitAt(world, "unit-knight", 120, 29);
+        assertNotNull(grunt, "Human 13 has no leftover grunt on 122,33");
+        assertNotNull(wise, "Human 13 has no wise-man on 123,28");
         assertNotNull(thrower, "Human 13 has no commanded axethrower on 118,29");
+        assertNotNull(knight, "Human 13 has no commanded knight on 120,29");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
         Integer firstChip = null;
-        for (int fixture = 1; fixture <= 76; fixture++) {
+        int hpAtChip = -1;
+        for (int fixture = 1; fixture <= 54; fixture++) {
             if (fixture == 5) {
                 applier.apply(GameCommand.attack(
                         thrower.player(), thrower.id(), knight.id()));
             }
-            int hpBefore = knight.hitPoints();
+            int hpBefore = wise.hitPoints();
             mission.tick();
-            if (firstChip == null && knight.hitPoints() < hpBefore
-                    && fixture > 25) {
+            if (firstChip == null && wise.hitPoints() < hpBefore
+                    && fixture > 38) {
                 firstChip = fixture;
+                hpAtChip = wise.hitPoints();
             }
-            if (fixture == 53) {
-                assertEquals(87, knight.hitPoints(),
-                        "native still has 87 on the dest-arm leftover land "
-                                + "through fixture 53; Java used to land the "
-                                + "ogre's first melee there");
+            if (fixture == 38) {
+                assertEquals(84, wise.hitPoints(),
+                        "ogre 1484's first melee is 90 to 84 at fixture 38");
             }
         }
 
-        assertEquals(118, ogre.tileX(),
-                "the dest-arm leftover lands the ogre on 118,27");
-        assertEquals(27, ogre.tileY(),
-                "the dest-arm leftover lands the ogre on 118,27");
-        assertEquals(76, firstChip,
-                "native first chips that knight at fixture 76 after the "
-                        + "Attack start body hold, not " + firstChip);
-        assertTrue(knight.hitPoints() < 87,
-                "the dest-arm leftover melee must chip the knight at "
-                        + "fixture 76; hp after that blow is "
-                        + knight.hitPoints());
+        assertEquals(122, grunt.tileX(),
+                "the leftover residual lands the grunt on 122,31");
+        assertEquals(31, grunt.tileY(),
+                "the leftover residual lands the grunt on 122,31");
+        assertEquals(54, firstChip,
+                "native first chips the wise-man at fixture 54 after Attack "
+                        + "start 3,2,1; Java used to land that blow at "
+                        + firstChip);
+        assertTrue(hpAtChip < 84,
+                "the leftover grunt must chip the wise-man at fixture 54; "
+                        + "hp after that blow is " + hpAtChip);
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

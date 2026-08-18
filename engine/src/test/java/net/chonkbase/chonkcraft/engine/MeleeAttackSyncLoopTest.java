@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.zip.ZipFile;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -196,8 +197,7 @@ class MeleeAttackSyncLoopTest {
                 new int[] {west}));
         attacker.setPathGoal(target.tileX(), target.tileY());
         int attackStart = world.idle.battleNetSequenceStart(attacker,
-                net.chonkbase.chonkcraft.engine.animation.BattleNetSequence
-                        .ATTACK_ANIMATION);
+                BattleNetSequence.ATTACK_ANIMATION);
         int moveStart = world.idle.battleNetSequenceStart(attacker,
                 net.chonkbase.chonkcraft.engine.animation.BattleNetSequence
                         .MOVE_ANIMATION);
@@ -363,17 +363,26 @@ class MeleeAttackSyncLoopTest {
                 "melee order must leave table-0x27 pending until first in-range");
 
         int seed = world.randomSeed();
-        // While the single leftover remains, residual settle must not spend
-        // SyncRand (native keeps index 1 unpaid through fixture 43).
+        int attackStart = world.idle.battleNetSequenceStart(attacker,
+                BattleNetSequence.ATTACK_ANIMATION);
+        // Native keeps leftover index 1 through construction 3,2 and only
+        // spends FUN_004234b0 at 2539/1 (fixture 43). Residual settle and
+        // the first two construction ticks must not debit.
         for (int call = 0; call < 12; call++) {
             world.tick();
             if (attacker.pathLength() == 1 && attacker.chasing()) {
-                assertEquals(seed, world.randomSeed(),
-                        "pathLen-1 residual settle must not pay table-0x27; "
-                                + "Human 13 grunt 115 seed jumped at fixture 41");
-                assertTrue(attacker.battleNetPendingMeleeSyncRand(),
-                        "table-0x27 must stay pending while the leftover heading "
-                                + "remains");
+                boolean lastConstruction = attackStart >= 0
+                        && attacker.battleNetSequenceOffset() == attackStart
+                        && attacker.battleNetAnimationTimer() == 1;
+                if (!lastConstruction) {
+                    assertEquals(seed, world.randomSeed(),
+                            "pathLen-1 leftover must not pay table-0x27 before "
+                                    + "the last Attack start tick; Human 13 "
+                                    + "grunt 115 used to jump at fixture 41");
+                    assertTrue(attacker.battleNetPendingMeleeSyncRand(),
+                            "table-0x27 must stay pending through construction "
+                                    + "3,2");
+                }
             }
         }
     }

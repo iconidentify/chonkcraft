@@ -13439,18 +13439,36 @@ public final class World {
         }
         // Human 13 grunt 1485/115: after retarget onto adjacent wise-man at
         // fixture 25 native keeps a one-step route residual (index=1) through
-        // fixture 43 and only spends FUN_004234b0 at F43. Java residual-
-        // drained that leftover and paid SyncRand at world 43 (fixture 41),
-        // two cycles early. Leave a single leftover heading unpaid until a
-        // later visit clears it (native index→20 at F44). pathLen 0 and ≥2
-        // residual settles keep the ordinary debit (F36 wise-man+grunt pair).
-        if (actionMoveWalked && unit.chasing() && unit.pathLength() == 1) {
-            if (BNE_PEND_TRACE) {
-                System.err.printf("JBNEMELEESYNC event=defer-path1 cycle=%d "
-                                + "unit=%d target=%d pathLen=1%n",
-                        cycle, unit.id(), target.id());
+        // fixture 43 and only spends FUN_004234b0 at F43, the last Attack
+        // start construction tick (2539/1). Java residual-drained that
+        // leftover and paid SyncRand at world 43 (fixture 41), two cycles
+        // early. Leave the leftover unpaid through construction 3,2 and
+        // debit on timer 1; native spends the heading at OP0 (index 20) at
+        // F44. pathLen 0 and ≥2 residual settles keep the ordinary debit
+        // (F36 wise-man+grunt pair).
+        if (unit.chasing() && unit.pathLength() == 1) {
+            int attackStart = battleNetSequence == null || idle == null
+                    ? -1
+                    : idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.ATTACK_ANIMATION);
+            boolean lastConstruction = attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() == 1;
+            boolean leftoverConstruction = attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() > 1;
+            if (!lastConstruction
+                    && (actionMoveWalked || leftoverConstruction)) {
+                if (BNE_PEND_TRACE) {
+                    System.err.printf("JBNEMELEESYNC event=defer-path1 cycle=%d "
+                                    + "unit=%d target=%d pathLen=1 seq=%d "
+                                    + "timer=%d%n",
+                            cycle, unit.id(), target.id(),
+                            unit.battleNetSequenceOffset(),
+                            unit.battleNetAnimationTimer());
+                }
+                return;
             }
-            return;
         }
         // Cavalry hit-response that just residual-settled this visit: open
         // Attack without FUN_004234b0. Human 13 knight 1500 settles at
@@ -13487,11 +13505,16 @@ public final class World {
             debitBattleNetMeleeSyncRand(unit);
         }
         // First in-range after a chase step must open the Attack program.
+        // Already sitting on Attack start (leftover construction 3,2,1)
+        // must not rewind the timer -- Human 13 grunt 1485 debits
+        // FUN_004234b0 at 2539/1 and native walks OP0 the next visit.
+        // Resetting timer 3 there re-armed construction and delayed the
+        // first chip from fixture 54 to 56.
         if (battleNetSequence != null) {
             int attackStart = idle.battleNetSequenceStart(unit,
                     BattleNetSequence.ATTACK_ANIMATION);
             if (attackStart >= 0) {
-                if (unit.battleNetSequenceOffset() > attackStart) {
+                if (unit.battleNetSequenceOffset() >= attackStart) {
                     return;
                 }
                 unit.setBattleNetSequenceOffset(attackStart);

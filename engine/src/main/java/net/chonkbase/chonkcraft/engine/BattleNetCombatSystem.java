@@ -502,21 +502,38 @@ final class BattleNetCombatSystem {
         if (unit.canMove() && unit.target() != null && !unit.isMoving()
                 && !world.movement.isStepping(unit) && unit.pathLength() > 0
                 && world.targets.inAttackRange(unit, unit.target())) {
-            // Multi-step leftover discard once residual has already settled:
-            // Human 13 ogre 1510 keeps two unused pure-south headings when the
-            // knight free-scans into range. Native opens Attack at post-OP0
-            // 644/1 (fixture 30); cold 643/3 delayed OP10 to fixture 40.
-            // pathLength >= 2 avoids single-heading mid-fight discards.
-            boolean multiLeftoverDiscard = unit.pathLength() >= 2
-                    && onBattleNetChaseMoveBody(unit)
-                    && unit.type() != null
-                    && unit.type().maxAttackRange() <= 1;
-            unit.clearPath();
-            unit.setRouteSpent(false);
-            unit.setChasing(false);
-            unit.setFighting(true);
-            if (multiLeftoverDiscard) {
-                world.openBattleNetAttackAfterChaseResidual(unit);
+            // A single leftover heading that residual-landed in range stays
+            // through Attack start 3,2,1. Human 13 grunt 1485 keeps
+            // route_index 1 beside the wise-man through fixture 43 and only
+            // spends it at OP0 (index 20) at 44. Multi leftover (ogre 1484
+            // pathn 5) still residual-opens past OP0 and spends immediately.
+            int attackStart = world.battleNetSequence == null
+                    || world.idle == null
+                    ? -1
+                    : world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.ATTACK_ANIMATION);
+            boolean leftoverConstruction = unit.pathLength() == 1
+                    && attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() > 0
+                    && unit.chasing();
+            if (!leftoverConstruction) {
+                // Multi-step leftover discard once residual has already settled:
+                // Human 13 ogre 1510 keeps two unused pure-south headings when the
+                // knight free-scans into range. Native opens Attack at post-OP0
+                // 644/1 (fixture 30); cold 643/3 delayed OP10 to fixture 40.
+                // pathLength >= 2 avoids single-heading mid-fight discards.
+                boolean multiLeftoverDiscard = unit.pathLength() >= 2
+                        && onBattleNetChaseMoveBody(unit)
+                        && unit.type() != null
+                        && unit.type().maxAttackRange() <= 1;
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setChasing(false);
+                unit.setFighting(true);
+                if (multiLeftoverDiscard) {
+                    world.openBattleNetAttackAfterChaseResidual(unit);
+                }
             }
         }
         if (unit.chasing() && unit.canMove()) {
@@ -582,27 +599,45 @@ final class BattleNetCombatSystem {
             // grunt 1507 E@55 not @52).
             boolean freeDetourResidualHold =
                     unit.battleNetEmptyRouteFreeDetourHold();
+            boolean inRangeReplanSettle = false;
             if (world.actionMoveWalked && !unit.isMoving()
                     && (replanResidualHold || freeDetourResidualHold)
                     && world.battleNetMoveAnimation(unit)) {
-                if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null) {
-                    String resEnv = System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
-                            .trim();
-                    if ("*".equals(resEnv)
-                            || unit.id() == Integer.parseInt(resEnv)) {
-                        System.err.printf(
-                                "JBNEREPLANHOLD cycle=%d unit=%d at=%d,%d "
-                                        + "pathn=%d freeDetour=%d arm-delay=2%n",
-                                world.cycle, unit.id(),
-                                unit.tileX(), unit.tileY(),
-                                unit.pathLength(),
-                                freeDetourResidualHold ? 1 : 0);
+                Unit quarry = unit.target();
+                boolean inRange = quarry != null && quarry.isAlive()
+                        && world.targets.inAttackRange(unit, quarry);
+                // Attack-four delay 2 is only for a chaser that still needs
+                // the next heading (Human 13 ogre 1482: settle 31, SW at 34).
+                // A leftover residual that already stands in weapon range
+                // opens Attack start 3 that visit -- Human 13 grunt 1485
+                // residual-lands beside the wise-man at fixture 41 on 2539/3
+                // and first chips at 54. Delay 2 used to burn the settle
+                // visit, open 2539 at timer 2, then re-arm 3,2,1 and land
+                // that blow at 57. Ordinary chase leftover (Orc 1 1592)
+                // still residual-opens past OP0.
+                if (!inRange) {
+                    if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null) {
+                        String resEnv = System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
+                                .trim();
+                        if ("*".equals(resEnv)
+                                || unit.id() == Integer.parseInt(resEnv)) {
+                            System.err.printf(
+                                    "JBNEREPLANHOLD cycle=%d unit=%d at=%d,%d "
+                                            + "pathn=%d freeDetour=%d arm-delay=2%n",
+                                    world.cycle, unit.id(),
+                                    unit.tileX(), unit.tileY(),
+                                    unit.pathLength(),
+                                    freeDetourResidualHold ? 1 : 0);
+                        }
                     }
+                    unit.setBattleNetChaseReplanResidualHold(false);
+                    unit.setBattleNetEmptyRouteFreeDetourHold(false);
+                    unit.setBattleNetOrderDelay(2);
+                    return;
                 }
+                inRangeReplanSettle = replanResidualHold;
                 unit.setBattleNetChaseReplanResidualHold(false);
                 unit.setBattleNetEmptyRouteFreeDetourHold(false);
-                unit.setBattleNetOrderDelay(2);
-                return;
             }
             if (world.actionMoveWalked && !unit.isMoving()) {
                 if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null
@@ -623,6 +658,36 @@ final class BattleNetCombatSystem {
                 }
                 unit.setBattleNetChaseReplanResidualHold(false);
                 unit.setBattleNetEmptyRouteFreeDetourHold(false);
+            }
+            // Leftover residual that just settled in melee range opens Attack
+            // start construction 3 this visit and keeps the leftover heading
+            // through 3,2,1. stepBattleNetAttackSequence already ran while
+            // the last pixels were still owed, so without this arm Java
+            // stayed on the Move body, then leftover-discarded the heading
+            // and re-armed construction three cycles late (1485 chip 57).
+            if (inRangeReplanSettle
+                    && unit.pathLength() == 1
+                    && unit.type() != null
+                    && unit.type().maxAttackRange() <= 1
+                    && world.battleNetMoveAnimation(unit)
+                    && world.battleNetSequence != null
+                    && unit.target() != null
+                    && unit.target().isAlive()
+                    && world.targets.inAttackRange(unit, unit.target())) {
+                int leftoverAttackStart = world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.ATTACK_ANIMATION);
+                if (leftoverAttackStart >= 0) {
+                    unit.setBattleNetSequenceOffset(leftoverAttackStart);
+                    unit.setBattleNetAnimationTimer(3);
+                    AnimationSet set = unit.type() == null
+                            ? null : unit.type().animationSet();
+                    Animation attack = set == null
+                            ? null : set.get(AnimationSet.State.ATTACK);
+                    if (attack != null && unit.animation().current() != attack) {
+                        unit.animation().switchTo(attack);
+                    }
+                    return;
+                }
             }
             if (world.actionMoveWalked && !unit.isMoving()
                     && PudUnitTypes.code(unit.type().ident()) == 50
@@ -681,6 +746,22 @@ final class BattleNetCombatSystem {
                 // holds STAND_GROUND there; Java's leftover NE to 22,43 fired
                 // at fixture cycle 21 five steps early.
                 if (world.targets.inAttackRange(unit, chased)) {
+                    int leftoverAttackStart = world.battleNetSequence == null
+                            || world.idle == null
+                            ? -1
+                            : world.idle.battleNetSequenceStart(unit,
+                                    BattleNetSequence.ATTACK_ANIMATION);
+                    if (unit.pathLength() == 1
+                            && leftoverAttackStart >= 0
+                            && unit.battleNetSequenceOffset() == leftoverAttackStart
+                            && unit.battleNetAnimationTimer() > 0
+                            && unit.chasing()) {
+                        // Keep the leftover heading through Attack 3,2,1.
+                        // Discarding here used to re-arm construction and
+                        // walk into stepMove, which dest-armed the leftover
+                        // heading (Human 13 grunt 1485 chip 55).
+                        return;
+                    }
                     // Melee multi-step leftover: open past OP0 with melee mark
                     // (Human 13 ogre 1510). Ranged multi-heading leftover after
                     // approach residual: OP0 already spent; native resumes

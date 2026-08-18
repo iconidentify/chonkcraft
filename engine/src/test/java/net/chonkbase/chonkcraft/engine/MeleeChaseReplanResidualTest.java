@@ -4,10 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.ZipFile;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
@@ -152,6 +158,114 @@ class MeleeChaseReplanResidualTest {
                 "leftover heading must be the replan path's next NW");
         assertEquals(landY + Direction.deltaY(nw), chaser.tileY(),
                 "leftover heading must be the replan path's next NW");
+    }
+
+    private static byte[] retailScriptBin() throws IOException {
+        String packProp = System.getProperty("chonkcraft.pack");
+        Path pack = packProp != null && !packProp.isBlank()
+                ? Path.of(packProp)
+                : Path.of(System.getProperty("user.home"),
+                        ".chonkcraft/work",
+                        "warcraft-ii-battle-net-edition-usa.pre-full-media-2026-07-30.chonkpack");
+        assumeTrue(Files.isRegularFile(pack),
+                "BNE asset pack required for retail Attack sequence");
+        try (ZipFile zip = new ZipFile(pack.toFile())) {
+            var entry = zip.getEntry("assets/archives/maindat/0278.bin");
+            assumeTrue(entry != null, "pack must contain maindat entry 278");
+            try (var in = zip.getInputStream(entry)) {
+                return in.readAllBytes();
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("an in-range leftover residual opens attack start the settle visit")
+    void anInRangeLeftoverResidualOpensAttackStartTheSettleVisit()
+            throws Exception {
+        // Human 13 grunt 1485 residual-lands beside wise-man 1496 with one
+        // leftover heading. Native opens Attack start 2539/3 that visit and
+        // keeps the leftover through 3,2,1. Out-of-range replan residual
+        // still pays delay 2 (1482).
+        byte[] script = retailScriptBin();
+        GameMap map = grass(24);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+
+        Unit chaser = world.createUnit(ogre(), 0, 10, 10);
+        Unit quarry = world.createUnit(prey(), 1, 10, 9);
+        assertTrue(chaser != null && quarry != null, "units must place");
+        assertTrue(world.orderAttack(chaser, quarry), "attack accepted");
+
+        int north = Direction.fromDelta(0, -1);
+        chaser.setTile(10, 10);
+        chaser.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {north}));
+        chaser.setPathGoal(quarry.tileX(), quarry.tileY());
+        chaser.setTarget(quarry);
+        chaser.setChasing(true);
+        chaser.setFighting(false);
+        chaser.setAutoTargeting(true);
+        chaser.setOffset(16, 16);
+        chaser.setLastStepHeading(north);
+        chaser.setWalkHolding(true);
+        chaser.setBattleNetChaseReplanResidualHold(true);
+        chaser.setBattleNetOrderDelay(0);
+        chaser.animation().switchTo(
+                chaser.type().animationSet().get(AnimationSet.State.MOVE));
+        int moveStart = world.idle.battleNetSequenceStart(chaser,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attackStart = world.idle.battleNetSequenceStart(chaser,
+                BattleNetSequence.ATTACK_ANIMATION);
+        assertTrue(moveStart >= 0 && attackStart >= 0,
+                "retail script must name Move and Attack starts");
+        chaser.setBattleNetSequenceOffset(moveStart + 4);
+        chaser.setBattleNetAnimationTimer(1);
+
+        Integer settled = null;
+        for (int call = 0; call < 12; call++) {
+            world.tick();
+            if (!chaser.isMoving()
+                    && chaser.offsetX() == 0 && chaser.offsetY() == 0) {
+                settled = call;
+                break;
+            }
+        }
+        assertTrue(settled != null,
+                "leftover residual must settle on the landing tile");
+        assertEquals(0, chaser.battleNetOrderDelay(),
+                "in-range leftover residual must not pay Attack-four delay 2; "
+                        + "delay=" + chaser.battleNetOrderDelay());
+        assertEquals(attackStart, chaser.battleNetSequenceOffset(),
+                "native opens Attack start construction on the settle visit");
+        assertEquals(3, chaser.battleNetAnimationTimer(),
+                "Attack start construction is timer 3 on the settle visit");
+        assertEquals(1, chaser.pathLength(),
+                "the leftover heading stays through construction 3");
+        assertTrue(chaser.chasing(),
+                "the leftover heading stays a chase leftover through 3,2,1");
+
+        world.tick();
+        assertEquals(1, chaser.pathLength(),
+                "the leftover heading stays through construction 2");
+        assertEquals(attackStart, chaser.battleNetSequenceOffset(),
+                "construction 2 stays on Attack start");
+        assertEquals(2, chaser.battleNetAnimationTimer(),
+                "construction ticks 3 to 2");
+
+        world.tick();
+        assertEquals(1, chaser.pathLength(),
+                "the leftover heading stays through construction 1");
+        assertEquals(attackStart, chaser.battleNetSequenceOffset(),
+                "construction 1 stays on Attack start");
+        assertEquals(1, chaser.battleNetAnimationTimer(),
+                "construction ticks 2 to 1");
+        assertEquals(10, chaser.tileX(),
+                "in-range leftover must not take the leftover heading");
+        assertEquals(10, chaser.tileY(),
+                "in-range leftover must not take the leftover heading");
     }
 
     @Test

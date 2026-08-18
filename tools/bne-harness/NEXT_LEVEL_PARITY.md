@@ -284,9 +284,14 @@ first blow is fixture 76. Java used to walk that OP0 and land eight
 damage at 53. The next live-shot gap was dest-arm axe 1483: native names
 the wise-man on the Attack@887/3 open and throws at fixture 99. Java
 waited for the later OP0 fire visit, re-armed construction, and threw
-at 102. Death is still 214 vs 226 and free is 1520 vs 1532, so those two
-ranged cells stay open. Chase is not observed -- the thrower is already
-in range.
+at 102. After that construct, dest-arm leftover residual that already
+stands in melee range used to pay the out-of-range replan Attack-four
+delay and re-arm construction: Human 13 grunt 1485 residual-lands
+beside wise-man 1496 at fixture 41 and native opens Attack@2539/3,
+keeps the leftover heading through 3,2,1, and first chips at 54.
+Java used to land that blow at 57. Death is still 214 vs 226 and free
+is 1520 vs 1532, so those two ranged cells stay open. Chase is not
+observed -- the thrower is already in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.
