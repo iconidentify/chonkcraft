@@ -340,12 +340,20 @@ final class BattleNetCombatSystem {
         }
         // Free-scan retarget on the first cold path after the order-delay
         // window while a live offer remains (native 0x409ff0 null seed).
-        // Human 13 knight 1493 switches axe→ogre before pathing SE. Knight
-        // 1500 free-scans onto ogre 120,24 the same tick; with the delay face
-        // held toward the acquisition goal, equal-cost first steps keep NW.
+        // Dest-arm leftover is planned to the acquired quarry first. Human 13
+        // knight 1490 dest-arms SE around the ogre on axe 1486's column, then
+        // the scan names that ogre; retargeting first dest-armed due south
+        // onto 124,31. Knight 1500 still free-scans onto ogre 120,24 after
+        // the NW leftover toward axe 118,24 is written, so equal-cost face
+        // preference keeps 119,25.
         if (!unit.chasing() && !unit.fighting() && unit.pathLength() == 0
                 && unit.target() != null && !unit.battleNetStationaryAttack()
                 && unit.offeredTarget() != null && unit.type().maxAttackRange() <= 1) {
+            Unit acquired = unit.target();
+            if (unit.canMove()
+                    && !world.targets.inAttackRange(unit, acquired)) {
+                world.movement.moveTowards(unit, acquired);
+            }
             Unit offered = unit.offeredTarget();
             if (!offered.isAlive() || offered.isDying() || !offered.isOnMap()) {
                 unit.setOfferedTarget(null);
@@ -355,7 +363,15 @@ final class BattleNetCombatSystem {
                         Math.max(1, unit.type().maxAttackRange()));
                 Unit candidate = world.targets.findBattleNetHostile(unit, reactRange, null);
                 if (candidate != null && candidate != unit.target()) {
-                    setAutoTarget(unit, candidate);
+                    boolean keepLeftover = unit.pathLength() > 0;
+                    setAutoTarget(unit, candidate, keepLeftover);
+                    if (keepLeftover) {
+                        // The leftover belongs to the acquired quarry. Name
+                        // the new goal so the later chase does not treat the
+                        // still-valid prefix as stale and dest-arm again.
+                        unit.setPathGoal(candidate.tileX(), candidate.tileY());
+                        world.refineBattleNetDestArmLeftover(unit, candidate);
+                    }
                 }
             }
         }

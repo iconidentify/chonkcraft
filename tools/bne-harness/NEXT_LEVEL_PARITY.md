@@ -278,10 +278,10 @@ consumer (`0x0041834b` / `battleNetProjectileDamage`). Death is still 214 vs
 not observed -- the thrower is already in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
-acquire c5, projectile-create c5 and projectile-flight c6. Impact is exact
-at c35 but the struck knight's dest-arm tile still differs at c29, so that
-cell is not causal-exact. Splash has no second observed HP drop on the
-impact cycle.
+acquire c5, projectile-create c5, projectile-flight c6 and impact c35.
+Knight 1490 dest-arms south-east onto 125,31 around the ogre sitting two
+tiles down the acquired axe's column; retargeting first dest-armed due
+south. Splash has no second observed HP drop on the impact cycle.
 
 Human 7 catapult 1519's eastern Attack Ground click is certified at acquire
 c9, projectile-create c13, projectile-flight c14 and impact c34. Type 21 is
@@ -289,7 +289,7 @@ live from occupancy until FREE: remaining is 0 for the whole hold, and flag
 `0x04` is not the live bit -- Human 13 sets it two cycles after birth, and
 Human 7 never sets it. Counting only remaining-distance or `0x04` hid that
 sprite. Splash has no second observed HP drop on the impact cycle. That is
-**20/185 certified**, not a claim that combat as a whole is complete.
+**21/185 certified**, not a claim that combat as a whole is complete.
 
 Native projectile receipts now carry the constructor cycle, source slot and
 fixed-pool slot. The adapter combines that authenticated source pointer with

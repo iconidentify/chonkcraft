@@ -5503,6 +5503,104 @@ public final class World {
     }
 
     /**
+     * Rewrites dest-arm leftover after a free-scan names a new quarry.
+     *
+     * <p>The leftover is planned to the acquired target first. A later equal-
+     * cost diagonal toward the new quarry must still win: Human 13 knight
+     * 1493 dest-arms north-west onto 119,28 toward 118,27, not due west onto
+     * the acquired axe at 118,29.</p>
+     */
+    void refineBattleNetDestArmLeftover(Unit unit, Unit target) {
+        if (unit == null || target == null || unit.pathLength() == 0) {
+            return;
+        }
+        int n = unit.pathLength();
+        int[] headings = new int[n];
+        for (int depth = 0; depth < n; depth++) {
+            headings[n - 1 - depth] = unit.peekHeadingAtDepth(depth);
+        }
+        PathFinder.Path path = new PathFinder.Path(
+                PathFinder.Result.FOUND, headings);
+        path = preferBattleNetGoalAxisFirstHeading(unit, path, target);
+        path = preferBattleNetSkirtDiagonalFirstHeading(unit, path, target);
+        unit.setPath(path);
+    }
+
+    /**
+     * Prefers the free equal-cost diagonal that skirts a hostile sitting two
+     * tiles along a cardinal leftover.
+     *
+     * <p>0x00450766 stands that hostile aside for the later chase, so the
+     * marked ray is still the pure cardinal. Dest-arm leftover is the wall
+     * follower's first heading: Human 13 knight 1490 dest-arms south-east
+     * onto 125,31 around ogre 1482 instead of south onto 124,31. The
+     * standing face supplies the other axis when it is not already the
+     * approach (east + south = south-east).</p>
+     */
+    private PathFinder.Path preferBattleNetSkirtDiagonalFirstHeading(
+            Unit unit, PathFinder.Path path, Unit target) {
+        if (path == null || path.length() == 0 || target == null
+                || unit.type() == null) {
+            return path;
+        }
+        int planned = path.headings()[path.length() - 1];
+        if (planned < 0 || planned >= Direction.COUNT
+                || Direction.isDiagonal(planned)) {
+            return path;
+        }
+        int stride = battleNetMovementStride(unit);
+        int midX = unit.tileX() + Direction.deltaX(planned) * stride;
+        int midY = unit.tileY() + Direction.deltaY(planned) * stride;
+        int blockedX = midX + Direction.deltaX(planned) * stride;
+        int blockedY = midY + Direction.deltaY(planned) * stride;
+        if (!map.contains(midX, midY) || !canEnter(unit, midX, midY)) {
+            return path;
+        }
+        Unit occupant = unitAt(blockedX, blockedY);
+        if (occupant == null || occupant == unit || occupant == target
+                || occupant.isDying() || !occupant.isOnMap()
+                || isAllied(unit.player(), occupant.player())
+                || occupant.type().building()) {
+            return path;
+        }
+        int face = unit.heading();
+        int sideX = Direction.deltaX(face);
+        int sideY = Direction.deltaY(face);
+        int planX = Direction.deltaX(planned);
+        int planY = Direction.deltaY(planned);
+        if (planX != 0) {
+            sideX = 0;
+        }
+        if (planY != 0) {
+            sideY = 0;
+        }
+        if (sideX == 0 && sideY == 0) {
+            return path;
+        }
+        int diag = Direction.fromDelta(planX + sideX, planY + sideY);
+        if (diag < 0 || diag >= Direction.COUNT || diag == planned) {
+            return path;
+        }
+        int goalX = target.tileX();
+        int goalY = target.tileY();
+        int cur = Math.max(Math.abs(unit.tileX() - goalX),
+                Math.abs(unit.tileY() - goalY));
+        int stepX = unit.tileX() + Direction.deltaX(diag) * stride;
+        int stepY = unit.tileY() + Direction.deltaY(diag) * stride;
+        if (!map.contains(stepX, stepY) || !canEnter(unit, stepX, stepY)) {
+            return path;
+        }
+        int planDist = Math.max(Math.abs(midX - goalX), Math.abs(midY - goalY));
+        int diagDist = Math.max(Math.abs(stepX - goalX), Math.abs(stepY - goalY));
+        if (diagDist > planDist || diagDist >= cur) {
+            return path;
+        }
+        int[] headings = path.headings().clone();
+        headings[headings.length - 1] = diag;
+        return new PathFinder.Path(path.result(), headings);
+    }
+
+    /**
      * Prefers an equal-cost diagonal first step that reduces the secondary
      * goal axis when a lead mid-Move brother occupies that diagonal.
      *
@@ -9704,6 +9802,7 @@ public final class World {
             // Offered free-scan arm only. Equal Chebyshev first steps keep the
             // current face when free (1500 face 7 → NW; 1493 SE still wins).
             path = preferBattleNetFaceFirstHeading(unit, path, target);
+            path = preferBattleNetSkirtDiagonalFirstHeading(unit, path, target);
         }
         if (path.length() > 0 && unit.battleNetPersonHelpFirstChase()) {
             // Person-help first chase only: equal-cost diagonal onto a lead
@@ -13662,11 +13761,6 @@ public final class World {
                             cycle, unit.id(), target.id(), target.type().ident(),
                             target.tileX(), target.tileY(), range);
                 }
-                // Face the acquisition goal for the delay window so an
-                // equal-cost free-scan approach can keep that heading (Human
-                // 13 knight 1500 holds face 7 toward axe 118,24, then NW onto
-                // 119,25 after free-scanning the ogre at 120,24).
-                unit.setHeading(movement.headingTowards(unit, target));
                 // Keep the attack order visible for the delay window before
                 // the first in-range swing or (action-16) Still drop.
                 unit.setBattleNetOrderDelay(2);

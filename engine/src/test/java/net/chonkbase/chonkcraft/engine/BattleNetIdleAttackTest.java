@@ -1098,6 +1098,87 @@ class BattleNetIdleAttackTest {
     }
 
     @Test
+    @DisplayName("a dest-arm leftover walks around a hostile on the acquired quarry's column")
+    void aDestArmLeftoverWalksAroundAHostileOnTheAcquiredQuarrysColumn() {
+        // Human 13 knight 1490 dest-arms SE onto 125,31 around ogre 1482
+        // sitting on 124,32, then free-scans that ogre. Retargeting first
+        // dest-armed due south onto 124,31 through the still-occupied square.
+        GameMap map = new GameMap(32, 32, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        int[] priorities = new int[110];
+        priorities[9] = 0x37;
+        priorities[7] = 0x3f;
+        world.setBattleNetUnitPriorities(priorities);
+
+        UnitType knightType = fighter("unit-knight", 50);
+        knightType.setMaxAttackRange(1);
+        knightType.setReactRangePerson(6);
+        knightType.setReactRangeComputer(8);
+        knightType.setCanTargetLand(true);
+        AnimationSet knightAnim = new AnimationSet("knight");
+        knightAnim.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        knightAnim.put(AnimationSet.State.MOVE,
+                Animation.parse("move", List.of(
+                        "unbreakable begin",
+                        "frame 0", "move 16", "wait 1",
+                        "frame 0", "move 16", "wait 1",
+                        "unbreakable end", "wait 1")));
+        knightAnim.put(AnimationSet.State.ATTACK,
+                Animation.parse("attack", List.of("frame 0", "wait 1",
+                        "attack", "wait 1")));
+        knightType.setAnimationSet(knightAnim);
+
+        UnitType axeType = fighter("unit-axethrower", 40);
+        axeType.setMaxAttackRange(4);
+        axeType.setCanTargetLand(true);
+        UnitType ogreType = fighter("unit-ogre", 60);
+        ogreType.setMaxAttackRange(1);
+        ogreType.setCanTargetLand(true);
+
+        Unit knight = world.createUnit(knightType, 1, 10, 10);
+        Unit axe = world.createUnit(axeType, 0, 10, 13);
+        Unit ogre = world.createUnit(ogreType, 0, 10, 12);
+        // Human 13 knight 1490's Still face is east; dest-arm combines that
+        // axis with the south approach around the ogre.
+        knight.setHeading(net.chonkbase.chonkcraft.engine.map.Direction.fromDelta(1, 0));
+        knight.setBattleNetReadySuppressed(true);
+        knight.setOfferedTarget(axe);
+        knight.setBattleNetAnimationTimer(2);
+        axe.setBattleNetAnimationTimer(8);
+        ogre.setBattleNetAnimationTimer(8);
+
+        world.tick();
+        world.tick();
+        assertEquals(Unit.Order.ATTACK, knight.order(),
+                "the offered hit-response must open Attack");
+        assertSame(axe, knight.target(),
+                "Attack opens on the acquired axethrower");
+        int startX = knight.tileX();
+        int startY = knight.tileY();
+        boolean destArmed = false;
+        for (int i = 0; i < 8; i++) {
+            world.tick();
+            if (knight.tileX() != startX || knight.tileY() != startY) {
+                destArmed = true;
+                break;
+            }
+        }
+        assertTrue(destArmed, "the knight must dest-arm after the order delay");
+        assertEquals(11, knight.tileX(),
+                "the first leftover dest-arms around the ogre, not through it");
+        assertEquals(11, knight.tileY(),
+                "the first leftover dest-arms south-east onto the free skirt");
+        assertSame(ogre, knight.target(),
+                "the free-scan may name the ogre after the leftover is written");
+    }
+
+    @Test
     @DisplayName("BNE target scoring reads UDTA priority instead of ChonkCraft priority")
     void unitDataPriorityBreaksTheCannonTowerTie() {
         GameMap map = new GameMap(24, 24, new Tileset());
