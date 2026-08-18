@@ -289,8 +289,8 @@ def _phase_events(result: dict[str, Any], attacker: int, defender: int,
     attack = units.get(attacker, [])
     defend = units.get(defender, [])
     phases: dict[str, dict[str, Any]] = {}
-    acquired = _first(attack, lambda item: item["order"] == "ATTACK",
-                      after=issue_cycle)
+    acquired = _first(attack, lambda item: item["order"] in {
+        "ATTACK", "ATTACK_GROUND", "ATTACK_MOVE"}, after=issue_cycle)
     if acquired is not None:
         phases["acquire"] = acquired
     baseline = next((item for item in reversed(attack)
@@ -333,6 +333,23 @@ def _phase_events(result: dict[str, Any], attacker: int, defender: int,
             phases.setdefault("retaliation", item)
         previous = item
     phases.update(_projectile_phases(result, attacker, issue_cycle))
+    # Center plus surround is the defining siege blow. One HP drop is
+    # ordinary damage; two observed units dropping on the impact cycle
+    # is splash.
+    impact = phases.get("impact") or phases.get("damage")
+    if impact is not None:
+        cycle = impact["cycle"]
+        drops = []
+        for events in units.values():
+            prev = None
+            for item in events:
+                if prev is not None and item["cycle"] == cycle \
+                        and item["hit_points"] < prev["hit_points"]:
+                    drops.append(item)
+                if item["cycle"] <= cycle:
+                    prev = item
+        if len(drops) >= 2:
+            phases["splash-damage"] = min(drops, key=lambda item: item["unit_id"])
     return phases
 
 
@@ -395,6 +412,7 @@ def _phase_signature(phase: str, item: dict[str, Any] | None) -> object:
                               "type_code", "x", "y", "remaining"),
         "impact": ("cycle", "source_id", "target_id", "type_code",
                    "present"),
+        "splash-damage": ("cycle", "hit_points", "alive"),
     }.get(phase, tuple(sorted(item)))
     return {key: item.get(key) for key in fields}
 
@@ -461,6 +479,14 @@ def damage_rng_diagnosis(native_text: str, java_text: str) -> dict[str, Any]:
         "native_damage_observed": native_damage is not None,
         "java_damage_observed": java_damage is not None,
     }
+    if native_damage is None and java_damage is None:
+        # Siege constructors store max/fixed damage and spend only the two
+        # aim-jitter draws. Neither side taking a damage seed is agreement.
+        report.update({
+            "exact": True,
+            "classification": "exact-damage-consumer",
+        })
+        return report
     if native_damage is None or java_damage is None:
         report.update({
             "exact": False,
@@ -552,10 +578,14 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
     command = next((item for item in scenario["commands"]
                     if item["unit_id"] == args.attacker), None)
     if command is None:
-        raise ValueError("combat attacker has no command in fixture")
-    if command["kind"] not in {"attack", "attack-move", "attack-ground",
-                               "patrol", "stand-ground"}:
-        raise ValueError("combat fixture command is not an attack stance")
+        if args.stance not in {"still", "automatic"}:
+            raise ValueError("combat attacker has no command in fixture")
+        issue_cycle = int(scenario.get("start_cycle") or 5)
+    else:
+        if command["kind"] not in {"attack", "attack-move", "attack-ground",
+                                   "patrol", "stand-ground"}:
+            raise ValueError("combat fixture command is not an attack stance")
+        issue_cycle = int(command["issue_cycle"])
     evidence_dir = output.parent / (output.stem + ".evidence")
     evidence_dir.mkdir(parents=True, exist_ok=True)
     scenario_path = evidence_dir / "scenario.json"
@@ -612,7 +642,7 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
     rows = derive_rows(native, java, encounter=args.encounter,
                        stance=args.stance, attacker=args.attacker,
                        defender=args.defender,
-                       issue_cycle=int(command["issue_cycle"]),
+                       issue_cycle=issue_cycle,
                        evidence_sha256=receipt_identity)
     def evidence_item(path: Path) -> dict[str, Any]:
         path = path.expanduser().resolve()

@@ -275,8 +275,14 @@ acquire c5, projectile-create c18, projectile-flight c19, impact/damage c25,
 retaliation c30 and swing c33, including the first constructor-damage
 consumer (`0x0041834b` / `battleNetProjectileDamage`). Death is still 214 vs
 217 and free is 1520 vs 1524, so those two ranged cells stay open. Chase is
-not observed -- the thrower is already in range. That is **13/185 certified**,
-not a claim that combat as a whole is complete.
+not observed -- the thrower is already in range.
+
+Human 13 catapult 1479's opening still-stance rock is also certified at
+acquire c5, projectile-create c5 and projectile-flight c6. Impact is exact
+at c35 but the struck knight's dest-arm tile still differs at c29, so that
+cell is not causal-exact. Splash has no second observed HP drop on the
+impact cycle. That is **16/185 certified**, not a claim that combat as a
+whole is complete.
 
 Native projectile receipts now carry the constructor cycle, source slot and
 fixed-pool slot. The adapter combines that authenticated source pointer with

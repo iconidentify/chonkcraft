@@ -272,6 +272,61 @@ class CombatLifecycleTest(unittest.TestCase):
         self.assertFalse(projectile["native_observed"])
         self.assertFalse(projectile["exact"])
 
+    def test_splash_damage_needs_a_center_and_a_surrounding_drop(self):
+        def result(side, neighbor_hp=(40, 40, 32)):
+            events = []
+            for cycle, hp, other in (
+                    (20, 40, neighbor_hp[0]),
+                    (24, 40, neighbor_hp[1]),
+                    (25, 28, neighbor_hp[2])):
+                events.extend([
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 10,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 1, "y": 1, "offset_x": 32, "offset_y": 32,
+                     "order": "ATTACK_GROUND", "hit_points": 110,
+                     "target_id": None, "missile_count": 1},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 20,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 5, "y": 1, "offset_x": 160, "offset_y": 32,
+                     "order": "STILL", "hit_points": hp,
+                     "target_id": None, "missile_count": 1},
+                    {"cycle": cycle, "kind": "combat-state", "unit_id": 21,
+                     "present": True, "alive": True, "on_map": True,
+                     "x": 6, "y": 1, "offset_x": 192, "offset_y": 32,
+                     "order": "STILL", "hit_points": other,
+                     "target_id": None, "missile_count": 1},
+                ])
+            events.extend([
+                {"cycle": 20, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": True,
+                 "source_id": 10, "target_id": 20, "type_code": 13,
+                 "x": 40, "y": 40, "remaining": 96},
+                {"cycle": 21, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": True,
+                 "source_id": 10, "target_id": 20, "type_code": 13,
+                 "x": 48, "y": 40, "remaining": 88},
+                {"cycle": 25, "kind": "combat-projectile",
+                 "projectile_id": "rock", "present": False,
+                 "source_id": 10, "target_id": 20, "type_code": 13,
+                 "x": 160, "y": 32, "remaining": -1},
+            ])
+            return {"side": side, "events": events}
+
+        rows = combat.derive_rows(
+            result("native"), result("java"), encounter="siege",
+            stance="attack-ground", attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="g" * 64)
+        splash = {row["phase"]: row for row in rows}["splash-damage"]
+        self.assertTrue(splash["exact"])
+        self.assertEqual(25, splash["native_cycle"])
+
+        lonely = combat.derive_rows(
+            result("native", neighbor_hp=(40, 40, 40)),
+            result("java", neighbor_hp=(40, 40, 40)),
+            encounter="siege", stance="attack-ground", attacker=10,
+            defender=20, issue_cycle=5, evidence_sha256="h" * 64)
+        self.assertNotIn("splash-damage", {row["phase"] for row in lonely})
+
 
 if __name__ == "__main__":
     unittest.main()
