@@ -143,6 +143,7 @@ class CausalEvent:
 def parse_native_trace(text: str, source: str = "native-trace") \
         -> list[CausalEvent]:
     events: list[CausalEvent] = []
+    last_cycle: int | None = None
     for line in text.splitlines():
         marker = "# bne-trace "
         if marker not in line:
@@ -153,6 +154,13 @@ def parse_native_trace(text: str, source: str = "native-trace") \
         if not isinstance(native_name, str):
             continue
         cycle = fields.get("cycle")
+        if isinstance(cycle, int):
+            last_cycle = cycle
+        elif last_cycle is not None:
+            # Older projectile-created lines omitted cycle=. They sit
+            # between that tick's async-random draws, so the preceding
+            # numbered event is the constructor cycle.
+            cycle = last_cycle
         events.append(CausalEvent(
             side="native", ordinal=len(events),
             kind=NATIVE_KIND.get(native_name, "native." + native_name),

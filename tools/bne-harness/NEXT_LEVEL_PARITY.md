@@ -267,16 +267,16 @@ fill a pinned-native proof row by themselves.
 The first complete native/Java transaction is now certified: Orc 1 grunt 1592
 attacking footman 1595 is exact at acquire c9, chase c13, retaliation c160,
 swing c204, damage c214, death c439 and free c1345, including the exact melee
-damage RNG consumer. That is **7/185 certified**, not a claim that combat as a
-whole is complete.
+damage RNG consumer.
 
-The first ranged causal shot is also observable end to end. In authenticated
-Human 13, a commanded axethrower creates its axe on c18, the shot is in flight
-on c19, and it impacts and damages on c25 on both engines. The struck knight
-retaliates on c30 and starts its swing on c33 on both engines. Those seven
-phase times are exact, but the row remains uncertified because the surrounding
-asynchronous RNG order is not yet exact. The gate deliberately distinguishes
-"this shot's lifecycle matches" from "the whole causal prefix matches."
+The first ranged attack transaction is now certified on the same bar. In
+authenticated Human 13, axethrower 1494 attacking knight 1493 is exact at
+acquire c5, projectile-create c18, projectile-flight c19, impact/damage c25,
+retaliation c30 and swing c33, including the first constructor-damage
+consumer (`0x0041834b` / `battleNetProjectileDamage`). Death is still 214 vs
+217 and free is 1520 vs 1524, so those two ranged cells stay open. Chase is
+not observed -- the thrower is already in range. That is **13/185 certified**,
+not a claim that combat as a whole is complete.
 
 Native projectile receipts now carry the constructor cycle, source slot and
 fixed-pool slot. The adapter combines that authenticated source pointer with

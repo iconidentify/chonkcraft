@@ -277,27 +277,74 @@ def projectile_counts_by_cycle(fixture: Path) -> dict[int, int]:
     return counts
 
 
+# Weapon type bytes written by the ordinary / mobile constructors. Impact
+# sprites (type 21) are a later detonation object and must not steal a
+# constructor source.
+_CONSTRUCTOR_PROJECTILE_TYPES = {13, 14, 15, 16, 24}
+
+
+def _constructor_sources(trace: str) \
+        -> tuple[dict[tuple[int, int], int], dict[int, list[int]]]:
+    """Map constructor births to pool slots.
+
+    Current tracer lines carry cycle and projectile-slot. Older sealed
+    captures omit both; those events still name the source unit and sit
+    among that tick's async draws. The allocator takes the lowest free
+    weapon slot, so unmatched births pair to newly occupied constructor
+    types in slot order -- which is why Human 13's axe is unit 1494 in
+    slot 8 at cycle 18 even though that fixture predates the slot field.
+    """
+    explicit: dict[tuple[int, int], int] = {}
+    pending: dict[int, list[int]] = {}
+    for event in parse_native_trace(trace):
+        if event.kind != "projectile.create" or event.cycle is None:
+            continue
+        source = event.fields.get("unit")
+        if not isinstance(source, int):
+            continue
+        slot = event.fields.get("projectile-slot")
+        if isinstance(slot, int) and slot >= 0:
+            explicit[(event.cycle, slot)] = source
+        else:
+            pending.setdefault(event.cycle, []).append(source)
+    return explicit, pending
+
+
+def _resolve_target(raw: bytes, source: int) -> int | None:
+    source_pointer = _uint(raw, 0x30, 4)
+    target_pointer = _uint(raw, 0x2c, 4)
+    if not source_pointer or not target_pointer:
+        return None
+    unit_pool_base = source_pointer - source * 152
+    delta = target_pointer - unit_pool_base
+    if delta >= 0 and delta % 152 == 0 and delta // 152 < 1600:
+        return delta // 152
+    return None
+
+
+def _slot_from_pointer(pointer: int, pool_base: int) -> int | None:
+    if not pointer:
+        return None
+    delta = pointer - pool_base
+    if delta >= 0 and delta % 152 == 0 and delta // 152 < 1600:
+        return delta // 152
+    return None
+
+
 def projectile_states_by_cycle(fixture: Path) \
         -> dict[int, list[dict[str, Any]]]:
     """Rebuild every live projectile identity and state at each native tick.
 
     The AUXL stream supplies slot generations and exact 64-byte records. The
     constructor hook supplies the otherwise-missing source-unit relationship.
-    Old fixtures without the cycle/slot hook remain usable, but their source is
-    deliberately null and therefore cannot certify a source-specific phase.
+    Older fixtures omit projectile-slot; those births still pair to the
+    lowest newly occupied constructor slots of that cycle.
     """
     with zipfile.ZipFile(fixture) as archive:
         payload = archive.read("state.bin")
         trace = (archive.read("trace.txt").decode("utf-8", "replace")
                  if "trace.txt" in archive.namelist() else "")
-    sources: dict[tuple[int, int], int] = {}
-    for event in parse_native_trace(trace):
-        if event.kind != "projectile.create" or event.cycle is None:
-            continue
-        slot = event.fields.get("projectile-slot")
-        source = event.fields.get("unit")
-        if isinstance(slot, int) and slot >= 0 and isinstance(source, int):
-            sources[(event.cycle, slot)] = source
+    sources, pending = _constructor_sources(trace)
 
     cursor = io.BytesIO(payload)
     state_header = cursor.read(STATE_HEADER.size)
@@ -306,6 +353,8 @@ def projectile_states_by_cycle(fixture: Path) \
     players = STATE_HEADER.unpack(state_header)[6]
     cycle = 0
     records: dict[int, tuple[int, bytes, int | None, int | None]] = {}
+    previous_active: dict[int, int] = {}
+    unit_pool_base: int | None = None
     result: dict[int, list[dict[str, Any]]] = {}
     while True:
         header = cursor.read(CHUNK_HEADER.size)
@@ -336,19 +385,61 @@ def projectile_states_by_cycle(fixture: Path) \
             source = sources.get((cycle, slot))
             target = None
             if source is not None:
-                source_pointer = _uint(raw, 0x30, 4)
-                target_pointer = _uint(raw, 0x2c, 4)
-                if source_pointer and target_pointer:
-                    unit_pool_base = source_pointer - source * 152
-                    delta = target_pointer - unit_pool_base
-                    if delta >= 0 and delta % 152 == 0 \
-                            and delta // 152 < 1600:
-                        target = delta // 152
+                target = _resolve_target(raw, source)
+                pointer = _uint(raw, 0x30, 4)
+                if pointer:
+                    unit_pool_base = pointer - source * 152
             if source is None and previous is not None \
                     and previous[0] == generation:
                 source = previous[2]
                 target = previous[3]
+            if source is None and unit_pool_base is not None:
+                # Towers use the fixed constructor at 0x0040fdc0, which the
+                # mobile 0x0040fb10 hook never sees. Once any hooked birth
+                # has established the unit-pool base, +0x30/+0x2c resolve
+                # those arrows the same way the hooked shots already do.
+                source = _slot_from_pointer(_uint(raw, 0x30, 4), unit_pool_base)
+                if source is not None:
+                    target = _resolve_target(raw, source)
             records[slot] = (generation, raw, source, target)
+        unmatched = list(pending.get(cycle, []))
+        if unmatched:
+            # Occupants already named by an explicit slot stay put. Only
+            # newly occupied constructor types take the remaining births
+            # in slot order -- retail's allocator scan. A still-flying
+            # unnamed slot must not steal a later constructor.
+            newly = []
+            for slot in sorted(records):
+                if slot >= bullet_count:
+                    continue
+                generation, raw, source, _target = records[slot]
+                if source is not None or not active_projectile_count(raw):
+                    continue
+                if raw[0x34] not in _CONSTRUCTOR_PROJECTILE_TYPES:
+                    continue
+                if previous_active.get(slot) == generation:
+                    continue
+                newly.append(slot)
+            for slot, source in zip(newly, unmatched):
+                generation, raw, _, _ = records[slot]
+                records[slot] = (generation, raw, source,
+                                 _resolve_target(raw, source))
+                pointer = _uint(raw, 0x30, 4)
+                if pointer:
+                    unit_pool_base = pointer - source * 152
+        if unit_pool_base is not None:
+            for slot, (generation, raw, source, _target) in list(records.items()):
+                if source is not None or not active_projectile_count(raw):
+                    continue
+                named = _slot_from_pointer(_uint(raw, 0x30, 4), unit_pool_base)
+                if named is None:
+                    continue
+                records[slot] = (generation, raw, named,
+                                 _resolve_target(raw, named))
+        previous_active = {
+            slot: item[0] for slot, item in records.items()
+            if slot < bullet_count and active_projectile_count(item[1])
+        }
         visible = []
         for slot in sorted(records):
             if slot >= bullet_count:

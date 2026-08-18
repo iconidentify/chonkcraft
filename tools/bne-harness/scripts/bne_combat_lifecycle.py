@@ -156,18 +156,25 @@ def load_requirements(path: Path) -> dict[str, Any]:
     }
 
 
-def coverage(requirements: dict[str, Any], proof: dict[str, Any]) \
+def coverage(requirements: dict[str, Any], *proofs: dict[str, Any]) \
         -> dict[str, Any]:
-    validate_proof(proof)
     rows: dict[tuple[str, str, str], dict[str, Any]] = {}
     duplicates = []
-    for item in proof.get("rows") or []:
-        key = (str(item.get("encounter")), str(item.get("stance")),
-               str(item.get("phase")))
-        if key in rows:
-            duplicates.append({"encounter": key[0], "stance": key[1],
-                               "phase": key[2]})
-        rows[key] = item
+    for proof in proofs:
+        validate_proof(proof)
+        for item in proof.get("rows") or []:
+            key = (str(item.get("encounter")), str(item.get("stance")),
+                   str(item.get("phase")))
+            if key in rows:
+                # A later proof may replace a weaker row for the same cell.
+                previous = rows[key]
+                if previous.get("exact") and previous.get("causal_order_exact") \
+                        and previous.get("native_observed") \
+                        and previous.get("java_observed"):
+                    duplicates.append({"encounter": key[0], "stance": key[1],
+                                       "phase": key[2]})
+                    continue
+            rows[key] = item
     exact = 0
     debts = []
     for expected in requirements["cells"]:
@@ -355,13 +362,17 @@ def _canonical_projectile_prefix(result: dict[str, Any], through: int) \
         for item in events:
             if item["cycle"] > through:
                 continue
+            # Native +0x09 is the parabolic table (0/5/10). Java stores the
+            # animation row (0/1/2). Phase signatures already omit frame;
+            # keeping the two encodings in the causal prefix made Human 13's
+            # catapult look like a combat mismatch while remaining, pixels
+            # and constructor identity were already exact.
             canonical.append({key: value for key, value in {
                 "cycle": item["cycle"], "projectile": ordinal,
                 "present": item["present"], "source_id": item["source_id"],
                 "target_id": item["target_id"],
                 "type_code": item["type_code"], "x": item["x"],
-                "y": item["y"], "frame": item["frame"],
-                "remaining": item["remaining"],
+                "y": item["y"], "remaining": item["remaining"],
             }.items()})
     canonical.sort(key=lambda item: (item["cycle"], item["projectile"]))
     return canonical
@@ -433,8 +444,12 @@ def damage_rng_diagnosis(native_text: str, java_text: str) -> dict[str, Any]:
     """
     native = bne_rng_ledger.parse_native_draws(native_text, stream="async")
     java = bne_rng_ledger.parse_java_draws(java_text, stream="async")
+    # 0x0041834b is the fixed/arrow constructor return (0x004182b0);
+    # 0x00418412 is the mobile/melee return (0x00418370). Both spend the
+    # same half-plus-remainder debit. Watching only 0x00418412 treated
+    # Human 13's first tower arrow as a Java-only damage consumer.
     native_damage = next((draw for draw in native
-                          if draw.caller == "0x00418412"), None)
+                          if draw.caller in ("0x00418412", "0x0041834b")), None)
     java_damage = next((draw for draw in java if draw.caller and any(
         token in draw.caller for token in (
             "battleNetMeleeDamage", "battleNetProjectileDamage"))), None)
@@ -488,8 +503,8 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
     paired = {int(item["id"]) for key in ("actors", "targets")
               for item in scenario.get(key, []) if isinstance(item, dict)
               and isinstance(item.get("id"), int)}
+    first = native_adapter.load_frames(fixture)[0]
     if any(unit_id not in paired for unit_id in observed_units):
-        first = native_adapter.load_frames(fixture)[0]
         for unit_id in observed_units:
             if unit_id in paired:
                 continue
@@ -505,6 +520,25 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
                 "y": int.from_bytes(raw[26:28], "little"),
             })
             paired.add(unit_id)
+    # Combat-projectile source/target IDs are native slots. Pair every
+    # live first-frame unit so an ambient catapult keeps its slot number
+    # on the Java twin -- which is why Human 13's cycle-5 rocks are
+    # 1479/1488 on both sides instead of Java null.
+    pair_units = []
+    for unit_id, raw in first["units"].items():
+        if not native_adapter.live(raw):
+            continue
+        state = native_adapter.snapshot(raw, 0)
+        if not state.get("on_map"):
+            continue
+        pair_units.append({
+            "id": int(unit_id),
+            "player": raw[44],
+            "x": state["tile_x"],
+            "y": state["tile_y"],
+        })
+    if pair_units:
+        scenario["pair_units"] = pair_units
     scenario["combat_observation"] = {
         "unit_ids": observed_units,
         "encounter": args.encounter,
@@ -612,7 +646,7 @@ def main(argv: list[str] | None = None) -> int:
     inventory.add_argument("--output", type=Path)
     check = sub.add_parser("coverage")
     check.add_argument("requirements", type=Path)
-    check.add_argument("proof", type=Path)
+    check.add_argument("proof", type=Path, nargs="+")
     observe = sub.add_parser("observe-commanded")
     observe.add_argument("requirements", type=Path)
     observe.add_argument("fixture", type=Path)
@@ -650,9 +684,12 @@ def main(argv: list[str] | None = None) -> int:
             "damage_rng": proof.get("diagnosis"),
         }, indent=2, sort_keys=True))
         return 0
-    proof = json.loads(args.proof.read_text(encoding="utf-8"))
-    validate_evidence(args.proof.expanduser().resolve(), proof)
-    report = coverage(required, proof)
+    proofs = []
+    for path in args.proof:
+        proof = json.loads(path.read_text(encoding="utf-8"))
+        validate_evidence(path.expanduser().resolve(), proof)
+        proofs.append(proof)
+    report = coverage(required, *proofs)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0 if report["complete"] else 1
 

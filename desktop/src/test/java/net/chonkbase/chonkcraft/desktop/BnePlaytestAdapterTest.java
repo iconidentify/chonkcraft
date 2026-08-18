@@ -188,6 +188,103 @@ class BnePlaytestAdapterTest {
     }
 
     @Test
+    @DisplayName("human 13 combat-state counts only constructor-debited shots")
+    void human13CombatStateCountsOnlyConstructorDebitedShots() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-playtest-h13-prefix-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        String scenarioSha = "f".repeat(64);
+        String scenario = """
+                {
+                  "schema": "chonkcraft-bne-playtest-scenario-1",
+                  "scenario_sha256": "%s",
+                  "seed_identity": {"fixture": "human13-ranged-prefix"},
+                  "setup": {
+                    "kind": "sealed-fixture",
+                    "scenario": "Campaign\\\\Human\\\\Human13.pud",
+                    "seed": 1
+                  },
+                  "pattern": "single",
+                  "settle_cycles": 10,
+                  "combat_observation": {
+                    "encounter": "ranged-infantry",
+                    "stance": "attack",
+                    "unit_ids": [1494]
+                  },
+                  "actors": [
+                    {"id": 1494, "player": 0, "domain": "land",
+                     "capabilities": ["attack"], "x": 118, "y": 29,
+                     "target_ids": [1493]}
+                  ],
+                  "pair_units": [
+                    {"id": 1479, "player": 0, "x": 118, "y": 36}
+                  ],
+                  "targets": [
+                    {"id": 1493, "player": 1, "domain": "land",
+                     "x": 120, "y": 29}
+                  ],
+                  "commands": [
+                    {"kind": "attack", "unit_id": 1494, "target_id": 1493,
+                     "queued": false, "issue_cycle": 5}
+                  ]
+                }
+                """.formatted(scenarioSha);
+        Map<String, Object> parsed = Json.parseObject(scenario);
+        parsed.put("scenario_sha256", scenarioSha);
+        Files.writeString(scenarioPath, Json.write(parsed), StandardCharsets.UTF_8);
+
+        BnePlaytestAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "c".repeat(64),
+        });
+
+        Map<String, Object> result = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        int cycleFour = -1;
+        int cycleFive = -1;
+        for (Object raw : (List<?>) result.get("events")) {
+            Map<?, ?> event = (Map<?, ?>) raw;
+            if (!"combat-state".equals(event.get("kind"))) {
+                continue;
+            }
+            int cycle = ((Number) event.get("cycle")).intValue();
+            int count = ((Number) event.get("missile_count")).intValue();
+            if (cycle == 4) {
+                cycleFour = count;
+            }
+            if (cycle == 5) {
+                cycleFive = count;
+            }
+        }
+        assertEquals(0, cycleFour,
+                "cycle 4 still has only presentation placeholders; retail "
+                        + "AUXL is empty until the constructor boundary");
+        assertTrue(cycleFive >= 2,
+                "cycle 5 constructs the two catapult rocks retail already "
+                        + "shows in the pool");
+        boolean namedCatapult = false;
+        for (Object raw : (List<?>) result.get("events")) {
+            Map<?, ?> event = (Map<?, ?>) raw;
+            if (!"combat-projectile".equals(event.get("kind"))) {
+                continue;
+            }
+            if (((Number) event.get("cycle")).intValue() != 5) {
+                continue;
+            }
+            if (event.get("source_id") instanceof Number source
+                    && source.intValue() == 1479) {
+                namedCatapult = true;
+                break;
+            }
+        }
+        assertTrue(namedCatapult,
+                "the cycle-5 rock must keep native slot 1479 after pairing");
+    }
+
+    @Test
     @DisplayName("an orc 1 grunt hall mend reports first progress at fixture 9")
     void anOrc1GruntHallMendReportsFirstProgressAtFixture9() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,

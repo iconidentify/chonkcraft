@@ -88,6 +88,12 @@ public final class BnePlaytestAdapter {
                 nativeToJava.putAll(pairActors(
                         array(scenario.get("targets"), "targets"), world));
             }
+            if (scenario.get("pair_units") instanceof List<?> pairing
+                    && !pairing.isEmpty()) {
+                nativeToJava.putAll(pairRoster(
+                        array(scenario.get("pair_units"), "pair_units"),
+                        world, nativeToJava));
+            }
             List<Integer> lifecycleUnits = lifecycleUnits(scenario, nativeToJava);
             List<Map<String, Object>> lifecycleEvents = new ArrayList<>();
             Map<Integer, Integer> javaToNative = new HashMap<>();
@@ -329,7 +335,7 @@ public final class BnePlaytestAdapter {
             state.put("on_map", false);
             state.put("hit_points", 0);
             state.put("carried", 0);
-            state.put("missile_count", world.missiles().size());
+            state.put("missile_count", constructedMissileCount(world));
             state.put("cargo_count", 0);
             return state;
         }
@@ -345,9 +351,27 @@ public final class BnePlaytestAdapter {
         state.put("carried", unit.carried());
         state.put("alive", unit.isAlive());
         state.put("on_map", unit.isOnMap());
-        state.put("missile_count", world.missiles().size());
+        state.put("missile_count", constructedMissileCount(world));
         state.put("cargo_count", unit.cargo().size());
         return state;
+    }
+
+    /**
+     * Native AUXL only counts shots that have crossed the projectile
+     * constructor. Presentation placeholders used to sit in the Java list
+     * first, so Human 13's two catapults made cycle 4 {@code missile_count}
+     * 2 while retail still reported 0 -- which is why the ranged causal
+     * prefix failed before the commanded axe existed.
+     */
+    private static int constructedMissileCount(
+            net.chonkbase.chonkcraft.engine.World world) {
+        int count = 0;
+        for (Missile missile : world.missiles()) {
+            if (world.battleNetProjectileConstructed(missile)) {
+                count++;
+            }
+        }
+        return count;
     }
 
     private static List<Integer> lifecycleUnits(Map<String, Object> scenario,
@@ -397,7 +421,7 @@ public final class BnePlaytestAdapter {
         // mapping needs a separately authenticated pointer-table observation;
         // do not pretend a Java id and a retail pointer are comparable.
         event.put("target_id", null);
-        event.put("missile_count", world.missiles().size());
+        event.put("missile_count", constructedMissileCount(world));
         return event;
     }
 
@@ -482,6 +506,42 @@ public final class BnePlaytestAdapter {
             paired.put(nativeId, existing.id());
         }
         require(!paired.isEmpty(), "playtest scenario paired no actors");
+        return paired;
+    }
+
+    /**
+     * Best-effort native-slot map for every first-frame unit. Combat
+     * projectile events speak native slot numbers; an ambient catapult
+     * that is not an actor used to become {@code source_id=null} and
+     * broke the Human 13 causal prefix while the shot itself matched.
+     */
+    private static Map<Integer, Integer> pairRoster(List<Object> roster,
+            net.chonkbase.chonkcraft.engine.World world,
+            Map<Integer, Integer> already) {
+        Map<Integer, Integer> paired = new LinkedHashMap<>();
+        for (Object value : roster) {
+            Map<String, Object> item = object(value, "pair unit");
+            int nativeId = number(item.get("id"), "pair unit id");
+            if (already.containsKey(nativeId) || paired.containsKey(nativeId)) {
+                continue;
+            }
+            if (!(item.get("x") instanceof Number) || !(item.get("y") instanceof Number)) {
+                continue;
+            }
+            int x = number(item.get("x"), "pair unit x");
+            int y = number(item.get("y"), "pair unit y");
+            int player = optionalNumber(item.get("player"), 0);
+            List<Unit> matches = world.unitsSnapshot().stream()
+                    .filter(Unit::isAlive)
+                    .filter(Unit::isOnMap)
+                    .filter(unit -> unit.player() == player)
+                    .filter(unit -> unit.tileX() == x && unit.tileY() == y)
+                    .toList();
+            if (matches.size() != 1) {
+                continue;
+            }
+            paired.put(nativeId, matches.getFirst().id());
+        }
         return paired;
     }
 

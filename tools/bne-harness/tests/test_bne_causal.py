@@ -44,6 +44,17 @@ class BneCausalTest(unittest.TestCase):
         self.assertEqual("rng.sync.draw", first["native"]["kind"])
         self.assertEqual(23, first["native"]["cycle"])
 
+    def test_projectile_created_inherits_the_surrounding_cycle(self):
+        events = bne_causal.parse_native_trace("""\
+# bne-trace event=async-random cycle=18 caller=00418412 before=1 after=2 result=3
+# bne-trace event=projectile-created unit=1494 type=9 seed-before=1 seed-after=2
+# bne-trace event=async-random cycle=18 caller=0040AD58 before=2 after=3 result=4
+""")
+        created = [event for event in events if event.kind == "projectile.create"]
+        self.assertEqual(1, len(created))
+        self.assertEqual(18, created[0].cycle)
+        self.assertEqual(1494, created[0].fields["unit"])
+
     def test_distinguishes_sync_seed_from_sync_draw(self):
         events = bne_causal.parse_native_trace("""\
 # bne-trace event=master-seed-call observed=1 applied=1 deterministic=true

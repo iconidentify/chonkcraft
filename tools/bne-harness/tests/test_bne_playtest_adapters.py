@@ -109,6 +109,37 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertEqual(24, result["observations"][1]["terminal_cycle"],
                          "the replacement itself still fulfills when order 15 pops")
 
+    def test_human13_constructor_without_slot_still_names_the_commanded_axe(self):
+        fixture = (
+            Path(__file__).resolve().parents[1]
+            / "work/combat-lifecycle/native/combat-ranged-human13-1800.bnefx"
+        )
+        self.assertTrue(fixture.is_file(), "authenticated Human 13 ranged fixture")
+        created = [
+            item for item in native.projectile_states_by_cycle(fixture).get(18, [])
+            if item.get("source_id") == 1494 and item.get("present")
+        ]
+        self.assertEqual(1, len(created),
+                         "retail's cycle-18 constructor is axethrower 1494; "
+                         "the older projectile-created line omits the slot, "
+                         "but AUXL still records that birth")
+        self.assertEqual(16, created[0]["type_code"],
+                         "unit 1494 fires a type-16 axe")
+        self.assertEqual(1493, created[0]["target_id"],
+                         "the commanded axe is aimed at knight 1493")
+        arrows = [
+            item for item in native.projectile_states_by_cycle(fixture).get(7, [])
+            if item.get("type_code") == 15 and item.get("present")
+        ]
+        self.assertEqual(1, len(arrows),
+                         "fixture cycle 7 has one tower arrow")
+        self.assertEqual(1481, arrows[0]["source_id"],
+                         "the fixed constructor is not hooked; +0x30 still "
+                         "names guard tower 1481 once a hooked birth has "
+                         "established the unit-pool base")
+        self.assertEqual(1490, arrows[0]["target_id"],
+                         "the tower arrow is aimed at knight 1490")
+
     def test_native_adapter_counts_in_flight_shots_on_the_terminal_cycle(self):
         fixture = (
             Path(__file__).resolve().parents[1]

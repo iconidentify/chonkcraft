@@ -326,13 +326,14 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     for name in (
             "command_report", "player_certification", "replay_certification",
             "replay_corpus",
-            "ai_conductor_report", "ai_discovery", "native_ai", "java_ai", "combat_proof",
+            "ai_conductor_report", "ai_discovery", "native_ai", "java_ai",
             "campaign_proof", "divergence_work_order", "divergence_pointer"):
         value = getattr(args, name, None)
         if value is not None:
             evidence_paths.append(value)
     evidence_paths.extend(getattr(args, "player_transaction", []) or [])
     evidence_paths.extend(getattr(args, "replay_report", []) or [])
+    evidence_paths.extend(getattr(args, "combat_proof", []) or [])
     gate_identity = identity(args.root, evidence_paths)
     current_engine = str(gate_identity["engine"]["engine_input_sha256"])
     current_program = str(gate_identity["program_input_sha256"])
@@ -398,17 +399,19 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     java_coverage = ai.coverage_report(java) if java else {
         "complete": False, "debt": "no current-head per-cycle Java AI ledger"}
     combat_requirements = combat.load_requirements(args.combat_requirements)
-    combat_proof = load(args.combat_proof)
-    combat_coverage = (combat.coverage(combat_requirements, combat_proof)
-                       if combat_proof else {
+    combat_proofs = [loaded for path in (args.combat_proof or [])
+                     if (loaded := load(path))]
+    combat_coverage = (combat.coverage(combat_requirements, *combat_proofs)
+                       if combat_proofs else {
                            "complete": False,
                            "exact": 0,
                            "required": combat_requirements["required_cells"],
                            "debt": "no pinned-native combat lifecycle proof receipt",
                        })
-    combat_authority = (combat_proof or {}).get("authority") or {}
+    combat_authority = (combat_proofs[0] if combat_proofs else {}).get(
+        "authority") or {}
     combat_current = bool(
-        combat_proof
+        combat_proofs
         and combat_authority.get("native_executable_sha256")
         == conductor.PINNED
         and combat_authority.get("java_engine_input_sha256") == current_engine
@@ -600,7 +603,8 @@ def main(argv: list[str] | None = None) -> int:
                         default=conductor.DEFAULT_PACK)
     parser.add_argument("--combat-requirements", type=Path,
                         default=Path("tools/bne-harness/combat-lifecycle-requirements.json"))
-    parser.add_argument("--combat-proof", type=Path)
+    parser.add_argument("--combat-proof", type=Path, action="append",
+                        default=[])
     parser.add_argument("--catalog", type=Path,
                         default=Path("engine/src/main/resources/chonkcraft/missions.tsv"))
     parser.add_argument("--campaign-proof", type=Path)

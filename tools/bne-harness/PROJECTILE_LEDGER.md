@@ -132,7 +132,9 @@ excluded until the retail constructor boundary is actually crossed.
 Native uses fixed slot plus generation as its local identity; Java uses a
 creation ordinal. The combat compiler canonicalizes both by birth order only
 after source/target/type are authenticated, so allocator-local numbers never
-become a false parity requirement. Human 13 now proves an axethrower shot at
-create c18, first flight c19 and impact/damage c25 on both engines. The larger
-asynchronous RNG prefix still differs, so that ranged lifecycle is reported as
-phase-exact but not yet certified.
+become a false parity requirement. Human 13 now certifies an axethrower shot
+at create c18, first flight c19 and impact/damage c25 on both engines, with
+exact native/Java observation, result and causal order. Older
+`projectile-created` lines omit the pool slot; those births pair to newly
+occupied constructor types in slot order, and a hooked birth's `+0x30`
+establishes the unit-pool base that names later unhooked tower arrows.

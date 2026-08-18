@@ -114,7 +114,10 @@ if [[ -n "${BNE_JAVA_AI_LEDGER:-}" ]]; then
   STATUS_ARGS+=(--java-ai "$BNE_JAVA_AI_LEDGER")
 fi
 if [[ -n "${BNE_COMBAT_PROOF:-}" ]]; then
-  STATUS_ARGS+=(--combat-proof "$BNE_COMBAT_PROOF")
+  IFS=':' read -r -a COMBAT_PROOFS <<< "$BNE_COMBAT_PROOF"
+  for proof in "${COMBAT_PROOFS[@]}"; do
+    STATUS_ARGS+=(--combat-proof "$proof")
+  done
 fi
 if [[ -n "${BNE_CAMPAIGN_PROOF:-}" ]]; then
   STATUS_ARGS+=(--campaign-proof "$BNE_CAMPAIGN_PROOF")

@@ -35,6 +35,26 @@ class CombatLifecycleTest(unittest.TestCase):
             "building-destruction",
         }, observed)
 
+    def test_coverage_merges_certified_rows_from_two_proofs(self):
+        required = combat.load_requirements(REQUIREMENTS)
+        melee = [{
+            **{key: item[key] for key in ("encounter", "stance", "phase")},
+            "native_observed": True, "java_observed": True,
+            "exact": True, "causal_order_exact": True,
+        } for item in required["cells"] if item["encounter"] == "melee-infantry"
+            and item["stance"] == "attack"]
+        ranged = [{
+            **{key: item[key] for key in ("encounter", "stance", "phase")},
+            "native_observed": True, "java_observed": True,
+            "exact": True, "causal_order_exact": True,
+        } for item in required["cells"] if item["encounter"] == "ranged-infantry"
+            and item["stance"] == "attack"
+            and item["phase"] in {"acquire", "swing", "projectile-create",
+                                  "projectile-flight", "damage", "retaliation"}]
+        report = combat.coverage(required, self.proof(melee), self.proof(ranged))
+        self.assertEqual(len(melee) + len(ranged), report["exact"])
+        self.assertFalse(report["complete"])
+
     def test_generated_matrix_is_not_native_proof(self):
         required = combat.load_requirements(REQUIREMENTS)
         report = combat.coverage(required, self.proof([]))
@@ -162,6 +182,32 @@ class CombatLifecycleTest(unittest.TestCase):
         self.assertEqual("0x0040ad58", report[
             "native_consumer_of_java_damage_seed"]["caller"])
 
+    def test_fixed_constructor_damage_return_is_a_damage_consumer(self):
+        # Human 13's first projectile debit is a tower arrow: native
+        # 0x0041834b, Java battleNetProjectileDamage. The mobile return
+        # 0x00418412 is a later axe. Both spend the same half-band helper.
+        native = "\n".join([
+            "# bne-trace event=async-random cycle=7 caller=0041834B "
+            "before=2884522246 after=3072498239 result=14114",
+            "# bne-trace event=async-random cycle=13 caller=00418412 "
+            "before=3161131417 after=2548013742 result=6111",
+        ])
+        java = "\n".join([
+            '{"schema":1,"side":"java","kind":"rng.async.draw",'
+            '"cycle":9,"fields":{"before":2884522246,'
+            '"after":3072498239,"result":14114,'
+            '"caller":"BattleNetProjectileSystem.battleNetProjectileDamage"}}',
+            '{"schema":1,"side":"java","kind":"rng.async.draw",'
+            '"cycle":15,"fields":{"before":3161131417,'
+            '"after":2548013742,"result":6111,'
+            '"caller":"BattleNetProjectileSystem.battleNetProjectileDamage"}}',
+        ])
+        report = combat.damage_rng_diagnosis(native, java)
+        self.assertTrue(report["exact"],
+                        "the first constructor debit is the same transition")
+        self.assertEqual("exact-damage-consumer", report["classification"])
+        self.assertEqual("0x0041834b", report["native_damage"]["caller"])
+
     def test_projectile_phases_require_the_commanded_attacker(self):
         def result(side, create=20, move=21, source=10):
             events = []
@@ -202,6 +248,20 @@ class CombatLifecycleTest(unittest.TestCase):
         self.assertTrue(phases["projectile-create"]["causal_order_exact"])
         self.assertTrue(phases["projectile-flight"]["causal_order_exact"])
         self.assertTrue(phases["impact"]["causal_order_exact"])
+
+        native_table = result("native")
+        java_row = result("java")
+        for event in native_table["events"]:
+            if event.get("kind") == "combat-projectile":
+                event["frame"] = 10
+        framed = combat.derive_rows(
+            native_table, java_row, encounter="ranged-infantry",
+            stance="attack", attacker=10, defender=20, issue_cycle=5,
+            evidence_sha256="e2" * 32)
+        self.assertTrue({row["phase"]: row for row in framed}[
+            "projectile-create"]["causal_order_exact"],
+            "native +0x09 table values and Java animation rows are not a "
+            "combat mismatch")
 
         absent = combat.derive_rows(
             result("native", source=99), result("java"),
