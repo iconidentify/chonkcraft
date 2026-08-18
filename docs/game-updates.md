@@ -83,10 +83,15 @@ makes every publication immutable, and remains independent of an installer's
 human-facing marketing version.
 
 The workflow derives a concise title and change list from the commits in the
-push. `CHONKCRAFT_RELEASE_TITLE` and `CHONKCRAFT_RELEASE_NOTES` remain explicit
-inputs for a curated or manually dispatched publication. Before signing, the
-pipeline uses the production launcher's embedded trust keys to fetch the prior
-history, appends the new entry, and writes a content-addressed replacement.
+push. A checked-in `RELEASE_NOTES.md` is used only when that file changed in
+the publishing push, or when an operator intentionally dispatches a release;
+its old text is never recycled merely because the file still exists.
+`CHONKCRAFT_RELEASE_TITLE` and `CHONKCRAFT_RELEASE_NOTES` remain explicit inputs
+for a curated publication. Before signing, the pipeline uses the production
+launcher's embedded trust keys to fetch the prior history, keeps only the
+newest occurrence of a repeated release title or body, appends the new entry,
+and writes a content-addressed replacement. This compacts accidental rebuilds
+without removing distinct historical releases.
 
 The workflow:
 

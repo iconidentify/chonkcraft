@@ -7,9 +7,12 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.Properties;
 
 /** A bounded, deterministic history of authenticated game publications. */
@@ -115,15 +118,35 @@ public final class ReleaseNotesCatalog {
     }
 
     public static History append(History previous, Entry current) {
-        Map<String, Entry> unique = new LinkedHashMap<>();
-        unique.put(current.version(), current);
-        for (Entry entry : previous.entries()) {
-            unique.putIfAbsent(entry.version(), entry);
-            if (unique.size() == MAX_ENTRIES) {
+        List<Entry> newestFirst = new ArrayList<>();
+        newestFirst.add(current);
+        newestFirst.addAll(previous.entries());
+
+        Map<String, Entry> uniqueVersions = new LinkedHashMap<>();
+        Set<String> uniqueTitles = new HashSet<>();
+        Set<String> uniqueBodies = new HashSet<>();
+        for (Entry entry : newestFirst) {
+            String title = storyKey(entry.title());
+            String body = storyKey(entry.body());
+            if (uniqueVersions.containsKey(entry.version())
+                    || (!title.isEmpty() && uniqueTitles.contains(title))
+                    || (!body.isEmpty() && uniqueBodies.contains(body))) {
+                continue;
+            }
+            uniqueVersions.put(entry.version(), entry);
+            uniqueTitles.add(title);
+            uniqueBodies.add(body);
+            if (uniqueVersions.size() == MAX_ENTRIES) {
                 break;
             }
         }
-        return new History(List.copyOf(unique.values()));
+        return new History(List.copyOf(uniqueVersions.values()));
+    }
+
+    /** Identifies one player-facing release story across automatic rebuilds. */
+    private static String storyKey(String value) {
+        return value == null ? "" : value.strip().toLowerCase(Locale.ROOT)
+                .replaceAll("\\s+", " ");
     }
 
     static History fromRelease(GameReleaseManager.Release release) {

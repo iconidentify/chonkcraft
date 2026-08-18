@@ -16,6 +16,7 @@ on:
       - '*/pom.xml'
       - scripts/release/build-update-assets.sh
       - scripts/release/publish-update-kubernetes.sh
+      - RELEASE_NOTES.md
       - .github/workflows/publish-game-update.yml
   workflow_dispatch:
     inputs:
@@ -77,14 +78,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -s RELEASE_NOTES.md ]]; then
+          before='${{ github.event.before }}'
+          curated=false
+          if [[ '${{ github.event_name }}' == workflow_dispatch ]]; then
+            curated=true
+          elif [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] \
+              && git cat-file -e "$before^{commit}" 2>/dev/null \
+              && ! git diff --quiet "$before" "${GITHUB_SHA}" -- RELEASE_NOTES.md; then
+            curated=true
+          fi
+          if [[ "$curated" == true && -s RELEASE_NOTES.md ]]; then
             title="$(sed -n '1s/^# //p' RELEASE_NOTES.md)"
             notes="$(tail -n +3 RELEASE_NOTES.md)"
             test -n "$title"
             test -n "$notes"
           else
             title="$(git log -1 --pretty=%s)"
-            before='${{ github.event.before }}'
             if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] \
                 && git cat-file -e "$before^{commit}" 2>/dev/null; then
               notes="$(git log --reverse --pretty='- %s' "$before..${GITHUB_SHA}")"
