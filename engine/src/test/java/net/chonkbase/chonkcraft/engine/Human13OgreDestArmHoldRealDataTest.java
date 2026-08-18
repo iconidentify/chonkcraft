@@ -2,7 +2,6 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,10 +78,8 @@ class Human13OgreDestArmHoldRealDataTest {
         assertEquals(76, firstChip,
                 "native first chips that knight at fixture 76 after the "
                         + "Attack start body hold, not " + firstChip);
-        assertTrue(knight.hitPoints() < 87,
-                "the dest-arm leftover melee must chip the knight at "
-                        + "fixture 76; hp after that blow is "
-                        + knight.hitPoints());
+        assertEquals(81, knight.hitPoints(),
+                "native's first dest-arm melee is 87 to 81 at fixture 76");
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

@@ -1174,6 +1174,9 @@ class BattleNetIdleAttackTest {
                 "the first leftover dest-arms around the ogre, not through it");
         assertEquals(11, knight.tileY(),
                 "the first leftover dest-arms south-east onto the free skirt");
+        assertEquals(1, knight.pathLength(),
+                "dest-arm leftover remaining is one heading after the dest-arm "
+                        + "step; a full pathfind leftover residual-opens past OP0");
         assertSame(ogre, knight.target(),
                 "the free-scan may name the ogre after the leftover is written");
     }

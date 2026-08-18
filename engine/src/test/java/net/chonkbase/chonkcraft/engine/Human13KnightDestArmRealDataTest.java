@@ -69,6 +69,12 @@ class Human13KnightDestArmRealDataTest {
         assertEquals(30 * Unit.TILE_PIXELS,
                 knight.tileY() * Unit.TILE_PIXELS + knight.offsetY(),
                 "dest-arm keeps the pixels on 124,30");
+        assertEquals(1, knight.pathLength(),
+                "native dest-arm leftover is SE,S with the SE already spent; "
+                        + "two remaining souths residual-opened past OP0");
+        assertEquals(net.chonkbase.chonkcraft.engine.map.Direction.fromDelta(0, 1),
+                knight.peekHeading(),
+                "the leftover heading after dest-arm SE is due south");
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

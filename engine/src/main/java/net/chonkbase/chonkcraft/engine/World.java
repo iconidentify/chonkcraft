@@ -5527,6 +5527,24 @@ public final class World {
     }
 
     /**
+     * Keeps dest-arm leftover's first two headings (dest-arm step + one more).
+     *
+     * <p>Pathfinder headings are reverse order: last entry is the first
+     * step. A standing offered acquire used to keep the whole chase route,
+     * so dest-arm leftover remaining was two souths after 1490's SE step.
+     */
+    private static PathFinder.Path keepBattleNetDestArmLeftoverHeadings(
+            PathFinder.Path path) {
+        int[] heads = path.headings();
+        int n = heads.length;
+        if (n <= 2) {
+            return path;
+        }
+        return new PathFinder.Path(path.result(),
+                new int[] {heads[n - 2], heads[n - 1]});
+    }
+
+    /**
      * Prefers the free equal-cost diagonal that skirts a hostile sitting two
      * tiles along a cardinal leftover.
      *
@@ -9803,6 +9821,14 @@ public final class World {
             // current face when free (1500 face 7 → NW; 1493 SE still wins).
             path = preferBattleNetFaceFirstHeading(unit, path, target);
             path = preferBattleNetSkirtDiagonalFirstHeading(unit, path, target);
+            // Dest-arm leftover from a standing offered acquire is dest-arm
+            // plus one more heading. Human 13 knight 1490 dest-arms SE,S
+            // (pathi 1) onto 125,31. A full pathfind leftover (S,S after the
+            // dest-arm) residual-opened past OP0 and chipped the ogre at 51
+            // instead of Attack start 1922/3 then 54.
+            if (!unit.chasing() && path.length() > 2) {
+                path = keepBattleNetDestArmLeftoverHeadings(path);
+            }
         }
         if (path.length() > 0 && unit.battleNetPersonHelpFirstChase()) {
             // Person-help first chase only: equal-cost diagonal onto a lead

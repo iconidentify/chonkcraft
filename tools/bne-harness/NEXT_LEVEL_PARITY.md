@@ -289,9 +289,12 @@ stands in melee range used to pay the out-of-range replan Attack-four
 delay and re-arm construction: Human 13 grunt 1485 residual-lands
 beside wise-man 1496 at fixture 41 and native opens Attack@2539/3,
 keeps the leftover heading through 3,2,1, and first chips at 54.
-Java used to land that blow at 57. Death is still 214 vs 226 and free
-is 1520 vs 1532, so those two ranged cells stay open. Chase is not
-observed -- the thrower is already in range.
+Java used to land that blow at 57. Dest-arm leftover from a standing
+offered acquire is dest-arm plus one more heading: knight 1490 dest-arms
+SE,S onto 125,31. A full pathfind leftover residual-opened past OP0 and
+chipped ogre 1482 at 51 instead of Attack start 1922/3 then 54. Death
+is still 214 vs 223 and free is 1520 vs 1530, so those two ranged cells
+stay open. Chase is not observed -- the thrower is already in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.

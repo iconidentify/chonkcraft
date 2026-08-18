@@ -665,8 +665,14 @@ final class BattleNetCombatSystem {
             // the last pixels were still owed, so without this arm Java
             // stayed on the Move body, then leftover-discarded the heading
             // and re-armed construction three cycles late (1485 chip 57).
-            if (inRangeReplanSettle
+            // Dest-arm leftover remaining one heading (1490 SE,S with SE
+            // already spent) uses the same Attack start 3 keep. Replan
+            // leftover 1485 is the other witness. Ordinary chase leftover
+            // after several steps still residual-opens past OP0 (1592).
+            if (world.actionMoveWalked && !unit.isMoving()
                     && unit.pathLength() == 1
+                    && (inRangeReplanSettle
+                            || unit.battleNetPathStepsTaken() == 1)
                     && unit.type() != null
                     && unit.type().maxAttackRange() <= 1
                     && world.battleNetMoveAnimation(unit)
