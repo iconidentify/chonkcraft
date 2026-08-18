@@ -273,9 +273,13 @@ The first ranged attack transaction is now certified on the same bar. In
 authenticated Human 13, axethrower 1494 attacking knight 1493 is exact at
 acquire c5, projectile-create c18, projectile-flight c19, impact/damage c25,
 retaliation c30 and swing c33, including the first constructor-damage
-consumer (`0x0041834b` / `battleNetProjectileDamage`). Death is still 214 vs
-217 and free is 1520 vs 1524, so those two ranged cells stay open. Chase is
-not observed -- the thrower is already in range.
+consumer (`0x0041834b` / `battleNetProjectileDamage`). After that first
+swing, dest-arm leftover residual used to walk Attack start into opcode
+10: ambient axe 1505 constructed at c38 and added a third live shot.
+Native keeps construction timer 3 then the start wait 63 on 887, so that
+axe never throws through fixture 42. Death is still 214 vs 216 and free
+is 1520 vs 1523, so those two ranged cells stay open. Chase is not
+observed -- the thrower is already in range.
 
 Human 13 catapult 1479's opening still-stance rock is also certified at
 acquire c5, projectile-create c5, projectile-flight c6 and impact c35.

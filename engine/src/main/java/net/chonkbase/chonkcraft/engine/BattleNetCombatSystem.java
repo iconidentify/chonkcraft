@@ -4151,21 +4151,25 @@ final class BattleNetCombatSystem {
         // Human 13 axe 1483/117: after an out-of-range OP0 and a Move→Attack
         // resume, the next in-range OP0 stays on attackStart with timer 63
         // (native sealed c26–42) and does not construct through fixture 42.
-        // Advancing into windup/OP10 spent the three-draw constructor at world
-        // 38 and shifted critter 1399. Require both the approach OP0 and the
-        // Move resume so pure in-range first swings (early axes, XHuman 12)
-        // still walk the windup.
+        // Human 13 axe 1505 is the same start wait after a dest-arm leftover
+        // residual lands in range: native is 887 timer 3,2,1 then 63, and
+        // never builds the extra axe Java used to throw at fixture 38.
+        // Construction timer 3 is not that start opcode wait -- ticking OP0
+        // into windup spent the three-draw constructor and shifted later
+        // damage. The chase flag may already be clear by the OP0 visit
+        // (in-range leftover discard runs after the first resume tick).
+        // Pure in-range first swings never resume from Move, so they still
+        // walk the windup (early axes, XHuman 12).
         if (tick.actionMarker()
                 && attackStart >= 0
                 && offset == attackStart
                 && unit.battleNetAttackResumeFromMove()
-                && unit.battleNetAttackOp0OutOfRange()
                 && unit.type() != null
                 && unit.type().firesMissile()
                 && unit.canMove()) {
             Unit tgt = unit.target();
             if (tgt != null && tgt.isAlive() && world.targets.inAttackRange(unit, tgt)
-                    && !unit.chasing() && !unit.isMoving()
+                    && !unit.isMoving()
                     && (tgt.type() == null || !tgt.type().building())) {
                 unit.setBattleNetAttackResumeFromMove(false);
                 unit.setBattleNetAttackOp0OutOfRange(false);
@@ -4176,6 +4180,13 @@ final class BattleNetCombatSystem {
                 }
                 unit.setBattleNetSequenceOffset(attackStart);
                 unit.setBattleNetAnimationTimer(63);
+                if (unit.chasing() && unit.pathLength() == 0) {
+                    // Dest-arm leftover residual already put the thrower in
+                    // weapon range. Leaving chase set used to dest-arm again
+                    // on the same visit and walk off the stall.
+                    unit.setChasing(false);
+                    unit.setFighting(true);
+                }
                 if (World.BNE_PEND_TRACE) {
                     System.err.printf("JBNEATTACKHOLD cycle=%d unit=%d "
                                     + "approach+resume timer=63 freeScan=%d%n",

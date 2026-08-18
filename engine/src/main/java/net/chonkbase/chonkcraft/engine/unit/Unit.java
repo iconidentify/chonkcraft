@@ -2514,8 +2514,10 @@ public final class Unit {
 
     /**
      * Attack program was cold-restarted from a live Move cursor while already
-     * in weapon range. Human 13 axe 1483's next in-range OP0 stalls on the
-     * attack-start offset (timer 63) rather than walking into OP10.
+     * in weapon range. The next in-range OP0 stalls on the attack-start
+     * offset (timer 63) rather than walking into OP10: Human 13 axe 1483
+     * after an approach, and axe 1505 after a dest-arm leftover residual
+     * lands in range.
      */
     public boolean battleNetAttackResumeFromMove() {
         return battleNetAttackResumeFromMove;

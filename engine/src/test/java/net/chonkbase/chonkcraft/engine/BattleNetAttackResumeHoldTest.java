@@ -183,4 +183,129 @@ class BattleNetAttackResumeHoldTest {
                 "presentation during approach-hold must not launch a pending "
                         + "axe while the sequence is still on attack-start");
     }
+
+    @Test
+    @DisplayName("a dest-arm leftover residual axe stalls on attack-start op0 with timer 63")
+    void aDestArmLeftoverResidualAxeStallsOnAttackStartOp0WithTimer63()
+            throws Exception {
+        // Human 13 axe 1505 dest-arms onto 124,25, lands the leftover
+        // residual in range of the knight, then native stays on 887 with
+        // construction 3,2,1 and seals timer 63. Java used to consume that
+        // start wait as the construction timer, walk into OP10, and throw
+        // at fixture 38.
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                9, BattleNetSequence.ATTACK_ANIMATION);
+        int moveStart = sequence.sequenceStart(
+                9, BattleNetSequence.MOVE_ANIMATION);
+        assumeTrue(attackStart == 887,
+                "retail axe Attack must start at script offset 887");
+        assumeTrue(moveStart >= 0, "retail axe Move sequence must resolve");
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(axethrower(), 0, 10, 8);
+        Unit target = world.createUnit(prey(), 1, 12, 8);
+        assumeTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.targets.inAttackRange(attacker, target),
+                "the dest-arm residual lands already in weapon range");
+        assertTrue(world.orderAttack(attacker, target),
+                "axe must accept the in-range attack order");
+
+        // Dest-arm leftover residual just landed: exhausted route, still
+        // chasing, cursor on the Move body. Opening OP0 was in range, so
+        // the 1483 approach flag is off -- this is the 1505 seam.
+        attacker.setChasing(true);
+        attacker.setFighting(false);
+        attacker.clearPath();
+        attacker.setBattleNetSequenceOffset(moveStart + 4);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetAttackResumeFromMove(false);
+        attacker.setBattleNetAttackOp0OutOfRange(false);
+
+        int guard = 0;
+        while (attacker.battleNetAnimationTimer() != 63 && guard++ < 12) {
+            world.tick();
+        }
+        assertEquals(attackStart, attacker.battleNetSequenceOffset(),
+                "dest-arm leftover residual must remain on attack-start, "
+                        + "not walk into the windup/OP10");
+        assertEquals(63, attacker.battleNetAnimationTimer(),
+                "native Human 13 axe 1505 seals timer 63 after dest-arm "
+                        + "leftover residual lands in range");
+        assertTrue(attacker.battleNetAttackResumeHoldActive(),
+                "dest-arm residual hold must suppress presentation "
+                        + "projectile queueing");
+        assertTrue(!attacker.chasing(),
+                "an arrived dest-arm residual is no longer a chase");
+
+        int missilesBefore = 0;
+        for (var ignored : world.missiles()) {
+            missilesBefore++;
+        }
+        world.hit(attacker, target);
+        int missilesAfter = 0;
+        for (var ignored : world.missiles()) {
+            missilesAfter++;
+        }
+        assertEquals(missilesBefore, missilesAfter,
+                "presentation during dest-arm residual hold must not launch "
+                        + "a pending axe while the sequence is still on "
+                        + "attack-start");
+    }
+
+    @Test
+    @DisplayName("an already in-range axe walks the opening attack wait")
+    void anAlreadyInRangeAxeWalksTheOpeningAttackWait() throws Exception {
+        // Human 13's first commanded axe starts in range and must still
+        // construct. Sealing timer 63 on every Attack open would stall that
+        // first shot.
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                9, BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 887,
+                "retail axe Attack must start at script offset 887");
+
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(axethrower(), 0, 10, 8);
+        Unit target = world.createUnit(prey(), 1, 12, 8);
+        assumeTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.targets.inAttackRange(attacker, target),
+                "the first swing starts already in weapon range");
+        assertTrue(world.orderAttack(attacker, target),
+                "axe must accept the in-range attack order");
+        attacker.setBattleNetSequenceOffset(attackStart);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setChasing(false);
+        attacker.setBattleNetAttackResumeFromMove(false);
+        attacker.setBattleNetAttackOp0OutOfRange(false);
+
+        int guard = 0;
+        while (attacker.battleNetSequenceOffset() == attackStart
+                && attacker.battleNetAnimationTimer() != 63
+                && guard++ < 16) {
+            world.tick();
+        }
+        assertTrue(attacker.battleNetSequenceOffset() > attackStart,
+                "a cold in-range first swing must walk past attack-start "
+                        + "into the windup, not seal timer 63");
+        assertTrue(attacker.battleNetAnimationTimer() != 63,
+                "timer 63 is the dest-arm/approach hold, not the first "
+                        + "in-range swing");
+    }
 }
