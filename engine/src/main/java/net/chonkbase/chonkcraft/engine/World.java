@@ -6565,7 +6565,16 @@ public final class World {
         // exits its peon at 18,9 toward the Great Hall order point 21,8;
         // scoring against centre 23,10 incorrectly preferred 18,10.
         return dropOutNearestOnSide(unit, towards.tileX(), towards.tileY(),
-                BattleNetMovementSystem.headingTowards(container, towards),
+                sideOf(BattleNetMovementSystem.headingTowards(container, towards)),
+                container, unit.tileX(), unit.tileY());
+    }
+
+    /** Resource emergence toward an exact native order point. */
+    int[] placeResourceBesidePoint(Unit unit, Unit container,
+            int goalX, int goalY) {
+        return dropOutNearestOnSide(unit, goalX, goalY,
+                dropOutSideTowards(container.tileX(), container.tileY(),
+                        goalX, goalY, container.heading()),
                 container, unit.tileX(), unit.tileY());
     }
 
@@ -7680,6 +7689,36 @@ public final class World {
     }
 
     /**
+     * The face selected by retail's unrounded 256-step direction.
+     *
+     * <p>The sprite stores only an eight-way facing, but DropOutNearest makes
+     * its face decision before that angle is rounded. Its comparisons split
+     * at the exact diagonal headings: north is {@code [N, NE)}, east is
+     * {@code [NE, SE)}, south is {@code [SE, SW)}, and the remaining arc is
+     * west. Consequently a shallow south-east vector can animate as SE while
+     * still leaving through the east face. XHuman 8's Stronghold-to-mine
+     * vector {@code (+7,+4)} is the sealed example.</p>
+     */
+    private static int dropOutSideTowards(int fromX, int fromY,
+            int goalX, int goalY, int fallbackHeading) {
+        long dx = (long) goalX - fromX;
+        long dy = (long) goalY - fromY;
+        if (dx == 0 && dy == 0) {
+            return sideOf(fallbackHeading);
+        }
+        if (dy < 0 && dx >= 0 && dx < -dy) {
+            return LEG_NORTH;
+        }
+        if (dx > 0 && dx >= -dy && dx > dy) {
+            return LEG_EAST;
+        }
+        if (dy > 0 && dy >= dx && dy > -dx) {
+            return LEG_SOUTH;
+        }
+        return LEG_WEST;
+    }
+
+    /**
      * Finds the nearest free square on the face pointing toward a goal.
      *
      * <p>Resource drop-out is face-directed before it is distance-directed.
@@ -7694,7 +7733,7 @@ public final class World {
      * square at (10,83), not the goal-nearest east square at (10,81).</p>
      */
     private int[] dropOutNearestOnSide(Unit unit, int goalX, int goalY,
-            int heading, Unit container, int startX, int startY) {
+            int initialSide, Unit container, int startX, int startY) {
         UnitType type = unit.type();
         long mask = Unit.movementMaskFor(type);
         long blocking = Unit.blockingFlagsFor(type);
@@ -7706,7 +7745,7 @@ public final class World {
         int addx = Math.max(1, container.type().tileWidth()) + width - 1;
         int addy = Math.max(1, container.type().tileHeight()) + height - 1;
         int leg;
-        switch (sideOf(heading)) {
+        switch (initialSide) {
             case LEG_NORTH -> {
                 x += addx - 1;
                 y -= 1;

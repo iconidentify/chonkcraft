@@ -282,6 +282,25 @@ class DropOutTest {
                 "fallback faces retain DropOutOnSide traversal order");
     }
 
+    @Test
+    void aShallowSouthEastResourceVectorKeepsTheNativeEastFace() {
+        World world = new World(grass(100));
+        Unit hall = world.createUnit(townHall(), 0, 53, 66);
+        Unit mine = world.createUnit(goldMine(), World.NEUTRAL_PLAYER, 60, 70);
+        Unit worker = world.createUnit(peasant(), 0, 40, 40);
+        assertNotNull(hall);
+        assertNotNull(mine);
+        assertNotNull(worker);
+
+        int[] spot = world.placeResourceBesidePoint(worker, hall,
+                mine.tileX(), mine.tileY());
+
+        assertNotNull(spot);
+        assertEquals(57, spot[0]);
+        assertEquals(69, spot[1],
+                "the unrounded (+7,+4) angle is east even though its sprite faces SE");
+    }
+
     /**
      * The other half of the round trip, {@code :1145}. The worker is <em>removed into</em> the depot for the
      * wait-at-depot pause -- it is off the map, not standing outside -- and
@@ -316,11 +335,11 @@ class DropOutTest {
         assertTrue(wentInside, "the worker never went into the hall to unload");
         assertEquals(100, world.player(0).get(Resource.GOLD), "the load should have been banked");
         assertNotNull(cameOutAt, "the worker never came back out of the hall");
-        // The hall spans (2..5, 2..5) and the mine's centre is (21,11), which
-        // is south-east of it. The nearest square on the ring is the corner
-        // (6,6).
+        // The hall spans (2..5, 2..5). The mine's exact order point (20,10)
+        // remains inside retail's east angular band, so the worker takes the
+        // closest square on that face rather than the diagonal corner.
         assertEquals(6, cameOutAt[0], "come out of the side the mine is on");
-        assertEquals(6, cameOutAt[1], "come out of the side the mine is on");
+        assertEquals(5, cameOutAt[1], "come out of the side the mine is on");
     }
 
     @Test

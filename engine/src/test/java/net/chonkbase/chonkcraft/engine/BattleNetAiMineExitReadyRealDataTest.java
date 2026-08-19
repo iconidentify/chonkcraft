@@ -161,6 +161,27 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 8 Stronghold exit keeps BNE's shallow east face")
+    void anXHuman8StrongholdExitKeepsBnesShallowEastFace() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 440; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 57, 69);
+        assertNotNull(peon,
+                "native slot 1501 must leave the Stronghold's east face on cycle 440");
+        assertEquals(Unit.Order.STILL, peon.order());
+        assertEquals(25, peon.battleNetOrderDelay());
+        assertEquals(1, peon.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                peon.queuedOrders().get(0).kind());
+        assertEquals(60, peon.queuedOrders().get(0).x());
+        assertEquals(70, peon.queuedOrders().get(0).y());
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

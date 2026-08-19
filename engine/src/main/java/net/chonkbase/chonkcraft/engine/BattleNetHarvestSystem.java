@@ -3144,13 +3144,25 @@ final class BattleNetHarvestSystem {
         boolean depotReadyAssigned = landReadyBoundary
                 && world.battleNetDepotUnitReady(worker);
 
+        // The callback may deliberately keep the current resource job. It is
+        // still stored as next action 23 behind the same timed Still head:
+        // XHuman 8 peon 1501 surfaces at fixture 440 with timer 25 even though
+        // 0x439280 leaves its remembered mine unchanged.
+        if (world.battleNetSequence != null
+                && landReadyBoundary && !depotReadyAssigned
+                && !worker.hasQueuedOrders() && mine != null) {
+            queueDepotHarvestContinuation(worker, mine,
+                    mine.tileX(), mine.tileY());
+        }
+
         boolean assignedBuild = depotReadyAssigned
                 && worker.pendingBuild() != null;
         int[] assignedGoal = null;
         if (depotReadyAssigned && !assignedBuild
                 && worker.resourceUnit() != null
                 && worker.resourceUnit().isAlive()) {
-            assignedGoal = World.centreOf(worker.resourceUnit());
+            assignedGoal = new int[] {
+                    worker.resourceUnit().tileX(), worker.resourceUnit().tileY()};
         } else if (depotReadyAssigned && !assignedBuild
                 && world.map.contains(
                         worker.resourceTileX(), worker.resourceTileY())) {
@@ -3169,12 +3181,14 @@ final class BattleNetHarvestSystem {
             spot = world.dropOutOnSide(worker.type(), World.LOOKING_WEST,
                     depot, worker.tileX(), worker.tileY());
         } else if (assignedGoal != null) {
-            spot = world.dropOutNearest(worker.type(), assignedGoal[0],
-                    assignedGoal[1], depot, worker.tileX(), worker.tileY());
+            // The ready callback has already authored the next order. Native
+            // uses that exact point and its unrounded direction to select a
+            // face, rather than admitting a geometrically nearer corner.
+            spot = world.placeResourceBesidePoint(worker, depot,
+                    assignedGoal[0], assignedGoal[1]);
         } else if (mine != null) {
-            int[] goal = World.centreOf(mine);
-            spot = world.dropOutNearest(worker.type(), goal[0], goal[1], depot,
-                    worker.tileX(), worker.tileY());
+            spot = world.placeResourceBesidePoint(worker, depot,
+                    mine.tileX(), mine.tileY());
         } else if (info.terrainHarvester()) {
             // FindTerrainType out from the square it last worked, then
             // DropOutNearest to whatever that found: a lumberjack leaves by
@@ -3211,8 +3225,13 @@ final class BattleNetHarvestSystem {
             }
             if (wood != null) {
                 worker.setResourceTile(wood[0], wood[1]);
-                spot = world.dropOutNearest(worker.type(), wood[0], wood[1], depot,
-                        worker.tileX(), worker.tileY());
+                if (world.battleNetSequence != null
+                        && landReadyBoundary && !worker.hasQueuedOrders()) {
+                    queueDepotHarvestContinuation(worker, null,
+                            wood[0], wood[1]);
+                }
+                spot = world.placeResourceBesidePoint(worker, depot,
+                        wood[0], wood[1]);
             } else {
                 // Nothing within ten squares of where it was working. Out of
                 // the west face and stand down, which is the Finished branch
@@ -3273,6 +3292,18 @@ final class BattleNetHarvestSystem {
             // cycle 492 on the west side of its hall, then Still at 493.
             worker.setOrderFinished(true);
         }
+    }
+
+
+    /** Keeps an unchanged resource loop behind a depot-ready Still head. */
+    private void queueDepotHarvestContinuation(Unit worker, Unit resource,
+            int tileX, int tileY) {
+        worker.enqueueOrder(new Unit.QueuedOrder(
+                Unit.QueuedOrderKind.HARVEST, tileX, tileY,
+                resource, null, null));
+        worker.setQueuedReplacementPending(true);
+        // The queue is visited once at the bottom of this unit tick.
+        worker.setBattleNetOrderDelay(26);
     }
 
 
