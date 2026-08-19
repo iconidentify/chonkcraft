@@ -11,9 +11,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.zip.ZipFile;
+import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
+import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -534,5 +537,60 @@ class MeleeAttackSyncLoopTest {
                         + Integer.toHexString(seedBefore));
         assertTrue(attacker.battleNetMeleeSyncRemaining() > 0,
                 "first debit must arm the twenty-five-cycle attack loop");
+    }
+
+    @Test
+    @DisplayName("xhuman 12's tower chaser pays SyncRand on its fixture-22 landing")
+    void xhuman12TowerChaserPaysSyncRandOnItsFixture22Landing() {
+        // XHuman 12 grunt 1379 (Java 221) reaches pixel 384,2720 beside the
+        // guard tower at fixture 22. Native changes Move 2534/1 to Attack
+        // 2540/1 and calls FUN_004234b0 on that same visit. Java drained the
+        // final two pixels, then cold-opened Attack 2539/3 and paid four
+        // fixture cycles late.
+        AssetSource assets = AssetSource.fromEnvironment();
+        assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        PudMap source = data.campaignMap(map);
+        assumeTrue(source != null, "XHuman 12 is not in the pack");
+        Mission mission = data.loadMission(map, GameData.personIn(source), 1);
+        assumeTrue(mission != null, "XHuman 12 will not load");
+        World world = mission.world();
+        Unit attacker = world.unitsSnapshot().stream()
+                .filter(unit -> unit.type() != null
+                        && "unit-grunt".equals(unit.type().ident())
+                        && unit.tileX() == 11 && unit.tileY() == 84)
+                .findFirst().orElse(null);
+        assertTrue(attacker != null,
+                "XHuman 12 must contain native grunt 1379 / Java 221");
+
+        for (int tick = 0; tick < 2; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 22; fixture++) {
+            mission.tick();
+            if (fixture == 21) {
+                assertEquals(1, world.randomSeed(),
+                        "native's first synchronized draw is not before fixture 22");
+            }
+        }
+
+        assertEquals(0x41c67ea6, world.randomSeed(),
+                "the landing visit must consume exactly one synchronized draw");
+        assertEquals(12, attacker.tileX(),
+                "native grunt 1379 lands on 12,85 at fixture 22");
+        assertEquals(85, attacker.tileY(),
+                "native grunt 1379 lands on 12,85 at fixture 22");
+        assertEquals(0, attacker.offsetX(),
+                "the fixture-22 landing must drain the horizontal residual");
+        assertEquals(0, attacker.offsetY(),
+                "the fixture-22 landing must drain the vertical residual");
+        assertEquals(2540, attacker.battleNetSequenceOffset(),
+                "the landing visit must open Attack past OP0, not construction 2539/3");
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "native is already on Attack 2540/1 after the landing visit");
+        assertTrue(attacker.battleNetMeleeSyncRemaining() > 0,
+                "the landing debit must arm the twenty-five-cycle melee loop");
     }
 }

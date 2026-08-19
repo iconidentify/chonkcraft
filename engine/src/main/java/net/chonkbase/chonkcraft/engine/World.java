@@ -13754,7 +13754,22 @@ public final class World {
         // debit on timer 1; native spends the heading at OP0 (index 20) at
         // F44. pathLen 0 and ≥2 residual settles keep the ordinary debit
         // (F36 wise-man+grunt pair).
-        if (unit.chasing() && unit.pathLength() == 1) {
+        boolean buildingResidualArrival = actionMoveWalked
+                && unit.chasing()
+                && unit.pathLength() == 1
+                && target.type() != null
+                && target.type().building();
+        if (buildingResidualArrival) {
+            // A one-heading skirt leftover beside a building is a refused
+            // quarry square, not the live leftover retained beside a unit.
+            // XHuman 12 grunt 1379 reaches pixel 384,2720 beside guard tower
+            // 1370 at fixture 22 with S still cached. Native marks route index
+            // 20, opens Attack at 2540/1, and calls FUN_004234b0 on that same
+            // residual-zero visit. Cold construction paid at fixture 26.
+            openBattleNetAttackAfterChaseResidual(unit, true);
+        }
+        if (unit.chasing() && unit.pathLength() == 1
+                && !buildingResidualArrival) {
             int attackStart = battleNetSequence == null || idle == null
                     ? -1
                     : idle.battleNetSequenceStart(unit,
