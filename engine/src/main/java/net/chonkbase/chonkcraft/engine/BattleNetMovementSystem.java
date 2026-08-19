@@ -1075,6 +1075,17 @@ final class BattleNetMovementSystem {
             if (worker.isMoving()) {
                 return;
             }
+            // A type-two land assault discards a cached patrol route after
+            // its third consecutive equal heading. The final step then
+            // settles here, before walkTowards has installed the replacement
+            // route. Charge native's Still construction at this boundary;
+            // waiting until stepMove is too late because the fresh twenty-
+            // heading route has already hidden the empty cursor by then.
+            // Orc 11 archer 1559 therefore holds fixtures 50..52 and commits
+            // its replacement NE only on fixture 53.
+            if (holdBattleNetPatrolStraightRunResidual(worker)) {
+                return;
+            }
             // GiveOrder 17 leftover-land beside an unenterable click is
             // Still. Native 1594 lands 27,17 at 43; PF_WAIT 10 stayed
             // Attack Ground through the window.
@@ -2294,19 +2305,8 @@ final class BattleNetMovementSystem {
                 // then replans -- Orc 11 archer 1559 Still@50 step@53 (+3 gap).
                 // Immediate replan free-stepped the next NE at fixture 50;
                 // PF_WAIT 10 was seven cycles late.
-                if (walkedThisCycle && unit.stepDrained()
-                        && unit.battleNetBorrowedMoveForStep()
-                        && unit.battleNetPatrolStraightRunExhausted()) {
-                    unit.setBattleNetPatrolStraightRunExhausted(false);
-                    unit.setRouteSpent(false);
-                    resetDisplacement(unit);
-                    unit.setWaitCycles(0);
-                    unit.setBattleNetOrderDelay(2);
-                    if (world.battleNetSequence != null) {
-                        unit.setBattleNetSequenceOffset(
-                                world.idle.battleNetStillSequenceStart(unit));
-                        unit.setBattleNetAnimationTimer(3);
-                    }
+                if (walkedThisCycle
+                        && holdBattleNetPatrolStraightRunResidual(unit)) {
                     return;
                 }
                 // Residual settle of the last path step under MOVE: native
@@ -4395,6 +4395,33 @@ final class BattleNetMovementSystem {
             unit.setRandomMoveSleep(0);
             unit.setAttackScanSleep(0);
         }
+    }
+
+
+    /** Charges Still construction after a type-two patrol straight run. */
+    private boolean holdBattleNetPatrolStraightRunResidual(Unit unit) {
+        if (unit == null
+                || !unit.battleNetPatrolStraightRunExhausted()
+                || unit.pathLength() != 0
+                || unit.isMoving()
+                || !unit.stepDrained()
+                || unit.battleNetAiBehavior() != 2
+                || unit.patrolX() < 0 || unit.patrolY() < 0
+                || (unit.order() != Unit.Order.PATROL
+                        && !unit.battleNetBorrowedMoveForStep())) {
+            return false;
+        }
+        unit.setBattleNetPatrolStraightRunExhausted(false);
+        unit.setRouteSpent(false);
+        resetDisplacement(unit);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(2);
+        if (world.battleNetSequence != null) {
+            unit.setBattleNetSequenceOffset(
+                    world.idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(3);
+        }
+        return true;
     }
 
 
