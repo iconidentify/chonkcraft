@@ -2669,6 +2669,27 @@ final class BattleNetMovementSystem {
                                     ? world.canEnterBattleNetTransportAnchor(
                                             unit, nextX, nextY)
                             : world.canEnter(unit, nextX, nextY);
+            // An empty-route retarget residual returns from Attack-four on
+            // the same native visit that a higher-slot cooperative ally
+            // vacates the replacement route's first cell. Java visits this
+            // grunt first, so its cache still contains that ally even though
+            // native has already let the ally move. The unit cache supports
+            // the brief overlap and rebuilds occupancy when the ally leaves;
+            // admit only this authenticated post-hold OP0 step, and only for
+            // a cooperative blocker that is already moving elsewhere.
+            // XHuman 12 grunt 1507 therefore commits E onto 28,38 at fixture
+            // 55 instead of soft-waiting one extra visit.
+            if (!canTakeStep
+                    && chaseMoveSequence
+                    && unit.battleNetChaseStepReady()
+                    && unit.battleNetChaseEmptyRouteReplan()
+                    && unit.battleNetChaseReplanResidualHold()) {
+                Unit postHoldBlocker = world.unitAt(nextX, nextY);
+                if (world.battleNetCooperativeBlocker(
+                        unit, postHoldBlocker)) {
+                    canTakeStep = true;
+                }
+            }
             if (World.TRACE_MOVING != null && unit.id() == World.TRACE_MOVING_ID) {
                 Unit decideBlocker = world.unitAt(nextX, nextY);
                 long decideFlags = world.map.contains(nextX, nextY)

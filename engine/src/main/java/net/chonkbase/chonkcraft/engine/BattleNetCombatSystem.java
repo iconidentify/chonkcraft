@@ -670,6 +670,16 @@ final class BattleNetCombatSystem {
                     unit.setBattleNetChaseReplanResidualHold(false);
                     unit.setBattleNetEmptyRouteFreeDetourHold(false);
                     unit.setBattleNetOrderDelay(2);
+                    if (freeDetourResidualHold) {
+                        // Attack-four owns the two following visits, but its
+                        // expiry hands the replacement route a Move decision
+                        // immediately. Keep both the permit and provenance
+                        // sticky through the delay so XHuman 12 grunt 1507
+                        // free-scans and steps E on fixture 55 rather than
+                        // only laying E,SE there and waiting another visit.
+                        unit.setBattleNetChaseStepReady(true);
+                        unit.setBattleNetChaseEmptyRouteReplan(true);
+                    }
                     return;
                 }
                 inRangeReplanSettle = replanResidualHold;
@@ -1328,6 +1338,21 @@ final class BattleNetCombatSystem {
                             // empty-route free-detour seam as the pathLength
                             // == 0 arm below (XHuman 12 grunt 1507).
                             unit.setBattleNetChaseEmptyRouteReplan(true);
+                            // When this retarget is reached by draining the
+                            // old route's final residual, the first new step
+                            // still owes native Attack-four after its pixels
+                            // settle. The marker used to be armed only when
+                            // that step was a compass detour. XHuman 12 grunt
+                            // 1507 now gets the same N from the new route
+                            // itself, but native still holds c52-c54 before E.
+                            if (world.actionMoveWalked
+                                    && unit.stepDrained()
+                                    && !unit.isMoving()
+                                    && unit.type() != null
+                                    && unit.type().maxAttackRange() <= 1
+                                    && !World.battleNetRangedChaseUnit(unit)) {
+                                unit.setBattleNetEmptyRouteFreeDetourHold(true);
+                            }
                         }
                         if (residualPathOneChangedTarget) {
                             world.planTowards(unit, chased, true);

@@ -2384,14 +2384,13 @@ public final class Unit {
     private boolean battleNetChaseReplanResidualHold;
 
     /**
-     * Empty-route free-detour first step still owes its residual settle hold.
+     * Empty-route retarget first step still owes its residual settle hold.
      *
-     * <p>XHuman 12 grunt 1507 free-detours N at fixture 36 with multi leftover
-     * under the free heading. Native holds Attack-four / delay 2 when that N
-     * residual settles so E lands at 55; keeping the multi leftover and arming
-     * ordinary replan residual hold left SE blocked replan stranded without a
-     * step. Truncate to the free heading and arm this flag so residual settle
-     * holds, then empty-route replan same-cycle steps.</p>
+     * <p>XHuman 12 grunt 1507 retargets after its old route exhausts and takes
+     * N at fixture 36. Whether N came from a free-compass detour or directly
+     * from the replacement route, native holds Attack-four / delay 2 when its
+     * residual settles so E lands at 55. The flag survives that first step,
+     * then empty-route replan same-cycle steps after the hold.</p>
      */
     public boolean battleNetEmptyRouteFreeDetourHold() {
         return battleNetEmptyRouteFreeDetourHold;
