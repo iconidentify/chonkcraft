@@ -16,6 +16,28 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("an XHuman 8 juggernaught restarts its sequence after the startup endpoint swap")
+    void anXHuman8JuggernaughtRestartsItsSequenceAfterTheStartupEndpointSwap() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        Unit juggernaught = at(mission.world(), "unit-ogre-juggernaught", 20, 58);
+        assertNotNull(juggernaught,
+                "XHuman 8 has no startup juggernaught at 20,58");
+
+        for (int cycle = 1; cycle < 5; cycle++) {
+            mission.tick();
+            assertEquals(Unit.Order.PATROL, juggernaught.order());
+            assertEquals(20, juggernaught.tileX(),
+                    "native holds its starting tile through fixture cycle " + cycle);
+            assertEquals(58, juggernaught.tileY());
+        }
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, juggernaught.order());
+        assertEquals(22, juggernaught.tileX(),
+                "native slot 1535 takes its first doubled east stride on cycle five");
+        assertEquals(58, juggernaught.tileY());
+    }
+
+    @Test
     @DisplayName("an XOrc 7 battleship takes its opening west patrol stride on fixture cycle two")
     void anXOrc7BattleshipTakesItsOpeningWestPatrolStrideOnFixtureCycleTwo() {
         Mission mission = mission("campaigns/orc-exp/levelx07o");

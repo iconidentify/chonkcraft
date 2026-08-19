@@ -11659,6 +11659,7 @@ public final class World {
                 // tile step.  This is visible at startup when a behaviour-six
                 // capital ship receives its own square as the near endpoint.
                 unit.setBattleNetOrderDelay(2);
+                restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
                 return;
             }
         }
@@ -13036,6 +13037,27 @@ public final class World {
         }
         unit.setBattleNetSequenceOffset(open.offset());
         unit.setBattleNetAnimationTimer(open.timer());
+    }
+
+    /** Restarts a capital ship whose startup Patrol first points at itself. */
+    private void restartBattleNetCapitalPatrolAfterEndpointSwap(Unit unit) {
+        if (!battleNetStandingPatrolSequence(unit)
+                || battleNetPatrolMoveBodyCursor(unit)) {
+            return;
+        }
+        // The behaviour-six ready pass can construct Patrol with the ship's
+        // own square as the near endpoint and a real destination as the back
+        // endpoint. The first Still OP0 exchanges those endpoints. Native
+        // constructs the new leg at the Still sequence head with timer 3
+        // (XHuman 8 slot 1535: goal 20,58 -> 29,59 on fixture cycle 2,
+        // sequence 2955/timer 3), then takes the doubled east stride on cycle
+        // 5. Continuing from the post-OP0 common Still loop enters WAIT 4 and
+        // delays that stride until cycle 7.
+        int still = idle.battleNetStillSequenceStart(unit);
+        if (still >= 0) {
+            unit.setBattleNetSequenceOffset(still);
+            unit.setBattleNetAnimationTimer(3);
+        }
     }
 
     /**
