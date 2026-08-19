@@ -114,6 +114,53 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 8 hall exit queues and pays its BNE watch-tower job")
+    void anXHuman8HallExitQueuesAndPaysItsWatchTowerJob() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 420; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 20, 8);
+        assertNotNull(peon,
+                "native slot 1571 must leave the Great Hall's nearest free west square");
+        assertEquals(Unit.Order.STILL, peon.order());
+        assertEquals(25, peon.battleNetOrderDelay());
+        assertEquals(1, peon.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.BUILD,
+                peon.queuedOrders().get(0).kind());
+        assertNotNull(peon.pendingBuild());
+        assertEquals("unit-orc-watch-tower", peon.pendingBuild().ident());
+        assertEquals(21, peon.buildGoalX());
+        assertEquals(3, peon.buildGoalY());
+        assertEquals(50, mission.world().player(6).get(
+                net.chonkbase.chonkcraft.engine.unit.UnitType.Resource.GOLD));
+        assertEquals(1300, mission.world().player(6).get(
+                net.chonkbase.chonkcraft.engine.unit.UnitType.Resource.WOOD));
+
+        for (int cycle = 421; cycle <= 444; cycle++) {
+            mission.tick();
+            assertEquals(Unit.Order.STILL, peon.order(),
+                    "native holds the depot-ready Still head through cycle " + cycle);
+            assertEquals(20, peon.tileX());
+            assertEquals(8, peon.tileY());
+        }
+        mission.tick();
+        assertEquals(Unit.Order.BUILD, peon.order(),
+                "native promotes Build on fixture cycle 445");
+        assertEquals(Unit.Order.BUILD, peon.currentAction(),
+                "the queued Build is semantically current on its promotion cycle");
+        for (int cycle = 446; cycle < 448; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(20, peon.tileX());
+        assertEquals(7, peon.tileY(),
+                "native takes its first northward tower stride on fixture cycle 448");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

@@ -45,7 +45,10 @@ final class BattleNetHarvestSystem {
      * @return whether the worker can gather there
      */
     boolean orderHarvest(Unit worker, int tileX, int tileY) {
-        if (!worker.type().canGather() || !worker.isAlive()) {
+        boolean liveContainedWorker = world.battleNetDepotReadyDispatching()
+                && worker.hitPoints() > 0 && worker.order() != Unit.Order.DYING;
+        if (!worker.type().canGather()
+                || (!worker.isAlive() && !liveContainedWorker)) {
             return false;
         }
         // A command onto a unit inside an unbreakable stretch waits for the
@@ -72,6 +75,10 @@ final class BattleNetHarvestSystem {
         if (resourceBuilding != null && resourceBuilding != worker) {
             for (ResourceInfo info : worker.type().gathering().values()) {
                 if (!info.terrainHarvester() && providesResource(resourceBuilding, info.resource())) {
+                    if (world.battleNetDepotReadyDispatching()) {
+                        return queueDepotHarvest(worker, info, resourceBuilding,
+                                tileX, tileY);
+                    }
                     if (beginHarvest(worker, info, resourceBuilding, tileX, tileY)) {
                         worker.rememberActionBeforeQueued(beforeHarvest);
                         return true;
@@ -84,6 +91,9 @@ final class BattleNetHarvestSystem {
         if (field != null && field.isForest()) {
             ResourceInfo wood = worker.type().gathering().get(UnitType.Resource.WOOD);
             if (wood != null) {
+                if (world.battleNetDepotReadyDispatching()) {
+                    return queueDepotHarvest(worker, wood, null, tileX, tileY);
+                }
                 if (beginHarvest(worker, wood, null, tileX, tileY)) {
                     worker.rememberActionBeforeQueued(beforeHarvest);
                     return true;
@@ -106,8 +116,12 @@ final class BattleNetHarvestSystem {
      * this overload preserves the native AI's selected resource object.</p>
      */
     boolean orderHarvest(Unit worker, Unit resourceBuilding) {
+        boolean liveContainedWorker = worker != null
+                && world.battleNetDepotReadyDispatching()
+                && worker.hitPoints() > 0 && worker.order() != Unit.Order.DYING;
         if (worker == null || resourceBuilding == null
-                || !worker.type().canGather() || !worker.isAlive()
+                || !worker.type().canGather()
+                || (!worker.isAlive() && !liveContainedWorker)
                 || !resourceBuilding.isAlive() || !resourceBuilding.isOnMap()) {
             return false;
         }
@@ -115,6 +129,10 @@ final class BattleNetHarvestSystem {
         for (ResourceInfo info : worker.type().gathering().values()) {
             if (!info.terrainHarvester()
                     && providesResource(resourceBuilding, info.resource())) {
+                if (world.battleNetDepotReadyDispatching()) {
+                    return queueDepotHarvest(worker, info, resourceBuilding,
+                            resourceBuilding.tileX(), resourceBuilding.tileY());
+                }
                 if (beginHarvest(worker, info, resourceBuilding,
                         resourceBuilding.tileX(), resourceBuilding.tileY())) {
                     worker.rememberActionBeforeQueued(beforeHarvest);
@@ -124,6 +142,22 @@ final class BattleNetHarvestSystem {
             }
         }
         return false;
+    }
+
+
+    /** Installs a depot-ready resource job behind native's timed Still head. */
+    private boolean queueDepotHarvest(Unit worker, ResourceInfo info,
+            Unit building, int tileX, int tileY) {
+        if (!beginHarvest(worker, info, building, tileX, tileY)) {
+            return false;
+        }
+        worker.setOrder(Unit.Order.STILL);
+        worker.setActionBeforeQueued(null);
+        worker.enqueueOrder(new Unit.QueuedOrder(
+                Unit.QueuedOrderKind.HARVEST, tileX, tileY,
+                building, null, null));
+        worker.setQueuedReplacementPending(true);
+        return true;
     }
 
 
@@ -1246,23 +1280,6 @@ final class BattleNetHarvestSystem {
         worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
         worker.setBattleNetOilActionTicks(0);
         return true;
-    }
-
-    /**
-     * Lets a computer peasant pass through the same Still/ready boundary
-     * after banking gold or wood.
-     *
-     * <p>This is only the hall-exit arm. Leaving a mine with a load still
-     * walks home; pausing there would let 0x438a50 spend the cargo on a
-     * farm before the bank sees it. Oil may pause at a platform because a
-     * tanker cannot found a farm.</p>
-     */
-    private boolean pauseLandForReadyDispatch(Unit worker, ResourceInfo info) {
-        if (info.resource() != UnitType.Resource.GOLD
-                && info.resource() != UnitType.Resource.WOOD) {
-            return false;
-        }
-        return pauseComputerForReadyDispatch(worker);
     }
 
     private boolean pauseComputerForReadyDispatch(Unit worker) {
@@ -3116,9 +3133,45 @@ final class BattleNetHarvestSystem {
             worker.setResourceTile(mine.tileX(), mine.tileY());
         }
 
+        // Hidden action 26 invokes the AI ready callback while the worker is
+        // still contained. Its queued task therefore selects either the new
+        // resource goal or construction's no-resource west exit. XHuman 8
+        // peon 1571 pays for its watch tower on fixture 420, leaves the Great
+        // Hall at 20,8, and remains Still with Build queued through 444.
+        boolean landReadyBoundary = (info.resource() == UnitType.Resource.GOLD
+                || info.resource() == UnitType.Resource.WOOD)
+                && pauseComputerForReadyDispatch(worker);
+        boolean depotReadyAssigned = landReadyBoundary
+                && world.battleNetDepotUnitReady(worker);
+
+        boolean assignedBuild = depotReadyAssigned
+                && worker.pendingBuild() != null;
+        int[] assignedGoal = null;
+        if (depotReadyAssigned && !assignedBuild
+                && worker.resourceUnit() != null
+                && worker.resourceUnit().isAlive()) {
+            assignedGoal = World.centreOf(worker.resourceUnit());
+        } else if (depotReadyAssigned && !assignedBuild
+                && world.map.contains(
+                        worker.resourceTileX(), worker.resourceTileY())) {
+            assignedGoal = new int[] {
+                    worker.resourceTileX(), worker.resourceTileY()};
+        }
+
         int[] spot;
         boolean noWoodLeft = false;
-        if (mine != null) {
+        if (assignedBuild) {
+            // A construction dispatch uses WaitInDepot's no-resource west
+            // exit, not the build point as a DropOutNearest goal. All five
+            // action-26-to-Build transitions in the sealed campaign corpus
+            // agree: the worker takes the first legal west traversal square,
+            // falling around later faces only when that face is blocked.
+            spot = world.dropOutOnSide(worker.type(), World.LOOKING_WEST,
+                    depot, worker.tileX(), worker.tileY());
+        } else if (assignedGoal != null) {
+            spot = world.dropOutNearest(worker.type(), assignedGoal[0],
+                    assignedGoal[1], depot, worker.tileX(), worker.tileY());
+        } else if (mine != null) {
             int[] goal = World.centreOf(mine);
             spot = world.dropOutNearest(worker.type(), goal[0], goal[1], depot,
                     worker.tileX(), worker.tileY());
@@ -3206,8 +3259,7 @@ final class BattleNetHarvestSystem {
         // spend a ready marker on a farm: Human 11 player 4 kept 720
         // gold through 1399 while retail founded 72,12 and rewrote the
         // land box. Player-issued resource orders keep their loop.
-        if (pauseOilForReadyDispatch(worker, info)
-                || pauseLandForReadyDispatch(worker, info)) {
+        if (pauseOilForReadyDispatch(worker, info) || landReadyBoundary) {
             return;
         }
         if (noWoodLeft

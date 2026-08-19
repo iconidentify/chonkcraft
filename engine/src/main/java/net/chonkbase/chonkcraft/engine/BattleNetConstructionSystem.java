@@ -786,7 +786,10 @@ final class BattleNetConstructionSystem {
      * @return whether the order was accepted
      */
     boolean orderBuild(Unit worker, UnitType what, int tileX, int tileY) {
-        if (worker.type().building() || !what.building() || !worker.isAlive()) {
+        boolean liveContainedBuilder = world.battleNetDepotReadyDispatching()
+                && worker.hitPoints() > 0 && worker.order() != Unit.Order.DYING;
+        if (worker.type().building() || !what.building()
+                || (!worker.isAlive() && !liveContainedBuilder)) {
             traceBattleNetBuildRejection(worker, what, tileX, tileY,
                     "invalid-builder-or-type");
             return false;
@@ -821,7 +824,11 @@ final class BattleNetConstructionSystem {
         // bank cannot cover is refused rather than begun: that is
         // {@code player.CheckUnitType(type)} on the same path
 
-        if (!world.players[worker.player()].canAfford(world.unitCosts(what))) {
+        boolean alreadyPaidForThisOrder = worker.buildPaid()
+                && worker.pendingBuild() == what
+                && worker.buildTileX() == tileX && worker.buildTileY() == tileY;
+        if (!alreadyPaidForThisOrder
+                && !world.players[worker.player()].canAfford(world.unitCosts(what))) {
             traceBattleNetBuildRejection(worker, what, tileX, tileY,
                     "affordability");
             return false;
@@ -922,6 +929,14 @@ final class BattleNetConstructionSystem {
         worker.setBuildPaid(true);
         markBattleNetPendingBuildReservation(what, tileX, tileY);
         world.battleNetAiBuildReservations.add(worker);
+        if (world.battleNetDepotReadyDispatching()) {
+            worker.setOrder(Unit.Order.STILL);
+            worker.setActionBeforeQueued(null);
+            worker.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.BUILD, tileX, tileY,
+                    null, what, null));
+            worker.setQueuedReplacementPending(true);
+        }
         return true;
     }
 

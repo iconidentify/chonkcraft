@@ -187,6 +187,12 @@ public final class World {
     /** Authoritative BNE action timing loaded from maindat entry 278. */
     BattleNetSequence battleNetSequence;
 
+    /**
+     * True while hidden depot action 26 asks the AI for this worker's next
+     * job. Orders created there belong behind the surfaced Still head.
+     */
+    private boolean battleNetDepotReadyDispatch;
+
     /** Native UDTA byte priorities, kept separate from ChonkCraft unit types. */
     int[] battleNetUnitPriorities;
 
@@ -349,6 +355,11 @@ public final class World {
     /** @see BattleNetHarvestSystem#orderHarvest */
     public boolean orderHarvest(Unit worker, Unit resourceBuilding) {
         return harvest.orderHarvest(worker, resourceBuilding);
+    }
+
+    /** Whether an AI order is being authored from a contained depot visit. */
+    boolean battleNetDepotReadyDispatching() {
+        return battleNetDepotReadyDispatch;
     }
 
     /** @see BattleNetHarvestSystem#canHarvestAt */
@@ -8630,7 +8641,9 @@ public final class World {
             boolean accepted = switch (queued.kind()) {
                 case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
                 case ATTACK -> orderAttack(unit, queued.target());
-                case HARVEST -> harvest.orderHarvest(unit, queued.x(), queued.y());
+                case HARVEST -> queued.target() != null
+                        ? harvest.orderHarvest(unit, queued.target())
+                        : harvest.orderHarvest(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());
                 case CAST -> queued.target() != null
                         ? orderCast(unit, queued.value(), queued.target())
@@ -8651,12 +8664,14 @@ public final class World {
                 case DEFEND -> orderDefend(unit, queued.target());
             };
             if (accepted && unit.order() != Unit.Order.STILL) {
-                if (queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS) {
+                if (queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
+                        || queued.kind() == Unit.QueuedOrderKind.HARVEST
+                        || queued.kind() == Unit.QueuedOrderKind.BUILD) {
                     // This is an in-action queue pop, not an order issued by
                     // the later AI/player command phase. The constructor's
                     // generic one-cycle reporting shim would leave the mine-
-                    // exit worker semantically Still on its promotion cycle
-                    // (XHuman 8 c198), while native already reports action 24.
+                    // or depot-exit worker semantically Still on its promotion
+                    // cycle, while native already reports action 23, 24 or 28.
                     unit.setActionBeforeQueued(null);
                 }
                 // "unit.Wait = 0" on the pop. Whatever the order that just ended was waiting
@@ -14052,6 +14067,35 @@ public final class World {
         } else {
             unit.setBattleNetOrderDelay(2);
         }
+    }
+
+    /**
+     * Runs the same ready-worker assignment from hidden depot action 26.
+     *
+     * <p>The unit is still contained, so the created order is queued by the
+     * harvest/construction command paths. This call deliberately omits the
+     * ordinary idle marker's two-cycle opening delay: WaitInDepot surfaces a
+     * 25-cycle Still head, and the bottom of this unit tick consumes the
+     * first count.</p>
+     */
+    boolean battleNetDepotUnitReady(Unit unit) {
+        AiPlayer ai = ais.get(unit.player());
+        if (ai == null) {
+            return false;
+        }
+        boolean previous = battleNetDepotReadyDispatch;
+        boolean assigned;
+        battleNetDepotReadyDispatch = true;
+        try {
+            assigned = ai.battleNetDepotUnitReady(this, unit);
+        } finally {
+            battleNetDepotReadyDispatch = previous;
+        }
+        if (assigned && unit.hasQueuedOrders()) {
+            unit.setActionBeforeQueued(null);
+            unit.setBattleNetOrderDelay(26);
+        }
+        return assigned;
     }
 
     /** Promotes the ready-pass order when BNE releases the initial Still. */

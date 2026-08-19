@@ -2904,8 +2904,19 @@ public final class AiPlayer {
      * current resource orders rather than by BNE's three side arrays.</p>
      */
     public boolean battleNetUnitReady(World world, Unit unit) {
+        return battleNetUnitReady(world, unit, false);
+    }
+
+    /** Ready assignment reached while hidden action 26 is still in a depot. */
+    public boolean battleNetDepotUnitReady(World world, Unit unit) {
+        return battleNetUnitReady(world, unit, true);
+    }
+
+    private boolean battleNetUnitReady(World world, Unit unit,
+            boolean containedDepot) {
         Player player = world.player(playerIndex);
-        if (unit == null || unit.player() != playerIndex || !unit.isOnMap()
+        if (unit == null || unit.player() != playerIndex
+                || (!containedDepot && !unit.isOnMap())
                 || unit.order() != Unit.Order.STILL) {
             return false;
         }

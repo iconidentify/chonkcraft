@@ -134,7 +134,9 @@ final class BattleNetBuildingPlacement {
 
 
     int[] aiFindBattleNetBuildingPlace(Unit worker, UnitType type, int step) {
-        if (worker == null || type == null || !worker.isOnMap()) {
+        if (worker == null || type == null
+                || (!worker.isOnMap()
+                    && !world.battleNetDepotReadyDispatching())) {
             return null;
         }
 
@@ -187,7 +189,9 @@ final class BattleNetBuildingPlacement {
      * and its build scan correctly advances to a lumber mill.</p>
      */
     int[] aiFindBattleNetHallPlace(Unit worker, UnitType type) {
-        if (worker == null || type == null || !worker.isOnMap()) {
+        if (worker == null || type == null
+                || (!worker.isOnMap()
+                    && !world.battleNetDepotReadyDispatching())) {
             return null;
         }
         boolean[] workerCell = world.battleNetConnectivityCell(worker);
