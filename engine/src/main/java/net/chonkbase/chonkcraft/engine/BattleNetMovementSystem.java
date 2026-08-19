@@ -1991,14 +1991,11 @@ final class BattleNetMovementSystem {
     /**
      * A melee leftover residual that already stands in weapon range, with
      * its last heading naming the quarry's occupied square, dest-arms into
-     * Attack only after the borrowed movement residual is fully paid. Weapon
-     * range is a tile-space decision, but it does not erase pixel-space debt:
-     * in the pinned Orc 1 commanded fight, retail walks the final ten pixels
-     * over fixtures 200 through 204 before opening Attack. Snapping at an
-     * eight-pixel "arrival band" opened Java's swing at 201 and its first
-     * damage at 210, four fixtures before retail. A route rebuilt after an
-     * AttackTarget swing has the same ownership rule (Human 1 dest-arm 401
-     * drains through fixture 417).
+     * Attack at the arrival band belonging to that action. A borrowed Move
+     * chase transfers at eight pixels (XHuman 9 and Human 8). COrder_Attack,
+     * or a route rebuilt after an AttackTarget swing, owns every borrowed
+     * pixel: Orc 1's commanded grunt drains ten through fixture 204, and
+     * Human 1's post-swing refill drains through 417.
      */
     private boolean arriveMeleeLeftoverOnOccupiedQuarry(Unit unit) {
         if (unit == null || unit.type() == null
@@ -2014,10 +2011,15 @@ final class BattleNetMovementSystem {
             return false;
         }
         int debt = Math.max(Math.abs(unit.offsetX()), Math.abs(unit.offsetY()));
-        // MoveToTarget may already be in weapon range while its last route
-        // element still owns pixels. Retail lets the Move program drain that
-        // debt; only the zero-debt consult transfers action ownership.
-        if (debt > 0) {
+        // A surrogate Move body chasing a quarry uses MoveToTarget's
+        // occupied-square band. The real Attack order and a SetAutoTarget
+        // rename do not, and an exhausted refill has explicit ownership even
+        // when that borrowed Move body has already replaced the outer label.
+        boolean attackOrderOwnsResidual = unit.order() == Unit.Order.ATTACK
+                || unit.autoTargeting();
+        boolean ownsEveryPixel = unit.battleNetAttackWaitRefillResidual()
+                || attackOrderOwnsResidual;
+        if (debt > (ownsEveryPixel ? 0 : 8)) {
             return false;
         }
         int heading = unit.pathLength() == 1

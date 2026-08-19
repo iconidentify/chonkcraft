@@ -636,7 +636,12 @@ final class BattleNetCombatSystem {
                 // visit, open 2539 at timer 2, then re-arm 3,2,1 and land
                 // that blow at 57. Ordinary chase leftover (Orc 1 1592)
                 // still residual-opens past OP0.
-                if (!inRange) {
+                // Tile range does not settle a route against a quarry that
+                // still owns a movement residual. Human 8's harvesting
+                // peasant is at -7,+7 here; native serves the two-cycle hold
+                // before the attack peasant resumes its approach.
+                boolean movingQuarry = quarry != null && quarry.isMoving();
+                if (!inRange || movingQuarry) {
                     if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null) {
                         String resEnv = System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL")
                                 .trim();
@@ -693,7 +698,8 @@ final class BattleNetCombatSystem {
             if (world.actionMoveWalked && !unit.isMoving()
                     && unit.pathLength() == 1
                     && (inRangeReplanSettle
-                            || unit.battleNetPathStepsTaken() == 1)
+                            || (unit.battleNetPathStepsTaken() == 1
+                                    && !unit.battleNetAttackWaitRefillResidual()))
                     && unit.type() != null
                     && unit.type().maxAttackRange() <= 1
                     && world.battleNetMoveAnimation(unit)
