@@ -1123,8 +1123,21 @@ final class BattleNetMovementSystem {
                 if (!worker.hasBattleNetAiHome()) {
                     worker.setBattleNetAiHome(tileX, tileY);
                 }
+                // The assault home is the selected enemy's top-left tile.
+                // Preserve its whole footprint in the long-route recovery:
+                // a 2x2 tower can be reachable only from its south/east edge,
+                // whose legal firing skirt is two tiles from that top-left.
+                // Treating every home as 1x1 made the recovery answer
+                // UNREACHABLE at XHuman 10's cannon tower (82,93), so grunts
+                // 245/248 stood down permanently at the terrain boundary.
+                Unit assaultGoal = world.unitAt(tileX, tileY);
+                int goalWidth = assaultGoal == null || assaultGoal.type() == null
+                        ? 1 : Math.max(1, assaultGoal.type().tileWidth());
+                int goalHeight = assaultGoal == null || assaultGoal.type() == null
+                        ? 1 : Math.max(1, assaultGoal.type().tileHeight());
                 PathFinder.Path recovered = world.findMovementPath(worker,
-                        new PathFinder.Goal(tileX, tileY, 1, 1, 0, 1));
+                        new PathFinder.Goal(tileX, tileY,
+                                goalWidth, goalHeight, 0, 1));
                 if (recovered.result() == PathFinder.Result.FOUND
                         && recovered.length() > 0) {
                     path = recovered;

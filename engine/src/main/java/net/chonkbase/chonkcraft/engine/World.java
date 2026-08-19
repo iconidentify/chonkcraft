@@ -5392,7 +5392,14 @@ public final class World {
                 if (!movement.battleNetSoftClearMoveAlly(candidate)) {
                     continue;
                 }
-            } else if (!hostilesStandAside) {
+            } else if (!hostilesStandAside || candidate.type().building()) {
+                // Patrol and combat point routes may plan through mobile
+                // non-allies because the action can engage them by the time
+                // the heading is consumed. Buildings never stand aside. In
+                // XHuman 10 the first profile-67 assault otherwise clears the
+                // neutral 3x3 mine at 21,57, repeatedly stores SE through its
+                // footprint, and leaves launched grunt 234 refusal-waiting on
+                // 21,56 for the rest of the match.
                 continue;
             }
             setMovementFieldFlags(candidate, false);
