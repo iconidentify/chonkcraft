@@ -520,7 +520,7 @@ Grade: **GREEN**.
 
 Automated driver: The harness supplies only the human opening while the retail ai.bin interpreter must operate the opponent.
 
-Success means: One independently observed opponent gathers and banks resources, builds and trains, spends, receives native behavior-two force assignment and sustains an attack without scripted opponent commands; the full authenticated sample stays active and error-free.
+Success means: One independently observed opponent gathers and banks resources, builds and trains, spends, receives native behavior-two force assignment and sustains an attack without scripted opponent commands; a late six-member campaign wave crosses the map and every member engages; the full authenticated sample stays active and error-free.
 
 Implementation:
 
@@ -535,6 +535,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/ai/AiTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/perf/AiCompetenceTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetHumanFiveGuardBehaviorRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetAiPatrolLivenessTest.java`
 - `scripts/check-bne-ai-gate.sh`
 
 Retail evidence:
@@ -544,6 +545,7 @@ Retail evidence:
 - The pinned 0x00426ad0/0x0044c260 control flow proves the three pending launch bytes, group sizes/counts, behavior-two assignment and fifty-cycle consumer now used by Java.
 - The authenticated campaign referee executes twenty computer slots with no opponent commands. On the same independently measured slot it observes harvest/return orders, real treasury credits, production and spending, native behavior-two force assignment and sustained attack orders.
 - Human 5's authenticated 1,800-cycle behavior keeps four authored base guards posted while all five members of a separate grunt/axethrower field squad engage; the pack-only AI gate prevents a tempting global wake-up regression.
+- A five-minute Human expansion 10 referee follows the six-member first behavior-two wave from its retail ai.bin launch through the long campaign route and requires every survivor to move and enter real combat.
 
 Known blockers:
 

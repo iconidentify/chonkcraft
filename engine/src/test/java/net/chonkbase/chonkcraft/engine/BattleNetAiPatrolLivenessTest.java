@@ -4,19 +4,88 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.pathfinder.PathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class BattleNetAiPatrolLivenessTest {
+
+    private record Pixel(int x, int y) {
+    }
+
+    @Test
+    @DisplayName("the late Human X10 assault crosses the map and engages")
+    void lateHumanExpansionTenAssaultCrossesTheMapAndEngages() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack; set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h");
+        Assumptions.assumeTrue(mission != null,
+                "Human expansion mission 10 is not in the pack");
+        World world = mission.world();
+
+        // The authenticated retail ai.bin profile's first full ground force
+        // launches at 6201. This is deliberately beyond the earlier
+        // three-minute competence window: the playtest defect left these
+        // patrols alive but motionless on the long road to the human
+        // cannon-tower region.
+        Map<Integer, Pixel> firstWave = new HashMap<>();
+        Set<Integer> moved = new HashSet<>();
+        Set<Integer> engaged = new HashSet<>();
+        for (int elapsed = 1; elapsed <= 8_000; elapsed++) {
+            mission.tick();
+            if (elapsed == 6_201) {
+                world.playerUnits(2).stream()
+                        .filter(Unit::isAlive)
+                        .filter(Unit::isOnMap)
+                        .filter(unit -> unit.battleNetAiBehavior() == 2)
+                        .forEach(unit -> firstWave.put(unit.id(),
+                                new Pixel(unit.pixelX(), unit.pixelY())));
+            }
+            if (firstWave.isEmpty()) {
+                continue;
+            }
+            for (Unit unit : world.playerUnits(2)) {
+                Pixel start = firstWave.get(unit.id());
+                if (start == null) {
+                    continue;
+                }
+                if (unit.pixelX() != start.x() || unit.pixelY() != start.y()) {
+                    moved.add(unit.id());
+                }
+                if (unit.target() != null
+                        || unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE
+                        || unit.currentAction() == Unit.Order.ATTACK
+                        || unit.currentAction() == Unit.Order.ATTACK_MOVE) {
+                    engaged.add(unit.id());
+                }
+            }
+        }
+
+        assertEquals(6, firstWave.size(),
+                "retail ai.bin no longer launched the six-member first wave");
+        assertEquals(firstWave.keySet(), moved,
+                "a launched behavior-two unit remained visibly frozen");
+        assertEquals(firstWave.keySet(), engaged,
+                "a launched behavior-two unit never reached real combat");
+    }
 
     @Test
     @DisplayName("an AI assault patrol routes around a neutral mine")
