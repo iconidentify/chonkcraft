@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "test_class": "net.chonkbase.chonkcraft.engine.AttackMoveTest",
-  "test_count": 66,
+  "test_count": 67,
   "authority": "Executable classification of the legacy LegacyEngine/ChonkCraft attack-move diagnostic suite; these names may remain red only while the BNE player/referee lane passes.",
   "classified_failures": [
     {

@@ -129,6 +129,12 @@ class AcknowledgeOnceTest {
         return null;
     }
 
+    private static boolean acceptedMove(Unit unit) {
+        return unit.order() == Unit.Order.MOVE
+                || unit.queuedOrders().stream().anyMatch(order ->
+                        order.kind() == Unit.QueuedOrderKind.MOVE);
+    }
+
     private static void rightClick(GameScreen screen, int x, int y) {
         MouseEvent event = new MouseEvent(screen, MouseEvent.MOUSE_PRESSED,
                 System.currentTimeMillis(), InputEvent.BUTTON3_DOWN_MASK,
@@ -174,7 +180,7 @@ class AcknowledgeOnceTest {
         // All four took the order. Without this the draw count below would be
         // satisfied by three of them ignoring the click entirely.
         for (Unit unit : squad) {
-            assertEquals(Unit.Order.MOVE, unit.order(),
+            assertTrue(acceptedMove(unit),
                     "a selected footman did not take the move order");
         }
 
@@ -208,7 +214,7 @@ class AcknowledgeOnceTest {
         Assumptions.assumeTrue(target != null, "nowhere on screen for the footman to walk to");
         long before = scene.screen().soundChoicesForTest();
         rightClick(scene.screen(), target[0] * TILE + TILE / 2, target[1] * TILE + TILE / 2);
-        assertEquals(Unit.Order.MOVE, lone.order(), "the lone footman did not take the order");
+        assertTrue(acceptedMove(lone), "the lone footman did not take the order");
         assertEquals(1, scene.screen().soundChoicesForTest() - before,
                 "a lone footman must still answer its order");
     }

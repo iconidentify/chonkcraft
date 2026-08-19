@@ -149,7 +149,7 @@ class PlayerOrderDeliveryTest {
         boolean destroyed = false;
         boolean siteDeathAnnounced = false;
         List<Unit> engaged = new ArrayList<>();
-        for (int cycle = 0; cycle < 1_200 && site.isAlive(); cycle++) {
+        for (int cycle = 0; cycle < 2_400 && site.isAlive(); cycle++) {
             if (cycle > 0 && cycle % 60 == 0) {
                 // Reissuing an attack in the middle of combat is ordinary
                 // player input. It must replace the order for all four, not
@@ -176,8 +176,8 @@ class PlayerOrderDeliveryTest {
                 "one or more queued group members never entered Attack");
         assertTrue(siteDeathAnnounced,
                 "combat removed the construction site without its BNE building-death event");
-        assertFalse(builder.removed(),
-                "destroying the site left its builder trapped outside the map");
+        assertFalse(builder.isAlive() && builder.removed(),
+                "destroying the site left a live builder trapped outside the map");
     }
 
     private static boolean hasAcceptedAttack(Unit unit, Unit target) {

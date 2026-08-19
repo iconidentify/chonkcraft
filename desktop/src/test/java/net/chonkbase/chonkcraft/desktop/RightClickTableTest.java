@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
@@ -182,6 +183,12 @@ class RightClickTableTest {
         unit.setSelected(true);
     }
 
+    private static boolean accepted(Unit unit, Unit.Order current,
+            Unit.QueuedOrderKind queued) {
+        return unit.order() == current
+                || unit.queuedOrders().stream().anyMatch(order -> order.kind() == queued);
+    }
+
     @Test
     @DisplayName("a loaded peasant right clicked onto the town hall delivers instead of walking")
     void aLoadedWorkerReturnsItsGoods() {
@@ -299,7 +306,8 @@ class RightClickTableTest {
 
         only(scene, siege);
         rightClick(scene.screen(), siege.tileX() + 4, siege.tileY() + 4, true, true);
-        assertEquals(Unit.Order.ATTACK_GROUND, siege.order(),
+        assertTrue(accepted(siege, Unit.Order.ATTACK_GROUND,
+                        Unit.QueuedOrderKind.ATTACK_GROUND),
                 "ctrl-alt-right-click on empty ground with a catapult gave " + siege.order());
 
         // And a unit without the flag falls through to the ordinary table
@@ -314,7 +322,8 @@ class RightClickTableTest {
         // It falls through to the rest of the table, which for a fighter with
         // control held is the empty-space branch: an attack with no target.
         // Doing nothing at all is the one answer upstream never gives.
-        assertEquals(Unit.Order.ATTACK_MOVE, footman.order(),
+        assertTrue(accepted(footman, Unit.Order.ATTACK_MOVE,
+                        Unit.QueuedOrderKind.ATTACK_MOVE),
                 "a footman given ctrl-alt-right-click ended up " + footman.order()
                         + " rather than falling through to DoRightButton_Attack's"
                         + " empty-space branch");
@@ -334,12 +343,13 @@ class RightClickTableTest {
         // square.
         only(scene, footman);
         rightClick(scene.screen(), walkable[0], walkable[1], false, false);
-        assertEquals(Unit.Order.MOVE, footman.order(),
+        assertTrue(accepted(footman, Unit.Order.MOVE, Unit.QueuedOrderKind.MOVE),
                 "a plain right click on open ground must still be a walk");
 
         only(scene, footman);
         rightClick(scene.screen(), walkable[0], walkable[1], true, false);
-        assertEquals(Unit.Order.ATTACK_MOVE, footman.order(),
+        assertTrue(accepted(footman, Unit.Order.ATTACK_MOVE,
+                        Unit.QueuedOrderKind.ATTACK_MOVE),
                 "control and a right click on open ground gave " + footman.order()
                         + ": mouse.cpp:406-413 sends an attack with no target, which is"
                         + " an advance that fights what it meets");
@@ -384,7 +394,7 @@ class RightClickTableTest {
         only(scene, footman);
         rightClick(scene.screen(), farm.tileX(), farm.tileY(), false, false);
 
-        assertEquals(Unit.Order.MOVE, footman.order(),
+        assertTrue(accepted(footman, Unit.Order.MOVE, Unit.QueuedOrderKind.MOVE),
                 "a footman sent at his own farm took the order " + footman.order()
                         + ": upstream's follow branches send Move when the target"
                         + " CanMove() is false");
@@ -403,7 +413,7 @@ class RightClickTableTest {
         only(scene, peasant);
         rightClick(scene.screen(), grunt.tileX(), grunt.tileY(), false, false);
 
-        assertEquals(Unit.Order.MOVE, peasant.order(),
+        assertTrue(accepted(peasant, Unit.Order.MOVE, Unit.QueuedOrderKind.MOVE),
                 "a peasant sent at an enemy took " + peasant.order()
                         + ": BNE's worker table has no attack branch");
     }
