@@ -5754,6 +5754,19 @@ public final class World {
     }
 
     PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target) {
+        return findBattleNetTargetPath(unit, target, false);
+    }
+
+    /**
+     * Native target route with the residual-retarget occupancy seam exposed.
+     *
+     * <p>A settled refused one-heading route that changes target keeps moving
+     * friends soft for its replacement ray. XHuman 12 grunt 1496 therefore
+     * stores S,S,S,S,S through grunt 95 on 30,40. Ordinary replans keep the
+     * measured short-leftover corridor compensation.</p>
+     */
+    PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         for (Unit candidate : units) {
@@ -5824,7 +5837,8 @@ public final class World {
             // 19 without it, so it stays until that rule is found.
             for (int i = softBlockers.size() - 1; i >= 0; i--) {
                 Unit ally = softBlockers.get(i);
-                if (!battleNetApproachCorridorHardAlly(
+                if (settledResidualRetarget
+                        || !battleNetApproachCorridorHardAlly(
                         unit, ally, goalX, goalY)) {
                     continue;
                 }
@@ -9935,6 +9949,11 @@ public final class World {
      * swing even at a goal that began dying during the route's empty wait.
      */
     PathFinder.Result planTowards(Unit unit, Unit target) {
+        return planTowards(unit, target, false);
+    }
+
+    PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget) {
         // Aimed at anywhere this unit could hit the target from, not at the
         // square the target is standing on. That square is occupied by
         // definition, so a route to it can only end on top of somebody: the
@@ -9958,7 +9977,8 @@ public final class World {
         if (targets.inAttackRange(unit, target)) {
             return PathFinder.Result.REACHED;
         }
-        PathFinder.Path path = findBattleNetTargetPath(unit, target);
+        PathFinder.Path path = findBattleNetTargetPath(
+                unit, target, settledResidualRetarget);
         if (path.result() != PathFinder.Result.FOUND) {
             if (path.result() == PathFinder.Result.UNREACHABLE) {
                 // The chase planner is NextPathElement inside DoActionMove

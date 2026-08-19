@@ -939,6 +939,7 @@ final class BattleNetCombatSystem {
                 // Non-building quarries unchanged.
                 boolean residualBlockedBuilding = false;
                 int residualBlockedFreeHeading = -1;
+                boolean residualPathOneChangedTarget = false;
                 if (previous != null && unit.pathLength() >= 6
                         && previous.type() != null && previous.type().building()
                         && previous.isAlive() && previous.isOnMap()
@@ -1089,7 +1090,26 @@ final class BattleNetCombatSystem {
                                 break;
                             }
                         }
-                        if (!pathn1FreeProgress) {
+                        // A collided mobile quarry whose best target changes
+                        // gives free-scan this same settle visit. Let it
+                        // retarget and lay its route before a compass fallback.
+                        // XHuman 12 grunt 1496 sees the knight on 30,44 here;
+                        // taking N first occupied 30,38 and blocked axe 1522's
+                        // cached SE later in the action cycle. Grunt 1514's
+                        // best target stays the footman, so it still takes
+                        // native's independent N fallback. Uncollided leftovers
+                        // and building quarries keep the earlier fallback
+                        // ordering (XHuman 10 grunt 1500, Human 13 ogre 1491,
+                        // and XHuman 12 grunt 1517).
+                        Unit pathn1Candidate = world.targets
+                                .findBattleNetHostile(unit, reactRange, null);
+                        boolean pathn1ChangedTarget = pathn1Candidate != null
+                                && pathn1Candidate != pathn1Quarry
+                                && pathn1Quarry.type() != null
+                                && !pathn1Quarry.type().building()
+                                && unit.battleNetCollisionCounter() > 0;
+                        residualPathOneChangedTarget = pathn1ChangedTarget;
+                        if (!pathn1FreeProgress && !pathn1ChangedTarget) {
                             // RI20 + free-compass first free neighbour. Full
                             // pathfind after clear returned SE (path 3134) and
                             // stepped N only at fixture 43; native N@42.
@@ -1308,6 +1328,26 @@ final class BattleNetCombatSystem {
                             // empty-route free-detour seam as the pathLength
                             // == 0 arm below (XHuman 12 grunt 1507).
                             unit.setBattleNetChaseEmptyRouteReplan(true);
+                        }
+                        if (residualPathOneChangedTarget) {
+                            world.planTowards(unit, chased, true);
+                            // Retargeting from a settled refused leftover
+                            // transfers back to Move start with native timer
+                            // 15 before any replacement heading is spent.
+                            // This is the other half of XHuman 12 grunt 1496:
+                            // merely yielding to free-scan still let it take
+                            // the new route's first step on fixture 41.
+                            unit.setBattleNetChaseReplanResidualHold(false);
+                            unit.setBattleNetOrderDelay(14);
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                                unit.setBattleNetAnimationTimer(15);
+                                unit.setBattleNetChaseStepReady(false);
+                            }
+                            return;
                         }
                         world.movement.moveTowards(unit, chased);
                     }
