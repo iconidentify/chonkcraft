@@ -2025,6 +2025,17 @@ final class BattleNetMovementSystem {
                         && !unit.chasing())) {
             return false;
         }
+        // A quarry that is still draining its own committed step keeps this
+        // Attack-owned residual alive even if the outer action is temporarily
+        // represented as MOVE. Human 8's harvesting peasant settles while
+        // its pursuer still owes seven pixels; retail pays all seven before
+        // entering Attack, rather than taking the borrowed-Move eight-pixel
+        // arrival band.
+        if (world.battleNetSequence != null
+                && unit.target().isMoving() && unit.isMoving()
+                && unit.target().order() == Unit.Order.HARVEST) {
+            unit.setBattleNetMovingQuarryResidual(true);
+        }
         int debt = Math.max(Math.abs(unit.offsetX()), Math.abs(unit.offsetY()));
         // A surrogate Move body chasing a quarry uses MoveToTarget's
         // occupied-square band. The real Attack order and a SetAutoTarget
@@ -2033,6 +2044,7 @@ final class BattleNetMovementSystem {
         boolean attackOrderOwnsResidual = unit.order() == Unit.Order.ATTACK
                 || unit.autoTargeting();
         boolean ownsEveryPixel = unit.battleNetAttackWaitRefillResidual()
+                || unit.battleNetMovingQuarryResidual()
                 || attackOrderOwnsResidual;
         if (debt > (ownsEveryPixel ? 0 : 8)) {
             return false;
@@ -2043,6 +2055,8 @@ final class BattleNetMovementSystem {
         int nextY = unit.tileY() + Direction.deltaY(heading);
         Unit quarry = world.unitAt(nextX, nextY);
         if (quarry == null || quarry != unit.target()
+                || (unit.battleNetMovingQuarryResidual()
+                        && quarry.isMoving())
                 || !world.targets.inAttackRange(unit, quarry)) {
             return false;
         }
@@ -2051,6 +2065,7 @@ final class BattleNetMovementSystem {
         unit.setBattleNetCollisionCounter(0);
         unit.setBattleNetChaseEmptyRouteReplan(false);
         unit.setBattleNetAttackWaitRefillResidual(false);
+        unit.setBattleNetMovingQuarryResidual(false);
         unit.setChasing(false);
         unit.setFighting(true);
         unit.setBattleNetResidualEmptyRouteSettle(false);

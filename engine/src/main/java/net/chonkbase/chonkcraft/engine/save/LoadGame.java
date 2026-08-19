@@ -767,6 +767,10 @@ public final class LoadGame {
             unit.setBattleNetAttackWaitRefillResidual(
                     truthy(state.rawGet("attackWaitRefillResidual")));
         }
+        if (state.rawGet("movingQuarryResidual") != null) {
+            unit.setBattleNetMovingQuarryResidual(
+                    truthy(state.rawGet("movingQuarryResidual")));
+        }
         if (state.rawGet("attackWrapDestArmPending") != null) {
             unit.setBattleNetAttackWrapDestArmPending(
                     truthy(state.rawGet("attackWrapDestArmPending")));

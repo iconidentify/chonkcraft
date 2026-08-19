@@ -696,6 +696,9 @@ public final class SaveGame {
         if (unit.battleNetAttackWaitRefillResidual()) {
             state.append(" attackWaitRefillResidual = true,");
         }
+        if (unit.battleNetMovingQuarryResidual()) {
+            state.append(" movingQuarryResidual = true,");
+        }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");
         }

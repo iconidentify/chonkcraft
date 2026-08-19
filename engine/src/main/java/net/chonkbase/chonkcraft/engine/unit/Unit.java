@@ -2267,6 +2267,7 @@ public final class Unit {
             // quarry: the replacement's first approach is an ordinary chase
             // with the native eight-pixel arrival band.
             battleNetAttackWaitRefillResidual = false;
+            battleNetMovingQuarryResidual = false;
         }
         this.target = target;
         if (target == null) {
@@ -2776,6 +2777,17 @@ public final class Unit {
     }
 
     private boolean battleNetAttackWaitRefillResidual;
+
+    /** A moving quarry keeps the current chase residual Attack-owned. */
+    public boolean battleNetMovingQuarryResidual() {
+        return battleNetMovingQuarryResidual;
+    }
+
+    public void setBattleNetMovingQuarryResidual(boolean residual) {
+        battleNetMovingQuarryResidual = residual;
+    }
+
+    private boolean battleNetMovingQuarryResidual;
 
     /**
      * Combat chase just rebuilt from an empty/exhausted route (not a mid-route

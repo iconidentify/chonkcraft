@@ -508,6 +508,17 @@ final class BattleNetCombatSystem {
         // knight, a gryphon-rider and a dragon are each one square ahead of
         // upstream's.
         boolean walked = false;
+        // A moving resource worker can remain tile-adjacent while its pixel
+        // anchor is still more than one square ahead. Native keeps the
+        // pursuer's current residual under Attack ownership until it is fully
+        // paid. Human 8's siege peasant follows the harvesting peasant this
+        // way from fixture 5 through 117 instead of freezing at fixture 17.
+        if (world.battleNetSequence != null
+                && unit.chasing() && unit.isMoving() && unit.pathLength() == 1
+                && unit.target() != null && unit.target().isMoving()
+                && unit.target().order() == Unit.Order.HARVEST) {
+            unit.setBattleNetMovingQuarryResidual(true);
+        }
         // Only a unit that can walk has a walk to be part-way through.
         // COrder_Attack::MoveToTarget opens with Assert(unit.CanMove()) and is
         // only ever reached from the MOVE_TO_TARGET state, which a static
@@ -706,6 +717,7 @@ final class BattleNetCombatSystem {
                     && world.battleNetSequence != null
                     && unit.target() != null
                     && unit.target().isAlive()
+                    && !unit.battleNetMovingQuarryResidual()
                     && world.targets.inAttackRange(unit, unit.target())) {
                 int leftoverAttackStart = world.idle.battleNetSequenceStart(unit,
                         BattleNetSequence.ATTACK_ANIMATION);
@@ -795,7 +807,21 @@ final class BattleNetCombatSystem {
                 // weapon range of tower 25,42 after its first NE and native
                 // holds STAND_GROUND there; Java's leftover NE to 22,43 fired
                 // at fixture cycle 21 five steps early.
-                if (world.targets.inAttackRange(unit, chased)) {
+                // Tile adjacency is not arrival while the quarry still owns
+                // a committed pixel step. Human 8's attack peasant and the
+                // harvesting peasant ahead of it are adjacent in tile space
+                // throughout fixtures 5..116, but retail keeps MOVE_TO_TARGET
+                // running until the quarry settles and their pixel anchors
+                // close to one tile at fixture 117. Treating the moving tile
+                // as attack range froze the chaser at fixture 17 and let it
+                // damage the quarry from several visible squares away.
+                boolean attackOwnsResidual =
+                        unit.order() == Unit.Order.ATTACK
+                        || unit.autoTargeting()
+                        || unit.battleNetAttackWaitRefillResidual()
+                        || unit.battleNetMovingQuarryResidual();
+                if ((!unit.isMoving() || !attackOwnsResidual)
+                        && world.targets.inAttackRange(unit, chased)) {
                     int leftoverAttackStart = world.battleNetSequence == null
                             || world.idle == null
                             ? -1
@@ -838,6 +864,7 @@ final class BattleNetCombatSystem {
                             && unit.type() != null
                             && unit.type().maxAttackRange() <= 1
                             && (unit.battleNetAttackWaitRefillResidual()
+                                    || unit.battleNetMovingQuarryResidual()
                                     || (unit.pathLength() >= 2
                                     && (onBattleNetChaseMoveBody(unit)
                                             || unit.battleNetSequenceOffset()
@@ -862,6 +889,7 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, true);
                         unit.setBattleNetAttackWaitRefillResidual(false);
+                        unit.setBattleNetMovingQuarryResidual(false);
                     } else if (rangedResidualOpen) {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, false);
