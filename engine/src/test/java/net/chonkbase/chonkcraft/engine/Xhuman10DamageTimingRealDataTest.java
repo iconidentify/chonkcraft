@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -93,6 +94,59 @@ class Xhuman10DamageTimingRealDataTest {
                 "the grunt must stand on 81,90 when the second blow lands");
         assertEquals(90, grunt.tileY(),
                 "the grunt must stand on 81,90 when the second blow lands");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's residual retarget leaves its dying quarry")
+    void xhuman10ResidualRetargetLeavesItsDyingQuarry() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        Unit grunt = unitAt(world, "unit-grunt", 78, 87);
+        Unit footman = unitAt(world, "unit-footman", 82, 88);
+        Unit knight = unitAt(world, "unit-knight", 84, 89);
+        assertNotNull(grunt, "XHuman 10 has no grunt on 78,87");
+        assertNotNull(footman, "XHuman 10 has no footman on 82,88");
+        assertNotNull(knight, "XHuman 10 has no knight on 84,89");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 54) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 50) {
+                assertSame(footman, grunt.target(),
+                        "the committed residual still owns the dying footman");
+                assertEquals(Unit.Order.DYING, footman.order());
+            } else if (fixture == 51) {
+                assertSame(knight, grunt.target(),
+                        "retail OP0 replaces the corpse with the live knight");
+                assertEquals(2539, grunt.battleNetSequenceOffset(),
+                        "retail parks on the grunt's Attack start");
+                assertEquals(3, grunt.battleNetAnimationTimer(),
+                        "the replacement pays Attack construction 3,2,1");
+                assertEquals(81, grunt.tileX());
+                assertEquals(89, grunt.tileY());
+            } else if (fixture == 53) {
+                assertEquals(81, grunt.tileX());
+                assertEquals(89, grunt.tileY(),
+                        "the grunt must hold through construction fixture 53");
+            }
+        }
+
+        assertSame(knight, grunt.target());
+        assertEquals(82, grunt.tileX());
+        assertEquals(88, grunt.tileY(),
+                "retail resumes the live chase NE on fixture 54");
+        assertTrue(grunt.isMoving(),
+                "the grunt must be walking, not swinging at the corpse");
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

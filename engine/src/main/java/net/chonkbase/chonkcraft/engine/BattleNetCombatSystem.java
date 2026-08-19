@@ -72,6 +72,70 @@ final class BattleNetCombatSystem {
     }
 
     /**
+     * Keeps the dead quarry's final approach square as dest-arm's first step.
+     *
+     * <p>Attack OP0 can replace a quarry after its exhausted chase residual
+     * has landed.  Native still feeds the old goal square to the first route
+     * heading before the replacement goal takes ownership.  XHuman 10 grunt
+     * 1495 therefore writes NE,E toward knight 1489: NE is the adjacent cell
+     * formerly occupied by dying footman 1492, while an immediate fresh plan
+     * writes E,E.  The old path goal survives {@link Unit#clearPath()}, so it
+     * is also the state a save made during Attack construction can preserve.
+     */
+    private void keepDeadQuarryDestArmHeading(Unit unit, Unit replacement,
+            int oldGoalX, int oldGoalY, boolean oldGoalEnterable) {
+        if (replacement == null || unit.pathLength() == 0
+                || oldGoalX < 0 || oldGoalY < 0
+                || (oldGoalX == replacement.tileX()
+                        && oldGoalY == replacement.tileY())) {
+            return;
+        }
+        int dx = oldGoalX - unit.tileX();
+        int dy = oldGoalY - unit.tileY();
+        if (Math.max(Math.abs(dx), Math.abs(dy)) != 1
+                || !oldGoalEnterable) {
+            return;
+        }
+        int targetWidth = replacement.type() == null ? 1
+                : Math.max(1, replacement.type().tileWidth());
+        int targetHeight = replacement.type() == null ? 1
+                : Math.max(1, replacement.type().tileHeight());
+        int nearX = World.battleNetNearFootprintCoordinate(oldGoalX,
+                replacement.tileX(), targetWidth);
+        int nearY = World.battleNetNearFootprintCoordinate(oldGoalY,
+                replacement.tileY(), targetHeight);
+        int distance = Math.max(Math.abs(nearX - oldGoalX),
+                Math.abs(nearY - oldGoalY));
+        if (unit.type() == null
+                || distance < unit.type().minAttackRange()
+                || distance > Math.max(1, unit.type().maxAttackRange())) {
+            return;
+        }
+        int heading = Direction.fromDelta(dx, dy);
+        if (heading < 0 || heading >= Direction.COUNT) {
+            return;
+        }
+        int n = unit.pathLength();
+        int[] headings = new int[n];
+        for (int depth = 0; depth < n; depth++) {
+            headings[n - 1 - depth] = unit.peekHeadingAtDepth(depth);
+        }
+        headings[n - 1] = heading;
+        unit.setPath(new PathFinder.Path(PathFinder.Result.FOUND, headings));
+        unit.setPathGoal(replacement.tileX(), replacement.tileY());
+    }
+
+    /** Clears only stale blocking bits; dying bodies stay in UnitCache. */
+    private void clearDyingMovementFieldAt(int x, int y) {
+        for (Unit corpse : world.unitsSnapshot()) {
+            if (corpse.isDying() && corpse.isOnMap() && corpse.type() != null
+                    && corpse.covers(x, y)) {
+                world.setMovementFieldFlags(corpse, false);
+            }
+        }
+    }
+
+    /**
      * Points a woodcutter at a square, throwing away the route it was walking.
      *
      * @return whether the worker is already standing next to it, and so has
@@ -353,7 +417,23 @@ final class BattleNetCombatSystem {
             if (unit.canMove()
                     && !world.targets.inAttackRange(unit, acquired)) {
                 boolean wrapDestArm = unit.battleNetAttackWrapDestArmPending();
+                boolean deadResidualDestArm = wrapDestArm
+                        && unit.battleNetPendingMeleeSyncRand();
+                int priorGoalX = unit.pathGoalX();
+                int priorGoalY = unit.pathGoalY();
+                if (deadResidualDestArm
+                        && priorGoalX >= 0 && priorGoalY >= 0) {
+                    clearDyingMovementFieldAt(priorGoalX, priorGoalY);
+                }
+                boolean priorGoalEnterable = priorGoalX >= 0
+                        && priorGoalY >= 0
+                        && world.canEnter(unit, priorGoalX, priorGoalY);
                 world.movement.moveTowards(unit, acquired);
+                if (deadResidualDestArm) {
+                    keepDeadQuarryDestArmHeading(unit, acquired,
+                            priorGoalX, priorGoalY, priorGoalEnterable);
+                    clearDyingMovementFieldAt(priorGoalX, priorGoalY);
+                }
                 if (wrapDestArm && unit.pathLength() > 0) {
                     // This is not a cold Move order. Attack's completed loop
                     // has already paid the action visit that asks for the
@@ -830,6 +910,63 @@ final class BattleNetCombatSystem {
                         || unit.autoTargeting()
                         || unit.battleNetAttackWaitRefillResidual()
                         || unit.battleNetMovingQuarryResidual();
+                // A chase residual can land beside a quarry which entered
+                // Die while the unbreakable step was still draining.  The
+                // arrival opens Attack OP0, and that OP0 free-scan may name
+                // an out-of-range replacement before it decides whether to
+                // fight or dest-arm another route.  Do not turn the corpse's
+                // tile adjacency into ATTACK_TARGET first: XHuman 10 grunt
+                // 1495 settles at 81,89 on fixture 51 after footman 1492 has
+                // begun dying, names the live knight on 83,89, holds Attack
+                // start through 3,2,1, and first-steps NE on fixture 54.
+                // Java instead opened the post-OP0 swing against the corpse
+                // and stayed frozen on 81,89.
+                boolean deadMeleeResidual = world.actionMoveWalked
+                        && !unit.isMoving()
+                        && unit.pathLength() == 0
+                        && unit.canMove()
+                        && unit.type() != null
+                        && unit.type().maxAttackRange() <= 1
+                        && chased != null
+                        && !world.targets.validAttackTarget(unit, chased);
+                if (deadMeleeResidual) {
+                    int deadReactRange = Math.max(
+                            unit.type().reactRange(
+                                    world.isPerson(unit.player())),
+                            Math.max(1, unit.type().maxAttackRange()));
+                    Unit replacement = world.targets.findBattleNetHostile(
+                            unit, deadReactRange, null);
+                    boolean replacementOutOfRange = replacement != null
+                            && replacement != chased
+                            && replacement.isAlive()
+                            && !replacement.isDying()
+                            && !world.targets.inAttackRange(
+                                    unit, replacement);
+                    if (replacementOutOfRange) {
+                        int replacementAttackStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        if (chased.isDying()) {
+                            // LetUnitDie has already removed this bit in BNE.
+                            // A later Java occupancy restore can put it back;
+                            // clear only the field flag and keep the corpse in
+                            // UnitCache for targeting/release order.
+                            world.setMovementFieldFlags(chased, false);
+                        }
+                        setAutoTarget(unit, replacement);
+                        if (replacementAttackStart >= 0) {
+                            unit.setBattleNetSequenceOffset(
+                                    replacementAttackStart);
+                            unit.setBattleNetAnimationTimer(3);
+                        }
+                        world.turnToTarget(unit, replacement, 0, 0);
+                        unit.setOfferedTarget(replacement);
+                        unit.setFighting(false);
+                        unit.setChasing(false);
+                        unit.setBattleNetAttackWrapDestArmPending(true);
+                        return;
+                    }
+                }
                 if ((!unit.isMoving() || !attackOwnsResidual)
                         && world.targets.inAttackRange(unit, chased)) {
                     int leftoverAttackStart = world.battleNetSequence == null
