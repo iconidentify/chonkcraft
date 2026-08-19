@@ -155,11 +155,11 @@ class BattleNetAiBuildBoundsRealDataTest {
     @Test
     @DisplayName("a human 8 computer rewrites the land-building box on the fifty-cycle beat")
     void aHuman8ComputerRewritesTheLandBuildingBoxOnTheFiftyCycleBeat() {
-        // Native writes 3e165600 at fixture 199. Java's extra hall is
-        // already up at the 149 beat, so the same rectangle lands there.
-        // 148 is the cycle before that beat and must keep the install box.
-        assertBuildBox("campaigns/human/level08h", 0, 148, 0x3e, 0x16, 0x4f, 0x00);
-        assertBuildBox("campaigns/human/level08h", 0, 149, 0x3e, 0x16, 0x56, 0x00);
+        // Native writes 3e165600 at fixture 199. The builder used to walk
+        // through an intervening building body, erect the extra hall fifty
+        // cycles early, and make Java rewrite the box on the 149 beat.
+        assertBuildBox("campaigns/human/level08h", 0, 198, 0x3e, 0x16, 0x4f, 0x00);
+        assertBuildBox("campaigns/human/level08h", 0, 199, 0x3e, 0x16, 0x56, 0x00);
     }
 
     @Test

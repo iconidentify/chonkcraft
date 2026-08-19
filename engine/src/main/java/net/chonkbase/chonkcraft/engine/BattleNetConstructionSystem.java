@@ -1184,9 +1184,7 @@ final class BattleNetConstructionSystem {
     boolean solidBuildingOriginAt(int tileX, int tileY) {
         for (Unit unit : world.units) {
             if (unit.tileX() != tileX || unit.tileY() != tileY
-                    || !unit.isAlive() || !unit.isOnMap()
-                    || unit.type() == null || !unit.type().building()
-                    || unit.type().nonSolid() || unit.type().hitPoints() <= 0) {
+                    || !solidBuilding(unit)) {
                 continue;
             }
             return true;
@@ -1196,15 +1194,17 @@ final class BattleNetConstructionSystem {
 
 
     /**
-     * Whether this worker is walking to found and must ignore
-     * {@code MapFieldBuilding} the same way CheckCanBuild does.
+     * Whether this worker is walking to found and needs the site-local
+     * {@code MapFieldBuilding} exception used by CheckCanBuild.
      *
      * <p>Garden of War's authenticated blacksmith packet sits at 90,6, on
      * the body of the 4x4 hall at 89,5. Every neighbour of 90,6 is also a
      * hall tile. Java used to treat those flags as a wall, so the peon
      * stopped at 92,4 and native unit 1554 had no Java blacksmith to bind
-     * to at record 3477. The order is flipped to MOVE for the step itself,
-     * which is why this keys off the pending type rather than the label.
+     * to at record 3477. The coarse bit is removed here and
+     * {@link #builderCanEnterBuildingBodyAt} puts every body outside the new
+     * site back. The order is flipped to MOVE for the step itself, which is
+     * why this keys off the pending type rather than the label.
      */
     boolean builderWalksThroughBuildingBodies(Unit unit) {
         return unit != null && unit.isOnMap() && unit.worksite() == null
@@ -1214,12 +1214,58 @@ final class BattleNetConstructionSystem {
 
     /**
      * Blocking flags for a builder's walk: same as movement, minus the
-     * building bit that CheckCanBuild also ignores. Origin tiles stay
-     * closed so a 1x1 wall is still a wall.
+     * coarse building bit. The cell predicate restores solid building bodies
+     * everywhere except an overlapping target footprint.
      */
     long builderTraversalBlocking(Unit unit) {
         long blocking = unit.blockingFlags() & ~TileFlag.BUILDING;
         return blocking;
+    }
+
+
+    /**
+     * Whether a builder may enter this square after the coarse building bit
+     * has been removed from its pathfinder mask.
+     *
+     * <p>{@link #footprintIsClear} deliberately ignores the body squares of
+     * an existing building when a new site's footprint overlaps them; only
+     * the existing building's origin rejects the placement. The builder must
+     * therefore be able to reach those target squares. That exception is
+     * local to the site. It does not make every intervening building
+     * transparent: sealed Orc 10 unit 1578 routes southwest around the castle
+     * between 43,6 and its farm point at 35,6. The previous global exception
+     * sent it west through the castle instead.</p>
+     */
+    boolean builderCanEnterBuildingBodyAt(Unit worker, int tileX, int tileY) {
+        if (worker == null || worker.pendingBuild() == null) {
+            return false;
+        }
+        boolean insideSite = tileX >= worker.buildTileX()
+                && tileY >= worker.buildTileY()
+                && tileX < worker.buildTileX()
+                        + Math.max(1, worker.pendingBuild().tileWidth())
+                && tileY < worker.buildTileY()
+                        + Math.max(1, worker.pendingBuild().tileHeight());
+        for (Unit building : world.units) {
+            if (!solidBuilding(building)) {
+                continue;
+            }
+            int right = building.tileX() + Math.max(1, building.type().tileWidth());
+            int bottom = building.tileY() + Math.max(1, building.type().tileHeight());
+            if (tileX >= building.tileX() && tileX < right
+                    && tileY >= building.tileY() && tileY < bottom
+                    && !insideSite) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+
+    private static boolean solidBuilding(Unit unit) {
+        return unit != null && unit.isAlive() && unit.isOnMap()
+                && unit.type() != null && unit.type().building()
+                && !unit.type().nonSolid() && unit.type().hitPoints() > 0;
     }
 
 

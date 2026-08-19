@@ -5985,7 +5985,8 @@ public final class World {
                 if (!map.isFootprintFree(x, y, 1, 1, mask, blocking)) {
                     return false;
                 }
-                return !ignoreBuilding || !construction.solidBuildingOriginAt(x, y);
+                return !ignoreBuilding
+                        || construction.builderCanEnterBuildingBodyAt(unit, x, y);
             }
 
             @Override
@@ -14468,7 +14469,8 @@ public final class World {
         if (free && ignoreBuilding) {
             for (int dy = 0; dy < h && free; dy++) {
                 for (int dx = 0; dx < w; dx++) {
-                    if (construction.solidBuildingOriginAt(x + dx, y + dy)) {
+                    if (!construction.builderCanEnterBuildingBodyAt(
+                            unit, x + dx, y + dy)) {
                         free = false;
                         break;
                     }
