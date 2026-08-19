@@ -1675,11 +1675,22 @@ final class BattleNetCombatSystem {
         int savedOffset = unit.battleNetSequenceOffset();
         int savedTimer = unit.battleNetAnimationTimer();
         boolean savedStepReady = unit.battleNetChaseStepReady();
+        boolean savedBorrowedMove = unit.battleNetBorrowedMoveForStep();
         unit.setOrder(Unit.Order.MOVE);
         unit.setBattleNetSequenceOffset(savedOffset);
         unit.setBattleNetAnimationTimer(savedTimer);
         unit.setBattleNetChaseStepReady(savedStepReady);
-        world.movement.stepMove(unit, false);
+        // MOVE is only a Java call-seam surrogate here. Native remains inside
+        // COrder_Attack::MoveToTarget, so an occupied-quarry arrival must not
+        // mistake the temporary label for weaker movement ownership and snap
+        // a residual of eight pixels. XHuman 9 skeleton 1431 pays its last
+        // ten pixels through fixture 46 before Attack owns the unit.
+        unit.setBattleNetBorrowedMoveForStep(true);
+        try {
+            world.movement.stepMove(unit, false);
+        } finally {
+            unit.setBattleNetBorrowedMoveForStep(savedBorrowedMove);
+        }
         boolean underWay = unit.order() == Unit.Order.MOVE;
         int offsetAfter = unit.battleNetSequenceOffset();
         int timerAfter = unit.battleNetAnimationTimer();

@@ -18,8 +18,9 @@ import org.junit.jupiter.api.Test;
  * skeleton 1431 starts at 15,118, arrives at 13,120 on cycle 26, and lands
  * its first blow on footman 1427 at cycle 55 (60 to 52). The footman has
  * already been on stationary Attack since the arrival (cycle 27) and
- * answers on cycle 57 (skeleton 30 to 24). The case's next coarse
- * divergence after that first blow is this defensive posture at cycle 56.
+ * stays on Attack at cycle 56 before answering on cycle 57 (skeleton 30 to
+ * 24). Separate neighboring-footman reactions make cycle 56 the case's next
+ * coarse frontier after this focal exchange.
  */
 class Xhuman09DefensiveReactionRealDataTest {
 
@@ -47,11 +48,33 @@ class Xhuman09DefensiveReactionRealDataTest {
             mission.tick();
         }
 
+        Integer skeletonOffsetXAt41 = null;
+        Integer skeletonOffsetYAt41 = null;
+        Integer skeletonOffsetXAt45 = null;
+        Integer skeletonOffsetYAt45 = null;
+        Integer skeletonOffsetXAt46 = null;
+        Integer skeletonOffsetYAt46 = null;
+        Integer footmanHpAt54 = null;
         Integer footmanHpAt55 = null;
         Unit.Order footmanOrderAt56 = null;
         Integer skeletonHpAt57 = null;
         while (fixtureCycle(world) < 57) {
             mission.tick();
+            if (fixtureCycle(world) == 41) {
+                skeletonOffsetXAt41 = skeleton.offsetX();
+                skeletonOffsetYAt41 = skeleton.offsetY();
+            }
+            if (fixtureCycle(world) == 45) {
+                skeletonOffsetXAt45 = skeleton.offsetX();
+                skeletonOffsetYAt45 = skeleton.offsetY();
+            }
+            if (fixtureCycle(world) == 46) {
+                skeletonOffsetXAt46 = skeleton.offsetX();
+                skeletonOffsetYAt46 = skeleton.offsetY();
+            }
+            if (fixtureCycle(world) == 54) {
+                footmanHpAt54 = footman.hitPoints();
+            }
             if (fixtureCycle(world) == 55) {
                 footmanHpAt55 = footman.hitPoints();
             }
@@ -63,9 +86,23 @@ class Xhuman09DefensiveReactionRealDataTest {
             }
         }
 
-        assertTrue(footmanHpAt55 != null && footmanHpAt55 < footmanOpened,
-                "retail's skeleton first blow lands on cycle 55; the footman is still at "
-                        + footmanHpAt55 + " of " + footmanOpened);
+        assertEquals(7, skeletonOffsetXAt41,
+                "script.bin leaves seven horizontal walk pixels on cycle 41");
+        assertEquals(-7, skeletonOffsetYAt41,
+                "the south-west chase still owes seven vertical pixels on cycle 41");
+        assertEquals(2, skeletonOffsetXAt45,
+                "the skeleton still owes two horizontal pixels on cycle 45");
+        assertEquals(-2, skeletonOffsetYAt45,
+                "the skeleton still owes two vertical pixels on cycle 45");
+        assertEquals(0, skeletonOffsetXAt46,
+                "the native Move body reaches the tile anchor on cycle 46");
+        assertEquals(0, skeletonOffsetYAt46,
+                "the native Move body reaches the tile anchor on cycle 46");
+        assertEquals(footmanOpened, footmanHpAt54,
+                "the skeleton must finish its borrowed walk pixels before attacking; "
+                        + "retail leaves the footman untouched through cycle 54");
+        assertEquals(52, footmanHpAt55,
+                "retail's skeleton first blow lands on cycle 55");
         assertEquals(Unit.Order.ATTACK, footmanOrderAt56,
                 "retail's struck footman stays on Attack at cycle 56, not "
                         + footmanOrderAt56);

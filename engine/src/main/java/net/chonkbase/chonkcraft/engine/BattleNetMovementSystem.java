@@ -2017,11 +2017,11 @@ final class BattleNetMovementSystem {
     /**
      * A melee leftover residual that already stands in weapon range, with
      * its last heading naming the quarry's occupied square, dest-arms into
-     * Attack at the arrival band belonging to that action. A borrowed Move
-     * chase transfers at eight pixels (XHuman 9 and Human 8). COrder_Attack,
-     * or a route rebuilt after an AttackTarget swing, owns every borrowed
-     * pixel: Orc 1's commanded grunt drains ten through fixture 204, and
-     * Human 1's post-swing refill drains through 417.
+     * Attack at the arrival band belonging to that action. COrder_Attack,
+     * including the temporary Java MOVE seam used by MoveToTarget, owns every
+     * borrowed pixel: XHuman 9's skeleton drains ten through fixture 46,
+     * Orc 1's commanded grunt drains ten through fixture 204, and Human 1's
+     * post-swing refill drains through 417.
      */
     private boolean arriveMeleeLeftoverOnOccupiedQuarry(Unit unit) {
         if (unit == null || unit.type() == null
@@ -2053,7 +2053,8 @@ final class BattleNetMovementSystem {
         // rename do not, and an exhausted refill has explicit ownership even
         // when that borrowed Move body has already replaced the outer label.
         boolean attackOrderOwnsResidual = unit.order() == Unit.Order.ATTACK
-                || unit.autoTargeting();
+                || unit.autoTargeting()
+                || (unit.chasing() && unit.battleNetBorrowedMoveForStep());
         boolean ownsEveryPixel = unit.battleNetAttackWaitRefillResidual()
                 || unit.battleNetMovingQuarryResidual()
                 || attackOrderOwnsResidual;
@@ -4292,7 +4293,15 @@ final class BattleNetMovementSystem {
             unit.setStepDrained(false);
             // After a chase step, retail is on the Move body past the opening
             // OP0 (skeleton 1133/1). Arm that body so the next OP0 is twenty
-            // quiet calls later, not a second immediate step.
+            // quiet calls later, not a second immediate step. The same
+            // script.bin body owns the residual pixel pace: XHuman 9
+            // skeleton 1431 reaches the logical tile on fixture 26 but
+            // drains 32 borrowed pixels through fixture 46 before Attack
+            // takes ownership and lands its first blow on fixture 55.
+            // ChonkCraft's presentation script drained that debt on fixture
+            // 41 and made the blow five cycles early. The type-level native
+            // pace arm below carries those pixels; the action cursor here
+            // continues to own OP0 decisions.
             if (world.battleNetSequence != null && unit.chasing()) {
                 world.combat.armBattleNetChaseMoveBody(unit);
             }
@@ -4695,7 +4704,10 @@ final class BattleNetMovementSystem {
      *
      * <p>Double-step ships, repair strides, and critters already did. Slow
      * siege engines join them because ChonkCraft Move's turn branch is not
-     * how retail dest-arms a committed leftover heading.
+     * how retail dest-arms a committed leftover heading. Skeletons use it
+     * because their ChonkCraft Move collapses the last ten diagonal pixels
+     * into one visit while script.bin spends them over fixtures 41..46 in the
+     * authenticated XHuman 9 chase.
      */
     boolean usesBattleNetMovePace(Unit unit) {
         if (unit == null || unit.type() == null) {
@@ -4705,6 +4717,7 @@ final class BattleNetMovementSystem {
                 || unit.battleNetRepairStride()
                 || unit.returningToDepot() && unit.carried() > 0
                 || "unit-critter".equals(unit.type().ident())
+                || "unit-skeleton".equals(unit.type().ident())
                 || siegeUsesScriptBinMovePace(unit);
     }
 
