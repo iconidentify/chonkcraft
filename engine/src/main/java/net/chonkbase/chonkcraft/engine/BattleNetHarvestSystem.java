@@ -1186,6 +1186,26 @@ final class BattleNetHarvestSystem {
         if (!pauseComputerForReadyDispatch(worker)) {
             return false;
         }
+        // A loaded platform exit owns the same timed Still head as a gold
+        // mine exit. XHuman 8 tanker 1538 surfaces on fixture 258 with raw
+        // action 2, next action 24 and timer 25; it stays Still through 282,
+        // promotes Return Goods on 283, and takes its first doubled stride on
+        // 286. Merely changing the current order to Still lets its very next
+        // idle marker call 0x439280 and reconstruct action 24 on fixture 259.
+        Unit home = worker.returnDepotGoal();
+        if (worker.carried() > 0 && home != null
+                && world.battleNetSequence != null) {
+            worker.clearPath();
+            worker.setReturningToDepot(true);
+            worker.setOrderTarget(home.tileX(), home.tileY());
+            worker.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.RETURN_GOODS,
+                    home.tileX(), home.tileY(), home, null, null));
+            worker.setQueuedReplacementPending(true);
+            // This unit tick decrements the queue once after StopGathering,
+            // leaving the authenticated timer 25 at the cycle boundary.
+            worker.setBattleNetOrderDelay(26);
+        }
         worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
         worker.setBattleNetOilActionTicks(0);
         return true;

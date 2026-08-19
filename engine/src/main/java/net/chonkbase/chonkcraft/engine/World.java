@@ -6548,7 +6548,7 @@ public final class World {
         // point rather than the footprint centre. XHuman 8's mine at 15,9
         // exits its peon at 18,9 toward the Great Hall order point 21,8;
         // scoring against centre 23,10 incorrectly preferred 18,10.
-        return dropOutNearestOnSide(unit.type(), towards.tileX(), towards.tileY(),
+        return dropOutNearestOnSide(unit, towards.tileX(), towards.tileY(),
                 BattleNetMovementSystem.headingTowards(container, towards),
                 container, unit.tileX(), unit.tileY());
     }
@@ -7673,12 +7673,14 @@ public final class World {
      * This distinction excludes a geometrically closer diagonal corner:
      * Orc 1's mine at 26,13 surfaces its peon on 25,15, not 25,16.</p>
      */
-    private int[] dropOutNearestOnSide(UnitType type, int goalX, int goalY,
+    private int[] dropOutNearestOnSide(Unit unit, int goalX, int goalY,
             int heading, Unit container, int startX, int startY) {
+        UnitType type = unit.type();
         long mask = Unit.movementMaskFor(type);
         long blocking = Unit.blockingFlagsFor(type);
         int width = Math.max(1, type.tileWidth());
         int height = Math.max(1, type.tileHeight());
+        int stride = battleNetMovementStride(unit);
         int x = container.tileX() - (width - 1);
         int y = container.tileY() - (height - 1);
         int addx = Math.max(1, container.type().tileWidth()) + width - 1;
@@ -7710,7 +7712,18 @@ public final class World {
             int bestDistance = Integer.MAX_VALUE;
             int count = leg == LEG_WEST || leg == LEG_EAST ? addy : addx;
             for (int i = count; i-- > 0;) {
-                if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                // DropOutNearest tests the same movement grid encoded on the
+                // contained unit. XHuman 8 tanker 1538 retains its doubled
+                // bit inside the platform at (67,55), so native rejects the
+                // otherwise-free odd west-face anchor (65,54), continues to
+                // the south face, and surfaces at (66,58). Accepting the odd
+                // anchor switched Java to a one-tile recovery route before
+                // the homeward oil leg even began.
+                boolean onMovementGrid = battleNetSequence == null || stride == 1
+                        || (Math.floorMod(x, stride) == 0
+                                && Math.floorMod(y, stride) == 0);
+                if (onMovementGrid
+                        && map.isFootprintFree(x, y, width, height, mask, blocking)) {
                     int distance = squareDistance(goalX, goalY, x, y);
                     if (distance < bestDistance) {
                         bestDistance = distance;
