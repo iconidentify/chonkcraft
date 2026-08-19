@@ -11521,8 +11521,7 @@ public final class World {
             }
             return;
         }
-        if (unit.pathLength() == 0 && !unit.isMoving()
-                && unit.tileX() == unit.orderTargetX() && unit.tileY() == unit.orderTargetY()) {
+        if (battleNetPatrolEndpointReached(unit)) {
             // Reached this end: swap the two and walk back.
             int backX = unit.patrolX();
             int backY = unit.patrolY();
@@ -11658,6 +11657,8 @@ public final class World {
                 // new movement animation; only the third can take a logical
                 // tile step.  This is visible at startup when a behaviour-six
                 // capital ship receives its own square as the near endpoint.
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(2);
                 restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
                 return;
@@ -11726,9 +11727,7 @@ public final class World {
         // dest-reached exchange above saw isMoving and skipped; do it now
         // so the land visit turns around instead of waiting for the next
         // free visit.
-        if (unit.pathLength() == 0 && !unit.isMoving()
-                && unit.tileX() == unit.orderTargetX()
-                && unit.tileY() == unit.orderTargetY()) {
+        if (battleNetPatrolEndpointReached(unit)) {
             int backX = unit.patrolX();
             int backY = unit.patrolY();
             if (backX != unit.orderTargetX() || backY != unit.orderTargetY()) {
@@ -11738,6 +11737,8 @@ public final class World {
                 // endpoints. The following two action visits advance the
                 // new movement animation; only the third can take a
                 // logical tile step.
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(2);
                 return;
             }
@@ -11751,6 +11752,36 @@ public final class World {
             armBattleNetPatrolMoveBody(unit);
             unit.clearPath();
         }
+    }
+
+    /** Whether Patrol has reached a literal or doubled-movement endpoint. */
+    private boolean battleNetPatrolEndpointReached(Unit unit) {
+        if (unit.pathLength() != 0 || unit.isMoving()) {
+            return false;
+        }
+        if (unit.tileX() == unit.orderTargetX()
+                && unit.tileY() == unit.orderTargetY()) {
+            return true;
+        }
+        if (!unit.battleNetDoubleStep() || unit.type() == null
+                || !unit.type().seaUnit()
+                || !map.contains(unit.orderTargetX(), unit.orderTargetY())
+                || !battleNetNavalRewriteOpenWater(
+                        unit.orderTargetX(), unit.orderTargetY())
+                || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
+                        Math.abs(unit.tileY() - unit.orderTargetY())) > 1) {
+            return false;
+        }
+        // A doubled ship stays on one parity lattice. Its requested point can
+        // lie inside the hull at the last legal top-left even though the two
+        // coordinates never become equal. Native uses the point pathfinder's
+        // REACHED result as Patrol arrival: XHuman 8 destroyer 1480 settles
+        // on 40,84 for endpoint 41,85, exchanges endpoints on fixture 108,
+        // and takes the west leg on 111. Literal equality instead paid
+        // PF_WAIT 10 and retried the impossible odd-grid point forever.
+        PathFinder.Path path = findBattleNetPointPath(unit,
+                unit.orderTargetX(), unit.orderTargetY());
+        return path.result() == PathFinder.Result.REACHED;
     }
 
     /**
