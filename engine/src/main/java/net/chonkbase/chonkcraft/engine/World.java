@@ -11038,6 +11038,21 @@ public final class World {
      * comes from and where it ends.
      */
     private void beginPendingAttack(Unit unit) {
+        boolean capitalPatrol = battleNetStandingPatrolSequence(unit);
+        if (capitalPatrol) {
+            // A capital ship banks Attack as next_order at its opening Patrol
+            // marker, takes one doubled stride, and keeps Patrol current for
+            // the whole Move body. Promote only when the binary cursor is
+            // about to visit its next opcode zero. Promoting on the following
+            // Java turn made XOrc 11's battleship show Attack at fixture five
+            // while still sitting on 20,40; native is Patrol on 18,40.
+            BattleNetSequence.Tick next = battleNetSequence.tick(
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer());
+            if (!next.valid() || !next.actionMarker()) {
+                return;
+            }
+        }
         // Residual-settled naval patrol acquisition keeps action 5 with a
         // queued next_order Attack and animation timer 15 through fixtures
         // 40..54 (XORc 11 destroyer 1542) before promoting order 12 at 55.
@@ -11069,6 +11084,12 @@ public final class World {
             return;
         }
         Unit.Order interrupted = unit.order();
+        if (capitalPatrol) {
+            if (orderAttack(unit, target, false, false)) {
+                rememberInterruptedOrder(unit, interrupted);
+            }
+            return;
+        }
         // At the square, not at the unit. AutoAttack commands
         // {@code CommandAttack(unit, goal->tilePos, nullptr, On)}
         // The game "Weak goal, can choose other unit"
@@ -11361,10 +11382,17 @@ public final class World {
         // constructor delay so timer 3 from promote expires on that first
         // free visit, not three visits later.
         boolean patrolOp0 = tickBattleNetPatrolSequence(unit);
+        boolean standingPatrol = battleNetStandingPatrolSequence(unit);
         if (delayHold) {
             return;
         }
-        if (patrolOp0 && battleNetPatrolAcquire(unit)) {
+        boolean openingCapitalStride = standingPatrol
+                && !battleNetPatrolMoveBodyCursor(unit)
+                && unit.pathLength() == 0 && !unit.isMoving();
+        boolean queuedOpeningAttack = patrolOp0 && openingCapitalStride
+                && battleNetPatrolQueueAcquire(unit);
+        if (patrolOp0 && !queuedOpeningAttack
+                && battleNetPatrolAcquire(unit)) {
             return;
         }
         // Drain residual before acquisition and leftover free-consume. A
@@ -11418,7 +11446,6 @@ public final class World {
         // battleships used to convert to AttackMove on the first free visit
         // and step a cycle late (native still Patrol at 18,40 / 8,26 on
         // fixture cycle 5). Residual mid-slide never reaches here.
-        boolean standingPatrol = battleNetStandingPatrolSequence(unit);
         if (standingPatrol && !patrolOp0) {
             // Move-body visits stay on Patrol until the next OP0. Destroyer
             // leftover-settle (1542) does not own this cursor and still
@@ -12816,6 +12843,7 @@ public final class World {
                 || !map.contains(toX, toY)) {
             return false;
         }
+        Unit.Order before = unit.order();
         // Native GiveOrder 5 from Still with remaining Still wait writes
         // next_order 5 and keeps Still: Orc 1 grunt 1592 queueWait 4
         // through fixture 8, Patrol at 9, dest-arms at 12. Installing
@@ -12837,7 +12865,7 @@ public final class World {
         unit.setPatrol(unit.tileX(), unit.tileY());
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);
-        armBattleNetPatrolSequence(unit);
+        armBattleNetPatrolSequence(unit, before);
         if (fromPlayer && battleNetSequence != null
                 && unit.battleNetOrderDelay() == 0) {
             // Issue-visit Patrol dest-arms at fixture 8: peon 1594
@@ -12848,19 +12876,34 @@ public final class World {
     }
 
     /**
-     * Keeps the Still cursor a capital-ship Patrol was promoted from, or
-     * installs Move when that cursor was already gone.
+     * Rewinds a capital-ship Patrol promoted from Still to that sequence's
+     * head, or installs Move when the prior order owned no cursor.
      *
      * <p>Native 1511 keeps Still 2955 and resets the timer to 3 on the
      * promote visit. Wiping the cursor here used to leave every later
      * walkTowards on sequence -1, so the ship never saw the Move-body OP0
      * that opens Attack at fixture 58.
      */
-    private void armBattleNetPatrolSequence(Unit unit) {
+    private void armBattleNetPatrolSequence(Unit unit, Unit.Order before) {
         if (battleNetSequence == null || unit == null || unit.type() == null
                 || !unit.type().seaUnit()
                 || !isBattleNetCapitalShip(unit.type().ident())) {
             return;
+        }
+        if (before == Unit.Order.STILL) {
+            // The ready callback is reached through Still's opcode zero. Its
+            // tick leaves the Java cursor just after that marker (4983 for a
+            // battleship), but native's Patrol constructor rewinds to the
+            // Still sequence head and arms three calls there. Keeping 4983
+            // enters WAIT 4 before the first stride: XOrc 7/8 then sit until
+            // fixture cycle six instead of moving on two, and XOrc 11 sits
+            // until nine instead of moving on five.
+            int still = idle.battleNetStillSequenceStart(unit);
+            if (still >= 0) {
+                unit.setBattleNetSequenceOffset(still);
+                unit.setBattleNetAnimationTimer(3);
+                return;
+            }
         }
         if (unit.battleNetSequenceOffset() >= 0) {
             unit.setBattleNetAnimationTimer(3);
@@ -12916,11 +12959,28 @@ public final class World {
      *
      * <p>This is order 12, not the 15-cycle AttackMove queue. Native 1511
      * opens Attack at fixture 58 on the same visit the Move body returns
-     * to OP0, still on 18,40, once the orc destroyer at 10,42 is inside
-     * computer react 8. The first OP0 is still on 20,40 (dist 10) and
-     * must miss so fixture 5 stays Patrol.
+     * to OP0, still on 18,40. Its first OP0 at fixture five already banks
+     * that Attack as next_order while Patrol takes the west stride.
      */
     private boolean battleNetPatrolAcquire(Unit unit) {
+        Unit target = battleNetPatrolTarget(unit);
+        return target != null && orderAttack(unit, target, false, false);
+    }
+
+    /** Banks a capital ship's first-marker target while Patrol takes its stride. */
+    private boolean battleNetPatrolQueueAcquire(Unit unit) {
+        Unit target = battleNetPatrolTarget(unit);
+        if (target == null) {
+            return false;
+        }
+        unit.setPendingAttack(target, Unit.Order.PATROL,
+                target.tileX(), target.tileY());
+        unit.setOrderTarget(target.tileX(), target.tileY());
+        return true;
+    }
+
+    /** Target selected at a capital-ship Patrol opcode zero. */
+    private Unit battleNetPatrolTarget(Unit unit) {
         if (unit.order() != Unit.Order.PATROL
                 || unit.type() == null
                 || !unit.type().canAttack()
@@ -12929,15 +12989,28 @@ public final class World {
                 || !unit.isOnMap()
                 || isBattleNetArmedTower(unit)
                 || cycle <= 1) {
-            return false;
+            return null;
         }
         int range = unit.type().reactRange(isPerson(unit.player()));
         if (range <= 0) {
+            return null;
+        }
+        return targets.findBattleNetHostile(unit, range,
+                unit.offeredTarget());
+    }
+
+    /** Whether the capital patrol cursor has left its one-time Still opening. */
+    private boolean battleNetPatrolMoveBodyCursor(Unit unit) {
+        if (battleNetSequence == null || unit == null || unit.type() == null) {
             return false;
         }
-        Unit target = targets.findBattleNetHostile(unit, range,
-                unit.offeredTarget());
-        return target != null && orderAttack(unit, target, false, false);
+        int moveStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attackStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int cursor = unit.battleNetSequenceOffset();
+        return moveStart >= 0 && cursor >= moveStart
+                && (attackStart < 0 || cursor < attackStart);
     }
 
     /**
@@ -12951,11 +13024,7 @@ public final class World {
         }
         int moveStart = idle.battleNetSequenceStart(unit,
                 BattleNetSequence.MOVE_ANIMATION);
-        int attackStart = idle.battleNetSequenceStart(unit,
-                BattleNetSequence.ATTACK_ANIMATION);
-        int cursor = unit.battleNetSequenceOffset();
-        if (moveStart >= 0 && cursor >= moveStart
-                && (attackStart < 0 || cursor < attackStart)) {
+        if (battleNetPatrolMoveBodyCursor(unit)) {
             return;
         }
         if (moveStart < 0) {
