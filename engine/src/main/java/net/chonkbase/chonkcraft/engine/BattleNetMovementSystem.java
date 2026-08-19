@@ -2290,6 +2290,28 @@ final class BattleNetMovementSystem {
                 }
             }
         }
+        if (mayDecide && unit.battleNetNearlyFullFreeDetour()
+                && unit.stepDrained() && !unit.isMoving()) {
+            // The nearly-full leftover's free-compass heading was a detached
+            // detour, not permission to consume the old route underneath it.
+            // Once that detour drains, native parks route_index 20 on the Move
+            // opening OP0 and replans on the following visit. XHuman 12 grunt
+            // 1494 therefore yields on fixture 53 and steps fresh SE on 54.
+            unit.setBattleNetNearlyFullFreeDetour(false);
+            unit.clearPath();
+            unit.setRouteSpent(false);
+            unit.setWaitCycles(0);
+            unit.setBattleNetOrderDelay(0);
+            unit.setBattleNetCollisionCounter(0);
+            int moveStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                unit.setBattleNetSequenceOffset(moveStart);
+                unit.setBattleNetAnimationTimer(1);
+                unit.setBattleNetChaseStepReady(false);
+            }
+            return;
+        }
         boolean stepped = false;
         if (mayDecide && promoteGiveOrderAttackGroundAfterLeftover(unit)) {
             return;
@@ -2932,6 +2954,7 @@ final class BattleNetMovementSystem {
                         }
                         if (freeHeading >= 0) {
                             unit.replacePeekHeading(freeHeading);
+                            unit.setBattleNetNearlyFullFreeDetour(true);
                             if (unit.battleNetCollisionCounter() < 2) {
                                 unit.setBattleNetCollisionCounter(0);
                             }

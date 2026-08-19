@@ -2403,6 +2403,22 @@ public final class Unit {
     private boolean battleNetEmptyRouteFreeDetourHold;
 
     /**
+     * A nearly-full chase leftover used one free-compass heading after its
+     * cooperative wait. If the following cached heading is still occupied
+     * after that detour drains, retail parks route index 20 for one visit
+     * before replanning (XHuman 12 grunt 1494, fixtures 37..54).
+     */
+    public boolean battleNetNearlyFullFreeDetour() {
+        return battleNetNearlyFullFreeDetour;
+    }
+
+    public void setBattleNetNearlyFullFreeDetour(boolean detour) {
+        battleNetNearlyFullFreeDetour = detour;
+    }
+
+    private boolean battleNetNearlyFullFreeDetour;
+
+    /**
      * Multi-step leftover residual opened Attack at post-OP0; the next melee
      * OP10 may land damage without a presentation pend (Human 13 ogre 1510).
      */

@@ -2087,9 +2087,14 @@ final class BattleNetCombatSystem {
             return;
         }
         target.setHitPoints(before - damage);
-        // Melee chips during OP0 do not bulk-hold (native Human 13 knight
-        // 1500 takes 7-point hits on 1922 and still walks into windup). Only
-        // splash notes the OP0-damage flag -- see resolveBattleNetSplash.
+        // A direct hit taken while a chase is still draining its Move body
+        // survives into the Attack opening. XHuman 12 grunt 1448 takes four
+        // direct arrow/melee hits on its final east residual, settles beside
+        // footman 1449 on fixture 40, then native keeps Attack@2539 for the
+        // 23-call body hold instead of striking on fixture 53. Direct chips
+        // that already land on Attack OP0 do not qualify (Human 13 knight
+        // 1500); this bridge is deliberately restricted to the approach.
+        noteBattleNetChaseApproachDamage(target);
         world.showDamage(target, damage);
         world.catchFire(target);
         // Retail BNE's direct hit path calls FUN_0040a9d0 before subtracting
@@ -2099,6 +2104,22 @@ final class BattleNetCombatSystem {
         // owns the native reaction; running this second policy made a struck
         // zeppelin spend three synchronized draws choosing a flee square that
         // does not exist in the native state.
+    }
+
+
+    /** Carries direct approach damage into the first in-range Attack OP0. */
+    private void noteBattleNetChaseApproachDamage(Unit victim) {
+        if (victim == null || !victim.canMove()
+                || world.battleNetSequence == null || world.idle == null
+                || !victim.chasing() || !onBattleNetChaseMoveBody(victim)) {
+            return;
+        }
+        victim.setBattleNetAttackOp0Damaged(true);
+        if (World.BNE_IDLE_TRACE) {
+            System.err.printf("JBNEATTACKOP0DMG approach cycle=%d unit=%d "
+                            + "off=%d%n",
+                    world.cycle, victim.id(), victim.battleNetSequenceOffset());
+        }
     }
 
 
