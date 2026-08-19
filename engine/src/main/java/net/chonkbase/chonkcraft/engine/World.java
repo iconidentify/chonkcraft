@@ -13747,13 +13747,13 @@ public final class World {
         }
         // Human 13 grunt 1485/115: after retarget onto adjacent wise-man at
         // fixture 25 native keeps a one-step route residual (index=1) through
-        // fixture 43 and only spends FUN_004234b0 at F43, the last Attack
-        // start construction tick (2539/1). Java residual-drained that
-        // leftover and paid SyncRand at world 43 (fixture 41), two cycles
-        // early. Leave the leftover unpaid through construction 3,2 and
-        // debit on timer 1; native spends the heading at OP0 (index 20) at
-        // F44. pathLen 0 and ≥2 residual settles keep the ordinary debit
-        // (F36 wise-man+grunt pair).
+        // fixture 43 and only spends FUN_004234b0 when OP0 consumes that
+        // heading at F44. Knight 1500 is the earlier witness: Attack-start
+        // construction 3,2,1 spans F37..39, route index 1 survives, and the
+        // draw plus index 20 write belong to OP0 at F40. Paying as soon as
+        // the sequence tick changed 2 to 1 advanced both draws one cycle.
+        // pathLen 0 and ≥2 residual settles keep the ordinary debit (F36
+        // wise-man+grunt pair).
         boolean buildingResidualArrival = actionMoveWalked
                 && unit.chasing()
                 && unit.pathLength() == 1
@@ -13774,14 +13774,10 @@ public final class World {
                     ? -1
                     : idle.battleNetSequenceStart(unit,
                             BattleNetSequence.ATTACK_ANIMATION);
-            boolean lastConstruction = attackStart >= 0
-                    && unit.battleNetSequenceOffset() == attackStart
-                    && unit.battleNetAnimationTimer() == 1;
             boolean leftoverConstruction = attackStart >= 0
                     && unit.battleNetSequenceOffset() == attackStart
-                    && unit.battleNetAnimationTimer() > 1;
-            if (!lastConstruction
-                    && (actionMoveWalked || leftoverConstruction)) {
+                    && unit.battleNetAnimationTimer() > 0;
+            if (actionMoveWalked || leftoverConstruction) {
                 if (BNE_PEND_TRACE) {
                     System.err.printf("JBNEMELEESYNC event=defer-path1 cycle=%d "
                                     + "unit=%d target=%d pathLen=1 seq=%d "
