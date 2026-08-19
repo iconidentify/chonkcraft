@@ -2970,6 +2970,30 @@ final class BattleNetMovementSystem {
                         int counter = unit.battleNetCollisionCounter() + 1;
                         unit.setBattleNetCollisionCounter(
                                 counter > 14 ? 0 : counter);
+                        // This first cooperative wait is a real visit to
+                        // FUN_004379e0, so it also owns the sticky refusal
+                        // nibble.  Keep the local collision count separate --
+                        // it is reset by several Java route-generation seams --
+                        // but seed the native count for an initial multi-step
+                        // melee chase.  XHuman 4 grunt 1505 plans W,NW,W,W,W
+                        // through a moving axe at fixture 9: retail records
+                        // refusal 1 while preserving that route for fifteen,
+                        // then its hard parks at fixtures 24..30 reach refusal
+                        // 8.  Missing this seed moved its recovery N one cycle
+                        // late (fixture 55 instead of 54).
+                        boolean initialMeleeChaseRefusal = counter == 1
+                                && unit.battleNetRefusals() == 0
+                                && !unit.stepDrained()
+                                && unit.pathLength() > 1
+                                && unit.target() != null
+                                && !World.battleNetRangedChaseUnit(unit)
+                                && (unit.order() == Unit.Order.ATTACK
+                                        || unit.order()
+                                                == Unit.Order.ATTACK_MOVE
+                                        || unit.chasing());
+                        if (initialMeleeChaseRefusal) {
+                            unit.setBattleNetRefusals(1);
+                        }
                         // Residual-settled one-heading leftover blocked on the
                         // settle visit: native route_index 20 then replan
                         // (XHuman 12 grunt 1514: residual of E onto 28,38,
