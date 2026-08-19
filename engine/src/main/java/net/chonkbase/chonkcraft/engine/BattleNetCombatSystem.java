@@ -1374,6 +1374,17 @@ final class BattleNetCombatSystem {
                     int keepPrevScore = -1;
                     int keepCandScore = -1;
                     int keepPathn = unit.pathLength();
+                    boolean settledBlockedTail = keepPathn == 1
+                            && world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && !world.canEnter(unit,
+                                    unit.tileX() + Direction.deltaX(
+                                            unit.peekHeading())
+                                            * world.battleNetMovementStride(unit),
+                                    unit.tileY() + Direction.deltaY(
+                                            unit.peekHeading())
+                                            * world.battleNetMovementStride(unit));
                     if (unit.pathLength() > 1
                             && previous.type().building()
                             && candidate.type().building()) {
@@ -1454,7 +1465,14 @@ final class BattleNetCombatSystem {
                         // and the diagonal landed at fixture 31 instead of 28.
                         // A chaser that is already routeless has nothing to
                         // tear up, so it replans and steps on the one visit.
-                        if (World.battleNetRangedChaseUnit(unit) && keepPathn > 0) {
+                        // A single blocked tail after the previous residual
+                        // settled is exhausted for the same purpose: XHuman
+                        // 12 axethrower 1529 has stale S left against the tower
+                        // crowd at fixture 54, retargets the footman and spends
+                        // the replacement SW immediately. Charging the generic
+                        // ranged hold left it frozen through fixture 56.
+                        if (World.battleNetRangedChaseUnit(unit)
+                                && keepPathn > 0 && !settledBlockedTail) {
                             unit.clearPath();
                             unit.setBattleNetOrderDelay(2);
                             return;
