@@ -434,7 +434,13 @@ final class BattleNetHarvestSystem {
                     worker.setBattleNetSpentHeading(heading);
                 }
             }
-            if (worker.distanceTo(depot) > 1
+            int depotDistance = worker.distanceTo(depot);
+            int movementStride = world.battleNetMovementStride(worker);
+            boolean doubledDepotSkirtArrived =
+                    worker.battleNetResourceApproachStaged()
+                            && movementStride > 1
+                            && depotDistance <= movementStride;
+            if ((!doubledDepotSkirtArrived && depotDistance > 1)
                     || worker.pathLength() > 0) {
                 // The walk runs its route out even once the doorstep is in
                 // reach: upstream's MoveToDepot ends on the route's own
@@ -498,8 +504,14 @@ final class BattleNetHarvestSystem {
             // Dest-arm leftover-land on 0x41f430 is PF_REACHED. Asking
             // confirm from inside the hall used to store an escape path
             // and leave Orc 1 standing on 25,22 after fixture 75.
+            // Land action 25 dest-arms onto the footprint before arrival.
+            // A doubled tanker instead enters from its marked outer anchor:
+            // XHuman 8's tanker remains at (60,56) through action-25 cycles
+            // 382..384, then banks into the refinery at (56,57) on 385 without
+            // another visible tile step. MapDistanceBetweenTypes reports that
+            // outer 2x2/3x3 footprint separation as two, one naval stride.
             boolean destArmArrived = worker.battleNetResourceApproachStaged()
-                    && worker.distanceTo(depot) == 0;
+                    && (depotDistance == 0 || doubledDepotSkirtArrived);
             if (!destArmArrived && !confirmResourceWalkArrival(worker, depot)) {
                 return;
             }

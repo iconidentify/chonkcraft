@@ -1730,7 +1730,22 @@ final class BattleNetMovementSystem {
         }
         int cheb = Math.max(Math.abs(entry[0] - worker.tileX()),
                 Math.abs(entry[1] - worker.tileY()));
-        return cheb >= 1 && cheb <= 2;
+        if (cheb >= 1 && cheb <= 2) {
+            return true;
+        }
+        // A doubled laden route can finish one anchor beyond that point ring
+        // while the mover's 2x2 hull is already within one doubled movement
+        // stride of the depot footprint. XHuman 8 tanker 1538 settles at
+        // (60,56) for the refinery at (56,57): its contracted path point is
+        // (57,57), Chebyshev three, but
+        // native promotes action 24 to action 25 on that settle visit and
+        // banks three visits later. Serving the generic empty-route ten here
+        // left the tanker visibly parked outside a usable refinery.
+        return action25 && worker.carried() > 0
+                && world.battleNetMovementStride(worker) > 1
+                && worker.stepDrained()
+                && worker.distanceTo(building)
+                        <= world.battleNetMovementStride(worker);
     }
 
     boolean spendTheEmptyRoute(Unit unit) {

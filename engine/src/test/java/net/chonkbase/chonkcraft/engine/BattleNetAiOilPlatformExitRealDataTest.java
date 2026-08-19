@@ -1,12 +1,14 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
+import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +76,33 @@ class BattleNetAiOilPlatformExitRealDataTest {
                 "native takes the refinery wall route's northwest stride on cycle 318");
         assertEquals(56, tanker.tileY(),
                 "the marked refinery skirt must beat the straight blocked-goal prefix");
+
+        for (int cycle = 319; cycle <= 381; cycle++) {
+            mission.tick();
+        }
+        assertEquals(60, tanker.tileX(),
+                "the final doubled west stride lands on the outer refinery skirt");
+        assertEquals(56, tanker.tileY());
+        int oilBefore = mission.world().player(tanker.player())
+                .get(UnitType.Resource.OIL);
+
+        mission.tick();
+        assertTrue(tanker.isOnMap(),
+                "native action 25 remains visible on refinery visit 382");
+        assertTrue(tanker.battleNetResourceApproachStaged(),
+                "the doubled outer skirt must arm native's three-visit depot stage");
+        mission.tick();
+        assertTrue(tanker.isOnMap(),
+                "native action 25 remains visible on refinery visit 383");
+        mission.tick();
+        assertTrue(tanker.isOnMap(),
+                "native action 25 remains visible on refinery visit 384");
+        mission.tick();
+        assertFalse(tanker.isOnMap(),
+                "native banks and enters hidden action 26 on fixture cycle 385");
+        assertEquals(oilBefore + 125,
+                mission.world().player(tanker.player()).get(UnitType.Resource.OIL),
+                "the refinery's 125-percent income must land on the entry cycle");
     }
 
     private static Unit at(World world, String ident, int x, int y) {

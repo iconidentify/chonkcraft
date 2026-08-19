@@ -108,6 +108,70 @@ class BattleNetResourceApproachTest {
     }
 
     @Test
+    @DisplayName("a doubled laden tanker stages from the refinery's outer skirt")
+    void doubledLadenTankerStagesFromOuterDepotSkirt() {
+        // XHuman 8 tanker 1538 finishes its doubled route at (60,56) beside
+        // the refinery at (56,57). Its contracted path point is (57,57),
+        // three anchors away, but the 2x2 hull is already at native range one.
+        // Native promotes action 24 to action 25 on the settle visit, holds
+        // three visible records, then banks and enters hidden action 26.
+        GameMap map = new GameMap(20, 20, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+        World world = new World(map);
+        UnitType refineryType = new UnitType("unit-orc-refinery");
+        refineryType.setTileSize(3, 3);
+        refineryType.setHitPoints(600);
+        refineryType.setBuilding(true);
+        refineryType.stores().add(UnitType.Resource.OIL);
+        Unit refinery = world.createUnit(refineryType, 0, 5, 5);
+        Unit boat = world.createUnit(tanker(), 0, 9, 4);
+        assertTrue(refinery != null && boat != null,
+                "the refinery and tanker must place");
+
+        boat.setBattleNetDoubleStep(true);
+        boat.setOrder(Unit.Order.HARVEST);
+        boat.setCarrying(UnitType.Resource.OIL);
+        boat.setHeldResource(UnitType.Resource.OIL);
+        boat.setCarried(100);
+        boat.setReturningToDepot(true);
+        boat.setReturnDepotGoal(refinery);
+        boat.setResourceDepot(refinery);
+        boat.clearPath();
+        boat.setRouteSpent(true);
+        boat.setStepDrained(true);
+        int oilBefore = world.player(0).get(UnitType.Resource.OIL);
+
+        world.tick();
+        assertTrue(boat.battleNetResourceApproachStaged(),
+                "settling on the doubled outer skirt must promote action 25");
+        assertTrue(boat.isOnMap(), "action 25 visit one stays visible");
+        world.tick();
+        assertTrue(boat.isOnMap(), "action 25 visit two stays visible");
+        world.tick();
+        assertTrue(boat.isOnMap(), "action 25 visit three stays visible");
+        assertTrue(boat.battleNetResourceApproachStaged(),
+                "the action-25 marker must survive its two quiet visits");
+        assertTrue(boat.battleNetDoubleStep(),
+                "the depot wait must retain the doubled movement lattice");
+        assertEquals(2, boat.distanceTo(refinery),
+                "the outer skirt is exactly one doubled stride from the depot");
+        int[] depotPoint = world.battleNetDepotPathPoint(boat, refinery);
+        assertEquals(6, depotPoint[0]);
+        assertEquals(5, depotPoint[1]);
+        assertFalse(world.movement.depotRingDestArm(boat, refinery),
+                "the outer doubled skirt enters without a visible dest-arm step");
+        world.tick();
+        assertFalse(boat.isOnMap(), "the next visit enters the refinery");
+        assertEquals(oilBefore + 100,
+                world.player(0).get(UnitType.Resource.OIL),
+                "the load is banked on the refinery-entry visit");
+    }
+
+    @Test
     @DisplayName("a board-seat tanker holds cover before entering the platform")
     void boardSeatTankerHoldsCoverBeforeEnter() {
         // Orc 14 tanker 1565: starts at 8,6, walks to 6,6 next to approach
