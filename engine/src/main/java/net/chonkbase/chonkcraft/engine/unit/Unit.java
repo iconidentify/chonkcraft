@@ -2468,8 +2468,10 @@ public final class Unit {
     private int battleNetWoodResidualSettles;
 
     /**
-     * One quiet visit is armed after a second-or-later wood residual settle
-     * (native route_index 20). The following decide visits steps.
+     * One quiet visit is armed after a second-or-later resource residual
+     * settle (native route_index 20). Gold uses it for an allied refusal;
+     * terrain wood also carries it from a blocked-corner shortcut to the
+     * rewritten route's first residual, which is then parked and replanned.
      */
     public boolean battleNetWoodRouteIndex20() {
         return battleNetWoodRouteIndex20;

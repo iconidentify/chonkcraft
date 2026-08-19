@@ -1762,6 +1762,48 @@ final class BattleNetHarvestSystem {
                     return;
                 }
             }
+            // A terrain worker's residual is drained in this outer harvest
+            // action before stepMove sees the route. Preserve the fact that
+            // this was the settle visit for a later-refusal leftover: native
+            // parks route_index at 20 and returns once while the allied body
+            // still holds the corner. The corner bytes survive so 0x450350
+            // can rewrite them, and that rewrite arms one later route-park:
+            // its first residual is discarded for a fresh route next visit.
+            // Collision 1 is the earlier invalidation/replan seam; this quiet
+            // residual family starts only after that history reached 2.
+            // XHuman 11 peon 1584 reaches pixel 320,192 beside ally 1588 at
+            // fixture 37 and stays logically on 10,6; NE+SE becomes E and
+            // commits 11,6 only at fixture 38. Letting stepMove run here lost
+            // the outer drain and took that shortcut one cycle early.
+            if (worker.stepDrained() && worker.pathLength() > 0
+                    && worker.battleNetCollisionCounter() >= 2) {
+                int heading = worker.peekHeading();
+                int nextX = worker.tileX() + Direction.deltaX(heading);
+                int nextY = worker.tileY() + Direction.deltaY(heading);
+                Unit blocker = world.unitAt(nextX, nextY);
+                boolean alliedBlocker = blocker != null && blocker != worker
+                        && blocker.isOnMap() && !blocker.isDying()
+                        && world.isAllied(worker.player(), blocker.player());
+                if (alliedBlocker) {
+                    int shortcut = BattleNetPathFinder.twoHeadingShortcut(
+                            worker.lastStepHeading(), heading);
+                    if (shortcut >= 0) {
+                        int shortcutX = worker.tileX()
+                                + Direction.deltaX(shortcut);
+                        int shortcutY = worker.tileY()
+                                + Direction.deltaY(shortcut);
+                        if (world.canEnter(worker, shortcutX, shortcutY)) {
+                            worker.setBattleNetWoodRouteIndex20(true);
+                        }
+                    }
+                    return;
+                }
+                if (worker.battleNetWoodRouteIndex20()) {
+                    worker.clearPath();
+                    worker.setRouteSpent(false);
+                    return;
+                }
+            }
         }
         if (worker.pathLength() == 0 && !worker.isMoving()) {
             if (worker.routeSpent()) {
