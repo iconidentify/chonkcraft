@@ -6543,8 +6543,12 @@ public final class World {
             return dropOutOnSide(unit.type(), LOOKING_WEST, container,
                     unit.tileX(), unit.tileY());
         }
-        int[] goal = centreOf(towards);
-        return dropOutNearestOnSide(unit.type(), goal[0], goal[1],
+        // Resource orders retain the destination unit's top-left tile as
+        // their order point, and DropOutNearest scores against that exact
+        // point rather than the footprint centre. XHuman 8's mine at 15,9
+        // exits its peon at 18,9 toward the Great Hall order point 21,8;
+        // scoring against centre 23,10 incorrectly preferred 18,10.
+        return dropOutNearestOnSide(unit.type(), towards.tileX(), towards.tileY(),
                 BattleNetMovementSystem.headingTowards(container, towards),
                 container, unit.tileX(), unit.tileY());
     }
@@ -8618,6 +8622,14 @@ public final class World {
                 case DEFEND -> orderDefend(unit, queued.target());
             };
             if (accepted && unit.order() != Unit.Order.STILL) {
+                if (queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS) {
+                    // This is an in-action queue pop, not an order issued by
+                    // the later AI/player command phase. The constructor's
+                    // generic one-cycle reporting shim would leave the mine-
+                    // exit worker semantically Still on its promotion cycle
+                    // (XHuman 8 c198), while native already reports action 24.
+                    unit.setActionBeforeQueued(null);
+                }
                 // "unit.Wait = 0" on the pop. Whatever the order that just ended was waiting
                 // out is not the new order's to serve: a unit sitting through
                 // the ten cycles a spent route costs, and then told to go
@@ -11740,6 +11752,7 @@ public final class World {
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(2);
+                restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
                 return;
             }
         }
@@ -13070,10 +13083,9 @@ public final class World {
         unit.setBattleNetAnimationTimer(open.timer());
     }
 
-    /** Restarts a capital ship whose startup Patrol first points at itself. */
+    /** Restarts a capital ship after either Patrol endpoint is exchanged. */
     private void restartBattleNetCapitalPatrolAfterEndpointSwap(Unit unit) {
-        if (!battleNetStandingPatrolSequence(unit)
-                || battleNetPatrolMoveBodyCursor(unit)) {
+        if (!battleNetStandingPatrolSequence(unit)) {
             return;
         }
         // The behaviour-six ready pass can construct Patrol with the ship's
@@ -13082,8 +13094,10 @@ public final class World {
         // constructs the new leg at the Still sequence head with timer 3
         // (XHuman 8 slot 1535: goal 20,58 -> 29,59 on fixture cycle 2,
         // sequence 2955/timer 3), then takes the doubled east stride on cycle
-        // 5. Continuing from the post-OP0 common Still loop enters WAIT 4 and
-        // delays that stride until cycle 7.
+        // 5. The same constructor runs after the far endpoint: slot 1535
+        // residual-settles there on cycle 217, restarts at 2955/timer 3, and
+        // takes its west stride on 220. Continuing either previous cursor
+        // enters the wrong wait body and strands the Patrol at the endpoint.
         int still = idle.battleNetStillSequenceStart(unit);
         if (still >= 0) {
             unit.setBattleNetSequenceOffset(still);

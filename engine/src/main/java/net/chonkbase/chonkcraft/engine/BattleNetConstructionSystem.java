@@ -1588,9 +1588,11 @@ final class BattleNetConstructionSystem {
                 * World.PROGRESS_PER_TIME_UNIT);
         // A building starts as a frame and gains its hit points as it goes up.
         // Retail BNE gives a fresh foundation one tenth of the completed
-        // type's hit points (XOrc 10 farm: 40 of 400 at its founding cycle),
-        // where the later LegacyEngine construction model began at one.
-        site.setHitPoints(Math.max(1, what.hitPoints() / 10));
+        // type's hit points, capped at 40: sealed towers begin at 10/100,
+        // while farms, mills, barracks, halls, blacksmiths, and oil platforms
+        // all begin at 40. The later LegacyEngine construction model began at
+        // one instead.
+        site.setHitPoints(battleNetFoundationHitPoints(what.hitPoints()));
         // The foundation call itself is cadence slot one. Ten following
         // no-op Built executions (plus this cycle when the site is
         // processed after create) put the first Boost on fixture c33
@@ -1664,7 +1666,7 @@ final class BattleNetConstructionSystem {
         // points (40→43→47→50…), then sleep for the rest of the twelve-
         // cycle construction cadence. Progress still advances one time
         // unit per boost so the roof lands after buildTime boosts.
-        int foundation = Math.max(1, full / 10);
+        int foundation = battleNetFoundationHitPoints(full);
         int buildTime = Math.max(1, world.unitCosts(site.type())
                 .getOrDefault(UnitType.Resource.TIME, 1));
         int pool = site.battleNetConstructionHpPool()
@@ -1806,6 +1808,10 @@ final class BattleNetConstructionSystem {
             }
         }
         world.recalculateSupply();
+    }
+
+    private static int battleNetFoundationHitPoints(int completedHitPoints) {
+        return Math.max(1, Math.min(40, completedHitPoints / 10));
     }
 
 

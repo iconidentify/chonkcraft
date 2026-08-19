@@ -2918,6 +2918,15 @@ public final class AiPlayer {
         if (world.battleNetStandingDownFromBuild(unit)) {
             return false;
         }
+        // A miner that has just surfaced owns a timed Still head with Return
+        // Goods waiting behind it. Native exposes the full 25-cycle ready
+        // hold (XHuman 8 slot 1571: Still 173..197, Return Goods at 198)
+        // before the queued order may promote. Letting the Java Still OP0
+        // call this callback during that hold replaced the queued return with
+        // a fresh Harvest on the very next cycle.
+        if (unit.hasQueuedOrders() && unit.battleNetOrderDelay() > 0) {
+            return false;
+        }
         if (player.type() != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
                 && player.type() != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE) {
             return false;

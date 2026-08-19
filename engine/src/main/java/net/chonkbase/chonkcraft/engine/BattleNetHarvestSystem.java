@@ -1250,7 +1250,7 @@ final class BattleNetHarvestSystem {
         if (pauseOilForReadyDispatch(worker, info)) {
             return;
         }
-        if (pausePlayerMinerForReturnDispatch(worker, info, home)) {
+        if (pauseGoldMinerForReturnDispatch(worker, info, home)) {
             return;
         }
         beginReturnToDepot(worker, info);
@@ -1270,19 +1270,19 @@ final class BattleNetHarvestSystem {
      * automatic walk home.
      *
      * <p>Retail does not turn the hidden gold action 26 directly into action
-     * 24. Authenticated {@code return-goods-1/02} surfaces peon 1594 at
-     * fixture 209 as Still with Return-Goods queued and timer 25, promotes
-     * action 24 at 234, and takes its first step at 237. Starting the depot
-     * walk from the mine-exit call skipped that physical ready boundary and
-     * banked the load nearly a hundred cycles early. Computer workers keep
-     * their AI dispatch path; this is the player-owned automatic resource
-     * continuation.</p>
+     * 24. Authenticated {@code return-goods-1/02} surfaces player peon 1594
+     * at fixture 209 as Still with Return-Goods queued and timer 25, promotes
+     * action 24 at 234, and takes its first step at 237. Computer miners cross
+     * the same boundary: XHuman 8 slot 1571 and XOrc 12 slot 1396 surface
+     * Still with next action 24 and timer 25. That ready window also lets the
+     * AI replace the queued return with construction when required. Starting
+     * the depot walk from the mine-exit call skips the physical ready boundary
+     * and advances the worker an extra tile immediately.</p>
      */
-    private boolean pausePlayerMinerForReturnDispatch(Unit worker,
+    private boolean pauseGoldMinerForReturnDispatch(Unit worker,
             ResourceInfo info, Unit home) {
         if (info.resource() != UnitType.Resource.GOLD
-                || home == null || world.battleNetSequence == null
-                || world.ais.containsKey(worker.player())) {
+                || home == null || world.battleNetSequence == null) {
             return false;
         }
         beginReturnToDepot(worker, info);
