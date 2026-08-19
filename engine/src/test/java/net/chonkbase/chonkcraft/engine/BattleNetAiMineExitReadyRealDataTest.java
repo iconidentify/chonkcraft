@@ -31,6 +31,49 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 8 AI peon keeps BNE's west route to its stronghold")
+    void anXHuman8AiPeonKeepsTheWestRouteToItsStronghold() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 193; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 59, 70);
+        assertMineExitReady(peon,
+                "native slot 1501 must surface south-west of its mine on cycle 193");
+        for (int cycle = 194; cycle < 221; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(58, peon.tileX());
+        assertEquals(70, peon.tileY(),
+                "native stores W,W,W toward the solid stronghold skirt");
+    }
+
+    @Test
+    @DisplayName("an XHuman 8 laden peon retries its occupied stronghold skirt on time")
+    void anXHuman8LadenPeonRetriesItsOccupiedStrongholdSkirtOnTime() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 228; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 19, 10);
+        assertNotNull(peon,
+                "native slot 1575 must settle its east stride on fixture cycle 228");
+        assertEquals(100, peon.carried());
+        for (int cycle = 229; cycle < 250; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(20, peon.tileX());
+        assertEquals(9, peon.tileY(),
+                "the blocked north-east heading must retry without a second action-25 delay");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");
@@ -43,6 +86,37 @@ class BattleNetAiMineExitReadyRealDataTest {
         assertMineExitReady(peasant,
                 "native slot 1396 must surface on the mine edge at fixture cycle 171");
         assertReadyHoldAndReturn(mission, peasant, 172, 195, 196, 199, 31, 75);
+        for (int cycle = 200; cycle < 221; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(30, peasant.tileX());
+        assertEquals(76, peasant.tileY(),
+                "native's second stored heading stays south-west toward the castle skirt");
+    }
+
+    @Test
+    @DisplayName("an XOrc 12 laden peasant stops its cached route on the keep skirt")
+    void anXOrc12LadenPeasantStopsItsCachedRouteOnTheKeepSkirt() {
+        Mission mission = mission("campaigns/orc-exp/levelx12o");
+        for (int cycle = 1; cycle < 228; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peasant = at(mission.world(), "unit-peasant", 75, 52);
+        assertNotNull(peasant,
+                "native slot 1434 must land its second north-east stride on cycle 228");
+        assertEquals(100, peasant.carried());
+        for (int cycle = 229; cycle < 250; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(75, peasant.tileX());
+        assertEquals(52, peasant.tileY(),
+                "the final cached north heading stays on the already-reached keep skirt");
+        assertEquals(2, peasant.battleNetOrderDelay(),
+                "native enters action 25 on the same cycle that residual movement settles");
     }
 
     private static void assertMineExitReady(Unit worker, String message) {

@@ -496,15 +496,20 @@ final class BattleNetConstructionSystem {
                 }
             }
         }
-        // A doubled BNE ship must receive headings drawn on its two-tile
-        // anchor grid. The legacy ChonkCraft pathfinder below emits one-tile
-        // headings; executing those with stride two made a tanker skip every
-        // other route cell and sail onto coast on its second step home. The
-        // retail target planner already marks the whole building skirt and
-        // searches with battleNetMovementStride, which is the same question
-        // MoveToDepot asks. Ordinary one-tile workers keep the established
-        // legacy route until their native building-target path is transcribed.
-        if (world.battleNetMovementStride(worker) > 1) {
+        // A laden BNE send-home walk keeps the depot solid, aims at the near
+        // cell of its footprint, and marks the whole one-tile skirt as the
+        // goal. The legacy ChonkCraft path below temporarily makes the
+        // building enterable and asks for that exact cell, which changes the
+        // stored headings before the worker reaches the skirt. XHuman 8 slot
+        // 1501 therefore took NW from 59,70 instead of native W,W,W toward
+        // the stronghold, while XOrc 12 slot 1396 stored SW,W instead of
+        // SW,SW toward the castle. Empty player Send Home has a different
+        // GiveOrder-27 approach point and retains its captured legacy path.
+        // Ships require the target router on their two-tile anchor grid even
+        // when empty, so they keep the established stride guard as well.
+        if (world.battleNetMovementStride(worker) > 1
+                || (worker.type().landUnit()
+                        && worker.returningToDepot() && worker.carried() > 0)) {
             return world.findBattleNetTargetPath(worker, target);
         }
         world.setMovementFieldFlags(target, false);

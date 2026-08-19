@@ -4026,7 +4026,38 @@ final class BattleNetMovementSystem {
                         }
                     }
                 }
-                battleNetRefuse(unit);
+                // Retail parks the route cursor on a refusal but leaves the
+                // route bytes in the unit record. Most Java callers can
+                // safely rebuild after clearPath, but a laden land worker
+                // entering its depot's skirt reads an empty route as arrival
+                // and enters action 25. XHuman 8 peon 1575 refuses its
+                // buffered NE from distance two every fixture cycle from 228
+                // through 235; keeping that byte lets the eighth refusal arm
+                // timer 15 and take NE on 250. Clearing it staged action 25
+                // for three cycles and did not step until 253. Constrain the
+                // retention to the authenticated skirt boundary: keeping
+                // routes for refused return walks farther afield changes
+                // unrelated AI economy and patrol timing.
+                PathFinder.Path ladenReturnRoute = null;
+                Unit returnDepot = unit.returnDepotGoal();
+                if (world.battleNetMovementStride(unit) == 1
+                        && unit.type().landUnit()
+                        && unit.returningToDepot() && unit.carried() > 0
+                        && returnDepot != null && unit.distanceTo(returnDepot) <= 2
+                        && unit.pathLength() > 0) {
+                    int remaining = unit.pathLength();
+                    int[] headings = new int[remaining];
+                    for (int depth = 0; depth < remaining; depth++) {
+                        headings[remaining - 1 - depth] =
+                                unit.peekHeadingAtDepth(depth);
+                    }
+                    ladenReturnRoute = new PathFinder.Path(
+                            PathFinder.Result.FOUND, headings);
+                }
+                int refusals = battleNetRefuse(unit);
+                if (ladenReturnRoute != null && refusals < 15) {
+                    unit.setPath(ladenReturnRoute);
+                }
                 return;
                 }
             }

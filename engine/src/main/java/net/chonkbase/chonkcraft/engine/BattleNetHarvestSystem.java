@@ -375,24 +375,36 @@ final class BattleNetHarvestSystem {
                 }
                 return;
             }
-            // A resource route ends when its next cached anchor enters the
-            // depot footprint. That is PF_REACHED to COrder_Resource, not a
-            // movement collision. The doubled naval pathfinder works on the
-            // ship's anchor grid, so an odd-anchor tanker can retain such a
-            // final heading after its first single-lattice correction. If it
+            // A resource route ends when its cached anchor has reached the
+            // depot's marked skirt. That is PF_REACHED to COrder_Resource,
+            // not a movement collision. Land routes can still contain a
+            // heading along that skirt: XOrc 12 peasant 1434 reaches (75,52)
+            // beside the keep with N buffered, but native enters action 25
+            // there instead of walking north. Clearing that leftover also
+            // preserves the action-25/refusal cadence when the skirt entry is
+            // temporarily occupied (XHuman 8 peon 1575 reaches (20,9) on
+            // fixture 250, not three cycles late).
+            //
+            // The doubled naval pathfinder works on the ship's anchor grid,
+            // so an odd-anchor tanker can instead retain a final heading into
+            // the footprint after its first single-lattice correction. If it
             // is handed to generic movement, the solid depot refuses that
             // heading forever: the user-save witness sat at (46,15), beside
             // the shipyard at (43,16), retrying SW into (45,16) every fifteen
-            // cycles. Consume the route boundary here and preserve its normal
-            // empty-route wait before the load is banked.
+            // cycles. Consume both route boundaries here and preserve the
+            // normal arrival staging before the load is banked.
             if (worker.distanceTo(depot) <= 1 && worker.pathLength() > 0
                     && !worker.battleNetResourceApproachStaged()) {
                 int heading = worker.peekHeading();
                 int stride = world.battleNetMovementStride(worker);
                 int nextX = worker.tileX() + Direction.deltaX(heading) * stride;
                 int nextY = worker.tileY() + Direction.deltaY(heading) * stride;
-                if (Unit.distanceBetween(worker.type(), nextX, nextY,
-                        depot.type(), depot.tileX(), depot.tileY()) == 0) {
+                int nextDistance = Unit.distanceBetween(worker.type(), nextX, nextY,
+                        depot.type(), depot.tileX(), depot.tileY());
+                boolean landRouteAlreadyReachedSkirt = stride == 1
+                        && worker.type().landUnit()
+                        && nextDistance <= 1;
+                if (nextDistance == 0 || landRouteAlreadyReachedSkirt) {
                     worker.clearPath();
                     worker.setRouteSpent(true);
                 }
