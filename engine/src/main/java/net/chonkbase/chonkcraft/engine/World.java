@@ -5778,6 +5778,8 @@ public final class World {
             int targetHeight = Math.max(1, target.type().tileHeight());
             int targetRight = targetLeft + targetWidth - 1;
             int targetBottom = targetTop + targetHeight - 1;
+            int goalPadding = battleNetMovementStride(unit);
+            boolean preferMarkedWallOnTie = goalPadding > 1;
 
             // 0x41f430 aims at the near edge of a target footprint, except
             // when the mover is already aligned inside that footprint where
@@ -5851,15 +5853,18 @@ public final class World {
                     unit.tileX(), unit.tileY(), goalX, goalY,
                     battleNetMovementStride(unit), traversalPassability,
                     optimizationPassability,
-                    // 0x4508f0 marks this entire one-tile skirt, target
+                    // 0x4508f0 marks this entire one-stride skirt, target
                     // footprint included, while leaving its blocking flags
-                    // in place. The ray hits the target and its wall follower
-                    // terminates on the marked edge.
-                    (x, y) -> x >= targetLeft - 1
-                            && x <= targetRight + 1
-                            && y >= targetTop - 1
-                            && y <= targetBottom + 1,
-                    true);
+                    // in place. Large movers need the doubled outer anchor:
+                    // XHuman 8 tanker 1538's refinery marker includes 60,56,
+                    // allowing the native W,NW,W wall route to rejoin there.
+                    // A one-tile ring left both wall faces failed and preserved
+                    // the straight W,W,W blocked-goal prefix.
+                    (x, y) -> x >= targetLeft - goalPadding
+                            && x <= targetRight + goalPadding
+                            && y >= targetTop - goalPadding
+                            && y <= targetBottom + goalPadding,
+                    true, false, false, preferMarkedWallOnTie);
             // A coastal building can have no reachable one-square target
             // skirt for a doubled naval anchor even though the weapon can
             // fire from open water. COrder_Attack::UpdatePathFinderData gives

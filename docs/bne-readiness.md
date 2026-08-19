@@ -136,7 +136,7 @@ Grade: **GREEN**.
 
 Automated driver: Player wire commands move retail land, naval and air units through authenticated maps and unit data.
 
-Success means: Real units complete formation detours and terrain-domain passages while 99 large-footprint, congestion and refusal checks pass with zero skips.
+Success means: Real units complete formation detours and terrain-domain passages while 104 large-footprint, congestion and refusal checks pass with zero skips.
 
 Implementation:
 

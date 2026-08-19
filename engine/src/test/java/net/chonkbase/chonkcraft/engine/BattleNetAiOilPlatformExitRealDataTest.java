@@ -62,6 +62,18 @@ class BattleNetAiOilPlatformExitRealDataTest {
         assertEquals(64, tanker.tileX(),
                 "native takes its first doubled west stride on fixture cycle 286");
         assertEquals(58, tanker.tileY());
+
+        for (int cycle = 287; cycle < 318; cycle++) {
+            mission.tick();
+            assertEquals(64, tanker.tileX(),
+                    "the west stride must drain through fixture cycle " + cycle);
+            assertEquals(58, tanker.tileY());
+        }
+        mission.tick();
+        assertEquals(62, tanker.tileX(),
+                "native takes the refinery wall route's northwest stride on cycle 318");
+        assertEquals(56, tanker.tileY(),
+                "the marked refinery skirt must beat the straight blocked-goal prefix");
     }
 
     private static Unit at(World world, String ident, int x, int y) {

@@ -177,6 +177,23 @@ public final class BattleNetPathFinder {
             Passability optimizationPassability, GoalMarker goalMarker,
             boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
             boolean preferPureMajorFreePrefix) {
+        return find(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix, false);
+    }
+
+    /**
+     * Finds a route with the authenticated large-target wall-tie convention.
+     *
+     * @param preferMarkedWallOnTie keep a marked target's wall-follow when a
+     *     doubled free prefix opens with the same first-step gain
+     */
+    public static PathFinder.Path find(int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie) {
         if (stride != 1 && stride != 2) {
             throw new IllegalArgumentException("BNE movement stride must be 1 or 2");
         }
@@ -256,15 +273,18 @@ public final class BattleNetPathFinder {
                 // first step closes more Chebyshev distance (SE from 4,26).
                 //
                 // Equal first-step gain with the same first heading keeps a
-                // multi-step free Bresenham prefix on double-step routes:
+                // multi-step free Bresenham prefix on double-step point routes:
                 // wall-follow's 0x450350 rewrite of a long open-water ray onto a unit-
                 // occupied goal rewrote SE,E,SE,E... into SE,SE,E,E... so
                 // XOrc 8 destroyer 1426 stepped 62,102→64,104 while native
                 // stored 03 02... and stepped to 64,102. Stride-1 land paths
                 // keep the strict greater-gain rule (XHuman 12 peon/grunt
-                // wall-follow ties must not prefer the ray). A one-step prefix
-                // is different: Human 13 daemon 1556 keeps the wall's second
-                // NE stride around its occupied point, route 01 01.
+                // wall-follow ties must not prefer the ray). Marked target
+                // skirts keep the wall route on that tie: XHuman 8 tanker 1538
+                // returns to its refinery as W,NW,W instead of the blocked-goal
+                // ray W,W,W. A one-step prefix is different: Human 13 daemon
+                // 1556 keeps the wall's second NE stride around its occupied
+                // point, route 01 01.
                 if (nx == toX && ny == toY && !direct.isEmpty()) {
                     PathFinder.Path prefix = found(direct);
                     PathFinder.Path escaped = escapeObstacle(direct, x, y,
@@ -288,7 +308,8 @@ public final class BattleNetPathFinder {
                             startY + Direction.deltaY(wallHeading) * stride,
                             toX, toY);
                     if (prefixGain > wallGain
-                            || (stride == 2
+                            || (!preferMarkedWallOnTie
+                                    && stride == 2
                                     && prefix.length() > 1
                                     && prefixGain == wallGain
                                     && prefixHeading == wallHeading)) {

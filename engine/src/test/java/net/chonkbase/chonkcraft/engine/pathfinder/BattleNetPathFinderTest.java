@@ -587,4 +587,28 @@ class BattleNetPathFinderTest {
                 "second step is pure E onto 64,102, not a rewritten SE");
     }
 
+    @Test
+    @DisplayName("a doubled marked-target tie keeps the wall route")
+    void doubledMarkedTargetTieKeepsTheWallRoute() {
+        // XHuman 8 tanker 1538 returns from (66,58) toward the refinery point
+        // (58,58). The exact point and its north-west doubled anchor are
+        // blocked, while allied hulls occupy (64,56)/(66,56) and the widened
+        // target marker includes (60,56). Native wall-follow joins there and
+        // 0x450350 rewrites W,W,W,N to W,NW,W without cutting through a hull.
+        BattleNetPathFinder.Passability passability = (x, y) ->
+                (x != 58 || y != 58) && (x != 58 || y != 56)
+                        && (x != 64 || y != 56)
+                        && (x != 66 || y != 56);
+        BattleNetPathFinder.GoalMarker marked =
+                (x, y) -> x == 60 && y == 56;
+
+        PathFinder.Path path = BattleNetPathFinder.find(
+                66, 58, 58, 58, 2,
+                passability, passability, marked,
+                true, false, false, true);
+
+        assertArrayEquals(new int[] {6, 7, 6}, path.headings(),
+                "stored route executes as W, NW, W to the refinery skirt");
+    }
+
 }
