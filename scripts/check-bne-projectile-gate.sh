@@ -43,7 +43,7 @@ expected = {
     "ImpactRenderingTest": 2,
     "NativeMissileRealDataTest": 1,
     "ClickMarkerTest": 3,
-    "PresentationAheadProjectilePrepareTest": 13,
+    "PresentationAheadProjectilePrepareTest": 14,
     "RareSpellBehaviorTest": 8,
 }
 observed = {}
@@ -58,7 +58,7 @@ for name, count in expected.items():
     actual = observed.get(name)
     if actual != (count, 0, 0, 0):
         raise SystemExit(f"{name}: expected {(count, 0, 0, 0)}, got {actual}")
-print("projectile lifecycle referee: 59 pass, 0 skipped")
+print("projectile lifecycle referee: 60 pass, 0 skipped")
 PY
 
 echo "projectile gate passed: flight, impact, persistent effects and click feedback"
