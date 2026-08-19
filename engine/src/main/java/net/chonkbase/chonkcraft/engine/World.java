@@ -7674,9 +7674,13 @@ public final class World {
      * <p>Resource drop-out is face-directed before it is distance-directed.
      * A south-west goal belongs to the west face under retail's asymmetric
      * heading bands; the closest square on that face wins. Only when the
-     * whole face is blocked does the spiral continue around the next face.
+     * whole face is blocked does the ordinary first-free spiral continue
+     * around the next face.
      * This distinction excludes a geometrically closer diagonal corner:
-     * Orc 1's mine at 26,13 surfaces its peon on 25,15, not 25,16.</p>
+     * Orc 1's mine at 26,13 surfaces its peon on 25,15, not 25,16. It also
+     * keeps fallback faces traversal-ordered: XHuman 8's coastal mine has its
+     * west and south faces blocked, so peon 1475 takes the first east-face
+     * square at (10,83), not the goal-nearest east square at (10,81).</p>
      */
     private int[] dropOutNearestOnSide(Unit unit, int goalX, int goalY,
             int heading, Unit container, int startX, int startY) {
@@ -7729,6 +7733,13 @@ public final class World {
                                 && Math.floorMod(y, stride) == 0);
                 if (onMovementGrid
                         && map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                    // Only the face selected from the resource destination
+                    // is distance-scored. Once that face is exhausted,
+                    // DropOutNearest resumes DropOutOnSide's traversal and
+                    // accepts the first legal square it encounters.
+                    if (step > 0) {
+                        return new int[] {x, y};
+                    }
                     int distance = squareDistance(goalX, goalY, x, y);
                     if (distance < bestDistance) {
                         bestDistance = distance;

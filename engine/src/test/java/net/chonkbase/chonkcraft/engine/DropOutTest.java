@@ -253,6 +253,35 @@ class DropOutTest {
                 "the worker did not emerge along the mine's south face");
     }
 
+    @Test
+    void aBlockedPreferredResourceFaceUsesTheFallbackFacesFirstFreeSquare() {
+        World world = new World(grass(30));
+        Unit hall = world.createUnit(townHall(), 0, 2, 2);
+        Unit mine = world.createUnit(goldMine(), World.NEUTRAL_PLAYER, 7, 8);
+        Unit worker = world.createUnit(peasant(), 0, 15, 15);
+        assertNotNull(hall);
+        assertNotNull(mine);
+        assertNotNull(worker);
+
+        // The hall selects the mine's west face. Block all of west and the
+        // following south face, leaving the east face open. Its traversal
+        // begins at the bottom (10,10), while a second distance score against
+        // the north-west hall would incorrectly prefer the top at (10,8).
+        for (int y = 8; y <= 10; y++) {
+            world.map().field(6, y).setFlags(TileFlag.WATER_ALLOWED);
+        }
+        for (int x = 6; x <= 10; x++) {
+            world.map().field(x, 11).setFlags(TileFlag.WATER_ALLOWED);
+        }
+
+        int[] spot = world.placeResourceBeside(worker, mine, hall);
+
+        assertNotNull(spot);
+        assertEquals(10, spot[0]);
+        assertEquals(10, spot[1],
+                "fallback faces retain DropOutOnSide traversal order");
+    }
+
     /**
      * The other half of the round trip, {@code :1145}. The worker is <em>removed into</em> the depot for the
      * wait-at-depot pause -- it is off the map, not standing outside -- and

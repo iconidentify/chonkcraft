@@ -99,6 +99,21 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 8 peon takes BNE's first free fallback mine face")
+    void anXHuman8PeonTakesTheFirstFreeFallbackMineFace() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 402; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 10, 83);
+        assertMineExitReady(peon,
+                "native slot 1475 must surface at the first free east-face square"
+                        + " after the coastal mine's west and south faces are blocked");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");
