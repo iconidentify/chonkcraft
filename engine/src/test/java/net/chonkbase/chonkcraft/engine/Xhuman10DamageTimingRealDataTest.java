@@ -17,8 +17,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>Authenticated campaign-1800 fixture {@code retail-xhuman-10-idle}:
  * grunt 1471 starts Still at 78,93 and arrives on 81,90 at fixture 41.
- * Archer 1470 at 84,94 opens when that grunt first stands at 80,91; its
- * type-15 arrow frees at fixture 52 (60 to 54). Footman 1479 on 82,91
+ * Archer 1470 at 84,94 waits through fixture 25 and opens on its own Still
+ * marker at 26; its type-15 arrow frees at fixture 52
+ * (60 to 54). Footman 1479 on 82,91
  * is already on stationary Attack from the arrival and lands opcode ten
  * at fixture 54 (54 to 46). The case's coarse first divergence after the
  * route-ownership wave is this second blow at cycle 54.
@@ -34,14 +35,16 @@ class Xhuman10DamageTimingRealDataTest {
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 0);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
         Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
         World world = mission.world();
 
         Unit grunt = unitAt(world, "unit-grunt", 78, 93);
         Unit footman = unitAt(world, "unit-footman", 82, 91);
+        Unit archer = unitAt(world, "unit-archer", 84, 94);
         assertNotNull(grunt, "XHuman 10 has no grunt on 78,93");
         assertNotNull(footman, "XHuman 10 has no footman on 82,91");
+        assertNotNull(archer, "XHuman 10 has no archer on 84,94");
         int opened = grunt.hitPoints();
 
         // Two HandleEachCycle warmup ticks precede fixture cycle 1 -- the
@@ -52,10 +55,18 @@ class Xhuman10DamageTimingRealDataTest {
 
         Integer hpAt52 = null;
         Integer hpAt54 = null;
+        Unit.Order archerOrderAt25 = null;
+        Unit.Order archerOrderAt26 = null;
         Unit.Order footmanOrderAt54 = null;
         while (world.cycle() < 56) {
             mission.tick();
             int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 25) {
+                archerOrderAt25 = archer.order();
+            }
+            if (fixture == 26) {
+                archerOrderAt26 = archer.order();
+            }
             if (fixture == 52) {
                 hpAt52 = grunt.hitPoints();
             }
@@ -65,6 +76,10 @@ class Xhuman10DamageTimingRealDataTest {
             }
         }
 
+        assertEquals(Unit.Order.STILL, archerOrderAt25,
+                "native waits for the archer's own cycle-26 Still marker");
+        assertEquals(Unit.Order.ATTACK, archerOrderAt26,
+                "native promotes the archer on its cycle-26 Still marker");
         assertTrue(hpAt52 != null && hpAt52 < opened,
                 "retail's first blow lands on cycle 52; the grunt is still at "
                         + hpAt52 + " of " + opened);

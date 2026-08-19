@@ -4018,13 +4018,6 @@ final class BattleNetMovementSystem {
             world.markOccupancy(unit, true);
             world.unitCountSeen(unit);
             world.markSight(unit, true);
-            // Native walks the unit pool so a mover is often visited before
-            // the idle defender. Java reverse-creation can let that defender
-            // spend its Still marker before this step, so the arrival is
-            // invisible until the next five-cycle OP0. XHuman 10's archer
-            // at 84,94 used to open two markers late; the arrow then landed
-            // after fixture 52.
-            world.battleNetIdleAcquireAround(unit);
             if (System.getenv("CHONKCRAFT_TRACE_BNE_WHERE") != null
                     && String.valueOf(unit.id()).equals(
                             System.getenv("CHONKCRAFT_TRACE_BNE_WHERE"))) {

@@ -990,7 +990,6 @@ final class BattleNetIdleSystem {
                             return;
                         }
                     }
-                    world.markBattleNetIdleMarker(unit);
                     int phase = unit.battleNetIdlePhase();
                     unit.setBattleNetIdlePhase(phase + 1);
                     dispatchBattleNetIdleMarker(unit,
@@ -1043,7 +1042,6 @@ final class BattleNetIdleSystem {
         unit.setBattleNetAnimationTimer(
                 critter && phase + 1 < actionMarkers ? 1 : 5);
 
-        world.markBattleNetIdleMarker(unit);
         dispatchBattleNetIdleMarker(unit, type, phase);
     }
 

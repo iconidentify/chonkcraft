@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
  */
 class Xhuman09DefensiveReactionRealDataTest {
 
+    private static final int BNE_INITIALIZATION_TICKS = 2;
+
     @Test
     @DisplayName("xhuman 9's struck footman is still attacking on cycle 56")
     void xhuman9sStruckFootmanIsStillAttackingOnCycle56() {
@@ -30,7 +32,7 @@ class Xhuman09DefensiveReactionRealDataTest {
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission("campaigns/human-exp/levelx09h", 0);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx09h", 1, 1);
         Assumptions.assumeTrue(mission != null, "XHuman 9 is not in the pack");
         World world = mission.world();
 
@@ -41,18 +43,22 @@ class Xhuman09DefensiveReactionRealDataTest {
         int skeletonOpened = skeleton.hitPoints();
         int footmanOpened = footman.hitPoints();
 
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
         Integer footmanHpAt55 = null;
         Unit.Order footmanOrderAt56 = null;
         Integer skeletonHpAt57 = null;
-        while (world.cycle() < 57) {
+        while (fixtureCycle(world) < 57) {
             mission.tick();
-            if (world.cycle() == 55) {
+            if (fixtureCycle(world) == 55) {
                 footmanHpAt55 = footman.hitPoints();
             }
-            if (world.cycle() == 56) {
+            if (fixtureCycle(world) == 56) {
                 footmanOrderAt56 = footman.order();
             }
-            if (world.cycle() == 57) {
+            if (fixtureCycle(world) == 57) {
                 skeletonHpAt57 = skeleton.hitPoints();
             }
         }
@@ -74,6 +80,10 @@ class Xhuman09DefensiveReactionRealDataTest {
                 "the footman must still stand on 13,121 after the first exchange");
         assertEquals(121, footman.tileY(),
                 "the footman must still stand on 13,121 after the first exchange");
+    }
+
+    private static int fixtureCycle(World world) {
+        return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

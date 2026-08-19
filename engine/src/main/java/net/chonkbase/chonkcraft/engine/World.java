@@ -170,15 +170,6 @@ public final class World {
      */
     private final boolean[] battleNetHelpPromotedThisCycle =
             new boolean[Player.MAX];
-    /**
-     * Units whose scheduler visit has already begun this cycle. Dest-arm
-     * acquire must not steal a later Still OP0 that is already due.
-     */
-    private final Set<Unit> battleNetVisitedThisCycle =
-            Collections.newSetFromMap(new java.util.IdentityHashMap<>());
-    /** Units whose Still program actually emitted its action marker this cycle. */
-    private final Set<Unit> battleNetIdleMarkerThisCycle =
-            Collections.newSetFromMap(new java.util.IdentityHashMap<>());
     /** Person help staggers one quiet cycle after the first promote only. */
     private final int[] battleNetPersonHelpLastPromoteCycle =
             new int[Player.MAX];
@@ -8704,8 +8695,6 @@ public final class World {
             }
         }
         java.util.Arrays.fill(battleNetHelpPromotedThisCycle, false);
-        battleNetVisitedThisCycle.clear();
-        battleNetIdleMarkerThisCycle.clear();
         if (PathFinder.tracingAsks()) {
             pathFinder.setTraceCycle(cycle);
         }
@@ -8786,7 +8775,6 @@ public final class World {
                 continue;
             }
             battleNetActiveActionUnit = unit;
-            battleNetVisitedThisCycle.add(unit);
             // The two combat counters run down for every unit every cycle,
             // wherever it is and whatever it is doing, as HandleBuffsEachCycle
             // does. Threshold is how long a unit refuses to re-aim; UnderAttack
@@ -13734,78 +13722,6 @@ public final class World {
             return;
         }
         unit.setBattleNetMeleeSyncRemaining(left);
-    }
-
-    /**
-     * Lets Still neighbours scan after a unit steps onto a new tile.
-     *
-     * <p>Retail walks the fixed pool low-slot to high, so a mover is often
-     * visited before the idle defender that will open on it. Java visits
-     * reverse creation order, and a Still marker that already fired this
-     * cycle cannot see the arrival until the next five-cycle beat. XHuman
-     * 10's person archer at 84,94 must open the cycle the grunt first
-     * stands at 80,91 -- otherwise the type-15 arrow is still in the air
-     * at fixture 52, where retail has already stored the first HP drop.
-     */
-    void battleNetIdleAcquireAround(Unit mover) {
-        if (mover == null || !mover.isAlive() || !mover.isOnMap() || cycle <= 1) {
-            return;
-        }
-        List<Unit> pool = snapshot != null ? snapshot : units;
-        for (Unit other : pool) {
-            if (other == mover || other.order() != Unit.Order.STILL
-                    || other.type() == null || !other.type().canAttack()
-                    || !other.isAggressive() || other.isDying()
-                    || !other.isOnMap()
-                    || isBattleNetArmedTower(other)
-                    || !isEnemyPlayer(other.player(), mover.player())) {
-                continue;
-            }
-            int band = Math.max(1,
-                    other.type().reactRange(isPerson(other.player())));
-            if (Math.max(Math.abs(other.tileX() - mover.tileX()),
-                    Math.abs(other.tileY() - mover.tileY())) > band) {
-                continue;
-            }
-            // Native 0x40b010 only scans on that unit's own Still marker.
-            // This helper exists because Java may visit a person defender
-            // before the mover dest-arms in the same cycle (XHuman 10
-            // archer 1470 at 84,94). Computer Still units wait for their
-            // next OP0: Human 1 grunt 1591's last marker at 215 missed
-            // dist 7, so it stays Still until 220 even though the walk
-            // enters react at dest-arm 217.
-            if (!isPerson(other.player())) {
-                continue;
-            }
-            // An offered hit response belongs to the defender's own OP0. A
-            // quiet WAIT countdown can leave timer one, but retail does not
-            // promote the remembered attacker until the following marker.
-            // Human 13 knight 1493 is the compact witness: the axe lands at
-            // c25, the knight counts down through c29, then attacks on c30.
-            //
-            // Ordinary person acquisition still needs the ordering bridge:
-            // Java and retail walk their pools oppositely, so XHuman 10's
-            // archer must see a grunt that steps into range later in Java's
-            // same cycle. Preserve that proven scan, but never use it to pull
-            // a remembered damage source across the marker boundary.
-            boolean markerFired = battleNetIdleMarkerThisCycle.contains(other);
-            if (other.offeredTarget() != null && !markerFired) {
-                continue;
-            }
-            // A defender not yet visited whose timer is one will fire OP0 and
-            // scan normally later in this cycle; doing it here spends that
-            // marker's construction tick early.
-            if (!markerFired && !battleNetVisitedThisCycle.contains(other)
-                    && other.battleNetAnimationTimer() == 1) {
-                continue;
-            }
-            battleNetAutoAttack(other);
-        }
-    }
-
-    /** Records the exact Still action-marker visits used by arrival rescans. */
-    void markBattleNetIdleMarker(Unit unit) {
-        battleNetIdleMarkerThisCycle.add(unit);
     }
 
     /**

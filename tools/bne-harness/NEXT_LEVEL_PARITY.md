@@ -166,8 +166,11 @@ on the issue visit. Computer Still scan is the unit's own Still marker
 (`0x40b010` / `0x40a830`). Human 1 grunt 1591 stays Still when the walk
 enters react at dest-arm 217 and acquires at 220, dest-arming the chase
 at 223; the first blow is dest-arm 281 on 26,22. Java's neighbour dest-arm
-helper used to acquire at 217. That helper remains only for person
-visit-order (XHuman 10 archer 1470). A dest-path Move queued through the
+helper used to acquire at 217. The later person-only version has now been
+removed as well: authenticated expansion orders show no arrival rescan.
+XHuman 4 ballista 1488 stays Still at fixture 6 and Attacks on its own marker
+at 11; XHuman 10 archer 1470 stays Still at 25 and Attacks on its own marker
+at 26. A dest-path Move queued through the
 Still 4985 body promotes from the expired wait without the following Still
 OP0 (`0x452ef0` installs Move 2477; no `0040AD58`). That extra draw used
 to steal `FUN_00418370`'s first remainder, so the 281 blow was 5 (60 to
