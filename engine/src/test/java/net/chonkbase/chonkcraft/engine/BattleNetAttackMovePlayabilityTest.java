@@ -3,10 +3,17 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.zip.ZipFile;
+import net.chonkbase.chonkcraft.data.map.PudUnitTypes;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -65,6 +72,23 @@ class BattleNetAttackMovePlayabilityTest {
         World world = new World(openField(48));
         world.setAllied(0, 1, false);
         return world;
+    }
+
+    private static byte[] retailScriptBin() throws IOException {
+        String packProp = System.getProperty("chonkcraft.pack");
+        Path pack = packProp != null && !packProp.isBlank()
+                ? Path.of(packProp)
+                : Path.of(System.getProperty("user.home"), ".chonkcraft/work",
+                        "warcraft-ii-battle-net-edition-usa.pre-full-media-2026-07-30.chonkpack");
+        assumeTrue(Files.isRegularFile(pack),
+                "BNE asset pack required for retail Move sequence");
+        try (ZipFile zip = new ZipFile(pack.toFile())) {
+            var entry = zip.getEntry("assets/archives/maindat/0278.bin");
+            assumeTrue(entry != null, "pack must contain maindat entry 278");
+            try (var in = zip.getInputStream(entry)) {
+                return in.readAllBytes();
+            }
+        }
     }
 
     @Test
@@ -152,6 +176,59 @@ class BattleNetAttackMovePlayabilityTest {
                 "the original attack-move stayed deadlocked after the route cleared");
         assertEquals(Unit.Order.STILL, marcher.order(),
                 "the recovered command never reached a completed state");
+    }
+
+    @Test
+    @DisplayName("a native empty-route refusal still reaches the attack-move scan")
+    void emptyRouteRefusalDoesNotFreezeBehindThePresentationMoveTail()
+            throws Exception {
+        // Human expansion 3 save, runtime grunt 313: its last chase heading
+        // settled at 44,119 three tiles from footman 338. The native Move OP0
+        // kept returning a two-cycle empty-route refusal, but the parallel
+        // presentation Move script was parked just before unbreakable-end.
+        // Treating that cosmetic bit as the native gate starved every target
+        // scan forever, so the enemy appeared frozen in place.
+        byte[] script = retailScriptBin();
+        World world = twoSideField();
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setBattleNetSequenceData(script);
+
+        UnitType gruntType = soldier("unit-grunt");
+        gruntType.setReactRangePerson(8);
+        UnitType footmanType = soldier("unit-footman");
+        Unit grunt = world.createUnit(gruntType, 0, 10, 10);
+        Unit footman = world.createUnit(footmanType, 1, 7, 10);
+        assertTrue(world.orderAttackMove(grunt, 4, 10));
+        grunt.setAttackMoveOpening(false);
+        grunt.setAutoTargeting(true);
+        grunt.setTarget(footman);
+        grunt.setChasing(true);
+        grunt.setFighting(false);
+        grunt.setPathGoal(footman.tileX(), footman.tileY());
+        grunt.setRouteSpent(true);
+        grunt.setAttackScanSleep(0);
+
+        Animation move = gruntType.animationSet().get(AnimationSet.State.MOVE);
+        grunt.animation().restore(move, move.size() - 3, 0, true);
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int moveStart = sequence.sequenceStart(
+                PudUnitTypes.code(gruntType.ident()),
+                BattleNetSequence.MOVE_ANIMATION);
+        assertTrue(moveStart >= 0, "retail grunt Move sequence must resolve");
+        grunt.setBattleNetSequenceOffset(moveStart);
+        grunt.setBattleNetAnimationTimer(1);
+
+        world.combat.stepAttackMove(grunt);
+
+        assertEquals(World.ATTACK_SCAN_INTERVAL, grunt.attackScanSleep(),
+                "the native PF_WAIT boundary never reached AutoSelectTarget; "
+                        + "underway state path=" + grunt.pathLength()
+                        + " spent=" + grunt.routeSpent()
+                        + " wait=" + grunt.waitCycles()
+                        + " chasing=" + grunt.chasing()
+                        + " moving=" + grunt.isMoving()
+                        + " seq=" + grunt.battleNetSequenceOffset());
     }
 
     @Test

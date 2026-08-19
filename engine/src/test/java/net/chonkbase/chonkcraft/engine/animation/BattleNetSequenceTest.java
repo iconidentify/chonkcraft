@@ -34,7 +34,8 @@ class BattleNetSequenceTest {
         assertEquals(new BattleNetSequence.Tick(32, 1, false, false, true), delayed);
 
         BattleNetSequence.Tick first = sequence.tick(delayed.offset(), delayed.timer());
-        assertEquals(new BattleNetSequence.Tick(35, 1, true, false, true), first);
+        assertEquals(new BattleNetSequence.Tick(
+                35, 1, true, false, true, 0, false, 0), first);
         BattleNetSequence.Tick second = sequence.tick(first.offset(), first.timer());
         assertEquals(new BattleNetSequence.Tick(36, 1, true, false, true), second);
         BattleNetSequence.Tick common = sequence.tick(second.offset(), second.timer());
@@ -80,8 +81,8 @@ class BattleNetSequenceTest {
         BattleNetSequence.Tick tick = new BattleNetSequence(program).tick(64, 1);
 
         // op5 1 + op6 2 + op13 3 + op14 4 = 10 pixel-motion arguments
-        assertEquals(new BattleNetSequence.Tick(at + 1, 6, false, false, true, 10),
-                tick);
+        assertEquals(new BattleNetSequence.Tick(
+                at + 1, 6, false, false, true, 10, false, 10), tick);
     }
 
     @Test

@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.ZipFile;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
@@ -100,6 +102,38 @@ class MeleeAttackSyncLoopTest {
                 Animation.parse("still", List.of("frame 0", "wait 1")));
         type.setAnimationSet(set);
         return type;
+    }
+
+    @Test
+    @DisplayName("an in-range melee draws the native attack frames while it fights")
+    void anInRangeMeleeDrawsTheNativeAttackFrames() throws Exception {
+        // The Human expansion 3 playtest save had footmen, a knight and a
+        // grunt exchanging real OP10 damage while their sprites remained on
+        // frame zero. script.bin already owns the exact 25/30/35/40 attack
+        // frames beside those damage markers, so the rendered unit must
+        // consume them from the same tick.
+        World world = new World(grass(16));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(retailScriptBin());
+
+        Unit attacker = world.createUnit(grunt(), 0, 6, 6);
+        Unit target = world.createUnit(prey(), 1, 7, 6);
+        assertTrue(attacker != null && target != null, "units must place");
+        assertTrue(world.orderAttack(attacker, target), "attack accepted");
+        attacker.setBattleNetOrderDelay(0);
+        attacker.setChasing(false);
+        attacker.setFighting(true);
+
+        Set<Integer> frames = new HashSet<>();
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+            frames.add(attacker.frame());
+        }
+
+        assertTrue(frames.stream().anyMatch(frame -> frame >= 25),
+                "the melee dealt damage behind a standing sprite; frames=" + frames);
     }
 
     @Test

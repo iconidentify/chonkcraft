@@ -2759,7 +2759,14 @@ final class BattleNetCombatSystem {
         // its quarry mid-step dropped the walk and swung from between two
         // squares -- the first blow of every fight landed most of a second
         // early, and the damage roll comes off the shared stream.
-        if (world.movement.isStepping(unit)) {
+        // Once the retail Move program itself is about to yield at OP0, its
+        // action boundary outranks a stale unbreakable bit in the parallel
+        // presentation Move. The latter can be parked on its final move
+        // instruction after residual pixels have reached zero. Calling that
+        // a live step forever prevents the route consult and target scan that
+        // OP0 explicitly permits.
+        boolean battleNetMoveDecisionDue = battleNetChaseMoveDecisionDue(unit);
+        if (world.movement.isStepping(unit) && !battleNetMoveDecisionDue) {
             stepMoveTowardsTarget(unit);
             // Dest leftover last heading that lands this visit Stills now.
             // Orc 1 dest-attack offsets hit nought at 92 and native is Still
@@ -3272,8 +3279,26 @@ final class BattleNetCombatSystem {
                 }
                 unit.setChasing(true);
                 boolean underWay = stepMoveTowardsTarget(unit);
+                // A BNE Move OP0 that finds no usable route has already
+                // returned PF_WAIT from the native action boundary. The
+                // parallel presentation Move can still be parked on its last
+                // move instruction with Unbreakable set; that cosmetic tail
+                // is not another native gate. Treating it as one starves the
+                // CheckForTargetInRange call below forever because each wake
+                // lays another empty route and immediately sleeps again.
+                // Human expansion 3's grunt 313 is the player-visible
+                // witness: settled at 44,119, it looped Move OP0 two-cycle
+                // refusals without ever reconsidering footman 338 or the
+                // nearby cannon tower.
+                boolean battleNetEmptyRouteRefusal = underWay
+                        && world.battleNetSequence != null
+                        && unit.chasing() && !unit.isMoving()
+                        && unit.pathLength() == 0 && !unit.routeSpent()
+                        && unit.waitCycles() > 0
+                        && onBattleNetChaseMoveBody(unit);
                 if (underWay || unit.animation().unbreakable()) {
-                    if (underWay && !unit.animation().unbreakable()) {
+                    if (underWay && (!unit.animation().unbreakable()
+                            || battleNetEmptyRouteRefusal)) {
                         // A refusal answers PF_WAIT, err >= 0, and the check
                         // runs on that breakable beat: a dead goal is let go
                         // and a live one weighed -- these are upstream's
@@ -3967,6 +3992,21 @@ final class BattleNetCombatSystem {
     }
 
 
+    /** Whether the next native Move tick yields to a settled chase order. */
+    private boolean battleNetChaseMoveDecisionDue(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || !unit.chasing() || unit.isMoving() || unit.walkHolding()
+                || unit.offsetX() != 0 || unit.offsetY() != 0
+                || !onBattleNetChaseMoveBody(unit)) {
+            return false;
+        }
+        BattleNetSequence.Tick next = world.battleNetSequence.tick(
+                unit.battleNetSequenceOffset(),
+                unit.battleNetAnimationTimer());
+        return next.valid() && next.actionMarker();
+    }
+
+
     /**
      * Arms the Move-sequence body past the opening opcode-zero after a chase
      * step commits (native offset after the step is the body, timer 1).
@@ -4274,6 +4314,15 @@ final class BattleNetCombatSystem {
         if (!tick.valid()) {
             unit.setBattleNetSequenceOffset(-1);
             return false;
+        }
+        // This cursor is already the authority for the swing and its OP10
+        // damage boundary, so it must also own the sprite frame selected on
+        // the same visit.  Leaving frames to the independent presentation
+        // program made a perfectly live melee look frozen: the Human
+        // expansion 3 playtest save had footmen, a knight and a grunt dealing
+        // damage while remaining visibly on frame zero.
+        if (tick.frame() >= 0) {
+            unit.setFrame(tick.frame());
         }
         // A completed Attack program returns from its tail directly through
         // OP0. Retail performs the free target scan on that transition, not

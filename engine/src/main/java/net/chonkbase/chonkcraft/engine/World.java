@@ -892,7 +892,19 @@ public final class World {
                 unit.pendingRotation(), unit.type().rotationSpeed());
         unit.setPendingRotation(step.rotation());
         unit.setFrame(step.frame());
-        announceNamed(unit, step.sound());
+        // With retail script.bin loaded, opcode ten -- not the independent
+        // ChonkCraft presentation program -- is the projectile launch.  The
+        // two programs can drift by dozens of cycles during a long ranged
+        // reload.  Playing the presentation's attack sound here therefore
+        // produces exactly the playtest symptom "I hear a projectile but see
+        // none": the previous shot has already landed and the next does not
+        // yet exist.  The constructor boundary emits this sound instead.
+        boolean deferredBattleNetProjectileSound = battleNetSequence != null
+                && unit.canMove() && unit.type() != null
+                && unit.type().firesMissile() && isSwinging(unit);
+        if (!deferredBattleNetProjectileSound) {
+            announceNamed(unit, step.sound());
+        }
         for (Animation.Instruction effect : step.effects()) {
             switch (effect.kind()) {
                 case SPAWN_UNIT -> spawnAnimationUnit(unit, effect.operand());
@@ -904,6 +916,25 @@ public final class World {
             }
         }
         return step;
+    }
+
+    /** Plays the attack animation's named sound at BNE's real shot boundary. */
+    void announceBattleNetProjectileAttack(Unit source) {
+        if (source == null || source.type() == null
+                || source.type().animationSet() == null) {
+            return;
+        }
+        Animation attack = source.type().animationSet()
+                .get(AnimationSet.State.ATTACK);
+        if (attack == null) {
+            return;
+        }
+        for (Animation.Instruction instruction : attack.instructions()) {
+            if (instruction.kind() == Animation.Kind.SOUND) {
+                announceNamed(source, instruction.operand());
+                return;
+            }
+        }
     }
 
     /**

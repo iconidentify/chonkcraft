@@ -307,6 +307,7 @@ final class BattleNetProjectileSystem {
 
     /** Records the native constructor boundary, never its earlier placeholder. */
     private void recordProjectileCreate(Missile missile) {
+        world.announceBattleNetProjectileAttack(missile.source());
         long creation = world.battleNetProjectileCausalOrdinals.computeIfAbsent(
                 missile, ignored -> world.nextBattleNetProjectileCausalOrdinal++);
         Unit source = missile.source();

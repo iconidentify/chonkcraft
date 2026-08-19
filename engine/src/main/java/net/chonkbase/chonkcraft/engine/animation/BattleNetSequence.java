@@ -52,24 +52,36 @@ public final class BattleNetSequence {
      *               ({@code op5}/{@code op6}/{@code op13}/{@code op14}). Hold
      *               ticks report zero. Callers scale ship {@code op13} for the
      *               doubled movement-delta table when unit+0x1c bit 2 is set.
+     * @param frame last sprite frame selected by this call, or {@code -1}
+     *              when it did not execute a frame opcode
      */
     public record Tick(int offset, int timer, boolean actionMarker,
             boolean inlineActionMarker, boolean valid, int pixels,
-            boolean inclusiveMovementWait) {
+            boolean inclusiveMovementWait, int frame) {
         /** Compatibility constructor for callers that ignore pixel motion. */
         public Tick(int offset, int timer, boolean actionMarker,
                 boolean inlineActionMarker, boolean valid) {
-            this(offset, timer, actionMarker, inlineActionMarker, valid, 0, false);
+            this(offset, timer, actionMarker, inlineActionMarker,
+                    valid, 0, false, -1);
         }
 
         /** Compatibility constructor for callers that inspect pixel motion. */
         public Tick(int offset, int timer, boolean actionMarker,
                 boolean inlineActionMarker, boolean valid, int pixels) {
-            this(offset, timer, actionMarker, inlineActionMarker, valid, pixels, false);
+            this(offset, timer, actionMarker, inlineActionMarker,
+                    valid, pixels, false, -1);
+        }
+
+        /** Compatibility constructor for callers that inspect movement waits. */
+        public Tick(int offset, int timer, boolean actionMarker,
+                boolean inlineActionMarker, boolean valid, int pixels,
+                boolean inclusiveMovementWait) {
+            this(offset, timer, actionMarker, inlineActionMarker,
+                    valid, pixels, inclusiveMovementWait, -1);
         }
 
         private static Tick invalid() {
-            return new Tick(-1, 0, false, false, false, 0, false);
+            return new Tick(-1, 0, false, false, false, 0, false, -1);
         }
     }
 
@@ -185,12 +197,14 @@ public final class BattleNetSequence {
 
         int nextTimer = (timer - 1) & 0xff;
         if (nextTimer != 0) {
-            return new Tick(offset, nextTimer, false, false, true, 0, false);
+            return new Tick(offset, nextTimer, false, false,
+                    true, 0, false, -1);
         }
 
         int cursor = offset;
         boolean inlineActionMarker = false;
         int pixels = 0;
+        int frame = -1;
         for (int instructions = 0;
                 instructions < MAX_INSTRUCTIONS_PER_TICK;
                 instructions++) {
@@ -203,7 +217,7 @@ public final class BattleNetSequence {
                     // FUN_00402440 increments the just-expired timer, leaving
                     // one call before the instruction following the marker.
                     return new Tick(cursor + 1, 1, true,
-                            inlineActionMarker, true, pixels, false);
+                            inlineActionMarker, true, pixels, false, frame);
                 }
                 case 1, 7, 8, 9 -> {
                     if (!contains(cursor, 2)) {
@@ -211,7 +225,7 @@ public final class BattleNetSequence {
                     }
                     return new Tick(cursor + 2,
                             Byte.toUnsignedInt(program[cursor + 1]), false,
-                            inlineActionMarker, true, pixels, false);
+                            inlineActionMarker, true, pixels, false, frame);
                 }
                 case 12 -> {
                     if (!contains(cursor, 2)) {
@@ -219,13 +233,13 @@ public final class BattleNetSequence {
                     }
                     return new Tick(cursor + 2,
                             Byte.toUnsignedInt(program[cursor + 1]), false,
-                            inlineActionMarker, true, pixels, true);
+                            inlineActionMarker, true, pixels, true, frame);
                 }
                 case 2 -> {
                     // Zero is meaningful in the native byte field: its next
                     // decrement wraps to 255 rather than immediately acting.
                     return new Tick(cursor + 1, 0, false,
-                            inlineActionMarker, true, pixels, false);
+                            inlineActionMarker, true, pixels, false, frame);
                 }
                 case 3 -> {
                     if (!contains(cursor, 3)) {
@@ -240,6 +254,7 @@ public final class BattleNetSequence {
                     if (!contains(cursor, 2)) {
                         return Tick.invalid();
                     }
+                    frame = Byte.toUnsignedInt(program[cursor + 1]);
                     cursor += 2;
                 }
                 case 10 -> {
@@ -266,6 +281,7 @@ public final class BattleNetSequence {
                         return Tick.invalid();
                     }
                     pixels += Byte.toUnsignedInt(program[cursor + 1]);
+                    frame = Byte.toUnsignedInt(program[cursor + 2]);
                     cursor += 3;
                 }
                 default -> {

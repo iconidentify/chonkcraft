@@ -39,6 +39,46 @@ import org.junit.jupiter.api.Test;
 class PresentationAheadProjectilePrepareTest {
 
     @Test
+    @DisplayName("a ranged attack sound waits for its visible BNE projectile")
+    void rangedAttackSoundWaitsForTheVisibleProjectile() throws Exception {
+        World world = new World(grass(16));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(retailScriptBin());
+        world.setMissileTypes(Map.of("missile-axe", axeMissile()));
+
+        UnitType trollType = axethrower();
+        trollType.animationSet().put(AnimationSet.State.ATTACK,
+                Animation.parse("attack-with-sound", List.of(
+                        "unbreakable begin", "frame 40", "attack",
+                        "sound axethrower-attack", "wait 1",
+                        "unbreakable end", "wait 1")));
+        Unit troll = world.createUnit(trollType, 0, 4, 4);
+        Unit target = world.createUnit(destroyer(), 1, 8, 4);
+        assertTrue(troll != null && target != null, "units place");
+
+        world.strike(troll, target);
+        assertEquals(1, world.missiles().size(),
+                "the presentation frame must own one pending axe");
+        Missile pending = world.missiles().get(0);
+        assertFalse(world.missileVisible(pending));
+        assertTrue(world.drainSoundEvents().isEmpty(),
+                "the invisible placeholder made a projectile sound");
+
+        // Opcode ten takes ownership out of the presentation placeholder map
+        // immediately before it arms the constructor.
+        world.battleNetPendingProjectileShots.remove(troll);
+        world.prepareBattleNetProjectile(pending, true);
+
+        assertTrue(world.missileVisible(pending));
+        assertEquals(List.of(new World.SoundEvent(
+                        troll, "axethrower-attack", true)),
+                world.drainSoundEvents(),
+                "the throw sound must coincide with the real projectile");
+    }
+
+    @Test
     @DisplayName("stand-ground OP10 preserves birth but defers constructor to cycle end")
     void standGroundOp10DefersOnlyTheConstructorToCycleEnd() throws Exception {
         byte[] script = retailScriptBin();

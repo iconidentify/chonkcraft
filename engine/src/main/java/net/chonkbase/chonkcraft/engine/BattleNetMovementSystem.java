@@ -4453,6 +4453,43 @@ final class BattleNetMovementSystem {
         unit.setResidual(0, 0);
     }
 
+    /**
+     * Drains a committed pixel step that was orphaned on a Still order.
+     *
+     * <p>{@code COrder_Still} never owns {@code unit.Moving}; retail finishes
+     * the step in {@code MoveToTarget} before the attack order can be
+     * replaced.  Saves from older ChonkCraft builds nevertheless contain
+     * this combination.  Advancing the Move presentation here brings the
+     * sprite onto its logical tile instead of either teleporting it or
+     * leaving it frozen at a permanent half-tile offset.</p>
+     *
+     * @return whether an orphaned step owned this visit
+     */
+    boolean settleOrphanedStillStep(Unit unit) {
+        if (unit == null || unit.order() != Unit.Order.STILL
+                || !unit.walkHolding()) {
+            return false;
+        }
+        if (unit.offsetX() != 0 || unit.offsetY() != 0
+                || unit.residualX() != 0 || unit.residualY() != 0) {
+            walkPixels(unit);
+        } else {
+            unit.setWalkHolding(false);
+        }
+        if (!unit.walkHolding()) {
+            resetDisplacement(unit);
+            unit.clearPath();
+            if (world.battleNetSequence != null && world.idle != null) {
+                int stillStart = world.idle.battleNetStillSequenceStart(unit);
+                if (stillStart >= 0) {
+                    unit.setBattleNetSequenceOffset(stillStart);
+                    unit.setBattleNetAnimationTimer(3);
+                }
+            }
+        }
+        return true;
+    }
+
 
     /**
      * Runs one cycle of a unit's move animation and returns the pixels it
@@ -4464,8 +4501,10 @@ final class BattleNetMovementSystem {
      *
      * <p>When a 2x2 residual pace is armed from {@code script.bin}, pixel
      * motion follows native Move waits (op13/op5) rather than ChonkCraft Move.
-     * The ChonkCraft script still advances for presentation/atMoveBoundary so
-     * the decide gate keeps its existing shape.
+     * ChonkCraft Move remains selected so {@code atMoveBoundary} keeps its
+     * existing shape. Laden resource returns also draw the frame selected by
+     * the native program; other pace users retain their established
+     * presentation until their frames have their own retail proof.
      */
     int advanceMoveAnimation(Unit unit) {
         // Armed residual pace owns pixel motion and leaves the ChonkCraft Move
@@ -4554,6 +4593,10 @@ final class BattleNetMovementSystem {
             unit.setBattleNetMovePaceOffset(-1);
             return;
         }
+        if (open.frame() >= 0
+                && unit.returningToDepot() && unit.carried() > 0) {
+            unit.setFrame(open.frame());
+        }
         unit.setBattleNetMovePaceOffset(open.offset());
         unit.setBattleNetMovePaceTimer(open.timer());
     }
@@ -4566,7 +4609,10 @@ final class BattleNetMovementSystem {
      * <p>Ship {@code op13} arguments are multiplied by two when the doubled
      * movement-delta table is armed: thirty-two {@code op13 1} opcodes cover
      * a 64-pixel double-step residual. Land {@code op5}/{@code op6} already
-     * sum to thirty-two for a one-tile step and keep the raw argument.
+     * sum to thirty-two for a one-tile step and keep the raw argument. A laden
+     * return also keeps the native frame beside that pace: peasants and peons
+     * walk through their loaded sheet while tankers' one-frame Move remains
+     * still.
      */
     int tickBattleNetMovePace(Unit unit) {
         if (world.battleNetSequence == null
@@ -4578,6 +4624,10 @@ final class BattleNetMovementSystem {
         if (!tick.valid()) {
             unit.setBattleNetMovePaceOffset(-1);
             return -1;
+        }
+        if (tick.frame() >= 0
+                && unit.returningToDepot() && unit.carried() > 0) {
+            unit.setFrame(tick.frame());
         }
         int timer = tick.timer();
         if (tick.inclusiveMovementWait()

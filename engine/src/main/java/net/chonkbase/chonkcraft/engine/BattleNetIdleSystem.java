@@ -653,6 +653,18 @@ final class BattleNetIdleSystem {
         if (working) {
             return;
         }
+        // A completed/interrupted combat order must not strand the visual
+        // half of its last walk on the replacement Still order.  It is an
+        // invalid state in retail (MoveToTarget drains the committed step
+        // before it may finish), but older ChonkCraft runs and saves can
+        // contain it: the unit reports Still while Moving remains set and
+        // IX/IY stay at a half-tile offset forever.  Finish that already-paid
+        // step before breathing or acquiring another target.  Besides
+        // repairing old saves, keeping the recovery here makes any future
+        // bad combat exit self-heal instead of leaving a frozen defender.
+        if (unit.canMove() && world.movement.settleOrphanedStillStep(unit)) {
+            return;
+        }
         if (!unit.canMove()) {
             if (World.isBattleNetArmedTower(unit) && world.battleNetSequence != null) {
                 world.combat.stepBattleNetTower(unit);

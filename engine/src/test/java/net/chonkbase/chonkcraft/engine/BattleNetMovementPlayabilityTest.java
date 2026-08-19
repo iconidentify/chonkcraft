@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -171,6 +172,34 @@ class BattleNetMovementPlayabilityTest {
         assertEquals(0, gryphon.offsetY(),
                 "the gryphon stood still with leftover pixels "
                         + gryphon.offsetX() + "," + gryphon.offsetY());
+    }
+
+    @Test
+    @DisplayName("a Still defender finishes an orphaned half-tile combat step")
+    void aStillDefenderFinishesAnOrphanedCombatStep() {
+        // The Human expansion 3 playtest save captured two footmen in this
+        // exact state: combat had returned them to Still, but Moving and a
+        // half-tile IX/IY displacement survived.  Still never normally walks,
+        // so they remained visibly frozen there while later attacks and
+        // sounds continued underneath.
+        Fixture fixture = fixture(map(16, 16, TileFlag.LAND_ALLOWED));
+        Unit footman = place(fixture, "unit-footman", 8, 8);
+        footman.setOrder(Unit.Order.STILL);
+        footman.setOffset(-32, -32);
+        footman.setWalkHolding(true);
+
+        boolean showedWalkFrame = false;
+        for (int cycle = 0; cycle < 100 && footman.walkHolding(); cycle++) {
+            fixture.world().tick();
+            showedWalkFrame |= footman.frame() != 0;
+        }
+
+        assertFalse(footman.walkHolding(),
+                "the Still defender kept the orphaned Moving flag forever");
+        assertEquals(0, footman.offsetX());
+        assertEquals(0, footman.offsetY());
+        assertTrue(showedWalkFrame,
+                "the frozen step teleported instead of showing its remaining walk");
     }
 
     @Test
