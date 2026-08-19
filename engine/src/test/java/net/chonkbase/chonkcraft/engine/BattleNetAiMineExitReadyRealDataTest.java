@@ -74,6 +74,31 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 8 laden peon finishes its negative Move body before retrying")
+    void anXHuman8LadenPeonFinishesItsNegativeMoveBodyBeforeRetrying() {
+        Mission mission = mission("campaigns/human-exp/levelx08h");
+        for (int cycle = 1; cycle < 260; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = at(mission.world(), "unit-peon", 58, 71);
+        assertNotNull(peon,
+                "native slot 1498 must be draining its north-west return stride on cycle 260");
+        assertEquals(100, peon.carried());
+        for (int cycle = 261; cycle < 272; cycle++) {
+            mission.tick();
+            assertEquals(58, peon.tileX(),
+                    "the negative stride's Move tail must hold through cycle " + cycle);
+            assertEquals(71, peon.tileY());
+        }
+        mission.tick();
+        assertEquals(57, peon.tileX(),
+                "native parks the blocked north-west leftover then replans west on cycle 272");
+        assertEquals(71, peon.tileY());
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

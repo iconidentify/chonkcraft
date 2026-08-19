@@ -264,8 +264,26 @@ final class BattleNetHarvestSystem {
             if (tryBattleNetGoldSoftWaitFreeWake(worker)) {
                 // delay cleared; continue into harvest walk below
             } else {
+                boolean parkCooperativeReturn = worker.battleNetRefusalHold()
+                        && worker.returningToDepot() && worker.carried() > 0;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
+                if (left == 0 && parkCooperativeReturn) {
+                    // A laden worker whose buffered heading was refused by an
+                    // allied mover does not retry that stale heading when the
+                    // fifteen-count expires. FUN_004379e0 counts the second
+                    // refusal, parks the route cursor at 20, and lets the next
+                    // action visit plan around the now-vacated body. XHuman 8
+                    // peon 1498 holds NW through fixture 270, parks on 271,
+                    // then replans and steps W on 272. Retrying NW here instead
+                    // either takes a stale diagonal or re-arms the same wait.
+                    worker.clearPath();
+                    worker.setRouteSpent(false);
+                    int counter = worker.battleNetCollisionCounter() + 1;
+                    worker.setBattleNetCollisionCounter(
+                            counter > 14 ? 0 : counter);
+                    worker.setBattleNetRefusalHold(false);
+                }
                 if (left > 0) {
                     return;
                 }
@@ -407,6 +425,13 @@ final class BattleNetHarvestSystem {
                 if (nextDistance == 0 || landRouteAlreadyReachedSkirt) {
                     worker.clearPath();
                     worker.setRouteSpent(true);
+                    // Retail parks the cursor but leaves the heading bytes in
+                    // the unit record. A worker behind this one asks
+                    // 0x0044fa20 where the blocker is going; retaining the
+                    // first parked heading lets that predicate recognize a
+                    // cooperative mover instead of treating it as a standing
+                    // wall (XHuman 8 peons 1501 and 1498 at fixture 256).
+                    worker.setBattleNetSpentHeading(heading);
                 }
             }
             if (worker.distanceTo(depot) > 1

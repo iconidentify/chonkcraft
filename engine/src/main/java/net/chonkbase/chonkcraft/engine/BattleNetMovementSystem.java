@@ -3133,6 +3133,15 @@ final class BattleNetMovementSystem {
                             if (onward != null && onward.isMoving()
                                     && onward.pathLength() == 0) {
                                 unit.setBattleNetRefusalHold(true);
+                                if (unit.returningToDepot()
+                                        && unit.carried() > 0) {
+                                    // The wake belongs to FUN_004379e0's
+                                    // route-park visit; the resource order
+                                    // does not plan again until its following
+                                    // visit. Store that additional quiet turn
+                                    // here (XHuman 8: park c271, W c272).
+                                    unit.setBattleNetOrderDelay(quiet + 1);
+                                }
                             }
                             return;
                         }
