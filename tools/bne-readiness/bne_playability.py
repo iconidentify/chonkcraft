@@ -125,19 +125,23 @@ def run(system: dict[str, Any], repository: Path, output: Path,
             returncode = None
             status = "timed-out"
 
+    failing_summaries: list[dict[str, int]] = []
     skipped_summaries: list[dict[str, int]] = []
     if log.is_file():
         contents = log.read_text(encoding="utf-8", errors="replace")
         for match in MAVEN_TEST_SUMMARY.finditer(contents):
             tests, failures, errors, skipped = (int(value) for value in match.groups())
+            summary = {
+                "tests": tests,
+                "failures": failures,
+                "errors": errors,
+                "skipped": skipped,
+            }
+            if failures or errors:
+                failing_summaries.append(summary)
             if skipped:
-                skipped_summaries.append({
-                    "tests": tests,
-                    "failures": failures,
-                    "errors": errors,
-                    "skipped": skipped,
-                })
-    if status == "passed" and skipped_summaries:
+                skipped_summaries.append(summary)
+    if status == "passed" and (failing_summaries or skipped_summaries):
         status = "failed"
 
     result.update({
@@ -146,9 +150,17 @@ def run(system: dict[str, Any], repository: Path, output: Path,
         "duration_seconds": round(time.monotonic() - before, 3),
         "log": str(log.relative_to(repository)),
     })
+    if failing_summaries:
+        result["failing_test_summaries"] = failing_summaries
     if skipped_summaries:
-        result["failure_reason"] = "test gate reported skipped checks"
         result["skipped_test_summaries"] = skipped_summaries
+    if failing_summaries and skipped_summaries:
+        result["failure_reason"] = (
+            "test gate reported failures, errors, or skipped checks")
+    elif failing_summaries:
+        result["failure_reason"] = "test gate reported failures or errors"
+    elif skipped_summaries:
+        result["failure_reason"] = "test gate reported skipped checks"
     return result
 
 

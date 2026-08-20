@@ -140,6 +140,46 @@ class ReadinessTest(unittest.TestCase):
         self.assertEqual("test gate reported skipped checks", result["failure_reason"])
         self.assertEqual(1, result["skipped_test_summaries"][0]["skipped"])
 
+    def test_a_zero_exit_with_test_failures_fails_closed(self):
+        system = copy.deepcopy(self.data["systems"][0])
+        system["grade"] = "yellow"
+        system["gate"]["required_inputs"] = []
+        system["gate"]["command"] = ["fake-gate"]
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            gate = repository / "fake-gate"
+            gate.write_text(
+                "#!/bin/sh\n"
+                "echo 'Tests run: 4, Failures: 1, Errors: 0, Skipped: 0'\n",
+                encoding="utf-8")
+            gate.chmod(0o755)
+            result = bne_playability.run(
+                system, repository, repository / "output", 5)
+
+        self.assertEqual("failed", result["status"])
+        self.assertEqual("test gate reported failures or errors",
+                         result["failure_reason"])
+        self.assertEqual(1, result["failing_test_summaries"][0]["failures"])
+
+    def test_a_zero_exit_with_test_errors_fails_closed(self):
+        system = copy.deepcopy(self.data["systems"][0])
+        system["grade"] = "yellow"
+        system["gate"]["required_inputs"] = []
+        system["gate"]["command"] = ["fake-gate"]
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            gate = repository / "fake-gate"
+            gate.write_text(
+                "#!/bin/sh\n"
+                "echo 'Tests run: 4, Failures: 0, Errors: 1, Skipped: 0'\n",
+                encoding="utf-8")
+            gate.chmod(0o755)
+            result = bne_playability.run(
+                system, repository, repository / "output", 5)
+
+        self.assertEqual("failed", result["status"])
+        self.assertEqual(1, result["failing_test_summaries"][0]["errors"])
+
     def test_runtime_resolves_the_authenticated_pack(self):
         with tempfile.TemporaryDirectory() as temporary:
             parent = Path(temporary)

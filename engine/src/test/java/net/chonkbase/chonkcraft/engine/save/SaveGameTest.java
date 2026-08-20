@@ -631,6 +631,10 @@ class SaveGameTest {
     private static World reload(Bench bench) throws IOException {
         StringWriter out = new StringWriter();
         SaveGame.write(bench.world(), "test-map", null, 0, out);
+        return reload(bench, out.toString());
+    }
+
+    private static World reload(Bench bench, String script) {
         GameMap map = new GameMap(bench.world().map().width(), bench.world().map().height(),
                 new Tileset());
         for (int y = 0; y < map.height(); y++) {
@@ -643,8 +647,65 @@ class SaveGameTest {
         reloaded.setUpgrades(load().data().upgrades().upgrades());
         reloaded.setUnitTypes(bench.types());
         reloaded.setMissileTypes(bench.missileTypes());
-        LoadGame.apply(reloaded, out.toString(), bench.types());
+        LoadGame.apply(reloaded, script, bench.types());
         return reloaded;
+    }
+
+    @Test
+    @DisplayName("a legacy AI patrol aimed at a hostile resumes as an assault")
+    void aLegacyAiAssaultPatrolRecoversItsMissingBehavior() throws IOException {
+        Bench bench = bench();
+        bench.world().player(0).setType(PudMap.PlayerType.PERSON);
+        bench.world().player(1).setType(PudMap.PlayerType.COMPUTER);
+        bench.world().establishDiplomacy();
+        bench.world().enableAi(1);
+        Unit hostile = bench.world().createUnit(
+                bench.types().get("unit-footman"), 0, 36, 36);
+        Unit assault = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 1, 5, 5);
+        assault.setOrder(Unit.Order.PATROL);
+        assault.setPatrol(5, 5);
+        assault.setOrderTarget(hostile.tileX(), hostile.tileY());
+        assault.setBattleNetAiBehavior(2);
+        assault.setBattleNetAiHome(hostile.tileX(), hostile.tileY());
+
+        StringWriter out = new StringWriter();
+        SaveGame.write(bench.world(), "test-map", null, 0, out);
+        String legacy = out.toString()
+                .replace(" aiBehavior = 2,", "")
+                .replace(" aiHomeX = 36, aiHomeY = 36,", "");
+        assertFalse(legacy.contains("aiBehavior = 2"),
+                "the fixture did not remove the historical missing field");
+
+        Unit loaded = find(reload(bench, legacy), "unit-grunt");
+        assertEquals(2, loaded.battleNetAiBehavior());
+        assertEquals(36, loaded.battleNetAiHomeX());
+        assertEquals(36, loaded.battleNetAiHomeY());
+    }
+
+    @Test
+    @DisplayName("an explicit behavior-zero map patrol is not promoted on load")
+    void anExplicitMapPatrolStaysDistinctFromAnAiAssault() throws IOException {
+        Bench bench = bench();
+        bench.world().player(0).setType(PudMap.PlayerType.PERSON);
+        bench.world().player(1).setType(PudMap.PlayerType.COMPUTER);
+        bench.world().establishDiplomacy();
+        bench.world().enableAi(1);
+        Unit hostile = bench.world().createUnit(
+                bench.types().get("unit-footman"), 0, 36, 36);
+        Unit patrol = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 1, 5, 5);
+        patrol.setOrder(Unit.Order.PATROL);
+        patrol.setPatrol(5, 5);
+        patrol.setOrderTarget(hostile.tileX(), hostile.tileY());
+
+        StringWriter out = new StringWriter();
+        SaveGame.write(bench.world(), "test-map", null, 0, out);
+        assertTrue(out.toString().contains("aiBehavior = 0"));
+
+        Unit loaded = find(reload(bench, out.toString()), "unit-grunt");
+        assertEquals(0, loaded.battleNetAiBehavior(),
+                "an explicitly ordinary patrol was rewritten as an assault");
     }
 
     @Test

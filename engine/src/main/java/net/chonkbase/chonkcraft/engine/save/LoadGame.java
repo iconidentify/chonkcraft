@@ -212,6 +212,8 @@ public final class LoadGame {
         // The most recently created unit, which the SetX calls refer to.
         Unit[] current = new Unit[1];
         java.util.Map<Integer, Unit> unitsBySavedId = new java.util.HashMap<>();
+        java.util.Set<Unit> explicitAiBehavior = java.util.Collections.newSetFromMap(
+                new java.util.IdentityHashMap<>());
 
         reader.register("CreateUnit", args -> {
             if (args.length < 3) {
@@ -319,6 +321,9 @@ public final class LoadGame {
             }
             Unit unit = unitsBySavedId.get(integer(args[0]));
             if (unit != null) {
+                if (state.rawGet("aiBehavior") != null) {
+                    explicitAiBehavior.add(unit);
+                }
                 applyUnitState(unit, state, types, unitsBySavedId);
             }
             return new Object[0];
@@ -555,6 +560,8 @@ public final class LoadGame {
 
         run(reader, script);
 
+        repairLegacyAiAssaultPatrols(world, explicitAiBehavior);
+
         // Schema-two saves could name runtime-only wood/rock transition
         // codes. Their flags have now all been restored, so any such picture
         // can be reconstructed against its complete neighbourhood.
@@ -577,6 +584,37 @@ public final class LoadGame {
         }
         world.repairRestoredOilOrders();
         world.recalculateSupply();
+    }
+
+    /**
+     * Recovers the assault marker omitted by saves written before it was durable.
+     *
+     * <p>BNE AI force marches travel as Patrol toward the selected hostile's
+     * tile. Without behavior two, the first empty compact route is interpreted
+     * as the end of a map-authored patrol and the whole assault becomes Still.
+     * A legacy save cannot name the missing marker, but an AI-owned Patrol whose
+     * destination is an actual hostile unit retains the force march's decisive
+     * external evidence. Newly written saves carry behavior zero explicitly,
+     * so a deliberate map patrol is never inferred through this migration path.
+     */
+    private static void repairLegacyAiAssaultPatrols(World world,
+            java.util.Set<Unit> explicitAiBehavior) {
+        for (Unit unit : world.units()) {
+            if (explicitAiBehavior.contains(unit)
+                    || unit.order() != Unit.Order.PATROL
+                    || unit.battleNetAiBehavior() != 0
+                    || !world.ais().containsKey(unit.player())
+                    || !world.map().contains(unit.orderTargetX(), unit.orderTargetY())) {
+                continue;
+            }
+            Unit hostile = world.unitAt(unit.orderTargetX(), unit.orderTargetY());
+            if (hostile == null || !hostile.isAlive() || !hostile.isOnMap()
+                    || !world.isEnemyPlayer(unit.player(), hostile.player())) {
+                continue;
+            }
+            unit.setBattleNetAiBehavior(2);
+            unit.setBattleNetAiHome(unit.orderTargetX(), unit.orderTargetY());
+        }
     }
 
     /**

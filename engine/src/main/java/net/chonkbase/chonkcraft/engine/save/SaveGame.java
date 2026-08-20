@@ -604,10 +604,11 @@ public final class SaveGame {
         state.append(" orderTargetY = ").append(unit.orderTargetY()).append(",");
         state.append(" attackMoveX = ").append(unit.attackMoveX()).append(",");
         state.append(" attackMoveY = ").append(unit.attackMoveY()).append(",");
-        if (unit.battleNetAiBehavior() != 0) {
-            state.append(" aiBehavior = ")
-                    .append(unit.battleNetAiBehavior()).append(",");
-        }
+        // Zero is state too. Legacy saves omitted it, leaving the loader no
+        // way to distinguish a deliberate map Patrol from an old assault
+        // whose behavior-two marker had not yet become durable.
+        state.append(" aiBehavior = ")
+                .append(unit.battleNetAiBehavior()).append(",");
         if (unit.hasBattleNetAiHome()) {
             state.append(" aiHomeX = ").append(unit.battleNetAiHomeX()).append(",");
             state.append(" aiHomeY = ").append(unit.battleNetAiHomeY()).append(",");
