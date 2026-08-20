@@ -808,6 +808,10 @@ final class BattleNetIdleSystem {
             // Human 14 p0 temple: raise-dead 1500g at fixture c35. Freeze 2
             // debited at c34 (one OP0 early); freeze 3 matches the sealed bank.
             freezeThrough = 3;
+        } else if (World.battleNetIsChurch(hall)) {
+            // Human 14 p4/p5 altar: table limit 10, twelfth OP0 at fixture
+            // c61. The first pulse is fixture c6, followed by WAIT 4.
+            freezeThrough = 7;
         } else if (World.battleNetIsBlacksmith(hall)
                 || World.battleNetIsLumberMill(hall)
                 || World.battleNetIsWatchTower(hall)
@@ -831,6 +835,7 @@ final class BattleNetIdleSystem {
                             || World.battleNetIsLumberMill(hall)
                             || World.battleNetIsWatchTower(hall)
                             || World.battleNetIsFlyerRoost(hall)
+                            || World.battleNetIsChurch(hall)
                             || World.battleNetIsFoundry(hall))) {
                 hall.setBattleNetAnimationTimer(1);
             }
@@ -933,6 +938,9 @@ final class BattleNetIdleSystem {
             // fixture ~c30; gating on data!=0 left that seat idle. Barracks
             // keep their own data/want rules inside the soldier selector.
             ai.battleNetTryTrainTanker(world, building);
+        } else if (World.battleNetIsChurch(building)) {
+            // Codes 0x90..0x92: paladin/ogre-mage and their spell upgrades.
+            ai.battleNetTryResearchChurch(world, building);
         } else if (World.battleNetIsBlacksmith(building)) {
             int profile = ai.battleNetBuildProfileId();
             // 0, 67, 70: sealed XHuman 10/11 axe1. 65: XHuman 9 p6 reseeds

@@ -466,6 +466,55 @@ class BattleNetTrainWorkerTest {
     }
 
     @Test
+    @DisplayName("human fourteen altars spend one thousand gold on ogre-mage at their native pulse")
+    void humanFourteenAltarsSpendOneThousandGoldOnOgreMage() throws Exception {
+        byte[] aiBin = retailAiBin();
+        UnitType altarType = altarOfStorms();
+        Player[] players = new Player[Player.MAX];
+        for (int i = 0; i < players.length; i++) {
+            players[i] = new Player(i,
+                    i == 0 ? net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                            : net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.NOBODY,
+                    net.chonkbase.chonkcraft.data.map.PudMap.Race.ORC);
+        }
+        World world = new World(grass(24), players);
+        world.setUnitTypes(Map.of("unit-altar-of-storms", altarType));
+        net.chonkbase.chonkcraft.engine.upgrade.UpgradeSet upgrades =
+                new net.chonkbase.chonkcraft.engine.upgrade.UpgradeSet();
+        var ogreMage = upgrades.getOrCreate("upgrade-ogre-mage");
+        ogreMage.costs().put(UnitType.Resource.GOLD, 1000);
+        ogreMage.costs().put(UnitType.Resource.TIME, 250);
+        world.setUpgrades(upgrades);
+        world.setResearchers(Map.of(
+                "upgrade-ogre-mage", Set.of("unit-altar-of-storms")));
+        Unit altar = world.createUnit(altarType, 0, 2, 2);
+        altar.setBattleNetAnimationTimer(1);
+        altar.setBattleNetSequenceOffset(-1);
+        altar.setBattleNetAiTrainCounter(0);
+        world.player(0).set(UnitType.Resource.GOLD, 20000);
+        world.player(0).set(UnitType.Resource.WOOD, 20000);
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetBuildProfile(aiBin, 29);
+        assertTrue(ai.battleNetHasAction33Candidate(0x90),
+                "profile 29 arms the ogre-mage milestone");
+        assertEquals(10, ai.battleNetAction33Limit(
+                        net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(
+                                "unit-altar-of-storms")),
+                "Human 14's table fires on the twelfth altar OP0");
+
+        int guard = 0;
+        while (altar.researching() == null && guard++ < 100) {
+            world.tick();
+        }
+        assertEquals("upgrade-ogre-mage", altar.researching(),
+                "the altar starts the retail caster-tier upgrade");
+        assertEquals(19000, world.player(0).get(UnitType.Resource.GOLD),
+                "ogre-mage costs exactly 1,000 gold");
+        assertEquals(20000, world.player(0).get(UnitType.Resource.WOOD),
+                "ogre-mage costs no wood");
+    }
+
+    @Test
     @DisplayName("an orc fourteen human mage tower does not spend five hundred gold on slow")
     void anOrcFourteenHumanMageTowerDoesNotSpendFiveHundredGoldOnSlow()
             throws Exception {
@@ -519,6 +568,15 @@ class BattleNetTrainWorkerTest {
         UnitType type = new UnitType("unit-temple-of-the-damned");
         type.setTileSize(3, 3);
         type.setHitPoints(500);
+        type.setBuilding(true);
+        type.setLandUnit(true);
+        return type;
+    }
+
+    private static UnitType altarOfStorms() {
+        UnitType type = new UnitType("unit-altar-of-storms");
+        type.setTileSize(3, 3);
+        type.setHitPoints(700);
         type.setBuilding(true);
         type.setLandUnit(true);
         return type;

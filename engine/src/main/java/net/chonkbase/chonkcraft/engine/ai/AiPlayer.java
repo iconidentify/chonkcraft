@@ -2660,6 +2660,59 @@ public final class AiPlayer {
     }
 
     /**
+     * Action-33 church/altar research selector.
+     *
+     * <p>Codes {@code 0x90..0x92} are the shared holy/ogre spell line:
+     * paladin or ogre-mage, then healing or bloodlust, then exorcism or
+     * runes. Human 14 players 4 and 5 both use the Orc branch; their profile
+     * tables give the altar limit 10, and retail debits the 1,000-gold
+     * ogre-mage upgrade on fixture cycle 61.</p>
+     */
+    public boolean battleNetTryResearchChurch(World world, Unit church) {
+        if (church == null || church.player() != playerIndex
+                || church.researching() != null
+                || church.producing() != null
+                || !church.trainingQueue().isEmpty()) {
+            return false;
+        }
+        Player player = world.player(playerIndex);
+        if (player == null
+                || (player.type() != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                    && player.type()
+                        != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE)) {
+            return false;
+        }
+        boolean orc = player.race() == net.chonkbase.chonkcraft.data.map.PudMap.Race.ORC;
+        int[] codes = {0x90, 0x91, 0x92};
+        String[] human = {
+            "upgrade-paladin", "upgrade-healing", "upgrade-exorcism"
+        };
+        String[] orcs = {
+            "upgrade-ogre-mage", "upgrade-bloodlust", "upgrade-runes"
+        };
+        String[] names = orc ? orcs : human;
+        for (int i = 0; i < codes.length; i++) {
+            int code = codes[i];
+            if (!battleNetHasAction33Candidate(code)) {
+                continue;
+            }
+            String upgrade = names[i];
+            if (world.upgrades(playerIndex).has(upgrade)) {
+                continue;
+            }
+            if (world.allowed() != null
+                    && !world.allowed().isAllowed(playerIndex, upgrade)) {
+                continue;
+            }
+            if (world.orderResearch(church, upgrade)) {
+                battleNetConsumeAction33Candidate(code);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Action-33 foundry research selector ({@code 0x40f4b0}).
      *
      * <p>Native order is 0x8c ship-attack1, 0x8e ship-armor1, 0x8d attack2,

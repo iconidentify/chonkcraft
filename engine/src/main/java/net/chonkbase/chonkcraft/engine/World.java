@@ -13911,6 +13911,8 @@ public final class World {
                 || "unit-fortress".equals(ident)
                 || "unit-human-barracks".equals(ident)
                 || "unit-orc-barracks".equals(ident)
+                || "unit-church".equals(ident)
+                || "unit-altar-of-storms".equals(ident)
                 || "unit-human-shipyard".equals(ident)
                 || "unit-orc-shipyard".equals(ident)
                 || "unit-human-blacksmith".equals(ident)
@@ -13934,6 +13936,16 @@ public final class World {
         }
         String ident = building.type().ident();
         return "unit-human-barracks".equals(ident) || "unit-orc-barracks".equals(ident);
+    }
+
+    /** Whether this action-33 building researches the paladin/ogre-mage line. */
+    static boolean battleNetIsChurch(Unit building) {
+        if (building == null || building.type() == null) {
+            return false;
+        }
+        String ident = building.type().ident();
+        return "unit-church".equals(ident)
+                || "unit-altar-of-storms".equals(ident);
     }
 
     /** Whether this action-33 building is a shipyard. */
@@ -14041,6 +14053,7 @@ public final class World {
 
     static boolean battleNetIsLimit1Trainer(Unit building) {
         return battleNetIsBarracks(building) || battleNetIsShipyard(building)
+                || battleNetIsChurch(building)
                 || battleNetIsBlacksmith(building)
                 || battleNetIsTownHall(building)
                 || battleNetIsLumberMill(building)
