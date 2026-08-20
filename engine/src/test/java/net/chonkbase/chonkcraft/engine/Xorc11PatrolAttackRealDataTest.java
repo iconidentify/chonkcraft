@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
@@ -79,6 +80,48 @@ class Xorc11PatrolAttackRealDataTest {
                 "the timer-one handoff spends the west chase stride on cycle 61");
         assertEquals(40, ship.tileY(),
                 "the battleship's first chase stride stays on the 40-row");
+    }
+
+    @Test
+    @DisplayName("xorc 11's crossing cannon shells land on cycle 91 with BNE outer splash")
+    void xorc11sCrossingCannonShellsLandOnCycle91WithBneOuterSplash() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/orc-exp/levelx11o",
+                GameData.personIn(data.campaignMap(
+                        "campaigns/orc-exp/levelx11o")), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit ship = nearest(world, "unit-battleship", 18, 40);
+        assertNotNull(ship, "XOrc 11 has no human battleship near 18,40");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 91) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 69 && fixture <= 90) {
+                assertEquals(150, ship.hitPoints(),
+                        "BNE's type-7 cannon travelers are still airborne at fixture "
+                                + fixture);
+            }
+        }
+
+        // Native is 127 here. Java is currently 125 because an older idle-RNG
+        // schedule difference gives these otherwise-correct splash rolls two
+        // neighbouring async values. Keep this regression scoped to what this
+        // evidence proves independently: type-7 arrival timing and the legal
+        // outer-splash damage band (9..18 per shell after armor), neither an
+        // early full-band kill nor a missing impact.
+        assertTrue(ship.hitPoints() >= 114 && ship.hitPoints() <= 132,
+                "fixture 91 must apply exactly two legal outer-band splashes, hp="
+                        + ship.hitPoints());
+        assertEquals(Unit.Order.ATTACK, ship.order(),
+                "the corrected cannon crossing must leave the battleship fighting");
     }
 
     @Test

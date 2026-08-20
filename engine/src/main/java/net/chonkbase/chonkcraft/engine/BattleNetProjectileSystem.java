@@ -295,6 +295,7 @@ final class BattleNetProjectileSystem {
             return -1;
         }
         return switch (type.ident()) {
+            case "missile-big-cannon" -> 7;
             case "missile-catapult-rock" -> 13;
             case "missile-ballista-bolt" -> 14;
             case "missile-arrow", "missile-arrow-super" -> 15;
@@ -358,6 +359,11 @@ final class BattleNetProjectileSystem {
             return 12;
         }
         return switch (type.ident()) {
+            // XOrc 11's authenticated projectile ledger: native type 7 opens
+            // with remaining 247 and drains 247,235,223... at 12 pixels per
+            // update. The legacy declaration's 20 landed both crossing
+            // battleship shells five fixture cycles early.
+            case "missile-big-cannon" -> 12;
             case "missile-arrow", "missile-axe" -> 12;
             // Table 0x00494e0c type 24 is 16; ChonkCraft missiles.legacy-declaration used 22 and
             // delivered XHuman 10 cannon bolts several ticks early.
@@ -700,9 +706,9 @@ final class BattleNetProjectileSystem {
             // Drawn offset and residual bank recombine into that raw pair, as
             // the projectile constructors do for aim points.
             int centerX = candidate.pixelX() + candidate.residualX()
-                    + World.centreOffset(candidate.type(), true);
+                    + World.battleNetCentreOffset(candidate.type(), true);
             int centerY = candidate.pixelY() + candidate.residualY()
-                    + World.centreOffset(candidate.type(), false);
+                    + World.battleNetCentreOffset(candidate.type(), false);
             int dx = impactX - centerX;
             int dy = impactY - centerY;
             int metric = Math.max(dx * dx, dy * dy);
