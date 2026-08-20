@@ -4958,6 +4958,25 @@ final class BattleNetCombatSystem {
         }
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());
+        // A live quarry may leave range during the committed swing body.
+        // The last non-marker visit still belongs to Attack even when Java's
+        // parallel presentation animation becomes breakable on that visit.
+        // Native hands ownership to Move only on the following OP0 marker.
+        // Human 8 attack-peasant 1513 therefore remains at 70,72 on fixture
+        // 57 (Attack tail timer 1) and first-steps NE on fixture 58. Letting
+        // stepAttack continue after the timer-2 -> timer-1 tick moved it at
+        // 57, one visit before the sequence authorized a chase decision.
+        boolean recoveryMarkerNext = false;
+        if (!tick.actionMarker()
+                && unit.fighting() && !unit.isMoving()
+                && !unit.battleNetStationaryAttack()
+                && !settledInRange
+                && sequenceTarget != null && sequenceTarget.isAlive()
+                && attackStart >= 0 && offset >= attackStart) {
+            BattleNetSequence.Tick next = world.battleNetSequence.tick(
+                    tick.offset(), tick.timer());
+            recoveryMarkerNext = next.valid() && next.actionMarker();
+        }
         // Keep dest-arm leftover construction on Attack start through 3,2,1
         // so stepAttack does not dest-arm on the same visits (Human 13 ogre
         // 1511 holds 120,26 at 115-117).
@@ -5070,7 +5089,7 @@ final class BattleNetCombatSystem {
             world.battleNetSequenceProjectileFired.remove(unit);
         }
         if (!tick.actionMarker()) {
-            return chaseDecision;
+            return chaseDecision || recoveryMarkerNext;
         }
         if (unit.battleNetPendingMeleeSyncRand()) {
             Unit target = unit.target();

@@ -69,6 +69,34 @@ class BattleNetMovingQuarryChaseRealDataTest {
                 "retail's first legal blow lands at fixture 127");
     }
 
+    @Test
+    void aHuman8AttackPeasantFinishesRecoveryBeforeChasing() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 70, 72);
+        assertNotNull(attacker);
+
+        while (fixtureCycle(mission.world()) < 57) {
+            mission.tick();
+        }
+        assertChaser(attacker, 70, 72, 0, 0, false);
+
+        mission.tick();
+        assertChaser(attacker, 71, 71, -32, 32, true);
+        assertEquals(2, attacker.pathLength(),
+                "native keeps the NE,E approach tail after its first step");
+    }
+
     private static Unit unitAt(World world, int player, String ident,
             int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
