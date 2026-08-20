@@ -2211,6 +2211,10 @@ final class BattleNetMovementSystem {
         //     fixture 38; the SE detour is fixture 39. Java's gold refuse
         //     arm, with collision already 1, took the far detour same cycle
         //     (one early). Free open leftovers keep same-cycle commit.
+        //   - XHuman 10 peon 1584: a refused route replans NE,NW,N with
+        //     collision one; after NE drains, the free N shortcut behind NW
+        //     still writes route_index 20 and increments collision to two at
+        //     fixture 54, then commits at 55.
         // Terrain wood (resourceUnit null) is unchanged.
         boolean goldMidRoute = unit.resourceUnit() != null
                 && !unit.returningToDepot()
@@ -2284,25 +2288,44 @@ final class BattleNetMovementSystem {
                 boolean ally = blocker != null && blocker != unit
                         && blocker.isOnMap() && !blocker.isDying()
                         && world.isAllied(unit.player(), blocker.player());
+                // A route freshly replacing a refusal retains that refusal
+                // nibble. When its first diagonal drains with a free
+                // cardinal shortcut behind the reverse diagonal, native
+                // still passes through
+                // FUN_004379e0: XHuman 10 peon 1584 changes 0x1d 0x10→0x20
+                // and route_index 1→20 at fixture 54, then takes N on 55.
+                // Do not apply this without the two-heading shortcut. Peon
+                // 1437's ally-blocked S is itself refused on fixture 38 and
+                // replans SE on 39; an extra park before that refusal made
+                // the whole route one cycle late.
+                int residualShortcut = unit.pathLength() == 2
+                        ? BattleNetPathFinder.twoHeadingShortcut(
+                                unit.lastStepHeading(), unit.peekHeading())
+                        : -1;
+                int residualStride = world.battleNetMovementStride(unit);
+                boolean refusedFreeRemainder =
+                        unit.battleNetCollisionCounter() > 0
+                        && unit.battleNetPathStepsTaken() == 1
+                        && residualShortcut >= 0
+                        && !Direction.isDiagonal(residualShortcut)
+                        && world.canEnter(unit,
+                                unit.tileX()
+                                        + Direction.deltaX(residualShortcut)
+                                                * residualStride,
+                                unit.tileY()
+                                        + Direction.deltaY(residualShortcut)
+                                                * residualStride);
                 // Orc 5's peasant 1529 pays a quiet visit on its second
                 // residual settle when a diagonal leftover holds an ally.
-                //
-                // The other half of this arm has gone. It charged the same
-                // quiet visit whenever the collision counter was already
-                // raised, and it was written when the free-detour arms above
-                // fired a cycle early and cancelled it out. With those arms
-                // gone what it stood in for is the refusal's own route-park:
-                // `fcn.004379e0` marks the cursor 20 through `0x00450ad0` and
-                // bumps the count at `0x00437a0d` in one visit. Retail's peon
-                // 1437 in XHuman 10 marks 16,108 refused on fixture 38 and
-                // steps south-east on 39; the quiet visit had this implementation
-                // marking on 39 and stepping on 40, and it stayed a cycle
-                // behind for the rest of the walk -- 56 against retail's 55
-                // on the very next step.
                 boolean orcFiveSeam = settles >= 2
                         && unit.pathLength() == 2
                         && Direction.isDiagonal(unit.peekHeading());
-                if (ally && orcFiveSeam) {
+                if (refusedFreeRemainder) {
+                    unit.setBattleNetCollisionCounter(
+                            unit.battleNetCollisionCounter() + 1);
+                    unit.setBattleNetWoodRouteIndex20(true);
+                    mayDecide = false;
+                } else if (ally && orcFiveSeam) {
                     unit.setBattleNetWoodRouteIndex20(true);
                     mayDecide = false;
                 }
