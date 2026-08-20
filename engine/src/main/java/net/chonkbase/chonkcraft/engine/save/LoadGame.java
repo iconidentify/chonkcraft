@@ -707,6 +707,10 @@ public final class LoadGame {
             unit.setBattleNetOrderDelay(
                     integer(state.rawGet("battleNetOrderDelay")));
         }
+        if (state.rawGet("battleNetRefusals") != null) {
+            unit.setBattleNetRefusals(
+                    integer(state.rawGet("battleNetRefusals")));
+        }
         if (state.rawGet("attackRefusalRecoveryStage") != null) {
             unit.setBattleNetAttackRefusalRecoveryStage(
                     integer(state.rawGet("attackRefusalRecoveryStage")));

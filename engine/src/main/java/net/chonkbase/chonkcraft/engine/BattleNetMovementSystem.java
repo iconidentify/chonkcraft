@@ -2028,6 +2028,43 @@ final class BattleNetMovementSystem {
     }
 
     /**
+     * Applies the native refusal ladder to a behavior-six small-warship map
+     * Patrol through its terminal ninth-refusal band.
+     *
+     * <p>XHuman 7 destroyer 1570 first records two refusals against 1562,
+     * replans west, and then both hulls finish that stride against destroyer
+     * 1573. The earlier count synchronizes their refusal eight on fixture 42;
+     * refusal nine owns the 15-count band at 57. When that band expires at
+     * fixture 72, Patrol's empty-route handler selects Still while the native
+     * refusal nibble remains nine. The launched behavior-two assault path is
+     * excluded: those ships must keep recovering toward their combat home.</p>
+     *
+     * <p>The near-goal bound separates this terminal Patrol refusal from a
+     * body encountered on a longer route. XOrc 8 destroyer 1431 is still
+     * seventeen tiles from its map point when submarine 1432 blocks its
+     * leftover northwest heading; native gives that first refusal the ordinary
+     * fifteen-count and then continues the remaining route.</p>
+     */
+    private boolean refuseBattleNetNavalMapPatrol(Unit unit) {
+        if (unit == null || unit.type() == null
+                || !unit.type().seaUnit()
+                || World.isBattleNetCapitalShip(unit.type().ident())
+                || unit.battleNetAiBehavior() == 2
+                || unit.target() != null
+                || unit.patrolX() < 0 || unit.patrolY() < 0
+                || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
+                        Math.abs(unit.tileY() - unit.orderTargetY())) > 4
+                || unit.isMoving()
+                || unit.pathLength() != 1) {
+            return false;
+        }
+        battleNetRefuse(unit);
+        unit.setRouteSpent(false);
+        unit.setBattleNetOrderDelay(0);
+        return true;
+    }
+
+    /**
      * Transfers a refused attack approach from Attack OP0 to Move's native
      * refusal wait.
      *
@@ -3024,6 +3061,10 @@ final class BattleNetMovementSystem {
                     boolean temporaryBody = blocker != null
                             && blocker != unit
                             && !blocker.type().building();
+                    if (temporaryBody
+                            && refuseBattleNetNavalMapPatrol(unit)) {
+                        return;
+                    }
                     if (temporaryBody && unit.stepDrained() && !unit.isMoving()
                             && unit.pathLength() > 0) {
                         unit.setBattleNetOrderDelay(14);
