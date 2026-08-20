@@ -1654,22 +1654,29 @@ public final class Unit {
     public void setOrder(Order order) {
         Order previous = this.order;
         this.order = order;
-        boolean keepCapitalPatrolCursor =
-                type != null
-                && type.seaUnit()
+        boolean capitalPatrolCursor = type != null && type.seaUnit()
                 && ("unit-battleship".equals(type.ident())
                         || "unit-ogre-juggernaught".equals(type.ident()))
                 && (order == Order.PATROL
                         || (order == Order.MOVE && battleNetBorrowedMoveForStep
                                 && previous == Order.PATROL));
-        if (order != Order.STILL && !keepCapitalPatrolCursor) {
+        boolean flyerPatrolStrideCursor = type != null
+                && type.moveType() == UnitType.Movement.FLY
+                && type.canAttack() && battleNetDoubleStep
+                && order == Order.MOVE && battleNetBorrowedMoveForStep
+                && previous == Order.PATROL;
+        boolean nativeSequencedPatrol = capitalPatrolCursor
+                || flyerPatrolStrideCursor;
+        if (order != Order.STILL && !nativeSequencedPatrol) {
             // Still keeps its cursor so the idle dispatcher can fire.
             // Capital-ship Patrol used to wipe that same cursor, so XOrc 11's
             // battleship lost the Still program at promote and never reached
             // the Move-body OP0 that opens Attack at fixture 58. walkTowards
             // borrows MOVE for that one stride and must not wipe it either.
-            // Other Patrol (scouts, destroyers) still wipe -- keeping those
-            // cursors shifted Human 12's async scout dest off 107,51.
+            // Armed doubled flyers also carry the cursor across the borrowed
+            // MOVE used for a Patrol stride. Other Patrol (unarmed scouts,
+            // destroyers) still wipe -- keeping those cursors shifted Human
+            // 12's async scout dest off 107,51.
             battleNetSequenceOffset = -1;
         }
     }

@@ -2907,6 +2907,63 @@ final class BattleNetMovementSystem {
                     canTakeStep = true;
                 }
             }
+            // Armed air Patrol does not put its first cardinal route behind
+            // the generic fifteen-count body wait. When an allied flyer
+            // occupies that anchor, retail rewrites the route to the two
+            // adjacent diagonals and commits the first in this visit. XOrc 8
+            // gryphon 1560 is released south from (0,6) at fixture 60, sees
+            // gryphon 1550 on (0,8), and stores SE,SW: SE lands now and SW
+            // carries it back to the original south line on the next stride.
+            if (!canTakeStep && unit.battleNetDoubleStep()
+                    && !Direction.isDiagonal(heading)
+                    && unit.type().moveType() == UnitType.Movement.FLY
+                    && unit.type().canAttack()
+                    && unit.battleNetBorrowedMoveForStep()
+                    && unit.patrolX() >= 0
+                    && unit.stepDrained() && !unit.isMoving()
+                    && unit.pathLength() > 0) {
+                Unit airBlocker = world.blockerOnLayer(unit, nextX, nextY);
+                boolean alliedFlyer = airBlocker != null
+                        && airBlocker != unit && airBlocker.type() != null
+                        && !airBlocker.type().building()
+                        && world.isAllied(
+                                unit.player(), airBlocker.player())
+                        && airBlocker.type().moveType()
+                                == UnitType.Movement.FLY;
+                if (alliedFlyer) {
+                    int left = Math.floorMod(
+                            heading - 1, Direction.COUNT);
+                    int right = Math.floorMod(
+                            heading + 1, Direction.COUNT);
+                    int[] detours = {left, right};
+                    for (int detour : detours) {
+                        int returnHeading = detour == left ? right : left;
+                        int detourX = unit.tileX()
+                                + Direction.deltaX(detour) * stride;
+                        int detourY = unit.tileY()
+                                + Direction.deltaY(detour) * stride;
+                        int returnX = detourX
+                                + Direction.deltaX(returnHeading) * stride;
+                        int returnY = detourY
+                                + Direction.deltaY(returnHeading) * stride;
+                        if (!world.canEnterBattleNetTransportAnchor(
+                                unit, detourX, detourY)
+                                || !world.canEnterBattleNetTransportAnchor(
+                                        unit, returnX, returnY)) {
+                            continue;
+                        }
+                        unit.clearPath();
+                        unit.setPath(new PathFinder.Path(
+                                PathFinder.Result.FOUND,
+                                new int[] {returnHeading, detour}));
+                        heading = detour;
+                        nextX = detourX;
+                        nextY = detourY;
+                        canTakeStep = true;
+                        break;
+                    }
+                }
+            }
             if (World.TRACE_MOVING != null && unit.id() == World.TRACE_MOVING_ID) {
                 Unit decideBlocker = world.unitAt(nextX, nextY);
                 long decideFlags = world.map.contains(nextX, nextY)

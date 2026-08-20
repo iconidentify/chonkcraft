@@ -11639,6 +11639,10 @@ public final class World {
         // free visit, not three visits later.
         boolean patrolOp0 = tickBattleNetPatrolSequence(unit);
         boolean standingPatrol = battleNetStandingPatrolSequence(unit);
+        boolean constructingFlyerPatrol =
+                battleNetConstructingFlyerPatrol(unit);
+        boolean flyerPatrolOp0 = constructingFlyerPatrol
+                && tickBattleNetFlyerPatrolSequence(unit);
         if (delayHold) {
             return;
         }
@@ -11715,6 +11719,19 @@ public final class World {
             restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
             return;
         }
+        // A launched armed flyer also reconstructs Patrol at the Still head
+        // when its scouting residual settles. XOrc 11 gryphon 1589 lands on
+        // (42,8) at fixture 61 with a south-west route already buffered, but
+        // native holds Still 3 + 5 calls and first-steps that route at 69.
+        // Spending it on the settle visit put Java eight cycles ahead.
+        if (residualSettledThisVisit
+                && unit.order() == Unit.Order.PATROL
+                && battleNetArmedFlyerPatrol(unit)
+                && unit.battleNetAiBehavior() == 2
+                && unit.pendingAttack() == null) {
+            restartBattleNetFlyerPatrol(unit);
+            return;
+        }
         // Large BNE ships on a fresh patrol must take their first even-grid
         // step under Patrol before acquisition may replace the order. XOrc 11
         // battleships used to convert to AttackMove on the first free visit
@@ -11724,6 +11741,14 @@ public final class World {
             // Move-body visits stay on Patrol until the next OP0. Destroyer
             // leftover-settle (1542) does not own this cursor and still
             // falls through to autoAttack below.
+            return;
+        }
+        // Far armed-flyer Patrol uses the same binary Still constructor.
+        // XOrc 8 gryphon 1560 promotes Patrol at fixture 52 with timer 3,
+        // advances through WAIT 5, and may not consult its route until the
+        // marker at fixture 60. A non-Move Java animation otherwise exposed
+        // an open movement boundary and tried the blocked south step at 55.
+        if (constructingFlyerPatrol && !flyerPatrolOp0) {
             return;
         }
         boolean awaitingFirstPatrolStep = unit.battleNetDoubleStep()
@@ -12026,6 +12051,13 @@ public final class World {
             // fixture 58.
             armBattleNetPatrolMoveBody(unit);
             unit.clearPath();
+        }
+        if (flyerPatrolOp0 && unit.order() == Unit.Order.PATROL) {
+            // The Still OP0 returns at cursor+1; the movement constructor
+            // selects the Move body after the logical step. Native gryphons
+            // therefore seal 2259/1 on their release fixtures, while their
+            // remaining detour/assault headings stay buffered.
+            armBattleNetPatrolMoveBody(unit);
         }
     }
 
@@ -13183,8 +13215,8 @@ public final class World {
     }
 
     /**
-     * Rewinds a capital-ship Patrol promoted from Still to that sequence's
-     * head, or installs Move when the prior order owned no cursor.
+     * Rewinds a native-sequenced Patrol promoted from Still to that sequence's
+     * head, or installs Move when a capital ship owned no cursor.
      *
      * <p>Native 1511 keeps Still 2955 and resets the timer to 3 on the
      * promote visit. Wiping the cursor here used to leave every later
@@ -13192,9 +13224,17 @@ public final class World {
      * that opens Attack at fixture 58.
      */
     private void armBattleNetPatrolSequence(Unit unit, Unit.Order before) {
-        if (battleNetSequence == null || unit == null || unit.type() == null
-                || !unit.type().seaUnit()
-                || !isBattleNetCapitalShip(unit.type().ident())) {
+        if (battleNetSequence == null || unit == null || unit.type() == null) {
+            return;
+        }
+        boolean capitalShip = unit.type().seaUnit()
+                && isBattleNetCapitalShip(unit.type().ident());
+        // Initial self-scout Patrol has its own authenticated six-visit arm.
+        // Only the exhausted flyer's later far-patrol promotion constructs a
+        // fresh Still program here (XOrc 8 gryphon 1560 at fixture 52).
+        boolean exhaustedFlyer = battleNetArmedFlyerPatrol(unit)
+                && unit.battleNetFlyerScoutExhausted();
+        if (!capitalShip && !exhaustedFlyer) {
             return;
         }
         if (before == Unit.Order.STILL) {
@@ -13211,6 +13251,9 @@ public final class World {
                 unit.setBattleNetAnimationTimer(3);
                 return;
             }
+        }
+        if (!capitalShip) {
+            return;
         }
         if (unit.battleNetSequenceOffset() >= 0) {
             unit.setBattleNetAnimationTimer(3);
@@ -13259,6 +13302,54 @@ public final class World {
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());
         return tick.actionMarker();
+    }
+
+    /** Whether this Patrol is an armed doubled flyer with a native cursor. */
+    private boolean battleNetArmedFlyerPatrol(Unit unit) {
+        return battleNetSequence != null
+                && unit != null
+                && unit.type() != null
+                && unit.order() == Unit.Order.PATROL
+                && unit.battleNetDoubleStep()
+                && unit.type().moveType() == UnitType.Movement.FLY
+                && unit.type().canAttack();
+    }
+
+    /** Whether the armed flyer's Patrol cursor is still in construction. */
+    private boolean battleNetConstructingFlyerPatrol(Unit unit) {
+        if (!battleNetArmedFlyerPatrol(unit) || unit.isMoving()
+                || !(unit.battleNetFlyerScoutExhausted()
+                        || unit.battleNetAiBehavior() == 2)) {
+            return false;
+        }
+        int stillStart = idle.battleNetStillSequenceStart(unit);
+        int moveStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        int cursor = unit.battleNetSequenceOffset();
+        return stillStart >= 0 && moveStart > stillStart
+                && cursor >= stillStart && cursor < moveStart;
+    }
+
+    /** Advances one quiet/action visit of an armed flyer's Still constructor. */
+    private boolean tickBattleNetFlyerPatrolSequence(Unit unit) {
+        BattleNetSequence.Tick tick = battleNetSequence.tick(
+                unit.battleNetSequenceOffset(),
+                unit.battleNetAnimationTimer());
+        if (!tick.valid()) {
+            return false;
+        }
+        unit.setBattleNetSequenceOffset(tick.offset());
+        unit.setBattleNetAnimationTimer(tick.timer());
+        return tick.actionMarker();
+    }
+
+    /** Reconstructs a launched flyer Patrol after its previous stride settles. */
+    private void restartBattleNetFlyerPatrol(Unit unit) {
+        int still = idle.battleNetStillSequenceStart(unit);
+        if (still >= 0) {
+            unit.setBattleNetSequenceOffset(still);
+            unit.setBattleNetAnimationTimer(3);
+        }
     }
 
     /**
