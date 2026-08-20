@@ -4056,12 +4056,15 @@ public final class World {
             return;
         }
         defender.setOfferedTarget(attacker);
-        // Person defenders only install the offer here. Recruiting every
-        // nearby Still brother on ordinary hits raised Human 13 knight 1493
-        // Attack at fixture 21 and XHuman 12 footman 1478 at 28. Person
-        // brother help is limited to lethal splash (see
-        // battleNetPersonMeleeHelpOnSplash).
+        // Person ordinary-hit help is the tight bodyguard ring, not the
+        // computer's react+1 band or the radius used by lethal splash.
+        // XHuman 9's footmen one and two tiles from the struck defender bank
+        // the skeleton at c55 and both promote at c56. Extending this to the
+        // whole person reaction range raised Human 13 knight 1493 three tiles
+        // from the struck knight at c21; letting buildings originate it raised
+        // XHuman 12 footman 1478 when the guard tower four tiles away was hit.
         if (isPerson(defender.player())) {
+            battleNetPersonCloseHitHelp(attacker, defender);
             return;
         }
         final int band = 13;
@@ -4101,6 +4104,44 @@ public final class World {
                 continue;
             }
             brother.setBattleNetPendingHelpAttack(attacker);
+        }
+    }
+
+    /** Banks action 12 for person melee guards within two tiles of an ally hit. */
+    private void battleNetPersonCloseHitHelp(Unit attacker, Unit defender) {
+        if (defender.type().building()
+                || defender.type().moveType() != UnitType.Movement.LAND
+                || defender.type().maxAttackRange() > 1) {
+            return;
+        }
+        for (Unit brother : battleNetSpatialUnits) {
+            if (brother == defender || brother == attacker
+                    || !brother.isAlive() || brother.isDying()
+                    || !brother.isOnMap()
+                    || brother.player() != defender.player()
+                    || brother.type() == null || brother.type().building()
+                    || !brother.type().canAttack()
+                    || !brother.isAggressive()
+                    || !brother.type().gathering().isEmpty()
+                    || brother.type().maxAttackRange() > 1
+                    || brother.type().moveType() != UnitType.Movement.LAND
+                    || brother.order() != Unit.Order.STILL
+                    || brother.currentAction() != Unit.Order.STILL
+                    || brother.target() != null
+                    || brother.battleNetPendingHelpAttack() != null
+                    || !targets.canTarget(brother, attacker)
+                    || !isEnemyPlayer(brother.player(), attacker.player())
+                    || battleNetDistance(brother, defender) > 2) {
+                continue;
+            }
+            brother.setBattleNetPendingHelpAttack(attacker);
+            brother.setBattleNetPendingCloseHitHelp(true);
+            if (BNE_IDLE_TRACE) {
+                System.err.printf("JBNECLOSEHELP cycle=%d brother=%d defender=%d"
+                                + " attacker=%d distance=%d%n",
+                        cycle, brother.id(), defender.id(), attacker.id(),
+                        battleNetDistance(brother, defender));
+            }
         }
     }
 
@@ -4144,7 +4185,8 @@ public final class World {
                     || brother.order() != Unit.Order.STILL
                     || brother.currentAction() != Unit.Order.STILL
                     || brother.target() != null
-                    || brother.battleNetPendingHelpAttack() != null
+                    || (brother.battleNetPendingHelpAttack() != null
+                            && brother.battleNetPendingHelpAttack() != attacker)
                     || brother.tileX() < left || brother.tileX() > right
                     || brother.tileY() < top || brother.tileY() > bottom
                     || !targets.canTarget(brother, attacker)
@@ -4157,6 +4199,11 @@ public final class World {
                 continue;
             }
             brother.setBattleNetPendingHelpAttack(attacker);
+            // The lethal-splash path calls ordinary HitUnit help first. If
+            // that tight-ring pass banked the same catapult, convert the bank
+            // to splash help so its proven owner stagger remains authoritative
+            // (XHuman 10 knights at c42..46).
+            brother.setBattleNetPendingCloseHitHelp(false);
         }
     }
 
@@ -9016,14 +9063,30 @@ public final class World {
                 // Solo help (grunt 1481) is unaffected: the single brother
                 // still promotes immediately with delay 3.
                 if (owner >= 0 && owner < battleNetHelpPromotedThisCycle.length
-                        && !battleNetHelpPromotedThisCycle[owner]) {
+                        && (unit.battleNetPendingCloseHitHelp()
+                                || !battleNetHelpPromotedThisCycle[owner])) {
                     Unit helpTarget = unit.battleNetPendingHelpAttack();
+                    boolean closeHitHelp =
+                            unit.battleNetPendingCloseHitHelp();
                     boolean deferPromote = false;
+                    if (closeHitHelp && battleNetSequence != null) {
+                        // Native writes next_order immediately, but Current
+                        // remains Still until that unit's own idle program
+                        // reaches its next action boundary. XHuman 9's two
+                        // footmen are already at timer one and pop at c56;
+                        // knight 1414 is at timer two and stays Still through
+                        // c58 before popping at c59.
+                        BattleNetSequence.Tick next = battleNetSequence.tick(
+                                unit.battleNetSequenceOffset(),
+                                unit.battleNetAnimationTimer());
+                        deferPromote = next.valid() && !next.actionMarker();
+                    }
                     // Person: promote the pending brother closest in row to the
                     // aggressor first (XHuman 10 knight 1489 shares y with
                     // catapult 74,89 before column neighbours). Tick order
                     // alone raised 1480 while native raised 1489.
-                    if (isPerson(owner) && helpTarget != null) {
+                    if (isPerson(owner) && helpTarget != null
+                            && !closeHitHelp) {
                         // After the first person help promote, skip one cycle
                         // before the second (native 1489@43, 1493@45); later
                         // promotes may batch same cycle (1485+1480@46).
@@ -9065,9 +9128,10 @@ public final class World {
                     }
                     if (!deferPromote) {
                         unit.setBattleNetPendingHelpAttack(null);
+                        unit.setBattleNetPendingCloseHitHelp(false);
                         if (helpTarget.isAlive() && helpTarget.isOnMap()
                                 && orderAttack(unit, helpTarget)) {
-                            if (isPerson(owner)) {
+                            if (isPerson(owner) && !closeHitHelp) {
                                 battleNetPersonHelpLastPromoteCycle[owner] =
                                         (int) cycle;
                                 battleNetPersonHelpPromoteCount[owner]++;
@@ -9079,8 +9143,16 @@ public final class World {
                                     battleNetHelpPromotedThisCycle[owner] =
                                             true;
                                 }
-                            } else {
+                            } else if (!isPerson(owner)) {
                                 battleNetHelpPromotedThisCycle[owner] = true;
+                            }
+                            if (closeHitHelp) {
+                                // Promotion happens at the top of the next
+                                // unit visit; Java also dispatches that new
+                                // order later in the same visit. Seed one
+                                // extra construction beat so the committed
+                                // state is native Attack 2539/timer 3.
+                                unit.setBattleNetAnimationTimer(4);
                             }
                             // Hold three order-delay cycles before the first
                             // chase step so XHuman 12 grunt 1481 stays at
@@ -9090,7 +9162,7 @@ public final class World {
                             // First chase path after person help may prefer
                             // an equal-cost goal-axis diagonal onto a lead
                             // brother (XHuman 10 knight 1493 SW onto 1489).
-                            if (isPerson(owner)) {
+                            if (isPerson(owner) && !closeHitHelp) {
                                 unit.setBattleNetPersonHelpFirstChase(true);
                             }
                         }

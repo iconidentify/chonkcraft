@@ -119,6 +119,100 @@ class Xhuman09DefensiveReactionRealDataTest {
                 "the footman must still stand on 13,121 after the first exchange");
     }
 
+    @Test
+    @DisplayName("xhuman 9's Data-marked melee neighbors wake and pursue on cycle 56")
+    void xhuman9sDataMarkedMeleeNeighborsWakeAndPursueOnCycle56() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx09h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 9 is not in the pack");
+        World world = mission.world();
+
+        Unit skeleton = unitAt(world, "unit-skeleton", 15, 118);
+        Unit eastFootman = unitAt(world, "unit-footman", 13, 123);
+        Unit westFootman = unitAt(world, "unit-footman", 12, 122);
+        Unit northKnight = unitAt(world, "unit-knight", 16, 125);
+        assertNotNull(skeleton, "XHuman 9 has no skeleton on 15,118");
+        assertNotNull(eastFootman, "XHuman 9 has no footman on 13,123");
+        assertNotNull(westFootman, "XHuman 9 has no footman on 12,122");
+        assertNotNull(northKnight, "XHuman 9 has no knight on 16,125");
+        assertTrue(eastFootman.battleNetPudData() != 0,
+                "the east witness must retain its native UNIT.Data marker");
+        assertTrue(westFootman.battleNetPudData() != 0,
+                "the west witness must retain its native UNIT.Data marker");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        Unit.Order eastOrderAt55 = null;
+        Unit.Order westOrderAt55 = null;
+        Unit.Order eastOrderAt56 = null;
+        Unit.Order westOrderAt56 = null;
+        Integer eastXAt58 = null;
+        Integer eastYAt58 = null;
+        Integer westXAt58 = null;
+        Integer westYAt58 = null;
+        Unit.Order knightOrderAt58 = null;
+        Unit.Order knightOrderAt59 = null;
+        while (fixtureCycle(world) < 59) {
+            mission.tick();
+            if (fixtureCycle(world) == 55) {
+                eastOrderAt55 = eastFootman.currentAction();
+                westOrderAt55 = westFootman.currentAction();
+            }
+            if (fixtureCycle(world) == 56) {
+                eastOrderAt56 = eastFootman.currentAction();
+                westOrderAt56 = westFootman.currentAction();
+            }
+            if (fixtureCycle(world) == 58) {
+                eastXAt58 = eastFootman.tileX();
+                eastYAt58 = eastFootman.tileY();
+                westXAt58 = westFootman.tileX();
+                westYAt58 = westFootman.tileY();
+                knightOrderAt58 = northKnight.currentAction();
+            }
+            if (fixtureCycle(world) == 59) {
+                knightOrderAt59 = northKnight.currentAction();
+            }
+        }
+
+        assertEquals(Unit.Order.STILL, eastOrderAt55,
+                "retail exposes the east footman's queued acquisition as Still at cycle 55");
+        assertEquals(Unit.Order.STILL, westOrderAt55,
+                "retail exposes the west footman's queued acquisition as Still at cycle 55");
+        assertEquals(Unit.Order.ATTACK, eastOrderAt56,
+                "the east Data-marked melee defender must wake on cycle 56");
+        assertEquals(Unit.Order.ATTACK, westOrderAt56,
+                "the west Data-marked melee defender must wake on cycle 56");
+        assertEquals(skeleton, eastFootman.target(),
+                "the east defender must pursue the nearby skeleton");
+        assertEquals(skeleton, westFootman.target(),
+                "the west defender must pursue the nearby skeleton");
+        assertEquals(13, eastXAt58,
+                "the east defender holds its native tile through cycle 58");
+        assertEquals(123, eastYAt58,
+                "the east defender holds its native tile through cycle 58");
+        assertEquals(12, westXAt58,
+                "the west defender holds its native tile through cycle 58");
+        assertEquals(122, westYAt58,
+                "the west defender holds its native tile through cycle 58");
+        assertEquals(13, eastFootman.tileX(),
+                "the east defender keeps its column on the first chase step");
+        assertEquals(122, eastFootman.tileY(),
+                "the east defender steps north on native cycle 59");
+        assertEquals(12, westFootman.tileX(),
+                "the west defender keeps its column on the first chase step");
+        assertEquals(121, westFootman.tileY(),
+                "the west defender steps north on native cycle 59");
+        assertEquals(Unit.Order.STILL, knightOrderAt58,
+                "the nearby knight's timer-two next order remains hidden through cycle 58");
+        assertEquals(Unit.Order.ATTACK, knightOrderAt59,
+                "the nearby knight promotes only on its own cycle-59 idle boundary");
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

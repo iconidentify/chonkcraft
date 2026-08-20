@@ -520,6 +520,9 @@ public final class Unit {
      */
     private Unit battleNetPendingHelpAttack;
 
+    /** Whether pending help came from a person ally struck within two tiles. */
+    private boolean battleNetPendingCloseHitHelp;
+
     /**
      * Whether the PUD's auxiliary word suppressed BNE's general ready pass.
      *
@@ -3177,6 +3180,13 @@ public final class Unit {
         battleNetPendingHelpAttack = target;
     }
 
+    public boolean battleNetPendingCloseHitHelp() {
+        return battleNetPendingCloseHitHelp;
+    }
+
+    public void setBattleNetPendingCloseHitHelp(boolean pending) {
+        battleNetPendingCloseHitHelp = pending;
+    }
     public boolean battleNetReadySuppressed() {
         return battleNetReadySuppressed;
     }
