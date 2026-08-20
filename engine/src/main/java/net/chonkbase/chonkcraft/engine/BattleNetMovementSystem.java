@@ -1154,12 +1154,13 @@ final class BattleNetMovementSystem {
             // orders retain their original route semantics.
             if (path.result() == PathFinder.Result.FOUND && path.length() == 0
                     && worker.order() == Unit.Order.PATROL
-                    && (worker.battleNetAiBehavior() == 2
-                        || world.ais.containsKey(worker.player()))) {
-                // Saves written before aiBehavior became durable can only
-                // express an AI assault through this live Patrol order. Repair
-                // that old representation as it is first exercised.
-                worker.setBattleNetAiBehavior(2);
+                    && worker.battleNetAiBehavior() == 2) {
+                // Only a launched behavior-two force owns long-route assault
+                // recovery. An ordinary map Patrol can belong to an AI
+                // player too: XHuman 7 juggernaught 1573 exhausts its single
+                // south heading at fixture 59 and goes Still. Treating every
+                // AI player's Patrol as a missing legacy assault invents a
+                // north-west route there and keeps the ship moving forever.
                 if (!worker.hasBattleNetAiHome()) {
                     worker.setBattleNetAiHome(tileX, tileY);
                 }
@@ -1186,6 +1187,29 @@ final class BattleNetMovementSystem {
                     world.finishOrder(worker);
                     return;
                 }
+            }
+            if (path.result() == PathFinder.Result.FOUND && path.length() == 0
+                    && worker.order() == Unit.Order.PATROL
+                    && worker.battleNetAiBehavior() != 2
+                    && world.ais.containsKey(worker.player())) {
+                // A map-authored patrol owned by an AI player is not an AI
+                // force march. Once its compact route is exhausted, native
+                // ends action 5 at the last residual pixel and constructs
+                // Still; it does not run the behavior-two long-route rescue.
+                // XHuman 7 juggernaught 1573 settles at 24,26 on fixture 59
+                // with the old 22,27 order point retained.
+                resetDisplacement(worker);
+                worker.clearPath();
+                worker.setRouteSpent(false);
+                worker.setWaitCycles(0);
+                world.finishOrder(worker);
+                worker.setActionBeforeQueued(null);
+                if (world.battleNetSequence != null) {
+                    worker.setBattleNetSequenceOffset(
+                            world.idle.battleNetStillSequenceStart(worker));
+                    worker.setBattleNetAnimationTimer(1);
+                }
+                return;
             }
             worker.setPath(path);
             // No path goal: this order does its own re-planning, every time

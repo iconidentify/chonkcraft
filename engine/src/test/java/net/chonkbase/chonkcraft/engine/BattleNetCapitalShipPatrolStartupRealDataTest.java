@@ -116,6 +116,38 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 7 juggernaught stands down when its map patrol route ends")
+    void anXHuman7JuggernaughtStandsDownWhenItsMapPatrolRouteEnds() {
+        Mission mission = mission("campaigns/human-exp/levelx07h");
+        Unit juggernaught = at(mission.world(),
+                "unit-ogre-juggernaught", 24, 24);
+        assertNotNull(juggernaught,
+                "XHuman 7 has no startup juggernaught at 24,24");
+        assertEquals(0, juggernaught.battleNetAiBehavior(),
+                "the map patrol is not a launched behavior-two assault");
+
+        for (int cycle = 1; cycle <= 58; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, juggernaught.order());
+        assertEquals(0, juggernaught.battleNetAiBehavior(),
+                "ordinary AI-player patrols must not be promoted to assaults");
+        assertEquals(24, juggernaught.tileX());
+        assertEquals(26, juggernaught.tileY());
+        assertEquals(-2, juggernaught.offsetY(),
+                "fixture 58 still owes the final two southbound pixels");
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, juggernaught.order(),
+                "native exhausts the one-heading map patrol instead of "
+                        + "inventing a north-west recovery leg");
+        assertEquals(24, juggernaught.tileX());
+        assertEquals(26, juggernaught.tileY());
+        assertEquals(0, juggernaught.offsetX());
+        assertEquals(0, juggernaught.offsetY());
+    }
+
+    @Test
     @DisplayName("an XOrc 11 battleship takes its opening west patrol stride on fixture cycle five")
     void anXOrc11BattleshipTakesItsOpeningWestPatrolStrideOnFixtureCycleFive() {
         Mission mission = mission("campaigns/orc-exp/levelx11o");
