@@ -319,10 +319,12 @@ final class BattleNetIdleSystem {
      *
      * <p>XOrc 11's five behaviour-six ships all carry the marker this implementation
      * reads as a cleared ready suppression, and the pass sends whichever of
-     * them is standing back out. It draws nothing and keeps the point the ship
-     * already had: destroyer 1519's stays 22,36 from fixture 44 through 60,
-     * across the patrol it is put on at 53, where the air arm picks a fresh
-     * point with two draws.
+     * them is standing back out. A launched behaviour-two small warship is
+     * also reissued while its previous Patrol pixels drain: XOrc 8 destroyer
+     * 1404 writes next-order Patrol and route index 20 at fixture 49, promotes
+     * it on landing at 67, and first-steps again at 70. The pass draws nothing
+     * and keeps the point the ship already had; the air arm instead picks a
+     * fresh point with two draws.
      */
     void fireBattleNetNavalPatrolPass() {
         if (world.battleNetSequence == null) {
@@ -334,8 +336,16 @@ final class BattleNetIdleSystem {
             if (unit == null || unit.type() == null || !unit.isAlive()) {
                 continue;
             }
+            boolean movingAssaultPatrol =
+                    unit.type().moveType() == UnitType.Movement.NAVAL
+                    && unit.order() == Unit.Order.PATROL
+                    && unit.battleNetAiBehavior() == 2
+                    && unit.battleNetDoubleStep()
+                    && unit.type().canAttack()
+                    && !World.isBattleNetCapitalShip(unit.type().ident());
             if (unit.type().moveType() != UnitType.Movement.NAVAL
-                    || unit.order() != Unit.Order.STILL) {
+                    || (unit.order() != Unit.Order.STILL
+                            && !movingAssaultPatrol)) {
                 continue;
             }
             Player owner = world.player(unit.player());
@@ -353,6 +363,16 @@ final class BattleNetIdleSystem {
             // battleships, and the one destroyer among them that retail does
             // not send is the one carrying the marker.
             if (!unit.type().canAttack() || unit.battleNetReadySuppressed()) {
+                continue;
+            }
+            if (movingAssaultPatrol) {
+                // The native fifty-cycle pass writes next_order Patrol and
+                // route_index 20 even while a type-two destroyer is sliding.
+                // Keep the committed pixels, discard its stale cached route,
+                // and let stepPatrol promote this replacement on landing.
+                unit.clearPath();
+                unit.setBattleNetPendingPatrol(unit.orderTargetX(),
+                        unit.orderTargetY());
                 continue;
             }
             unit.setBattleNetPendingPatrol(unit.orderTargetX(),
