@@ -1532,7 +1532,31 @@ final class BattleNetCombatSystem {
                         world.movement.moveTowards(unit, chased);
                     }
                 } else if (unit.pathLength() == 0) {
-                    // Route terminator: rebuild without the empty-route wait.
+                    // A collided route's final residual owns this visit. The
+                    // following Move OP0 lays the refill; it does not share
+                    // the residual-settle visit. XHuman 12 grunt 1503 drains
+                    // E on fixture 55 with collision one and route index 20,
+                    // then plans S,SW,SW,SE on 56. Combining both visits let
+                    // Java route around the moving ally and step SE at 55.
+                    if (world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && unit.battleNetCollisionCounter() > 0
+                            && !unit.battleNetChaseEmptyRouteReplan()) {
+                        unit.setRouteSpent(false);
+                        unit.clearPath();
+                        unit.setStepDrained(false);
+                        unit.setBattleNetChaseEmptyRouteReplan(true);
+                        return;
+                    }
+                    // Route terminator: rebuild without the generic ten-cycle
+                    // empty-route wait. A deferred collided refill keeps
+                    // moving allies soft while drawing the new route, so its
+                    // direct first heading can enter the native cooperative
+                    // refusal machine instead of being routed around them.
+                    boolean collidedResidualRefill =
+                            unit.battleNetChaseEmptyRouteReplan()
+                            && unit.battleNetCollisionCounter() > 0;
                     unit.setRouteSpent(false);
                     unit.clearPath();
                     if (candidate != null) {
@@ -1543,7 +1567,7 @@ final class BattleNetCombatSystem {
                     // free-detours instead of cooperative-waiting fourteen
                     // (XHuman 12 grunt 1507 residual SE exhaust → replan).
                     unit.setBattleNetChaseEmptyRouteReplan(true);
-                    world.movement.moveTowards(unit, chased);
+                    world.planTowards(unit, chased, collidedResidualRefill);
                 } else if (goalMoved) {
                     unit.setPathGoal(chased.tileX(), chased.tileY());
                 }
