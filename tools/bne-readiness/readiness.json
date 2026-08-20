@@ -261,6 +261,7 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetCombatPlayabilityTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/ContainerDeathTest.java",
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java",
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BattleShowcaseTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/CombatTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/CombatFeedbackTest.java"
       ],
@@ -268,14 +269,15 @@
         "Native damage callsites, attack opcodes, asynchronous RNG draws, spatial-help reactions and causal projectile events have authenticated captures.",
         "The retail-data referee sends real footman, archer and ballista orders through CommandApplier and observes committed melee, projectile flight, splash target filtering, hit-point loss and death.",
         "The command referee rejects incompatible BNE orders instead of claiming success, and a repeatedly commanded mixed squad retains one live construction-site target until it is destroyed.",
+        "A 120-unit mixed retail battle receives exactly one wire command per unit and no director corrections; all six consecutive 500-cycle windows produce damage or death, every order reaches a physical/combat checkpoint, at least 100 units move pixels and at least 60 die.",
         "Synthetic formula and feedback controls cover armour, piercing damage, minimum range, footprint splash, retaliation offers, score attribution, damage text, burning and corpse cleanup."
       ],
       "blockers": [],
       "gate": {
-        "driver": "Scripted opposing units enter range and the referee observes acquisition, committed swings, damage and death.",
-        "success": "Melee, ranged, splash and retaliation scenarios terminate with the expected resource-independent state changes.",
+        "driver": "Player wire orders drive focused retail fights and a 120-unit mixed battle with no director reissuing targets.",
+        "success": "Melee, ranged, splash and retaliation scenarios terminate correctly, and every 500-cycle window of the undirected mass battle makes physical damage or death progress while both armies remain alive.",
         "required_inputs": ["asset_pack"],
-        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=BattleNetCombatPlayabilityTest,ContainerDeathTest,PlayerOrderDeliveryTest,CombatTest,CombatFeedbackTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
+        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=BattleNetCombatPlayabilityTest,ContainerDeathTest,PlayerOrderDeliveryTest,BattleShowcaseTest,CombatTest,CombatFeedbackTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
       }
     },
     {

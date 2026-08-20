@@ -14,7 +14,6 @@
 
 unsorted	native	net.chonkbase.chonkcraft.desktop.AcknowledgeOnceTest#exactlyOneUnitSpeaks
 unsorted	native	net.chonkbase.chonkcraft.desktop.AcknowledgeOnceTest#oneUnitStillSpeaks
-unsorted	native	net.chonkbase.chonkcraft.desktop.BattleShowcaseTest#theShowcaseDeploysTwoFullArmiesAndTheyEngage
 unsorted	neither	net.chonkbase.chonkcraft.desktop.BnePlaytestAdapterTest#aHuman1FootmanAcceptsAFieldMoveAsThePersonPlayer
 unsorted	legacyEngine	net.chonkbase.chonkcraft.desktop.CritterExplodesTest#tenClicksExplodeIt
 unsorted	native	net.chonkbase.chonkcraft.desktop.RightClickTableTest#aWorkerRightClickedOntoAnEnemyWalksRatherThanAttacks

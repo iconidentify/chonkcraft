@@ -37,7 +37,7 @@ The exact-fidelity frontier remains a separate, stricter proof.
 | Idle acquisition and target selection | GREEN | A retail footman guards its post against eligible and ineligible contacts while native-shaped targeting checks and legacy diagnostics run fail-closed. | No blocking fact recorded. |
 | Harvesting and resource economy | GREEN | A scripted worker is sent to gold and wood and the referee observes approach, work, return and player credit. | No blocking fact recorded. |
 | Construction, placement and production | GREEN | Player wire commands build the retail-data production chain, train its unit and research its first weapon upgrade. | No blocking fact recorded. |
-| Combat, damage and death | GREEN | Scripted opposing units enter range and the referee observes acquisition, committed swings, damage and death. | No blocking fact recorded. |
+| Combat, damage and death | GREEN | Player wire orders drive focused retail fights and a 120-unit mixed battle with no director reissuing targets. | No blocking fact recorded. |
 | Projectiles and combat feedback | GREEN | A retail-data firer launches arrows and boulders while the referee follows native construction, pool order, integer flight, parabolic frame phases, impact damage, art and screen pixels. | No blocking fact recorded. |
 | Naval movement and oil economy | GREEN | Player commands drive ships along a retail coast and through the complete platform, loading and refinery loop while a terrain referee checks every anchor. | No blocking fact recorded. |
 | Spells and magical effects | GREEN | A scripted caster spends mana on legal targets while the referee observes missiles, delays and effects. | No blocking fact recorded. |
@@ -136,7 +136,7 @@ Grade: **GREEN**.
 
 Automated driver: Player wire commands move retail land, naval and air units through authenticated maps and unit data.
 
-Success means: Real units complete formation detours and terrain-domain passages while 104 large-footprint, congestion and refusal checks pass with zero skips.
+Success means: Real units complete formation detours and terrain-domain passages while 99 large-footprint, congestion and refusal checks pass with zero skips.
 
 Implementation:
 
@@ -350,9 +350,9 @@ scripts/run-tests.sh -pl engine,desktop -am -Dtest=ConstructionTest,BattleNetBui
 
 Grade: **GREEN**.
 
-Automated driver: Scripted opposing units enter range and the referee observes acquisition, committed swings, damage and death.
+Automated driver: Player wire orders drive focused retail fights and a 120-unit mixed battle with no director reissuing targets.
 
-Success means: Melee, ranged, splash and retaliation scenarios terminate with the expected resource-independent state changes.
+Success means: Melee, ranged, splash and retaliation scenarios terminate correctly, and every 500-cycle window of the undirected mass battle makes physical damage or death progress while both armies remain alive.
 
 Implementation:
 
@@ -364,6 +364,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetCombatPlayabilityTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/ContainerDeathTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BattleShowcaseTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/CombatTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/CombatFeedbackTest.java`
 
@@ -372,6 +373,7 @@ Retail evidence:
 - Native damage callsites, attack opcodes, asynchronous RNG draws, spatial-help reactions and causal projectile events have authenticated captures.
 - The retail-data referee sends real footman, archer and ballista orders through CommandApplier and observes committed melee, projectile flight, splash target filtering, hit-point loss and death.
 - The command referee rejects incompatible BNE orders instead of claiming success, and a repeatedly commanded mixed squad retains one live construction-site target until it is destroyed.
+- A 120-unit mixed retail battle receives exactly one wire command per unit and no director corrections; all six consecutive 500-cycle windows produce damage or death, every order reaches a physical/combat checkpoint, at least 100 units move pixels and at least 60 die.
 - Synthetic formula and feedback controls cover armour, piercing damage, minimum range, footprint splash, retaliation offers, score attribution, damage text, burning and corpse cleanup.
 
 Known blockers:
@@ -381,7 +383,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine,desktop -am -Dtest=BattleNetCombatPlayabilityTest,ContainerDeathTest,PlayerOrderDeliveryTest,CombatTest,CombatFeedbackTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine,desktop -am -Dtest=BattleNetCombatPlayabilityTest,ContainerDeathTest,PlayerOrderDeliveryTest,BattleShowcaseTest,CombatTest,CombatFeedbackTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## Projectiles and combat feedback
