@@ -256,6 +256,14 @@ final class BattleNetCombatSystem {
             unit.setBattleNetPersonHelpRetargetHandoff(false);
             unit.setBattleNetOrderDelay(0);
         }
+        if (unit.battleNetNavalPatrolAttackConstruction()) {
+            if (unit.battleNetAnimationTimer() > 1) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return;
+            }
+            unit.setBattleNetNavalPatrolAttackTimerOneReady(true);
+        }
         if (stepBattleNetAttackSequence(unit)) {
             return;
         }
@@ -3167,6 +3175,8 @@ final class BattleNetCombatSystem {
         unit.setMoveRange(0);
         unit.setOrder(Unit.Order.ATTACK_MOVE);
         unit.setBattleNetAttackWaitRefillResidual(false);
+        unit.setBattleNetNavalPatrolAttackConstruction(false);
+        unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         return true;
     }
 
@@ -3193,7 +3203,21 @@ final class BattleNetCombatSystem {
         // swing while script.bin's opcode-ten cursor never advances, leaving
         // the pending melee blow permanently unresolved.  Human 6's adjacent
         // grunt and ballista are the player-visible witness.
-        if (stepBattleNetAttackSequence(unit)) {
+        boolean navalPatrolConstruction =
+                unit.battleNetNavalPatrolAttackConstruction();
+        if (navalPatrolConstruction
+                && unit.battleNetAnimationTimer() > 1) {
+            // Keep executing the attack-move far enough to choose and cache
+            // its native route, but do not tick the ordinary Attack program
+            // or spend that route while construction owns this visit.
+            unit.setBattleNetAnimationTimer(
+                    unit.battleNetAnimationTimer() - 1);
+        } else if (navalPatrolConstruction) {
+            // Timer one was committed in the previous visit. This visit is
+            // the native OP0 handoff that may spend the cached first heading.
+            unit.setBattleNetNavalPatrolAttackTimerOneReady(true);
+        }
+        if (!navalPatrolConstruction && stepBattleNetAttackSequence(unit)) {
             return;
         }
         if (unit.destPathOpeningHold() && unit.battleNetOrderDelay() > 0) {

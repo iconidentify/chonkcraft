@@ -3955,6 +3955,8 @@ public final class World {
         unit.setBattleNetPersonHelpFirstChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
+        unit.setBattleNetNavalPatrolAttackConstruction(false);
+        unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         // A commanded target: the unit does not go looking for a better one.
         // autoAttack and attackBack say otherwise for the ones they pick.
         unit.setAutoTargeting(false);
@@ -9609,6 +9611,8 @@ public final class World {
         unit.setBattleNetPersonHelpFirstChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
+        unit.setBattleNetNavalPatrolAttackConstruction(false);
+        unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
         // EndActionAttack destroys that order whether it restores a saved
         // order or falls back to Still, so the offered reference releases at
@@ -11303,6 +11307,12 @@ public final class World {
         Unit.Order interrupted = unit.order();
         if (capitalPatrol) {
             if (orderAttack(unit, target, false, false)) {
+                // Native keeps the Patrol route buffer while action 12 is
+                // constructed. Java's patrol residual has already consumed
+                // that buffer by this seam, so rebuild its equivalent now;
+                // the 3,2,1 hold below owns it until the timer-one visit.
+                movement.moveTowards(unit, target);
+                armBattleNetNavalPatrolAttackConstruction(unit);
                 rememberInterruptedOrder(unit, interrupted);
             }
             return;
@@ -11327,6 +11337,11 @@ public final class World {
         if (!combat.orderAttackMove(unit, targetX, targetY)) {
             return;
         }
+        if (queuedUnder == Unit.Order.PATROL
+                && unit.battleNetDoubleStep()
+                && unit.type() != null && unit.type().seaUnit()) {
+            armBattleNetNavalPatrolAttackConstruction(unit);
+        }
         // CommandAttack(..., EFlushMode::On) calls ClearSavedAction before
         // AutoAttack installs the order it cloned above
         // A stale save left
@@ -11336,6 +11351,30 @@ public final class World {
         // to its post upstream. Keeping Move made the next two target drops
         // look like separate restores and reset the scan counter twice.
         rememberInterruptedOrder(unit, interrupted);
+    }
+
+    /** Pays the native 3,2,1 Attack constructor after a sea Patrol pop. */
+    private void armBattleNetNavalPatrolAttackConstruction(Unit unit) {
+        if (battleNetSequence == null || unit == null || unit.type() == null) {
+            return;
+        }
+        int attackStart = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return;
+        }
+        // Promotion and the first Execute share a Java unit visit, so seed
+        // four to commit native timer three at the end of that visit.
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(4);
+        unit.setBattleNetNavalPatrolAttackConstruction(true);
+        unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        AnimationSet set = unit.type().animationSet();
+        Animation attack = set == null ? null
+                : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
     }
 
     /** Keeps only the autonomous orders upstream restores after combat. */
@@ -11608,7 +11647,10 @@ public final class World {
                 && unit.pathLength() == 0 && !unit.isMoving();
         boolean queuedOpeningAttack = patrolOp0 && openingCapitalStride
                 && battleNetPatrolQueueAcquire(unit);
+        boolean patrolResidualOwnsVisit = standingPatrol
+                && (unit.isMoving() || unit.walkHolding());
         if (patrolOp0 && !queuedOpeningAttack
+                && !patrolResidualOwnsVisit
                 && battleNetPatrolAcquire(unit)) {
             return;
         }
@@ -14704,6 +14746,8 @@ public final class World {
         // from leaking presentation-ahead missiles through a different exit.
         projectiles.interruptPendingAttack(unit);
         unit.setBattleNetAttackGroundMove(false);
+        unit.setBattleNetNavalPatrolAttackConstruction(false);
+        unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         unit.rememberActionBeforeQueued(unit.order());
         unit.setOrder(Unit.Order.STILL);
         unit.setRandomMoveSleep(0);

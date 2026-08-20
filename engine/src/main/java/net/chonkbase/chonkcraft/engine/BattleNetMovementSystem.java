@@ -2285,9 +2285,13 @@ final class BattleNetMovementSystem {
         // ordinary walk the gate is read *after* the guarded walk so a
         // unit that still owed pixels into this cycle can commit while
         // the drain of the old element is what cleared Moving.
-        boolean mayDecide = chaseMoveSequence
-                ? unit.battleNetChaseStepReady()
-                : !unit.walkHolding() && atMoveBoundary(unit);
+        boolean navalPatrolAttackHandoff =
+                unit.battleNetNavalPatrolAttackConstruction()
+                && unit.battleNetNavalPatrolAttackTimerOneReady();
+        boolean mayDecide = navalPatrolAttackHandoff
+                || (chaseMoveSequence
+                        ? unit.battleNetChaseStepReady()
+                        : !unit.walkHolding() && atMoveBoundary(unit));
         // Gold-approach mid-route residual settle: native writes route_index
         // 20 (movb $0x14 at 0x450ad4) and pays one quiet decide before a
         // blocked leftover commits or detours. Authenticated:
@@ -2792,6 +2796,16 @@ final class BattleNetMovementSystem {
             int nextX = unit.tileX() + Direction.deltaX(heading) * stride;
             int nextY = unit.tileY() + Direction.deltaY(heading) * stride;
 
+            // A residual-settled sea patrol has already selected and cached
+            // its attack route, but native keeps that route parked while
+            // Attack construction counts 3,2,1. Do not treat the occupied
+            // first heading as a refusal and erase it during those quiet
+            // visits; XOrc 11 destroyer 1542 keeps SW toward the dragon.
+            if (unit.battleNetNavalPatrolAttackConstruction()
+                    && !unit.battleNetNavalPatrolAttackTimerOneReady()) {
+                return;
+            }
+
             // Re-check the square: another unit may have taken it since the
             // path was found. Wait a few cycles and re-plan, which resolves a
             // jam without searching every time two units brush past.
@@ -2820,6 +2834,34 @@ final class BattleNetMovementSystem {
                                     ? world.canEnterBattleNetTransportAnchor(
                                             unit, nextX, nextY)
                             : world.canEnter(unit, nextX, nextY);
+            if (!canTakeStep
+                    && unit.battleNetNavalPatrolAttackConstruction()
+                    && unit.battleNetNavalPatrolAttackTimerOneReady()) {
+                Unit patrolBlocker = world.blockerOnLayer(unit, nextX, nextY);
+                boolean sameCyclePatrolVacate = patrolBlocker != null
+                        && patrolBlocker != unit
+                        && world.isAllied(unit.player(), patrolBlocker.player())
+                        && patrolBlocker.type() != null
+                        && patrolBlocker.type().seaUnit()
+                        && patrolBlocker.battleNetDoubleStep()
+                        && patrolBlocker.order() == Unit.Order.PATROL
+                        && world.battleNetMoveAnimation(patrolBlocker)
+                        && (patrolBlocker.isMoving()
+                                || patrolBlocker.stepDrained());
+                if (sameCyclePatrolVacate) {
+                    // Retail visits the battleship's higher Java-id native
+                    // slot first, so it has vacated 8,26 before the destroyer
+                    // first-steps SW. Java's opposite creation order sees the
+                    // old occupancy here; the cache permits this brief overlap
+                    // and the later patrol visit removes it in the same tick.
+                    canTakeStep = true;
+                }
+            }
+            if (unit.battleNetNavalPatrolAttackConstruction()
+                    && unit.battleNetNavalPatrolAttackTimerOneReady()) {
+                unit.setBattleNetNavalPatrolAttackConstruction(false);
+                unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+            }
             // An empty-route retarget residual returns from Attack-four on
             // the same native visit that a higher-slot cooperative ally
             // vacates the replacement route's first cell. Java visits this

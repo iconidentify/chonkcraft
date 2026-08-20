@@ -2640,6 +2640,31 @@ public final class Unit {
     private boolean battleNetPersonHelpRetargetHandoff;
 
     /**
+     * A sea patrol's queued position attack is paying Attack construction
+     * before its first chase stride. The timer-one visit may enter a lane a
+     * later native-slot patrol ship vacates in the same scheduler cycle.
+     */
+    public boolean battleNetNavalPatrolAttackConstruction() {
+        return battleNetNavalPatrolAttackConstruction;
+    }
+
+    public void setBattleNetNavalPatrolAttackConstruction(boolean active) {
+        battleNetNavalPatrolAttackConstruction = active;
+    }
+
+    private boolean battleNetNavalPatrolAttackConstruction;
+
+    public boolean battleNetNavalPatrolAttackTimerOneReady() {
+        return battleNetNavalPatrolAttackTimerOneReady;
+    }
+
+    public void setBattleNetNavalPatrolAttackTimerOneReady(boolean ready) {
+        battleNetNavalPatrolAttackTimerOneReady = ready;
+    }
+
+    private boolean battleNetNavalPatrolAttackTimerOneReady;
+
+    /**
      * walkTowards temporarily sets order to MOVE for stepMove. Residual empty-
      * route Still-promotion must not arm on borrowed Move (XHuman 2 peon 1530
      * free-prefix replan delayed three cycles by Attack construction delay 2).

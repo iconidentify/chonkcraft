@@ -2,7 +2,6 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
@@ -31,7 +30,9 @@ class Xorc11PatrolAttackRealDataTest {
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission("campaigns/orc-exp/levelx11o", 0);
+        Mission mission = data.loadMission("campaigns/orc-exp/levelx11o",
+                GameData.personIn(data.campaignMap(
+                        "campaigns/orc-exp/levelx11o")), 1);
         Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
         World world = mission.world();
 
@@ -46,7 +47,7 @@ class Xorc11PatrolAttackRealDataTest {
 
         Unit.Order orderAt5 = null;
         Unit.Order orderAt58 = null;
-        while (world.cycle() < 60) {
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 61) {
             mission.tick();
             int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
             if (fixture == 5) {
@@ -54,6 +55,17 @@ class Xorc11PatrolAttackRealDataTest {
             }
             if (fixture == 58) {
                 orderAt58 = ship.order();
+            }
+            if (fixture >= 58 && fixture <= 60) {
+                assertEquals(18, ship.tileX(),
+                        "Attack construction holds the west stride through "
+                                + fixture);
+                assertEquals(40, ship.tileY());
+                assertEquals(3092, ship.battleNetSequenceOffset(),
+                        "capital Patrol promotion opens Attack start");
+                assertEquals(61 - fixture,
+                        ship.battleNetAnimationTimer(),
+                        "native capital Attack construction counts 3,2,1");
             }
         }
 
@@ -63,11 +75,63 @@ class Xorc11PatrolAttackRealDataTest {
         assertEquals(Unit.Order.ATTACK, orderAt58,
                 "retail's battleship leaves Patrol for Attack at cycle 58, not "
                         + orderAt58);
+        assertEquals(16, ship.tileX(),
+                "the timer-one handoff spends the west chase stride on cycle 61");
         assertEquals(40, ship.tileY(),
-                "the battleship must still stand on the 40-row when it opens Attack");
-        assertTrue(Math.abs(ship.tileX() - 18) <= 2,
-                "the battleship must still stand beside 18,40 when it opens Attack, not "
-                        + ship.tileX() + "," + ship.tileY());
+                "the battleship's first chase stride stays on the 40-row");
+    }
+
+    @Test
+    @DisplayName("xorc 11's destroyer pays Attack construction before swapping patrol lanes")
+    void xorc11sDestroyerPaysAttackConstructionBeforeSwappingPatrolLanes() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/orc-exp/levelx11o",
+                GameData.personIn(data.campaignMap(
+                        "campaigns/orc-exp/levelx11o")), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit destroyer = nearest(world, "unit-human-destroyer", 8, 22);
+        Unit battleship = nearest(world, "unit-battleship", 6, 24);
+        assertNotNull(destroyer,
+                "XOrc 11 has no human destroyer near its 8,22 opening");
+        assertNotNull(battleship,
+                "XOrc 11 has no battleship near its 6,24 opening");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 58) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 55 && fixture <= 57) {
+                assertEquals(10, destroyer.tileX(),
+                        "fixture " + fixture
+                                + " Attack construction must hold the southwest stride");
+                assertEquals(24, destroyer.tileY(),
+                        "fixture " + fixture
+                                + " Attack construction must hold the southwest stride");
+                assertEquals(3266, destroyer.battleNetSequenceOffset(),
+                        "the queued patrol acquisition opens Attack start");
+                assertEquals(58 - fixture,
+                        destroyer.battleNetAnimationTimer(),
+                        "native counts Attack construction 3,2,1");
+            }
+        }
+
+        assertEquals(8, destroyer.tileX(),
+                "the timer-one visit first-steps southwest into the vacated lane");
+        assertEquals(26, destroyer.tileY(),
+                "the timer-one visit first-steps southwest into the vacated lane");
+        assertEquals(10, battleship.tileX(),
+                "the earlier native slot vacates the destroyer's lane southeast");
+        assertEquals(28, battleship.tileY(),
+                "the earlier native slot vacates the destroyer's lane southeast");
+        assertEquals(Unit.Order.PATROL, battleship.order(),
+                "the battleship keeps Patrol while making room");
     }
 
     private static Unit nearest(World world, String ident, int x, int y) {
