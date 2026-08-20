@@ -518,7 +518,14 @@ final class BattleNetHarvestSystem {
                 worker.setBattleNetResourceApproachStaged(true);
                 return;
             }
-            if (world.movement.depotRingDestArm(worker, depot)) {
+            // A doubled tanker is already at BNE's legal outer anchor when
+            // the depot lies within one naval stride. Dest-arming it again
+            // produces a heading into the refinery's land footprint; the
+            // move is refused and this early return repeats forever, leaving
+            // a full tanker visibly frozen beside home. Land workers still
+            // need the ordinary one-tile arm onto 0x41f430.
+            if (!doubledDepotSkirtArrived
+                    && world.movement.depotRingDestArm(worker, depot)) {
                 boolean pathWait = world.movement.walkTowards(worker, depot);
                 if (pathWait && worker.order() == Unit.Order.HARVEST
                         && worker.waitCycles() > 0) {

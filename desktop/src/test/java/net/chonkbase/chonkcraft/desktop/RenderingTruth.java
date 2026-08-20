@@ -434,6 +434,36 @@ final class RenderingTruth {
         }
         String spell = null;
         if (wizard != null && defenders.get(0) != null) {
+            // A second caster supplies the deterministic hit that lights the
+            // building. Keep the first caster for the spell-in-flight proof:
+            // when one nearby fireball was made to do both jobs it exploded
+            // immediately on the building, so BURNING became reliable by
+            // making SPELL disappear between sampled frames.
+            Unit fireWizard = null;
+            if (building != null) {
+                long mask = Unit.movementMaskFor(caster);
+                long blocking = Unit.blockingFlagsFor(caster);
+                for (int[] tile : ground) {
+                    if (!world.map().isFootprintFree(tile[0], tile[1],
+                            Math.max(1, caster.tileWidth()),
+                            Math.max(1, caster.tileHeight()), mask, blocking)) {
+                        continue;
+                    }
+                    fireWizard = world.createUnit(caster, local, tile[0], tile[1]);
+                    if (fireWizard != null) {
+                        fireWizard.setMana(caster.mana());
+                        break;
+                    }
+                }
+            }
+            var fireball = world.spells().get("spell-fireball");
+            if (fireWizard != null && fireball != null) {
+                if (!fireball.dependUpgrade().isEmpty()) {
+                    world.upgrades(local).complete(fireball.dependUpgrade());
+                }
+                orderStagedSpell(world, fireWizard, "spell-fireball", building);
+            }
+
             // A spell in the air is its own category, and a caster will not
             // throw one unless the upgrade that unlocks it has been had.
             for (String candidate : new String[] {"spell-fireball", "spell-blizzard",

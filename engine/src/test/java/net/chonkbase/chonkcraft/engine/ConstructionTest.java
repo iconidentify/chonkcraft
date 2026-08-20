@@ -56,6 +56,16 @@ class ConstructionTest {
         return set;
     }
 
+    /** A yielding building program, required by native-paced production. */
+    private static AnimationSet building() {
+        AnimationSet set = new AnimationSet("building");
+        set.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        set.put(AnimationSet.State.TRAIN,
+                Animation.parse("train", List.of("frame 0", "wait 1")));
+        return set;
+    }
+
     private static UnitType peasant() {
         UnitType type = new UnitType("unit-peasant");
         type.setTileSize(1, 1);
@@ -76,6 +86,7 @@ class ConstructionTest {
         type.setHitPoints(400);
         type.setBuilding(true);
         type.setSupply(4);
+        type.setAnimationSet(building());
         type.costs().put(Resource.TIME, 1);
         type.costs().put(Resource.GOLD, 500);
         type.costs().put(Resource.WOOD, 250);
