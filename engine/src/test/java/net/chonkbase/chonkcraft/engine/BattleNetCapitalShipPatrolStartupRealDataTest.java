@@ -76,6 +76,46 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
     }
 
     @Test
+    @DisplayName("an XOrc 8 battleship finishes each doubled patrol stride before replanning")
+    void anXOrc8BattleshipFinishesItsDoubledStrideBeforeReplanning() {
+        Mission mission = mission("campaigns/orc-exp/levelx08o");
+        Unit battleship = at(mission.world(), "unit-battleship", 40, 108);
+        assertNotNull(battleship,
+                "XOrc 8 has no startup battleship at 40,108");
+
+        for (int cycle = 1; cycle <= 54; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, battleship.order());
+        assertEquals(42, battleship.tileX());
+        assertEquals(110, battleship.tileY());
+        assertEquals(-2, battleship.offsetX(),
+                "fixture 54 still owes the last two horizontal pixels");
+        assertEquals(-2, battleship.offsetY(),
+                "fixture 54 still owes the last two vertical pixels");
+
+        mission.tick();
+        assertEquals(42, battleship.tileX(),
+                "fixture 55 settles the first doubled stride before replanning");
+        assertEquals(110, battleship.tileY());
+        assertEquals(0, battleship.offsetX());
+        assertEquals(0, battleship.offsetY());
+
+        mission.tick();
+        mission.tick();
+        assertEquals(42, battleship.tileX(),
+                "native holds the settled patrol through fixture 57");
+        assertEquals(110, battleship.tileY());
+
+        mission.tick();
+        assertEquals(44, battleship.tileX(),
+                "fixture 58 spends the next doubled south-east patrol stride");
+        assertEquals(112, battleship.tileY());
+        assertEquals(-64, battleship.offsetX());
+        assertEquals(-64, battleship.offsetY());
+    }
+
+    @Test
     @DisplayName("an XOrc 11 battleship takes its opening west patrol stride on fixture cycle five")
     void anXOrc11BattleshipTakesItsOpeningWestPatrolStrideOnFixtureCycleFive() {
         Mission mission = mission("campaigns/orc-exp/levelx11o");

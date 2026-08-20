@@ -11556,6 +11556,21 @@ public final class World {
                 return;
             }
         }
+        // A capital ship whose Patrol Move body reaches opcode zero on the
+        // same visit its doubled-stride pixels settle does not immediately
+        // lay another route. Native reconstructs Patrol at the Still head
+        // with timer three, then takes the next stride at the following OP0:
+        // XOrc 8 battleship 1424 settles (42,110) on fixture 55 and first-
+        // steps SE again on 58. A queued hostile is promoted by
+        // beginPendingAttack before stepPatrol reaches this branch, so the
+        // XOrc 11 opening-stride Attack transition keeps its native marker.
+        if (patrolOp0 && standingPatrol && residualSettledThisVisit
+                && unit.order() == Unit.Order.PATROL
+                && unit.battleNetAiBehavior() == 2
+                && unit.pendingAttack() == null) {
+            restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
+            return;
+        }
         // Large BNE ships on a fresh patrol must take their first even-grid
         // step under Patrol before acquisition may replace the order. XOrc 11
         // battleships used to convert to AttackMove on the first free visit
