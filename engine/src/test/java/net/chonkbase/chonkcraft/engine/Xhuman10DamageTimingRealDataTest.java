@@ -165,6 +165,61 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's refused knight reconstructs Attack before walking")
+    void xhuman10RefusedKnightReconstructsAttackBeforeWalking() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit knight = unitAt(world, "unit-knight", 84, 88);
+        assertNotNull(knight,
+                "XHuman 10 has no refused knight on 84,88 after warmup");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 67) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 63 && fixture <= 65) {
+                assertEquals(84, knight.tileX(),
+                        "fixture " + fixture + " native holds the refused chase "
+                                + "through Attack 3,2,1; id=" + knight.id()
+                                + " stage="
+                                + knight.battleNetAttackRefusalRecoveryStage()
+                                + " seq=" + knight.battleNetSequenceOffset()
+                                + "/" + knight.battleNetAnimationTimer());
+                assertEquals(88, knight.tileY());
+                assertEquals(1922, knight.battleNetSequenceOffset(),
+                        "the refusal wake reconstructs the knight Attack start");
+                assertEquals(66 - fixture, knight.battleNetAnimationTimer(),
+                        "Attack construction must count 3,2,1");
+            } else if (fixture == 66) {
+                assertEquals(84, knight.tileX(),
+                        "native plans the replacement route before walking it");
+                assertEquals(88, knight.tileY());
+                assertEquals(1874, knight.battleNetSequenceOffset(),
+                        "the timer-one boundary hands ownership back to Move");
+                assertEquals(1, knight.battleNetAnimationTimer());
+                assertNotNull(knight.target());
+                assertEquals(82, knight.target().tileX(),
+                        "the plan-only visit names the nearby grunt");
+                assertEquals(88, knight.target().tileY());
+            }
+        }
+
+        assertEquals(83, knight.tileX(),
+                "native first-steps west only on fixture 67");
+        assertEquals(88, knight.tileY());
+        assertTrue(knight.isMoving(),
+                "the replacement chase must remain live after the deferred step");
+    }
+
+    @Test
     @DisplayName("xhuman 10's commanded knight pays Attack construction before retarget")
     void xhuman10CommandedKnightHoldsBeforeItsAutomaticRetarget() {
         AssetSource assets = AssetSource.fromEnvironment();

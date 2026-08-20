@@ -678,6 +678,11 @@ public final class SaveGame {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
         }
+        if (unit.battleNetAttackRefusalRecoveryStage() != 0) {
+            state.append(" attackRefusalRecoveryStage = ")
+                    .append(unit.battleNetAttackRefusalRecoveryStage())
+                    .append(",");
+        }
         if (unit.reportsActionBeforeQueued()) {
             state.append(" actionBeforeQueued = ")
                     .append(quote(unit.currentAction().name())).append(",");

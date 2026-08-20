@@ -3955,6 +3955,7 @@ public final class World {
         unit.setBattleNetPersonHelpFirstChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
+        unit.setBattleNetAttackRefusalRecoveryStage(0);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         // A commanded target: the unit does not go looking for a better one.
@@ -9611,6 +9612,7 @@ public final class World {
         unit.setBattleNetPersonHelpFirstChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
+        unit.setBattleNetAttackRefusalRecoveryStage(0);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.

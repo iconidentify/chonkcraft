@@ -264,6 +264,9 @@ final class BattleNetCombatSystem {
             }
             unit.setBattleNetNavalPatrolAttackTimerOneReady(true);
         }
+        if (stepBattleNetAttackRefusalRecovery(unit)) {
+            return;
+        }
         if (stepBattleNetAttackSequence(unit)) {
             return;
         }
@@ -1756,6 +1759,13 @@ final class BattleNetCombatSystem {
                     unit.setPathGoal(chased.tileX(), chased.tileY());
                 }
                 } // else free-scan / empty-route / goalMoved
+            }
+            if (unit.battleNetAttackRefusalRecoveryStage() == 3) {
+                // The Attack timer-one boundary above returned ownership to
+                // Move. Native uses this visit to free-scan and cache the new
+                // route, but the first heading belongs to the next Execute.
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return;
             }
             boolean underWay = stepMoveTowardsTarget(unit);
             walked = true;
@@ -5199,6 +5209,75 @@ final class BattleNetCombatSystem {
             }
         }
         world.battleNetAttackMarkers.add(unit);
+        return false;
+    }
+
+    /**
+     * Serves the native Move-refusal -> Attack-construction -> Move handoff.
+     *
+     * <p>A refused attack approach remains logically a chase, so the ordinary
+     * attack-sequence gate intentionally ignores its out-of-range Attack
+     * cursor. The refusal provenance supplies the narrower authority needed
+     * to count construction without allowing target selection or movement on
+     * those visits.</p>
+     */
+    private boolean stepBattleNetAttackRefusalRecovery(Unit unit) {
+        int stage = unit.battleNetAttackRefusalRecoveryStage();
+        if (stage == 0 || world.battleNetSequence == null) {
+            return false;
+        }
+        if (World.BNE_PEND_TRACE) {
+            System.err.printf("JBNEREFUSALRECOVERY cycle=%d unit=%d "
+                            + "step stage=%d delay=%d seq=%d/%d chase=%d%n",
+                    world.cycle, unit.id(), stage,
+                    unit.battleNetOrderDelay(),
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer(), unit.chasing() ? 1 : 0);
+        }
+        if (!unit.chasing() || unit.target() == null
+                || !(unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE)) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        if (stage == 1) {
+            if (unit.battleNetOrderDelay() > 0) {
+                return false;
+            }
+            int attackStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            unit.setBattleNetSequenceOffset(attackStart);
+            unit.setBattleNetAnimationTimer(3);
+            unit.setBattleNetAttackRefusalRecoveryStage(2);
+            return true;
+        }
+        if (stage == 2) {
+            int attackStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart < 0
+                    || unit.battleNetSequenceOffset() != attackStart) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            if (unit.battleNetAnimationTimer() > 1) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return true;
+            }
+            int moveStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            unit.setBattleNetSequenceOffset(moveStart);
+            unit.setBattleNetAnimationTimer(1);
+            unit.setBattleNetAttackRefusalRecoveryStage(3);
+        }
         return false;
     }
 

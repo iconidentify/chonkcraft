@@ -705,6 +705,25 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("an attack refusal recovery keeps its native handoff stage")
+    void attackRefusalRecoveryStageRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-knight"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 1, 10, 12);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setBattleNetAttackRefusalRecoveryStage(2);
+
+        Unit loaded = find(reload(bench), "unit-knight");
+
+        assertNotNull(loaded.target());
+        assertEquals(2, loaded.battleNetAttackRefusalRecoveryStage(),
+                "reloading during Attack 3,2,1 must not free the chase early");
+    }
+
+    @Test
     @DisplayName("an attack-loop retarget keeps its pending dest-arm across a save")
     void attackWrapDestArmPendingRoundTrips() throws IOException {
         Bench bench = bench();

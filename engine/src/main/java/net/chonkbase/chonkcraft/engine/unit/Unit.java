@@ -2574,6 +2574,24 @@ public final class Unit {
     private boolean battleNetAttackOp0OutOfRange;
 
     /**
+     * Native action handoff after a refused attack approach.
+     *
+     * <p>Stage 1 waits for Move's complete refusal band to expire, stage 2
+     * pays Attack-start construction 3,2,1, and stage 3 lets the following
+     * Move visit select and cache a replacement route without consuming its
+     * first heading. XHuman 10 knight 1493 is the authenticated witness.</p>
+     */
+    public int battleNetAttackRefusalRecoveryStage() {
+        return battleNetAttackRefusalRecoveryStage;
+    }
+
+    public void setBattleNetAttackRefusalRecoveryStage(int stage) {
+        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(3, stage));
+    }
+
+    private int battleNetAttackRefusalRecoveryStage;
+
+    /**
      * Melee Attack tail wrap named an out-of-range quarry after the old one
      * died. Construction 3,2,1 stays on Attack start; the next OP0 dest-arms
      * leftover instead of walking into windup or Still.

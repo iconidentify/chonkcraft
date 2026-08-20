@@ -2073,6 +2073,22 @@ final class BattleNetMovementSystem {
         // full band start one visit early.
         unit.setBattleNetAnimationTimer(settledMultiResidual ? 1 : 15);
         unit.setBattleNetChaseStepReady(false);
+        // The Move refusal band does not hand an attacking unit straight
+        // back to a walk. Native returns through Attack-start construction,
+        // then gives Move one route-plan-only visit before the first heading.
+        // Remember ownership here; battleNetOrderDelay alone loses the
+        // provenance as soon as its final count is spent.
+        if (!executingMove && unit.battleNetPersonSplashHelpAttack()) {
+            unit.setBattleNetAttackRefusalRecoveryStage(1);
+        }
+        if (World.BNE_PEND_TRACE
+                && unit.battleNetAttackRefusalRecoveryStage() == 1) {
+            System.err.printf("JBNEREFUSALRECOVERY cycle=%d unit=%d "
+                            + "arm stage=1 delay=%d seq=%d/%d%n",
+                    world.cycle, unit.id(), unit.battleNetOrderDelay(),
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer());
+        }
     }
 
     private boolean settledMultiResidualRefusal(Unit unit) {
