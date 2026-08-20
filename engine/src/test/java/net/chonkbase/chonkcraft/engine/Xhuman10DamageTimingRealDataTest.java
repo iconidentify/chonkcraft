@@ -97,6 +97,74 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's splash-help knight defers SyncRand to Attack OP0")
+    void xhuman10SplashHelpKnightDefersSyncRandUntilAttackOp0() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        Unit guard = unitAt(world, "unit-footman", 98, 56);
+        Unit knight = unitAt(world, "unit-knight", 84, 89);
+        assertNotNull(guard,
+                "XHuman 10 has no stationary footman on 98,56");
+        assertNotNull(knight,
+                "XHuman 10 has no splash-help knight on 84,89");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        Integer seedAt57 = null;
+        Integer seedAt58 = null;
+        Integer seedAt60 = null;
+        Integer knightSequenceAt58 = null;
+        Integer knightTimerAt58 = null;
+        Integer knightSyncAt58 = null;
+        Boolean knightPendingAt58 = null;
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 61) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 57) {
+                seedAt57 = world.randomSeed();
+            } else if (fixture == 58) {
+                seedAt58 = world.randomSeed();
+                knightSequenceAt58 = knight.battleNetSequenceOffset();
+                knightTimerAt58 = knight.battleNetAnimationTimer();
+                knightSyncAt58 = knight.battleNetMeleeSyncRemaining();
+                knightPendingAt58 = knight.battleNetPendingMeleeSyncRand();
+            } else if (fixture == 60) {
+                seedAt60 = world.randomSeed();
+            }
+        }
+
+        assertEquals(0x967eb0e7, seedAt57,
+                "the two earlier live footmen own the first two native draws");
+        assertEquals(0x2781e494, seedAt58,
+                "the stationary footman owns native fixture 58's sole draw");
+        assertEquals(Unit.Order.ATTACK, guard.order(),
+                "the person guard must still be on native action 16");
+        assertTrue(guard.battleNetStationaryAttack(),
+                "the 98,56 footman is the stationary action-16 witness");
+        assertEquals(1922, knightSequenceAt58,
+                "the residual arrival opens the knight's Attack start");
+        assertEquals(3, knightTimerAt58,
+                "native keeps Attack construction 3,2,1 after the arrival");
+        assertEquals(0, knightSyncAt58,
+                "the knight must not arm its melee cadence on residual settle");
+        assertEquals(Boolean.TRUE, knightPendingAt58,
+                "the knight retains the draw until Attack OP0");
+        assertEquals(0xc46b9b3d, seedAt60,
+                "the next mobile grunt owns fixture 60's draw");
+        assertEquals(0xf94bdf32, world.randomSeed(),
+                "the knight finally debits on native Attack OP0 at fixture 61");
+        assertTrue(knight.battleNetMeleeSyncRemaining() > 0,
+                "Attack OP0 arms the knight's twenty-five-cycle cadence");
+    }
+
+    @Test
     @DisplayName("xhuman 10's residual retarget leaves its dying quarry")
     void xhuman10ResidualRetargetLeavesItsDyingQuarry() {
         AssetSource assets = AssetSource.fromEnvironment();

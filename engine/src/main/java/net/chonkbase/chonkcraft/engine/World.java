@@ -13919,18 +13919,20 @@ public final class World {
                 return;
             }
         }
-        // Cavalry hit-response that just residual-settled this visit: open
-        // Attack without FUN_004234b0. Human 13 knight 1500 settles at
-        // fixture 37 with timer 3 and no SyncRand; debiting on settle was
-        // the extra f37 draw after the wise-man+grunt f36 pair. Gate on
-        // actionMoveWalked so standing fighters (catapult first-arm) keep
-        // the ordinary settle debit.
+        // Cavalry that just residual-settled this visit opens Attack without
+        // FUN_004234b0. Human 13 knight 1500 (offered hit-response) settles
+        // at fixture 37 with timer 3 and no SyncRand. XHuman 10 knight 1489
+        // comes from lethal-splash help, so its offer was cleared when that
+        // order was promoted; it likewise keeps Attack start 1922/3,2,1 at
+        // fixtures 58..60 and only debits on OP0 at 61. Restricting this to
+        // offeredTarget spent its draw three visits early. Gate on the
+        // residual walk so standing cavalry fighters keep the ordinary
+        // first-arm debit.
         int typeCode = unit.type() == null ? -1
                 : PudUnitTypes.code(unit.type().ident());
-        boolean residualCavalryHit = actionMoveWalked
-                && unit.offeredTarget() != null
+        boolean residualCavalryArrival = actionMoveWalked
                 && (typeCode == 6 || typeCode == 7);
-        if (!residualCavalryHit) {
+        if (!residualCavalryArrival) {
             unit.setBattleNetPendingMeleeSyncRand(false);
             if (BNE_PEND_TRACE) {
                 System.err.printf("JBNEMELEESYNC event=consume-first cycle=%d "
