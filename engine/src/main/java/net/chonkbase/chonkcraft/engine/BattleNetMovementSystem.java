@@ -1203,6 +1203,32 @@ final class BattleNetMovementSystem {
             // congested depot.
             worker.countResourceMoveCycle();
         }
+        // A route-index-20 visit must consult the collision view from the
+        // start of the native unit pass. Java has already visited higher-ID
+        // workers, so a full-tile drawing offset is the surviving witness
+        // that an ally occupied this leftover when the pass began. Orc 5
+        // peasant 1532 must discard W from [SW,W], refill [SW,SW], and take
+        // the fresh SW on this same visit after peasant 1529 moves west.
+        if (building != null && building.type() != null
+                && building.type().givesResource() == UnitType.Resource.GOLD
+                && !worker.returningToDepot()
+                && !worker.isMoving() && worker.stepDrained()
+                && worker.battleNetWoodRouteIndex20()
+                && worker.pathLength() == 2
+                && Direction.isDiagonal(worker.peekHeading())) {
+            int nextX = worker.tileX()
+                    + Direction.deltaX(worker.peekHeading());
+            int nextY = worker.tileY()
+                    + Direction.deltaY(worker.peekHeading());
+            if (world.unitAt(nextX, nextY) == null
+                    && battleNetGoldAllyJustVacated(worker, nextX, nextY)) {
+                worker.setBattleNetWoodRouteIndex20(false);
+                worker.clearPath();
+                worker.setRouteSpent(false);
+                worker.setWaitCycles(0);
+                worker.setBattleNetOrderDelay(0);
+            }
+        }
         // Gold free-prefix forest re-aim once residual pixels settle. Firing
         // mid-MOVE drew SyncRand a dozen cycles early; waiting the residual
         // out lands the first chop on fixture cycle 24 with native. Do not
@@ -4514,6 +4540,44 @@ final class BattleNetMovementSystem {
             unit.setRandomMoveSleep(0);
             unit.setAttackScanSleep(0);
         }
+    }
+
+    /**
+     * Preserves native's collision view when Java has visited an ally first.
+     *
+     * <p>Native Orc 5 peasant 1532 sees peasant 1529 on 32,101 while parking
+     * its second gold residual at fixture 38. Java visits 1529 first and
+     * commits its west step before 1532 asks, so {@link World#unitAt(int,
+     * int)} already reports the cell free. A freshly committed step still
+     * carries a full tile of drawing offset back to its old cell; treating
+     * that old cell as occupied for this visit restores the native snapshot
+     * without delaying genuinely free residuals.</p>
+     */
+    private boolean battleNetGoldAllyJustVacated(Unit mover, int x, int y) {
+        for (Unit candidate : world.unitsSnapshot()) {
+            if (candidate == mover || !candidate.isAlive()
+                    || !candidate.isOnMap() || candidate.isDying()
+                    || candidate.type() == null
+                    || !world.isAllied(mover.player(), candidate.player())) {
+                continue;
+            }
+            String ident = candidate.type().ident();
+            if (ident == null || (!ident.contains("peon")
+                    && !ident.contains("peasant"))) {
+                continue;
+            }
+            int ox = candidate.offsetX();
+            int oy = candidate.offsetY();
+            if (Math.max(Math.abs(ox), Math.abs(oy)) != Unit.TILE_PIXELS) {
+                continue;
+            }
+            int oldX = candidate.tileX() + Integer.signum(ox);
+            int oldY = candidate.tileY() + Integer.signum(oy);
+            if (oldX == x && oldY == y) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
