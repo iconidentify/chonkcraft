@@ -363,7 +363,8 @@ final class BattleNetCombatSystem {
                 int peek = unit.peekHeading();
                 int peekX = unit.tileX() + Direction.deltaX(peek) * stride;
                 int peekY = unit.tileY() + Direction.deltaY(peek) * stride;
-                if (world.canEnter(unit, peekX, peekY)) {
+                if (world.canEnter(unit, peekX, peekY)
+                        && !unit.battleNetRefusalHold()) {
                     unit.setBattleNetOrderDelay(0);
                     // Fall through -- planned axis is free.
                 } else {
@@ -1442,6 +1443,22 @@ final class BattleNetCombatSystem {
                     int keepPrevScore = -1;
                     int keepCandScore = -1;
                     int keepPathn = unit.pathLength();
+                    // A settled multi-heading chase that has just paid a
+                    // complete cooperative refusal band reaches target scan
+                    // on Move-start/1 with its collision provenance intact.
+                    // Native draws the replacement ray through friends that
+                    // moved during that band. XHuman 10 grunt 1490 therefore
+                    // stores E,E,SE toward the new knight and takes E on the
+                    // wake visit; the ordinary short-corridor compensation
+                    // wall-followed SW instead.
+                    boolean completedSettledRefusalBand = keepPathn > 1
+                            && unit.type() != null
+                            && "unit-grunt".equals(unit.type().ident())
+                            && unit.battleNetPathStepsTaken() >= 2
+                            && unit.stepDrained() && !unit.isMoving()
+                            && unit.battleNetCollisionCounter() > 0
+                            && unit.battleNetAnimationTimer() == 1
+                            && onBattleNetChaseMoveBody(unit);
                     boolean settledBlockedTail = keepPathn == 1
                             && world.actionMoveWalked
                             && unit.stepDrained()
@@ -1613,7 +1630,11 @@ final class BattleNetCombatSystem {
                             }
                             return;
                         }
-                        world.movement.moveTowards(unit, chased);
+                        if (completedSettledRefusalBand) {
+                            world.planTowardsAfterRefusalBand(unit, chased);
+                        } else {
+                            world.movement.moveTowards(unit, chased);
+                        }
                     }
                 } else if (unit.pathLength() == 0) {
                     boolean rangedCollidedResidualRefill =

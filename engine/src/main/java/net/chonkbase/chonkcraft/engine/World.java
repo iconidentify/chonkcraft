@@ -5814,6 +5814,13 @@ public final class World {
      */
     PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
             boolean settledResidualRetarget) {
+        return findBattleNetTargetPath(unit, target,
+                settledResidualRetarget, false);
+    }
+
+    private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         for (Unit candidate : units) {
@@ -5825,7 +5832,11 @@ public final class World {
                 // 0x450690 may cross a friendly unit whose Move sequence has
                 // already begun. Attack-sequence chasers keep hard occupancy
                 // (XHuman 12 residual replan east wall-follow).
-                if (!movement.battleNetSoftClearMoveAlly(candidate)) {
+                if (!movement.battleNetSoftClearMoveAlly(candidate)
+                        && !(completedRefusalBand
+                                && movement
+                                        .battleNetRefusalBandSoftClearMoveAlly(
+                                                candidate))) {
                     continue;
                 }
             } else if (!hostilesStandAside || candidate.type().building()) {
@@ -10026,6 +10037,17 @@ public final class World {
 
     PathFinder.Result planTowards(Unit unit, Unit target,
             boolean settledResidualRetarget) {
+        return planTowards(unit, target, settledResidualRetarget, false);
+    }
+
+    PathFinder.Result planTowardsAfterRefusalBand(
+            Unit unit, Unit target) {
+        return planTowards(unit, target, true, true);
+    }
+
+    private PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand) {
         // Aimed at anywhere this unit could hit the target from, not at the
         // square the target is standing on. That square is occupied by
         // definition, so a route to it can only end on top of somebody: the
@@ -10050,7 +10072,8 @@ public final class World {
             return PathFinder.Result.REACHED;
         }
         PathFinder.Path path = findBattleNetTargetPath(
-                unit, target, settledResidualRetarget);
+                unit, target, settledResidualRetarget,
+                completedRefusalBand);
         if (path.result() != PathFinder.Result.FOUND) {
             if (path.result() == PathFinder.Result.UNREACHABLE) {
                 // The chase planner is NextPathElement inside DoActionMove

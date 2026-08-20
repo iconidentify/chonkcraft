@@ -1060,6 +1060,35 @@ final class BattleNetMovementSystem {
         return true;
     }
 
+    /**
+     * Move-body ownership used by the replacement ray after a paid refusal.
+     *
+     * <p>The ordinary 0x4501bc view keeps a collision-elevated ally solid.
+     * Once a chaser has parked its route and paid the complete refusal band,
+     * the replacement target ray is drawn through melee friends that are
+     * visibly leaving on a Move body. XHuman 10's grunt 1490 stores E,E,SE
+     * through the collision-two grunt already moving across 80,88.</p>
+     */
+    boolean battleNetRefusalBandSoftClearMoveAlly(Unit candidate) {
+        if (candidate == null || !candidate.isMoving()
+                || candidate.type() == null
+                || candidate.type().maxAttackRange() > 1) {
+            return false;
+        }
+        if (world.battleNetSequence == null) {
+            return true;
+        }
+        int move = world.idle.battleNetSequenceStart(candidate,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attack = world.idle.battleNetSequenceStart(candidate,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int offset = candidate.battleNetSequenceOffset();
+        if (move < 0 || offset < 0) {
+            return true;
+        }
+        return offset >= move && (attack < 0 || offset < attack);
+    }
+
 
     /**
      * One cycle of walking towards a tile, under some other order.
@@ -1989,12 +2018,22 @@ final class BattleNetMovementSystem {
         if (world.battleNetSequence == null
                 || unit == null
                 || unit.target() == null
-                // A unit already executing Move must keep its current cursor;
-                // this transfer is specifically Attack OP0 yielding to Move.
-                || executingBattleNetMoveProgram(unit)
                 || !(unit.order() == Unit.Order.ATTACK
                         || unit.order() == Unit.Order.ATTACK_MOVE
                         || unit.chasing())) {
+            return;
+        }
+        boolean executingMove = executingBattleNetMoveProgram(unit);
+        // An ordinary refusal inside an unfinished Move body keeps its live
+        // cursor. A settled multi-step residual is the wrap boundary itself:
+        // native parks the Move start, refills the rewritten route on the
+        // next visit, and then pays timer 15. XHuman 10 grunt 1490 reaches
+        // that boundary at fixture 41. Letting Java's old Move cursor wrap
+        // through OP0 while the logical refusal delay counted down retargeted
+        // it at 53 and armed a second hold; native remains on Move start and
+        // steps east at 57 after one band.
+        boolean settledMultiResidual = settledMultiResidualRefusal(unit);
+        if (executingMove && !settledMultiResidual) {
             return;
         }
         int moveStart = world.idle.battleNetSequenceStart(unit,
@@ -2003,8 +2042,30 @@ final class BattleNetMovementSystem {
             return;
         }
         unit.setBattleNetSequenceOffset(moveStart);
-        unit.setBattleNetAnimationTimer(15);
+        // The refusal visit itself leaves native at Move-start/1 with its
+        // route spent. The following scheduler visit refills the route and
+        // writes 15. battleNetOrderDelay mirrors that delayed write through
+        // syncBattleNetAttackRefusalTimer; writing 15 here made XHuman 10's
+        // full band start one visit early.
+        unit.setBattleNetAnimationTimer(settledMultiResidual ? 1 : 15);
         unit.setBattleNetChaseStepReady(false);
+    }
+
+    private boolean settledMultiResidualRefusal(Unit unit) {
+        return unit != null && unit.type() != null
+                // The native witness and both route-index counterexamples
+                // are grunt Move programs. Workers and ogres reach similar
+                // Java surrogate state through different action seams; do
+                // not infer this route-index transfer for those types.
+                && "unit-grunt".equals(unit.type().ident())
+                && unit.stepDrained()
+                && !unit.isMoving() && unit.pathLength() > 1
+                // Route index is part of the native branch. A refusal after
+                // the first heading keeps the live cache and writes 15 on
+                // that visit (XHuman 10 grunt 1477). After two headings,
+                // grunt 1490 first parks index 20 at timer 1, then refills
+                // and writes 15 on the following visit.
+                && unit.battleNetPathStepsTaken() >= 2;
     }
 
     /** Native action ownership is the sequence cursor, not the UI animation. */
@@ -3286,8 +3347,22 @@ final class BattleNetMovementSystem {
                                     && !World.battleNetRangedChaseUnit(unit)) {
                                 quiet = Math.max(quiet, 15);
                             }
-                            unit.setBattleNetOrderDelay(quiet);
+                            boolean fullRefusalBand =
+                                    settledMultiResidualRefusal(unit);
+                            // Native records Move-start/1 on the refusal
+                            // visit, then Move-start/15 on the next visit.
+                            // The generic quiet count starts immediately, so
+                            // retain one extra logical visit for this settled
+                            // wrap boundary.
+                            unit.setBattleNetOrderDelay(
+                                    quiet + (fullRefusalBand ? 1 : 0));
                             armBattleNetAttackRefusalMove(unit);
+                            if (fullRefusalBand) {
+                                // Once the settled route has been parked,
+                                // retail pays the complete refusal band even
+                                // if the planned cell frees in the meantime.
+                                unit.setBattleNetRefusalHold(true);
+                            }
                             // Refused by an ally that is mid-step with nothing
                             // queued behind it: that ally stops where it lands,
                             // and native counts the wait out rather than taking
