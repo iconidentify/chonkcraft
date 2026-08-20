@@ -381,6 +381,70 @@ final class BattleNetIdleSystem {
     }
 
 
+    /**
+     * Retail's fifty-cycle replacement order for profile-18 land assaults.
+     *
+     * <p>Orc 11's behavior-two knight and three archers are already moving
+     * under Patrol when the native player pass reaches them on fixture cycles
+     * 49 and 99. It nevertheless writes Patrol as their next order and parks
+     * every route cursor at 20. The old pixels finish, the replacement
+     * promotes at the next action marker, and the group resumes after the
+     * Patrol constructor. Without this pass Java's knight and lead archer
+     * first-step on fixture 101 while retail holds them through 103.</p>
+     */
+    void fireBattleNetLandPatrolPass() {
+        if (world.battleNetSequence == null) {
+            return;
+        }
+        List<Unit> ready = world.unitsSnapshot();
+        for (int index = ready.size() - 1; index >= 0; index--) {
+            Unit unit = ready.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || unit.type().moveType() != UnitType.Movement.LAND
+                    || unit.order() != Unit.Order.PATROL
+                    || unit.battleNetAiBehavior() != 2
+                    || !unit.hasBattleNetAiHome()
+                    || !unit.type().canAttack() || unit.type().canGather()) {
+                continue;
+            }
+            Player owner = world.player(unit.player());
+            AiPlayer ai = world.ais.get(unit.player());
+            if (owner == null
+                    || owner.type()
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                    || ai == null || ai.battleNetBuildProfileId() != 18) {
+                continue;
+            }
+            // GiveOrder replaces the cached route immediately but does not
+            // interrupt the committed stride or current animation body.
+            unit.clearPath();
+            unit.setBattleNetPatrolStraightRunExhausted(false);
+            unit.setBattleNetPendingPatrol(unit.battleNetAiHomeX(),
+                    unit.battleNetAiHomeY());
+            int quiet = world.battleNetSequence.quietTicksUntilActionMarker(
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer());
+            if (quiet < 0) {
+                // Land Patrols do not otherwise retain a binary cursor in
+                // Java. A body with pixels still committed exposes its native
+                // boundary when those pixels settle. A physically settled
+                // body on this beat has the two remaining quiet visits seen
+                // on Orc 11 knight 1558 at fixture 99 (timer 2, then 1).
+                quiet = unit.isMoving() ? 0 : 2;
+            }
+            unit.setBattleNetOrderDelay(Math.max(0, quiet));
+            if (World.BNE_IDLE_TRACE) {
+                System.err.printf("JBNEPATROLPASS cycle=%d unit=%d land=1"
+                                + " target=%d,%d sequence=%d timer=%d quiet=%d%n",
+                        world.cycle, unit.id(), unit.battleNetAiHomeX(),
+                        unit.battleNetAiHomeY(),
+                        unit.battleNetSequenceOffset(),
+                        unit.battleNetAnimationTimer(), quiet);
+            }
+        }
+    }
+
+
     void fireBattleNetReadyForAll() {
         List<Unit> ready = world.unitsSnapshot();
         world.prepareBattleNetInitialAttackGroups(ready);

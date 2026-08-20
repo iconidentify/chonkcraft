@@ -8923,6 +8923,7 @@ public final class World {
         // their proven horizon.
         if (cycle > 2 && (cycle - 2) % 50 == 49) {
             idle.fireBattleNetNavalPatrolPass();
+            idle.fireBattleNetLandPatrolPass();
         }
         // A point command temporarily replaces an autonomous scout Patrol.
         // Retail re-enters the scout callback before HandleEachCycle on the
@@ -11645,6 +11646,31 @@ public final class World {
                 battleNetConstructingArmedPatrol(unit);
         boolean armedPatrolOp0 = constructingArmedPatrol
                 && tickBattleNetArmedPatrolSequence(unit);
+        // The periodic profile-18 land pass queues a replacement Patrol even
+        // while the old one is active. Native waits for the old movement body
+        // and committed pixels to finish, then promotes next_order at OP0:
+        // Orc 11's knight/archer queue at fixture 99, construct at 101 and
+        // first-step at 104. Promoting on the pass itself skips the final two
+        // old-body visits; ignoring the pending order steps three early.
+        if (unit.type().moveType() == UnitType.Movement.LAND
+                && unit.battleNetAiBehavior() == 2
+                && unit.hasBattleNetPendingPatrol()) {
+            if (unit.isMoving() || !movement.atMoveBoundary(unit)) {
+                // Route index 20 does not erase pixels or the Move animation
+                // already committed by the old order. Advance that body only;
+                // do not let the empty route invent another old-order step.
+                movement.walkPixels(unit);
+            }
+            // The binary action record, not the Java sprite animation, owns
+            // the promotion boundary. battleNetOrderDelay retains any binary
+            // quiet ticks available at the pass; committed pixels expose the
+            // same boundary for moving land units. If that marker also drains
+            // the final pixels, promote on the same visit after walkPixels.
+            if (!delayHold && !unit.isMoving()) {
+                beginBattleNetPendingPatrol(unit);
+            }
+            return;
+        }
         if (delayHold) {
             return;
         }
