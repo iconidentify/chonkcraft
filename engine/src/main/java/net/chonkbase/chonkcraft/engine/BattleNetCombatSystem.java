@@ -38,6 +38,74 @@ final class BattleNetCombatSystem {
     }
 
     /**
+     * Keeps the cardinal wall head of a collided ranged residual refill.
+     *
+     * <p>The route optimizer normally swaps two compass headings when the
+     * diagonal shortcut is free. On the residual-refill visit native still
+     * tests that shortcut through the old collision view: XHuman 4
+     * axethrower 1490 therefore keeps N at 77,62 instead of swapping N,NE to
+     * Java's NE,N and walking away from its footman target. Restrict this to
+     * a diagonal which actually increases target distance, and retain only
+     * its free, non-regressing cardinal component.</p>
+     */
+    private void preserveCollidedRangedWallHead(Unit unit, Unit target) {
+        if (unit.pathLength() == 0 || target == null
+                || unit.type() == null || target.type() == null) {
+            return;
+        }
+        int planned = unit.peekHeading();
+        if (!Direction.isDiagonal(planned)) {
+            return;
+        }
+        int targetLeft = target.tileX();
+        int targetTop = target.tileY();
+        int targetWidth = Math.max(1, target.type().tileWidth());
+        int targetHeight = Math.max(1, target.type().tileHeight());
+        int targetRight = targetLeft + targetWidth - 1;
+        int targetBottom = targetTop + targetHeight - 1;
+        int goalX = targetLeft;
+        if (targetLeft < unit.tileX()) {
+            goalX = unit.tileX() < targetRight
+                    ? targetLeft + targetWidth / 2 : targetRight;
+        }
+        int goalY = targetTop;
+        if (targetTop < unit.tileY()) {
+            goalY = unit.tileY() < targetBottom
+                    ? targetTop + targetHeight / 2 : targetBottom;
+        }
+        int stepX = Direction.deltaX(planned);
+        int stepY = Direction.deltaY(planned);
+        int towardX = Integer.signum(goalX - unit.tileX());
+        int towardY = Integer.signum(goalY - unit.tileY());
+        boolean xAgrees = stepX == towardX;
+        boolean yAgrees = stepY == towardY;
+        if (xAgrees == yAgrees) {
+            return;
+        }
+        int cardinal = xAgrees
+                ? Direction.fromDelta(stepX, 0)
+                : Direction.fromDelta(0, stepY);
+        int stride = world.battleNetMovementStride(unit);
+        int currentDistance = Math.max(Math.abs(unit.tileX() - goalX),
+                Math.abs(unit.tileY() - goalY));
+        int diagonalDistance = Math.max(Math.abs(unit.tileX()
+                        + stepX * stride - goalX),
+                Math.abs(unit.tileY() + stepY * stride - goalY));
+        int cardinalX = unit.tileX()
+                + Direction.deltaX(cardinal) * stride;
+        int cardinalY = unit.tileY()
+                + Direction.deltaY(cardinal) * stride;
+        int cardinalDistance = Math.max(Math.abs(cardinalX - goalX),
+                Math.abs(cardinalY - goalY));
+        if (diagonalDistance <= currentDistance
+                || cardinalDistance > currentDistance
+                || !world.canEnter(unit, cardinalX, cardinalY)) {
+            return;
+        }
+        unit.replacePeekHeading(cardinal);
+    }
+
+    /**
      * Whether a chase soft-wait may treat {@code x,y} as enterable.
      *
      * <p>Includes a cell a moving ally is vacating: the ally's tile still
@@ -1548,6 +1616,13 @@ final class BattleNetCombatSystem {
                         world.movement.moveTowards(unit, chased);
                     }
                 } else if (unit.pathLength() == 0) {
+                    boolean rangedCollidedResidualRefill =
+                            world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && unit.battleNetCollisionCounter() > 0
+                            && World.battleNetRangedChaseUnit(unit)
+                            && !unit.battleNetChaseEmptyRouteReplan();
                     // A collided route's final residual owns this visit. The
                     // following Move OP0 lays the refill; it does not share
                     // the residual-settle visit. XHuman 12 grunt 1503 drains
@@ -1558,6 +1633,7 @@ final class BattleNetCombatSystem {
                             && unit.stepDrained()
                             && !unit.isMoving()
                             && unit.battleNetCollisionCounter() > 0
+                            && !World.battleNetRangedChaseUnit(unit)
                             && !unit.battleNetChaseEmptyRouteReplan()) {
                         unit.setRouteSpent(false);
                         unit.clearPath();
@@ -1584,6 +1660,9 @@ final class BattleNetCombatSystem {
                     // (XHuman 12 grunt 1507 residual SE exhaust → replan).
                     unit.setBattleNetChaseEmptyRouteReplan(true);
                     world.planTowards(unit, chased, collidedResidualRefill);
+                    if (rangedCollidedResidualRefill) {
+                        preserveCollidedRangedWallHead(unit, chased);
+                    }
                 } else if (goalMoved) {
                     unit.setPathGoal(chased.tileX(), chased.tileY());
                 }

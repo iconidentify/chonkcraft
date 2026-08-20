@@ -3633,6 +3633,28 @@ final class BattleNetMovementSystem {
                             return;
                         }
                         unit.setBattleNetCollisionCounter(counter);
+                        // A gold route which arrived at this residual with a
+                        // refusal already banked parks immediately on its
+                        // second allied refusal. XHuman 4 peon 1567 finishes
+                        // E at 118,14 with coll 1 and cached E,NE,E; peon 1573
+                        // still occupies the next E cell. Native raises coll
+                        // to 2 and writes route_index 20 on fixture 55, then
+                        // replans NE and commits it on 56. Keeping the cached
+                        // E until the ally vacated lost that diagonal. The
+                        // Orc 12 coll-band witness enters its residual with
+                        // coll 0; after arming below, its later refusals have
+                        // walkedThisCycle false and continue to count to 8.
+                        if (walkedThisCycle && unit.stepDrained()
+                                && counter > 1
+                                && unit.pathLength() >= 3
+                                && world.battleNetCooperativeBlocker(
+                                        unit, allyBlocker)) {
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setBattleNetFarMultiStepResidualRefuse(false);
+                            unit.setBattleNetOrderDelay(0);
+                            return;
+                        }
                         // Spend the refused heading and try later stored
                         // headings only when they strictly close Chebyshev to
                         // the approach (1554: refuse S, take SE onto 6,27).

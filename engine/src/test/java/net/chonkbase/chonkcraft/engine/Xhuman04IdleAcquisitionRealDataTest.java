@@ -99,6 +99,52 @@ class Xhuman04IdleAcquisitionRealDataTest {
                 "the recovered grunt must be walking rather than frozen");
     }
 
+    @Test
+    @DisplayName("xhuman 4 refills ranged and gold residual routes on cycle 56")
+    void xhuman4RefillsRangedAndGoldResidualRoutesOnCycle56() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        Unit thrower = unitAt(world, "unit-axethrower", 78, 62);
+        Unit peon = unitAt(world, "unit-peon", 116, 14);
+        assertNotNull(thrower, "XHuman 4 has no axethrower on 78,62");
+        assertNotNull(peon, "XHuman 4 has no peon on 116,14");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 55) {
+            mission.tick();
+        }
+        assertEquals(77, thrower.tileX());
+        assertEquals(62, thrower.tileY(),
+                "the ranged residual remains on its old row through cycle 55");
+        assertEquals(Unit.Order.ATTACK, thrower.order());
+        assertEquals(118, peon.tileX());
+        assertEquals(14, peon.tileY(),
+                "the gold residual remains on its old row through cycle 55");
+        assertEquals(Unit.Order.HARVEST, peon.order());
+
+        mission.tick();
+
+        assertEquals(77, thrower.tileX());
+        assertEquals(61, thrower.tileY(),
+                "the ranged empty-route refill must commit native north on cycle 56");
+        assertEquals(Unit.Order.ATTACK, thrower.order(),
+                "the axethrower must stay live in its chase");
+        assertEquals(119, peon.tileX());
+        assertEquals(13, peon.tileY(),
+                "the refused gold residual must replan native north-east on cycle 56");
+        assertEquals(Unit.Order.HARVEST, peon.order(),
+                "the peon must stay live in its gold trip");
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null
