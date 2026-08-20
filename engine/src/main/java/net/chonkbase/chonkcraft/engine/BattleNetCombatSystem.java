@@ -1385,6 +1385,20 @@ final class BattleNetCombatSystem {
                                     unit.tileY() + Direction.deltaY(
                                             unit.peekHeading())
                                             * world.battleNetMovementStride(unit));
+                    // A ranged stride that drained on this visit is no longer
+                    // a live route to tear down. XHuman 10 axethrower 1496
+                    // reaches the end of E on fixture 55 with four cached
+                    // headings, changes footman -> knight, writes E,E,SE and
+                    // spends the first E in that same visit. Charging the
+                    // ordinary three-visit ranged teardown cleared the route;
+                    // the allied grunt then stepped west into the free cell
+                    // and every subsequent replan refused against it.
+                    boolean settledRangedResidual =
+                            World.battleNetRangedChaseUnit(unit)
+                            && world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && !world.targets.inAttackRange(unit, candidate);
                     if (unit.pathLength() > 1
                             && previous.type().building()
                             && candidate.type().building()) {
@@ -1472,7 +1486,8 @@ final class BattleNetCombatSystem {
                         // the replacement SW immediately. Charging the generic
                         // ranged hold left it frozen through fixture 56.
                         if (World.battleNetRangedChaseUnit(unit)
-                                && keepPathn > 0 && !settledBlockedTail) {
+                                && keepPathn > 0 && !settledBlockedTail
+                                && !settledRangedResidual) {
                             unit.clearPath();
                             unit.setBattleNetOrderDelay(2);
                             return;
@@ -1486,7 +1501,8 @@ final class BattleNetCombatSystem {
                         // heading was tried for XHuman 12 grunt 1495 and
                         // rejected: it pulled Human 13 ogre 1482 and other
                         // grunts earlier (fixture 19).
-                        if (keepPathn > 0) {
+                        if (keepPathn > 0
+                                && !World.battleNetRangedChaseUnit(unit)) {
                             unit.setBattleNetChaseReplanResidualHold(true);
                         } else {
                             // Exhausted route retarget (keepPathn 0): same
