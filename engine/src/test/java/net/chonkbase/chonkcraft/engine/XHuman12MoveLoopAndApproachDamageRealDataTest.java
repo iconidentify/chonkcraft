@@ -16,7 +16,7 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
-    @DisplayName("xhuman 12 pays the move-loop OP0 and approach-damage hold")
+    @DisplayName("xhuman 12 pays builder, move-loop, and approach-damage cadence")
     void xhuman12PaysMoveLoopOp0AndApproachDamageHold() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -31,9 +31,11 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         Unit loopGrunt = unitAt(world, "unit-grunt", 26, 39);
         Unit approachGrunt = unitAt(world, "unit-grunt", 23, 60);
         Unit footman = unitAt(world, "unit-footman", 26, 59);
+        Unit builder = unitAt(world, "unit-peon", 4, 85);
         assertNotNull(loopGrunt, "XHuman 12 has no native-slot-1494 grunt");
         assertNotNull(approachGrunt, "XHuman 12 has no native-slot-1448 grunt");
         assertNotNull(footman, "XHuman 12 has no native-slot-1449 footman");
+        assertNotNull(builder, "XHuman 12 has no native-slot-1376 builder");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -47,6 +49,7 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         int approachTimer43 = -1;
         int footmanHp57 = -1;
         int footmanHp58 = -1;
+        int builderX55 = -1;
         while (world.cycle() < 61) {
             mission.tick();
             int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
@@ -68,8 +71,14 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
             if (fixture == 58) {
                 footmanHp58 = footman.hitPoints();
             }
+            if (fixture == 55) {
+                builderX55 = builder.tileX();
+            }
         }
 
+        assertEquals(7, builderX55,
+                "ordinary build traffic waits fourteen visits; the combat "
+                        + "nearly-full exception must not delay its third tile");
         assertEquals(23, approachTimer43,
                 "damaged approach must arm native's Attack body hold");
         assertEquals(27, loopX53, "Move-loop goto must not step on fixture 53");

@@ -3533,9 +3533,20 @@ final class BattleNetMovementSystem {
                             // Nearly-full leftover residual-settled: one extra
                             // quiet visit so free-compass after this wait lands
                             // at fixture 37 not 36 (XHuman 12 grunt 1494).
+                            // This is a melee chase exception, not a generic
+                            // path-length rule. XHuman 12's builder peon 1376
+                            // also has a six-heading free prefix when traffic
+                            // refuses its east step; giving that BUILD walk the
+                            // combat visit moved its third tile at fixture 56
+                            // instead of retail's 55.
                             if (unit.stepDrained() && !unit.isMoving()
                                     && unit.pathLength() == 6
-                                    && !World.battleNetRangedChaseUnit(unit)) {
+                                    && unit.target() != null
+                                    && !World.battleNetRangedChaseUnit(unit)
+                                    && (unit.order() == Unit.Order.ATTACK
+                                            || unit.order()
+                                                    == Unit.Order.ATTACK_MOVE
+                                            || unit.chasing())) {
                                 quiet = Math.max(quiet, 15);
                             }
                             boolean fullRefusalBand =
