@@ -2559,6 +2559,23 @@ final class BattleNetMovementSystem {
                         && ((unit.type().canAttack() && unit.isAggressive())
                                 || "unit-critter".equals(
                                         unit.type().ident()))) {
+                    // A residual can empty one stored route while the Move
+                    // still has a usable continuation. Native asks 0x44fbd0
+                    // for that continuation before it promotes the mover to
+                    // Still and performs target acquisition. XHuman 2's
+                    // opening ogres drain route index seven at fixture 93,
+                    // refill a north-east course, and remain Move even with
+                    // hostiles in react range. Scanning first made both ogres
+                    // freeze on their previous tiles and start attacking.
+                    if (!"unit-critter".equals(unit.type().ident())
+                            && !unit.chasing()
+                            && unit.attackMoveX() < 0
+                            && unit.attackMoveY() < 0
+                            && battleNetEmptyRouteRefillsImmediately(unit)) {
+                        unit.setRouteSpent(false);
+                        stepMoveOrder(unit);
+                        return;
+                    }
                     boolean critter = "unit-critter".equals(
                             unit.type().ident());
                     int react = Math.max(
@@ -2664,18 +2681,12 @@ final class BattleNetMovementSystem {
                         && unit.attackMoveY() < 0
                         && !chaseMoveSequence
                         && battleNetEmptyRouteRefillsImmediately(unit)) {
-                    // The entrance path above already distinguishes a
-                    // completed point route from an intermediate exhausted
-                    // buffer and asks 0x44fbd0 again on the same visit. The
-                    // residual-settle path of a plain autonomous Move must
-                    // make the same decision. Attack-Move and a borrowed
-                    // march own a different PF_WAIT boundary and retain the
-                    // ordinary pause. This path used to fall straight into
-                    // spendTheEmptyRoute here:
-                    // XHuman 8 grunt 1491 drained its west step on fixture
-                    // 119, paid PF_WAIT 10, and did not take native's final
-                    // south-west step until 130. Native replaces the short
-                    // route at the settle boundary and commits SW on 119.
+                    // Non-aggressive movers do not enter the target-scan arm
+                    // above, but they own the same immediate route refill.
+                    // XOrc 12 mage 1368 drains its fourth heading at fixture
+                    // 77 and commits the first heading of the replacement
+                    // route on that visit. Falling through to PF_WAIT 10 kept
+                    // it parked on 19,82 until fixture 88.
                     unit.setRouteSpent(false);
                     stepMoveOrder(unit);
                     return;

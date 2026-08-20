@@ -1105,13 +1105,13 @@ class MeleeChaseReplanResidualTest {
     }
 
     @Test
-    @DisplayName("move residual of an exhausted route becomes attack when a hostile is in react range")
-    void moveResidualOfAnExhaustedRouteBecomesAttackWhenAHostileIsInReactRange() {
-        // retail-xhuman-12-idle grunt 1358: path=22 exhausts after the second
-        // E onto 12,90; residual settles at fixture 38 into STAND_GROUND /
-        // Attack (next_order 12 via 0x45324d). spendTheEmptyRoute's PF_WAIT
-        // 10 left Java on MOVE. Residual settle of the last step under MOVE
-        // with routeSpent must Still then orderAttack.
+    @DisplayName("move residual refills a usable route before acquiring a hostile")
+    void moveResidualRefillsAUsableRouteBeforeAcquiringAHostile() {
+        // XHuman 2 ogres 1547/1549 exhaust their opening routes with hostiles
+        // already in react range. Native 0x44fbd0 finds another route and
+        // commits its first step before Still-acquisition can replace Move.
+        // XHuman 12 grunt 1358 still becomes Attack at this boundary because
+        // its boxed-in home route refills empty, which dispatches Still OP0.
         GameMap map = grass(40);
         World world = new World(map);
         world.fog().revealAll(0);
@@ -1143,43 +1143,14 @@ class MeleeChaseReplanResidualTest {
 
         int asyncBefore = world.battleNetRandomSeed();
         world.movement.stepMove(walker, true);
-        assertEquals(Unit.Order.ATTACK, walker.order(),
-                "exhausted MOVE residual with a hostile in react range must "
-                        + "become Attack (native STAND_GROUND/order 12)");
-        assertSame(hostile, walker.target(),
-                "Still-acquisition must adopt the hostile as the attack goal");
-        assertEquals(20, walker.tileX(),
-                "the residual settle must not take another tile step");
-        assertEquals(20, walker.tileY(),
-                "the residual settle must not take another tile step");
-        // Native Still OP0 spends one async idle-random before promoting
-        // next_order Attack. Without that draw, XHuman 12 grunt 1358's
-        // ordinal was taken by reverse-order footman melee at fixture 38.
-        assertTrue(world.battleNetRandomSeed() != asyncBefore,
-                "residual settle into Still must spend the idle-random draw "
-                        + "before Attack promotion (native 0040AD58)");
-        assertEquals(2, walker.battleNetOrderDelay(),
-                "Attack construction after residual settle must quiet two visits "
-                        + "before the first chase step (native N at fixture 41)");
-        // First free Attack visit: delay 2→1, no tile step.
-        world.actionMoveWalked = false;
-        walker.setOffset(0, 0);
-        walker.setStepDrained(true);
-        world.combat.stepAttack(walker);
-        assertEquals(20, walker.tileX(),
-                "first construction visit must not chase a tile");
-        assertEquals(20, walker.tileY(),
-                "first construction visit must not chase a tile");
-        assertEquals(1, walker.battleNetOrderDelay(),
-                "construction delay counts down one per free visit");
-        // Second free visit: delay 1→0, still no step.
-        world.combat.stepAttack(walker);
-        assertEquals(20, walker.tileX(),
-                "second construction visit must not chase a tile");
-        assertEquals(20, walker.tileY(),
-                "second construction visit must not chase a tile");
-        assertEquals(0, walker.battleNetOrderDelay(),
-                "construction delay must be spent after two quiet visits");
+        assertEquals(Unit.Order.MOVE, walker.order(),
+                "a usable continuation keeps Move ahead of target acquisition");
+        assertEquals(21, walker.tileX(),
+                "the refilled route commits its first east step immediately");
+        assertEquals(19, walker.tileY(),
+                "the refilled course detours north-east around the hostile");
+        assertEquals(asyncBefore, world.battleNetRandomSeed(),
+                "route refill must not spend Still OP0's idle-random draw");
     }
 
     private static UnitType tower() {
