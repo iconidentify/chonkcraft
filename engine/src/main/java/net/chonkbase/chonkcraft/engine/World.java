@@ -3952,6 +3952,9 @@ public final class World {
         unit.setChasing(false);
         unit.setFighting(false);
         unit.setSwingAtAir(false);
+        unit.setBattleNetPersonHelpFirstChase(false);
+        unit.setBattleNetPersonSplashHelpAttack(false);
+        unit.setBattleNetPersonHelpRetargetHandoff(false);
         // A commanded target: the unit does not go looking for a better one.
         // autoAttack and attackBack say otherwise for the ones they pick.
         unit.setAutoTargeting(false);
@@ -9175,6 +9178,7 @@ public final class World {
                             // brother (XHuman 10 knight 1493 SW onto 1489).
                             if (isPerson(owner) && !closeHitHelp) {
                                 unit.setBattleNetPersonHelpFirstChase(true);
+                                unit.setBattleNetPersonSplashHelpAttack(true);
                             }
                         }
                     }
@@ -9602,6 +9606,9 @@ public final class World {
         unit.setBattleNetStationaryRecoveryHeld(false);
         unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setBattleNetAttackWrapDestArmPending(false);
+        unit.setBattleNetPersonHelpFirstChase(false);
+        unit.setBattleNetPersonSplashHelpAttack(false);
+        unit.setBattleNetPersonHelpRetargetHandoff(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
         // EndActionAttack destroys that order whether it restores a saved
         // order or falls back to Still, so the offered reference releases at

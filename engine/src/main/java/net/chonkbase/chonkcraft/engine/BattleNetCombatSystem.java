@@ -233,6 +233,29 @@ final class BattleNetCombatSystem {
      * its wind-up.
      */
     void stepAttack(Unit unit) {
+        // A lethal-splash help chase retains its commanded route while native
+        // pays Attack construction 3,2,1, then hands ownership to automatic
+        // retargeting on the timer-one visit. This is deliberately outside
+        // stepBattleNetAttackSequence: the unit is still chasing an out-of-
+        // range quarry, so the ordinary sequence gate correctly ignores it.
+        if (unit.battleNetPersonHelpRetargetHandoff()) {
+            int attackStart = world.battleNetSequence == null ? -1
+                    : world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() > 1) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                if (unit.battleNetOrderDelay() > 0) {
+                    unit.setBattleNetOrderDelay(
+                            unit.battleNetOrderDelay() - 1);
+                }
+                return;
+            }
+            unit.setBattleNetPersonHelpRetargetHandoff(false);
+            unit.setBattleNetOrderDelay(0);
+        }
         if (stepBattleNetAttackSequence(unit)) {
             return;
         }
@@ -1423,6 +1446,43 @@ final class BattleNetCombatSystem {
                 } else {
                 Unit candidate = world.targets.findBattleNetHostile(unit, reactRange, null);
                 if (candidate != null && candidate != previous) {
+                    // A lethal-splash help chase does not hand its just-
+                    // settled commanded route straight to automatic
+                    // retargeting. Native XHuman 10 knight 1480 retains the
+                    // catapult route while Attack start pays 3,2,1, then
+                    // retargets the nearby grunt and first-steps on fixture
+                    // 64. Ordinary commanded and autonomous chases do not
+                    // inherit this one-time ownership boundary.
+                    boolean splashHelpRetargetHandoff =
+                            unit.battleNetPersonSplashHelpAttack()
+                            && world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && unit.pathLength() > 0
+                            && unit.type() != null
+                            && unit.type().maxAttackRange() <= 1
+                            && !world.targets.inAttackRange(unit, candidate)
+                            && onBattleNetChaseMoveBody(unit);
+                    if (splashHelpRetargetHandoff
+                            && world.battleNetSequence != null) {
+                        int handoffAttackStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        if (handoffAttackStart >= 0) {
+                            unit.setBattleNetSequenceOffset(handoffAttackStart);
+                            unit.setBattleNetAnimationTimer(3);
+                            unit.setBattleNetOrderDelay(2);
+                            unit.setBattleNetPersonHelpRetargetHandoff(true);
+                            AnimationSet set = unit.type().animationSet();
+                            Animation attack = set == null ? null
+                                    : set.get(AnimationSet.State.ATTACK);
+                            if (attack != null
+                                    && unit.animation().current() != attack) {
+                                unit.animation().switchTo(attack);
+                            }
+                            return;
+                        }
+                    }
                     // Decide keep before setAutoTarget: the default arm clears
                     // the multi-step cache as soon as the target changes, which
                     // is why XHuman 12 grunt 1470's leftover E was gone by the
@@ -2665,6 +2725,10 @@ final class BattleNetCombatSystem {
         // cached output survives behind the fight and is what the same
         // COrder_Attack resumes afterwards.
         Unit previous = unit.target();
+        if (previous != target) {
+            unit.setBattleNetPersonSplashHelpAttack(false);
+            unit.setBattleNetPersonHelpRetargetHandoff(false);
+        }
         if (previous != target && !preserveCachedRoute) {
             // The implementation folds COrder state into the unit. Callers that have
             // just executed upstream's PF_WAIT or restored AUTO_TARGETING

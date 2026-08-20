@@ -165,6 +165,47 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's commanded knight pays Attack construction before retarget")
+    void xhuman10CommandedKnightHoldsBeforeItsAutomaticRetarget() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        Unit knight = unitAt(world, "unit-knight", 84, 91);
+        assertNotNull(knight,
+                "XHuman 10 has no commanded knight on 84,91");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 64) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 61 && fixture <= 63) {
+                assertEquals(83, knight.tileX(),
+                        "native retains the settled route through Attack 3,2,1");
+                assertEquals(90, knight.tileY(),
+                        "native retains the settled route through Attack 3,2,1");
+                assertEquals(1922, knight.battleNetSequenceOffset(),
+                        "the commanded-to-auto handoff belongs to Attack start");
+                assertEquals(64 - fixture, knight.battleNetAnimationTimer(),
+                        "Attack construction counts 3,2,1 before retargeting");
+            }
+        }
+
+        assertEquals(82, knight.tileX(),
+                "native first-steps northwest only after the construction hold");
+        assertEquals(89, knight.tileY(),
+                "native first-steps northwest only after the construction hold");
+        assertTrue(knight.isMoving(),
+                "fixture 64 owns the replacement chase residual");
+    }
+
+    @Test
     @DisplayName("xhuman 10's residual retarget leaves its dying quarry")
     void xhuman10ResidualRetargetLeavesItsDyingQuarry() {
         AssetSource assets = AssetSource.fromEnvironment();

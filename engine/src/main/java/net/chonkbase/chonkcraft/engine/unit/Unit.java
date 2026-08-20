@@ -2611,6 +2611,35 @@ public final class Unit {
     private boolean battleNetPersonHelpFirstChase;
 
     /**
+     * This attack was promoted from a person's lethal-splash help offer.
+     * Retained through the first chase so its later command-to-auto handoff
+     * can pay native's Attack construction delay exactly once.
+     */
+    public boolean battleNetPersonSplashHelpAttack() {
+        return battleNetPersonSplashHelpAttack;
+    }
+
+    public void setBattleNetPersonSplashHelpAttack(boolean helpAttack) {
+        battleNetPersonSplashHelpAttack = helpAttack;
+    }
+
+    private boolean battleNetPersonSplashHelpAttack;
+
+    /**
+     * The settled splash-help chase is paying Attack start 3,2,1 before its
+     * first automatic retarget (XHuman 10 knight 1480, fixtures 61--63).
+     */
+    public boolean battleNetPersonHelpRetargetHandoff() {
+        return battleNetPersonHelpRetargetHandoff;
+    }
+
+    public void setBattleNetPersonHelpRetargetHandoff(boolean handoff) {
+        battleNetPersonHelpRetargetHandoff = handoff;
+    }
+
+    private boolean battleNetPersonHelpRetargetHandoff;
+
+    /**
      * walkTowards temporarily sets order to MOVE for stepMove. Residual empty-
      * route Still-promotion must not arm on borrowed Move (XHuman 2 peon 1530
      * free-prefix replan delayed three cycles by Attack construction delay 2).
