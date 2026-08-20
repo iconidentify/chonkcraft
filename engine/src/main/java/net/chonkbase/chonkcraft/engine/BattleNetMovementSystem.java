@@ -2248,8 +2248,26 @@ final class BattleNetMovementSystem {
                         Math.abs(approach[0] - unit.tileX()),
                         Math.abs(approach[1] - unit.tileY()));
                 if (approachCheb >= 2) {
-                    unit.setBattleNetOrderDelay(29);
-                    mayDecide = false;
+                    if (unit.battleNetPathStepsTaken() == 1) {
+                        // First residual of the route: XHuman 4 peon 1570
+                        // waits two fifteen-count bands behind peon 1578
+                        // before taking its second E.
+                        unit.setBattleNetOrderDelay(29);
+                        mayDecide = false;
+                    } else if (unit.battleNetPathStepsTaken() >= 2) {
+                        // A later residual owns a different native branch.
+                        // XHuman 7 peon 1458 has already settled SE then E
+                        // when its remaining E,E meets peon 1451. Retail
+                        // parks route index 20 on fixture 53, then refills
+                        // SE,NE and takes SE on 54 instead of waiting for the
+                        // old east cell. Keep this visit as the route park;
+                        // the resource order lays the replacement next visit.
+                        unit.clearPath();
+                        unit.setRouteSpent(false);
+                        unit.setWaitCycles(0);
+                        unit.setBattleNetOrderDelay(0);
+                        return;
+                    }
                 }
             }
         }
