@@ -166,8 +166,8 @@ class SaveGameTest {
     }
 
     @Test
-    @DisplayName("the Human 6 saved assault resumes and partial wood remains cargo")
-    void humanSixAssaultAndWoodResumeAfterSave() throws IOException {
+    @DisplayName("captured frozen assaults resume and partial wood remains cargo")
+    void capturedFrozenAssaultsAndWoodResumeAfterSave() throws IOException {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install configured. Set -Dchonkcraft.pack or wc2.install.dir.");
@@ -215,6 +215,61 @@ class SaveGameTest {
                 "the restored assault patrol remained frozen on an empty route");
         assertTrue(world.player(1).get(UnitType.Resource.WOOD) >= woodBefore + 200,
                 "the saved partial load and nearby Town Hall load were not banked");
+
+        assertHumanExpansionThreeCombatResumes(data);
+    }
+
+    /** Promotes the player's captured frozen-enemy save from a print-only probe. */
+    private static void assertHumanExpansionThreeCombatResumes(GameData data)
+            throws IOException {
+        Path save = Path.of(System.getProperty("user.home"), ".chonkcraft", "saves",
+                "human-exp-mission-3.sav.gz");
+        Assumptions.assumeTrue(Files.isRegularFile(save),
+                "the Human expansion 3 frozen-enemy save is not installed");
+        String script = LoadGame.read(save);
+        LoadGame.Header header = LoadGame.header(script);
+        assertNotNull(header);
+        var mission = data.loadMission(header.mapPath());
+        assertNotNull(mission);
+        for (Unit unit : new ArrayList<>(mission.world().units())) {
+            mission.world().remove(unit);
+        }
+        LoadGame.apply(mission.world(), script, data.unitTypes().types());
+        mission.triggers().restoreState(LoadGame.triggerState(script));
+
+        Unit assault = mission.world().units().stream()
+                .filter(unit -> unit.id() == 313)
+                .findFirst().orElse(null);
+        assertNotNull(assault, "captured assault grunt 313 is missing");
+        assertEquals(Unit.Order.ATTACK_MOVE, assault.order(),
+                "the regression save no longer contains its frozen attack-move");
+        int startPixelX = assault.pixelX();
+        int startPixelY = assault.pixelY();
+        int startHitPoints = assault.hitPoints();
+        int firstPhysicalProgress = -1;
+        int firstCombatEffect = -1;
+        for (int elapsed = 1; elapsed <= 180; elapsed++) {
+            mission.tick();
+            if (firstPhysicalProgress < 0
+                    && (assault.pixelX() != startPixelX
+                        || assault.pixelY() != startPixelY)) {
+                firstPhysicalProgress = elapsed;
+            }
+            if (firstCombatEffect < 0
+                    && (assault.fighting()
+                        || assault.hitPoints() < startHitPoints
+                        || assault.order() == Unit.Order.DYING
+                        || !assault.isAlive())) {
+                firstCombatEffect = elapsed;
+            }
+        }
+
+        assertTrue(firstPhysicalProgress > 0 && firstPhysicalProgress <= 60,
+                "the captured enemy attack-move produced no physical progress; first="
+                        + firstPhysicalProgress);
+        assertTrue(firstCombatEffect > 0 && firstCombatEffect <= 180,
+                "the captured enemy moved but never rejoined battle; first="
+                        + firstCombatEffect);
     }
 
     @Test
