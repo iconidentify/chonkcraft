@@ -10107,17 +10107,28 @@ public final class World {
             }
             return path.result();
         }
-        if (path.length() > 0 && unit.offeredTarget() != null) {
-            // Offered free-scan arm only. Equal Chebyshev first steps keep the
-            // current face when free (1500 face 7 → NW; 1493 SE still wins).
+        if (path.length() > 0 && (unit.offeredTarget() != null
+                || unit.battleNetRetargetResidualRoutePark())) {
+            // Offered free-scan and queued-Attack promotion arms preserve a
+            // free current face when it is an equal Chebyshev first step.
+            // XHuman 4 grunt 1520 promotes Attack after its NW residual,
+            // retargets footman -> ballista, and takes NW again on fixture
+            // 88; the ordinary replacement route began W. The residual-route
+            // park marker is the CUnit-side ownership that distinguishes this
+            // from an ordinary settled retarget. (Offered 1500 face 7 → NW;
+            // 1493 SE still wins.)
             path = preferBattleNetFaceFirstHeading(unit, path, target);
-            path = preferBattleNetSkirtDiagonalFirstHeading(unit, path, target);
+            if (unit.offeredTarget() != null) {
+                path = preferBattleNetSkirtDiagonalFirstHeading(
+                        unit, path, target);
+            }
             // Dest-arm leftover from a standing offered acquire is dest-arm
             // plus one more heading. Human 13 knight 1490 dest-arms SE,S
             // (pathi 1) onto 125,31. A full pathfind leftover (S,S after the
             // dest-arm) residual-opened past OP0 and chipped the ogre at 51
             // instead of Attack start 1922/3 then 54.
-            if (!unit.chasing() && path.length() > 2) {
+            if (unit.offeredTarget() != null
+                    && !unit.chasing() && path.length() > 2) {
                 path = keepBattleNetDestArmLeftoverHeadings(path);
             }
         }

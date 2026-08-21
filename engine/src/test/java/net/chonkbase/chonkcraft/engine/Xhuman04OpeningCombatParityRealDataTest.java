@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.IdentityHashMap;
@@ -35,18 +36,26 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Unit middleAxe = unitAt(world, "unit-axethrower", 78, 60);
         Unit northAxe = unitAt(world, "unit-axethrower", 78, 59);
         Unit blockedGrunt = unitAt(world, "unit-grunt", 77, 61);
+        Unit retaliatingGrunt = unitAt(world, "unit-grunt", 77, 62);
         Unit defender = unitAt(world, "unit-footman", 72, 60);
         Unit adjacentGrunt = unitAt(world, "unit-grunt", 77, 60);
+        Unit retargetFaceGrunt = unitAt(world, "unit-grunt", 77, 59);
+        Unit retaliatingFootman = unitAt(world, "unit-footman", 72, 62);
         Unit mineApproachPeon = unitAt(world, "unit-peon", 116, 14);
         Unit residualRetargetFootman = unitAt(world, "unit-footman", 71, 62);
+        Unit blockedRetargetFootman = unitAt(world, "unit-footman", 71, 61);
         assertNotNull(southAxe);
         assertNotNull(middleAxe);
         assertNotNull(northAxe);
         assertNotNull(blockedGrunt);
+        assertNotNull(retaliatingGrunt);
         assertNotNull(defender);
         assertNotNull(adjacentGrunt);
+        assertNotNull(retargetFaceGrunt);
+        assertNotNull(retaliatingFootman);
         assertNotNull(mineApproachPeon);
         assertNotNull(residualRetargetFootman);
+        assertNotNull(blockedRetargetFootman);
 
         for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -73,7 +82,25 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Integer retargetFootmanX86 = null;
         Integer retargetFootmanY86 = null;
         Boolean retargetFootmanMoving86 = null;
-        for (int fixture = 1; fixture <= 86; fixture++) {
+        Integer blockedRetargetY87 = null;
+        Boolean blockedRetargetMoving87 = null;
+        Integer blockedRetargetY88 = null;
+        Boolean blockedRetargetMoving88 = null;
+        Integer adjacentGruntX88 = null;
+        Integer adjacentGruntY88 = null;
+        Boolean adjacentGruntMoving88 = null;
+        Integer blockedRetargetX104 = null;
+        Integer blockedRetargetY104 = null;
+        Boolean blockedRetargetMoving104 = null;
+        Integer blockedGruntX105 = null;
+        Integer blockedGruntY105 = null;
+        Boolean blockedGruntMoving105 = null;
+        Integer blockedGruntX108 = null;
+        Integer blockedGruntY108 = null;
+        Boolean blockedGruntMoving108 = null;
+        Unit blockedGruntTarget73 = null;
+        Integer retaliatingFootmanHp109 = null;
+        for (int fixture = 1; fixture <= 109; fixture++) {
             mission.tick();
             for (Missile missile : world.missiles()) {
                 if (missile.source() != null
@@ -103,6 +130,10 @@ class Xhuman04OpeningCombatParityRealDataTest {
             } else if (fixture == 72) {
                 mineApproachX72 = mineApproachPeon.tileX();
                 mineApproachY72 = mineApproachPeon.tileY();
+            } else if (fixture == 73) {
+                blockedGruntTarget73 = retaliatingGrunt.target();
+            } else if (fixture == 109) {
+                retaliatingFootmanHp109 = retaliatingFootman.hitPoints();
             }
             if (fixture == 83) {
                 retargetFootmanX83 = residualRetargetFootman.tileX();
@@ -115,12 +146,35 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 retargetFootmanY86 = residualRetargetFootman.tileY();
                 retargetFootmanMoving86 = residualRetargetFootman.isMoving();
             }
+            if (fixture == 87) {
+                blockedRetargetY87 = blockedRetargetFootman.tileY();
+                blockedRetargetMoving87 = blockedRetargetFootman.isMoving();
+            } else if (fixture == 88) {
+                blockedRetargetY88 = blockedRetargetFootman.tileY();
+                blockedRetargetMoving88 = blockedRetargetFootman.isMoving();
+                adjacentGruntX88 = retargetFaceGrunt.tileX();
+                adjacentGruntY88 = retargetFaceGrunt.tileY();
+                adjacentGruntMoving88 = retargetFaceGrunt.isMoving();
+            } else if (fixture == 104) {
+                blockedRetargetX104 = blockedRetargetFootman.tileX();
+                blockedRetargetY104 = blockedRetargetFootman.tileY();
+                blockedRetargetMoving104 = blockedRetargetFootman.isMoving();
+            }
             if (fixture == 82) {
                 syncSeed82 = world.randomSeed();
             } else if (fixture == 83) {
                 syncSeed83 = world.randomSeed();
             } else if (fixture == 85) {
                 syncSeed85 = world.randomSeed();
+            }
+            if (fixture == 105) {
+                blockedGruntX105 = blockedGrunt.tileX();
+                blockedGruntY105 = blockedGrunt.tileY();
+                blockedGruntMoving105 = blockedGrunt.isMoving();
+            } else if (fixture == 108) {
+                blockedGruntX108 = blockedGrunt.tileX();
+                blockedGruntY108 = blockedGrunt.tileY();
+                blockedGruntMoving108 = blockedGrunt.isMoving();
             }
         }
 
@@ -150,6 +204,8 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the mine approach detour must reach native's north skirt");
         assertEquals(12, mineApproachY72,
                 "the moving gold sibling stays solid, preserving NE,NE,SE");
+        assertSame(retaliatingFootman, blockedGruntTarget73,
+                "the banked hit offer wins the equal-score spatial tie");
         assertEquals(0xf94bdf32, syncSeed82,
                 "the residual retarget must not spend SyncRand before Attack 3,2,1");
         assertEquals(0xd9e2b600, syncSeed83,
@@ -170,6 +226,40 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the replacement route must begin with native's NE heading");
         assertEquals(Boolean.TRUE, retargetFootmanMoving86,
                 "fixture 86 must own the live residual of the accepted NE step");
+        assertEquals(60, blockedRetargetY87,
+                "a blocked retained heading first parks the old route cursor");
+        assertEquals(Boolean.FALSE, blockedRetargetMoving87,
+                "the route-index-20 visit must not spend the replacement head");
+        assertEquals(59, blockedRetargetY88,
+                "the visit after route parking first-steps the replacement N");
+        assertEquals(Boolean.TRUE, blockedRetargetMoving88,
+                "fixture 88 owns the replacement route's live residual");
+        assertEquals(73, adjacentGruntX88,
+                "the queued-Attack retarget keeps its equal-distance NW face");
+        assertEquals(58, adjacentGruntY88,
+                "the ballista chase must not replace native NW with pure west");
+        assertEquals(Boolean.TRUE, adjacentGruntMoving88,
+                "fixture 88 owns the live NW residual toward the ballista");
+        assertEquals(72, blockedRetargetX104,
+                "a melee-to-melee retarget immediately spends native NE");
+        assertEquals(58, blockedRetargetY104,
+                "the later footman retarget must not buy another pre-step hold");
+        assertEquals(Boolean.TRUE, blockedRetargetMoving104,
+                "the next queued Attack belongs behind the live NE residual");
+        assertEquals(75, blockedGruntX105,
+                "the exhausted handoff route promotes its next queued Attack");
+        assertEquals(60, blockedGruntY105,
+                "Attack construction must precede the second SW heading");
+        assertEquals(Boolean.FALSE, blockedGruntMoving105,
+                "fixture 105 opens the queued Attack instead of moving early");
+        assertEquals(74, blockedGruntX108,
+                "the queued Attack hands the retained route back after 3,2,1");
+        assertEquals(61, blockedGruntY108,
+                "the second SW heading resumes on native fixture 108");
+        assertEquals(Boolean.TRUE, blockedGruntMoving108,
+                "the resumed SW heading owns a live residual");
+        assertEquals(56, retaliatingFootmanHp109,
+                "the grunt's first blow lands on its native retaliation target");
         assertTrue(defender.battleNetMeleeSyncRemaining() > 0,
                 "the delayed target handoff must retain its melee RNG cadence");
     }

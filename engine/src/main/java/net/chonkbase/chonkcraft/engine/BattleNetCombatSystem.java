@@ -266,6 +266,7 @@ final class BattleNetCombatSystem {
                 unit.animation().switchTo(move);
             }
         }
+        boolean completedPersonHelpRetargetHandoff = false;
         // A lethal-splash help chase retains its commanded route while native
         // pays Attack construction 3,2,1, then hands ownership to automatic
         // retargeting on the timer-one visit. This is deliberately outside
@@ -288,6 +289,43 @@ final class BattleNetCombatSystem {
             }
             unit.setBattleNetPersonHelpRetargetHandoff(false);
             unit.setBattleNetOrderDelay(0);
+            if (unit.stepDrained() && !unit.isMoving()
+                    && unit.pathLength() > 0) {
+                int retainedHeading = unit.peekHeading();
+                int retainedStride = world.battleNetMovementStride(unit);
+                int retainedX = unit.tileX()
+                        + Direction.deltaX(retainedHeading) * retainedStride;
+                int retainedY = unit.tileY()
+                        + Direction.deltaY(retainedHeading) * retainedStride;
+                if (!world.canEnter(unit, retainedX, retainedY)) {
+                    // Promotion of the queued Attack does not erase the
+                    // route which the interrupted chase owned. If its next
+                    // byte now refuses, retail first parks the old cursor at
+                    // 20 and returns to Move-start/1; only the next visit
+                    // scans, writes a replacement and spends its head.
+                    // XHuman 4 footman 1497 therefore stays on (71,60) at
+                    // fixture 87 and first-steps N on 88. Replanning in the
+                    // timer-one handoff stepped it one cycle early.
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    int moveStart = world.battleNetSequence == null ? -1
+                            : world.idle.battleNetSequenceStart(unit,
+                                    BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(1);
+                    }
+                    AnimationSet set = unit.type() == null
+                            ? null : unit.type().animationSet();
+                    Animation move = set == null ? null
+                            : set.get(AnimationSet.State.MOVE);
+                    if (move != null && unit.animation().current() != move) {
+                        unit.animation().switchTo(move);
+                    }
+                    return;
+                }
+            }
+            completedPersonHelpRetargetHandoff = true;
         }
         if (unit.battleNetNavalPatrolAttackConstruction()) {
             if (unit.battleNetAnimationTimer() > 1) {
@@ -601,7 +639,14 @@ final class BattleNetCombatSystem {
                 int reactRange = Math.max(
                         unit.type().reactRange(world.isPerson(unit.player())),
                         Math.max(1, unit.type().maxAttackRange()));
-                Unit candidate = world.targets.findBattleNetHostile(unit, reactRange, null);
+                // AutoSelectTarget prices the banked hit offer before walking
+                // the reaction band. The settled-route pass below does the
+                // same; this follow-up dest-arm pass must not null-seed and
+                // immediately undo an equal-score offer on the next visit.
+                // XHuman 4 grunt 1489 retained footman 1495 at fixture 73,
+                // while the null seed switched north to 1518 on fixture 74.
+                Unit candidate = world.targets.findBattleNetHostile(
+                        unit, reactRange, offered);
                 if (candidate != null && candidate != unit.target()) {
                     boolean keepLeftover = unit.pathLength() > 0;
                     setAutoTarget(unit, candidate, keepLeftover);
@@ -842,8 +887,13 @@ final class BattleNetCombatSystem {
             // mid-Move script, and requiring wrap index 0 dropped the hold
             // (and the focused regression). Type 50 still arms Attack-four
             // on the sequence at its own wrap boundary (wise-man 1496).
+            // A one-heading replacement has no leftover path by settlement,
+            // but the spent-route bit still owns the queued Attack promotion:
+            // XHuman 4 grunt 1505 carries next_order 12 while its lone NW
+            // drains on fixtures 70-85, then promotes it into Attack 3,2,1
+            // on 86-88 before replanning and first-stepping SW on 89.
             boolean replanResidualHold = unit.battleNetChaseReplanResidualHold()
-                    && unit.pathLength() > 0;
+                    && (unit.pathLength() > 0 || unit.routeSpent());
             // Empty-route free-detour residual: path is only the free heading
             // (or already spent), so ordinary replan residual hold (pathn>0)
             // never arms. Hold delay 2 when that free first step residual
@@ -1576,18 +1626,26 @@ final class BattleNetCombatSystem {
                         // free-compass heading and defer the ordinary scan.
                     }
                 } else {
-                // Behavior-one computer defenders retain an equal-scoring
-                // incumbent. Their native order callback supplies the current
-                // goal to 0x409ff0, unlike the null-seeded free scan used by
-                // ordinary autonomous attacks. XHuman 12 grunt 1470 therefore
-                // keeps tower 1464 at its first Move boundary (equal score),
+                // OfferNewTarget's bank is the first incumbent supplied to
+                // AutoSelectTarget. A direct hit therefore wins an equal-score
+                // spatial tie even when another enemy appears earlier in the
+                // screen-Y index. XHuman 4 footman 1495 hits grunt 1489 on
+                // fixture 68; when the grunt's ballista chase settles on 73,
+                // all three adjacent footmen score 0x2003c, but the banked
+                // 1495 is retained and receives the later blow. Null-seeding
+                // the scan selected northern footman 1518 instead.
+                //
+                // Without an offer, behavior-one computer defenders retain
+                // an equal-scoring building incumbent. Their native order
+                // callback supplies the current goal to 0x409ff0: XHuman 12
+                // grunt 1470 keeps tower 1464 at its first Move boundary,
                 // then changes to the now-closer tower 1483 at the next one.
-                // Null-seeding both visits changed it sixteen cycles early and
-                // erased the retarget provenance which owns the residual hold.
-                Unit scanIncumbent = unit.battleNetAiBehavior() == 1
-                        && previous.type() != null
-                        && previous.type().building()
-                        ? previous : null;
+                Unit scanIncumbent = unit.offeredTarget() != null
+                        ? unit.offeredTarget()
+                        : unit.battleNetAiBehavior() == 1
+                                && previous.type() != null
+                                && previous.type().building()
+                                ? previous : null;
                 Unit candidate = world.targets.findBattleNetHostile(
                         unit, reactRange, scanIncumbent);
                 if (candidate != null && candidate != previous) {
@@ -1608,19 +1666,21 @@ final class BattleNetCombatSystem {
                             && unit.type().maxAttackRange() <= 1
                             && !world.targets.inAttackRange(unit, candidate)
                             && onBattleNetChaseMoveBody(unit);
-                    // Footmen use the same handoff after a settled chase
-                    // residual even without person-help provenance. XHuman 4
-                    // footman 1484 drains SE at (72,63), retains its old axe
-                    // target and route while Attack construction pays 3,2,1
-                    // on fixtures 83-85, then chooses the grunt and first-
-                    // steps NE on 86. Installing the grunt immediately made
-                    // Java take that step on 83. This is not the broad melee
-                    // settled-retarget rule rejected by the grunt/ogre
-                    // witnesses below: retail's type-zero footman is the
-                    // observed extra arm, and only while the new quarry is
-                    // still outside weapon range.
+                    // Footmen leaving a ranged quarry use the same handoff
+                    // after a settled chase residual even without person-help
+                    // provenance. XHuman 4 footman 1484 drains SE at (72,63),
+                    // retains its old axe target and route while Attack
+                    // construction pays 3,2,1 on fixtures 83-85, then chooses
+                    // the grunt and first-steps NE on 86. Installing the grunt
+                    // immediately made Java take that step on 83. This is not
+                    // a blanket footman or settled-melee rule: on fixture 104
+                    // footman 1497 changes grunt -> grunt and immediately
+                    // spends NE, queuing the next Attack behind that residual.
+                    // Applying this pre-step hold there froze it through 106.
                     boolean footmanResidualRetargetHandoff =
                             PudUnitTypes.code(unit.type().ident()) == 0
+                            && previous.type() != null
+                            && previous.type().maxAttackRange() > 1
                             && world.actionMoveWalked
                             && unit.stepDrained()
                             && !unit.isMoving()
@@ -1827,8 +1887,18 @@ final class BattleNetCombatSystem {
                         // heading was tried for XHuman 12 grunt 1495 and
                         // rejected: it pulled Human 13 ogre 1482 and other
                         // grunts earlier (fixture 19).
-                        if (keepPathn > 0
+                        if ((keepPathn > 0
+                                || completedPersonHelpRetargetHandoff
+                                || unit.battleNetRetargetResidualRoutePark())
                                 && !World.battleNetRangedChaseUnit(unit)) {
+                            // A completed queued-Attack handoff may have
+                            // exhausted its retained route before this new
+                            // target is installed. RetargetResidualRoutePark
+                            // is the same ownership after the ordinary replan
+                            // hold has completed. In either case the newly
+                            // queued Attack belongs behind the replacement's
+                            // first residual: XHuman 4 grunt 1505 promotes at
+                            // fixtures 105-107 after first-stepping SW on 89.
                             unit.setBattleNetChaseReplanResidualHold(true);
                         } else {
                             // Exhausted route retarget (keepPathn 0): same
@@ -5063,8 +5133,17 @@ final class BattleNetCombatSystem {
             int reactRange = Math.max(
                     unit.type().reactRange(world.isPerson(unit.player())),
                     Math.max(1, unit.type().maxAttackRange()));
+            // Once the offered aggressor has become the live goal, later
+            // AutoSelectTarget passes price that banked goal first. Equal
+            // scores do not dislodge it. XHuman 4 grunt 1489 installs footman
+            // 1495 on fixture 73 and retains it through Attack OP0; null-
+            // seeding this fixture-74 pass immediately switched to northern
+            // 1518. Ordinary OP0 scans remain null-seeded: footman 1518 must
+            // still switch between equal adjacent grunts on fixture 57.
             Unit candidate = world.targets.findBattleNetHostile(
-                    unit, reactRange, null);
+                    unit, reactRange,
+                    sequenceTarget == unit.offeredTarget()
+                            ? sequenceTarget : null);
             boolean candidateInRange = candidate != null
                     && candidate != sequenceTarget
                     && candidate.isAlive()

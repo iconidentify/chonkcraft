@@ -160,6 +160,73 @@ class MeleeChaseReplanResidualTest {
                 "leftover heading must be the replan path's next NW");
     }
 
+    @Test
+    @DisplayName("a spent one-heading melee replan still promotes its queued attack")
+    void aSpentOneHeadingMeleeReplanStillPromotesItsQueuedAttack() {
+        // XHuman 4 grunt 1505 retargets and first-steps a one-heading NW
+        // replacement on fixture 70. Native leaves next_order=Attack while
+        // that step drains, promotes it when the pixels settle on fixture 86,
+        // pays Attack construction 3,2,1, and first-steps the next chase on
+        // fixture 89. The Java route has pathLength zero after the only
+        // heading is popped, but routeSpent preserves the same ownership.
+        GameMap map = grass(40);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        Unit chaser = world.createUnit(ogre(), 0, 20, 20);
+        Unit quarry = world.createUnit(prey(), 1, 16, 16);
+        assertTrue(chaser != null && quarry != null, "units must place");
+        assertTrue(world.orderAttack(chaser, quarry), "attack accepted");
+
+        int nw = Direction.fromDelta(-1, -1);
+        chaser.setTile(20, 20);
+        chaser.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {nw}));
+        assertEquals(nw, chaser.popHeading(),
+                "the committed one-heading replacement is spent");
+        assertEquals(0, chaser.pathLength(), "replacement has no tail");
+        assertTrue(chaser.routeSpent(), "spent route provenance remains");
+        chaser.setPathGoal(quarry.tileX(), quarry.tileY());
+        chaser.setTarget(quarry);
+        chaser.setChasing(true);
+        chaser.setAutoTargeting(true);
+        chaser.setOffset(2, 2);
+        chaser.setLastStepHeading(nw);
+        chaser.setWalkHolding(true);
+        chaser.setBattleNetChaseReplanResidualHold(true);
+        chaser.setBattleNetOrderDelay(0);
+        chaser.animation().switchTo(
+                chaser.type().animationSet().get(AnimationSet.State.MOVE));
+
+        int landX = chaser.tileX();
+        int landY = chaser.tileY();
+        world.tick();
+        assertFalse(chaser.isMoving(), "the committed residual settles");
+        assertEquals(landX, chaser.tileX(),
+                "queued Attack promotion must stop a same-cycle replan");
+        assertEquals(landY, chaser.tileY(),
+                "queued Attack promotion must stop a same-cycle replan");
+        assertEquals(2, chaser.battleNetOrderDelay(),
+                "Attack construction owns the next two quiet visits");
+
+        world.tick();
+        assertEquals(landX, chaser.tileX(), "Attack timer two holds");
+        assertEquals(landY, chaser.tileY(), "Attack timer two holds");
+        world.tick();
+        assertEquals(landX, chaser.tileX(), "Attack timer one holds");
+        assertEquals(landY, chaser.tileY(), "Attack timer one holds");
+        for (int visit = 0; visit < 8
+                && chaser.tileX() == landX && chaser.tileY() == landY;
+                visit++) {
+            world.tick();
+        }
+        assertEquals(landX - 1, chaser.tileX(),
+                "the replacement chase must resume after construction");
+        assertEquals(landY - 1, chaser.tileY(),
+                "the replacement chase must resume after construction");
+    }
+
     private static byte[] retailScriptBin() throws IOException {
         String packProp = System.getProperty("chonkcraft.pack");
         Path pack = packProp != null && !packProp.isBlank()
