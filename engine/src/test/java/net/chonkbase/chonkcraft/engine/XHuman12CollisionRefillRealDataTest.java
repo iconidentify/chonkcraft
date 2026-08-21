@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
@@ -58,6 +59,59 @@ class XHuman12CollisionRefillRealDataTest {
                 "the replacement route must spend south-west on fixture 57");
         assertEquals(45, grunt.tileY());
         assertEquals(2, grunt.battleNetCollisionCounter());
+    }
+
+    @Test
+    @DisplayName("xhuman 12 pays attack construction before parking a blocked chase")
+    void xhuman12PaysAttackConstructionBeforeParkingBlockedChase() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit grunt = unitAt(world, "unit-grunt", 30, 38);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 60) {
+            mission.tick();
+            int fixture = fixtureCycle(world);
+            if (fixture >= 56 && fixture <= 58) {
+                assertEquals(30, grunt.tileX(),
+                        "Attack construction must not consume the free diagonal");
+                assertEquals(39, grunt.tileY());
+                assertEquals(world.idle.battleNetSequenceStart(grunt,
+                                BattleNetSequence.ATTACK_ANIMATION),
+                        grunt.battleNetSequenceOffset());
+                assertEquals(59 - fixture, grunt.battleNetAnimationTimer());
+                assertEquals(5, grunt.pathLength(),
+                        "construction retains the refused south route");
+            }
+            if (fixture == 59) {
+                assertEquals(30, grunt.tileX());
+                assertEquals(39, grunt.tileY());
+                assertEquals(0, grunt.pathLength(),
+                        "the construction handoff parks route index 20");
+                assertEquals(2, grunt.battleNetCollisionCounter());
+                assertEquals(world.idle.battleNetSequenceStart(grunt,
+                                BattleNetSequence.MOVE_ANIMATION),
+                        grunt.battleNetSequenceOffset());
+                assertEquals(1, grunt.battleNetAnimationTimer());
+            }
+        }
+
+        assertEquals(30, grunt.tileX(),
+                "the blocked replacement route must not step at fixture 60");
+        assertEquals(39, grunt.tileY());
+        assertEquals(2, grunt.pathLength());
+        assertEquals(3, grunt.battleNetCollisionCounter());
     }
 
     private static int fixtureCycle(World world) {

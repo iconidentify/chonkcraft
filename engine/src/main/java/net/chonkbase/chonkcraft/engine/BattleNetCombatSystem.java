@@ -233,6 +233,39 @@ final class BattleNetCombatSystem {
      * its wind-up.
      */
     void stepAttack(Unit unit) {
+        // A completed fifteen-count Move refusal band can hand a still-blocked
+        // chase through Attack construction 3,2,1 before Move owns the route
+        // park. Keep that construction ticking even though the quarry remains
+        // out of range; the ordinary attack-sequence gate correctly ignores
+        // all other out-of-range chasers.
+        if (unit.battleNetBlockedChaseAttackConstruction()) {
+            int attackStart = world.battleNetSequence == null ? -1
+                    : world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() > 1) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return;
+            }
+            unit.setBattleNetBlockedChaseAttackConstruction(false);
+            unit.setBattleNetRetargetResidualRoutePark(true);
+            int moveStart = world.battleNetSequence == null ? -1
+                    : world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                unit.setBattleNetSequenceOffset(moveStart);
+                unit.setBattleNetAnimationTimer(1);
+            }
+            AnimationSet set = unit.type() == null
+                    ? null : unit.type().animationSet();
+            Animation move = set == null
+                    ? null : set.get(AnimationSet.State.MOVE);
+            if (move != null && unit.animation().current() != move) {
+                unit.animation().switchTo(move);
+            }
+        }
         // A lethal-splash help chase retains its commanded route while native
         // pays Attack construction 3,2,1, then hands ownership to automatic
         // retargeting on the timer-one visit. This is deliberately outside
@@ -494,6 +527,9 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
                 return;
             }
+        }
+        if (armBattleNetBlockedChaseAttackConstruction(unit)) {
+            return;
         }
         // Deferred action-16 drop: the last recovery tick (timer==1) arms
         // the hold and finishes on the following visit. Finishing on the
@@ -2010,6 +2046,63 @@ final class BattleNetCombatSystem {
         unit.setFighting(true);
         world.consumeBattleNetPendingMeleeSyncRand(unit);
         world.strike(unit, target);
+    }
+
+    /**
+     * Opens the three-visit Attack-four handoff after a full blocked Move band.
+     */
+    private boolean armBattleNetBlockedChaseAttackConstruction(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || unit.type() == null || !unit.chasing() || unit.isMoving()
+                || !unit.stepDrained() || unit.pathLength() < 4
+                || unit.battleNetCollisionCounter() <= 0
+                || unit.battleNetRetargetResidualRoutePark()
+                || Direction.isDiagonal(unit.peekHeading())
+                || unit.target() == null || !unit.target().isAlive()
+                || world.targets.inAttackRange(unit, unit.target())) {
+            return false;
+        }
+        int moveStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart < 0 || unit.battleNetSequenceOffset() != moveStart
+                || unit.battleNetAnimationTimer() != 1) {
+            return false;
+        }
+        int stride = world.battleNetMovementStride(unit);
+        int nextX = unit.tileX()
+                + Direction.deltaX(unit.peekHeading()) * stride;
+        int nextY = unit.tileY()
+                + Direction.deltaY(unit.peekHeading()) * stride;
+        if (world.canEnter(unit, nextX, nextY)) {
+            return false;
+        }
+        Unit blocker = world.unitAt(nextX, nextY);
+        // This is later than FUN_004379e0's ordinary cooperative wait. The
+        // blocker may carry its own collision nibble by now (1495 carries one),
+        // but it is visibly mid-stride away from the refused cell. Reusing the
+        // stricter cooperative predicate therefore skips the native handoff.
+        if (blocker == null || blocker == unit || !blocker.isOnMap()
+                || blocker.isDying()
+                || !world.isAllied(unit.player(), blocker.player())
+                || !blocker.isMoving()
+                || !world.battleNetMoveAnimation(blocker)) {
+            return false;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return false;
+        }
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        unit.setBattleNetBlockedChaseAttackConstruction(true);
+        AnimationSet set = unit.type().animationSet();
+        Animation attack = set == null
+                ? null : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
+        return true;
     }
 
 

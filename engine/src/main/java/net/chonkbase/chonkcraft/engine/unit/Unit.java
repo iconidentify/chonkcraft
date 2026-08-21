@@ -2408,6 +2408,26 @@ public final class Unit {
     private boolean battleNetRetargetResidualRoutePark;
 
     /**
+     * A full Move refusal band that hands an out-of-range chase through
+     * Attack construction 3,2,1 before its cached route is parked.
+     *
+     * <p>XHuman 12 grunt 1496 reaches Move-start/timer one with five south
+     * headings cached behind a cooperative mover. Retail displays Attack
+     * animation four for three visits, then returns to Move-start and parks
+     * route index 20. Without this handoff Java immediately replans onto the
+     * free south-east square and walks into the battle one visit later.</p>
+     */
+    public boolean battleNetBlockedChaseAttackConstruction() {
+        return battleNetBlockedChaseAttackConstruction;
+    }
+
+    public void setBattleNetBlockedChaseAttackConstruction(boolean hold) {
+        battleNetBlockedChaseAttackConstruction = hold;
+    }
+
+    private boolean battleNetBlockedChaseAttackConstruction;
+
+    /**
      * Empty-route retarget first step still owes its residual settle hold.
      *
      * <p>XHuman 12 grunt 1507 retargets after its old route exhausts and takes

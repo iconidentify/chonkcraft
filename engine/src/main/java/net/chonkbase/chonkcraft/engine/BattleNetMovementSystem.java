@@ -3015,6 +3015,13 @@ final class BattleNetMovementSystem {
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
                     unit.setBattleNetOrderDelay(0);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
                     return;
                 }
             }
