@@ -3307,6 +3307,7 @@ public final class World {
         if (home == null) {
             home = new int[] {unit.tileX(), unit.tileY()};
         }
+        unit.setBattleNetAiBehavior(1);
         unit.setBattleNetAiHome(home[0], home[1]);
     }
 

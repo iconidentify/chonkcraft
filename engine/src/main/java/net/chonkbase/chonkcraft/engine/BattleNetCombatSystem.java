@@ -1487,22 +1487,58 @@ final class BattleNetCombatSystem {
                 }
                 if (residualBlockedBuilding
                         && residualBlockedFreeHeading >= 0) {
-                    unit.clearPath();
-                    unit.setPath(new PathFinder.Path(
-                            PathFinder.Result.FOUND,
-                            new int[] {residualBlockedFreeHeading}));
-                    unit.setRouteSpent(false);
-                    unit.setBattleNetCollisionCounter(0);
-                    unit.setBattleNetChaseEmptyRouteReplan(false);
-                    unit.setTarget(previous);
-                    unit.setPathGoal(previous.tileX(), previous.tileY());
-                    unit.setChasing(true);
-                    chased = previous;
-                    // Free-scan deferred: fall through to step the free-
-                    // compass heading. order_pt retarget lands after the
-                    // step on the next boundary.
+                    Unit blockedCandidate = world.targets
+                            .findBattleNetHostile(unit, reactRange,
+                                    unit.battleNetAiBehavior() == 1
+                                            ? previous : null);
+                    if (blockedCandidate != null
+                            && blockedCandidate != previous) {
+                        // Path work owns the first half of this boundary, but
+                        // behavior one's target callback still runs before the
+                        // heading is committed. XHuman 12 grunt 1480 first
+                        // finds SW around its blocked tower residual, then
+                        // upgrades tower 1483 -> footman 1478 and stores the
+                        // full SW,S... replacement route in the same visit.
+                        // Deferring that scan kept only a one-heading detour;
+                        // when it drained at fixture 57 Java walked north while
+                        // native paid the retarget residual Attack-four hold.
+                        setAutoTarget(unit, blockedCandidate);
+                        chased = blockedCandidate;
+                        unit.setRouteSpent(false);
+                        unit.setBattleNetCollisionCounter(0);
+                        unit.setBattleNetChaseEmptyRouteReplan(false);
+                        unit.setBattleNetChaseReplanResidualHold(true);
+                        world.movement.moveTowards(unit, chased);
+                    } else {
+                        unit.clearPath();
+                        unit.setPath(new PathFinder.Path(
+                                PathFinder.Result.FOUND,
+                                new int[] {residualBlockedFreeHeading}));
+                        unit.setRouteSpent(false);
+                        unit.setBattleNetCollisionCounter(0);
+                        unit.setBattleNetChaseEmptyRouteReplan(false);
+                        unit.setTarget(previous);
+                        unit.setPathGoal(previous.tileX(), previous.tileY());
+                        unit.setChasing(true);
+                        chased = previous;
+                        // No strict target upgrade: keep the independent
+                        // free-compass heading and defer the ordinary scan.
+                    }
                 } else {
-                Unit candidate = world.targets.findBattleNetHostile(unit, reactRange, null);
+                // Behavior-one computer defenders retain an equal-scoring
+                // incumbent. Their native order callback supplies the current
+                // goal to 0x409ff0, unlike the null-seeded free scan used by
+                // ordinary autonomous attacks. XHuman 12 grunt 1470 therefore
+                // keeps tower 1464 at its first Move boundary (equal score),
+                // then changes to the now-closer tower 1483 at the next one.
+                // Null-seeding both visits changed it sixteen cycles early and
+                // erased the retarget provenance which owns the residual hold.
+                Unit scanIncumbent = unit.battleNetAiBehavior() == 1
+                        && previous.type() != null
+                        && previous.type().building()
+                        ? previous : null;
+                Unit candidate = world.targets.findBattleNetHostile(
+                        unit, reactRange, scanIncumbent);
                 if (candidate != null && candidate != previous) {
                     // A lethal-splash help chase does not hand its just-
                     // settled commanded route straight to automatic
@@ -1561,6 +1597,7 @@ final class BattleNetCombatSystem {
                     int keepPrevScore = -1;
                     int keepCandScore = -1;
                     int keepPathn = unit.pathLength();
+                    boolean behaviorOneStrictBuildingHeading = false;
                     // A settled multi-heading chase that has just paid a
                     // complete cooperative refusal band reaches target scan
                     // on Move-start/1 with its collision provenance intact.
@@ -1609,7 +1646,8 @@ final class BattleNetCombatSystem {
                         int candScore = world.targets.battleNetTargetScore(unit, candidate);
                         keepPrevScore = prevScore;
                         keepCandScore = candScore;
-                        if (candScore > 0 && candScore == prevScore) {
+                        if (candScore > 0 && (candScore == prevScore
+                                || unit.battleNetAiBehavior() == 1)) {
                             int heading = unit.peekHeading();
                             keepHeading = heading;
                             int nextX = unit.tileX()
@@ -1631,7 +1669,21 @@ final class BattleNetCombatSystem {
                                     Math.abs(nearY - nextY));
                             keepCur = cur;
                             keepNxt = nxt;
-                            keepPrefix = nxt < cur;
+                            boolean closes = nxt < cur;
+                            keepPrefix = closes && candScore == prevScore;
+                            // Behavior-one's current goal breaks an equal tie,
+                            // but a strict score upgrade still changes target.
+                            // Its already-approved next compass element is
+                            // handed to the replacement route, though. XHuman
+                            // 12 grunt 1470 upgrades tower 1464 -> 1483 at
+                            // fixture 41 and takes its cached NE; rebuilding
+                            // solely from Java occupancy chose E and diverged
+                            // immediately. The replacement tail starts with N,
+                            // which is what native consumes after the residual
+                            // Attack-four handoff.
+                            behaviorOneStrictBuildingHeading = closes
+                                    && unit.battleNetAiBehavior() == 1
+                                    && candScore > prevScore;
                         }
                     }
                     if (System.getenv("CHONKCRAFT_TRACE_BNE_KEEP") != null) {
@@ -1752,6 +1804,11 @@ final class BattleNetCombatSystem {
                             world.planTowardsAfterRefusalBand(unit, chased);
                         } else {
                             world.movement.moveTowards(unit, chased);
+                            if (behaviorOneStrictBuildingHeading
+                                    && keepHeading >= 0
+                                    && unit.pathLength() > 0) {
+                                unit.replacePeekHeading(keepHeading);
+                            }
                         }
                     }
                 } else if (unit.pathLength() == 0) {
