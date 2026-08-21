@@ -13273,10 +13273,14 @@ public final class World {
                 && unit.battleNetFlyerScoutExhausted();
         boolean assaultWarship = battleNetArmedSmallWarshipPatrol(unit)
                 && unit.battleNetAiBehavior() == 2;
-        if (!capitalShip && !exhaustedFlyer && !assaultWarship) {
+        boolean settledLandLaunch = before == Unit.Order.MOVE
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.battleNetAiBehavior() == 2;
+        if (!capitalShip && !exhaustedFlyer && !assaultWarship
+                && !settledLandLaunch) {
             return;
         }
-        if (before == Unit.Order.STILL) {
+        if (before == Unit.Order.STILL || settledLandLaunch) {
             // The ready callback is reached through Still's opcode zero. Its
             // tick leaves the Java cursor just after that marker (4983 for a
             // battleship), but native's Patrol constructor rewinds to the
@@ -13288,6 +13292,13 @@ public final class World {
             if (still >= 0) {
                 unit.setBattleNetSequenceOffset(still);
                 unit.setBattleNetAnimationTimer(3);
+                if (settledLandLaunch) {
+                    AnimationSet set = unit.type().animationSet();
+                    if (set != null) {
+                        unit.animation().switchTo(
+                                set.getOrStill(AnimationSet.State.STILL));
+                    }
+                }
                 return;
             }
         }

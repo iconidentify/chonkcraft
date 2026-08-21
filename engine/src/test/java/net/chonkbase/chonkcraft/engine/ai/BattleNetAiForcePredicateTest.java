@@ -10,6 +10,8 @@ import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
+import net.chonkbase.chonkcraft.engine.pathfinder.PathFinder;
+import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Test;
 
@@ -39,6 +41,7 @@ class BattleNetAiForcePredicateTest {
         UnitType type = new UnitType(name);
         type.setTileSize(1, 1);
         type.setHitPoints(60);
+        type.setSpeed(10);
         type.setCanAttack(true);
         type.setCanTargetLand(true);
         type.setLandUnit(!sea && !air);
@@ -166,5 +169,56 @@ class BattleNetAiForcePredicateTest {
         assertEquals(2, java.util.stream.Stream.of(first, second, spare)
                 .filter(unit -> unit.battleNetAiBehavior() == 2)
                 .count());
+    }
+
+    @Test
+    void periodicGroundLaunchQueuesPatrolBehindCommittedMove() {
+        World world = world();
+        var mover = world.createUnit(
+                fighter("unit-ogre", false, false), 0, 2, 2);
+        UnitType enemyHall = new UnitType("unit-town-hall");
+        enemyHall.setTileSize(2, 2);
+        enemyHall.setHitPoints(1200);
+        enemyHall.setBuilding(true);
+        world.createUnit(enemyHall, 1, 12, 12);
+        world.tick();
+
+        world.orderMove(mover, 10, 2);
+        mover.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND,
+                new int[] {2, 2}));
+        mover.setOffset(-8, 0);
+        mover.setWalkHolding(true);
+
+        byte[] profile = new byte[140];
+        profile[0] = 100;
+        profile[100] = 120;
+        profile[102] = 122;
+        int pc = 104;
+        profile[pc++] = 0;
+        profile[pc++] = BattleNetAiBytecode.OFF_LAUNCH_GROUND;
+        profile[pc++] = 1;
+        profile[pc++] = 0;
+        profile[pc++] = BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT;
+        profile[pc++] = 1;
+        profile[pc++] = 0;
+        profile[pc++] = BattleNetAiBytecode.OFF_GROUND_FORCE_MULTIPLIER;
+        profile[pc++] = 1;
+        profile[pc++] = 2;
+        profile[pc++] = 100;
+        profile[120] = (byte) 0xff;
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetBuildProfile(profile, 0);
+
+        ai.battleNetRunPeriodicForces(world);
+
+        assertEquals(Unit.Order.MOVE, mover.order(),
+                "the old stride remains current until its pixels settle");
+        assertEquals(0, mover.pathLength(),
+                "the launch parks the old route immediately");
+        assertTrue(mover.hasBattleNetPendingPatrol(),
+                "Patrol survives as the native next order");
+        assertEquals(12, mover.battleNetPendingPatrolX());
+        assertEquals(12, mover.battleNetPendingPatrolY());
     }
 }

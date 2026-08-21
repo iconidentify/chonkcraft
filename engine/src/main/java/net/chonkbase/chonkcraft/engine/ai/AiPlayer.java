@@ -645,11 +645,19 @@ public final class AiPlayer {
                 member.setBattleNetAiHome(goalX, goalY);
                 // Native's behavior-two handler issues Patrol here unless the
                 // current order is one of the explicitly uninterruptible
-                // action-table entries. Preserve active combat/harvest work;
-                // ordinary standing and patrol guards are eligible.
+                // action-table entries. A plain Move is interruptible too,
+                // but only after its committed pixels finish: XHuman 12 ogre
+                // 1356 is sliding east when the fixture-49 ground launch parks
+                // route index 20 and writes Patrol as next_order, then promotes
+                // Patrol on its fixture-57 residual settle. Preserve active
+                // combat/harvest work; standing, patrol and plain movers are
+                // eligible at their respective native boundaries.
                 if (member.order() == Unit.Order.STILL
                         || member.order() == Unit.Order.PATROL) {
                     world.orderPatrol(member, goalX, goalY);
+                } else if (member.order() == Unit.Order.MOVE) {
+                    member.clearPath();
+                    member.setBattleNetPendingPatrol(goalX, goalY);
                 }
             }
             cursor = end;

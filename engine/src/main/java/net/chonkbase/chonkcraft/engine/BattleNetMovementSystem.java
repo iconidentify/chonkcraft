@@ -473,6 +473,25 @@ final class BattleNetMovementSystem {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             return;
         }
+        // A recurring AI force launch can replace an ordinary Move while its
+        // final stride is still physically committed. Retail parks the route
+        // immediately, drains only those old pixels, then promotes the queued
+        // Patrol on the settle visit. Letting the empty Move route replan here
+        // loses the launch and sends the fighter gliding past the assault.
+        // XHuman 12 ogre 1356 is the sealed witness: launch/RI20 at fixture 49,
+        // Patrol/Still construction at 57, north step at 60.
+        if (unit.order() == Unit.Order.MOVE
+                && unit.battleNetAiBehavior() == 2
+                && unit.hasBattleNetPendingPatrol()) {
+            if (unit.isMoving()) {
+                walkPixels(unit);
+                if (unit.isMoving()) {
+                    return;
+                }
+            }
+            world.beginBattleNetPendingPatrol(unit);
+            return;
+        }
         if (finishLeftoverReplacement(unit)) {
             return;
         }
