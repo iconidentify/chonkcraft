@@ -151,6 +151,14 @@ final class BattleShowcase {
         }
 
         world.fireBattleNetReadyForAll();
+        // A showcase can fall back to any retail map when Garden of War is
+        // absent. Campaign maps are allowed to declare slots 0 and 1 allied,
+        // neutral, or in a one-way truce; Alamo on the Japanese disc does.
+        // Unit placement alone does not change that diplomacy, so every
+        // concrete Attack was rejected and the fleets merely attack-moved
+        // past one another while area spells made the land front look busy.
+        world.setAllied(0, 1, false);
+        world.setAllied(1, 0, false);
         revealForShowcase(world);
         orderCharge(world, humanLand, orcLand);
         orderCharge(world, orcLand, humanLand);

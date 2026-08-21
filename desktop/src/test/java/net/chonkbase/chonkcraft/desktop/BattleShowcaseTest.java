@@ -116,13 +116,21 @@ class BattleShowcaseTest {
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
         String mapName = BattleShowcase.defaultMapName(assets);
-        assertTrue(mapName.toLowerCase().contains("garden"),
-                "retail Garden of War should supply the original showcase stage");
+        boolean packHasGarden = assets.mapNames().stream()
+                .map(name -> name.toLowerCase(java.util.Locale.ROOT))
+                .anyMatch(name -> name.contains("garden") && name.contains("war"));
+        if (packHasGarden) {
+            assertTrue(mapName.toLowerCase().contains("garden"),
+                    "retail Garden of War should supply the original showcase stage");
+        }
         PudMap source = PudReader.read(assets.map(mapName));
         World world = new World(
                 GameMap.from(source, data.loadTileset(source.tileset()).tileset()),
                 Player.forSoloGame(source));
         data.configureWorld(world, source);
+        // Prove deploy overrides a fallback campaign map's authored truce.
+        world.setAllied(0, 1, true);
+        world.setAllied(1, 0, true);
 
         BattleShowcase.Result result = BattleShowcase.deploy(
                 world, data.unitTypes().types(), 120);
@@ -133,6 +141,8 @@ class BattleShowcaseTest {
         assertEquals(world.map().height() / 2, result.centreY());
         assertEquals(96, result.landUnits());
         assertEquals(24, result.navalUnits());
+        assertTrue(world.isEnemyPlayer(0, 1) && world.isEnemyPlayer(1, 0),
+                "the staged armies inherited the source map's non-hostile diplomacy");
         assertTrue(result.openingSpells() > 0,
                 "the opening should include real mage and death-knight spell orders");
         assertTrue(world.fog().isVisible(0, 0, 0)
@@ -156,6 +166,19 @@ class BattleShowcaseTest {
                 .count();
         assertEquals(attackers, explicitlyAimed,
                 "every combatant starts with a concrete enemy, not a vague destination");
+        long navalAttackers = result.units().stream()
+                .filter(unit -> unit.type().moveType()
+                        == net.chonkbase.chonkcraft.engine.unit.UnitType.Movement.NAVAL)
+                .filter(unit -> unit.type().canAttack())
+                .count();
+        long aimedNaval = result.units().stream()
+                .filter(unit -> unit.type().moveType()
+                        == net.chonkbase.chonkcraft.engine.unit.UnitType.Movement.NAVAL)
+                .filter(unit -> unit.type().canAttack())
+                .filter(unit -> unit.target() != null)
+                .count();
+        assertEquals(navalAttackers, aimedNaval,
+                "armed ships must begin with enemy ships, not empty attack-moves");
 
         int land = 0;
         int water = 0;
