@@ -3810,7 +3810,8 @@ final class BattleNetMovementSystem {
                         if (!residualShortLeftover
                                 && unit.stepDrained()
                                 && !unit.isMoving()
-                                && unit.pathLength() >= 4) {
+                                && unit.pathLength() >= 4
+                                && world.unitAt(nextX, nextY) == null) {
                             int strideDetour =
                                     world.battleNetMovementStride(unit);
                             int freeHeading = -1;
@@ -3863,6 +3864,19 @@ final class BattleNetMovementSystem {
                         // 77,61 at 39 -- and axethrower 1516 behind it found
                         // the square free and went north where retail plans
                         // west around it.
+                        // The residual-settle entry adds the native collision
+                        // nibble before parking the route. A standing hard
+                        // refusal that did not just drain uses the separate
+                        // sticky ladder below; incrementing both advanced its
+                        // fifteenth-refusal wrap one cycle early (XHuman 12
+                        // grunt 1503). Native grunt 1476 is the residual arm:
+                        // collision one becomes two on fixture 40.
+                        if (unit.stepDrained() && !unit.isMoving()) {
+                            int collision =
+                                    unit.battleNetCollisionCounter() + 1;
+                            unit.setBattleNetCollisionCounter(
+                                    collision > 14 ? 0 : collision);
+                        }
                         int refusals = battleNetRefuse(unit);
                         unit.setRouteSpent(false);
                         // Retail leaves the movement timer at fifteen on the
