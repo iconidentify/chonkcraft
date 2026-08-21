@@ -37,12 +37,16 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Unit blockedGrunt = unitAt(world, "unit-grunt", 77, 61);
         Unit defender = unitAt(world, "unit-footman", 72, 60);
         Unit adjacentGrunt = unitAt(world, "unit-grunt", 77, 60);
+        Unit mineApproachPeon = unitAt(world, "unit-peon", 116, 14);
+        Unit residualRetargetFootman = unitAt(world, "unit-footman", 71, 62);
         assertNotNull(southAxe);
         assertNotNull(middleAxe);
         assertNotNull(northAxe);
         assertNotNull(blockedGrunt);
         assertNotNull(defender);
         assertNotNull(adjacentGrunt);
+        assertNotNull(mineApproachPeon);
+        assertNotNull(residualRetargetFootman);
 
         for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -57,7 +61,19 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Integer defenderTimer60 = null;
         Integer adjacentHp68 = null;
         Integer adjacentHp70 = null;
-        for (int fixture = 1; fixture <= 71; fixture++) {
+        Integer mineApproachX72 = null;
+        Integer mineApproachY72 = null;
+        Integer syncSeed82 = null;
+        Integer syncSeed83 = null;
+        Integer syncSeed85 = null;
+        Integer retargetFootmanX83 = null;
+        Integer retargetFootmanY83 = null;
+        Integer retargetFootmanX85 = null;
+        Integer retargetFootmanY85 = null;
+        Integer retargetFootmanX86 = null;
+        Integer retargetFootmanY86 = null;
+        Boolean retargetFootmanMoving86 = null;
+        for (int fixture = 1; fixture <= 86; fixture++) {
             mission.tick();
             for (Missile missile : world.missiles()) {
                 if (missile.source() != null
@@ -84,6 +100,27 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 adjacentHp68 = adjacentGrunt.hitPoints();
             } else if (fixture == 70) {
                 adjacentHp70 = adjacentGrunt.hitPoints();
+            } else if (fixture == 72) {
+                mineApproachX72 = mineApproachPeon.tileX();
+                mineApproachY72 = mineApproachPeon.tileY();
+            }
+            if (fixture == 83) {
+                retargetFootmanX83 = residualRetargetFootman.tileX();
+                retargetFootmanY83 = residualRetargetFootman.tileY();
+            } else if (fixture == 85) {
+                retargetFootmanX85 = residualRetargetFootman.tileX();
+                retargetFootmanY85 = residualRetargetFootman.tileY();
+            } else if (fixture == 86) {
+                retargetFootmanX86 = residualRetargetFootman.tileX();
+                retargetFootmanY86 = residualRetargetFootman.tileY();
+                retargetFootmanMoving86 = residualRetargetFootman.isMoving();
+            }
+            if (fixture == 82) {
+                syncSeed82 = world.randomSeed();
+            } else if (fixture == 83) {
+                syncSeed83 = world.randomSeed();
+            } else if (fixture == 85) {
+                syncSeed85 = world.randomSeed();
             }
         }
 
@@ -109,6 +146,30 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the defender must not land Java's former early fixture-68 hit");
         assertEquals(36, adjacentHp70,
                 "the other native attacks still land through fixture 70");
+        assertEquals(120, mineApproachX72,
+                "the mine approach detour must reach native's north skirt");
+        assertEquals(12, mineApproachY72,
+                "the moving gold sibling stays solid, preserving NE,NE,SE");
+        assertEquals(0xf94bdf32, syncSeed82,
+                "the residual retarget must not spend SyncRand before Attack 3,2,1");
+        assertEquals(0xd9e2b600, syncSeed83,
+                "the two standing melee loops retain native fixture-83 cadence");
+        assertEquals(0xbf54bc7e, syncSeed85,
+                "the residual retarget spends at OP0 alongside the native loop");
+        assertEquals(72, retargetFootmanX83,
+                "the settled footman keeps its old route during Attack construction");
+        assertEquals(63, retargetFootmanY83,
+                "the settled footman must not take Java's former early NE step");
+        assertEquals(72, retargetFootmanX85,
+                "Attack construction 3,2,1 owns fixtures 83 through 85");
+        assertEquals(63, retargetFootmanY85,
+                "the retarget handoff retains the settled square through timer one");
+        assertEquals(73, retargetFootmanX86,
+                "the completed handoff first-steps NE on native fixture 86");
+        assertEquals(62, retargetFootmanY86,
+                "the replacement route must begin with native's NE heading");
+        assertEquals(Boolean.TRUE, retargetFootmanMoving86,
+                "fixture 86 must own the live residual of the accepted NE step");
         assertTrue(defender.battleNetMeleeSyncRemaining() > 0,
                 "the delayed target handoff must retain its melee RNG cadence");
     }

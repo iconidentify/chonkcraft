@@ -421,7 +421,9 @@ final class BattleNetConstructionSystem {
                                     && candidate.pathLength() > 0);
                     if (!inMoveBody) {
                         softClear = false;
-                    } else if (candidate.battleNetCollisionCounter() > 0) {
+                    } else if (candidate.battleNetCollisionCounter() > 0
+                            || battleNetSpentGoldSiblingStaysSolid(
+                                    candidate, target)) {
                         // 0x4501bc keeps a square occupied when the blocker's
                         // high nibble at 0x1d is set, whatever its animation
                         // says, and this branch was the one place that did not
@@ -431,6 +433,17 @@ final class BattleNetConstructionSystem {
                         // square walled and stores S,SE, and this implementation stood
                         // 1561 aside, drew SE first, and could not take it.
                         // Six refusals and a fifteen-cycle sleep followed.
+                        //
+                        // Java can already have collapsed the final buffered
+                        // heading of a gold route into routeSpent while its
+                        // pixels are still draining. Native retains that
+                        // heading and its collision nibble through the same
+                        // interval. XHuman 4 peon 1570/Java 30 is the direct
+                        // witness: native remains [E,E,E] index 2/collision 2
+                        // at (120,13), so peon 1567 routes NE,NE,SE around it
+                        // on fixture 56. Java's collapsed representation must
+                        // stay solid too; soft-clearing it produced NE,E and
+                        // the first visible mismatch at fixture 72.
                         softClear = false;
                     } else if (goldFreePrefixReplan
                             && candidate.pathLength() <= 1
@@ -519,6 +532,34 @@ final class BattleNetConstructionSystem {
         } finally {
             world.setMovementFieldFlags(target, true);
         }
+    }
+
+
+    /** Native collision ownership retained by a collapsed gold-route tail. */
+    private static boolean battleNetSpentGoldSiblingStaysSolid(
+            Unit candidate, Unit target) {
+        return candidate.order() == Unit.Order.HARVEST
+                && !candidate.returningToDepot()
+                && candidate.resourceUnit() == target
+                && candidate.carrying() == UnitType.Resource.GOLD
+                && candidate.isMoving()
+                && candidate.pathLength() == 0
+                && candidate.routeSpent()
+                // Only the approach rewrite which discarded an eastward
+                // leftover represents 1570's native buffered E here. A
+                // merely exhausted diagonal route is still soft-cleared:
+                // XHuman 12 peon 1550 finishes SE while sibling 1553 plans
+                // on fixture 3, and native leaves 1553 at (6,26). Treating
+                // every moving spent route as solid made it step SE early.
+                // The retained collision ownership is also the first half of
+                // that east residual: XHuman 4 plans with 1570 at offset -21,
+                // while XOrc 12's otherwise-similar 1336 is already at -13
+                // and native soft-clears it when 1337 replans on fixture 35.
+                && candidate.battleNetSpentHeading()
+                        == Direction.fromDelta(1, 0)
+                && candidate.lastStepHeading() == Direction.fromDelta(1, 0)
+                && candidate.offsetX() < -16
+                && candidate.offsetY() == 0;
     }
 
 

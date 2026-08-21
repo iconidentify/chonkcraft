@@ -727,6 +727,7 @@ final class BattleNetCombatSystem {
         // knight, a gryphon-rider and a dragon are each one square ahead of
         // upstream's.
         boolean walked = false;
+        Unit chaseTargetBeforeWalk = unit.target();
         // A moving resource worker can remain tile-adjacent while its pixel
         // anchor is still more than one square ahead. Native keeps the
         // pursuer's current residual under Attack ownership until it is fully
@@ -1607,7 +1608,27 @@ final class BattleNetCombatSystem {
                             && unit.type().maxAttackRange() <= 1
                             && !world.targets.inAttackRange(unit, candidate)
                             && onBattleNetChaseMoveBody(unit);
-                    if (splashHelpRetargetHandoff
+                    // Footmen use the same handoff after a settled chase
+                    // residual even without person-help provenance. XHuman 4
+                    // footman 1484 drains SE at (72,63), retains its old axe
+                    // target and route while Attack construction pays 3,2,1
+                    // on fixtures 83-85, then chooses the grunt and first-
+                    // steps NE on 86. Installing the grunt immediately made
+                    // Java take that step on 83. This is not the broad melee
+                    // settled-retarget rule rejected by the grunt/ogre
+                    // witnesses below: retail's type-zero footman is the
+                    // observed extra arm, and only while the new quarry is
+                    // still outside weapon range.
+                    boolean footmanResidualRetargetHandoff =
+                            PudUnitTypes.code(unit.type().ident()) == 0
+                            && world.actionMoveWalked
+                            && unit.stepDrained()
+                            && !unit.isMoving()
+                            && unit.pathLength() > 0
+                            && !world.targets.inAttackRange(unit, candidate)
+                            && onBattleNetChaseMoveBody(unit);
+                    if ((splashHelpRetargetHandoff
+                            || footmanResidualRetargetHandoff)
                             && world.battleNetSequence != null) {
                         int handoffAttackStart = world.idle
                                 .battleNetSequenceStart(unit,
@@ -1921,7 +1942,11 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetAttackRefusalRecoveryStage(0);
                 return;
             }
-            boolean underWay = stepMoveTowardsTarget(unit);
+            boolean retargetedOnResidualSettle = world.actionMoveWalked
+                    && unit.target() != chaseTargetBeforeWalk
+                    && PudUnitTypes.code(unit.type().ident()) == 0;
+            boolean underWay = stepMoveTowardsTarget(
+                    unit, retargetedOnResidualSettle);
             // Hard-refusal stage six is the single Move probe after Attack
             // construction.  A refused probe re-arms stage five inside
             // BattleNetMovementSystem; an accepted/reached probe has paid the
@@ -2004,6 +2029,14 @@ final class BattleNetCombatSystem {
                 // here for table-0x27 melee types (not only on a later attack
                 // animation marker). Deferring until the marker left Human 13
                 // seed at 1 through fixture 19 while native advanced.
+                if (reached != chaseTargetBeforeWalk
+                        && PudUnitTypes.code(unit.type().ident()) == 0
+                        && unit.battleNetPendingMeleeSyncRand()) {
+                    world.armBattleNetAttackStart(unit);
+                    unit.setBattleNetOrderDelay(2);
+                    world.turnToTarget(unit, reached, 0, 0);
+                    return;
+                }
                 world.consumeBattleNetPendingMeleeSyncRand(unit);
                 world.turnToTarget(unit, reached, 0, 0);
                 return;
@@ -2159,6 +2192,20 @@ final class BattleNetCombatSystem {
         if (walked) {
             unit.setChasing(false);
             unit.setFighting(true);
+            // A residual-settle target switch enters cold Attack construction
+            // before table 0x27 is charged. Native XHuman 4 footman 1510
+            // finishes NE and changes axe 1506 -> grunt 1515 on fixture 82,
+            // records Attack timer 3,2,1 through 84, then spends SyncRand at
+            // OP0 on 85. Paying on the settle visit exposed the new target
+            // three callbacks early and made the shared seed diverge at 82.
+            if (target != chaseTargetBeforeWalk
+                    && PudUnitTypes.code(unit.type().ident()) == 0
+                    && unit.battleNetPendingMeleeSyncRand()) {
+                world.armBattleNetAttackStart(unit);
+                unit.setBattleNetOrderDelay(2);
+                world.turnToTarget(unit, target, 0, 0);
+                return;
+            }
             world.consumeBattleNetPendingMeleeSyncRand(unit);
             world.turnToTarget(unit, target, 0, 0);
             return;
@@ -2280,6 +2327,12 @@ final class BattleNetCombatSystem {
      * @return whether the walk is still waiting or on its way
      */
     boolean stepMoveTowardsTarget(Unit unit) {
+        return stepMoveTowardsTarget(unit, false);
+    }
+
+
+    private boolean stepMoveTowardsTarget(
+            Unit unit, boolean deferSettledRetargetSync) {
         Unit.Order saved = unit.order();
         // setOrder(MOVE/ATTACK) clears battleNetSequenceOffset so Still
         // cursors cannot fire mid-walk. Chase Move OP0 cadence needs that
@@ -2337,7 +2390,12 @@ final class BattleNetCombatSystem {
             if (target != null && world.targets.inAttackRange(unit, target)) {
                 unit.setChasing(false);
                 unit.setFighting(true);
-                world.consumeBattleNetPendingMeleeSyncRand(unit);
+                if (deferSettledRetargetSync) {
+                    world.armBattleNetAttackStart(unit);
+                    unit.setBattleNetOrderDelay(2);
+                } else {
+                    world.consumeBattleNetPendingMeleeSyncRand(unit);
+                }
             }
         }
         return underWay;

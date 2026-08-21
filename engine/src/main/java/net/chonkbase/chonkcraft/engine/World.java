@@ -14185,6 +14185,11 @@ public final class World {
             }
             debitBattleNetMeleeSyncRand(unit);
         }
+        armBattleNetAttackStart(unit);
+    }
+
+    /** Opens cold Attack construction without spending table-0x27 SyncRand. */
+    void armBattleNetAttackStart(Unit unit) {
         // First in-range after a chase step must open the Attack program.
         // Already sitting on Attack start (leftover construction 3,2,1)
         // must not rewind the timer -- Human 13 grunt 1485 debits
