@@ -41,6 +41,16 @@ class HfsImageTest {
                 "the archive data fork changed while traversing the catalog");
     }
 
+    @Test
+    @DisplayName("Japanese HFS names are decoded without MacRoman mojibake")
+    void aJapaneseVolumeNameIsDecoded() {
+        byte[] encoded = java.util.HexFormat.of().parseHex(
+                "83458348815b834e8389837483674949204344");
+
+        assertEquals("ウォークラフトII CD",
+                HfsImage.macName(encoded, 0, encoded.length));
+    }
+
     private static byte[] hfsImage() {
         byte[] image = new byte[100 * 512];
         int partition = 512;

@@ -457,8 +457,13 @@ public final class PackManagerView extends LauncherTheme.StonePanel {
         progress.setVisible(true);
         activity.setVisible(true);
         guide.setVisible(false);
-        progress.measured(update.percent());
-        progressAmount.setText(progressText(update));
+        if (update.measured()) {
+            progress.measured(update.percent());
+            progressAmount.setText(progressText(update));
+        } else {
+            progress.begin();
+            progressAmount.setText("WORKING");
+        }
     }
 
     boolean useEnabled() {

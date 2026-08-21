@@ -2,7 +2,10 @@ package net.chonkbase.chonkcraft.data.archive;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ public final class HfsImage implements AutoCloseable {
     private static final int MDB_OFFSET = 1024;
     private static final int HFS_SIGNATURE = 0x4244;
     private static final Charset MAC_ROMAN = Charset.forName("x-MacRoman");
+    private static final Charset SHIFT_JIS = Charset.forName("Shift_JIS");
 
     private final RandomAccessFile file;
     private final long volumeOffset;
@@ -206,7 +210,7 @@ public final class HfsImage implements AutoCloseable {
         }
         int parent = checkedInt(u32(tree, record + 2), "catalog parent");
         int nameLength = Math.min(tree[record + 6] & 0xFF, keyLength - 6);
-        String name = new String(tree, record + 7, nameLength, MAC_ROMAN);
+        String name = macName(tree, record + 7, nameLength);
         int data = record + ((keyLength + 2) & ~1);
         if (data + 8 > tree.length) {
             return;
@@ -283,7 +287,34 @@ public final class HfsImage implements AutoCloseable {
 
     private static String pascal(byte[] bytes, int offset, int maximum) {
         int length = Math.min(bytes[offset] & 0xFF, maximum);
-        return new String(bytes, offset + 1, length, MAC_ROMAN);
+        return macName(bytes, offset + 1, length);
+    }
+
+    /** Classic Japanese HFS discs store catalog strings as Shift-JIS. */
+    static String macName(byte[] bytes, int offset, int length) {
+        try {
+            String japanese = SHIFT_JIS.newDecoder()
+                    .onMalformedInput(CodingErrorAction.REPORT)
+                    .onUnmappableCharacter(CodingErrorAction.REPORT)
+                    .decode(ByteBuffer.wrap(bytes, offset, length))
+                    .toString();
+            long japaneseCharacters = japanese.codePoints()
+                    .filter(HfsImage::isJapaneseCharacter)
+                    .count();
+            if (japaneseCharacters >= 2) {
+                return japanese;
+            }
+        } catch (CharacterCodingException e) {
+            // Western HFS names are decoded by the normal MacRoman path below.
+        }
+        return new String(bytes, offset, length, MAC_ROMAN);
+    }
+
+    private static boolean isJapaneseCharacter(int codePoint) {
+        Character.UnicodeBlock block = Character.UnicodeBlock.of(codePoint);
+        return block == Character.UnicodeBlock.HIRAGANA
+                || block == Character.UnicodeBlock.KATAKANA
+                || block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS;
     }
 
     private static String cString(byte[] bytes, int offset, int length) {

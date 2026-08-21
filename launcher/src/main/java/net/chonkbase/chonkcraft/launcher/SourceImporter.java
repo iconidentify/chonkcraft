@@ -22,8 +22,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+import net.chonkbase.assetpack.Json;
 import net.chonkbase.chonkcraft.data.archive.CdImage;
 import net.chonkbase.chonkcraft.data.archive.HfsImage;
 import net.chonkbase.chonkcraft.data.source.InstallSource;
@@ -207,7 +209,7 @@ public final class SourceImporter {
         if (name.endsWith(".sit")) {
             Path expanded = work.resolve("stuffit");
             progress.say("Opening the StuffIt archive");
-            extractStuffIt(source, expanded);
+            extractStuffIt(source, expanded, progress, 2, 22);
             Path installation = findInstallation(expanded);
             if (installation != null) {
                 return new Prepared(installation, "the Warcraft II files in " + source.getFileName());
@@ -273,7 +275,7 @@ public final class SourceImporter {
         for (int i = 0; i < nestedArchives.size(); i++) {
             Path expanded = work.resolve("nested-stuffit-" + i);
             progress.say("Opening " + nestedArchives.get(i).getFileName());
-            extractStuffIt(nestedArchives.get(i), expanded);
+            extractStuffIt(nestedArchives.get(i), expanded, progress, 22, 24);
             Path installation = findInstallation(expanded);
             if (installation != null) {
                 return new Prepared(installation, "the Warcraft II files in "
@@ -564,16 +566,64 @@ public final class SourceImporter {
         }
     }
 
-    private static void extractStuffIt(Path source, Path destination) throws IOException {
+    private static void extractStuffIt(Path source, Path destination,
+            Reporter progress, int fromPercent, int toPercent) throws IOException {
         Files.createDirectories(destination);
+        long expandedBytes = stuffItExpandedBytes(source);
+        String message = "Expanding " + source.getFileName();
         IOException failure = runAny(List.of(
                 List.of("unar", "-quiet", "-force-overwrite",
                         "-output-directory", destination.toString(), source.toString()),
                 List.of("7zz", "x", "-y", "-o" + destination, source.toString()),
-                List.of("7z", "x", "-y", "-o" + destination, source.toString())));
+                List.of("7z", "x", "-y", "-o" + destination, source.toString())),
+                () -> progress.bytes(message, treeBytes(destination), expandedBytes,
+                        fromPercent, toPercent));
         if (failure != null) {
             throw new IOException("StuffIt extraction needs unar (The Unarchiver), and no"
                     + " compatible extractor could open " + source.getFileName(), failure);
+        }
+        progress.bytes(message, expandedBytes, expandedBytes, fromPercent, toPercent);
+    }
+
+    /** Reads unar's companion listing so the long StuffIt stage is measurable. */
+    private static long stuffItExpandedBytes(Path source) throws IOException {
+        long fallback = Math.max(1, Files.size(source));
+        try {
+            Process process = new ProcessBuilder(resolveTool("lsar"), "-json",
+                    source.toString()).redirectErrorStream(true).start();
+            byte[] output = process.getInputStream().readAllBytes();
+            if (process.waitFor() != 0) {
+                return fallback;
+            }
+            Map<String, Object> listing = Json.parseObject(new String(output,
+                    java.nio.charset.StandardCharsets.UTF_8));
+            long total = 0;
+            for (Object item : Json.array(listing, "lsarContents")) {
+                if (item instanceof Map<?, ?> values) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> entry = (Map<String, Object>) values;
+                    total = Math.addExact(total,
+                            Json.longValue(entry, "XADFileSize", 0));
+                }
+            }
+            return total > 0 && total <= MAX_ZIP_BYTES ? total : fallback;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return fallback;
+        } catch (IOException | RuntimeException e) {
+            return fallback;
+        }
+    }
+
+    private static long treeBytes(Path root) throws IOException {
+        try (var walk = Files.walk(root)) {
+            long total = 0;
+            for (Path file : walk.filter(Files::isRegularFile).toList()) {
+                total = Math.addExact(total, Files.size(file));
+            }
+            return total;
+        } catch (ArithmeticException e) {
+            throw new IOException("expanded archive is too large", e);
         }
     }
 
@@ -629,29 +679,65 @@ public final class SourceImporter {
      * refuses the format both move to the next compatible extractor.
      */
     private static IOException runAny(List<List<String>> commands) {
+        return runAny(commands, null);
+    }
+
+    @FunctionalInterface
+    private interface ProcessProgress {
+        void update() throws IOException;
+    }
+
+    private static IOException runAny(List<List<String>> commands,
+            ProcessProgress progress) {
         IOException last = null;
         for (List<String> command : commands) {
+            Path outputFile = null;
             try {
                 List<String> resolved = new ArrayList<>(command);
                 resolved.set(0, resolveTool(command.getFirst()));
+                outputFile = Files.createTempFile("chonkcraft-archive-", ".log");
                 Process process = new ProcessBuilder(resolved)
                         .redirectErrorStream(true)
+                        .redirectOutput(outputFile.toFile())
                         .start();
-                byte[] output = process.getInputStream().readAllBytes();
-                int code = process.waitFor();
+                while (!process.waitFor(250, TimeUnit.MILLISECONDS)) {
+                    report(progress);
+                }
+                report(progress);
+                int code = process.exitValue();
                 if (code == 0) {
                     return null;
                 }
                 last = new IOException(resolved.getFirst() + " exited " + code + ": "
-                        + new String(output, java.nio.charset.StandardCharsets.UTF_8).trim());
+                        + Files.readString(outputFile,
+                                java.nio.charset.StandardCharsets.UTF_8).trim());
             } catch (IOException e) {
                 last = e;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return new IOException("archive extraction was interrupted", e);
+            } finally {
+                if (outputFile != null) {
+                    try {
+                        Files.deleteIfExists(outputFile);
+                    } catch (IOException e) {
+                        // A diagnostic file in the system temp directory is harmless.
+                    }
+                }
             }
         }
         return last == null ? new IOException("no archive command was available") : last;
+    }
+
+    private static void report(ProcessProgress progress) {
+        if (progress == null) {
+            return;
+        }
+        try {
+            progress.update();
+        } catch (IOException e) {
+            // Extraction is authoritative; a transient size probe is only UI data.
+        }
     }
 
     /**

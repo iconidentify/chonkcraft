@@ -62,6 +62,19 @@ class PackManagerViewTest {
     }
 
     @Test
+    @DisplayName("unmeasured archive work remains visibly active")
+    void unmeasuredProgressKeepsWorkingAnimation() {
+        PackManagerView view = new PackManagerView(new Actions());
+        view.setBusy(true, "Preparing StuffIt archive");
+        view.setProgress(new SourceImporter.ProgressUpdate(
+                "Opening the StuffIt archive", 1, 0, 0,
+                SourceImporter.Unit.NONE));
+
+        assertTrue("WORKING".equals(view.progressAmountText()),
+                "an unmeasured extraction looked stuck at a fixed percentage");
+    }
+
+    @Test
     @DisplayName("the managed pack directory has an explicit browser action")
     void packDirectoryCanBeOpened() {
         Actions actions = new Actions();
