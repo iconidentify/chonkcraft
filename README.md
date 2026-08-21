@@ -64,27 +64,32 @@ straight into a map instead of the launcher.
 
 ### Massive battle showcase
 
-For video capture or a repeatable stress run, the showcase turns Garden of
-War into a completely open parade ground, stages every Human and Orc land/air
-battlefield class in opposing formations, and immediately sounds a synchronized
-charge. Footmen, grunts, knights, ogres, archers, axethrowers, upgraded troops,
-siege engines, demolition teams, workers, spellcasters, scouts and flyers are
-all present. It uses the normal BNE movement, targeting, combat, projectile,
-animation, sound and death paths; it is not a pre-rendered scene and never
-modifies the source map or graphics pack.
+For video capture or a repeatable stress run, the total-war showcase restores
+the original giant central Garden of War collision and turns the formerly
+empty outer perimeter into an ocean for opposing fleets. The camera opens on
+the enormous flat-map land melee as synchronized land and naval charges begin.
+Footmen, grunts, knights, ogres, archers,
+axethrowers, ballistae, catapults, demolition teams, workers, mages, death
+knights, gryphons, dragons, battleships, juggernauts, destroyers, submarines,
+transports and tankers are all present. Mages open with blizzards and fireballs;
+death knights answer with death and decay, whirlwinds and death coils. It uses
+the normal BNE movement, targeting, spell, projectile, animation, sound and
+death paths; it is not a pre-rendered scene and never modifies the source map
+or graphics pack.
 
 ```bash
-scripts/run-battle-showcase.sh                 # visual, 480 combatants
-scripts/run-battle-showcase.sh 400             # visual, heavier battle
-scripts/run-battle-showcase.sh --benchmark     # 400 units, 1,800 headless cycles
-scripts/run-battle-showcase.sh --benchmark 600 3600
+scripts/run-battle-showcase.sh                 # visual, 720 combatants
+scripts/run-battle-showcase.sh 1600            # visual, maximum chaos
+scripts/run-battle-showcase.sh --benchmark     # 720 units, 1,800 headless cycles
+scripts/run-battle-showcase.sh --benchmark 1600 900
 ```
 
-The visual run opens on the centre of the clash for capture. Naval classes are
-deliberately reserved for a water arena instead of making ships sail over
-grass. The benchmark reports simulation
-throughput, casualties and damaged survivors, and fails if the armies never
-engage or the map cannot hold at least 75% of the requested force. Once the
+Land, sea, siege, air and magic all run at once. The showcase disables fog of
+war and reveals cloaked naval units for recording; normal games are unaffected.
+The benchmark reports simulation throughput,
+casualties, damaged survivors and peak projectiles, and fails if any combat
+domain is absent, the armies never engage, or the map cannot hold at least 75%
+of the requested force. Once the
 opening formations cross, a small showcase director periodically gives every
 disengaged survivor a normal attack command against its nearest compatible
 enemy. It does not move units or deal damage itself; it prevents congestion or
@@ -92,7 +97,7 @@ an exhausted attack-move from looking like a silent ceasefire merely because
 there is no human issuing the next command. The status line reports the
 remaining forces and clearly names the winner when one side is eliminated.
 
-The number is the combined force size and is clamped to 40–800. For a clean
+The number is the combined force size and is clamped to 80–1,600. For a clean
 capture, close any other running ChonkCraft game first, then launch the visual
 mode and record the window. Press Escape and choose **End Scenario**, or close
 the window, when the capture is finished. The deterministic benchmark is the

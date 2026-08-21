@@ -2,10 +2,10 @@
 #
 # Launch a deterministic, camera-ready battle using the normal game engine.
 #
-#   scripts/run-battle-showcase.sh                 # 480 units, visual
-#   scripts/run-battle-showcase.sh 400             # 400 units, visual
-#   scripts/run-battle-showcase.sh --benchmark     # 400 units, 1800 cycles
-#   scripts/run-battle-showcase.sh --benchmark 600 3600
+#   scripts/run-battle-showcase.sh                 # 720 units, visual
+#   scripts/run-battle-showcase.sh 1600            # maximum-chaos visual run
+#   scripts/run-battle-showcase.sh --benchmark     # 720 units, 1800 cycles
+#   scripts/run-battle-showcase.sh --benchmark 1600 900
 
 set -euo pipefail
 
@@ -14,11 +14,11 @@ mode="${1:-}"
 
 if [[ "${mode}" != "--benchmark" ]]; then
   export CHONKCRAFT_SHOWCASE=1
-  export CHONKCRAFT_SHOWCASE_UNITS="${1:-480}"
+  export CHONKCRAFT_SHOWCASE_UNITS="${1:-720}"
   exec "${repo_root}/scripts/run-game.sh"
 fi
 
-units="${2:-400}"
+units="${2:-720}"
 cycles="${3:-1800}"
 classpath_file="${repo_root}/desktop/target/runtime-classpath.txt"
 

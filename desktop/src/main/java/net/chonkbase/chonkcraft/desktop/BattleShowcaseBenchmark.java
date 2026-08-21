@@ -20,7 +20,8 @@ public final class BattleShowcaseBenchmark {
             throw new IllegalStateException(
                     "Set CHONKCRAFT_ASSET_PACK or WC2_INSTALL_DIR");
         }
-        int units = number(args, 0, 400, BattleShowcase.MIN_UNITS, BattleShowcase.MAX_UNITS);
+        int units = number(args, 0, 720, BattleShowcase.MIN_UNITS,
+                BattleShowcase.MAX_UNITS);
         int cycles = number(args, 1, 1_800, 30, 18_000);
         GameData data = new GameData(assets);
         String mapName = BattleShowcase.defaultMapName(assets);
@@ -39,9 +40,13 @@ public final class BattleShowcaseBenchmark {
 
         int initialAlive = alive(result);
         BattleShowcase.Status status = null;
+        int simulated = 0;
+        int peakMissiles = 0;
         long started = System.nanoTime();
         for (int cycle = 0; cycle < cycles; cycle++) {
             world.tick();
+            simulated++;
+            peakMissiles = Math.max(peakMissiles, world.missiles().size());
             status = director.update();
             if (status.complete()) {
                 break;
@@ -58,13 +63,15 @@ public final class BattleShowcaseBenchmark {
         System.out.printf("  Map: %s%n", mapName);
         System.out.printf("  Units: %d deployed (%d human, %d orc)%n",
                 result.deployed(), result.humanUnits(), result.orcUnits());
+        System.out.printf("  Fronts: %d land/air, %d naval; %d opening spell orders%n",
+                result.landUnits(), result.navalUnits(), result.openingSpells());
         System.out.printf("  Simulated: %d cycles (%.1f game seconds) in %.3f real seconds%n",
-                cycles, cycles / (double) World.CYCLES_PER_SECOND, seconds);
+                simulated, simulated / (double) World.CYCLES_PER_SECOND, seconds);
         System.out.printf("  Throughput: %.0f cycles/second (%.1fx real time)%n",
-                cycles / seconds,
-                cycles / seconds / World.CYCLES_PER_SECOND);
-        System.out.printf("  Combat: %d casualties, %d damaged survivors%n",
-                initialAlive - alive, damaged);
+                simulated / seconds,
+                simulated / seconds / World.CYCLES_PER_SECOND);
+        System.out.printf("  Combat: %d casualties, %d damaged survivors, %d peak missiles%n",
+                initialAlive - alive, damaged, peakMissiles);
         if (status != null && status.complete()) {
             System.out.printf("  Outcome: %s%n", status.message());
         } else if (status != null) {
@@ -80,6 +87,10 @@ public final class BattleShowcaseBenchmark {
         }
         if (initialAlive == alive && damaged == 0) {
             throw new IllegalStateException("the opposing armies never engaged");
+        }
+        if (result.navalUnits() == 0 || result.openingSpells() == 0 || peakMissiles == 0) {
+            throw new IllegalStateException(
+                    "the total-war showcase omitted naval, magic, or projectile action");
         }
     }
 
