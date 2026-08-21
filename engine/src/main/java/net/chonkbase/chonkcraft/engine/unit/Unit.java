@@ -2394,6 +2394,20 @@ public final class Unit {
     private boolean battleNetChaseReplanResidualHold;
 
     /**
+     * Whether a melee retarget route has paid its first residual Attack hold
+     * and still owes retail's route-index-20 movement visit.
+     */
+    public boolean battleNetRetargetResidualRoutePark() {
+        return battleNetRetargetResidualRoutePark;
+    }
+
+    public void setBattleNetRetargetResidualRoutePark(boolean park) {
+        battleNetRetargetResidualRoutePark = park;
+    }
+
+    private boolean battleNetRetargetResidualRoutePark;
+
+    /**
      * Empty-route retarget first step still owes its residual settle hold.
      *
      * <p>XHuman 12 grunt 1507 retargets after its old route exhausts and takes

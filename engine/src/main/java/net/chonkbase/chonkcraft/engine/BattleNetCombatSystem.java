@@ -851,6 +851,17 @@ final class BattleNetCombatSystem {
                         }
                     }
                     unit.setBattleNetChaseReplanResidualHold(false);
+                    if (replanResidualHold) {
+                        // The hold ends the first pixel leg of a route laid by
+                        // a melee retarget. Retail keeps that provenance for
+                        // the following Move decision: if the cached next
+                        // square refuses, its route cursor is parked before a
+                        // replacement route receives the cooperative wait.
+                        // XHuman 12 grunt 1492 settles at fixture 38, pays the
+                        // Attack-four tail, parks the stale E route at 41, and
+                        // only then plans the blocked SW detour at 42.
+                        unit.setBattleNetRetargetResidualRoutePark(true);
+                    }
                     unit.setBattleNetEmptyRouteFreeDetourHold(false);
                     unit.setBattleNetOrderDelay(2);
                     if (freeDetourResidualHold) {

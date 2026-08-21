@@ -2971,6 +2971,34 @@ final class BattleNetMovementSystem {
                     canTakeStep = true;
                 }
             }
+            // A live route installed by a melee retarget owns one more native
+            // boundary after its first step and Attack-four residual hold.
+            // When its cached next square refuses, 0x450ad0 parks the old
+            // cursor on this visit; the following visit lays the replacement
+            // route and may then enter FUN_004379e0's cooperative wait. Losing
+            // that provenance made Java wait on the stale heading and later
+            // walk into the traffic it should have routed around (XHuman 12
+            // grunt 1492: park c41, replacement SW + timer 15 c42).
+            if (unit.battleNetRetargetResidualRoutePark()
+                    && unit.stepDrained() && !unit.isMoving()
+                    && unit.pathLength() > 0
+                    && unit.target() != null
+                    && !World.battleNetRangedChaseUnit(unit)
+                    && (unit.order() == Unit.Order.ATTACK
+                            || unit.order() == Unit.Order.ATTACK_MOVE
+                            || unit.chasing())) {
+                unit.setBattleNetRetargetResidualRoutePark(false);
+                if (!canTakeStep) {
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    unit.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    return;
+                }
+            }
             // Armed air Patrol does not put its first cardinal route behind
             // the generic fifteen-count body wait. When an allied flyer
             // occupies that anchor, retail rewrites the route to the two
@@ -3242,13 +3270,13 @@ final class BattleNetMovementSystem {
                         }
                     }
                     // After one cooperative soft-wait, residual-settled melee
-                    // with nearly-full leftover path free-compass detours.
-                    // XHuman 12 grunt 1494 (path 6 at 27,40) after coll>=1.
-                    //
-                    // It stands in for the replan native does, and taking it
-                    // out costs 25 of 410,880 paired unit-cycles fleet-wide
-                    // and seventeen cycles on the case. It goes when the
-                    // replan is right; focused tests preserve the rule.
+                    // with a nearly-full leftover free-compass detours on the
+                    // next movement visit. This is the Java scheduling bridge
+                    // for native's park-at-36, replan-and-N-at-37 lifecycle.
+                    // Preserve the collision increment from that native park:
+                    // resetting it after choosing N left grunt 1494 at zero
+                    // instead of two, so the adjacent grunt's fixture-42 path
+                    // search incorrectly crossed the crowded north-east side.
                     if (!canTakeStep
                             && unit.stepDrained()
                             && !unit.isMoving()
@@ -3274,9 +3302,9 @@ final class BattleNetMovementSystem {
                         if (freeHeading >= 0) {
                             unit.replacePeekHeading(freeHeading);
                             unit.setBattleNetNearlyFullFreeDetour(true);
-                            if (unit.battleNetCollisionCounter() < 2) {
-                                unit.setBattleNetCollisionCounter(0);
-                            }
+                            int collision = unit.battleNetCollisionCounter() + 1;
+                            unit.setBattleNetCollisionCounter(
+                                    collision > 14 ? 0 : collision);
                             heading = freeHeading;
                             nextX = unit.tileX()
                                     + Direction.deltaX(heading) * strideDetour;
