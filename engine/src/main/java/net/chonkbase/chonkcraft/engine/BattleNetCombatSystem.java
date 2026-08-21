@@ -1407,6 +1407,53 @@ final class BattleNetCombatSystem {
                                 && unit.battleNetCollisionCounter() > 0;
                         residualPathOneChangedTarget = pathn1ChangedTarget;
                         if (!pathn1FreeProgress && !pathn1ChangedTarget) {
+                            // A behavior-one defender already inside the
+                            // expanded skirt of a multi-tile building has a
+                            // route goal on that footprint, not merely on its
+                            // north-west tile.  At XHuman 12 fixture 57 grunt
+                            // 1358 is distance two from tower 1370's 2x2
+                            // footprint although the raw tile delta is three.
+                            // Native parks the blocked N leftover, refills the
+                            // complete NW,NE route, and takes NW on the next
+                            // visit. Treating the raw delta as a far compass
+                            // fallback selected the first free S instead.
+                            boolean footprintNearBuilding =
+                                    unit.battleNetAiBehavior() == 1
+                                    && pathn1Quarry.type() != null
+                                    && pathn1Quarry.type().building()
+                                    && pathn1Cur > 2
+                                    && world.battleNetDistance(
+                                            unit, pathn1Quarry) <= 2;
+                            if (footprintNearBuilding) {
+                                unit.clearPath();
+                                unit.setRouteSpent(false);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(0);
+                                world.planTowards(unit, pathn1Quarry, true);
+                                return;
+                            }
+                            // A sticky native refusal means this is also a
+                            // buffer-refill boundary, even when the quarry is
+                            // mobile. XHuman 12 grunt 1514 has already paid
+                            // refusal one when its last N residual settles at
+                            // fixture 41. Retail writes N,NE,SE,E... and waits
+                            // one visit before consuming N; Java kept only N,
+                            // so the residual which lands at 58 had no NE tail
+                            // to commit. A target-changing refusal takes the
+                            // separate retarget arm above and is not this case.
+                            boolean refusalBackedMobileRefill =
+                                    unit.battleNetAiBehavior() == 1
+                                    && unit.battleNetRefusals() > 0
+                                    && pathn1Quarry.type() != null
+                                    && !pathn1Quarry.type().building();
+                            if (refusalBackedMobileRefill) {
+                                unit.clearPath();
+                                unit.setRouteSpent(false);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(0);
+                                world.planTowards(unit, pathn1Quarry, true);
+                                return;
+                            }
                             // RI20 + free-compass first free neighbour. Full
                             // pathfind after clear returned SE (path 3134) and
                             // stepped N only at fixture 43; native N@42.

@@ -3531,18 +3531,39 @@ final class BattleNetMovementSystem {
                                     int keptColl =
                                             unit.battleNetCollisionCounter();
                                     int keptPathn = unit.pathLength();
-                                    unit.replacePeekHeading(freeHeading);
                                     unit.clearPath();
-                                    unit.setPath(new PathFinder.Path(
-                                            PathFinder.Result.FOUND,
-                                            new int[] {freeHeading}));
+                                    // The compass result is the approved first
+                                    // byte of a replacement buffer, not a
+                                    // complete one-byte route. Retail 1510
+                                    // consumes SE at fixture 41 but retains
+                                    // E,E,NE...; that E is what enters the
+                                    // fifteen-count refusal when the residual
+                                    // settles at fixture 57. Losing the tail
+                                    // made Java empty-route replan NW at 58.
+                                    PathFinder.Result refill = world.planTowards(
+                                            unit, unit.target(), true);
+                                    if (refill == PathFinder.Result.FOUND
+                                            && unit.pathLength() > 0) {
+                                        unit.replacePeekHeading(freeHeading);
+                                    } else {
+                                        unit.setPath(new PathFinder.Path(
+                                                PathFinder.Result.FOUND,
+                                                new int[] {freeHeading}));
+                                    }
                                     if (keptPathn > 1 && keptColl >= 1) {
                                         unit.setBattleNetCollisionCounter(
                                                 keptColl);
                                     }
                                     unit.setBattleNetChaseEmptyRouteReplan(
                                             false);
-                                    unit.setBattleNetOrderDelay(3);
+                                    // A full replacement retains its next
+                                    // Move decision; the one-byte fallback
+                                    // needs the old Attack-four delay/free-
+                                    // wake bridge. Native parks on this visit
+                                    // and may consume the approved head on the
+                                    // following one.
+                                    unit.setBattleNetOrderDelay(
+                                            unit.pathLength() > 1 ? 0 : 3);
                                     return;
                                 }
                                 // Native's give-up is nine bytes -- 0x00450ad0 sets
@@ -3698,6 +3719,18 @@ final class BattleNetMovementSystem {
                     // delay 2 stepped at 38.
                     if (unit.stepDrained() && !unit.isMoving()
                             && unit.pathLength() >= 5
+                            // A one-step long residual with an existing
+                            // collision is the route-park arm, not the axis-
+                            // rescue arm. XHuman 12 grunt 1517 carries eight
+                            // headings after its first SE, settles against an
+                            // allied blocker at fixture 58, parks there, and
+                            // refills E on 59. Same-cycle E let it steal the
+                            // square one visit early. Fresh long routes
+                            // (pathStepsTaken zero) still need this rescue.
+                            && !(unit.battleNetPathStepsTaken() == 1
+                                    && unit.battleNetCollisionCounter() > 0
+                                    && unit.battleNetRefusals() == 0
+                                    && unit.pathLength() > 5)
                             && Direction.isDiagonal(heading)) {
                         Unit hardBlocker = world.unitAt(nextX, nextY);
                         boolean allyHard = hardBlocker != null
