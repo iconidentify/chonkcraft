@@ -594,22 +594,44 @@ public final class LoadGame {
      * as the end of a map-authored patrol and the whole assault becomes Still.
      * A legacy save cannot name the missing marker, but an AI-owned Patrol whose
      * destination is an actual hostile unit retains the force march's decisive
-     * external evidence. Newly written saves carry behavior zero explicitly,
-     * so a deliberate map patrol is never inferred through this migration path.
+     * external evidence. If that hostile has since vanished, a nearby rally
+     * endpoint paired with a far destination retains the force's construction
+     * shape. Newly written saves carry behavior zero explicitly, so a deliberate
+     * map patrol is never inferred through this migration path.
      */
     private static void repairLegacyAiAssaultPatrols(World world,
             java.util.Set<Unit> explicitAiBehavior) {
         for (Unit unit : world.units()) {
             if (explicitAiBehavior.contains(unit)
                     || unit.order() != Unit.Order.PATROL
-                    || unit.battleNetAiBehavior() != 0
+                    || unit.battleNetAiBehavior() > 1
                     || !world.ais().containsKey(unit.player())
                     || !world.map().contains(unit.orderTargetX(), unit.orderTargetY())) {
                 continue;
             }
             Unit hostile = world.unitAt(unit.orderTargetX(), unit.orderTargetY());
-            if (hostile == null || !hostile.isAlive() || !hostile.isOnMap()
-                    || !world.isEnemyPlayer(unit.player(), hostile.player())) {
+            boolean liveHostile = hostile != null && hostile.isAlive()
+                    && hostile.isOnMap()
+                    && world.isEnemyPlayer(unit.player(), hostile.player());
+            int goalDistance = Math.max(
+                    Math.abs(unit.tileX() - unit.orderTargetX()),
+                    Math.abs(unit.tileY() - unit.orderTargetY()));
+            int backDistance = Math.max(
+                    Math.abs(unit.tileX() - unit.patrolX()),
+                    Math.abs(unit.tileY() - unit.patrolY()));
+            // A legacy assault can outlive the hostile that originally
+            // supplied its far endpoint. The captured Human 6 save has the
+            // packed force seven tiles from its rally point and sixty from
+            // that now-empty endpoint. RestoreUnit constructs modern AI
+            // combatants as behavior one, so requiring zero or a still-live
+            // target made this whole saved army go Still on its first tick.
+            // The tight near-back/far-goal shape is the durable force-march
+            // evidence; newly written behavior-zero map Patrols are excluded
+            // above through explicitAiBehavior.
+            boolean legacyForceMarch = unit.battleNetAiBehavior() <= 1
+                    && unit.patrolX() >= 0 && unit.patrolY() >= 0
+                    && backDistance <= 8 && goalDistance >= 16;
+            if (!liveHostile && !legacyForceMarch) {
                 continue;
             }
             unit.setBattleNetAiBehavior(2);

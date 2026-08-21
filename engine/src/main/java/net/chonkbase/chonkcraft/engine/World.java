@@ -5828,6 +5828,20 @@ public final class World {
     private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
             boolean settledResidualRetarget,
             boolean completedRefusalBand) {
+        return findBattleNetTargetPath(unit, target, settledResidualRetarget,
+                completedRefusalBand, false);
+    }
+
+    /** Target route built by Patrol before its queued Attack becomes current. */
+    private PathFinder.Path findBattleNetPatrolOpeningTargetPath(
+            Unit unit, Unit target) {
+        return findBattleNetTargetPath(unit, target, false, false, true);
+    }
+
+    private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean keepMovingAlliesHard) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         for (Unit candidate : units) {
@@ -5836,6 +5850,9 @@ public final class World {
                 continue;
             }
             if (isAllied(unit.player(), candidate.player())) {
+                if (keepMovingAlliesHard) {
+                    continue;
+                }
                 // 0x450690 may cross a friendly unit whose Move sequence has
                 // already begun. Attack-sequence chasers keep hard occupancy
                 // (XHuman 12 residual replan east wall-follow).
@@ -9217,7 +9234,8 @@ public final class World {
                                 + " path=%d spent=%d pos=%d,%d ix=%d iy=%d"
                                 + " residual=%d,%d resource=%d depot=%d"
                                 + " worksite=%d returning=%d carried=%d"
-                                + " target=%d offered=%d%n",
+                                + " target=%d offered=%d ai=%d home=%d,%d"
+                                + " patrol=%d,%d goal=%d,%d%n",
                         cycle, unit.id(), unit.order(), unit.currentAction(),
                         unit.waitCycles(), unit.animation().unbreakable() ? 1 : 0,
                         unit.animation().index(), unit.animation().waitCycles(),
@@ -9237,7 +9255,11 @@ public final class World {
                         unit.worksite() == null ? -1 : unit.worksite().id(),
                         unit.returningToDepot() ? 1 : 0, unit.carried(),
                         unit.target() == null ? -1 : unit.target().id(),
-                        unit.offeredTarget() == null ? -1 : unit.offeredTarget().id());
+                        unit.offeredTarget() == null ? -1 : unit.offeredTarget().id(),
+                        unit.battleNetAiBehavior(),
+                        unit.battleNetAiHomeX(), unit.battleNetAiHomeY(),
+                        unit.patrolX(), unit.patrolY(),
+                        unit.orderTargetX(), unit.orderTargetY());
             }
             // Waiting belongs to the actions that call COrder::IsWaiting.
             // Die does not: COrder_Die::Execute goes straight to
@@ -11283,6 +11305,8 @@ public final class World {
      */
     private void beginPendingAttack(Unit unit) {
         boolean capitalPatrol = battleNetStandingPatrolSequence(unit);
+        boolean landPatrolHandoff =
+                battleNetLandPatrolAttackHandoff(unit);
         if (capitalPatrol) {
             // A capital ship banks Attack as next_order at its opening Patrol
             // marker, takes one doubled stride, and keeps Patrol current for
@@ -11309,6 +11333,12 @@ public final class World {
                 && unit.battleNetOrderDelay() > 0) {
             return;
         }
+        if (landPatrolHandoff && unit.isMoving()) {
+            // The Patrol stride owns the current action until its last pixel.
+            // XHuman 12 ogre 1356 keeps action 4 through fixture 71 and pops
+            // its direct Attack on the fixture-72 settle visit.
+            return;
+        }
         Unit target = unit.pendingAttack();
         Unit.Order queuedUnder = unit.pendingAttackFrom();
         int targetX = unit.pendingAttackX();
@@ -11328,6 +11358,12 @@ public final class World {
             return;
         }
         Unit.Order interrupted = unit.order();
+        if (landPatrolHandoff) {
+            if (orderAttack(unit, target, false, false)) {
+                rememberInterruptedOrder(unit, interrupted);
+            }
+            return;
+        }
         if (capitalPatrol) {
             if (orderAttack(unit, target, false, false)) {
                 // Native keeps the Patrol route buffer while action 12 is
@@ -11694,6 +11730,18 @@ public final class World {
         if (delayHold) {
             return;
         }
+        // A land force recruited out of a committed Move constructs Patrol
+        // at the Still head. On its first free visit retail scans, banks a
+        // direct Attack as next_order, and still takes the Patrol's first
+        // stride. XHuman 12 ogre 1356 therefore steps N on fixture 60 under
+        // Patrol and promotes Attack only when those pixels settle on 72.
+        // Generic autoAttack returned before walking, then popped AttackMove
+        // on 61 and left the assault standing through 75.
+        boolean openingLandAssaultPatrol =
+                battleNetOpeningLandAssaultPatrol(unit);
+        if (openingLandAssaultPatrol) {
+            battleNetPatrolQueueAcquire(unit);
+        }
         boolean openingCapitalStride = standingPatrol
                 && !battleNetPatrolMoveBodyCursor(unit)
                 && unit.pathLength() == 0 && !unit.isMoving();
@@ -11810,7 +11858,10 @@ public final class World {
         boolean awaitingFirstPatrolStep = unit.battleNetDoubleStep()
                 && unit.pathLength() == 0
                 && !unit.isMoving();
-        if (!standingPatrol && !awaitingFirstPatrolStep && combat.autoAttack(unit)) {
+        if (!standingPatrol && !awaitingFirstPatrolStep
+                && !openingLandAssaultPatrol
+                && !battleNetLandPatrolAttackHandoff(unit)
+                && combat.autoAttack(unit)) {
             // Sea double-step with multi-step leftover (typically residual-
             // settled): native rewrites the route to the hostile and holds
             // under Patrol for fifteen animation ticks (1542: timer 15 at
@@ -12078,6 +12129,13 @@ public final class World {
         // stepMove reads the order it is given, so a patrolling unit has to
         // borrow the move order for the duration of the step and give it back.
         movement.walkTowards(unit, unit.orderTargetX(), unit.orderTargetY());
+        if (battleNetLandPatrolAttackHandoff(unit) && !unit.isMoving()) {
+            // beginPendingAttack runs before the order body, so the visit
+            // that drains the final pixels has already missed its ordinary
+            // pop. Native promotes on that same settle visit.
+            beginPendingAttack(unit);
+            return;
+        }
         // Residual of leftover dest-arm can settle inside walkTowards. The
         // dest-reached exchange above saw isMoving and skipped; do it now
         // so the land visit turns around instead of waiting for the next
@@ -13459,10 +13517,54 @@ public final class World {
         if (target == null) {
             return false;
         }
-        unit.setPendingAttack(target, Unit.Order.PATROL,
-                target.tileX(), target.tileY());
-        unit.setOrderTarget(target.tileX(), target.tileY());
+        int goalX = target.tileX();
+        int goalY = target.tileY();
+        if (unit.type().moveType() == UnitType.Movement.LAND
+                && unit.battleNetAiBehavior() == 2) {
+            // This acquire is still COrder_Patrol's OP0, but native has
+            // already installed COrder_Attack's marked-footprint path input.
+            // The distinction is visible against a building: XHuman 12 ogre
+            // 1356 targets the tower at 13,86, stores order point 13,87 and
+            // first-steps N. A plain point path to 13,86 begins NE instead,
+            // collides with the packed assault line, and leaves the ogre
+            // standing while the rest of the battle moves away.
+            goalX = battleNetFootprintGoal(unit.tileX(), target.tileX(),
+                    Math.max(1, target.type().tileWidth()));
+            goalY = battleNetFootprintGoal(unit.tileY(), target.tileY(),
+                    Math.max(1, target.type().tileHeight()));
+            PathFinder.Path path = findBattleNetPatrolOpeningTargetPath(
+                    unit, target);
+            unit.setPath(path);
+            unit.setPathGoal(target.tileX(), target.tileY());
+        }
+        unit.setPendingAttack(target, Unit.Order.PATROL, goalX, goalY);
+        unit.setOrderTarget(goalX, goalY);
         return true;
+    }
+
+    /** Whether a freshly constructed land-assault Patrol owns its first OP0. */
+    private boolean battleNetOpeningLandAssaultPatrol(Unit unit) {
+        if (battleNetSequence == null || unit == null || unit.type() == null
+                || unit.order() != Unit.Order.PATROL
+                || unit.type().moveType() != UnitType.Movement.LAND
+                || unit.battleNetAiBehavior() != 2
+                || unit.pathLength() != 0 || unit.isMoving()) {
+            return false;
+        }
+        int stillStart = idle.battleNetStillSequenceStart(unit);
+        return stillStart >= 0
+                && unit.battleNetSequenceOffset() == stillStart
+                && unit.battleNetAnimationTimer() == 3;
+    }
+
+    /** Direct Attack queued behind a behavior-two land Patrol stride. */
+    private static boolean battleNetLandPatrolAttackHandoff(Unit unit) {
+        return unit != null && unit.type() != null
+                && unit.order() == Unit.Order.PATROL
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.battleNetAiBehavior() == 2
+                && unit.pendingAttack() != null
+                && unit.pendingAttackFrom() == Unit.Order.PATROL;
     }
 
     /** Target selected at a capital-ship Patrol opcode zero. */

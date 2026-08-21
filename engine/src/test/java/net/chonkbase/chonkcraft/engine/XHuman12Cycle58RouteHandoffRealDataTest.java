@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** Locks the four native route handoffs that meet at XHuman 12 fixture 58. */
+/** Locks the native route handoffs that meet at XHuman 12 fixture 58. */
 class XHuman12Cycle58RouteHandoffRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
@@ -32,15 +32,17 @@ class XHuman12Cycle58RouteHandoffRealDataTest {
         Unit longRefusal = unitAt(world, "unit-grunt", 34, 38);
         Unit blockedRefill = unitAt(world, "unit-grunt", 27, 37);
         Unit residualPark = unitAt(world, "unit-grunt", 22, 37);
+        Unit moveDetour = unitAt(world, "unit-ogre", 70, 35);
         assertNotNull(towerChaser, "XHuman 12 has no native-slot-1358 grunt");
         assertNotNull(longRefusal, "XHuman 12 has no native-slot-1510 grunt");
         assertNotNull(blockedRefill, "XHuman 12 has no native-slot-1514 grunt");
         assertNotNull(residualPark, "XHuman 12 has no native-slot-1517 grunt");
+        assertNotNull(moveDetour, "XHuman 12 has no native-slot-1527 ogre");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        while (fixtureCycle(world) < 59) {
+        while (fixtureCycle(world) < 60) {
             mission.tick();
             int fixture = fixtureCycle(world);
             if (fixture == 58) {
@@ -53,9 +55,15 @@ class XHuman12Cycle58RouteHandoffRealDataTest {
                 assertAt(residualPark, 24, 39,
                         "the blocked diagonal parks before its replacement route");
             }
+            if (fixture == 59) {
+                assertAt(moveDetour, 73, 34,
+                        "the free-compass move detour parks its stale route tail");
+            }
         }
         assertAt(residualPark, 25, 39,
                 "the parked residual route refills and steps east at fixture 59");
+        assertAt(moveDetour, 74, 34,
+                "the parked move detour replans east at fixture 60");
     }
 
     private static int fixtureCycle(World world) {

@@ -2308,18 +2308,22 @@ final class BattleNetMovementSystem {
             AnimationSet dbgSet = unit.type().animationSet();
             Animation dbgMove = dbgSet == null ? null : dbgSet.get(AnimationSet.State.MOVE);
             System.err.printf("JMOVINGDBG cycle=%d unit=%d moving=%d unbreak=%d"
-                    + " curranim-is-move=%d wait=%d anim=%d ix=%d iy=%d dir=%d path=%d"
+                    + " curranim-is-move=%d wait=%d anim=%d ix=%d iy=%d dir=%d path=%d peek=%d"
                     + " fast=%d residual=%d,%d drained=%d chasing=%d pathgoal=%d,%d"
-                    + " target=%d@%d,%d%n",
+                    + " delay=%d free-detour=%d target=%d@%d,%d%n",
                     world.cycle, unit.id(), unit.walkHolding() ? 1 : 0,
                     unit.animation().unbreakable() ? 1 : 0,
                     unit.animation().current() == dbgMove ? 1 : 0,
                     unit.animation().waitCycles(), unit.animation().index(),
                     unit.offsetX(), unit.offsetY(), unit.direction(),
-                    unit.pathLength(), unit.pathWaitBudget(),
+                    unit.pathLength(), unit.pathLength() == 0
+                            ? -1 : unit.peekHeading(),
+                    unit.pathWaitBudget(),
                     unit.residualX(), unit.residualY(),
                     unit.stepDrained() ? 1 : 0, unit.chasing() ? 1 : 0,
                     unit.pathGoalX(), unit.pathGoalY(),
+                    unit.battleNetOrderDelay(),
+                    unit.battleNetNearlyFullFreeDetour() ? 1 : 0,
                     unit.target() == null ? -1 : unit.target().id(),
                     unit.target() == null ? -1 : unit.target().tileX(),
                     unit.target() == null ? -1 : unit.target().tileY());
@@ -2520,11 +2524,12 @@ final class BattleNetMovementSystem {
         }
         if (mayDecide && unit.battleNetNearlyFullFreeDetour()
                 && unit.stepDrained() && !unit.isMoving()) {
-            // The nearly-full leftover's free-compass heading was a detached
-            // detour, not permission to consume the old route underneath it.
+            // A free-compass heading detached from a refused route is not
+            // permission to consume the old route underneath it.
             // Once that detour drains, native parks route_index 20 on the Move
             // opening OP0 and replans on the following visit. XHuman 12 grunt
-            // 1494 therefore yields on fixture 53 and steps fresh SE on 54.
+            // 1494 therefore yields on fixture 53 and steps fresh SE on 54;
+            // pure-Move ogre 1527 yields on 59 and steps fresh E on 60.
             unit.setBattleNetNearlyFullFreeDetour(false);
             unit.clearPath();
             unit.setRouteSpent(false);
@@ -4637,8 +4642,18 @@ final class BattleNetMovementSystem {
                             // Install the free heading and return without
                             // stepping: the next movement visit takes NE
                             // when canEnter is true (ogre 1527 native@47).
-                            // Same-cycle step landed@46; orderDelay 1@48.
+                            // The old route tail remains in the native record
+                            // for this leg but is parked, not consumed, when
+                            // the detour drains. Same-cycle step landed@46;
+                            // retaining that tail stepped NE again at 59
+                            // instead of parking and replanning E at 60.
                             unit.replacePeekHeading(freeHeading);
+                            // This branch returns before consuming the
+                            // approved heading. Arm the route park only when
+                            // that heading is actually taken; arming it here
+                            // would mistake the old residual for the detour
+                            // and park one visit too soon.
+                            unit.setBattleNetMoveFreeDetourPending(true);
                             unit.setBattleNetCollisionCounter(0);
                             unit.setWaitCycles(0);
                             return;
@@ -4686,6 +4701,10 @@ final class BattleNetMovementSystem {
             unit.setPathWaitBudget(0);
             stepped = true;
             unit.popHeading();
+            if (unit.battleNetMoveFreeDetourPending()) {
+                unit.setBattleNetMoveFreeDetourPending(false);
+                unit.setBattleNetNearlyFullFreeDetour(true);
+            }
             int priorX = unit.tileX();
             int priorY = unit.tileY();
             world.markOccupancy(unit, false);

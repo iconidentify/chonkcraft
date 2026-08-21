@@ -25,7 +25,7 @@ import xml.etree.ElementTree as ET
 root = Path(sys.argv[1])
 expected = {
     "net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecodeTest": 8,
-    "net.chonkbase.chonkcraft.engine.ai.BattleNetAiForcePredicateTest": 3,
+    "net.chonkbase.chonkcraft.engine.ai.BattleNetAiForcePredicateTest": 4,
     "net.chonkbase.chonkcraft.engine.ai.BattleNetAiRetailDataTest": 1,
     "net.chonkbase.chonkcraft.engine.perf.AiCompetenceTest": 1,
     "net.chonkbase.chonkcraft.engine.BattleNetHumanFiveGuardBehaviorRealDataTest": 1,
@@ -45,7 +45,7 @@ for name, count in expected.items():
             f"{name}: expected {count}/0/0/0 tests/skips/failures/errors, "
             f"got {observed}/{skipped}/{failures}/{errors}"
         )
-print("retail AI inventory: 17 pass, 0 skipped")
+print("retail AI inventory: 18 pass, 0 skipped")
 PY
 
 echo "retail AI gate passed: ai.bin opponent gathers, builds, forms and attacks"

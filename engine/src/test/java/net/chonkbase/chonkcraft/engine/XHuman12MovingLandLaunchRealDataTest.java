@@ -35,7 +35,7 @@ class XHuman12MovingLandLaunchRealDataTest {
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        while (fixtureCycle(world) < 57) {
+        while (fixtureCycle(world) < 72) {
             mission.tick();
             int fixture = fixtureCycle(world);
             if (fixture == 49) {
@@ -52,18 +52,30 @@ class XHuman12MovingLandLaunchRealDataTest {
                 assertEquals(ogre.battleNetAiHomeY(),
                         ogre.battleNetPendingPatrolY());
             }
+            if (fixture == 57) {
+                assertEquals(10, ogre.tileX(),
+                        "the launch must stop the stale route from gliding east");
+                assertEquals(90, ogre.tileY());
+                assertEquals(Unit.Order.PATROL, ogre.order(),
+                        "Patrol promotes on the committed stride's settle visit");
+                assertEquals(10, ogre.patrolX());
+                assertEquals(90, ogre.patrolY());
+                assertEquals(581, ogre.battleNetSequenceOffset(),
+                        "the Patrol handoff constructs native Still");
+                assertEquals(3, ogre.battleNetAnimationTimer());
+            }
+            if (fixture == 60) {
+                assertEquals(10, ogre.tileX());
+                assertEquals(89, ogre.tileY(),
+                        "the constructed assault Patrol first-steps north");
+            }
+            if (fixture >= 60 && fixture <= 71) {
+                assertEquals(Unit.Order.PATROL, ogre.order(),
+                        "the direct Attack stays queued while Patrol pixels drain");
+            }
         }
-
-        assertEquals(10, ogre.tileX(),
-                "the launch must stop the stale route from gliding east");
-        assertEquals(90, ogre.tileY());
-        assertEquals(Unit.Order.PATROL, ogre.order(),
-                "Patrol promotes on the committed stride's settle visit");
-        assertEquals(10, ogre.patrolX());
-        assertEquals(90, ogre.patrolY());
-        assertEquals(581, ogre.battleNetSequenceOffset(),
-                "the Patrol handoff constructs native Still");
-        assertEquals(3, ogre.battleNetAnimationTimer());
+        assertEquals(Unit.Order.ATTACK, ogre.order(),
+                "the queued direct Attack promotes on the stride's settle visit");
     }
 
     private static int fixtureCycle(World world) {

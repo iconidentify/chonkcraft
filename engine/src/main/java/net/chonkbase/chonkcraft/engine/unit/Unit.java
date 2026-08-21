@@ -2447,10 +2447,10 @@ public final class Unit {
     private boolean battleNetEmptyRouteFreeDetourHold;
 
     /**
-     * A nearly-full chase leftover used one free-compass heading after its
-     * cooperative wait. If the following cached heading is still occupied
-     * after that detour drains, retail parks route index 20 for one visit
-     * before replanning (XHuman 12 grunt 1494, fixtures 37..54).
+     * A refused route used one free-compass heading after its cooperative
+     * wait. When that detour drains, retail parks route index 20 for one visit
+     * before replanning rather than consuming the stale cached tail (XHuman
+     * 12 grunt 1494, fixtures 37..54, and ogre 1527, fixtures 47..60).
      */
     public boolean battleNetNearlyFullFreeDetour() {
         return battleNetNearlyFullFreeDetour;
@@ -2461,6 +2461,22 @@ public final class Unit {
     }
 
     private boolean battleNetNearlyFullFreeDetour;
+
+    /**
+     * A pure Move route selected a detached free-compass heading but returned
+     * before consuming it. The next committed step promotes this to
+     * {@link #battleNetNearlyFullFreeDetour()} so its stale route tail parks
+     * only after the detour's pixels drain.
+     */
+    public boolean battleNetMoveFreeDetourPending() {
+        return battleNetMoveFreeDetourPending;
+    }
+
+    public void setBattleNetMoveFreeDetourPending(boolean pending) {
+        battleNetMoveFreeDetourPending = pending;
+    }
+
+    private boolean battleNetMoveFreeDetourPending;
 
     /**
      * Multi-step leftover residual opened Attack at post-OP0; the next melee
@@ -3760,6 +3776,7 @@ public final class Unit {
         this.battleNetGoldFreePrefixLength = 0;
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
+        this.battleNetMoveFreeDetourPending = false;
     }
 
     public void clearPath() {
@@ -3774,6 +3791,7 @@ public final class Unit {
         this.battleNetGoldFreePrefixLength = 0;
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
+        this.battleNetMoveFreeDetourPending = false;
     }
 
     /**

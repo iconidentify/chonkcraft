@@ -753,6 +753,9 @@ class SaveGameTest {
         patrol.setOrder(Unit.Order.PATROL);
         patrol.setPatrol(5, 5);
         patrol.setOrderTarget(hostile.tileX(), hostile.tileY());
+        // Computer combat units construct with native behavior one. This
+        // fixture is specifically the behavior-zero map Patrol counterexample.
+        patrol.setBattleNetAiBehavior(0);
 
         StringWriter out = new StringWriter();
         SaveGame.write(bench.world(), "test-map", null, 0, out);
