@@ -9444,6 +9444,12 @@ public final class World {
                 "hp", unit.hitPoints(),
                 "heading", unit.heading(),
                 "path_length", unit.pathLength(),
+                "path_steps", unit.battleNetPathStepsTaken(),
+                "last_step_heading", unit.lastStepHeading(),
+                "route_spent", unit.routeSpent(),
+                "step_drained", unit.stepDrained(),
+                "chase_step_ready", unit.battleNetChaseStepReady(),
+                "chase_empty_replan", unit.battleNetChaseEmptyRouteReplan(),
                 "wait", unit.waitCycles(),
                 "collision", unit.battleNetCollisionCounter(),
                 "order_delay", unit.battleNetOrderDelay(),
@@ -9457,6 +9463,8 @@ public final class World {
                 "ranged_scan_hold", unit.battleNetRangedFreeScanHoldActive(),
                 "ranged_scan_pending", unit.battleNetRangedFreeScanHoldPending(),
                 "target", target == null ? -1 : target.id(),
+                "offered_target", unit.offeredTarget() == null
+                        ? -1 : unit.offeredTarget().id(),
                 "removed", unit.removed());
     }
 

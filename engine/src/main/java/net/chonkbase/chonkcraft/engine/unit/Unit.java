@@ -2620,7 +2620,14 @@ public final class Unit {
     }
 
     public void setBattleNetAttackRefusalRecoveryStage(int stage) {
-        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(3, stage));
+        // Stages four through six are the hard-refusal twin of the original
+        // cooperative handoff.  They retain native ownership across the
+        // fifteen-count Move band, Attack construction, and the one Move
+        // probe which either takes the newly-free heading or returns to
+        // Attack construction.  SaveGame already persists this integer, so
+        // keeping the phases here also prevents a mid-jam reload from
+        // turning a blocked combatant into a permanently frozen one.
+        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(6, stage));
     }
 
     private int battleNetAttackRefusalRecoveryStage;

@@ -3917,6 +3917,25 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetCollisionCounter(
                                     collision > 14 ? 0 : collision);
                         }
+                        // Stage six is the one Move probe owned by a completed
+                        // hard-refusal Attack construction.  A blocked probe
+                        // goes back to Attack 3 without incrementing or
+                        // sleeping again; native grunt 1505 repeats this at
+                        // XHuman 4 fixtures 48 and 51 before its north square
+                        // frees on 54.
+                        if (unit.battleNetAttackRefusalRecoveryStage() == 6
+                                && unit.target() != null
+                                && unit.chasing()) {
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            if (!world.combat
+                                    .rearmBattleNetHardRefusalAttack(unit)) {
+                                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                            }
+                            return;
+                        }
                         int refusals = battleNetRefuse(unit);
                         unit.setRouteSpent(false);
                         // Retail leaves the movement timer at fifteen on the
@@ -3928,6 +3947,31 @@ final class BattleNetMovementSystem {
                         // fifteen is fourteen here.
                         unit.setWaitCycles(0);
                         unit.setBattleNetOrderDelay(refusals >= 8 ? 14 : 0);
+                        // A hard-refused attack route owns Move-start rather
+                        // than allowing the bytecode cursor to walk forward
+                        // while the unit remains stationary. Refusals two
+                        // through seven park at timer one; refusal eight
+                        // writes fifteen and hands the eventual wake to the
+                        // Attack retry state machine above.
+                        // stepMoveTowardsTarget temporarily labels this same
+                        // native Attack execution as MOVE while it calls the
+                        // movement subsystem.  Chasing + a live target is the
+                        // ownership proof here; testing the surrogate order
+                        // label silently skipped every real attack chase.
+                        if (unit.target() != null && unit.chasing()) {
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                                unit.setBattleNetAnimationTimer(
+                                        refusals >= 8 ? 15 : 1);
+                                unit.setBattleNetChaseStepReady(false);
+                            }
+                            if (refusals == 8) {
+                                unit.setBattleNetAttackRefusalRecoveryStage(4);
+                            }
+                        }
                         return;
                     }
                 }

@@ -1139,12 +1139,16 @@ final class BattleNetCombatSystem {
                     // (Human 13 ogre 1510). Ranged multi-heading leftover after
                     // approach residual: OP0 already spent; native resumes
                     // mid-windup. markMelee false so OP10 still flies the axe.
-                    // Open when remaining pathn==2 (XHuman 12 axe 1473/127 at
-                    // 21,44 after one NE) or after two-or-more tile steps with
-                    // any multi leftover (Human 13 axe 1495/105 at 115,28 after
-                    // NE,E -- native seq 888). Single-step multi-leftover
-                    // (Human 13 axe 1483/117 at 119,33 after one NE) stays cold
-                    // so the approach+resume OP0 can seal timer 63.
+                    // Open when at most two headings remain (XHuman 4 axes
+                    // 1521/79, 1506/94, and 1516/84), or after two-or-more tile
+                    // steps with any multi leftover (Human 13 axe 1495/105 at
+                    // 115,28 after NE,E). Native opens 888/1 on the residual-
+                    // settle visit in each case.
+                    // Cold-starting them armed the unrelated 63-cycle hold and
+                    // made live ranged attackers appear permanently frozen.
+                    // Single-step four-leftover (Human 13 axe 1483/117 at
+                    // 119,33 after one NE) stays cold so its approach+resume
+                    // OP0 can seal timer 63.
                     // Melee multi leftover: open past OP0. Do not require the
                     // Move body cursor -- Human 13 wise-man 1496 residual-settles
                     // pathn 2 already on Attack@1922 (native opens mid-windup at
@@ -1171,12 +1175,11 @@ final class BattleNetCombatSystem {
                                     || (pathStepsAtSettle >= 2
                                             && onBattleNetChaseMoveBody(unit)));
                     boolean rangedResidualOpen = world.actionMoveWalked
-                            && unit.pathLength() >= 2
                             && onBattleNetChaseMoveBody(unit)
                             && unit.type() != null
                             && unit.type().maxAttackRange() > 1
-                            && (unit.pathLength() == 2
-                                    || pathStepsAtSettle >= 2);
+                            && battleNetRangedResidualRouteQualifies(
+                                    unit, pathStepsAtSettle);
                     int pathnAtSettle = unit.pathLength();
                     unit.clearPath();
                     unit.setRouteSpent(false);
@@ -1919,6 +1922,35 @@ final class BattleNetCombatSystem {
                 return;
             }
             boolean underWay = stepMoveTowardsTarget(unit);
+            // Hard-refusal stage six is the single Move probe after Attack
+            // construction.  A refused probe re-arms stage five inside
+            // BattleNetMovementSystem; an accepted/reached probe has paid the
+            // handoff and must no longer retain its retry ownership.
+            if (unit.battleNetAttackRefusalRecoveryStage() == 6) {
+                Unit retryTarget = unit.target();
+                boolean refusedEmptyProbe = !unit.isMoving()
+                        && unit.pathLength() == 0
+                        && retryTarget != null && retryTarget.isAlive()
+                        && !world.targets.inAttackRange(unit, retryTarget);
+                if (refusedEmptyProbe) {
+                    // An exhausted route is rebuilt inside stepMove after the
+                    // earlier chase-boundary consult.  If that rebuilt first
+                    // heading refuses, movement has already parked it again
+                    // before the explicit refusal arm can observe stage six.
+                    // The empty parked route is the same native result and
+                    // therefore re-enters Attack construction here.
+                    // spendTheEmptyRoute reports its refused rebuild as a
+                    // short Java wait. Native has already transferred
+                    // ownership back to Attack and revisits on 3,2,1;
+                    // retaining that surrogate wait inserts two frozen
+                    // cycles between every probe.
+                    if (!rearmBattleNetHardRefusalAttack(unit)) {
+                        unit.setBattleNetAttackRefusalRecoveryStage(0);
+                    }
+                } else {
+                    unit.setBattleNetAttackRefusalRecoveryStage(0);
+                }
+            }
             walked = true;
             // Mid-animation first, and nothing else is looked at: upstream's
             // MoveToTarget runs DoActionMove and then
@@ -4724,6 +4756,14 @@ final class BattleNetCombatSystem {
     }
 
 
+    /** Native ranged residuals open after a short tail or two paid steps. */
+    static boolean battleNetRangedResidualRouteQualifies(
+            Unit unit, int pathStepsAtSettle) {
+        return unit != null && (unit.pathLength() <= 2
+                || pathStepsAtSettle >= 2);
+    }
+
+
     /** Whether the next native Move tick yields to a settled chase order. */
     private boolean battleNetChaseMoveDecisionDue(Unit unit) {
         if (world.battleNetSequence == null || unit == null
@@ -4954,6 +4994,7 @@ final class BattleNetCombatSystem {
         boolean freeScanWindow = unit.battleNetAnimationTimer() > 0
                 && (!rangedOp0 || unit.battleNetAnimationTimer() == 1
                         || resumedFromMove);
+        boolean deferMeleeRetarget = false;
         if (attackStart >= 0
                 && offset == attackStart
                 && freeScanWindow
@@ -4966,9 +5007,34 @@ final class BattleNetCombatSystem {
                     Math.max(1, unit.type().maxAttackRange()));
             Unit candidate = world.targets.findBattleNetHostile(
                     unit, reactRange, null);
-            if (candidate != null && candidate != sequenceTarget
+            boolean candidateInRange = candidate != null
+                    && candidate != sequenceTarget
                     && candidate.isAlive()
-                    && world.targets.inAttackRange(unit, candidate)) {
+                    && world.targets.inAttackRange(unit, candidate);
+            boolean completedMeleeRetargetDelay = candidateInRange
+                    && !rangedOp0
+                    && unit.battleNetOrderDelay() > 0
+                    && unit.battleNetAnimationTimer() == 1;
+            // A newly acquired melee order carries a two-visit target-
+            // selection delay while Attack construction still counts down.
+            // Native scans and reports the better candidate on both visits,
+            // but keeps the old target pointer and advances 3,2,1; only the
+            // timer-one visit installs the candidate and restarts at 3.
+            // XHuman 4 footman 1518 is the direct witness: it holds grunt
+            // 1489 through fixtures 54..56, selects adjacent grunt 1515 on
+            // 55/56, switches on 57, and enters the native 23-count OP0 hold
+            // after construction. Switching on 55 froze construction under
+            // the surrogate delay and let it hit 1515 at 68, three cycles
+            // before native.
+            deferMeleeRetarget = candidateInRange && !rangedOp0
+                    && unit.battleNetOrderDelay() > 0
+                    && unit.battleNetAnimationTimer() > 1;
+            if (deferMeleeRetarget
+                    && unit.battleNetOrderDelay() > 1) {
+                unit.setBattleNetOrderDelay(
+                        unit.battleNetOrderDelay() - 1);
+            }
+            if (candidateInRange && !deferMeleeRetarget) {
                 setAutoTarget(unit, candidate);
                 world.turnToTarget(unit, candidate, 0, 0);
                 // Construction-open retarget keeps the 3,2,1 countdown.
@@ -4979,6 +5045,19 @@ final class BattleNetCombatSystem {
                 if (restartConstruction) {
                     unit.setBattleNetSequenceOffset(attackStart);
                     unit.setBattleNetAnimationTimer(3);
+                }
+                if (completedMeleeRetargetDelay) {
+                    // Installing the deferred target is the first live
+                    // in-range Attack callback, so table 0x27 is charged on
+                    // this visit even though construction just restarted.
+                    world.consumeBattleNetPendingMeleeSyncRand(unit);
+                    // The completed retarget uses the same post-construction
+                    // OP0 hold as an in-range melee residual: after 3,2,1,
+                    // native parks for bodyWaitSum-1 rather than entering the
+                    // windup. Reuse that proved state-machine arm; XHuman 4
+                    // footman 1518 reaches Attack@2539/23 on fixture 60.
+                    unit.setBattleNetAttackResumeFromMove(true);
+                    unit.setBattleNetAttackOp0OutOfRange(true);
                 }
                 if (rangedOp0) {
                     unit.setBattleNetAttackResumeFromMove(true);
@@ -5395,7 +5474,7 @@ final class BattleNetCombatSystem {
             world.battleNetSequenceProjectileFired.remove(unit);
         }
         if (!tick.actionMarker()) {
-            return chaseDecision || recoveryMarkerNext;
+            return deferMeleeRetarget || chaseDecision || recoveryMarkerNext;
         }
         if (unit.battleNetPendingMeleeSyncRand()) {
             Unit target = unit.target();
@@ -5429,6 +5508,32 @@ final class BattleNetCombatSystem {
      * to count construction without allowing target selection or movement on
      * those visits.</p>
      */
+    boolean rearmBattleNetHardRefusalAttack(Unit unit) {
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return false;
+        }
+        // Native reaches this boundary through active-order idle dispatch.
+        // That dispatch owns one asynchronous draw (and its rare facing
+        // change) before Attack construction begins. Missing the debit did
+        // not merely move critters differently: it reassigned later damage
+        // and projectile draws to the wrong combatants.
+        world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
+        unit.setWaitCycles(0);
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        unit.setBattleNetAttackRefusalRecoveryStage(5);
+        AnimationSet set = unit.type() == null
+                ? null : unit.type().animationSet();
+        Animation attack = set == null
+                ? null : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
+        return true;
+    }
+
     private boolean stepBattleNetAttackRefusalRecovery(Unit unit) {
         int stage = unit.battleNetAttackRefusalRecoveryStage();
         if (stage == 0 || world.battleNetSequence == null) {
@@ -5446,6 +5551,53 @@ final class BattleNetCombatSystem {
                 || !(unit.order() == Unit.Order.ATTACK
                         || unit.order() == Unit.Order.ATTACK_MOVE)) {
             unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        // A hard-blocked chase retries immediately for seven visits, then
+        // owns one complete Move timer band.  On its wake native clears the
+        // refusal nibble and runs Attack construction 3,2,1.  Timer one hands
+        // one route probe to Move; if that probe is still blocked the
+        // movement side re-arms stage five without charging another band.
+        // XHuman 4 grunt 1505 is the compact witness: Move 2482/1 and
+        // collision 0x20..0x70 on fixtures 24..29, Move 2482/15 on 30,
+        // Attack 2539/3 on 45, and repeated Attack probes until N frees on 54.
+        if (stage == 4) {
+            if (unit.battleNetOrderDelay() > 0) {
+                return false;
+            }
+            unit.setBattleNetRefusals(0);
+            unit.setBattleNetCollisionCounter(0);
+            if (!rearmBattleNetHardRefusalAttack(unit)) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            return true;
+        }
+        if (stage == 5) {
+            int attackStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart < 0
+                    || unit.battleNetSequenceOffset() != attackStart) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            if (unit.battleNetAnimationTimer() > 1) {
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return true;
+            }
+            int moveStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            unit.setBattleNetSequenceOffset(moveStart);
+            unit.setBattleNetAnimationTimer(1);
+            unit.setBattleNetAttackRefusalRecoveryStage(6);
+            return false;
+        }
+        if (stage == 6) {
             return false;
         }
         if (stage == 1) {
