@@ -7,6 +7,9 @@ on:
       - 'matchmaking/**'
       - 'matchmaker-server/**'
       - 'engine/src/main/java/net/chonkbase/chonkcraft/engine/network/**'
+      - 'desktop/src/main/java/net/chonkbase/chonkcraft/desktop/Main.java'
+      - 'desktop/src/main/java/net/chonkbase/chonkcraft/desktop/NetworkPeer.java'
+      - 'scripts/check-bne-network-gate.sh'
       - 'pom.xml'
       - '.github/workflows/matchmaker.yml'
   pull_request:
@@ -14,6 +17,9 @@ on:
       - 'matchmaking/**'
       - 'matchmaker-server/**'
       - 'engine/src/main/java/net/chonkbase/chonkcraft/engine/network/**'
+      - 'desktop/src/main/java/net/chonkbase/chonkcraft/desktop/Main.java'
+      - 'desktop/src/main/java/net/chonkbase/chonkcraft/desktop/NetworkPeer.java'
+      - 'scripts/check-bne-network-gate.sh'
       - 'pom.xml'
   workflow_dispatch:
 
@@ -121,3 +127,33 @@ jobs:
           done
           echo "The public multiplayer health endpoint did not become ready." >&2
           exit 1
+      - name: Prove public room, relay, map sync, lobby start, and game traffic
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/jbr/install-jbr-25.sh
+          scripts/jbr/with-jbr-25.sh mvn -B -DskipTests install
+          scripts/jbr/with-jbr-25.sh mvn -B -pl matchmaker-server \
+            -Dtest=ProductionMatchmakerSmokeTest \
+            -Dchonkcraft.production.matchmaker.smoke=true \
+            -Dchonkcraft.network.build="production-smoke-${GITHUB_SHA}" \
+            test
+
+  production-clients:
+    name: Play through production with two rendered BNE clients
+    if: github.event_name == 'push'
+    needs: deploy
+    runs-on: arc-i9beef-chonkcraft
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned runtime
+        run: scripts/jbr/install-jbr-25.sh
+      - name: Build authenticated BNE asset pack
+        env:
+          WC2_INSTALL_DIR: /opt/wc2/install
+        run: scripts/build-asset-pack.sh --out "${RUNNER_TEMP}/wc2.chonkpack"
+      - name: Prove rendered clients, host map replacement, and lockstep convergence
+        env:
+          CHONKCRAFT_MATCHMAKER_URL: https://match.chonkbase.net
+        run: scripts/check-bne-network-gate.sh "${RUNNER_TEMP}/wc2.chonkpack"

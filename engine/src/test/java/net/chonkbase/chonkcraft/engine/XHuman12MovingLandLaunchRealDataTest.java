@@ -76,6 +76,19 @@ class XHuman12MovingLandLaunchRealDataTest {
         }
         assertEquals(Unit.Order.ATTACK, ogre.order(),
                 "the queued direct Attack promotes on the stride's settle visit");
+        assertEquals(null, ogre.savedOrder(),
+                "a behavior-two assault launch has no Patrol restore order");
+
+        while (fixtureCycle(world) < 178) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, ogre.order(),
+                "the assault survivor stands down when its direct quarry dies");
+        assertEquals(11, ogre.tileX());
+        assertEquals(88, ogre.tileY());
+        assertEquals(581, ogre.battleNetSequenceOffset(),
+                "the completed fight constructs the native Still program");
+        assertEquals(3, ogre.battleNetAnimationTimer());
     }
 
     private static int fixtureCycle(World world) {

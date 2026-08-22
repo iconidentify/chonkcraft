@@ -120,9 +120,8 @@ class ScoutPassTest {
                 "the computer left its aircraft standing for sixty cycles; "
                         + "retail picks one up on every fiftieth and gives it "
                         + "somewhere new to fly");
-        assertEquals(49, sentOnCycle,
-                "retail's beat lands on the forty-ninth cycle and every "
-                        + "fiftieth after it, which is where XOrc 8 spends the "
-                        + "draw that sends its gryphon rider out again");
+        assertEquals(51, sentOnCycle,
+                "the Java world includes two sealed initialization ticks, so "
+                        + "retail fixture cycle 49 is world cycle 51");
     }
 }

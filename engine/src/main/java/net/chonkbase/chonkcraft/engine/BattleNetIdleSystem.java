@@ -70,6 +70,27 @@ final class BattleNetIdleSystem {
                     unit.target() == null ? -1 : unit.target().id(),
                     unit.autoTargeting() ? 1 : 0, unit.underAttack());
         }
+        Unit helpOffer = unit.battleNetPendingHelpAttack();
+        if (helpOffer != null && unit.order() == Unit.Order.ATTACK
+                && unit.target() != null && unit.target() != helpOffer) {
+            // OfferNewTarget may bank a better aggressor while an existing
+            // Attack owns cold construction or a committed walk.  It is not
+            // promoted until this Attack action callback.  XHuman 9 footman
+            // 1420 receives skeleton 1430 while still constructing its chase
+            // toward 1431; at fixture 59 the callback accepts 1430, lays and
+            // first-steps N, and leaves the replacement Attack behind that
+            // residual.  Promoting from the hit callback itself would erase
+            // the old action before its committed movement visit.
+            unit.setBattleNetPendingHelpAttack(null);
+            world.combat.setAutoTarget(unit, helpOffer);
+            // This was a hit offer, not a person's explicit target choice.
+            // setAutoTarget supplies native target/path state, but the order
+            // remains direct-owned after the one offered handoff.
+            unit.setAutoTargeting(false);
+            unit.setBattleNetChaseReplanResidualHold(true);
+            unit.setBattleNetPersonHelpRetargetHandoff(true);
+            return true;
+        }
         if (!unit.autoTargeting() && world.isPerson(unit.player())) {
             // A person's explicit order stands until it is done. The computer's
             // units re-decide either way, which is upstream's rule.
@@ -268,6 +289,75 @@ final class BattleNetIdleSystem {
     }
 
     /**
+     * Reissues launched combat aircraft on retail's fifty-cycle force pass.
+     *
+     * <p>Behaviour-four scouts are selected only while standing by
+     * {@link #fireBattleNetScoutPass()}. A behaviour-two air-force member is
+     * different: native writes Patrol as {@code next_order} even while its
+     * current Patrol stride is still draining, parks route index 20, and
+     * promotes the replacement when those committed pixels land. XOrc 11's
+     * gryphon 1589 records that transition at fixture 99 and reconstructs
+     * Patrol at fixture 117 before moving again at 125.</p>
+     */
+    void fireBattleNetAirPatrolPass() {
+        if (world.battleNetSequence == null) {
+            return;
+        }
+        List<Unit> ready = world.unitsSnapshot();
+        for (int index = ready.size() - 1; index >= 0; index--) {
+            Unit unit = ready.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || unit.type().moveType() != UnitType.Movement.FLY
+                    || unit.order() != Unit.Order.PATROL
+                    || unit.battleNetAiBehavior() != 2
+                    || world.battleNetForceLaunchedThisCycle(unit)
+                    || !unit.type().canAttack()
+                    || !unit.battleNetDoubleStep()) {
+                continue;
+            }
+            Player owner = world.player(unit.player());
+            if (owner == null
+                    || (owner.type()
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                        && owner.type()
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE)) {
+                continue;
+            }
+            // GiveOrder replaces the cached route but cannot retract a stride
+            // whose sub-tile pixels are already committed.
+            unit.clearPath();
+            unit.setBattleNetPendingPatrol(unit.orderTargetX(),
+                    unit.orderTargetY());
+        }
+    }
+
+    /**
+     * Finds the base that makes an ordinary aircraft native behaviour four.
+     *
+     * <p>The role is not a blanket property of everything that flies. Retail
+     * adopts the two scouts and the two racial combat aircraft only when their
+     * controller owns a hall. A marked combat aircraft remains a map guard,
+     * while a marked unarmed scout may still be adopted. Summoned flyers use
+     * other handlers even though they share the movement class.</p>
+     */
+    private boolean battleNetCombatScoutStartup(Unit unit, Player owner) {
+        if (unit == null || unit.type() == null || owner == null
+                || unit.type().moveType() != UnitType.Movement.FLY
+                || !unit.type().canAttack()
+                || (owner.type()
+                        != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                    && owner.type()
+                        != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE)
+                || unit.battleNetReadySuppressed()) {
+            return false;
+        }
+        String ident = unit.type().ident();
+        boolean ordinaryAircraft = "unit-gryphon-rider".equals(ident)
+                || "unit-dragon".equals(ident);
+        return ordinaryAircraft && world.nearestBattleNetHall(unit) != null;
+    }
+
+    /**
      * Re-enters the native scout callback after a player point-command has
      * interrupted a Patrol.
      *
@@ -375,22 +465,45 @@ final class BattleNetIdleSystem {
                         unit.orderTargetY());
                 continue;
             }
-            unit.setBattleNetPendingPatrol(unit.orderTargetX(),
-                    unit.orderTargetY());
+            int targetX = unit.orderTargetX();
+            int targetY = unit.orderTargetY();
+            // Behaviour six keeps the service-base point selected by the
+            // ready callback as its stable home.  The live Patrol point is a
+            // hull-relative shoreline rewrite of that home, so it must be
+            // recomputed each time the fifty-cycle pass launches a standing
+            // ship.  Reusing the old rewrite can turn a real route into an
+            // empty arrival after the hull has moved: XHuman 7's northern
+            // destroyer first rewrites shipyard (22,27) to (24,27) from
+            // (28,26), but its next launch from (26,26) rewrites the same
+            // home to (23,27) and takes NW on fixture 106.  Keeping (24,27)
+            // made the doubled point pathfinder report arrival and stranded
+            // the ship in Still forever.  Behaviour-two assault patrols use
+            // their current tactical point and remain unchanged.
+            if (unit.battleNetAiBehavior() == 6
+                    && unit.hasBattleNetAiHome()) {
+                targetX = unit.battleNetAiHomeX();
+                targetY = unit.battleNetAiHomeY();
+            }
+            unit.setBattleNetPendingPatrol(targetX, targetY);
         }
     }
 
-
     /**
-     * Retail's fifty-cycle replacement order for profile-18 land assaults.
+     * Retail handler two's fifty-cycle return for land assault members.
      *
-     * <p>Orc 11's behavior-two knight and three archers are already moving
-     * under Patrol when the native player pass reaches them on fixture cycles
-     * 49 and 99. It nevertheless writes Patrol as their next order and parks
-     * every route cursor at 20. The old pixels finish, the replacement
-     * promotes at the next action marker, and the group resumes after the
-     * Patrol constructor. Without this pass Java's knight and lead archer
-     * first-step on fixture 101 while retail holds them through 103.</p>
+     * <p>Native {@code 0x00427f60} measures Chebyshev distance to the unit's
+     * AI home and reissues Patrol when it is at least
+     * {@code computerReactRange / 2 + 4} away and the current action is
+     * interruptible.  The decoded action-property table admits Still, Move
+     * and Patrol while rejecting Attack.  This is a role rule, not a mission
+     * profile rule: a force member that has finished fighting must resume its
+     * assault instead of remaining frozen wherever combat ended.</p>
+     *
+     * <p>A standing member keeps Still until its next action marker. XHuman
+     * 12 ogre 1356 is Still with next Patrol on fixtures 199-200, promotes on
+     * 201, drains Patrol's three-call constructor, and steps on 204. A moving
+     * member instead drains its already committed pixels before promotion;
+     * Orc 11's knight and archers seal that half of the same rule.</p>
      */
     void fireBattleNetLandPatrolPass() {
         if (world.battleNetSequence == null) {
@@ -400,27 +513,64 @@ final class BattleNetIdleSystem {
         for (int index = ready.size() - 1; index >= 0; index--) {
             Unit unit = ready.get(index);
             if (unit == null || unit.type() == null || !unit.isAlive()
+                    || !unit.isOnMap()
                     || unit.type().moveType() != UnitType.Movement.LAND
-                    || unit.order() != Unit.Order.PATROL
                     || unit.battleNetAiBehavior() != 2
                     || !unit.hasBattleNetAiHome()
-                    || !unit.type().canAttack() || unit.type().canGather()) {
+                    || !unit.type().canAttack() || unit.type().canGather()
+                    || !battleNetBehaviorTwoPatrolInterruptible(unit.order())) {
                 continue;
             }
             Player owner = world.player(unit.player());
-            AiPlayer ai = world.ais.get(unit.player());
             if (owner == null
                     || owner.type()
-                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
-                    || ai == null || ai.battleNetBuildProfileId() != 18) {
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER) {
+                continue;
+            }
+            int distance = Math.max(
+                    Math.abs(unit.tileX() - unit.battleNetAiHomeX()),
+                    Math.abs(unit.tileY() - unit.battleNetAiHomeY()));
+            int returnBand = unit.type().reactRangeComputer() / 2 + 4;
+            if (distance < returnBand) {
                 continue;
             }
             // GiveOrder replaces the cached route immediately but does not
             // interrupt the committed stride or current animation body.
             unit.clearPath();
+            // ReleaseOrders also clears the cooperative-refusal state carried
+            // by the old route. Native Orc 11 knight 1558 enters the fixture-
+            // 99 pass with refusal nibble two and leaves it at zero while its
+            // committed pixels keep moving. Retaining Java's old counters
+            // made the knight falsely solid to the archer's replacement ray;
+            // that archer rerouted east instead of buffering NE and waiting
+            // behind the moving formation as BNE does.
+            unit.setBattleNetRefusals(0);
+            unit.setBattleNetCollisionCounter(0);
             unit.setBattleNetPatrolStraightRunExhausted(false);
             unit.setBattleNetPendingPatrol(unit.battleNetAiHomeX(),
                     unit.battleNetAiHomeY());
+            unit.setPendingAttack(null, null, -1, -1);
+            unit.setOfferedTarget(null);
+            // GiveOrder's transient native 0x4000 bit makes the body
+            // cooperative to later path queries on this same scheduler pass,
+            // even while CurrentAction still reports Still. It is cleared
+            // when beginBattleNetPendingPatrol promotes the replacement.
+            unit.setDestPathOpeningHold(true);
+            if (unit.order() == Unit.Order.STILL) {
+                // Still's script cursor is the queue clock. Do not add a Java
+                // delay: fixture 199 itself ticks 4985/3 to 4985/2, then the
+                // marker reached on 201 promotes the pending Patrol.
+                if (World.BNE_IDLE_TRACE) {
+                    System.err.printf("JBNEPATROLPASS cycle=%d unit=%d land=1"
+                                    + " standing=1 target=%d,%d distance=%d"
+                                    + " threshold=%d sequence=%d timer=%d%n",
+                            world.cycle, unit.id(), unit.battleNetAiHomeX(),
+                            unit.battleNetAiHomeY(), distance, returnBand,
+                            unit.battleNetSequenceOffset(),
+                            unit.battleNetAnimationTimer());
+                }
+                continue;
+            }
             int quiet = world.battleNetSequence.quietTicksUntilActionMarker(
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
@@ -440,6 +590,73 @@ final class BattleNetIdleSystem {
                         unit.battleNetAiHomeY(),
                         unit.battleNetSequenceOffset(),
                         unit.battleNetAnimationTimer(), quiet);
+            }
+        }
+    }
+
+    /** Actions whose decoded native property byte permits handler-two Patrol. */
+    private static boolean battleNetBehaviorTwoPatrolInterruptible(
+            Unit.Order order) {
+        return order == Unit.Order.STILL
+                || order == Unit.Order.MOVE
+                || order == Unit.Order.PATROL;
+    }
+
+    /**
+     * Sends idle behavior-one land guards back to their assigned home.
+     *
+     * <p>This is the directly decoded Still branch of native handler one at
+     * {@code 0x00427e20}.  The handler rejects workers, measures Chebyshev
+     * distance to {@code unit+0x58}, and reissues Move when that distance is
+     * at least {@code computerReactRange / 2 + 4}.  It runs from the same
+     * translated fifty-cycle role walk as the scout and naval handlers.  The
+     * broad gameplay consequence is important: a defender that finished a
+     * fight does not remain a permanent wall, and workers queued behind the
+     * formation can route again on that same pass.</p>
+     */
+    void fireBattleNetLandGuardHomePass() {
+        if (world.battleNetSequence == null) {
+            return;
+        }
+        List<Unit> ready = world.unitsSnapshot();
+        // Native walks low pool slots upward; Java's creation list is the
+        // reverse of that stable pool order.
+        for (int index = ready.size() - 1; index >= 0; index--) {
+            Unit unit = ready.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || !unit.isOnMap() || unit.battleNetAiBehavior() != 1
+                    || !unit.hasBattleNetAiHome()
+                    // UNIT.Data-marked map guards keep their authored post.
+                    // Native's role assigner retains marker two and a near
+                    // self-home for these units; Java's creation-time home is
+                    // still the coarse hall projection, so sending them by
+                    // that surrogate would mobilise fixed mission guards.
+                    || unit.battleNetReadySuppressed()
+                    || unit.type().moveType() != UnitType.Movement.LAND
+                    || unit.type().building() || unit.type().canGather()
+                    || !unit.type().canAttack()
+                    || unit.order() != Unit.Order.STILL) {
+                continue;
+            }
+            Player owner = world.player(unit.player());
+            if (owner == null
+                    || owner.type()
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER) {
+                continue;
+            }
+            int distance = Math.max(
+                    Math.abs(unit.tileX() - unit.battleNetAiHomeX()),
+                    Math.abs(unit.tileY() - unit.battleNetAiHomeY()));
+            int returnBand = unit.type().reactRangeComputer() / 2 + 4;
+            if (distance < returnBand) {
+                continue;
+            }
+            if (world.movement.orderBattleNetAiHomeMove(unit,
+                    unit.battleNetAiHomeX(), unit.battleNetAiHomeY())) {
+                // Native handler one clears unit+0x54 after a successful
+                // home reissue, so a stale hit offer cannot pull the guard
+                // straight back out of the new Move.
+                unit.setOfferedTarget(null);
             }
         }
     }
@@ -502,6 +719,19 @@ final class BattleNetIdleSystem {
             }
             Player owner = world.player(unit.player());
             AiPlayer ai = world.ais.get(unit.player());
+            if (battleNetCombatScoutStartup(unit, owner)) {
+                // Native assigns behaviour four and constructs a random
+                // NextAction here. Java's self-scout route is already
+                // tile/cycle-identical, so retain its self endpoint while
+                // constructing it at the native boundary. Besides paying the
+                // two coordinates, this lets the first action marker promote
+                // Patrol before the ordinary flying-idle rearm -- native does
+                // not spend 0040AE30 on that marker.
+                world.battleNetRand();
+                world.battleNetRand();
+                unit.setBattleNetPendingPatrol(unit.tileX(), unit.tileY());
+                unit.setBattleNetScoutPatrol(true);
+            }
             if (owner != null
                     && owner.type()
                             == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
@@ -509,6 +739,18 @@ final class BattleNetIdleSystem {
                     && unit.type().canAttack() && !unit.type().canGather()) {
                 World.BattleNetPatrolEndpoints target =
                         world.battleNetNavalPatrolTarget(unit);
+                // FUN_00427a10 is the behaviour-six ready callback. The
+                // profile-specific startup assault pass above has already
+                // marked its selected ships behaviour two; every other
+                // unsuppressed AI warship keeps six plus the service-base
+                // home used to construct its opening patrol. This state is
+                // operational, not merely diagnostic: the recurring naval
+                // pass uses it to send live ships toward reachable enemies.
+                if (unit.battleNetAiBehavior() != 2) {
+                    unit.setBattleNetAiBehavior(6);
+                    unit.setBattleNetAiHome(target.targetX(),
+                            target.targetY());
+                }
                 unit.setBattleNetPendingPatrol(target.targetX(), target.targetY(),
                         target.backX(), target.backY());
                 if (World.BNE_IDLE_TRACE) {
@@ -1210,25 +1452,8 @@ final class BattleNetIdleSystem {
             return;
         }
 
-        int choice = world.battleNetRand() & 0xff;
+        int choice = battleNetLandIdleChoice(unit);
         boolean critter = "unit-critter".equals(unit.type().ident());
-        // Occupied-mobile empty only: first two OP0s miss the wander band
-        // (134, 191) and reverse-walk would take choice 42. Redraw into the
-        // band on the third OP0 (Human 3 1587 → 40,15). Free-empty restart
-        // must not force-redraw (Human 3 1589 stays Still after free empty).
-        if (critter && unit.battleNetOccupiedEmptyForceWander()
-                && unit.battleNetOccupiedEmptyNoWanderCount() >= 2
-                && (choice < 4 || choice > 50)) {
-            int guard = 0;
-            while ((choice < 4 || choice > 50) && guard++ < 32) {
-                choice = world.battleNetRand() & 0xff;
-            }
-        }
-        if (choice == 0) {
-            unit.setHeading(Math.floorMod(unit.heading() - 1, 8));
-        } else if (choice <= 3) {
-            unit.setHeading(Math.floorMod(unit.heading() + 1, 8));
-        }
         if (!critter || choice < 4 || choice > 50) {
             world.battleNetUnitReady(unit);
             world.battleNetAutoAttack(unit);
@@ -1362,6 +1587,38 @@ final class BattleNetIdleSystem {
                     Integer.toUnsignedString(seedBefore),
                     Integer.toUnsignedString(world.battleNetRandomSeed), x, y);
         }
+    }
+
+
+    /**
+     * Pays FUN_0040ad50's land-unit choice and its rare facing nudge.
+     *
+     * <p>Ordinary Still OP0 uses the result to decide whether a critter
+     * wanders. A melee residual auto-target handoff passes through the same
+     * native dispatcher before Attack construction; that caller needs the
+     * shared RNG/facing half without running ready and auto-target twice.</p>
+     */
+    int battleNetLandIdleChoice(Unit unit) {
+        int choice = world.battleNetRand() & 0xff;
+        boolean critter = "unit-critter".equals(unit.type().ident());
+        // Occupied-mobile empty only: first two OP0s miss the wander band
+        // (134, 191) and reverse-walk would take choice 42. Redraw into the
+        // band on the third OP0 (Human 3 1587 → 40,15). Free-empty restart
+        // must not force-redraw (Human 3 1589 stays Still after free empty).
+        if (critter && unit.battleNetOccupiedEmptyForceWander()
+                && unit.battleNetOccupiedEmptyNoWanderCount() >= 2
+                && (choice < 4 || choice > 50)) {
+            int guard = 0;
+            while ((choice < 4 || choice > 50) && guard++ < 32) {
+                choice = world.battleNetRand() & 0xff;
+            }
+        }
+        if (choice == 0) {
+            unit.setHeading(Math.floorMod(unit.heading() - 1, 8));
+        } else if (choice <= 3) {
+            unit.setHeading(Math.floorMod(unit.heading() + 1, 8));
+        }
+        return choice;
     }
 
 

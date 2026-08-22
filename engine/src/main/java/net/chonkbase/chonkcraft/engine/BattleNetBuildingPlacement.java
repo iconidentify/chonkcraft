@@ -189,6 +189,15 @@ final class BattleNetBuildingPlacement {
      * and its build scan correctly advances to a lumber mill.</p>
      */
     int[] aiFindBattleNetHallPlace(Unit worker, UnitType type) {
+        int[] site = aiFindBattleNetHallPlace(worker, type, true);
+        return site != null ? site
+                : aiFindBattleNetHallPlace(worker, type, false);
+    }
+
+
+    /** One complete native base-hall scan under a fixed skirt policy. */
+    private int[] aiFindBattleNetHallPlace(
+            Unit worker, UnitType type, boolean clearSurround) {
         if (worker == null || type == null
                 || (!worker.isOnMap()
                     && !world.battleNetDepotReadyDispatching())) {
@@ -215,7 +224,8 @@ final class BattleNetBuildingPlacement {
                 continue;
             }
             int[] site = aiFindBattleNetBuildingPlaceAround(worker, type,
-                    mine.tileX(), mine.tileY(), workerCell, 1);
+                    mine.tileX(), mine.tileY(), workerCell, 1,
+                    clearSurround);
             if (System.getenv("CHONKCRAFT_TRACE_AIBUILD") != null) {
                 System.err.printf("JBNHALL p%d mine=%d at=%d,%d resources=%d"
                                 + " depot=0 site=%s%n",
@@ -234,12 +244,21 @@ final class BattleNetBuildingPlacement {
             }
         }
         return bestMine == null ? null : aiFindBattleNetBuildingPlaceAround(
-                worker, type, bestMine.tileX(), bestMine.tileY(), workerCell, 1);
+                worker, type, bestMine.tileX(), bestMine.tileY(), workerCell, 1,
+                clearSurround);
     }
 
 
     int[] aiFindBattleNetBuildingPlaceAround(Unit worker, UnitType type,
             int anchorX, int anchorY, boolean[] workerCell, int step) {
+        return aiFindBattleNetBuildingPlaceAround(
+                worker, type, anchorX, anchorY, workerCell, step, false);
+    }
+
+
+    private int[] aiFindBattleNetBuildingPlaceAround(Unit worker, UnitType type,
+            int anchorX, int anchorY, boolean[] workerCell, int step,
+            boolean clearSurround) {
 
         if (System.getenv("CHONKCRAFT_TRACE_AIBUILD") != null) {
             System.err.printf("JBNPLACE worker=%d type=%s anchor=%d,%d step=%d%n",
@@ -263,7 +282,7 @@ final class BattleNetBuildingPlacement {
                     if (world.map.contains(x, y)) {
                         boolean sameCell = workerCell[x + y * world.map.width()];
                         boolean place = sameCell && world.construction.canPlaceBattleNetBuilding(
-                                worker, type, x, y);
+                                worker, type, x, y, clearSurround);
                         if (System.getenv("CHONKCRAFT_TRACE_AIBUILD_CANDIDATES") != null) {
                             StringBuilder flags = new StringBuilder();
                             for (int fy = 0; fy < Math.max(1, type.tileHeight()); fy++) {

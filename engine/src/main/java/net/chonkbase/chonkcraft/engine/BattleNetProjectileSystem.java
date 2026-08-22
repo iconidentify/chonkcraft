@@ -322,6 +322,18 @@ final class BattleNetProjectileSystem {
                 "type_ident", missile.type() == null ? null : missile.type().ident(),
                 "source", source == null ? -1 : source.id(),
                 "target", target == null ? -1 : target.id(),
+                "from_x", (int) Math.round(missile.fromX()),
+                "from_y", (int) Math.round(missile.fromY()),
+                "to_x", (int) Math.round(missile.toX()),
+                "to_y", (int) Math.round(missile.toY()),
+                "source_pixel_x", source == null ? -1 : source.pixelX(),
+                "source_pixel_y", source == null ? -1 : source.pixelY(),
+                "source_residual_x", source == null ? 0 : source.residualX(),
+                "source_residual_y", source == null ? 0 : source.residualY(),
+                "target_pixel_x", target == null ? -1 : target.pixelX(),
+                "target_pixel_y", target == null ? -1 : target.pixelY(),
+                "target_residual_x", target == null ? 0 : target.residualX(),
+                "target_residual_y", target == null ? 0 : target.residualY(),
                 "remaining", missile.battleNetRemaining());
     }
 
@@ -811,6 +823,25 @@ final class BattleNetProjectileSystem {
                 continue;
             }
             world.combat.noteAttacked(source, candidate);
+            // FUN_00410680 reaches the ordinary AI HitUnit response for every
+            // positive splash, not only for a killing one. XOrc 11 is the
+            // compact non-lethal witness: two cannon splashes leave the
+            // battleship alive at 127 HP on fixture 91, while destroyer 1519
+            // still receives next-order Attack toward the northern
+            // juggernaut and promotes it on fixture 92. That computer has no
+            // AI force roster, so the response also has to pass through the
+            // spatial HitUnit helper used by ordinary damage. Restrict this
+            // non-lethal bridge to AI defenders; person melee splash
+            // recruitment has its separately proved lethal-only policy below.
+            AiPlayer targetAi = world.ais.get(candidate.player());
+            if (targetAi != null
+                    && !world.isPerson(candidate.player())
+                    && source != null
+                    && (candidate.type() == null
+                            || !candidate.type().wall())) {
+                targetAi.helpMe(world, source, candidate);
+                world.battleNetSpatialHitHelp(source, candidate);
+            }
             // Lethal splash keeps last living HP on the corpse (melee path
             // in BattleNetCombatSystem; XHuman 10 footman 1492 DYING@42).
             int before = candidate.hitPoints();
@@ -818,15 +849,9 @@ final class BattleNetProjectileSystem {
                 // HitUnit help before death. Person melee Still brothers
                 // answer a lethal splash (knight 1489); non-lethal hits must
                 // not recruit (Human 13@21 REG).
-                AiPlayer targetAi = world.ais.get(candidate.player());
-                if (targetAi != null && source != null
-                        && (candidate.type() == null
-                                || !candidate.type().wall())) {
-                    targetAi.helpMe(world, source, candidate);
-                }
                 if (source != null && (candidate.type() == null
                         || !candidate.type().wall())) {
-                    world.battleNetSpatialHelpReactPlusOne(source, candidate);
+                    world.battleNetSpatialHitHelp(source, candidate);
                     world.battleNetPersonMeleeHelpOnSplash(source, candidate);
                 }
                 world.kill(candidate, source);

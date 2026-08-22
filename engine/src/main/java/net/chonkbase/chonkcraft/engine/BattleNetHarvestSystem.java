@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.MapField;
@@ -212,6 +213,7 @@ final class BattleNetHarvestSystem {
 
     boolean beginHarvest(Unit worker, ResourceInfo info, Unit building, int tileX, int tileY) {
         worker.setGatherClockStarted(false);
+        worker.setBattleNetWoodReadyPathRequired(false);
         // Default off; gold free-prefix forest re-aim and range-one leftover
         // routes arm the walk claim themselves. A plain adjacent wood order
         // only draws at work 2660 (standing start).
@@ -286,6 +288,9 @@ final class BattleNetHarvestSystem {
                 worker.setBattleNetDoubleStep(false);
             }
         }
+        if (stepBattleNetWoodTerminalRefusal(worker, info)) {
+            return;
+        }
         if (worker.battleNetOrderDelay() > 0) {
             // Gold-mine approach soft-wait free-wake: XHuman 7 peon 1446
             // residual-settles at 110,105 with native route_index 20 while
@@ -339,7 +344,9 @@ final class BattleNetHarvestSystem {
             System.err.printf("JRESOURCESTATE cycle=%d unit=%d returning=%d"
                             + " resource=%d alive=%d at=%d,%d tile=%d,%d depot=%d@%d,%d"
                             + " remembered=%d carried=%d worksite=%d finished=%d"
-                            + " order_delay=%d wait=%d path=%d moving=%d stepping=%d%n",
+                            + " order_delay=%d wait=%d path=%d moving=%d stepping=%d"
+                            + " spent=%d drained=%d collision=%d free_prefix=%d"
+                            + " free_prefix_length=%d ready_wood_path=%d%n",
                     world.cycle, worker.id(), worker.returningToDepot() ? 1 : 0,
                     tracedResource == null ? -1 : tracedResource.id(),
                     tracedResource != null && tracedResource.isAlive() ? 1 : 0,
@@ -353,7 +360,13 @@ final class BattleNetHarvestSystem {
                     worker.orderFinished() ? 1 : 0, worker.battleNetOrderDelay(),
                     worker.waitCycles(), worker.pathLength(),
                     worker.isMoving() ? 1 : 0,
-                    world.movement.isStepping(worker) ? 1 : 0);
+                    world.movement.isStepping(worker) ? 1 : 0,
+                    worker.routeSpent() ? 1 : 0,
+                    worker.stepDrained() ? 1 : 0,
+                    worker.battleNetCollisionCounter(),
+                    worker.battleNetGoldFreePrefix() ? 1 : 0,
+                    worker.battleNetGoldFreePrefixLength(),
+                    worker.battleNetWoodReadyPathRequired() ? 1 : 0);
         }
         if (info == null) {
             // GiveOrder 24 on a soldier still walks FindDeposit. Native
@@ -637,7 +650,9 @@ final class BattleNetHarvestSystem {
         // (41,9) and on fixture c24 re-aims to adjacent tree (40,7), clears
         // the route, and starts the first chop SyncRand. Wall-follow SE or
         // re-planning NW into forest left the seed at 41c67ea6.
-        if (resource == null && info.terrainHarvester() && !world.movement.isStepping(worker)
+        if (resource == null && info.terrainHarvester()
+                && !worker.battleNetWoodReadyPathRequired()
+                && !world.movement.isStepping(worker)
                 && !worker.isMoving() && worker.battleNetOrderDelay() == 0) {
             int[] found = null;
             if (worker.pathLength() > 0) {
@@ -671,6 +686,8 @@ final class BattleNetHarvestSystem {
         // cold-commit and let the leftover fire after the drain.
         boolean woodRangeOne = info.terrainHarvester()
                 && resource == null
+                && (!worker.battleNetWoodReadyPathRequired()
+                        || worker.routeSpent())
                 && Math.max(Math.abs(worker.tileX() - targetX),
                         Math.abs(worker.tileY() - targetY)) <= 1;
         // Gold on the approach square must also count as at-resource while
@@ -693,6 +710,8 @@ final class BattleNetHarvestSystem {
                 : woodRangeOne
                         || (Math.max(Math.abs(worker.tileX() - targetX),
                                 Math.abs(worker.tileY() - targetY)) <= 1
+                        && (!worker.battleNetWoodReadyPathRequired()
+                                || worker.routeSpent())
                         // Native NextPathElement rechecks the resource
                         // order's range before consuming another cached
                         // heading.  A terrain worker whose completed pixel
@@ -957,6 +976,7 @@ final class BattleNetHarvestSystem {
             // route (XOrc 12).  In either shape native sets cursor=20 and
             // proceeds directly to StartGathering, with no PF_WAIT ten.
             worker.clearPath();
+            worker.setBattleNetWoodReadyPathRequired(false);
         }
         // Gold action 25 keeps native route cursor 20 once the approach
         // square is underfoot. The Java adapter may still hold a spent
@@ -1147,6 +1167,86 @@ final class BattleNetHarvestSystem {
 
 
     /**
+     * Serves the terrain-resource RI20 -> action-23 construction -> wall-face
+     * handoff after a terminal residual is refused by an allied worker.
+     */
+    private boolean stepBattleNetWoodTerminalRefusal(
+            Unit worker, ResourceInfo info) {
+        int refused = worker.battleNetWoodTerminalRefusalHeading();
+        if (refused < 0) {
+            return false;
+        }
+        if (info == null || !info.terrainHarvester()
+                || worker.resourceUnit() != null || worker.returningToDepot()) {
+            worker.setBattleNetWoodTerminalRefusalHeading(-1);
+            return false;
+        }
+        int gatherStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        worker, BattleNetSequence.ATTACK_ANIMATION);
+        if (gatherStart < 0) {
+            worker.setBattleNetWoodTerminalRefusalHeading(-1);
+            return false;
+        }
+        if (worker.battleNetSequenceOffset() != gatherStart) {
+            // The RI20 visit itself remains Move-start/1. Its following
+            // resource-action callback clears the completed collision state
+            // and exposes the native gathering construction cursor at 3.
+            worker.setBattleNetCollisionCounter(0);
+            worker.setBattleNetRefusals(0);
+            worker.setWaitCycles(0);
+            worker.setBattleNetOrderDelay(0);
+            worker.setBattleNetSequenceOffset(gatherStart);
+            worker.setBattleNetAnimationTimer(3);
+            AnimationSet set = worker.type().animationSet();
+            Animation attack = set == null ? null
+                    : set.get(AnimationSet.State.ATTACK);
+            if (attack != null && worker.animation().current() != attack) {
+                worker.animation().switchTo(attack);
+            }
+            return true;
+        }
+        if (worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return true;
+        }
+
+        int goalX = worker.battleNetWoodOrderX();
+        int goalY = worker.battleNetWoodOrderY();
+        int currentDistance = Math.max(
+                Math.abs(goalX - worker.tileX()),
+                Math.abs(goalY - worker.tileY()));
+        int admitted = -1;
+        for (int turn = 0; turn < Direction.COUNT; turn++) {
+            int heading = Math.floorMod(refused + turn, Direction.COUNT);
+            int nextX = worker.tileX() + Direction.deltaX(heading);
+            int nextY = worker.tileY() + Direction.deltaY(heading);
+            int nextDistance = Math.max(
+                    Math.abs(goalX - nextX), Math.abs(goalY - nextY));
+            if (nextDistance < currentDistance
+                    && world.canEnter(worker, nextX, nextY)) {
+                admitted = heading;
+                break;
+            }
+        }
+        if (admitted < 0) {
+            // The formation is still closed. Retail remains in the bounded
+            // action-23 retry cadence rather than degrading to an every-cycle
+            // empty path or abandoning the worker's harvest order.
+            worker.setBattleNetAnimationTimer(3);
+            return true;
+        }
+        worker.setBattleNetWoodTerminalRefusalHeading(-1);
+        worker.setBattleNetWoodReadyPathRequired(false);
+        worker.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND, new int[] {admitted}));
+        worker.setPathGoal(-1, -1);
+        return false;
+    }
+
+
+    /**
      * Pays the final {@code DoActionMove} ask which says a resource walk has
      * reached its range-one goal.
      *
@@ -1301,7 +1401,30 @@ final class BattleNetHarvestSystem {
         }
         worker.setReturningToDepot(false);
         worker.setOrder(Unit.Order.STILL);
+        armResourceReadyStillHead(worker);
         return true;
+    }
+
+    /** Installs WaitInDepot's native timed Still program. */
+    private void armResourceReadyStillHead(Unit worker) {
+        if (world.battleNetSequence != null) {
+            int stillStart = world.idle.battleNetStillSequenceStart(worker);
+            if (stillStart >= 0) {
+                // WaitInDepot does not expose a freshly constructed Still
+                // action at timer one.  It keeps the worker's native Still
+                // program and installs a 25-call head while 0x439280's next
+                // resource job waits behind it.  XHuman 12 slot 1491 is the
+                // compact land witness: hidden action 26 / timer one on
+                // fixture 175 becomes Still@2595 / timer 25 on 176, then 24
+                // on 177 without paying FUN_0040ad58.  Starting an ordinary
+                // Still program here fired its OP0 immediately, consumed a
+                // phantom shared-RNG draw, and shifted a neighbouring grunt's
+                // damage roll.  The same timed boundary is visible for oil
+                // tankers, so keep it in the shared computer-worker pause.
+                worker.setBattleNetSequenceOffset(stillStart);
+                worker.setBattleNetAnimationTimer(25);
+            }
+        }
     }
 
 
@@ -1381,6 +1504,7 @@ final class BattleNetHarvestSystem {
         beginReturnToDepot(worker, info);
         worker.clearPath();
         worker.setOrder(Unit.Order.STILL);
+        armResourceReadyStillHead(worker);
         worker.setOrderTarget(home.tileX(), home.tileY());
         worker.enqueueOrder(new Unit.QueuedOrder(
                 Unit.QueuedOrderKind.RETURN_GOODS,
@@ -1821,19 +1945,35 @@ final class BattleNetHarvestSystem {
                 // claim). A longer free-prefix mid-journey replan must not
                 // pay that delay -- it held XHuman 2 peon 1530 at 92,100
                 // through fixture 52 while native stepped NW at 50.
-                worker.setRouteSpent(false);
-                int[] localTree = findAdjacentForest(worker.tileX(),
-                        worker.tileY());
-                if (localTree == null) {
-                    localTree = world.findTerrainType(worker,
-                            worker.tileX(), worker.tileY(), 1);
-                }
-                if (localTree != null) {
-                    worker.setResourceTile(localTree[0], localTree[1]);
-                }
                 int freeLen = worker.battleNetGoldFreePrefixLength();
+                if (System.getenv("CHONKCRAFT_TRACE_WOOD") != null) {
+                    System.err.printf("JWOODROUTESPENT %d unit=%d"
+                                    + " free=%d marked=%d at=%d,%d"
+                                    + " tree=%d,%d%n",
+                            world.cycle, worker.id(), freeLen,
+                            worker.battleNetGoldFreePrefix() ? 1 : 0,
+                            worker.tileX(), worker.tileY(),
+                            worker.resourceTileX(), worker.resourceTileY());
+                }
+                worker.setRouteSpent(false);
                 boolean shortFreePrefix = freeLen > 0 && freeLen < 3;
-                if (localTree != null || shortFreePrefix || freeLen == 0) {
+                // Only the short free-tip family re-aims to a newly adjacent
+                // tree. A full direct prefix can finish beside intervening
+                // forest while still owning its original order point: Human
+                // 13 peon 1467 exhausts five headings at (50,48), retains the
+                // tree at (50,46), and immediately replans NE,N on fixture 85.
+                // Re-aiming that full prefix to (50,47) parked the peon in an
+                // invented action-23 delay and made it look frozen.
+                if (shortFreePrefix || freeLen == 0) {
+                    int[] localTree = findAdjacentForest(worker.tileX(),
+                            worker.tileY());
+                    if (localTree == null) {
+                        localTree = world.findTerrainType(worker,
+                                worker.tileX(), worker.tileY(), 1);
+                    }
+                    if (localTree != null) {
+                        worker.setResourceTile(localTree[0], localTree[1]);
+                    }
                     worker.setBattleNetOrderDelay(2);
                     return;
                 }
@@ -1914,6 +2054,8 @@ final class BattleNetHarvestSystem {
                 MapField goalField = world.map.fieldOrNull(goalX, goalY);
                 boolean forestGoal = goalField != null
                         && goalField.isForest();
+                boolean buildingGoal = goalField != null
+                        && goalField.hasFlag(TileFlag.BUILDING);
                 if (forestGoal) {
                     PathFinder.Path wall = world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker,
@@ -1933,14 +2075,34 @@ final class BattleNetHarvestSystem {
                 // endpoint pack so XHuman 2 path 707 is not shortened.
                 // Wall detours longer than their Chebyshev span skip tip
                 // upgrade so Human 8's east face is not rewritten to SE.
-                path = forestGoal
-                        ? world.battleNetForestDiagonalPrefer(
-                                worker, path, goalX, goalY)
-                        : world.battleNetDiagonalPreferPath(
-                                worker, path, goalX, goalY);
+                // A permanent wall is neither case: it keeps the pathfinder's
+                // wall-follow answer. XHuman 12 peon 1365 stores N,NE,E,SE
+                // around wall cell 13,89 and refuses the occupied north head
+                // on fixture 200; treating every blocked goal like a building
+                // rewrote that route to the free south-east tip one cycle
+                // early.
+                if (forestGoal) {
+                    path = world.battleNetForestDiagonalPrefer(
+                            worker, path, goalX, goalY);
+                } else if (buildingGoal) {
+                    path = world.battleNetDiagonalPreferPath(
+                            worker, path, goalX, goalY);
+                }
             }
             if (path.result() == PathFinder.Result.REACHED) {
                 // Already beside it; the chop notices for itself.
+                return;
+            }
+            if (path.result() == PathFinder.Result.FOUND
+                    && path.length() == 0) {
+                // Terrain action 23 retries an empty approach on its
+                // three-call 2657 cadence, regardless of whether UnitReady
+                // or an ordinary wood walk created it. Human 5 peon 1567 asks
+                // on fixtures 107,110,113,116,119 and 122. XHuman 12's three
+                // boxed peons likewise hold 2657/3,2,1; when the periodic AI
+                // pass opens their corridor on 199, they ask and step on 200,
+                // not during an invented every-cycle retry on 199.
+                worker.setBattleNetOrderDelay(2);
                 return;
             }
             if (path.result() == PathFinder.Result.UNREACHABLE) {
@@ -2083,7 +2245,10 @@ final class BattleNetHarvestSystem {
         if (worker == null || info == null || resource == null
                 || info.resource() != UnitType.Resource.GOLD || info.terrainHarvester()
                 || worker.order() != Unit.Order.HARVEST || worker.returningToDepot()
-                || !worker.routeSpent() || worker.pathLength() > 0) {
+                || !worker.routeSpent() || worker.pathLength() > 0
+                || !worker.battleNetGoldFreePrefix()
+                || worker.battleNetGoldFreePrefixLength() < 1
+                || worker.battleNetGoldFreePrefixLength() > 2) {
             return false;
         }
         int[] approach = world.battleNetApproachPoint(worker, resource);
@@ -2151,8 +2316,9 @@ final class BattleNetHarvestSystem {
                                 worker.movementMask(), worker.blockingFlags())) {
                     continue;
                 }
-                if (Math.max(Math.abs(ax - workerX),
-                        Math.abs(ay - workerY)) != 1) {
+                if (!worker.battleNetWoodReadyPathRequired()
+                        && Math.max(Math.abs(ax - workerX),
+                                Math.abs(ay - workerY)) != 1) {
                     continue;
                 }
                 int clearance = world.construction.battleNetApproachBuildingClearance(ax, ay);
@@ -2213,6 +2379,14 @@ final class BattleNetHarvestSystem {
         int blockedX = treeX;
         int blockedY = treeY;
         boolean sawBlocked = false;
+        boolean traceWoodRay = false;
+        StringBuilder woodRay = null;
+        String tracePath = System.getenv("CHONKCRAFT_TRACE_BNE_PATH");
+        if (tracePath != null && (tracePath.isBlank()
+                || worker.id() == Integer.parseInt(tracePath.trim()))) {
+            traceWoodRay = true;
+            woodRay = new StringBuilder();
+        }
         while (x != workerX || y != workerY) {
             // Native orderXY on Human 5 peasant 1512 is 31,106 -- a square
             // under the farm footprint at 30,106 -- not the first free
@@ -2221,15 +2395,32 @@ final class BattleNetHarvestSystem {
             // preserveBlockedGoalPrefix then consumes the diagonal ray that
             // free-only goals collapse into pure west (Java 32,106 vs native
             // SW onto 32,107).
-            if (world.map.contains(x, y)
-                    && component[x + y * world.map.width()]) {
+            boolean inMap = world.map.contains(x, y);
+            boolean inComponent = inMap
+                    && component[x + y * world.map.width()];
+            if (traceWoodRay) {
+                MapField tracedField = world.map.fieldOrNull(x, y);
+                woodRay.append(woodRay.isEmpty() ? "" : ",")
+                        .append(x).append(':').append(y)
+                        .append(":component=").append(inComponent ? 1 : 0)
+                        .append(":forest=").append(tracedField != null
+                                && tracedField.isForest() ? 1 : 0)
+                        .append(":flags=").append(tracedField == null ? "-"
+                                : Long.toHexString(tracedField.flags()));
+            }
+            if (inMap) {
                 // Terrain only: unit occupancy must not push reverse-free past
                 // the real open tip (XHuman 2 peon corridor). Building tiles
                 // on the ray (Human 5 farm) are remembered and yield orderXY
-                // as the last building cell before open land.
-                boolean buildingTile = world.map.field(x, y)
-                        .hasFlag(TileFlag.BUILDING);
-                if (!buildingTile) {
+                // as the last blocked cell before open land. The same native
+                // boundary includes static terrain. XHuman 12 peon 1365's
+                // ray leaves tree (14,89), crosses wall (13,89), then reaches
+                // open (12,88); retail stores the wall square as orderXY.
+                MapField rayField = world.map.field(x, y);
+                boolean resourceTerrain = rayField.isForest();
+                boolean blockedTerrain = rayField.hasFlag(TileFlag.BUILDING)
+                        || (!inComponent && !resourceTerrain);
+                if (inComponent && !blockedTerrain) {
                     if (sawBlocked) {
                         freeX = blockedX;
                         freeY = blockedY;
@@ -2240,9 +2431,14 @@ final class BattleNetHarvestSystem {
                     foundFree = true;
                     break;
                 }
-                blockedX = x;
-                blockedY = y;
-                sawBlocked = true;
+                // Do not count the selected tree (or contiguous forest) as
+                // an intervening obstacle. Otherwise ordinary tree→open rays
+                // would return the tree rather than the measured free skirt.
+                if (blockedTerrain) {
+                    blockedX = x;
+                    blockedY = y;
+                    sawBlocked = true;
+                }
             }
             int minorStep = 0;
             error -= minor;
@@ -2254,6 +2450,12 @@ final class BattleNetHarvestSystem {
             int stepDy = xMajor ? minorStep : majorSign;
             x -= stepDx;
             y -= stepDy;
+        }
+        if (traceWoodRay) {
+            System.err.printf("JWOODRAY cycle=%d unit=%d ray=%s"
+                            + " found=%d free=%d,%d blocked=%d,%d%n",
+                    world.cycle, worker.id(), woodRay,
+                    foundFree ? 1 : 0, freeX, freeY, blockedX, blockedY);
         }
         if (!foundFree || (freeX == treeX && freeY == treeY)
                 || (freeX == workerX && freeY == workerY)) {
@@ -2400,8 +2602,37 @@ final class BattleNetHarvestSystem {
         }
 
         boolean[] connected = world.battleNetConnectivityCell(worker);
-        int x = worker.tileX();
-        int y = worker.tileY();
+        boolean failedGoldReady = worker.battleNetWoodReadyPathRequired();
+        // This flag is also the durable action-23 retry marker. During the
+        // synchronous UnitReady lookup it is only a context bit; consume it
+        // now, and let assignHarvester re-arm it only for the adjacent-tree
+        // branch that actually needs the native path gate.
+        worker.setBattleNetWoodReadyPathRequired(false);
+        int[] ordinary = findAiWoodFromCenter(
+                worker, connected, worker.tileX(), worker.tileY());
+        if (!failedGoldReady || ordinary == null
+                || Math.max(Math.abs(ordinary[0] - worker.tileX()),
+                        Math.abs(ordinary[1] - worker.tileY())) > 1) {
+            return ordinary;
+        }
+
+        // A failed-gold UnitReady lookup whose ordinary result is already
+        // adjacent cannot take the standing chop shortcut: native supplies
+        // the row immediately north to its terrain-action square ring and
+        // keeps action 23 path-gated. Human 5 peon 1567 at (105,48) thereby
+        // chooses (104,46), not the adjacent southern tree (104,47). Distant
+        // fallbacks such as XHuman 12 retain the ordinary anchor-centred
+        // result and route.
+        int[] shifted = findAiWoodFromCenter(
+                worker, connected, worker.tileX(), worker.tileY() - 1);
+        if (shifted == null) {
+            shifted = ordinary;
+        }
+        return new int[] {shifted[0], shifted[1], 1};
+    }
+
+    private int[] findAiWoodFromCenter(Unit worker, boolean[] connected,
+            int x, int y) {
         int sideLength = 3;
         int maximum = (world.map.width() * 3) >> 2;
         int[] dx = {1, 0, -1, 0};
@@ -3203,6 +3434,14 @@ final class BattleNetHarvestSystem {
             queueDepotHarvestContinuation(worker, mine,
                     mine.tileX(), mine.tileY());
         }
+        if (landReadyBoundary) {
+            // The synchronous ready callback constructs its queued Harvest
+            // order through beginHarvest, which invalidates the non-Still
+            // cursor before queueDepotHarvest restores Still.  The timed
+            // WaitInDepot head belongs to that final Still state, so restore
+            // it after the callback has authored (or declined) the next job.
+            armResourceReadyStillHead(worker);
+        }
 
         boolean assignedBuild = depotReadyAssigned
                 && worker.pendingBuild() != null;
@@ -3718,6 +3957,18 @@ final class BattleNetHarvestSystem {
             }
         }
         try {
+            // Large naval resource movers use the same native anchor grid as
+            // every other doubled ship action. Human 7 tanker 1533's cached
+            // SW step lands its anchor on water at (80,52), while the visual
+            // 2x2 hull overlaps coast at (81,53). Native accepts the step;
+            // applying the land-worker footprint test here rejected it and
+            // trapped the tanker in a one-cycle replan loop. The resource is
+            // already soft-cleared above, so this also preserves the final
+            // platform-entry exception without widening ordinary workers.
+            if (unit.battleNetDoubleStep() && unit.type() != null
+                    && unit.type().seaUnit()) {
+                return world.canEnterBattleNetTransportAnchor(unit, x, y);
+            }
             return world.canEnter(unit, x, y);
         } finally {
             for (Unit candidate : cleared) {

@@ -56,4 +56,64 @@ class NavalPatrolCoastGoalRealDataTest {
         assertEquals(52, sub.tileY(),
                 "native double-steps west to open water 18,52 at fixture 48");
     }
+
+    @Test
+    @DisplayName("xhuman 07 moving submarine answers the attacked naval guard")
+    void xHuman07MovingSubmarineAnswersAttackedNavalGuard() {
+        Mission mission = load().loadMission("campaigns/human-exp/levelx07h");
+        Assumptions.assumeTrue(mission != null, "levelx07h did not load");
+        Unit sub = null;
+        for (Unit u : mission.world().units()) {
+            if (u != null && u.type() != null
+                    && "unit-orc-submarine".equals(u.type().ident())
+                    && u.player() == 6
+                    && u.tileX() >= 16 && u.tileX() <= 22
+                    && u.tileY() >= 50 && u.tileY() <= 56) {
+                sub = u;
+                break;
+            }
+        }
+        assertTrue(sub != null, "western orc submarine not found");
+        Unit guard = mission.world().units().stream()
+                .filter(u -> u.id() == 180)
+                .findFirst().orElseThrow();
+
+        // The naval ready callback is native behaviour six. Its opening home
+        // is the service base at 22,27; the later coast rewrite changes only
+        // the live order point, not that AI state.
+        for (int i = 0; i < 55; i++) {
+            mission.tick();
+        }
+        assertTrue(guard.hitPoints() < guard.type().hitPoints(),
+                "the cloaked submarine hits the guarded destroyer on 55");
+        assertEquals(6, sub.battleNetAiBehavior());
+        assertEquals(22, sub.battleNetAiHomeX());
+        assertEquals(27, sub.battleNetAiHomeY());
+        assertTrue(sub.hasBattleNetPendingPatrol(),
+                "naval help must survive behind the committed residual pixels");
+        assertEquals(86, sub.battleNetPendingPatrolX(),
+                "behavior six rendezvouses with guarded destroyer 1420");
+        assertEquals(120, sub.battleNetPendingPatrolY());
+
+        // Fixture cycle = world - 2. The old west residual lands on fixture
+        // 91 and owns the whole visit; only then may the replacement patrol
+        // construct. Its 3,2,1 hold releases the first SE stride on 94.
+        while (mission.world().cycle() < 93) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, sub.order());
+        assertEquals(18, sub.tileX());
+        assertEquals(52, sub.tileY());
+        assertEquals(86, sub.orderTargetX());
+        assertEquals(120, sub.orderTargetY());
+        assertEquals(1, sub.battleNetOrderDelay(),
+                "the replacement is one Java tick from its native release");
+
+        while (mission.world().cycle() < 96) {
+            mission.tick();
+        }
+        assertEquals(20, sub.tileX(),
+                "native recurring patrol first-steps SE on fixture 94");
+        assertEquals(54, sub.tileY());
+    }
 }

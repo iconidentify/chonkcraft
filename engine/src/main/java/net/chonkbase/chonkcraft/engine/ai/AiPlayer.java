@@ -640,7 +640,23 @@ public final class AiPlayer {
             }
             int goalX = enemy.tileX();
             int goalY = enemy.tileY();
+            // Native ground selector 0x004266c0 does not send every force at
+            // the nearest hostile returned by EnemyUnitFinder. It chooses the
+            // most populated hostile person's coarse land region and returns
+            // a walkable rally point in that region. The same selector owns
+            // startup and recurring ground launches. Keeping the nearest
+            // tower as aiHome made an assault stop forever as soon as that
+            // tower died, while BNE retained the regional home and relaunched
+            // it on the next handler-two pass.
+            if (predicate == 4) {
+                int[] regionalHome = world.battleNetLandAssaultHome(playerIndex);
+                if (regionalHome != null) {
+                    goalX = regionalHome[0];
+                    goalY = regionalHome[1];
+                }
+            }
             for (Unit member : members) {
+                world.markBattleNetForceLaunchThisCycle(member);
                 member.setBattleNetAiBehavior(2);
                 member.setBattleNetAiHome(goalX, goalY);
                 // Native's behavior-two handler issues Patrol here unless the
@@ -2050,6 +2066,9 @@ public final class AiPlayer {
         if (info.terrainHarvester()) {
             int[] wood = nearestForest(world, unit);
             if (wood != null && world.orderHarvest(unit, wood[0], wood[1])) {
+                if (wood.length >= 3 && wood[2] != 0) {
+                    unit.setBattleNetWoodReadyPathRequired(true);
+                }
                 return true;
             }
             explore(unit, true, false);
@@ -2965,16 +2984,22 @@ public final class AiPlayer {
      * current resource orders rather than by BNE's three side arrays.</p>
      */
     public boolean battleNetUnitReady(World world, Unit unit) {
-        return battleNetUnitReady(world, unit, false);
+        return battleNetUnitReady(world, unit, false, null);
+    }
+
+    /** Ready assignment after the current resource produced no usable route. */
+    public boolean battleNetUnitReadyAfterResourceFailure(
+            World world, Unit unit, Unit failedResource) {
+        return battleNetUnitReady(world, unit, false, failedResource);
     }
 
     /** Ready assignment reached while hidden action 26 is still in a depot. */
     public boolean battleNetDepotUnitReady(World world, Unit unit) {
-        return battleNetUnitReady(world, unit, true);
+        return battleNetUnitReady(world, unit, true, null);
     }
 
     private boolean battleNetUnitReady(World world, Unit unit,
-            boolean containedDepot) {
+            boolean containedDepot, Unit failedResource) {
         Player player = world.player(playerIndex);
         if (unit == null || unit.player() != playerIndex
                 || (!containedDepot && !unit.isOnMap())
@@ -3211,7 +3236,15 @@ public final class AiPlayer {
                 && assignHarvester(world, unit, UnitType.Resource.WOOD)) {
             return true;
         }
-        Unit mine = world.findBattleNetReadyGoldMine(unit);
+        // A ready callback reached by an empty gold walk has already failed
+        // that resource class for this unit visit. Retail falls through to
+        // its wood assignment instead of selecting another mine: XHuman 12
+        // peon 1365 changes its point from mine (36,91) to tree (13,89) on
+        // fixture 90 even though another connected mine remains available.
+        Unit mine = failedResource != null
+                && failedResource.type().givesResource()
+                        == UnitType.Resource.GOLD
+                ? null : world.findBattleNetReadyGoldMine(unit);
         if (mine != null
                 && world.orderHarvest(unit, mine.tileX(), mine.tileY())) {
             return true;
@@ -4717,6 +4750,8 @@ public final class AiPlayer {
             }
         }
 
+        helpNavalGuard(world, attacker, defender);
+
         // The second half sends inactive defending forces to the reported
         // place.  Upstream keeps force completion in a separate boolean:
         // both an incomplete and a completed scripted attack force retain
@@ -4741,6 +4776,62 @@ public final class AiPlayer {
                 launchMember(world, member, soldier, force.goalX(), force.goalY());
             }
         }
+    }
+
+    /**
+     * Sends the nearest ordinary naval patrol to an attacked map guard.
+     *
+     * <p>BNE's map-authored naval guard remains behaviour one while ordinary
+     * ready warships become behaviour six. When an unseen attacker strikes
+     * that guard, {@code AiHelpMe} cannot issue an Attack against the hidden
+     * unit, so it moves the closest roaming fleet member to the reported
+     * hull instead. XHuman 7 is the sealed witness: cloaked submarine 1418
+     * removes 32 HP from guarded destroyer 1420 at fixture 55, and roaming
+     * submarine 1511 receives next-order 4 with a pointer to 1420 in that
+     * same cycle. Its existing westward pixels drain before the support order
+     * promotes at 91 and first-steps south-east at 94.</p>
+     */
+    private void helpNavalGuard(World world, Unit attacker, Unit defender) {
+        if (defender.type() == null
+                || defender.type().moveType() != UnitType.Movement.NAVAL
+                || !defender.type().canAttack()
+                || defender.battleNetAiBehavior() != 1
+                || !defender.battleNetReadySuppressed()
+                || world.isVisibleAsGoal(playerIndex, attacker)) {
+            return;
+        }
+        Unit helper = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (Unit candidate : world.playerUnits(playerIndex)) {
+            if (candidate == defender || !candidate.isAlive()
+                    || !candidate.isOnMap() || candidate.type() == null
+                    || candidate.type().moveType()
+                            != UnitType.Movement.NAVAL
+                    || !candidate.type().canAttack()
+                    || !candidate.isAggressive()
+                    || candidate.battleNetAiBehavior() != 6
+                    || candidate.battleNetReadySuppressed()
+                    || candidate.order() != Unit.Order.PATROL
+                    || !candidate.isMoving()
+                    || candidate.hasBattleNetPendingPatrol()
+                    || !canTargetType(candidate, attacker)) {
+                continue;
+            }
+            int distance = candidate.distanceTo(defender);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                helper = candidate;
+            }
+        }
+        if (helper == null) {
+            return;
+        }
+        // NewActionMove(unit*) keeps the current Move action alive, discards
+        // the unused route tail, and exposes order 4 only after the committed
+        // pixels settle. PendingPatrol is Java's equivalent unit-position
+        // replacement and auto-targeting will engage threats on arrival.
+        helper.clearPath();
+        helper.setBattleNetPendingPatrol(defender.tileX(), defender.tileY());
     }
 
     private static boolean canTargetType(Unit unit, Unit target) {

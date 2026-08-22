@@ -123,15 +123,15 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
                 "unit-ogre-juggernaught", 24, 24);
         assertNotNull(juggernaught,
                 "XHuman 7 has no startup juggernaught at 24,24");
-        assertEquals(0, juggernaught.battleNetAiBehavior(),
-                "the map patrol is not a launched behavior-two assault");
+        assertEquals(6, juggernaught.battleNetAiBehavior(),
+                "native ordinary naval patrols carry behavior six");
 
         for (int cycle = 1; cycle <= 58; cycle++) {
             mission.tick();
         }
         assertEquals(Unit.Order.PATROL, juggernaught.order());
-        assertEquals(0, juggernaught.battleNetAiBehavior(),
-                "ordinary AI-player patrols must not be promoted to assaults");
+        assertEquals(6, juggernaught.battleNetAiBehavior(),
+                "ordinary AI-player patrols must remain behavior six");
         assertEquals(24, juggernaught.tileX());
         assertEquals(26, juggernaught.tileY());
         assertEquals(-2, juggernaught.offsetY(),

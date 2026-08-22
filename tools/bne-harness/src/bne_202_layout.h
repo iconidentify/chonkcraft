@@ -256,6 +256,18 @@ static const char *bne_unit_type_name(unsigned int type) {
         "unit-human-cannon-tower", "unit-orc-cannon-tower", "unit-circle-of-power",
         "unit-dark-portal", "unit-runestone", "unit-human-wall", "unit-orc-wall"
     };
+    /* The PUD/map roster stops at the two wall types, but live units can
+     * become internal destroyed-place types after death.  Direct schema-1.1
+     * transitions authenticate 107 as the 2x2 place (XHuman 12 guard tower
+     * 1370 at cycle 175) and 108 as the 3x3 place (Human 5 barracks 1529 at
+     * cycle 1608).  Name only the witnessed extension ids here; an unwitnessed
+     * one must stay unknown rather than acquiring a guessed label. */
+    if (type == 107) {
+        return "unit-destroyed-2x2-place";
+    }
+    if (type == 108) {
+        return "unit-destroyed-3x3-place";
+    }
     if (type >= sizeof(names) / sizeof(names[0])) {
         return "unit-unknown";
     }

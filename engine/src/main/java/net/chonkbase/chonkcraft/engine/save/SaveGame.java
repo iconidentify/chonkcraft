@@ -609,6 +609,9 @@ public final class SaveGame {
         // whose behavior-two marker had not yet become durable.
         state.append(" aiBehavior = ")
                 .append(unit.battleNetAiBehavior()).append(",");
+        if (unit.battleNetAiHomeMoveConstruction()) {
+            state.append(" aiHomeMoveConstruction = true,");
+        }
         if (unit.hasBattleNetAiHome()) {
             state.append(" aiHomeX = ").append(unit.battleNetAiHomeX()).append(",");
             state.append(" aiHomeY = ").append(unit.battleNetAiHomeY()).append(",");
@@ -679,6 +682,19 @@ public final class SaveGame {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
         }
+        if (unit.battleNetWoodReadyPathRequired()) {
+            state.append(" woodReadyPathRequired = true,");
+        }
+        if (unit.battleNetWoodTerminalRefusalHeading() >= 0) {
+            state.append(" woodTerminalRefusalHeading = ")
+                    .append(unit.battleNetWoodTerminalRefusalHeading())
+                    .append(",");
+        }
+        if (unit.battleNetRangedAttackCadenceRemaining() != 0) {
+            state.append(" rangedAttackCadenceRemaining = ")
+                    .append(unit.battleNetRangedAttackCadenceRemaining())
+                    .append(",");
+        }
         if (unit.battleNetRefusals() != 0) {
             state.append(" battleNetRefusals = ")
                     .append(unit.battleNetRefusals()).append(",");
@@ -709,8 +725,53 @@ public final class SaveGame {
         if (unit.battleNetMovingQuarryResidual()) {
             state.append(" movingQuarryResidual = true,");
         }
+        if (unit.battleNetSaturatedResidualFaceRetry()) {
+            state.append(" saturatedResidualFaceRetry = true,");
+        }
+        if (unit.battleNetDirectRefusalRecoveryProbe()) {
+            state.append(" directRefusalRecoveryProbe = true,");
+        }
+        if (unit.battleNetSaturatedNearRecoveryFullRoute()) {
+            state.append(" saturatedNearRecoveryFullRoute = true,");
+        }
+        if (unit.battleNetDirectRefusalReplacementBand()) {
+            state.append(" directRefusalReplacementBand = true,");
+        }
+        if (unit.battleNetSaturatedTerminatorRoutePending()) {
+            state.append(" saturatedTerminatorRoutePending = true,");
+        }
+        if (unit.battleNetRetargetResidualParkRefill()) {
+            state.append(" retargetResidualParkRefill = true,");
+            state.append(" retargetResidualParkSteps = ")
+                    .append(unit.battleNetRetargetResidualParkSteps())
+                    .append(",");
+        }
+        if (unit.battleNetParkedRefusalHeading() >= 0) {
+            state.append(" parkedRefusalHeading = ")
+                    .append(unit.battleNetParkedRefusalHeading()).append(",");
+        }
+        if (unit.battleNetSaturatedWallFacePairHeading() >= 0) {
+            state.append(" saturatedWallFacePairHeading = ")
+                    .append(unit.battleNetSaturatedWallFacePairHeading())
+                    .append(",");
+        }
+        if (unit.battleNetSaturatedWallFacePairParked()) {
+            state.append(" saturatedWallFacePairParked = true,");
+        }
+        if (unit.battleNetSaturatedRetargetRouteBand()) {
+            state.append(" saturatedRetargetRouteBand = true,");
+        }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");
+        }
+        if (unit.battleNetSpatialHitHelpHandoff()) {
+            state.append(" spatialHitHelpHandoff = true,");
+        }
+        if (unit.battleNetLandPatrolAttackRoutePending()) {
+            state.append(" landPatrolAttackRoutePending = true,");
+        }
+        if (unit.battleNetResidualEmptyApproachIdlePending()) {
+            state.append(" residualEmptyApproachIdlePending = true,");
         }
         if (unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             state.append(" oilAction = ")

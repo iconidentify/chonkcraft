@@ -232,6 +232,41 @@ class BattleNetResourceApproachTest {
     }
 
     @Test
+    @DisplayName("an outbound tanker refills an exhausted route without PF_WAIT")
+    void outboundTankerRefillsAnExhaustedRouteOnTheSettleVisit() {
+        // Orc 14 tanker 1515 exhausts SW,S,SE on fixture 103 while still
+        // traveling toward its platform. Native refills the action-23 route
+        // and commits the next S heading on that same visit; the generic
+        // empty-route PF_WAIT left Java visibly parked until fixture 114.
+        GameMap map = new GameMap(32, 32, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+        World world = new World(map);
+        Unit rig = world.createUnit(platform(), 15, 24, 24);
+        Unit boat = world.createUnit(tanker(), 0, 4, 4);
+        assertTrue(world.orderHarvest(boat, rig));
+
+        boat.setBattleNetOrderDelay(0);
+        boat.clearPath();
+        boat.setRouteSpent(true);
+        boat.setWaitCycles(0);
+        int beforeX = boat.tileX();
+        int beforeY = boat.tileY();
+
+        world.movement.walkTowards(boat, rig);
+
+        assertEquals(0, boat.waitCycles(),
+                "outbound action 23 must not enter the ten-cycle wait band");
+        assertTrue(boat.tileX() != beforeX || boat.tileY() != beforeY,
+                "the replacement route must commit its first heading now");
+        assertTrue(boat.isMoving(),
+                "the committed heading must leave live residual pixels");
+    }
+
+    @Test
     @DisplayName("a distant tanker stays visible on first platform cover")
     void distantTankerDoesNotEnterOnTheLandingCall() {
         // XOrc 8: tanker at (112,52) bound for platform (115,53). After the
@@ -1582,6 +1617,8 @@ class BattleNetResourceApproachTest {
         // Free-prefix residue after residual pixels settle: spent empty route
         // far from the mine approach, standing already beside forest.
         peon.clearPath();
+        peon.setBattleNetGoldFreePrefix(true);
+        peon.setBattleNetGoldFreePrefixLength(1);
         peon.setRouteSpent(true);
         peon.setOffset(0, 0);
         peon.setWalkHolding(false);

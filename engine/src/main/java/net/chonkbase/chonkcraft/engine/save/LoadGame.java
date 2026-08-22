@@ -680,6 +680,10 @@ public final class LoadGame {
         if (state.rawGet("aiBehavior") != null) {
             unit.setBattleNetAiBehavior(integer(state.rawGet("aiBehavior")));
         }
+        if (state.rawGet("aiHomeMoveConstruction") != null) {
+            unit.setBattleNetAiHomeMoveConstruction(
+                    truthy(state.rawGet("aiHomeMoveConstruction")));
+        }
         if (state.rawGet("aiHomeX") != null) {
             unit.setBattleNetAiHome(integer(state.rawGet("aiHomeX")),
                     integer(state.rawGet("aiHomeY")));
@@ -767,6 +771,18 @@ public final class LoadGame {
             unit.setBattleNetOrderDelay(
                     integer(state.rawGet("battleNetOrderDelay")));
         }
+        if (state.rawGet("woodReadyPathRequired") != null) {
+            unit.setBattleNetWoodReadyPathRequired(
+                    truthy(state.rawGet("woodReadyPathRequired")));
+        }
+        if (state.rawGet("woodTerminalRefusalHeading") != null) {
+            unit.setBattleNetWoodTerminalRefusalHeading(
+                    integer(state.rawGet("woodTerminalRefusalHeading")));
+        }
+        if (state.rawGet("rangedAttackCadenceRemaining") != null) {
+            unit.setBattleNetRangedAttackCadenceRemaining(integer(
+                    state.rawGet("rangedAttackCadenceRemaining")));
+        }
         if (state.rawGet("battleNetRefusals") != null) {
             unit.setBattleNetRefusals(
                     integer(state.rawGet("battleNetRefusals")));
@@ -798,6 +814,50 @@ public final class LoadGame {
         if (state.rawGet("stopAfterLeftover") != null) {
             unit.setBattleNetStopAfterLeftover(
                     truthy(state.rawGet("stopAfterLeftover")));
+        }
+        if (state.rawGet("saturatedResidualFaceRetry") != null) {
+            unit.setBattleNetSaturatedResidualFaceRetry(
+                    truthy(state.rawGet("saturatedResidualFaceRetry")));
+        }
+        if (state.rawGet("directRefusalRecoveryProbe") != null) {
+            unit.setBattleNetDirectRefusalRecoveryProbe(
+                    truthy(state.rawGet("directRefusalRecoveryProbe")));
+        }
+        if (state.rawGet("saturatedNearRecoveryFullRoute") != null) {
+            unit.setBattleNetSaturatedNearRecoveryFullRoute(
+                    truthy(state.rawGet("saturatedNearRecoveryFullRoute")));
+        }
+        if (state.rawGet("directRefusalReplacementBand") != null) {
+            unit.setBattleNetDirectRefusalReplacementBand(
+                    truthy(state.rawGet("directRefusalReplacementBand")));
+        }
+        if (state.rawGet("saturatedTerminatorRoutePending") != null) {
+            unit.setBattleNetSaturatedTerminatorRoutePending(
+                    truthy(state.rawGet("saturatedTerminatorRoutePending")));
+        }
+        if (state.rawGet("retargetResidualParkRefill") != null) {
+            unit.setBattleNetRetargetResidualParkRefill(
+                    truthy(state.rawGet("retargetResidualParkRefill")));
+            if (state.rawGet("retargetResidualParkSteps") != null) {
+                unit.setBattleNetRetargetResidualParkSteps(
+                        integer(state.rawGet("retargetResidualParkSteps")));
+            }
+        }
+        if (state.rawGet("parkedRefusalHeading") != null) {
+            unit.setBattleNetParkedRefusalHeading(
+                    integer(state.rawGet("parkedRefusalHeading")));
+        }
+        if (state.rawGet("saturatedWallFacePairHeading") != null) {
+            unit.setBattleNetSaturatedWallFacePairHeading(
+                    integer(state.rawGet("saturatedWallFacePairHeading")));
+        }
+        if (state.rawGet("saturatedWallFacePairParked") != null) {
+            unit.setBattleNetSaturatedWallFacePairParked(
+                    truthy(state.rawGet("saturatedWallFacePairParked")));
+        }
+        if (state.rawGet("saturatedRetargetRouteBand") != null) {
+            unit.setBattleNetSaturatedRetargetRouteBand(
+                    truthy(state.rawGet("saturatedRetargetRouteBand")));
         }
         if (state.rawGet("oilAction") != null) {
             try {
@@ -842,6 +902,18 @@ public final class LoadGame {
         if (state.rawGet("attackWrapDestArmPending") != null) {
             unit.setBattleNetAttackWrapDestArmPending(
                     truthy(state.rawGet("attackWrapDestArmPending")));
+        }
+        if (state.rawGet("spatialHitHelpHandoff") != null) {
+            unit.setBattleNetSpatialHitHelpHandoff(
+                    truthy(state.rawGet("spatialHitHelpHandoff")));
+        }
+        if (state.rawGet("landPatrolAttackRoutePending") != null) {
+            unit.setBattleNetLandPatrolAttackRoutePending(
+                    truthy(state.rawGet("landPatrolAttackRoutePending")));
+        }
+        if (state.rawGet("residualEmptyApproachIdlePending") != null) {
+            unit.setBattleNetResidualEmptyApproachIdlePending(truthy(
+                    state.rawGet("residualEmptyApproachIdlePending")));
         }
         if (truthy(state.rawGet("burning"))) {
             unit.setBurning(true);

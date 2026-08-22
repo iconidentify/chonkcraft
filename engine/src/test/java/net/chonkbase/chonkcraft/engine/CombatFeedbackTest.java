@@ -375,6 +375,45 @@ class CombatFeedbackTest {
     // -------------------------------------- finding 9: rubble without delay
 
     @Test
+    @DisplayName("BNE building destruction pays its synchronized sound draw")
+    void aBattleNetBuildingDeathPaysOneSynchronizedSoundDraw() {
+        World world = new World(grass(30));
+        // Smallest usable type-zero Still table: entry zero points to table
+        // two, whose Still slot at six points to opcode zero at eight.
+        world.setBattleNetSequenceData(
+                new byte[] {2, 0, 0, 0, 0, 0, 8, 0, 0});
+
+        UnitType hall = soldier("unit-town-hall");
+        hall.setBuilding(true);
+        hall.setSpeed(0);
+        hall.sounds().put("dead", "building destroyed");
+        Unit building = world.createUnit(hall, 0, 10, 10);
+
+        UnitType wallType = soldier("unit-human-wall");
+        wallType.setBuilding(true);
+        wallType.setWall(true);
+        wallType.setSpeed(0);
+        wallType.sounds().put("dead", "building destroyed");
+        Unit wall = world.createUnit(wallType, 0, 14, 10);
+
+        UnitType footmanType = soldier("unit-footman");
+        footmanType.sounds().put("dead", "basic human voices dead");
+        Unit footman = world.createUnit(footmanType, 0, 16, 10);
+
+        world.restoreRandom(0x30e4f99f, 0);
+        world.kill(footman);
+        world.kill(wall);
+        assertEquals(0, world.randomDraws(),
+                "mobile voices and native wall types 103/104 do not use 0x423050");
+
+        world.kill(building);
+        assertEquals(1, world.randomDraws(),
+                "the three-way building-destroyed selector must debit exactly once");
+        assertEquals(0x0586eaec, world.randomSeed(),
+                "XHuman 12 guard tower 1370 authenticates this exact LCG step");
+    }
+
+    @Test
     @DisplayName("a building with no death animation goes straight to its rubble")
     void aDestroyedBuildingDoesNotStandAround() {
         World world = new World(grass(30));

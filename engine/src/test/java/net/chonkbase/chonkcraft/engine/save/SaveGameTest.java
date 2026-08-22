@@ -783,6 +783,25 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a failed-resource wood-ready retry survives a save")
+    void failedResourceWoodReadyPathRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit worker = bench.world().createUnit(
+                bench.types().get("unit-peasant"), 0, 10, 10);
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setCarrying(UnitType.Resource.WOOD);
+        worker.setBattleNetOrderDelay(2);
+        worker.setBattleNetWoodReadyPathRequired(true);
+
+        Unit loaded = find(reload(bench), "unit-peasant");
+
+        assertEquals(Unit.Order.HARVEST, loaded.order());
+        assertEquals(2, loaded.battleNetOrderDelay());
+        assertTrue(loaded.battleNetWoodReadyPathRequired(),
+                "reload must not turn native's path-gated retry into an immediate chop");
+    }
+
+    @Test
     @DisplayName("a queued BNE point command keeps both of its clocks")
     void playerCommandBoundaryRoundTrips() throws IOException {
         Bench bench = bench();
@@ -861,6 +880,31 @@ class SaveGameTest {
         assertEquals("unit-footman", loaded.target().type().ident());
         assertTrue(loaded.battleNetAttackWrapDestArmPending(),
                 "a save during Attack 3,2,1 must still dest-arm on the next OP0");
+    }
+
+    @Test
+    @DisplayName("formation refusal handoff ownership survives a save")
+    void formationRefusalHandoffOwnershipRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-footman"), 1, 10, 12);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setBattleNetDirectRefusalReplacementBand(true);
+        attacker.setBattleNetSaturatedNearRecoveryFullRoute(true);
+        attacker.setBattleNetSaturatedTerminatorRoutePending(true);
+
+        Unit loaded = find(reload(bench), "unit-grunt");
+
+        assertNotNull(loaded.target());
+        assertTrue(loaded.battleNetDirectRefusalReplacementBand(),
+                "reload must not lose the paid direct-refusal replacement band");
+        assertTrue(loaded.battleNetSaturatedNearRecoveryFullRoute(),
+                "reload must preserve the saturated near-route handoff");
+        assertTrue(loaded.battleNetSaturatedTerminatorRoutePending(),
+                "reload must not redraw a saturated terminator as a fresh route");
     }
 
     @Test

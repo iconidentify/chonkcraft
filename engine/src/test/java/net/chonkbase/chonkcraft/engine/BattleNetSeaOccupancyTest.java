@@ -1095,6 +1095,10 @@ class BattleNetSeaOccupancyTest {
                 "destroyer must not leave its start tile toward the yard");
         assertEquals(Unit.Order.STILL, destroyer.order(),
                 "blocked shipyard-footprint patrol must surface Still");
+        assertTrue(destroyer.battleNetFlyingIdleTimer() >= 8,
+                "the failed Patrol must re-arm naval idle on that visit");
+        assertTrue(destroyer.battleNetFlyingIdleTimer() <= 15,
+                "native's naval idle re-arm is an eight-to-fifteen countdown");
     }
 
     @Test
@@ -1151,8 +1155,8 @@ class BattleNetSeaOccupancyTest {
                 "second surface attacker joins the type-two assault");
         assertEquals(2, third.battleNetAiBehavior(),
                 "third surface attacker joins the type-two assault");
-        assertEquals(0, fourth.battleNetAiBehavior(),
-                "a fourth surface ship stays on ordinary naval behaviour");
+        assertEquals(6, fourth.battleNetAiBehavior(),
+                "a fourth surface ship stays on ordinary behavior-six patrol");
         assertEquals(30, first.battleNetAiHomeX(),
                 "assault home is the person capital ship");
         assertEquals(30, first.battleNetAiHomeY(),

@@ -166,6 +166,11 @@ class RangedOp0FreeScanRetargetHoldTest {
         assertEquals(attackStart, attacker.battleNetSequenceOffset(),
                 "retarget must stay on attack-start, not enter windup");
 
+        // The abandoned quarry's cadence can still contain a smaller live
+        // remainder after the chase. Native replacement semantics ignore it
+        // and restart the complete free-scan OP0 hold.
+        attacker.setBattleNetRangedAttackCadenceRemaining(17);
+
         // Next in-range OP0 seals timer 63 (approach-style post-retarget hold).
         guard = 0;
         while (attacker.battleNetAnimationTimer() != 63 && guard++ < 16) {

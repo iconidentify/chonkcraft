@@ -155,6 +155,38 @@ final class BattleNetConstructionSystem {
      */
     boolean canPlaceBattleNetBuilding(Unit builder, UnitType what,
             int tileX, int tileY) {
+        return canPlaceBattleNetBuilding(builder, what, tileX, tileY, false);
+    }
+
+
+    /**
+     * BNE's lattice-search predicate, optionally including its first-pass
+     * one-tile clear skirt.
+     *
+     * <p>The ready-worker callback sets byte {@code 0x4b508c} before its first
+     * base-hall search. {@code 0x439de0} then expands the proposed footprint
+     * by one square on every side and applies the same terrain and occupancy
+     * mask before it asks the ordinary building predicate. Only when the
+     * complete hall search fails does the callback clear that byte and repeat
+     * without the skirt. This is not the later {@code AiCheckSurrounding}
+     * transition counter: mobile units in the enlarged rectangle count here.
+     *
+     * <p>Retail Orc 5 is the compact witness. Its peasant carries foundation
+     * {@code +0x80=(106,48)} and fixed build goal
+     * {@code +0x84=(109,48)}. Candidates 109, 108 and 107 on row 48 have a
+     * friendly archer in their north skirt; candidate 106 is the first clear
+     * one. Omitting the first pass made Java accept 109 and eventually found
+     * the whole four-by-four hall three tiles east.</p>
+     */
+    boolean canPlaceBattleNetBuilding(Unit builder, UnitType what,
+            int tileX, int tileY, boolean clearSurround) {
+        if (clearSurround
+                && !battleNetBuildingSurroundingFootprintClear(
+                        what, tileX, tileY)) {
+            traceBattleNetBuildRejection(builder, what, tileX, tileY,
+                    "surrounding-footprint");
+            return false;
+        }
         if (!canPlaceBuilding(null, what, tileX, tileY)) {
             traceBattleNetBuildRejection(builder, what, tileX, tileY,
                     "base-predicate");
@@ -193,6 +225,20 @@ final class BattleNetConstructionSystem {
             }
         }
         return true;
+    }
+
+
+    /** The enlarged map-mask scan controlled by native byte {@code 0x4b508c}. */
+    private boolean battleNetBuildingSurroundingFootprintClear(
+            UnitType what, int tileX, int tileY) {
+        int x = tileX == 0 ? 0 : tileX - 1;
+        int y = tileY == 0 ? 0 : tileY - 1;
+        int width = Math.max(1, what.tileWidth()) + 2;
+        int height = Math.max(1, what.tileHeight()) + 2;
+        long blocking = TileFlag.UNPASSABLE | TileFlag.NO_BUILDING
+                | TileFlag.LAND_UNIT | TileFlag.SEA_UNIT | TileFlag.BUILDING;
+        return world.map.isFootprintFree(x, y, width, height,
+                Unit.movementMaskFor(what), blocking);
     }
 
 
@@ -665,6 +711,16 @@ final class BattleNetConstructionSystem {
             }
         }
         if (worker.pathLength() == 0 && !worker.isMoving()) {
+            if (worker.battleNetAiBuildTerminalRetry()
+                    && world.battleNetAiBuildReservations.contains(worker)) {
+                // Native keeps the terminal path buffer on an identical
+                // ready-callback replacement. It does not ask the point
+                // finder again even if a neighbouring square has since
+                // opened; the replacement returns through ready on this
+                // action beat (XHuman 12 slot 1364, fixtures 87..102).
+                restartBattleNetAiBuildAfterSpentRoute(worker);
+                return;
+            }
             // Free-prefix mid-journey: skip emptied-buffer PF_WAIT when the
             // tip still sits short of the site (same rule as gold free-
             // prefix tips). Full segments still pay the ten.
@@ -730,6 +786,11 @@ final class BattleNetConstructionSystem {
                                 minRange, maxRange), world.moverFor(worker));
             }
             if (path.result() == PathFinder.Result.UNREACHABLE) {
+                if (skipEmptyWait
+                        && world.battleNetAiBuildReservations.contains(worker)) {
+                    restartBattleNetAiBuildAfterSpentRoute(worker);
+                    return;
+                }
                 // An unreachable site is retried, not abandoned -- and for a
                 // computer player every unreachable answer runs the shove
                 // first, dice and all: DoActionMove's PF_UNREACHABLE case
@@ -894,18 +955,17 @@ final class BattleNetConstructionSystem {
         worker.setBuildReached(false);
         worker.setBuildWalked(false);
         worker.setBuildTile(tileX, tileY);
-        // 0x4513d0 stores an AI hall candidate directly in +0x84 with a
-        // null +0x88 target. Do not pass that point through the unit-
-        // target footprint clamp: Orc 5's native hall route is five SW
-        // headings to 109,48, whereas clamping it to 112,48 bends the
-        // second heading south. Ordinary placement still uses the older
-        // approximation below; applying the raw-point rule to every
-        // building exposes separate candidate-search discrepancies.
-        boolean hall = what.stores().contains(UnitType.Resource.GOLD);
+        // Native keeps the foundation and its fixed path point in separate
+        // words. Orc 5's retail peasant proves both simultaneously:
+        // +0x80 is the hall top-left at 106,48 and +0x84 is the footprint
+        // edge at 109,48. The placement finder supplies the former;
+        // GiveOrder/0x41f430 derives the latter from the builder's position.
+        // Collapsing the two happened to preserve the walk but founded a
+        // four-by-four hall at its top-right approach square.
         worker.setBuildGoal(
-                hall ? tileX : world.battleNetFootprintGoal(worker.tileX(), tileX,
+                world.battleNetFootprintGoal(worker.tileX(), tileX,
                         Math.max(1, what.tileWidth())),
-                hall ? tileY : world.battleNetFootprintGoal(worker.tileY(), tileY,
+                world.battleNetFootprintGoal(worker.tileY(), tileY,
                         Math.max(1, what.tileHeight())));
         if (World.BNE_IDLE_TRACE) {
             System.err.printf(
@@ -1029,6 +1089,54 @@ final class BattleNetConstructionSystem {
     }
 
 
+    /**
+     * Returns an AI builder whose accepted route ended at a terminal point to
+     * its ordinary native ready callback.
+     *
+     * <p>This is distinct from a first pathfinder refusal. Once a paid
+     * free-prefix segment has settled, BNE treats a non-progressing successor
+     * as the end of that build order: it reduces the queue's made count,
+     * clears the old placement reservation and dispatches the worker's Still
+     * action marker in the same unit visit. The callback may immediately buy
+     * the same request again. XHuman 12 slot 1364 proves both halves at
+     * fixture 84: its compact route to (33,88) ends at (10,88), then native
+     * debits another 600 gold and 450 lumber every three cycles until the bank
+     * can no longer cover the mill.</p>
+     *
+     * <p>The old debit is deliberately not refunded. This is not the
+     * occupied-foundation hand-back, whose native path does refund and stands
+     * down for three cycles; it is the ready dispatcher replacing a paid
+     * action after its terminal movement segment.</p>
+     */
+    private void restartBattleNetAiBuildAfterSpentRoute(Unit worker) {
+        aiHandBackBuild(worker);
+        worker.setBuildPaid(false);
+        abandonPendingBuild(worker);
+        worker.setOrder(Unit.Order.STILL);
+        worker.setActionBeforeQueued(null);
+
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (world.battleNetSequence != null && stillStart >= 0) {
+            worker.setBattleNetSequenceOffset(stillStart);
+            worker.setBattleNetAnimationTimer(1);
+        }
+        int phase = worker.battleNetIdlePhase();
+        worker.setBattleNetIdlePhase(phase + 1);
+        world.idle.dispatchBattleNetIdleMarker(worker,
+                PudUnitTypes.code(worker.type().ident()), phase);
+
+        // The ready callback changes the logical order to Build, but native's
+        // constructor Still body remains the visible sequence and owns the
+        // two quiet visits before the next attempt.
+        if (worker.order() == Unit.Order.BUILD
+                && world.battleNetSequence != null && stillStart >= 0) {
+            worker.setBattleNetSequenceOffset(stillStart);
+            worker.setBattleNetAnimationTimer(3);
+            worker.setBattleNetAiBuildTerminalRetry(true);
+        }
+    }
+
+
     /** Refunds work that never reached the point of creating a building. */
     void abandonPendingBuild(Unit worker) {
         UnitType what = worker.pendingBuild();
@@ -1051,6 +1159,7 @@ final class BattleNetConstructionSystem {
             world.refund(worker.player(), world.unitCosts(what), 100);
         }
         worker.setBuildPaid(false);
+        worker.setBattleNetAiBuildTerminalRetry(false);
         worker.setBuildReached(false);
         worker.setBuildWalked(false);
         worker.setPendingBuild(null);
@@ -1464,7 +1573,36 @@ final class BattleNetConstructionSystem {
                 // cycle. findRouteToOrBeside is the form that knows this.
                 world.movement.walkTowards(worker, siteX, siteY);
             } else {
+                // A paid AI build route has one terminal shape that the
+                // point finder must not turn into a brand-new journey.  The
+                // final cached heading can be refused on the same visit that
+                // drains the preceding step: one heading was left and the
+                // unit was still Moving on entry, but it leaves the visit
+                // standing with the buffer parked and another refusal in the
+                // retail counter.  Native leaves Build visible for that
+                // checkpoint, then returns the worker through its ready
+                // callback on the following action visit.  XHuman 12 slot
+                // 1376 does exactly this at (10,85): its final SE is occupied
+                // by a harvesting peon, Build survives fixture 135, and the
+                // ready callback selects gold on 136.
+                //
+                // Capture the transition, rather than testing the resulting
+                // empty route alone.  Empty routes also mean an ordinary
+                // first path request, a free-prefix boundary, and a completed
+                // successful segment; treating any of those as terminal
+                // would make the AI abandon valid construction work.
+                int routeBeforeWalk = worker.pathLength();
+                boolean movingBeforeWalk = worker.isMoving();
+                int refusalsBeforeWalk = worker.battleNetRefusals();
                 walkToSite(worker, siteX, siteY, siteW, siteH, nearest, reach);
+                if (world.battleNetAiBuildReservations.contains(worker)
+                        && worker.order() == Unit.Order.BUILD
+                        && movingBeforeWalk && routeBeforeWalk == 1
+                        && !worker.isMoving() && worker.pathLength() == 0
+                        && !worker.routeSpent() && worker.stepDrained()
+                        && worker.battleNetRefusals() > refusalsBeforeWalk) {
+                    worker.setBattleNetAiBuildTerminalRetry(true);
+                }
             }
             if (worker.order() != Unit.Order.BUILD) {
                 aiHandBackBuild(worker);

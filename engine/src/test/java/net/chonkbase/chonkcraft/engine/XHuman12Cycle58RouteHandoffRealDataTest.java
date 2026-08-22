@@ -66,6 +66,54 @@ class XHuman12Cycle58RouteHandoffRealDataTest {
                 "the parked move detour replans east at fixture 60");
     }
 
+    @Test
+    @DisplayName("an exhausted detached move detour stands down on its settle visit")
+    void anExhaustedDetachedMoveDetourStandsDownOnItsSettleVisit() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Java 102 / native 1498 parks its east route at index 20, receives
+        // the one-heading native replacement NE, and drains that heading at
+        // 78,33 beside the occupied goal 79,34. The authenticated unit record
+        // is Move/route-index 1 through fixture 132 and Still@581/1 on 133.
+        Unit moveDetour = unitAt(world, "unit-ogre", 70, 38);
+        assertNotNull(moveDetour, "XHuman 12 has no native-slot-1498 ogre");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 133) {
+            mission.tick();
+            int fixture = fixtureCycle(world);
+            if (fixture == 121) {
+                assertAt(moveDetour, 78, 33,
+                        "the replacement NE heading lands on the native tile");
+                assertEquals(0, moveDetour.pathLength(),
+                        "the detached native route contains no stale tail");
+                assertEquals(Unit.Order.MOVE, moveDetour.order(),
+                        "the route remains Move while its pixels drain");
+            }
+            if (fixture == 132) {
+                assertEquals(Unit.Order.MOVE, moveDetour.order(),
+                        "the last residual cycle is still visibly Move");
+            }
+        }
+
+        assertEquals(Unit.Order.STILL, moveDetour.order(),
+                "the exhausted detached route stands down on fixture 133");
+        assertEquals(581, moveDetour.battleNetSequenceOffset(),
+                "replacement Still remains at the native ogre sequence head");
+        assertEquals(1, moveDetour.battleNetAnimationTimer(),
+                "the quiet replacement Still owns native timer one");
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

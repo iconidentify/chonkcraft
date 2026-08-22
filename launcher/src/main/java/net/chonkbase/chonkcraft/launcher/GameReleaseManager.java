@@ -296,11 +296,32 @@ public final class GameReleaseManager {
         List<String> command = launchCommand(version, pack);
         home.create();
         Path log = home.logs().resolve("game-latest.log");
+        archivePreviousLog(version.version(), log);
         return new ProcessBuilder(command)
                 .directory(version.gameJar().getParent().toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.to(log.toFile()))
                 .start();
+    }
+
+    /** Keeps the last failed launch available when Play is pressed again. */
+    private void archivePreviousLog(String version, Path latest) {
+        try {
+            if (!Files.isRegularFile(latest) || Files.size(latest) == 0L) {
+                return;
+            }
+            String safeVersion = version.replaceAll("[^A-Za-z0-9._-]", "_");
+            long stamp = Files.getLastModifiedTime(latest).toMillis();
+            Path archived = home.logs().resolve(
+                    "game-" + safeVersion + "-" + stamp + ".log");
+            for (int suffix = 1; Files.exists(archived); suffix++) {
+                archived = home.logs().resolve(
+                        "game-" + safeVersion + "-" + stamp + "-" + suffix + ".log");
+            }
+            Files.copy(latest, archived);
+        } catch (IOException ignored) {
+            // Diagnostics must never prevent the game itself from launching.
+        }
     }
 
     /**
