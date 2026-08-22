@@ -593,4 +593,36 @@ class MeleeAttackSyncLoopTest {
         assertTrue(attacker.battleNetMeleeSyncRemaining() > 0,
                 "the landing debit must arm the twenty-five-cycle melee loop");
     }
+
+    @Test
+    @DisplayName("human 5's one-step building chasers debit only after landing")
+    void human5sOneStepBuildingChasersDebitOnlyAfterLanding() {
+        // Native grunts 1528/1532 both owe two presentation pixels at fixture
+        // 21, but their quarry is a barracks.  Unlike XHuman 9's footman-on-
+        // skeleton approach, table-0x27 waits for the fixture-22 building
+        // landing; both grunts then debit in unit-table order.
+        AssetSource assets = AssetSource.fromEnvironment();
+        assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level05h";
+        PudMap source = data.campaignMap(map);
+        assumeTrue(source != null, "Human 5 is not in the pack");
+        Mission mission = data.loadMission(map, GameData.personIn(source), 1);
+        assumeTrue(mission != null, "Human 5 will not load");
+        World world = mission.world();
+
+        for (int tick = 0; tick < 2; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 22; fixture++) {
+            mission.tick();
+            if (fixture == 21) {
+                assertEquals(0x41c67ea6, world.randomSeed(),
+                        "the two-pixel building tails do not own an early draw");
+            }
+        }
+        assertEquals(0x2781e494, world.randomSeed(),
+                "both one-step barracks chasers debit on fixture-22 landing");
+    }
 }

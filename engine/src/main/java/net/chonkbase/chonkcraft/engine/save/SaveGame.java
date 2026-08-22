@@ -679,6 +679,14 @@ public final class SaveGame {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
         }
+        if (unit.battleNetWoodReadyPathRequired()) {
+            state.append(" woodReadyPathRequired = true,");
+        }
+        if (unit.battleNetRangedAttackCadenceRemaining() != 0) {
+            state.append(" rangedAttackCadenceRemaining = ")
+                    .append(unit.battleNetRangedAttackCadenceRemaining())
+                    .append(",");
+        }
         if (unit.battleNetRefusals() != 0) {
             state.append(" battleNetRefusals = ")
                     .append(unit.battleNetRefusals()).append(",");
@@ -709,8 +717,29 @@ public final class SaveGame {
         if (unit.battleNetMovingQuarryResidual()) {
             state.append(" movingQuarryResidual = true,");
         }
+        if (unit.battleNetSaturatedResidualFaceRetry()) {
+            state.append(" saturatedResidualFaceRetry = true,");
+        }
+        if (unit.battleNetDirectRefusalRecoveryProbe()) {
+            state.append(" directRefusalRecoveryProbe = true,");
+        }
+        if (unit.battleNetRetargetResidualParkRefill()) {
+            state.append(" retargetResidualParkRefill = true,");
+            state.append(" retargetResidualParkSteps = ")
+                    .append(unit.battleNetRetargetResidualParkSteps())
+                    .append(",");
+        }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");
+        }
+        if (unit.battleNetSpatialHitHelpHandoff()) {
+            state.append(" spatialHitHelpHandoff = true,");
+        }
+        if (unit.battleNetLandPatrolAttackRoutePending()) {
+            state.append(" landPatrolAttackRoutePending = true,");
+        }
+        if (unit.battleNetResidualEmptyApproachIdlePending()) {
+            state.append(" residualEmptyApproachIdlePending = true,");
         }
         if (unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             state.append(" oilAction = ")

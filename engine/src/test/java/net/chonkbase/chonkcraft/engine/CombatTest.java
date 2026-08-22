@@ -325,7 +325,7 @@ class CombatTest {
         // aggressor in the struck unit's offer (+0x54) and commands nothing at
         // all, and the offer is what the unit's next standing scan turns into
         // a chase. See BattleNetCombatSystem.applyDamage and
-        // World.battleNetSpatialHelpReactPlusOne.
+        // World.battleNetSpatialHitHelp.
         //
         // So the answer is delayed rather than absent, and it arrives as an
         // ATTACK on the unit rather than an ATTACK_MOVE at its ground. Both

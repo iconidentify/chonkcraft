@@ -233,6 +233,42 @@ def _operations(native: Sequence[Draw], java: Sequence[Draw]) \
     return operations
 
 
+def _shared_capture_window(native: Sequence[Draw], java: Sequence[Draw]) \
+        -> tuple[Sequence[Draw], Sequence[Draw], dict[str, int]]:
+    """Remove only the unrecorded prefix before both hooks share a seed.
+
+    Native campaign traces begin at ``scenario-loaded`` after the executable
+    has constructed the map's unit pool. Java causal tracing also records
+    those construction draws. Comparing both arrays from element zero turns
+    that observation-boundary difference into hundreds of invented Java-only
+    draws and prevents the ledger from reaching gameplay.
+
+    The asynchronous LCG is a permutation, so one transition identifies one
+    point in its chain. The earliest transition present on both sides is the
+    first comparable draw; everything before it exists outside one capture's
+    window and cannot support a parity claim. Interior and trailing draws are
+    untouched and remain available to the ordinary mismatch classifier.
+    """
+    if not native or not java:
+        return native, java, {"native": 0, "java": 0}
+    java_positions: dict[tuple[int, int], int] = {}
+    for index, draw in enumerate(java):
+        java_positions.setdefault(draw.transition, index)
+    common: tuple[int, int] | None = None
+    for native_index, draw in enumerate(native):
+        java_index = java_positions.get(draw.transition)
+        if java_index is None:
+            continue
+        candidate = (native_index, java_index)
+        if common is None or sum(candidate) < sum(common):
+            common = candidate
+    if common is None:
+        return native, java, {"native": 0, "java": 0}
+    native_prefix, java_prefix = common
+    return (native[native_prefix:], java[java_prefix:],
+            {"native": native_prefix, "java": java_prefix})
+
+
 def _consumer_correspondence(matches: Sequence[dict[str, Any]]) \
         -> list[dict[str, Any]]:
     """What each native address looked like on the Java side, and how often.
@@ -264,6 +300,22 @@ def _consumer_correspondence(matches: Sequence[dict[str, Any]]) \
     return correspondence
 
 
+def _java_consumer_family(caller: str) -> str:
+    """Return the native-equivalent RNG consumer represented by Java code.
+
+    BNE rolls physical projectile and melee damage through the same native
+    routine.  The port keeps those entry points separate because projectiles
+    resolve later, but that Java class boundary is not a random-stream
+    boundary and must not manufacture a consumer change in the ledger.
+    """
+    if caller in {
+        "BattleNetProjectileSystem.battleNetProjectileDamage",
+        "World.battleNetMeleeDamage",
+    }:
+        return "battle-net-physical-damage"
+    return caller
+
+
 def _consumer_divergence(matches: Sequence[dict[str, Any]]) \
         -> dict[str, Any] | None:
     """The first draw whose consumer stopped being the one it had always been.
@@ -277,10 +329,12 @@ def _consumer_divergence(matches: Sequence[dict[str, Any]]) \
     The pairing is learned from the agreeing prefix rather than assumed:
     the first time a native address is seen beside a Java method the two are
     provisionally partners, and the disagreement is the first draw that
-    contradicts a partnership already established in either direction.
+    contradicts the Java consumer previously observed for that native call
+    site.  This is intentionally one-way: a port may consolidate several
+    native return addresses (for example projectile X/Y jitter) into one Java
+    helper without changing which subsystem consumed the random numbers.
     """
     forward: dict[str, str] = {}
-    reverse: dict[str, str] = {}
     expected: list[str] = []
     actual: list[str] = []
     usable: list[dict[str, Any]] = []
@@ -291,19 +345,15 @@ def _consumer_divergence(matches: Sequence[dict[str, Any]]) \
         if native_caller is None or java_caller is None:
             continue
         native_caller, java_caller = str(native_caller), str(java_caller)
+        java_consumer = _java_consumer_family(java_caller)
         index = len(usable)
         usable.append(pair)
-        actual.append(java_caller)
+        actual.append(java_consumer)
         if native_caller in forward:
             expected.append(forward[native_caller])
-        elif java_caller in reverse:
-            # The Java method already belongs to another native address, so
-            # this draw is spent by somebody who has been paired elsewhere.
-            expected.append("(unpaired with " + reverse[java_caller] + ")")
         else:
-            expected.append(java_caller)
-            forward[native_caller] = java_caller
-            reverse[java_caller] = native_caller
+            expected.append(java_consumer)
+            forward[native_caller] = java_consumer
         if contradiction is None and expected[index] != actual[index]:
             contradiction = index
     if contradiction is None:
@@ -315,6 +365,7 @@ def _consumer_divergence(matches: Sequence[dict[str, Any]]) \
         "java": usable[contradiction]["java"],
         "expected_java_caller": expected[contradiction],
         "observed_java_caller": actual[contradiction],
+        "observed_java_method": usable[contradiction]["java"].get("caller"),
         "window_consumers_preserved": reordered,
     }
 
@@ -483,6 +534,11 @@ def build_ledger(native_draws: Sequence[Draw] | None,
         })
         return report
 
+    native_draws, java_draws, capture_prefix = _shared_capture_window(
+        native_draws, java_draws)
+    report["capture_prefix_excluded"] = capture_prefix
+    report["native"]["compared_draw_count"] = len(native_draws)
+    report["java"]["compared_draw_count"] = len(java_draws)
     operations = _operations(native_draws, java_draws)
     matches = [item for item in operations if item["op"] == "match"]
     report["cycle_offset"] = _cycle_offsets(matches)

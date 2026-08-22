@@ -2380,6 +2380,11 @@ def add_triage_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--baseline-survey", type=Path, action="append",
                         required=True,
                         help="saved proof to preserve (repeatable)")
+    parser.add_argument(
+        "--allow-asset-migration", action="store_true",
+        help=("accept a replacement pack only when all 52 measured Java "
+              "traces and semantic results are byte-identical to one baseline"),
+    )
     parser.add_argument("--artifact-root", type=Path,
                         default=ROOT / ".bne-artifacts")
     parser.add_argument("--allow-partial", action="store_true")

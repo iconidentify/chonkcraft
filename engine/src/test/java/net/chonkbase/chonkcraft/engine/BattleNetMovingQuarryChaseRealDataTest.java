@@ -97,6 +97,64 @@ class BattleNetMovingQuarryChaseRealDataTest {
                 "native keeps the NE,E approach tail after its first step");
     }
 
+    @Test
+    void aHuman8AttackPeasantLetsMoveTimerOneOwnItsQuietVisit() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 77, 69);
+        assertNotNull(attacker);
+
+        while (fixtureCycle(mission.world()) < 87) {
+            mission.tick();
+        }
+        assertChaser(attacker, 74, 65, 0, 0, false);
+        assertEquals(1, attacker.pathLength());
+
+        mission.tick();
+        assertChaser(attacker, 74, 65, 0, 0, false);
+        assertEquals(1, attacker.pathLength(),
+                "the timer-one Move visit retains the cached NW heading");
+
+        mission.tick();
+        assertChaser(attacker, 73, 64, 32, 32, true);
+        assertEquals(0, attacker.pathLength());
+
+        while (fixtureCycle(mission.world()) < 104) {
+            mission.tick();
+        }
+        assertChaser(attacker, 73, 64, 0, 0, false);
+
+        mission.tick();
+        assertChaser(attacker, 72, 65, 32, -32, true);
+        assertEquals(1, attacker.pathLength(),
+                "the exhausted chase must retain the second replacement heading");
+        assertNotNull(attacker.target());
+        assertEquals(72, attacker.target().tileX(),
+                "the fixture-105 Move OP0 retargets to the nearer peasant");
+        assertEquals(66, attacker.target().tileY(),
+                "the replacement quarry is the peasant on 72,66");
+
+        while (fixtureCycle(mission.world()) < 121) {
+            mission.tick();
+        }
+        assertChaser(attacker, 72, 65, 0, 0, false);
+        assertEquals(1, attacker.pathLength(),
+                "the settled chase keeps its final route byte through Attack construction");
+        assertEquals(2657, attacker.battleNetSequenceOffset(),
+                "the final pixel yields to BNE's Attack program before another tile step");
+        assertEquals(3, attacker.battleNetAnimationTimer());
+    }
+
     private static Unit unitAt(World world, int player, String ident,
             int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
