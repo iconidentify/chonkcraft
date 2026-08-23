@@ -1167,6 +1167,65 @@ class MeleeChaseReplanResidualTest {
     }
 
     @Test
+    @DisplayName("a fully slept cold chase parks its stale route before redrawing")
+    void aFullySleptColdChaseParksItsStaleRouteBeforeRedrawing() {
+        // Human 13 grunt 1507 lays SE,SE toward the wise-man but finds the
+        // allied ogre on its first square. Native pays Move 15..1, writes
+        // route index 20 on the timer-one visit, then redraws around current
+        // occupancy and takes E. Retrying SE instead buys another complete
+        // refusal band and leaves a crowded attacker visibly frozen.
+        GameMap map = grass(40);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        Unit chaser = world.createUnit(grunt(), 0, 20, 20);
+        Unit quarry = world.createUnit(prey(), 1, 23, 23);
+        Unit ally = world.createUnit(ogre(), 0, 21, 21);
+        assertTrue(chaser != null && quarry != null && ally != null,
+                "units must place");
+        assertTrue(world.orderAttack(chaser, quarry), "attack accepted");
+
+        int se = Direction.fromDelta(1, 1);
+        chaser.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {se, se}));
+        chaser.setPathGoal(quarry.tileX(), quarry.tileY());
+        chaser.setTarget(quarry);
+        chaser.setOfferedTarget(quarry);
+        chaser.setChasing(true);
+        chaser.setOffset(0, 0);
+        chaser.setWalkHolding(false);
+        chaser.setStepDrained(true);
+        chaser.setBattleNetCollisionCounter(1);
+        chaser.setBattleNetOrderDelay(1);
+        chaser.animation().switchTo(
+                chaser.type().animationSet().get(AnimationSet.State.MOVE));
+        ally.animation().switchTo(
+                ally.type().animationSet().get(AnimationSet.State.STILL));
+
+        world.combat.stepAttack(chaser);
+
+        assertEquals(0, chaser.pathLength(),
+                "timer-one must park the untouched blocked route");
+        assertEquals(1, chaser.battleNetOrderDelay(),
+                "the park owns one action visit before refill");
+        assertEquals(20, chaser.tileX(), "the park visit must stay in place");
+        assertEquals(20, chaser.tileY(), "the park visit must stay in place");
+
+        world.combat.stepAttack(chaser);
+        assertEquals(0, chaser.battleNetOrderDelay(),
+                "the parked route exposes refill on the following visit");
+        assertEquals(20, chaser.tileX(), "the bridge visit must stay in place");
+        assertEquals(20, chaser.tileY(), "the bridge visit must stay in place");
+
+        world.combat.stepAttack(chaser);
+        assertEquals(21, chaser.tileX(),
+                "the fresh route must take the free east square");
+        assertEquals(20, chaser.tileY(),
+                "the fresh route must route east around the occupied diagonal");
+    }
+
+    @Test
     @DisplayName("residual path-two chase refuse with collision pays timer fifteen before replan")
     void residualPathTwoChaseRefuseWithCollisionPaysTimerFifteenBeforeReplan() {
         // retail-xhuman-10-idle grunt 1486: residual-settled leftover EE with

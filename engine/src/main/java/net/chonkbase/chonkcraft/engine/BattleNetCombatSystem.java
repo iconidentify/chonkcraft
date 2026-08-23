@@ -736,6 +736,22 @@ final class BattleNetCombatSystem {
                     return;
                 }
             } else {
+                boolean coldChaseRefusalPark =
+                        unit.battleNetOrderDelay() == 1
+                        && unit.chasing()
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.pathLength() > 1
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetCollisionCounter() == 1
+                        && unit.battleNetRefusals() == 0
+                        && unit.target() != null
+                        // A matching standing offer is the order provenance
+                        // for this park. No offer, or an offer naming another
+                        // attacker, hands the paid refusal to Attack
+                        // construction instead (the held-out XHuman 10 and
+                        // XHuman 12 witnesses).
+                        && unit.offeredTarget() == unit.target()
+                        && !World.battleNetRangedChaseUnit(unit);
                 boolean paidCachedEmptyRefill =
                         unit.battleNetChaseEmptyRouteReplan()
                         && unit.stepDrained() && !unit.isMoving()
@@ -801,6 +817,32 @@ final class BattleNetCombatSystem {
                                             * wakeStride);
                 }
                 unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                if (coldChaseRefusalPark) {
+                    // A freshly drawn melee chase route whose opening byte
+                    // refused has already paid FUN_004379e0's complete Move
+                    // timer.  Timer one parks the untouched buffer at native
+                    // route index 20; the following action visit draws a new
+                    // route against current occupancy.  Retrying the stale
+                    // head instead buys another complete refusal band and is
+                    // an unbounded crowded-combat freeze.  Human 13 grunt
+                    // 1507 is the sealed witness: SE,SE / timer 15..1 at
+                    // fixtures 114..129, then a fresh E,SE,SW route and the E
+                    // step at 130.
+                    world.causalTrace.event(world.cycle,
+                            "path.cold-refusal-park", unit.id(),
+                            "path_length", unit.pathLength(),
+                            "heading", unit.peekHeading(),
+                            "collision", unit.battleNetCollisionCounter());
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    // The park is its own action visit.  Refill begins on the
+                    // following visit, so retain one Java scheduler beat
+                    // after exposing the empty native buffer.
+                    unit.setBattleNetOrderDelay(1);
+                    unit.setBattleNetChaseStepReady(false);
+                    return;
+                }
                 if (refusalWake) {
                     unit.setBattleNetRefusalHold(true);
                 }
