@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 876 of 2,421 tests skip and
+either way. With nothing configured, 973 of 2,537 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,10 +57,11 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **23 skips of 2,421**, updated after the player-intent
-coverage additions against the runner's authenticated Battle.net Edition installation.
-One of the twenty-three depends on which release the installation is: the
-Battle.net Edition runner sees 23, while a classic installation sees 24.
+Asserts the `full` profile: **25 skips of 2,537**, re-measured after the BNE
+parity and production-multiplayer coverage additions against the runner's
+authenticated retail installation. One of the twenty-five depends on which
+release the installation is: a source exposing the Battle.net Edition stereo
+video path sees 24, while the currently mounted source sees 25.
 `scripts/ci/check-test-skips.py` explains the release-dependent assertion.
 About nine minutes.
 
@@ -88,15 +89,16 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 876 |
-| `full` | installation, pack, Opus vectors | 23 |
+| `data-free` | none | 973 |
+| `full` | installation, pack, Opus vectors | 25 |
 
-The twenty-three that skip even in `full` want nothing anyone should have to
+The twenty-five that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, four are
 fixture-sensitive behaviours, four need custom maps absent from the retail pack,
-and two exact-save referees need the operator's private playtest saves. One video
-assertion depends on which retail release is mounted.
+three exact-save referees need the operator's private playtest saves, and the
+production service smoke runs only in the deploy workflow. One video assertion
+depends on which retail release is mounted.
 
 ## The failure gate
 
