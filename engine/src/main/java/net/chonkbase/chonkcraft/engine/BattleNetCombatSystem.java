@@ -8863,6 +8863,25 @@ final class BattleNetCombatSystem {
             unit.setBattleNetSequenceOffset(moveStart);
             unit.setBattleNetAnimationTimer(1);
             unit.setBattleNetAttackRefusalRecoveryStage(6);
+            if (unit.battleNetChaseReplanResidualHold()
+                    && unit.pathLength() == 0
+                    && unit.battleNetChaseEmptyRouteReplan()) {
+                // A replacement ray which refused at the residual boundary
+                // has already paid the active-order Attack constructor that
+                // stage five just completed.  Do not let the generic blocked-
+                // chase gate buy the same 3,2,1 a second time.  Retail parks
+                // the empty cursor on this handoff, serves one Move-start
+                // visit, then redraws and probes. Human 13 ogre 1519 is the
+                // sealed crowded-line witness: Attack 643/3,2,1 on fixtures
+                // 149..151, Move 586 on 152..153, and the open southeast
+                // detour commits on 154. The duplicate constructor left the
+                // live fighter visibly frozen through fixture 155.
+                unit.setBattleNetChaseReplanResidualHold(false);
+                unit.setBattleNetRetargetResidualRoutePark(true);
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                unit.setBattleNetOrderDelay(1);
+                return true;
+            }
             return false;
         }
         if (stage == 6) {
