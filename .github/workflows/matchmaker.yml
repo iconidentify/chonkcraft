@@ -147,6 +147,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - name: Install rendered-client font dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq fontconfig fonts-dejavu-core
       - name: Install pinned runtime
         run: scripts/jbr/install-jbr-25.sh
       - name: Build authenticated BNE asset pack
