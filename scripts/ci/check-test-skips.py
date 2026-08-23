@@ -10,7 +10,7 @@ and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
     authenticated inputs       2631 tests,   25 skipped
-    no external input          2631 tests, 1053 skipped
+    no external input          2631 tests, 1054 skipped
 
 Both can be green.
 
@@ -137,7 +137,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # they run in `full` and join this profile's skip inventory. The
         # production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1743, 741),
+        "engine": (1743, 742),
         "desktop": (329, 253),
         "matchmaker-server": (5, 1),
     },

@@ -5,7 +5,7 @@
 #
 # It exists because the suite skips rather than fails when its external inputs
 # are missing, so an unconfigured machine gets BUILD SUCCESS out of a run that
-# verified almost nothing. 1,053 of 2,631 tests skip that way. This prints the
+# verified almost nothing. 1,054 of 2,631 tests skip that way. This prints the
 # difference before you spend twenty-five seconds wondering why the run was
 # fast.
 #
@@ -226,7 +226,7 @@ elif [[ "$wc2_ok" == 1 ]]; then
 else
     printf '  At least one external input is missing.\n'
     printf '  The suite will still report BUILD SUCCESS, having skipped most of itself:\n'
-    printf '  with no input at all, 1053 of 2631 tests skip.\n'
+    printf '  with no input at all, 1054 of 2631 tests skip.\n'
     printf '  That is not a passing run. See docs/development-setup.md.\n'
 fi
 
