@@ -1330,6 +1330,7 @@ class MeleeChaseReplanResidualTest {
         chaser.setAutoTargeting(true);
         chaser.setOffset(0, 0);
         chaser.setStepDrained(true);
+        chaser.carryBattleNetPathStepsTaken(2);
         chaser.setBattleNetOrderDelay(0);
         chaser.setBattleNetCollisionCounter(0);
         chaser.setBattleNetAiBehavior(1);

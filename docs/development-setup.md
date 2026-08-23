@@ -485,10 +485,10 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 961 skips, so 1,627 tests actually run without exposing licensed
+It asserts 1,018 skips, so 1,570 tests actually run without exposing licensed
 media to public pull-request code. The August parity expansion added 51 engine
-tests while converting 12 formerly asset-dependent checks into data-free
-coverage; the lower skip count is therefore an intentional coverage gain.
+tests: six are self-contained and 45 use authenticated local-oracle fixtures,
+so the latter deliberately join the hosted lane's skip inventory.
 
 ## Packaging
 

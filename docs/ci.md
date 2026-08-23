@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 961 of 2,588 tests skip and
+either way. With nothing configured, 1,018 of 2,588 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -89,7 +89,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 961 |
+| `data-free` | none | 1,018 |
 | `full` | installation, pack, Opus vectors | 20 |
 
 The twenty that skip even in `full` want nothing anyone should have to provide:

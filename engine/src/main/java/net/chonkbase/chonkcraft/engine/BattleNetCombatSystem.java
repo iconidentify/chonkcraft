@@ -1774,6 +1774,7 @@ final class BattleNetCombatSystem {
                 // Non-building quarries unchanged.
                 boolean residualBlockedBuilding = false;
                 int residualBlockedFreeHeading = -1;
+                int residualBlockedPathStepsTaken = -1;
                 boolean residualPathOneChangedTarget = false;
                 if (previous != null && unit.pathLength() >= 6
                         && previous.type() != null && previous.type().building()
@@ -1807,6 +1808,8 @@ final class BattleNetCombatSystem {
                             if (world.canEnter(unit, freeX, freeY)) {
                                 residualBlockedFreeHeading = dir;
                                 residualBlockedBuilding = true;
+                                residualBlockedPathStepsTaken =
+                                        unit.battleNetPathStepsTaken();
                                 break;
                             }
                         }
@@ -2179,7 +2182,7 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetChaseReplanResidualHold(true);
                         world.movement.moveTowards(unit, chased);
                         if (unit.pathLength() > 0
-                                && unit.battleNetPathStepsTaken() == 2) {
+                                && residualBlockedPathStepsTaken == 2) {
                             // The blocked building residual has already paid
                             // this visit's path consult. The target upgrade
                             // replaces the tail, but it does not replace the
