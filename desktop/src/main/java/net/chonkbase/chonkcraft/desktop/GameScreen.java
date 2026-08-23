@@ -11,6 +11,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.JPanel;
 import net.chonkbase.chonkcraft.data.graphic.IndexedImage;
@@ -3748,6 +3749,31 @@ final class GameScreen extends JPanel {
 
     void setNetworkChat(net.chonkbase.chonkcraft.engine.network.NetworkGame network) {
         chat = network == null ? null : new InGameChat(network, font, audio);
+        if (network == null) {
+            return;
+        }
+        String alliance = alliedOpeningStatus(network);
+        if (!alliance.isEmpty()) {
+            status = alliance;
+        }
+    }
+
+    /** What the running simulation, rather than the lobby's promise, says the team is. */
+    static String alliedOpeningStatus(
+            net.chonkbase.chonkcraft.engine.network.NetworkGame network) {
+        List<String> allies = network.connectedPlayers().stream()
+                .filter(player -> player.allied() && !player.local())
+                .map(net.chonkbase.chonkcraft.engine.network.NetworkGame.PlayerPresence::name)
+                .toList();
+        if (allies.isEmpty()) {
+            return "";
+        }
+        // A Top-vs-Bottom lobby used to arrive at the map with no visible
+        // confirmation of what it had done. The first status line now states
+        // the relationship the running simulation actually holds; if setup
+        // loses the alliance, this line disappears with it.
+        return BattleNetMessages.sentence(
+                "Allied with " + String.join(" and ", allies) + ". Shared sight is on");
     }
 
     void acceptChat(net.chonkbase.chonkcraft.engine.network.NetworkGame.ChatEvent event) {

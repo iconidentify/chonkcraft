@@ -231,12 +231,18 @@ final class LobbyScreen extends JPanel {
         if (!lobby.isHost()) {
             return;
         }
-        if (!lobby.state().allPlayersReady()) {
+        GameLobby.State state = lobby.state();
+        if (!state.allPlayersReady()) {
             notice = "Waiting for every player to receive the map.";
             return;
         }
-        if (lobby.state().slots().stream().filter(GameLobby.Slot::isPlaying).count() < 2) {
+        if (state.slots().stream().filter(GameLobby.Slot::isPlaying).count() < 2) {
             notice = "A game needs at least two players.";
+            return;
+        }
+        if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                && !bothTeamsHavePlayers(state)) {
+            notice = "Top vs Bottom needs at least one player on each team.";
             return;
         }
         try {
@@ -493,7 +499,7 @@ final class LobbyScreen extends JPanel {
                         : holding >= 0
                                 ? "Now click an open slot to move them there."
                                 : state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
-                                        ? "Team allies share sight. Click a player, then an open row to move."
+                                        ? teamSummary(state)
                                         : "Click any player, then an open slot, to choose a colour.";
             } else if (hint.isEmpty()) {
                 hint = state.localSlot() < 0
@@ -508,9 +514,12 @@ final class LobbyScreen extends JPanel {
         if (lobby.isHost()) {
             boolean enoughPlayers = state.slots().stream().filter(GameLobby.Slot::isPlaying)
                     .count() >= 2;
-            boolean canStart = state.allPlayersReady() && enoughPlayers;
+            boolean bothTeams = state.gameTemplate() != GameLobby.GameTemplate.TOP_VS_BOTTOM
+                    || bothTeamsHavePlayers(state);
+            boolean canStart = state.allPlayersReady() && enoughPlayers && bothTeams;
             button(g2, TABLE_X, FOOT_Y, 160, FOOT_HEIGHT,
                     !enoughPlayers ? "Waiting for Players"
+                            : !bothTeams ? "Fill Both Teams"
                             : state.allPlayersReady() ? "Start Game" : "Syncing Map...",
                     canStart ? this::begin : null);
         }
@@ -520,6 +529,43 @@ final class LobbyScreen extends JPanel {
         button(g2, TABLE_X + TABLE_WIDTH - 160, FOOT_Y, 160, FOOT_HEIGHT,
                 state.updateRequired() ? "Quit to Update" : "Cancel (Esc)",
                 state.updateRequired() ? this::quitForUpdate : this::cancel);
+    }
+
+    /** Whether Top vs Bottom has somebody to fight on both map-defined sides. */
+    private boolean bothTeamsHavePlayers(GameLobby.State state) {
+        LobbyTeams teams = lobbyTeams(state);
+        boolean top = false;
+        boolean bottom = false;
+        for (GameLobby.Slot slot : state.slots()) {
+            if (!slot.isPlaying()) {
+                continue;
+            }
+            if (teams.sideOf(slot.index()) == LobbyTeams.Side.TOP) {
+                top = true;
+            } else {
+                bottom = true;
+            }
+        }
+        return top && bottom;
+    }
+
+    /** A compact, literal account of who will share sight and who will not. */
+    private String teamSummary(GameLobby.State state) {
+        LobbyTeams teams = lobbyTeams(state);
+        List<String> top = new ArrayList<>();
+        List<String> bottom = new ArrayList<>();
+        for (GameLobby.Slot slot : state.slots()) {
+            if (!slot.isPlaying()) {
+                continue;
+            }
+            String name = slot.occupant() == GameLobby.Occupant.COMPUTER
+                    ? "Computer" : slot.name();
+            String member = name + " (" + PlayerColours.nameOf(slot.index()) + ")";
+            (teams.sideOf(slot.index()) == LobbyTeams.Side.TOP ? top : bottom).add(member);
+        }
+        String topNames = top.isEmpty() ? "empty" : String.join(" + ", top);
+        String bottomNames = bottom.isEmpty() ? "empty" : String.join(" + ", bottom);
+        return "Top: " + topNames + " | Bottom: " + bottomNames + " | Shared sight ON";
     }
 
     private void copyInvite() {

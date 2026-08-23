@@ -139,6 +139,10 @@ require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]
   "${work}/host.log" "host-team"
 require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
   "${work}/client.log" "client-team"
+require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1 active-computer-ais=1 attached-computer-ais=1' \
+  "${work}/host.log" "host-exact-team"
+require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1 active-computer-ais=1 attached-computer-ais=1' \
+  "${work}/client.log" "client-exact-team"
 require_log 'finished: cycles=180' "${work}/host.log" "host-finish"
 require_log 'finished: cycles=180' "${work}/client.log" "client-finish"
 host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/host.log" | tail -1)"
@@ -232,6 +236,10 @@ require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]
   "${online_host_log}" "online-host-team"
 require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
   "${online_client_log}" "online-client-team"
+require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1 active-computer-ais=1 attached-computer-ais=1' \
+  "${online_host_log}" "online-host-exact-team"
+require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1 active-computer-ais=1 attached-computer-ais=1' \
+  "${online_client_log}" "online-client-exact-team"
 online_host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_host_log}" | tail -1)"
 online_client_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_client_log}" | tail -1)"
 if [[ -z "${online_host_hash}" || "${online_host_hash}" != "${online_client_hash}" ]]; then

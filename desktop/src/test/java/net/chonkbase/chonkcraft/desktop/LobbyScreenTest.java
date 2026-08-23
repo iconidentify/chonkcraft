@@ -226,6 +226,35 @@ class LobbyScreenTest {
     }
 
     @Test
+    @DisplayName("Top vs Bottom cannot start with everybody on one team")
+    void topVsBottomRequiresBothDisplayedTeams() throws Exception {
+        GameData data = load();
+        Recording heard = new Recording();
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 24)) {
+            assertTrue(lobby.setOccupant(1, GameLobby.Occupant.COMPUTER));
+            assertTrue(lobby.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
+            LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", heard);
+            screen.render();
+
+            assertFalse(click(screen, LobbyScreen.startBounds()),
+                    "Top vs Bottom offered Start while the opposing team was empty");
+            assertFalse(heard.started.get(),
+                    "the one-sided team lobby began an unwinnable match");
+
+            assertTrue(click(screen, LobbyScreen.moveBounds(1)),
+                    "the computer could not be picked up from the Top Team");
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.rowBounds(4)),
+                    "the computer could not be placed on the Bottom Team");
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.startBounds()),
+                    "Start stayed unavailable after both displayed teams were occupied");
+            assertTrue(heard.started.get(),
+                    "the valid two-sided team lobby did not begin");
+        }
+    }
+
+    @Test
     @DisplayName("Start stays unavailable until the joiner's map is ready")
     void startWaitsForTheJoinersMap() throws Exception {
         Recording heard = new Recording();

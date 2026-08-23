@@ -165,6 +165,8 @@ public final class NetworkPeer {
             lobbySetup.applyGameTemplate(world, source);
         }
         world.recalculateSupply();
+        int activeComputerAis = world.enableAiForComputerPlayers();
+        var aiAssignments = data.attachRetailAi(world, source, java.util.Map.of());
         if (lobbySetup != null
                 && lobbyRun.lobby().state().gameTemplate()
                         == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
@@ -176,6 +178,8 @@ public final class NetworkPeer {
                             Relation.SHARED_VISION),
                     relatedPlayers(lobbyRun.lobby(), world, localPlayer,
                             Relation.ENEMY));
+            proveTopVsBottomScenario(lobbyRun.lobby(), world, localPlayer,
+                    activeComputerAis, aiAssignments.size());
         }
         int visibleTiles = visibleTiles(world, localPlayer);
         if (visibleTiles == 0) {
@@ -507,6 +511,49 @@ public final class NetworkPeer {
         ALLIED,
         SHARED_VISION,
         ENEMY
+    }
+
+    /**
+     * Proves the exact player-reported layout rather than merely finding some alliance.
+     *
+     * <p>The release referee creates two people on one displayed team and one
+     * computer on the other. Its old regular expression accepted any non-empty
+     * ally/enemy lists, so it passed even if the human was allied to the
+     * computer and the other human was the enemy. This assertion names the
+     * occupants and also starts the computer's retail AI before allowing the
+     * two-process proof to continue.
+     */
+    private static void proveTopVsBottomScenario(GameLobby lobby, World world,
+            int localPlayer, int activeComputerAis, int attachedComputerAis) {
+        long humanAllies = lobby.state().slots().stream()
+                .filter(slot -> slot.index() != localPlayer)
+                .filter(slot -> slot.occupant() == GameLobby.Occupant.HUMAN)
+                .filter(slot -> world.isAllied(localPlayer, slot.index())
+                        && world.isAllied(slot.index(), localPlayer))
+                .count();
+        long sharedHumanAllies = lobby.state().slots().stream()
+                .filter(slot -> slot.index() != localPlayer)
+                .filter(slot -> slot.occupant() == GameLobby.Occupant.HUMAN)
+                .filter(slot -> world.sharesVisionWith(localPlayer, slot.index())
+                        && world.sharesVisionWith(slot.index(), localPlayer))
+                .count();
+        long computerEnemies = lobby.state().slots().stream()
+                .filter(slot -> slot.occupant() == GameLobby.Occupant.COMPUTER)
+                .filter(slot -> world.isEnemyPlayer(localPlayer, slot.index())
+                        && world.isEnemyPlayer(slot.index(), localPlayer))
+                .count();
+        if (humanAllies != 1 || sharedHumanAllies != 1 || computerEnemies != 1
+                || activeComputerAis != 1 || attachedComputerAis != 1) {
+            throw new IllegalStateException("Top vs Bottom did not produce one human ally "
+                    + "with shared sight and one live computer enemy: human-allies="
+                    + humanAllies + " shared-human-allies=" + sharedHumanAllies
+                    + " computer-enemies=" + computerEnemies + " active-computer-ais="
+                    + activeComputerAis + " attached-computer-ais=" + attachedComputerAis);
+        }
+        System.out.printf("peer %d team-proof: human-allies=%d shared-human-allies=%d "
+                        + "computer-enemies=%d active-computer-ais=%d attached-computer-ais=%d%n",
+                localPlayer, humanAllies, sharedHumanAllies, computerEnemies,
+                activeComputerAis, attachedComputerAis);
     }
 
     /** A machine-readable account of the relationships applied before cycle zero. */

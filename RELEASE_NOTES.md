@@ -1,17 +1,16 @@
-# Multiplayer Teams and Reliable Worker Orders
+# Explicit Multiplayer Teams and Reliable Worker Orders
 
-- Added a Battle.net Edition-style **Top vs Bottom** lobby mode. Players in
-  the same fixed starting area begin as mutual allies with shared vision.
-- Fixed the team lobby on maps whose colour slots alternate between map
-  areas. Top and Bottom are now visibly grouped and labelled from the verified
-  map, so two adjacent-looking rows can no longer start on opposing teams.
-- The host can now move any player—including themselves—to an open colour and
-  starting slot, and can move computer seats the same way. Team, colour, and
-  shared-sight setup are explicit before the match.
-- Multiplayer sync checks now cover alliances and shared vision at cycle zero,
-  catching a missing team setup immediately instead of after combat diverges.
+- Made **Top vs Bottom** literal: every lobby row names its map-defined team,
+  the summary names each occupied colour on both sides, and it says when shared
+  sight is on. Two adjacent-looking colour slots can no longer masquerade as a
+  team on maps whose starting positions alternate between north and south.
+- Top vs Bottom will not start with everybody on one side. The host can move
+  people, computers, or themselves between open colour/start slots, and the
+  battlefield opens by naming the human ally whose sight is actually shared.
+- Strengthened the production multiplayer referee around the reported family
+  setup: two separate game processes must place both humans on the same team,
+  put one computer on the opposing team, attach its retail `ai.bin` profile,
+  share human vision in both directions, and stay synchronized for 180 cycles.
 - Fixed the lost-worker failure where a farm order released as a peasant or
   peon entered a mine could strand that worker off-map forever while it still
   consumed food. The worker now emerges and resumes the acknowledged build.
-- Bumped the deterministic lobby protocol so old and new team-capable clients
-  cannot accidentally enter the same lockstep game.

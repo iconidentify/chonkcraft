@@ -234,6 +234,14 @@ class LobbyMapSetupTest {
                 assertFalse(world.isAllied(0, 7),
                         "the bottom computer was silently put on Chris's team");
                 assertTrue(world.isEnemyPlayer(0, 7));
+                assertEquals(PudMap.PlayerType.COMPUTER, world.player(7).type(),
+                        "the bottom lobby seat did not become a computer player");
+                assertEquals(1, world.enableAiForComputerPlayers(),
+                        "the displayed computer did not start exactly one live AI");
+                assertTrue(world.ais().containsKey(7),
+                        "the bottom computer's AI was absent from the running world");
+                assertEquals(1, data.attachRetailAi(world, source, java.util.Map.of()).size(),
+                        "the bottom computer did not receive its retail ai.bin profile");
             }
         }
     }

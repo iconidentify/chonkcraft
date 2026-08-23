@@ -77,6 +77,16 @@ class InGameChatVisualTest {
         }
     }
 
+    @Test
+    @DisplayName("the battlefield names the ally whose sight is shared")
+    void theRunningAllianceIsConfirmedOnEntry() throws Exception {
+        try (Scene scene = scene()) {
+            assertEquals("Allied with Morgan. Shared sight is on.",
+                    GameScreen.alliedOpeningStatus(scene.game()),
+                    "the map opened without identifying the alliance actually in force");
+        }
+    }
+
     private static Scene scene() throws Exception {
         Player[] players = new Player[Player.MAX];
         for (int i = 0; i < players.length; i++) {

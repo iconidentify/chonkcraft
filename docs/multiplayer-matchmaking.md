@@ -172,13 +172,16 @@ The settled lobby also carries its game template. In **Top vs Bottom**, the
 host assigns colours/start slots and players whose fixed map starts occupy the
 same vertical area enter as mutual allies with mutual shared vision; the
 screen groups those interleaved colour slots into labelled Top Team and Bottom
-Team rows using the verified map bytes. Authenticated UI and startup regressions
-recreate the reported **All You Need BNE** setup exactly. The portable
-two-process release gate selects a retail map present in that particular pack
-whose fixed starts can represent the same two-people-versus-one-computer team
-shape; it requires both peers to report non-empty alliance, shared-vision, and
-enemy rosters before comparing their final simulation hashes. Diplomacy and
-shared sight are themselves part of that hash from cycle zero.
+Team rows using the verified map bytes. The roster summary names the occupied
+colour on each side and confirms shared sight; a one-sided Top-vs-Bottom lobby
+cannot start. Authenticated UI and startup regressions recreate the reported
+**All You Need BNE** setup exactly. The portable two-process release gate
+selects a retail map present in that particular pack whose fixed starts can
+represent the same two-people-versus-one-computer team shape. Both peers must
+prove exactly one mutual human ally with shared vision, exactly one mutual
+computer enemy with its retail `ai.bin` profile active, and matching final
+simulation hashes after 180 cycles. Diplomacy and shared sight are themselves
+part of that hash from cycle zero.
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.
