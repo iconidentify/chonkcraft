@@ -111,13 +111,20 @@ public final class NetworkPeer {
         // path is the one thing the two machines cannot agree on: they are
         // different machines. --map has always been a name.
         String wantedMap = mapName;
-        mapName = findMap(assets, wantedMap);
+        boolean provingTopVsBottom = wantedMap == null
+                && gameTemplate == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                && (lobbyHost != null || onlineHost != null);
+        mapName = provingTopVsBottom
+                ? findTopVsBottomMap(assets) : findMap(assets, wantedMap);
         if (mapName == null && lobbyJoin == null) {
             System.err.println("No map found.");
             System.exit(2);
         }
         if (mapName == null) {
             mapName = wantedMap == null ? "" : wantedMap;
+        }
+        if (lobbyJoin == null && onlineJoin == null) {
+            System.out.println("selected map " + mapName);
         }
         int lobbyModes = (lobbyHost == null ? 0 : 1) + (lobbyJoin == null ? 0 : 1)
                 + (onlineHost == null ? 0 : 1) + (onlineJoin == null ? 0 : 1);
@@ -533,6 +540,43 @@ public final class NetworkPeer {
         for (String candidate : assets.mapNames()) {
             if (wanted == null || candidate.equalsIgnoreCase(wanted)
                     || Paths.get(candidate).getFileName().toString().equalsIgnoreCase(wanted)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /** A real map capable of the release gate's two-people-versus-one-AI proof. */
+    private static String findTopVsBottomMap(AssetSource assets) {
+        for (String candidate : assets.mapNames()) {
+            byte[] bytes = assets.map(candidate);
+            if (bytes == null) {
+                continue;
+            }
+            PudMap source;
+            try {
+                source = PudReader.read(bytes);
+            } catch (RuntimeException malformed) {
+                continue;
+            }
+            int capacity = Math.max(2, Math.min(8, source.playableSlots()));
+            if (capacity < 3 || source.startLocation(0) == null) {
+                continue;
+            }
+            LobbyTeams teams = LobbyTeams.from(source, capacity);
+            boolean openAlly = false;
+            boolean openEnemy = false;
+            for (int slot = 1; slot < capacity; slot++) {
+                if (source.startLocation(slot) == null) {
+                    continue;
+                }
+                if (teams.together(0, slot)) {
+                    openAlly = true;
+                } else {
+                    openEnemy = true;
+                }
+            }
+            if (openAlly && openEnemy) {
                 return candidate;
             }
         }

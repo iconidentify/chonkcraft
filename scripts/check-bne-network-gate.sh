@@ -113,19 +113,34 @@ if [[ ${host_status} -ne 0 || ${client_status} -ne 0 ]]; then
   sed 's/^/client: /' "${work}/client.log" >&2
   exit 1
 fi
-grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${work}/host.log"
-grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${work}/client.log"
-grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/host.log"
-grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/client.log"
-grep -q 'source=host-transfer' "${work}/client.log"
-grep -q 'template=TOP_VS_BOTTOM' "${work}/host.log"
-grep -q 'template=TOP_VS_BOTTOM' "${work}/client.log"
-grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
-  "${work}/host.log"
-grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
-  "${work}/client.log"
-grep -q 'finished: cycles=180' "${work}/host.log"
-grep -q 'finished: cycles=180' "${work}/client.log"
+require_log() {
+  local pattern="$1"
+  local file="$2"
+  local proof="$3"
+  if ! grep -Eq "${pattern}" "${file}"; then
+    echo "multiplayer proof missing ${proof}" >&2
+    sed "s/^/${proof}: /" "${file}" >&2
+    exit 1
+  fi
+}
+require_log 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' \
+  "${work}/host.log" "host-initial-view"
+require_log 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' \
+  "${work}/client.log" "client-initial-view"
+require_log 'rendered frame: nonblack=[1-9][0-9]*' \
+  "${work}/host.log" "host-render"
+require_log 'rendered frame: nonblack=[1-9][0-9]*' \
+  "${work}/client.log" "client-render"
+require_log '^selected map ' "${work}/host.log" "host-map-selection"
+require_log 'source=host-transfer' "${work}/client.log" "client-map-transfer"
+require_log 'template=TOP_VS_BOTTOM' "${work}/host.log" "host-template"
+require_log 'template=TOP_VS_BOTTOM' "${work}/client.log" "client-template"
+require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${work}/host.log" "host-team"
+require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${work}/client.log" "client-team"
+require_log 'finished: cycles=180' "${work}/host.log" "host-finish"
+require_log 'finished: cycles=180' "${work}/client.log" "client-finish"
 host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/host.log" | tail -1)"
 client_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/client.log" | tail -1)"
 if [[ -z "${host_hash}" || "${host_hash}" != "${client_hash}" ]]; then
@@ -204,15 +219,19 @@ if [[ ${host_status} -ne 0 || ${client_status} -ne 0 ]]; then
   sed 's/^/client: /' "${online_client_log}" >&2
   exit 1
 fi
-grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${online_host_log}"
-grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${online_client_log}"
-grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_host_log}"
-grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_client_log}"
-grep -q 'source=host-transfer' "${online_client_log}"
-grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
-  "${online_host_log}"
-grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
-  "${online_client_log}"
+require_log 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' \
+  "${online_host_log}" "online-host-initial-view"
+require_log 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' \
+  "${online_client_log}" "online-client-initial-view"
+require_log 'rendered frame: nonblack=[1-9][0-9]*' \
+  "${online_host_log}" "online-host-render"
+require_log 'rendered frame: nonblack=[1-9][0-9]*' \
+  "${online_client_log}" "online-client-render"
+require_log 'source=host-transfer' "${online_client_log}" "online-client-map-transfer"
+require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${online_host_log}" "online-host-team"
+require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${online_client_log}" "online-client-team"
 online_host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_host_log}" | tail -1)"
 online_client_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_client_log}" | tail -1)"
 if [[ -z "${online_host_hash}" || "${online_host_hash}" != "${online_client_hash}" ]]; then
