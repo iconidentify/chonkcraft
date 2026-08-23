@@ -45,11 +45,12 @@ class RangedOp0FreeScanRetargetHoldTest {
 
     private static byte[] retailScriptBin() throws IOException {
         String packProp = System.getProperty("chonkcraft.pack");
-        Path pack = packProp != null && !packProp.isBlank()
-                ? Path.of(packProp)
-                : Path.of(System.getProperty("user.home"),
-                        ".chonkcraft/work",
-                        "warcraft-ii-battle-net-edition-usa.pre-full-media-2026-07-30.chonkpack");
+        if (packProp == null || packProp.isBlank()) {
+            packProp = System.getenv("CHONKCRAFT_ASSET_PACK");
+        }
+        assumeTrue(packProp != null && !packProp.isBlank(),
+                "BNE asset pack path required via chonkcraft.pack or CHONKCRAFT_ASSET_PACK");
+        Path pack = Path.of(packProp);
         assumeTrue(Files.isRegularFile(pack),
                 "BNE asset pack required for retail Attack sequence");
         try (ZipFile zip = new ZipFile(pack.toFile())) {

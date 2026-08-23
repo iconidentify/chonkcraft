@@ -187,12 +187,20 @@ public final class PlayInvariants {
                 continue;
             }
             run.clickSamples++;
-            int x = unit.tileX() + type.tileWidth() / 2;
-            int y = unit.tileY() + type.tileHeight() / 2;
+            // A flyer may legally anchor on the last map row or column even
+            // when its two-tile selection box extends beyond the terrain.
+            // Its geometric centre is then outside the clickable map. Probe
+            // the closest visible point inside its footprint instead: this is
+            // where an actual mouse click can land.
+            int x = Math.max(0, Math.min(world.map().width() - 1,
+                    unit.tileX() + type.tileWidth() / 2));
+            int y = Math.max(0, Math.min(world.map().height() - 1,
+                    unit.tileY() + type.tileHeight() / 2));
             if (world.unitAt(x, y) == null) {
                 run.breaches.add(new Breach(run.mission, "clickable",
                         type.ident() + " at " + unit.tileX() + "," + unit.tileY()
-                                + " answers nothing when clicked at its own centre " + x + "," + y
+                                + " answers nothing when clicked inside its visible footprint "
+                                + x + "," + y
                                 + " [order=" + unit.order() + " alive=" + unit.isAlive()
                                 + " pointable=" + unit.isPointable()
                                 + " hp=" + unit.hitPoints() + "]"));

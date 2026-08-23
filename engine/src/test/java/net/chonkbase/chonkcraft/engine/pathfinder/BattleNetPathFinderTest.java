@@ -79,6 +79,44 @@ class BattleNetPathFinderTest {
     }
 
     @Test
+    @DisplayName("a marked target skirt may finish beneath a mobile occupant")
+    void markedSkirtIgnoresMobileOccupancyWithoutEnteringTheMine() {
+        // Authenticated Orc 11 fixture 137. Peasant 139 routes west toward the
+        // gold-mine approach point 7,123 while peasant 124 occupies the marked
+        // skirt at 8,124.
+        // Native finishes the wall face on that skirt and optimizes the route
+        // to SW,W,W,W,W,W. Treating the peasant like terrain instead chooses
+        // the next skirt row and writes SW,SW,W,W,W,W.
+        BattleNetPathFinder.Passability passability =
+                new BattleNetPathFinder.Passability() {
+                    @Override
+                    public boolean canEnter(int x, int y) {
+                        return !intrinsicallyBlocked(x, y)
+                                && (x != 8 || y != 124);
+                    }
+
+                    @Override
+                    public boolean canEnterIgnoringMobileOccupancy(int x, int y) {
+                        return !intrinsicallyBlocked(x, y);
+                    }
+
+                    private boolean intrinsicallyBlocked(int x, int y) {
+                        return (x == 7 && y == 123)
+                                || (x == 7 && y == 124);
+                    }
+                };
+
+        PathFinder.Path path = BattleNetPathFinder.find(
+                14, 123, 7, 123, 1,
+                passability, passability,
+                (x, y) -> Math.max(Math.abs(x - 7),
+                        Math.abs(y - 123)) <= 1);
+
+        assertArrayEquals(new int[] {6, 6, 6, 6, 6, 5}, path.headings(),
+                "the stored reverse path executes as SW then five west steps");
+    }
+
+    @Test
     @DisplayName("Human 8's blocked mine route escapes east, then north-east")
     void humanEightMineApproachMatchesTheCapturedBnePrefix() {
         PathFinder.Path path = BattleNetPathFinder.find(

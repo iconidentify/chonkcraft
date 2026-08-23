@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 991 of 2,628 tests skip and
+either way. With nothing configured, 1,053 of 2,631 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,7 +57,7 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **25 skips of 2,588**, re-measured after the BNE
+Asserts the `full` profile: **25 skips of 2,631**, re-measured after the BNE
 parity and production-multiplayer coverage additions against the runner's
 authenticated retail installation. One of the twenty-five depends on which release
 the installation is: a source exposing the Battle.net Edition stereo video
@@ -89,7 +89,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 991 |
+| `data-free` | none | 1,053 |
 | `full` | installation, pack, Opus vectors | 25 |
 
 The twenty-five that skip even in `full` want nothing anyone should have to

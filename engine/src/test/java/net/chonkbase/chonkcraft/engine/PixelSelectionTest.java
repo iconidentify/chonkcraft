@@ -53,6 +53,16 @@ class PixelSelectionTest {
         return type;
     }
 
+    private static UnitType gryphon() {
+        UnitType type = new UnitType("unit-gryphon-rider");
+        type.setTileSize(2, 2);
+        type.setBoxSize(63, 63);
+        type.setHitPoints(100);
+        type.setSpeed(14);
+        type.setAirUnit(true);
+        return type;
+    }
+
     @Test
     @DisplayName("a standing unit is found under its own square")
     void aStandingUnitIsFound() {
@@ -92,6 +102,18 @@ class PixelSelectionTest {
         assertSame(hall, world.unitAtPixel(10 * 32 + 64, 10 * 32 + 64, null));
         assertSame(hall, world.unitAtPixel(10 * 32 + 8, 10 * 32 + 8, null));
         assertNull(world.unitAtPixel(10 * 32 - 40, 10 * 32 + 64, null));
+    }
+
+    @Test
+    @DisplayName("an edge flyer is clickable on the visible part of its box")
+    void anEdgeFlyerRemainsClickableInsideTheMap() {
+        World world = world();
+        Unit gryphon = world.createUnit(gryphon(), 0, 29, 31);
+
+        assertSame(gryphon, world.unitAt(30, 31),
+                "the visible map row must retain the flyer's occupancy");
+        assertSame(gryphon, world.unitAtPixel(30 * 32 + 16, 31 * 32 + 16, null),
+                "the clipped visible half of the selection box must accept a click");
     }
 
     @Test

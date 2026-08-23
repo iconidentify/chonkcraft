@@ -485,9 +485,9 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 991 skips, so 1,637 tests actually run without exposing licensed
+It asserts 1,053 skips, so 1,578 tests actually run without exposing licensed
 media to public pull-request code. The authenticated lane asserts 25 skips out
-of 2,628 tests. Tests backed by retail sequences deliberately join the hosted
+of 2,631 tests. Tests backed by retail sequences deliberately join the hosted
 lane's skip inventory while running on the private authenticated runner.
 
 ## Packaging

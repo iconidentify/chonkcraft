@@ -12,7 +12,6 @@
 # make a run green is the failure this file exists to prevent, so a shrinking
 # diff should say in its commit message which test was fixed and how.
 
-unsorted	neither	net.chonkbase.chonkcraft.desktop.BnePlaytestAdapterTest#aHuman1FootmanAcceptsAFieldMoveAsThePersonPlayer
 unsorted	legacyEngine	net.chonkbase.chonkcraft.desktop.CritterExplodesTest#tenClicksExplodeIt
 unsorted	neither	net.chonkbase.chonkcraft.desktop.SelectionAndMinimapTest#theMinimapUsesTheDeclaredNeutralColour
 unsorted	native	net.chonkbase.chonkcraft.desktop.WallCommandTest#aWallClickIsAnAttackCommand

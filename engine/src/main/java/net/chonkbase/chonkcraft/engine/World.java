@@ -6473,11 +6473,18 @@ public final class World {
     private static final int BNE_RAY_STEPS = 20;
 
     BattleNetPathFinder.Passability battleNetTraversalPassability(Unit unit) {
+        return battleNetTraversalPassability(unit, false);
+    }
+
+    BattleNetPathFinder.Passability battleNetTraversalPassability(
+            Unit unit, boolean quiescentResourceWaiterYieldsMarkedSkirt) {
         long mask = unit.movementMask();
         boolean ignoreBuilding = construction.builderWalksThroughBuildingBodies(unit);
         long blocking = ignoreBuilding
                 ? construction.builderTraversalBlocking(unit)
                 : unit.blockingFlags();
+        long fixedBlocking = blocking
+                & ~(TileFlag.LAND_UNIT | TileFlag.AIR_UNIT | TileFlag.SEA_UNIT);
         int mapWidth = map.width();
         int mapHeight = map.height();
         return new BattleNetPathFinder.Passability() {
@@ -6491,10 +6498,60 @@ public final class World {
             }
 
             @Override
+            public boolean canEnterIgnoringMobileOccupancy(int x, int y) {
+                if (!quiescentResourceWaiterYieldsMarkedSkirt
+                        || !battleNetQuiescentResourceWaiterAt(unit, x, y)) {
+                    return canEnter(x, y);
+                }
+                if (!map.isFootprintFree(x, y, 1, 1, mask, fixedBlocking)) {
+                    return false;
+                }
+                return !ignoreBuilding
+                        || construction.builderCanEnterBuildingBodyAt(unit, x, y);
+            }
+
+            @Override
             public boolean isOutOfBounds(int x, int y) {
                 return x < 0 || y < 0 || x >= mapWidth || y >= mapHeight;
             }
         };
+    }
+
+    /**
+     * Whether a marked gold-mine skirt is occupied only by the quiescent
+     * one-byte waiter that native lets the next peon route beneath.
+     *
+     * <p>Orc 11's gold peasant replans through the quiescent waiter on
+     * (8,124): the blocker has no pixels or collision debt and retains one
+     * route byte. Moving and collision-heavy waiters remain walls. Treating
+     * every mobile occupant as absent regresses packed mine queues across ten
+     * campaign maps, including Orc 5 and XHuman 12.</p>
+     */
+    private boolean battleNetQuiescentResourceWaiterAt(
+            Unit mover, int x, int y) {
+        List<Unit> occupants = unitCache.get(x + y * map.width());
+        if (occupants == null) {
+            return false;
+        }
+        boolean found = false;
+        long blocking = mover.blockingFlags();
+        for (Unit occupant : occupants) {
+            if (occupant == mover || !occupant.isOnMap()
+                    || (occupant.occupancyFlag() & blocking) == 0) {
+                continue;
+            }
+            if (occupant.type().building()
+                    || occupant.player() != mover.player()
+                    || occupant.order() != Unit.Order.HARVEST
+                    || occupant.isMoving()
+                    || occupant.offsetX() != 0 || occupant.offsetY() != 0
+                    || occupant.battleNetCollisionCounter() != 0
+                    || occupant.pathLength() != 1) {
+                return false;
+            }
+            found = true;
+        }
+        return found;
     }
 
     /**

@@ -69,6 +69,20 @@ public final class BattleNetPathFinder {
         boolean canEnter(int x, int y);
 
         /**
+         * Whether the terrain and fixed occupants admit this square when
+         * mobile-unit occupancy is ignored.
+         *
+         * <p>Native's marked-target wall follower may finish on a target-ring
+         * square occupied by another mover. It still refuses the intrinsically
+         * blocked target body, trees, rocks and buildings. The default keeps
+         * synthetic callers conservative unless they can distinguish those
+         * two causes of a failed {@link #canEnter(int, int)} test.</p>
+         */
+        default boolean canEnterIgnoringMobileOccupancy(int x, int y) {
+            return canEnter(x, y);
+        }
+
+        /**
          * Outside the map. Native fails the entire wall when the candidate
          * step is out of bounds ({@code cmp} against map size at
          * {@code 0x45015c}/{@code 0x45016a}); blocked terrain only rotates.
@@ -790,7 +804,9 @@ public final class BattleNetPathFinder {
         String tracedWallStart = System.getenv(
                 "CHONKCRAFT_TRACE_BNE_WALL_STEPS");
         boolean traceSteps = tracedWallStart != null
-                && tracedWallStart.trim().equals(anchorX + "," + anchorY);
+                && (tracedWallStart.trim().equals(anchorX + "," + anchorY)
+                        || tracedWallStart.trim().equals(
+                                "goal:" + toX + "," + toY));
         int x = anchorX;
         int y = anchorY;
         int heading = blockedHeading;
@@ -815,7 +831,12 @@ public final class BattleNetPathFinder {
                     }
                     return null;
                 }
-                if (passability.canEnter(nx, ny)) {
+                boolean enterable = passability.canEnter(nx, ny);
+                boolean markedSkirtIgnoringMover = !enterable
+                        && goalMarker != null
+                        && goalMarker.contains(nx, ny)
+                        && passability.canEnterIgnoringMobileOccupancy(nx, ny);
+                if (enterable || markedSkirtIgnoringMover) {
                     break;
                 }
                 if (traceSteps) {

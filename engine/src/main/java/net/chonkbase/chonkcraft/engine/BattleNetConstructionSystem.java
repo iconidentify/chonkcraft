@@ -522,7 +522,8 @@ final class BattleNetConstructionSystem {
                 int targetBottom = targetTop
                         + Math.max(1, target.type().tileHeight()) - 1;
                 BattleNetPathFinder.Passability traversalPassability =
-                        world.battleNetTraversalPassability(worker);
+                        world.battleNetTraversalPassability(worker,
+                                goldResource && goldFreePrefixReplan);
                 BattleNetPathFinder.Passability optimizationPassability =
                         (x, y) -> traversalPassability.canEnter(x, y)
                                 && !world.battleNetUnitOccupies(
