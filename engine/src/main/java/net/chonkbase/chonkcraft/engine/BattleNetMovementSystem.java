@@ -2327,6 +2327,14 @@ final class BattleNetMovementSystem {
             return;
         }
         boolean executingMove = executingBattleNetMoveProgram(unit);
+        // Ranged chases ask for the next route byte directly from Move OP0.
+        // A melee residual can expose the same ready bit while retaining its
+        // live Move body: XHuman 12 grunt 1503 must keep that cursor, mark its
+        // one-byte route spent, and replan east on the next visit. Rewinding
+        // every ready unit instead put the grunt into a fifteen-count wait
+        // and let an axethrower steal its square at fixture 39.
+        boolean refusedOnActionMarker = unit.battleNetChaseStepReady()
+                && World.battleNetRangedChaseUnit(unit);
         // An ordinary refusal inside an unfinished Move body keeps its live
         // cursor. A refusal on the OP0 visit is different: the interpreter
         // has already exposed ChaseStepReady and advanced past Move start,
@@ -2352,7 +2360,8 @@ final class BattleNetMovementSystem {
                 && unit.target().type().building();
         boolean postRetargetParkRefill =
                 unit.battleNetRetargetResidualParkRefill();
-        if (executingMove && !settledMultiResidual
+        if (executingMove && !refusedOnActionMarker
+                && !settledMultiResidual
                 && !postRetargetParkRefill) {
             return;
         }
@@ -6111,6 +6120,9 @@ final class BattleNetMovementSystem {
             pickUpMoveAnimation(unit);
         } else if (!stepped && !walkedThisCycle) {
             walkPixels(unit);
+        }
+        if (world.combat.openBattleNetRetainedDyingRangedConstruction(unit)) {
+            return;
         }
         if (finishLeftoverReplacement(unit)) {
             return;

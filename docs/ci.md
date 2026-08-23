@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 991 of 2,627 tests skip and
+either way. With nothing configured, 991 of 2,628 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts

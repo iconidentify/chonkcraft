@@ -134,6 +134,59 @@ class PresentationAheadProjectilePrepareTest {
                 "the same cycle-end boundary arms flight");
     }
 
+    @Test
+    @DisplayName("ranged OP10 completes against its retained dying target")
+    void rangedOpcodeTenCompletesAgainstItsRetainedDyingTarget()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(
+                        "unit-axethrower"),
+                BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart >= 0, "axethrower Attack sequence must exist");
+        int op10 = -1;
+        for (int off = attackStart; off < attackStart + 64; off++) {
+            if (sequence.opcodeAt(off) == 10) {
+                op10 = off;
+                break;
+            }
+        }
+        assumeTrue(op10 >= 0, "axethrower Attack must contain opcode ten");
+
+        World world = new World(grass(16));
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.setMissileTypes(Map.of("missile-axe", axeMissile()));
+        world.restoreRandom(1, 0);
+        Unit attacker = world.createUnit(axethrower(), 0, 2, 2);
+        Unit victim = world.createUnit(destroyer(), 1, 6, 2);
+        assertTrue(attacker != null && victim != null, "units place");
+        victim.setOrder(Unit.Order.DYING);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(victim);
+        attacker.setFighting(true);
+        attacker.setBattleNetSequenceOffset(op10);
+        attacker.setBattleNetAnimationTimer(1);
+
+        int seedBefore = world.battleNetRandomSeed();
+        world.combat.stepBattleNetAttackSequence(attacker);
+
+        assertEquals(1, world.missiles().size(),
+                "committed OP10 must create the retail projectile");
+        Missile shot = world.missiles().get(0);
+        assertTrue(shot.battleNetConstructorDrawn(),
+                "mobile OP10 spends its constructor immediately");
+        assertTrue(shot.battleNetMotion(),
+                "the dying target does not suppress visible flight");
+        assertNotEquals(seedBefore, world.battleNetRandomSeed(),
+                "damage and aim draws belong to the committed attack body");
+        assertTrue(world.missileVisible(shot),
+                "a ranged attack cannot become sound without a projectile");
+    }
+
     private static GameMap grass(int size) {
         GameMap map = new GameMap(size, size, new Tileset());
         for (int y = 0; y < size; y++) {

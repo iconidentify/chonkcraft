@@ -574,6 +574,20 @@ final class BattleNetCombatSystem {
             // visits early and never re-engage.
             return;
         }
+        if (world.battleNetSequence != null
+                && unit.battleNetAttackResumeHoldActive()
+                && quietSequenceGoal != null && quietSequenceGoal.isDying()
+                && unit.type() != null && unit.type().firesMissile()) {
+            // The OP0 reached after a ranged chase is itself a committed
+            // body hold. A retained Die pointer does not turn that marker
+            // into EndActionAttack: XHuman 10 axethrower 1478 remains on its
+            // stand-ground attack while Attack@887 counts 63.., even though
+            // footman 1492 is already dying. Letting the ordinary target-gone
+            // arm run here changed the order to Still on the marker visit,
+            // paid a phantom idle draw, and reassigned every later projectile
+            // and damage roll.
+            return;
+        }
         if (unit.battleNetOrderDelay() > 0) {
             world.movement.syncBattleNetAttackRefusalTimer(unit);
             // One-heading chase cooperative soft-wait: re-check every visit.
@@ -1269,6 +1283,9 @@ final class BattleNetCombatSystem {
             if (world.movement.onMoveAnimation(unit) && unit.isMoving()) {
                 world.movement.walkPixels(unit);
                 world.actionMoveWalked = true;
+                if (openBattleNetRetainedDyingRangedConstruction(unit)) {
+                    return;
+                }
             }
             boolean saturatedWallFacePairSettle =
                     world.actionMoveWalked && !unit.isMoving()
@@ -7606,6 +7623,60 @@ final class BattleNetCombatSystem {
 
 
     /**
+     * Parks a completed ranged chase whose retained quarry has entered Die.
+     *
+     * <p>A chase body's last pixels drain after its Move-sequence tick. If
+     * the retained CUnitPtr enters Die while those pixels are owed, retail
+     * still opens cold Attack construction; it does not fall through the
+     * adjacent script bytes as though Move were already an attack body.
+     * XHuman 10 axethrower 1478 is the sealed witness: fixture 56 is
+     * Move@882/1 with two pixels owed, fixture 57 is Attack@887/3, and
+     * fixture 60 enters the 63-count OP0 hold. Missing this handoff created a
+     * phantom axe at fixture 67 and reassigned the following damage roll.
+     *
+     * <p>The movement caller catches a quarry already in Die when the pixels
+     * drain. The attack caller catches the equally authentic ordering where
+     * the quarry enters Die later in that cycle and the settled chaser sees
+     * it on its next visit.</p>
+     */
+    boolean openBattleNetRetainedDyingRangedConstruction(Unit unit) {
+        Unit target = unit.target();
+        if (world.battleNetSequence == null
+                || !unit.chasing()
+                || unit.isMoving() || !unit.stepDrained()
+                || !world.battleNetMoveAnimation(unit)
+                || unit.order() != Unit.Order.ATTACK
+                || target == null || !target.isDying()
+                || unit.type() == null || !unit.type().firesMissile()
+                || !world.targets.inAttackRange(unit, target)) {
+            return false;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return false;
+        }
+        unit.clearPath();
+        unit.setRouteSpent(false);
+        unit.setChasing(false);
+        unit.setFighting(true);
+        unit.setBattleNetAttackResumeFromMove(true);
+        unit.setBattleNetAttackResumeHoldActive(false);
+        unit.setBattleNetAttackOp0OutOfRange(false);
+        unit.setBattleNetSequenceMeleeLanded(false);
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        AnimationSet set = unit.type().animationSet();
+        Animation attack = set == null ? null
+                : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
+        return true;
+    }
+
+
+    /**
      * Arms a one-visit deferral of action-16 Still when the recovery timer is
      * on its last tick after this visit's sequence countdown.
      *
@@ -7638,6 +7709,9 @@ final class BattleNetCombatSystem {
         if (world.battleNetSequence == null || !unit.canMove()) {
             return false;
         }
+        if (openBattleNetRetainedDyingRangedConstruction(unit)) {
+            return true;
+        }
         Unit sequenceTarget = unit.target();
         boolean completedMeleeArrival = unit.chasing()
                 && !unit.isMoving()
@@ -7662,9 +7736,14 @@ final class BattleNetCombatSystem {
         // instead of 37 and the missing damage rolls shifted the async stream
         // into critter 1399's fixture-37 OP0 (choice 24 wander vs native Still
         // until 42).
+        boolean retainedDyingRangedInRange = !unit.isMoving()
+                && sequenceTarget != null && sequenceTarget.isDying()
+                && unit.type() != null && unit.type().firesMissile()
+                && world.targets.inAttackRange(unit, sequenceTarget);
         boolean settledInRange = !unit.isMoving()
                 && sequenceTarget != null
-                && sequenceTarget.isAlive()
+                && (sequenceTarget.isAlive()
+                        || retainedDyingRangedInRange)
                 && world.targets.inAttackRange(unit, sequenceTarget);
         int attackStart = world.idle.battleNetSequenceStart(unit,
                 BattleNetSequence.ATTACK_ANIMATION);
@@ -7750,7 +7829,13 @@ final class BattleNetCombatSystem {
             // Human 13 axe 1483 re-enters Attack from the Move body then
             // stalls on the opening OP0 (timer 63). Mark the resume so the
             // next in-range OP0 can match that pre-fire hold.
-            resumedFromMove = !paidWrapConstruction;
+            // A retained Die pointer still crosses the same Move -> Attack
+            // construction boundary, but it is not a fresh free-scan visit.
+            // XHuman 10 axethrower 1478 keeps dying footman 1492 and opens
+            // 887/3 at fixture 57; scanning here replaces the pointer instead
+            // of entering the proved OP0 hold.
+            resumedFromMove = !paidWrapConstruction
+                    && !retainedDyingRangedInRange;
             unit.setBattleNetAttackResumeFromMove(!paidWrapConstruction);
             if (paidWrapConstruction) {
                 unit.setBattleNetAttackWrapDestArmPending(false);
@@ -7836,6 +7921,8 @@ final class BattleNetCombatSystem {
                 && unit.canMove()
                 && unit.type() != null
                 && sequenceTarget != null
+                && !(rangedOp0 && retainedDyingRangedInRange
+                        && unit.battleNetAttackResumeFromMove())
                 && (sequenceTarget.isAlive() || sequenceTarget.isDying())) {
             // A committed ranged OP0 still performs its free scan when the
             // incumbent has entered Die but remains a live CUnitPtr. Retail
@@ -8269,7 +8356,7 @@ final class BattleNetCombatSystem {
                 && unit.type().firesMissile()
                 && unit.canMove()) {
             Unit tgt = unit.target();
-            if (tgt != null && tgt.isAlive()
+            if (tgt != null && (tgt.isAlive() || tgt.isDying())
                     && world.targets.inAttackRange(unit, tgt)
                     && !unit.isMoving()
                     // Ordinary building approaches enter windup immediately
@@ -8525,9 +8612,19 @@ final class BattleNetCombatSystem {
                 Unit sequenceVictim = unit.target();
                 MissileType sequenceMissile = world.projectiles.missileFor(unit);
                 if (sequenceMissile != null && !sequenceMissile.isNone()
-                        && sequenceVictim != null && sequenceVictim.isAlive()
+                        && sequenceVictim != null
+                        && (sequenceVictim.isAlive()
+                                || sequenceVictim.order() == Unit.Order.DYING)
                         && !unit.isMoving()
                         && world.targets.inAttackRange(unit, sequenceVictim)) {
+                    // Opcode ten completes the committed ranged body against
+                    // its retained CUnitPtr even after that target has entered
+                    // Die. Human 13's axethrower 1486 is the authenticated
+                    // witness: wise-man 1496 is already DYING, but fixture
+                    // 147 still rolls damage, spends both constructor jitter
+                    // draws and creates the visible axe. Rejecting Die here
+                    // left the attacker animating in ATTACK with no missile,
+                    // then shifted every later asynchronous consumer.
                     Missile inlineShot = world.projectiles.launch(
                             unit, sequenceVictim, sequenceMissile);
                     world.logBattleNetPend("op10-without-presentation", unit,

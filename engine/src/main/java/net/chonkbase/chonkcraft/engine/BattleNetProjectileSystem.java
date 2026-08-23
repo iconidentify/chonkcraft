@@ -892,7 +892,7 @@ final class BattleNetProjectileSystem {
                     && (candidate.type() == null
                             || !candidate.type().wall())) {
                 // HitUnit's local offer exists even when this map-authored
-                // computer has no Lua AI object. The force roster is an
+                // computer has no map-script AI object. The force roster is an
                 // optional second response; coupling the spatial offer to it
                 // left XOrc 11's unrostered destroyers inert after taking a
                 // cannon splash.

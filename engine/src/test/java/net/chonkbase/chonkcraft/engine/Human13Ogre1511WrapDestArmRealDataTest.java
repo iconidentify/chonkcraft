@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -91,7 +92,7 @@ class Human13Ogre1511WrapDestArmRealDataTest {
     }
 
     @Test
-    @DisplayName("human 13's idle ogre retains the native four-heading Attack-tail route")
+    @DisplayName("human 13 retains its Attack-tail route and dying-target ranged OP10")
     void human13sIdleOgreRetainsTheNativeFourHeadingAttackTailRoute() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -102,12 +103,17 @@ class Human13Ogre1511WrapDestArmRealDataTest {
         World world = mission.world();
 
         Unit ogre = unitAt(world, "unit-ogre", 125, 22);
+        Unit thrower = unitById(world, 114);
+        Unit wiseMan = unitById(world, 104);
         assertNotNull(ogre, "Human 13 has no northern ogre on 125,22");
+        assertNotNull(thrower, "Human 13 has no eastern axethrower on 124,33");
+        assertNotNull(wiseMan, "Human 13 has no eastern wise man on 122,30");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        for (int fixture = 1; fixture <= 142; fixture++) {
+        int throwerMissilesBefore = -1;
+        for (int fixture = 1; fixture <= 147; fixture++) {
             mission.tick();
             if (fixture == 118) {
                 assertEquals(121, ogre.tileX(),
@@ -123,15 +129,44 @@ class Human13Ogre1511WrapDestArmRealDataTest {
                         "the retained south heading lands on 121,28");
                 assertEquals(2, ogre.pathLength(),
                         "native still owns SE,S after the second stride");
+            } else if (fixture == 142) {
+                assertEquals(Unit.Order.ATTACK, ogre.order(),
+                        "retargeting keeps Attack ownership");
+                assertEquals(122, ogre.tileX(),
+                        "the retained third heading advances on the retarget tick");
+                assertEquals(29, ogre.tileY(),
+                        "the retained third heading advances on the retarget tick");
+            } else if (fixture == 146) {
+                assertEquals(Unit.Order.DYING, wiseMan.order(),
+                        "the retained ranged target has entered Die");
+                assertSame(wiseMan, thrower.target(),
+                        "the committed Attack body keeps its CUnitPtr");
+                assertEquals(900, thrower.battleNetSequenceOffset(),
+                        "fixture 146 is the wait-one visit before ranged OP10");
+                assertEquals(1, thrower.battleNetAnimationTimer(),
+                        "ranged OP10 must execute on the next visit");
+                assertEquals(0xb4cef525, world.battleNetRandomSeed(),
+                        "the authenticated async stream reaches the OP10 boundary");
+                throwerMissilesBefore = (int) world.missiles().stream()
+                        .filter(missile -> missile.source() == thrower)
+                        .count();
             }
         }
 
-        assertEquals(Unit.Order.ATTACK, ogre.order(),
-                "retargeting keeps Attack ownership");
-        assertEquals(122, ogre.tileX(),
-                "the retained third heading advances on the retarget tick");
-        assertEquals(29, ogre.tileY(),
-                "the retained third heading advances on the retarget tick");
+        assertEquals(0x51323ee9, world.battleNetRandomSeed(),
+                "fixture 147 spends damage, two constructor and later callbacks "
+                        + "in authenticated BNE order");
+        List<Missile> throwerMissiles = world.missiles().stream()
+                .filter(missile -> missile.source() == thrower)
+                .toList();
+        assertEquals(throwerMissilesBefore + 1, throwerMissiles.size(),
+                "dying-target OP10 creates the visible eastern axe");
+        Missile shot = throwerMissiles.get(throwerMissiles.size() - 1);
+        assertSame(wiseMan, shot.target());
+        assertEquals(5, shot.damage(),
+                "native fixture 147 rolls five damage before constructor jitter");
+        assertTrue(shot.battleNetConstructorDrawn());
+        assertTrue(shot.battleNetMotion());
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {
@@ -139,6 +174,15 @@ class Human13Ogre1511WrapDestArmRealDataTest {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null
                     && ident.equals(unit.type().ident())
                     && unit.tileX() == x && unit.tileY() == y) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }

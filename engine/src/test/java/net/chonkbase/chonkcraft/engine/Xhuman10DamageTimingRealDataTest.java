@@ -914,16 +914,40 @@ class Xhuman10DamageTimingRealDataTest {
         Unit grunt = unitAt(world, "unit-grunt", 78, 93);
         Unit dyingIncumbent = unitById(world, 105);
         Unit thirdTarget = unitById(world, 118);
+        Unit heldAxe = unitById(world, 122);
+        Unit easternOgre = unitById(world, 52);
         assertNotNull(archer, "XHuman 10 has no archer on 84,85");
         assertNotNull(grunt, "XHuman 10 has no opening grunt on 78,93");
         assertNotNull(dyingIncumbent, "XHuman 10 has no second archer target");
         assertNotNull(thirdTarget, "XHuman 10 has no third archer target");
+        assertNotNull(heldAxe, "XHuman 10 has no western held axethrower");
+        assertNotNull(easternOgre, "XHuman 10 has no eastern melee ogre");
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
 
         while (world.cycle() - BNE_INITIALIZATION_TICKS < 89) {
             mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 57) {
+                assertEquals(887, heldAxe.battleNetSequenceOffset(),
+                        "a retained dying target reopens Attack construction");
+                assertEquals(3, heldAxe.battleNetAnimationTimer());
+            } else if (fixture == 60) {
+                assertEquals(887, heldAxe.battleNetSequenceOffset());
+                assertEquals(63, heldAxe.battleNetAnimationTimer(),
+                        "the dying pointer still owns native's ranged OP0 hold");
+                assertEquals(Unit.Order.ATTACK, heldAxe.order(),
+                        "the committed hold keeps native stand-ground attack ownership");
+            } else if (fixture == 67) {
+                assertEquals(887, heldAxe.battleNetSequenceOffset());
+                assertEquals(56, heldAxe.battleNetAnimationTimer(),
+                        "the hold prevents a phantom dying-target axe");
+                assertEquals(Unit.Order.ATTACK, heldAxe.order());
+            } else if (fixture == 68) {
+                assertEquals(73, easternOgre.hitPoints(),
+                        "the later melee roll remains on native's async draw");
+            }
         }
         assertEquals(2039, archer.battleNetSequenceOffset());
         assertEquals(3, archer.battleNetAnimationTimer(),
