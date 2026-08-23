@@ -93,19 +93,23 @@ class MultiplayerVisualTest {
         unavailable.failed("The online service could not be reached.");
         write(paint(unavailable, 1280, 800), output.resolve("online-recovery-1280x800.png"));
 
-        byte[] teamMap = assets.map("All You Need BNE.pud");
+        String teamMapName = assets.hasMap("All You Need BNE.pud")
+                ? "All You Need BNE.pud" : assets.mapNames().getFirst();
+        byte[] teamMap = assets.map(teamMapName);
+        int teamCapacity = Math.max(2, Math.min(8,
+                net.chonkbase.chonkcraft.data.map.PudReader.read(teamMap).playableSlots()));
         GameLobby hosted = GameLobby.host(
-                "Chris", "All You Need BNE.pud", teamMap, 8, 0);
-        hosted.setOccupant(1, GameLobby.Occupant.COMPUTER);
-        hosted.setOccupant(2, GameLobby.Occupant.COMPUTER);
-        hosted.setOccupant(3, GameLobby.Occupant.COMPUTER);
+                "Chris", teamMapName, teamMap, teamCapacity, 0);
+        for (int slot = 1; slot < Math.min(4, teamCapacity); slot++) {
+            hosted.setOccupant(slot, GameLobby.Occupant.COMPUTER);
+        }
         hosted.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
         Seat seat = new Seat(listing(
-                "QD7K3M", "Chris's Game", "All You Need BNE.pud", 1, 8),
+                "QD7K3M", "Chris's Game", teamMapName, 1, teamCapacity),
                 "host", "ws://127.0.0.1/relay", "ticket", 0, 0,
                 "https://chonkbase.net/chonkcraft/join/QD7K3M",
                 net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol.Visibility.PUBLIC);
-        LobbyScreen lobby = new LobbyScreen(data, hosted, "All You Need BNE.pud",
+        LobbyScreen lobby = new LobbyScreen(data, hosted, teamMapName,
                 new OnlineLobby(new MatchmakingClient(URI.create("http://127.0.0.1:1")), seat),
                 new LobbyScreen.Listener() {
                     @Override

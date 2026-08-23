@@ -75,7 +75,6 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-host "${port}" --computer-player true --cycles 180 \
-  --map "All You Need BNE.pud" \
   --game-template top-vs-bottom \
   >"${work}/host.log" 2>&1 &
 host_pid=$!
@@ -84,7 +83,6 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-join "127.0.0.1:${port}" --without-map true --cycles 180 \
-  --map "All You Need BNE.pud" \
   >"${work}/client.log" 2>&1 &
 client_pid=$!
 
@@ -153,7 +151,6 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-host "${matchmaker_url}" --computer-player true --cycles 180 \
-  --map "All You Need BNE.pud" \
   --game-template top-vs-bottom \
   >"${online_host_log}" 2>&1 &
 host_pid=$!
@@ -179,7 +176,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-join "${room_code}" --matchmaker-url "${matchmaker_url}" \
-  --without-map true --cycles 180 --map "All You Need BNE.pud" \
+  --without-map true --cycles 180 \
   >"${online_client_log}" 2>&1 &
 client_pid=$!
 

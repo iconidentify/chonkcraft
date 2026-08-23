@@ -175,6 +175,8 @@ class LobbyMapSetupTest {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null, "No BNE media configured");
         byte[] bytes = assets.map("All You Need BNE.pud");
+        Assumptions.assumeTrue(bytes != null,
+                "This BNE installation does not carry the supplemental All You Need map");
         PudMap source = PudReader.read(bytes);
         GameData data = new GameData(assets);
         InetAddress local = InetAddress.getLoopbackAddress();

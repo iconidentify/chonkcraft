@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2636 tests,   25 skipped
-    no external input          2636 tests, 1057 skipped
+    authenticated inputs       2640 tests,   27 skipped
+    no external input          2640 tests, 1060 skipped
 
 Both can be green.
 
@@ -94,7 +94,7 @@ MODULES = (
 # Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
 # authenticated retail installation and derived pack.
 #
-# Twenty-five skip on the current `full` runner. One is release-dependent and
+# Twenty-seven skip on the current `full` runner. One is release-dependent and
 # is described at the `full` profile below.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
@@ -137,8 +137,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # they run in `full` and join this profile's skip inventory. The
         # production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1745, 743),
-        "desktop": (332, 255),
+        "engine": (1747, 744),
+        "desktop": (334, 257),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -152,15 +152,15 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # CI jobs install them; see .github/workflows/tests.yml.
     #
     # Re-measured 23 August 2026 against the authenticated retail installation
-    # and its derived pack. The twenty-five that skip are: five
+    # and its derived pack. The twenty-seven that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
-    # tests in runtime and desktop, four fixture-sensitive checks, four custom-
+    # tests in runtime and desktop, four fixture-sensitive checks, six custom-
     # map referees whose maps are absent from the retail pack, three private
     # playtest-save referees, one opt-in production multiplayer smoke, and one
     # release-dependent test described below.
     #
-    # ONE OF THE TWENTY-FIVE DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
+    # ONE OF THE TWENTY-SEVEN DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
     # is the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
@@ -180,8 +180,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1745, 7),
-        "desktop": (332, 6),
+        "engine": (1747, 7),
+        "desktop": (334, 8),
         "matchmaker-server": (5, 1),
     },
 }

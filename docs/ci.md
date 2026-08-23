@@ -57,11 +57,11 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **25 skips of 2,631**, re-measured after the BNE
+Asserts the `full` profile: **27 skips of 2,640**, re-measured after the BNE
 parity and production-multiplayer coverage additions against the runner's
-authenticated retail installation. One of the twenty-five depends on which release
+authenticated retail installation. One of the twenty-seven depends on which release
 the installation is: a source exposing the Battle.net Edition stereo video
-path sees 24, while the currently mounted classic source sees 25.
+path sees 26, while the currently mounted classic source sees 27.
 `scripts/ci/check-test-skips.py` explains the release-dependent assertion.
 About nine minutes.
 
@@ -89,13 +89,13 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,054 |
-| `full` | installation, pack, Opus vectors | 25 |
+| `data-free` | none | 1,060 |
+| `full` | installation, pack, Opus vectors | 27 |
 
-The twenty-five that skip even in `full` want nothing anyone should have to
+The twenty-seven that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, four are
-fixture-sensitive, four need custom maps absent from the retail pack, three
+fixture-sensitive, six need custom maps absent from the retail pack, three
 need private playtest saves, and the production service smoke runs only in the
 deploy workflow. One video assertion depends on which retail release is
 mounted.
