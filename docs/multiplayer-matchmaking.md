@@ -143,8 +143,11 @@ workflow publishes immutable commit tags to GHCR after the real two-client
 relay/map/start test passes. A master push then authenticates with a dedicated
 Kubernetes identity that can update only the four named ChonkCraft matchmaker
 resources, applies the immutable commit image, waits for the single-replica
-rollout, and verifies the public TLS health endpoint. The deployer cannot read
-Secrets or mutate the existing ChonkBlocker relay in the shared namespace.
+rollout, verifies the public TLS health endpoint, and runs a production protocol
+smoke through the newly deployed service. A second job on the authenticated BNE
+runner then drives two rendered game clients through that public service. The
+deployer cannot read Secrets or mutate the existing ChonkBlocker relay in the
+shared namespace.
 
 Cluster bootstrap is deliberately separate from ordinary releases: an
 administrator applies `deployer-rbac.yaml` and the kustomization once, then
@@ -168,3 +171,13 @@ and mute state and drives Enter-to-send into the real network session.
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.
+
+`ProductionMatchmakerSmokeTest` is an opt-in post-deploy proof against
+`match.chonkbase.net`: it creates a private room, occupies both WSS relay seats,
+forces a deliberately incorrect joiner map through exact host replacement,
+starts the lobby, and carries game batches in both directions. The workflow then
+runs `scripts/check-bne-network-gate.sh` with an authenticated BNE pack. Its two
+independent `NetworkPeer` JVMs repeat the map-replacement and lobby path, render
+both 640x480 battlefields and reject all-black output, advance 180 cycles, and
+require the same final simulation hash. This distinguishes a live web service
+from a multiplayer game that players can actually enter and see.

@@ -114,6 +114,8 @@ if [[ ${host_status} -ne 0 || ${client_status} -ne 0 ]]; then
 fi
 grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${work}/host.log"
 grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${work}/client.log"
+grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/host.log"
+grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/client.log"
 grep -q 'source=host-transfer' "${work}/client.log"
 grep -q 'finished: cycles=180' "${work}/host.log"
 grep -q 'finished: cycles=180' "${work}/client.log"
@@ -124,3 +126,85 @@ if [[ -z "${host_hash}" || "${host_hash}" != "${client_hash}" ]]; then
   exit 1
 fi
 echo "real multiplayer startup passed: transferred map, visible client frame, 180 cycles, hash ${host_hash}"
+
+# Opt in to the public service proof for deployment and release gates. This is
+# the same pair of real-data desktop processes as above, but room creation,
+# map transfer and every lockstep packet cross the production HTTPS/WSS ingress.
+matchmaker_url="${CHONKCRAFT_MATCHMAKER_URL:-}"
+if [[ -z "${matchmaker_url}" ]]; then
+  exit 0
+fi
+
+online_build="client-gate-$(date -u +%Y%m%d%H%M%S)-$$"
+online_host_log="${work}/online-host.log"
+online_client_log="${work}/online-client.log"
+CHONKCRAFT_ASSET_PACK="${asset_pack}" \
+  "${repo_root}/scripts/jbr/with-jbr-25.sh" java \
+  -Djava.awt.headless=true \
+  -Dchonkcraft.network.build="${online_build}" \
+  -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
+  --online-host "${matchmaker_url}" --computer-player true --cycles 180 \
+  >"${online_host_log}" 2>&1 &
+host_pid=$!
+
+room_code=""
+for _ in {1..100}; do
+  room_code="$(sed -n 's/^online room \([A-Z0-9]*\)$/\1/p' "${online_host_log}" | tail -1)"
+  [[ -z "${room_code}" ]] || break
+  if ! kill -0 "${host_pid}" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+if [[ -z "${room_code}" ]]; then
+  echo "production multiplayer host did not publish a room code" >&2
+  sed 's/^/host: /' "${online_host_log}" >&2
+  exit 1
+fi
+
+CHONKCRAFT_ASSET_PACK="${asset_pack}" \
+  "${repo_root}/scripts/jbr/with-jbr-25.sh" java \
+  -Djava.awt.headless=true \
+  -Dchonkcraft.network.build="${online_build}" \
+  -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
+  --online-join "${room_code}" --matchmaker-url "${matchmaker_url}" \
+  --without-map true --cycles 180 \
+  >"${online_client_log}" 2>&1 &
+client_pid=$!
+
+(
+  sleep 30
+  kill "${host_pid}" "${client_pid}" 2>/dev/null || true
+) &
+watchdog_pid=$!
+
+set +e
+wait "${host_pid}"
+host_status=$?
+wait "${client_pid}"
+client_status=$?
+set -e
+kill "${watchdog_pid}" 2>/dev/null || true
+wait "${watchdog_pid}" 2>/dev/null || true
+watchdog_pid=""
+host_pid=""
+client_pid=""
+
+if [[ ${host_status} -ne 0 || ${client_status} -ne 0 ]]; then
+  echo "production multiplayer client proof failed (host=${host_status}, client=${client_status})" >&2
+  sed 's/^/host: /' "${online_host_log}" >&2
+  sed 's/^/client: /' "${online_client_log}" >&2
+  exit 1
+fi
+grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${online_host_log}"
+grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${online_client_log}"
+grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_host_log}"
+grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_client_log}"
+grep -q 'source=host-transfer' "${online_client_log}"
+online_host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_host_log}" | tail -1)"
+online_client_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_client_log}" | tail -1)"
+if [[ -z "${online_host_hash}" || "${online_host_hash}" != "${online_client_hash}" ]]; then
+  echo "production multiplayer worlds disagree: host=${online_host_hash}, client=${online_client_hash}" >&2
+  exit 1
+fi
+echo "production multiplayer clients passed: rendered both views, transferred the retail map, 180 cycles, hash ${online_host_hash}"

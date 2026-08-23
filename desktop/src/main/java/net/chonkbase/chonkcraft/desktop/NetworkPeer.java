@@ -1,11 +1,16 @@
 package net.chonkbase.chonkcraft.desktop;
 
 import java.net.InetAddress;
+import java.net.URI;
+import java.awt.image.BufferedImage;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import net.chonkbase.chonkcraft.data.graphic.IndexedImage;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.map.PudReader;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -13,6 +18,7 @@ import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.map.MapRenderer;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
@@ -22,6 +28,12 @@ import net.chonkbase.chonkcraft.engine.network.NetworkSession;
 import net.chonkbase.chonkcraft.engine.network.SyncHash;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import net.chonkbase.chonkcraft.matchmaking.MatchmakingClient;
+import net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol;
+import net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol.CreateGameRequest;
+import net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol.JoinGameRequest;
+import net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol.Visibility;
+import net.chonkbase.chonkcraft.matchmaking.RelayDatagramSocket;
 
 /**
  * A headless peer for a networked game.
@@ -61,6 +73,9 @@ public final class NetworkPeer {
         String mapName = null;
         String lobbyHost = null;
         String lobbyJoin = null;
+        String onlineHost = null;
+        String onlineJoin = null;
+        String matchmakerUrl = "https://match.chonkbase.net";
         boolean withoutMap = false;
         boolean computerPlayer = false;
 
@@ -73,6 +88,9 @@ public final class NetworkPeer {
                 case "--map" -> mapName = args[i + 1];
                 case "--lobby-host" -> lobbyHost = args[i + 1];
                 case "--lobby-join" -> lobbyJoin = args[i + 1];
+                case "--online-host" -> onlineHost = args[i + 1];
+                case "--online-join" -> onlineJoin = args[i + 1];
+                case "--matchmaker-url" -> matchmakerUrl = args[i + 1];
                 case "--without-map" -> withoutMap = Boolean.parseBoolean(args[i + 1]);
                 case "--computer-player" -> computerPlayer = Boolean.parseBoolean(args[i + 1]);
                 default -> { }
@@ -97,13 +115,22 @@ public final class NetworkPeer {
         if (mapName == null) {
             mapName = wantedMap == null ? "" : wantedMap;
         }
-        if (lobbyHost != null && lobbyJoin != null) {
-            throw new IllegalArgumentException("choose either --lobby-host or --lobby-join");
+        int lobbyModes = (lobbyHost == null ? 0 : 1) + (lobbyJoin == null ? 0 : 1)
+                + (onlineHost == null ? 0 : 1) + (onlineJoin == null ? 0 : 1);
+        if (lobbyModes > 1) {
+            throw new IllegalArgumentException("choose one direct or online lobby mode");
         }
 
         LobbyRun lobbyRun = null;
         byte[] selectedMap = assets.map(mapName);
-        if (lobbyHost != null || lobbyJoin != null) {
+        if (onlineHost != null || onlineJoin != null) {
+            URI service = URI.create(onlineHost != null ? onlineHost : matchmakerUrl);
+            lobbyRun = meetOnline(assets, mapName, selectedMap, service,
+                    onlineJoin, withoutMap, computerPlayer);
+            localPlayer = lobbyRun.localPlayer();
+            mapName = lobbyRun.mapName();
+            selectedMap = lobbyRun.mapBytes();
+        } else if (lobbyHost != null || lobbyJoin != null) {
             lobbyRun = meetInLobby(assets, mapName, selectedMap,
                     lobbyHost, lobbyJoin, withoutMap, computerPlayer);
             localPlayer = lobbyRun.localPlayer();
@@ -127,9 +154,16 @@ public final class NetworkPeer {
             throw new IllegalStateException("player " + localPlayer
                     + " has an all-black initial view");
         }
+        int nonBlackPixels = renderedPixels(data, source, world, localPlayer);
+        if (nonBlackPixels == 0) {
+            throw new IllegalStateException("player " + localPlayer
+                    + " has an all-black rendered frame");
+        }
         System.out.printf("peer %d initial view: visible=%d start=%s%n",
                 localPlayer, visibleTiles,
                 java.util.Arrays.toString(source.startLocation(localPlayer)));
+        System.out.printf("peer %d rendered frame: nonblack=%d%n",
+                localPlayer, nonBlackPixels);
 
         // The roster in a fixed order, so a unit type can travel as an index
         // and mean the same thing on both machines.
@@ -254,8 +288,103 @@ public final class NetworkPeer {
         return visible;
     }
 
+    /** Paints the actual battlefield renderer and rejects the reported black-client failure. */
+    private static int renderedPixels(GameData data, PudMap source, World world,
+            int localPlayer) {
+        GameData.LoadedTileset tileset = data.loadTileset(source.tileset());
+        IndexedImage rendered = new MapRenderer(tileset.tileset(), tileset.sheet())
+                .render(world.map().width(), world.map().height(), world.map().tileCodes());
+        BufferedImage terrain = rendered.toIndexedBufferedImage(tileset.palette());
+        String tilesetName = source.tileset() == PudMap.Tileset.FOREST
+                ? "summer" : source.tileset().name().toLowerCase(java.util.Locale.ROOT);
+        String race = source.races()[localPlayer] == PudMap.Race.ORC ? "orc" : "human";
+        GameScreen screen = new GameScreen(world, data, terrain, tileset.palette(),
+                tilesetName, localPlayer, 640, 480, null, null, null, null, null,
+                List.of(), race);
+        screen.setSize(640, 480);
+        screen.setLayout((net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout) null);
+        screen.setGameScale(1);
+        screen.setFogTiles(FogTiles.from(tileset.sheet(), data.fogOfWar().levels()));
+        screen.setFogOpacity(data.fogOfWar().levels());
+        int[] start = source.startLocation(localPlayer);
+        if (start != null) {
+            screen.centreOn(start[0], start[1]);
+        }
+        BufferedImage frame = new BufferedImage(640, 480, BufferedImage.TYPE_INT_RGB);
+        var graphics = frame.createGraphics();
+        screen.paint(graphics);
+        graphics.dispose();
+        int nonBlack = 0;
+        for (int y = 0; y < frame.getHeight(); y++) {
+            for (int x = 0; x < frame.getWidth(); x++) {
+                if ((frame.getRGB(x, y) & 0x00ff_ffff) != 0) {
+                    nonBlack++;
+                }
+            }
+        }
+        return nonBlack;
+    }
+
     /** A lobby, its agreed map and the slot it assigned this process. */
     private record LobbyRun(GameLobby lobby, int localPlayer, String mapName, byte[] mapBytes) {}
+
+    /** Meets another process through the same public HTTPS/WSS path as the desktop menus. */
+    private static LobbyRun meetOnline(AssetSource assets, String mapName, byte[] selectedMap,
+            URI service, String joinCode, boolean withoutMap,
+            boolean computerPlayer) throws Exception {
+        boolean hosting = joinCode == null;
+        MatchmakingClient client = new MatchmakingClient(service);
+        MatchmakingProtocol.Seat seat;
+        RelayDatagramSocket relay;
+        GameLobby lobby;
+        if (hosting) {
+            int capacity = Math.max(2, Math.min(8,
+                    PudReader.read(selectedMap).playableSlots()));
+            String digest = HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(selectedMap));
+            seat = client.create(new CreateGameRequest("Real client deployment proof",
+                    mapName, digest, capacity, Visibility.PRIVATE,
+                    MatchmakingProtocol.gameBuild()));
+            relay = new RelayDatagramSocket(URI.create(seat.relayUri()),
+                    seat.relayTicket(), seat.endpointId());
+            lobby = GameLobby.hostRelayed("Harness Host", mapName, selectedMap,
+                    capacity, relay);
+            System.out.println("online room " + seat.game().code());
+        } else {
+            seat = client.join(joinCode,
+                    new JoinGameRequest("Harness Client", MatchmakingProtocol.gameBuild()));
+            relay = new RelayDatagramSocket(URI.create(seat.relayUri()),
+                    seat.relayTicket(), seat.endpointId());
+            lobby = GameLobby.joinRelayed("Harness Client", relay,
+                    seat.hostEndpointId(), wanted -> {
+                        if (withoutMap) {
+                            return null;
+                        }
+                        String local = findMap(assets, wanted);
+                        return local == null ? null : assets.map(local);
+                    });
+        }
+
+        long deadline = System.currentTimeMillis() + 60_000L;
+        while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
+            lobby.poll();
+            if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
+                settleAndStart(lobby, computerPlayer);
+                relay.markRoomStarted();
+                lobby.start();
+            }
+            Thread.sleep(2);
+        }
+        if (!lobby.isStarted() || lobby.mapBytes() == null) {
+            lobby.close();
+            throw new IllegalStateException("the online lobby did not synchronize and start");
+        }
+        System.out.printf("online lobby slot %d map %s bytes=%d source=%s%n",
+                lobby.state().localSlot(), lobby.state().map(), lobby.mapBytes().length,
+                lobby.mapWasTransferred() ? "host-transfer" : "local");
+        return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
+                lobby.mapBytes());
+    }
 
     /** Meets one other process, synchronizes the map, and leaves the socket ready for play. */
     private static LobbyRun meetInLobby(AssetSource assets, String mapName, byte[] selectedMap,
@@ -285,19 +414,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                if (computerPlayer) {
-                    for (GameLobby.Slot slot : lobby.state().slots()) {
-                        if (slot.occupant() == GameLobby.Occupant.OPEN) {
-                            lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
-                            break;
-                        }
-                    }
-                }
-                for (GameLobby.Slot slot : lobby.state().slots()) {
-                    if (slot.occupant() == GameLobby.Occupant.OPEN) {
-                        lobby.setOccupant(slot.index(), GameLobby.Occupant.CLOSED);
-                    }
-                }
+                settleAndStart(lobby, computerPlayer);
                 lobby.start();
             }
             Thread.sleep(2);
@@ -311,6 +428,22 @@ public final class NetworkPeer {
                 lobby.mapWasTransferred() ? "host-transfer" : "local");
         return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
                 lobby.mapBytes());
+    }
+
+    private static void settleAndStart(GameLobby lobby, boolean computerPlayer) {
+        if (computerPlayer) {
+            for (GameLobby.Slot slot : lobby.state().slots()) {
+                if (slot.occupant() == GameLobby.Occupant.OPEN) {
+                    lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
+                    break;
+                }
+            }
+        }
+        for (GameLobby.Slot slot : lobby.state().slots()) {
+            if (slot.occupant() == GameLobby.Occupant.OPEN) {
+                lobby.setOccupant(slot.index(), GameLobby.Occupant.CLOSED);
+            }
+        }
     }
 
     /**

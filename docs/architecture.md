@@ -260,9 +260,11 @@ Executable tests and authenticated comparison evidence remain authoritative.
 What is deliberately **not** ported: the map editor, replays, and the 741 `Q`
 conversion rows.
 
-What is **unverified** rather than done: multiplayer between two physically
-separate machines. It runs between processes on one machine and the lockstep and
-sync-hash machinery is tested, but nobody has recorded a two-machine game.
+The automated production gate runs two independent rendered game processes
+through the public HTTPS/WSS matchmaker and relay, forces exact map replacement,
+and proves 180 lockstep cycles converge to one world hash. A recorded match
+between two physically separate player machines remains useful field
+confirmation; it is no longer the only evidence for the public network path.
 
 The test suite is **2,184 tests**. On a fully configured CI machine 19 skip; with
 no external inputs 714 do. Both numbers matter and the difference between them is the

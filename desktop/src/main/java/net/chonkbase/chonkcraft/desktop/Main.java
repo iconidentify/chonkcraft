@@ -832,20 +832,9 @@ public final class Main {
         System.out.printf("multiplayer: slot %d, map %s%n",
                 lobby.localPlayer(), lobby.map().getFileName());
 
-        networkWorld = world;
-        networkLocalPlayer = lobby.localPlayer();
-        start(data, assets, pipeline, null, lobby.map(), null, 0, started.game());
-        networkWorld = null;
+        start(data, assets, pipeline, null, lobby.map(), null, 0,
+                started.game(), world, lobby.localPlayer());
     }
-
-    /**
-     * The world a networked game already built.
-     *
-     * <p>start() would otherwise build a second one from the same map, and the
-     * lockstep driver would be advancing a world nobody was looking at.
-     */
-    private static World networkWorld;
-    private static int networkLocalPlayer = -1;
 
     /**
      * Opens a saved game.
@@ -1478,6 +1467,24 @@ public final class Main {
             Java2DPipeline.Choice pipeline, Mission mission, Path mapFileOrNull,
             String campaignName, int missionNumber,
             net.chonkbase.chonkcraft.engine.network.NetworkGame network) {
+        start(data, assets, pipeline, mission, mapFileOrNull, campaignName,
+                missionNumber, network, null, -1);
+    }
+
+    /**
+     * Loads a game with an optional world already settled by a network lobby.
+     *
+     * <p>The prepared world and local slot travel as arguments because startup
+     * hands the finished screen to Swing asynchronously. Keeping either in a
+     * mutable static lets a later load replace or inherit another game's slot;
+     * a joiner that inherited an unused slot owned no units, had no sight, and
+     * saw a completely black battlefield.
+     */
+    private static void start(GameData data, AssetSource assets,
+            Java2DPipeline.Choice pipeline, Mission mission, Path mapFileOrNull,
+            String campaignName, int missionNumber,
+            net.chonkbase.chonkcraft.engine.network.NetworkGame network,
+            World preparedNetworkWorld, int preparedLocalPlayer) {
         closeFrontEndAudio();
         Path mapFile = mapFileOrNull;
         PudMap source;
@@ -1496,11 +1503,11 @@ public final class Main {
                 System.exit(2);
                 return;
             }
-            if (networkWorld != null) {
+            if (preparedNetworkWorld != null) {
                 // Already built, and already wrapped in the lockstep driver.
                 // Building a second one here would leave the driver advancing
                 // a world nobody was looking at.
-                world = networkWorld;
+                world = preparedNetworkWorld;
                 placed = world.units().size();
             } else if (savedScript != null) {
                 world = new World(
@@ -1562,7 +1569,7 @@ public final class Main {
         // In a networked game the slot is the one the lobby agreed, not the
         // first the map happens to mark playable: both machines read the same
         // map and would otherwise both command the same units.
-        int localPlayer = networkLocalPlayer >= 0 ? networkLocalPlayer : firstHumanPlayer(source);
+        int localPlayer = localPlayerForStart(source, preparedLocalPlayer);
 
         System.out.printf("Java2D pipeline: %s%n", pipeline);
         System.out.printf("Map %s: %dx%d tiles, %s tileset%n",
@@ -1822,6 +1829,12 @@ public final class Main {
             }
         }
         return 0;
+    }
+
+    /** Keeps a lobby's player slot scoped to that one game startup. */
+    static int localPlayerForStart(PudMap source, int preparedLocalPlayer) {
+        return preparedLocalPlayer >= 0
+                ? preparedLocalPlayer : firstHumanPlayer(source);
     }
 
     /**

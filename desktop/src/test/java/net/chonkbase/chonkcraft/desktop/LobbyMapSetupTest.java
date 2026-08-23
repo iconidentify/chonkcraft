@@ -120,4 +120,15 @@ class LobbyMapSetupTest {
             assertEquals(PudMap.PlayerType.NOBODY, players[3].type());
         }
     }
+
+    @Test
+    @DisplayName("A network player slot cannot leak into the next game")
+    void aNetworkPlayerSlotIsScopedToOneStartup() {
+        PudMap map = multiplayerMap();
+
+        assertEquals(3, Main.localPlayerForStart(map, 3),
+                "the joining client lost the slot assigned by its lobby");
+        assertEquals(0, Main.localPlayerForStart(map, -1),
+                "a later local game inherited the prior network player's slot");
+    }
 }
