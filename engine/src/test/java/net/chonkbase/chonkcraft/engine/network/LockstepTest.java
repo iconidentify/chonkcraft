@@ -613,6 +613,23 @@ class LockstepTest {
     }
 
     @Test
+    void theHashCoversTeamsAndSharedVisionFromCycleZero() {
+        World first = battlefield();
+        World second = battlefield();
+        assertEquals(SyncHash.of(first), SyncHash.of(second));
+
+        second.setAllied(0, 1, true);
+        assertNotEquals(SyncHash.of(first), SyncHash.of(second),
+                "a missing team assignment must be a setup desync");
+
+        first.setAllied(0, 1, true);
+        assertEquals(SyncHash.of(first), SyncHash.of(second));
+        second.setSharedVision(0, 1, true);
+        assertNotEquals(SyncHash.of(first), SyncHash.of(second),
+                "a missing shared-vision row must be a setup desync");
+    }
+
+    @Test
     void aLatePeerHashIsComparedToHistory() throws Exception {
         World hostWorld = battlefield();
         World guestWorld = battlefield();

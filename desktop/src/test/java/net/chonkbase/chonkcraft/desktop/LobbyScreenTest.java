@@ -159,6 +159,44 @@ class LobbyScreenTest {
         }
     }
 
+    @Test
+    @DisplayName("Top vs Bottom groups the map's real teams instead of implying row order")
+    void topVsBottomShowsTheMapDefinedTeams() throws Exception {
+        GameData data = load();
+        byte[] map = data.source().map("All You Need BNE.pud");
+        assertNotNull(map);
+        try (GameLobby lobby = GameLobby.host(
+                "Chris", "All You Need BNE.pud", map, 8, PORT + 23)) {
+            lobby.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
+            LobbyScreen screen = new LobbyScreen(data, lobby,
+                    "All You Need BNE.pud", new Recording());
+            screen.render();
+
+            // This retail map interleaves north and south colour slots. A
+            // plain colour-order table put Blue directly below Red and made
+            // them look like teammates even though their starts are on
+            // opposite halves of the map.
+            int[] expected = {0, 3, 4, 6, 1, 2, 5, 7};
+            for (int row = 0; row < expected.length; row++) {
+                assertEquals(expected[row], screen.slotAtRowForTest(row),
+                        "visual row " + row + " names the wrong starting area");
+            }
+
+            // Computers use the same visible move gesture as people. Moving
+            // the bottom team's Yellow AI to the second Top Team row changes
+            // the real colour/start slot, not merely its presentation.
+            assertTrue(lobby.setOccupant(7, GameLobby.Occupant.COMPUTER));
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.moveBounds(7)));
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.rowBounds(1)));
+            assertEquals(GameLobby.Occupant.COMPUTER,
+                    lobby.state().slots().get(3).occupant());
+            assertEquals(GameLobby.Occupant.OPEN,
+                    lobby.state().slots().get(7).occupant());
+        }
+    }
+
     /**
      * The screen must not start a game one person can play, because the
      * lockstep scheduler would then be waiting on nobody and the player would
@@ -283,7 +321,7 @@ class LobbyScreenTest {
             LobbyScreen screen = new LobbyScreen(data, host, "garden.pud", new Recording());
             screen.render();
             // Picking them up, then putting them down.
-            assertTrue(click(screen, LobbyScreen.rowBounds(seat)));
+            assertTrue(click(screen, LobbyScreen.moveBounds(seat)));
             screen.render();
             assertTrue(click(screen, LobbyScreen.rowBounds(7)));
             assertEquals(GameLobby.Occupant.HUMAN, host.state().slots().get(7).occupant());
@@ -299,7 +337,7 @@ class LobbyScreenTest {
         try (GameLobby host = GameLobby.host("Chris", "garden.pud", 8, PORT + 22)) {
             LobbyScreen screen = new LobbyScreen(data, host, "garden.pud", new Recording());
             screen.render();
-            assertTrue(click(screen, LobbyScreen.rowBounds(0)));
+            assertTrue(click(screen, LobbyScreen.moveBounds(0)));
             screen.render();
             assertTrue(click(screen, LobbyScreen.rowBounds(6)));
 

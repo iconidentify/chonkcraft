@@ -74,10 +74,11 @@ record LobbySetup(Path map, GameLobby lobby) {
      * Applies the selected BNE game template to the already-identical world.
      *
      * <p>Top vs Bottom is defined by the map's fixed starting areas, not by
-     * race. Slots whose start markers lie in the same vertical half are made
-     * mutual allies and receive mutual shared vision. Moving a player to a
-     * different colour/start slot in the lobby therefore moves that player to
-     * the other team, while Melee retains the world's ordinary opponent table.
+     * race or the slot's unsorted row. The lobby draws the same
+     * {@link LobbyTeams} assignment used here, so moving a player between the
+     * displayed teams also changes the alliance and shared-vision tables that
+     * every peer starts with. Melee retains the world's ordinary opponent
+     * table.
      */
     void applyGameTemplate(World world, PudMap source) {
         if (lobby.state().gameTemplate() != GameLobby.GameTemplate.TOP_VS_BOTTOM) {
@@ -86,30 +87,17 @@ record LobbySetup(Path map, GameLobby lobby) {
         List<GameLobby.Slot> playing = lobby.state().slots().stream()
                 .filter(GameLobby.Slot::isPlaying)
                 .toList();
+        LobbyTeams teams = LobbyTeams.from(source, lobby.capacity());
         for (GameLobby.Slot player : playing) {
             for (GameLobby.Slot other : playing) {
                 if (player.index() == other.index()) {
                     continue;
                 }
-                boolean teammates = sameStartingArea(source, player.index(), other.index());
+                boolean teammates = teams.together(player.index(), other.index());
                 world.setAllied(player.index(), other.index(), teammates);
                 world.setSharedVision(player.index(), other.index(), teammates);
             }
         }
-    }
-
-    /** Whether two fixed start markers belong to the top or bottom area. */
-    private boolean sameStartingArea(PudMap source, int player, int other) {
-        int[] first = source.startLocation(player);
-        int[] second = source.startLocation(other);
-        if (first != null && second != null) {
-            return (first[1] * 2 < source.height()) == (second[1] * 2 < source.height());
-        }
-        // Valid multiplayer PUDs carry one start marker per playable slot.
-        // Keep protocol-only and hand-built fixtures deterministic if one is
-        // absent: the first and second halves of the lobby are the two areas.
-        int half = Math.max(1, (lobby.capacity() + 1) / 2);
-        return player / half == other / half;
     }
 
     /**

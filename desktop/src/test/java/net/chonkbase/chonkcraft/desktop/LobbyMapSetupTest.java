@@ -9,13 +9,17 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import net.chonkbase.chonkcraft.data.map.PudReader;
 import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -163,6 +167,84 @@ class LobbyMapSetupTest {
             assertTrue(world.isEnemyPlayer(0, 2));
             assertFalse(world.sharesVisionWith(0, 2));
         }
+    }
+
+    @Test
+    @DisplayName("All You Need starts the displayed Top Team as allies with shared sight")
+    void allYouNeedTopTeamCrossesTheStartCommit() throws Exception {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null, "No BNE media configured");
+        byte[] bytes = assets.map("All You Need BNE.pud");
+        PudMap source = PudReader.read(bytes);
+        GameData data = new GameData(assets);
+        InetAddress local = InetAddress.getLoopbackAddress();
+
+        try (GameLobby host = GameLobby.host(
+                    "Chris", "All You Need BNE.pud", bytes, 8, PORT + 3);
+                GameLobby client = GameLobby.join(
+                    "Connor", local, PORT + 3, ignored -> bytes)) {
+            long deadline = System.currentTimeMillis() + 5_000L;
+            while (System.currentTimeMillis() < deadline
+                    && (host.humanCount() < 2 || !host.state().allPlayersReady())) {
+                host.poll();
+                client.poll();
+                Thread.sleep(5);
+            }
+            assertEquals(2, host.humanCount(), "Connor never reached the lobby");
+
+            int connor = host.state().slots().stream()
+                    .filter(slot -> "Connor".equals(slot.name()))
+                    .findFirst().orElseThrow().index();
+            LobbyTeams teams = LobbyTeams.from(source, 8);
+            assertFalse(teams.together(0, connor),
+                    "the regression needs the default second seat in the other area");
+            assertTrue(host.move(connor, 3),
+                    "Violet is the open Top Team seat displayed below Red");
+            assertTrue(host.setOccupant(7, GameLobby.Occupant.COMPUTER));
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
+
+            // Start immediately. START must commit the move and template even
+            // if the last ordinary STATE datagram is still in flight.
+            host.start();
+            deadline = System.currentTimeMillis() + 5_000L;
+            while (System.currentTimeMillis() < deadline && !client.isStarted()) {
+                client.poll();
+                Thread.sleep(5);
+            }
+            assertTrue(client.isStarted());
+            assertEquals(3, client.state().localSlot());
+            assertEquals(GameLobby.GameTemplate.TOP_VS_BOTTOM,
+                    client.state().gameTemplate());
+
+            LobbySetup hostSetup = new LobbySetup(Path.of("All You Need BNE.pud"), host);
+            LobbySetup clientSetup = new LobbySetup(Path.of("All You Need BNE.pud"), client);
+            World hostWorld = populatedWorld(data, source, hostSetup);
+            World clientWorld = populatedWorld(data, source, clientSetup);
+            int[] connorStart = source.startLocation(3);
+
+            for (World world : List.of(hostWorld, clientWorld)) {
+                assertTrue(world.isAllied(0, 3));
+                assertTrue(world.isAllied(3, 0));
+                assertTrue(world.sharesVisionWith(0, 3));
+                assertTrue(world.sharesVisionWith(3, 0));
+                assertTrue(world.isVisibleTo(0, connorStart[0], connorStart[1]),
+                        "Connor's opening sight did not reach Chris's gameboard");
+                assertFalse(world.isAllied(0, 7),
+                        "the bottom computer was silently put on Chris's team");
+                assertTrue(world.isEnemyPlayer(0, 7));
+            }
+        }
+    }
+
+    private static World populatedWorld(GameData data, PudMap source, LobbySetup setup) {
+        World world = new World(
+                GameMap.from(source, data.loadTileset(source.tileset()).tileset()),
+                setup.players(source));
+        data.configureWorld(world, source);
+        data.populate(world, source);
+        setup.applyGameTemplate(world, source);
+        world.recalculateSupply();
+        return world;
     }
 
     @Test

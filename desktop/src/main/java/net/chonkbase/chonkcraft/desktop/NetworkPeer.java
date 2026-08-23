@@ -158,6 +158,18 @@ public final class NetworkPeer {
             lobbySetup.applyGameTemplate(world, source);
         }
         world.recalculateSupply();
+        if (lobbySetup != null
+                && lobbyRun.lobby().state().gameTemplate()
+                        == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+            System.out.printf("peer %d team: allies=%s shared-vision=%s enemies=%s%n",
+                    localPlayer,
+                    relatedPlayers(lobbyRun.lobby(), world, localPlayer,
+                            Relation.ALLIED),
+                    relatedPlayers(lobbyRun.lobby(), world, localPlayer,
+                            Relation.SHARED_VISION),
+                    relatedPlayers(lobbyRun.lobby(), world, localPlayer,
+                            Relation.ENEMY));
+        }
         int visibleTiles = visibleTiles(world, localPlayer);
         if (visibleTiles == 0) {
             throw new IllegalStateException("player " + localPlayer
@@ -378,7 +390,8 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate);
+                settleAndStart(lobby, computerPlayer, gameTemplate,
+                        PudReader.read(selectedMap));
                 relay.markRoomStarted();
                 lobby.start();
             }
@@ -424,7 +437,8 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate);
+                settleAndStart(lobby, computerPlayer, gameTemplate,
+                        PudReader.read(selectedMap));
                 lobby.start();
             }
             Thread.sleep(2);
@@ -442,11 +456,34 @@ public final class NetworkPeer {
     }
 
     private static void settleAndStart(GameLobby lobby, boolean computerPlayer,
-            GameLobby.GameTemplate gameTemplate) {
+            GameLobby.GameTemplate gameTemplate, PudMap source) {
         lobby.setGameTemplate(gameTemplate);
+        LobbyTeams teams = LobbyTeams.from(source, lobby.capacity());
+        int host = lobby.state().hostSlot();
+        if (gameTemplate == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+            // The production gate deliberately exercises the user's setup:
+            // two people on one displayed team, one computer on the other.
+            // A joining human initially takes the first colour slot, which
+            // can belong to the opposite area on an interleaved retail map.
+            for (GameLobby.Slot slot : lobby.state().slots()) {
+                if (slot.occupant() != GameLobby.Occupant.HUMAN
+                        || slot.index() == host || teams.together(host, slot.index())) {
+                    continue;
+                }
+                for (GameLobby.Slot target : lobby.state().slots()) {
+                    if (target.occupant() == GameLobby.Occupant.OPEN
+                            && teams.together(host, target.index())) {
+                        lobby.move(slot.index(), target.index());
+                        break;
+                    }
+                }
+            }
+        }
         if (computerPlayer) {
             for (GameLobby.Slot slot : lobby.state().slots()) {
-                if (slot.occupant() == GameLobby.Occupant.OPEN) {
+                if (slot.occupant() == GameLobby.Occupant.OPEN
+                        && (gameTemplate != GameLobby.GameTemplate.TOP_VS_BOTTOM
+                                || !teams.together(host, slot.index()))) {
                     lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
                     break;
                 }
@@ -457,6 +494,32 @@ public final class NetworkPeer {
                 lobby.setOccupant(slot.index(), GameLobby.Occupant.CLOSED);
             }
         }
+    }
+
+    private enum Relation {
+        ALLIED,
+        SHARED_VISION,
+        ENEMY
+    }
+
+    /** A machine-readable account of the relationships applied before cycle zero. */
+    private static List<Integer> relatedPlayers(GameLobby lobby, World world,
+            int localPlayer, Relation relation) {
+        List<Integer> related = new ArrayList<>();
+        for (GameLobby.Slot slot : lobby.state().slots()) {
+            if (!slot.isPlaying() || slot.index() == localPlayer) {
+                continue;
+            }
+            boolean matches = switch (relation) {
+                case ALLIED -> world.isAllied(localPlayer, slot.index());
+                case SHARED_VISION -> world.sharesVisionWith(localPlayer, slot.index());
+                case ENEMY -> world.isEnemyPlayer(localPlayer, slot.index());
+            };
+            if (matches) {
+                related.add(slot.index());
+            }
+        }
+        return List.copyOf(related);
     }
 
     /**

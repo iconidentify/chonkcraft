@@ -95,6 +95,16 @@ public final class SyncHash {
 
         for (Player player : world.players()) {
             hash = mix(hash, world.departedControlMask(player.index()));
+            // Diplomacy and shared sight are simulation state too. A peer
+            // that missed the final Top-vs-Bottom template used to report the
+            // same hash until the different target/fog decision happened to
+            // alter a unit. Cover the tables at cycle zero so the network
+            // names the setup divergence immediately.
+            for (int other = 0; other < Player.MAX; other++) {
+                hash = mix(hash, world.isEnemyPlayer(player.index(), other) ? 1 : 0);
+                hash = mix(hash, world.isAllied(player.index(), other) ? 1 : 0);
+                hash = mix(hash, world.sharesVisionWith(player.index(), other) ? 1 : 0);
+            }
             if (!player.isActive()) {
                 continue;
             }

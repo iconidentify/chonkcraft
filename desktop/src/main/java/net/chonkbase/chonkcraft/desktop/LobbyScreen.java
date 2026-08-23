@@ -14,16 +14,19 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JPanel;
+import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.data.map.PudReader;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
 
 /**
  * The table everybody sits at before the game starts.
  *
- * <p>Eight rows, one per slot, in Warcraft II's own colour order -- because
- * the slot is not a line in a list, it is who you will be: the colour on the
- * minimap and the corner of the map you start in. A lobby that hides that
- * makes the first minute of the game a surprise.
+ * <p>Eight rows, one per slot. Melee keeps Warcraft II's own colour order;
+ * Top vs Bottom groups those same colour/start slots by their map-defined
+ * starting area. The slot is not merely a line in a list: it is your colour,
+ * starting position and, in a team template, your side. A lobby that hides
+ * any one of those makes the first minute of the game a surprise.
  *
  * <p>The host decides and everyone else watches. Every control here is the
  * host's; a client sees the same table and can change nothing on it, which is
@@ -48,8 +51,12 @@ final class LobbyScreen extends JPanel {
 
     private static final int ROW_GAP = 4;
 
-    /** Where the two per-row buttons sit, measured from the table's right edge. */
-    private static final int ACTION_WIDTH = 92;
+    /** Where the per-row controls sit, measured from the table's right edge. */
+    private static final int ACTION_WIDTH = 120;
+
+    private static final int MOVE_WIDTH = 54;
+
+    private static final int ACTION_GAP = 4;
 
     private static final int RACE_WIDTH = 72;
 
@@ -70,7 +77,9 @@ final class LobbyScreen extends JPanel {
     /** Where the two columns of a row's text begin. */
     private static final int COLOUR_COLUMN = 30;
 
-    private static final int WHO_COLUMN = 110;
+    private static final int TEAM_COLUMN = 108;
+
+    private static final int WHO_COLUMN = 202;
 
     /** What the screen can ask of whatever is running it. */
     interface Listener {
@@ -120,6 +129,9 @@ final class LobbyScreen extends JPanel {
 
     private BufferedImage design;
     private BufferedImage scaleCache;
+
+    /** Parsed from the lobby's verified bytes, so the UI and simulation use one map. */
+    private PudMap synchronizedMap;
 
     LobbyScreen(GameData data, GameLobby lobby, String mapName, Listener listener) {
         this(data, lobby, mapName, null, listener);
@@ -260,7 +272,7 @@ final class LobbyScreen extends JPanel {
             holding = -1;
             return;
         }
-        if (slot.occupant() == GameLobby.Occupant.HUMAN) {
+        if (slot.isPlaying()) {
             holding = index;
         }
     }
@@ -335,20 +347,28 @@ final class LobbyScreen extends JPanel {
     }
 
     private void drawTable(Graphics2D g2, GameLobby.State state) {
-        List<GameLobby.Slot> slots = state.slots();
+        LobbyTeams teams = lobbyTeams(state);
+        List<GameLobby.Slot> slots = state.gameTemplate()
+                == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                        ? teams.arrange(state.slots()) : state.slots();
         for (int i = 0; i < slots.size(); i++) {
             GameLobby.Slot slot = slots.get(i);
             int y = TABLE_Y + i * (ROW_HEIGHT + ROW_GAP);
-            boolean mine = i == state.localSlot();
+            boolean mine = slot.index() == state.localSlot();
             PanelArt.sunken(g2, TABLE_X, y, TABLE_WIDTH, ROW_HEIGHT,
                     mine ? StoneTexture.Tint.SLATE : StoneTexture.Tint.STONE);
-            if (holding == i) {
+            if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+                g2.setColor(teams.sideOf(slot.index()) == LobbyTeams.Side.TOP
+                        ? new Color(72, 116, 176, 34) : new Color(176, 94, 52, 34));
+                g2.fillRect(TABLE_X + 2, y + 2, TABLE_WIDTH - 4, ROW_HEIGHT - 4);
+            }
+            if (holding == slot.index()) {
                 g2.setColor(new Color(255, 220, 100, 60));
                 g2.fillRect(TABLE_X, y, TABLE_WIDTH, ROW_HEIGHT);
             }
 
             // The colour, which is the point of the slot.
-            g2.setColor(PlayerColours.of(i));
+            g2.setColor(PlayerColours.of(slot.index()));
             g2.fillRect(TABLE_X + 6, y + 7, 16, 16);
             g2.setColor(new Color(0, 0, 0, 180));
             g2.drawRect(TABLE_X + 6, y + 7, 16, 16);
@@ -359,8 +379,14 @@ final class LobbyScreen extends JPanel {
                 // was a guess made against a bitmap face and it left every
                 // line sitting low in its slot.
                 int text = y + (ROW_HEIGHT - font.height()) / 2;
-                font.draw(g2, PlayerColours.nameOf(i), TABLE_X + COLOUR_COLUMN, text,
+                font.draw(g2, PlayerColours.nameOf(slot.index()),
+                        TABLE_X + COLOUR_COLUMN, text,
                         GameFont.Ink.GREY);
+                if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+                    font.draw(g2, teams.sideOf(slot.index()).caption(),
+                            TABLE_X + TEAM_COLUMN, text,
+                            mine ? GameFont.Ink.WHITE : GameFont.Ink.GREY);
+                }
                 String who = switch (slot.occupant()) {
                     case HUMAN -> slot.name() + (mine ? " (you)" : "");
                     case COMPUTER -> "Computer";
@@ -384,10 +410,20 @@ final class LobbyScreen extends JPanel {
                                 "orc".equals(slot.race()) ? "human" : "orc") : null);
             }
 
-            if (lobby.isHost() && !mine) {
-                if (slot.occupant() == GameLobby.Occupant.HUMAN) {
-                    button(g2, actionX, y + 4, ACTION_WIDTH, ROW_HEIGHT - 8, "Remove",
-                            () -> lobby.kick(slot.index()));
+            if (lobby.isHost()) {
+                if (slot.isPlaying()) {
+                    button(g2, actionX, y + 4, MOVE_WIDTH, ROW_HEIGHT - 8, "Move",
+                            () -> pickUpOrPlace(slot.index(), slot));
+                    if (!mine) {
+                        int secondaryX = actionX + MOVE_WIDTH + ACTION_GAP;
+                        button(g2, secondaryX, y + 4,
+                                ACTION_WIDTH - MOVE_WIDTH - ACTION_GAP, ROW_HEIGHT - 8,
+                                slot.occupant() == GameLobby.Occupant.HUMAN
+                                        ? "Remove" : "Close",
+                                slot.occupant() == GameLobby.Occupant.HUMAN
+                                        ? () -> lobby.kick(slot.index())
+                                        : () -> cycle(slot.index(), slot.occupant()));
+                    }
                 } else {
                     button(g2, actionX, y + 4, ACTION_WIDTH, ROW_HEIGHT - 8,
                             captionFor(slot.occupant()),
@@ -395,12 +431,30 @@ final class LobbyScreen extends JPanel {
                 }
             }
 
-            // The rest of the row picks a player up and puts them down again.
+            // The rest of the row picks any playing seat up and puts it down
+            // again. That includes computers: a team setup should not require
+            // closing one AI and recreating it on the other side.
             if (lobby.isHost()) {
                 hits.add(new Hit(new Rectangle(TABLE_X, y, TABLE_WIDTH - ACTION_WIDTH
                         - RACE_WIDTH - 20, ROW_HEIGHT), () -> pickUpOrPlace(slot.index(), slot)));
             }
         }
+    }
+
+    /** The exact fixed-start assignment shared with game startup. */
+    private LobbyTeams lobbyTeams(GameLobby.State state) {
+        if (synchronizedMap == null) {
+            byte[] bytes = lobby.mapBytes();
+            if (bytes != null) {
+                try {
+                    synchronizedMap = PudReader.read(bytes);
+                } catch (RuntimeException malformed) {
+                    // A protocol-only test can have no PUD. The deterministic
+                    // slot-half fallback still gives it a readable lobby.
+                }
+            }
+        }
+        return LobbyTeams.from(synchronizedMap, state.slots().size());
     }
 
     /** What the cycling button offers next, which is what it should say. */
@@ -439,7 +493,7 @@ final class LobbyScreen extends JPanel {
                         : holding >= 0
                                 ? "Now click an open slot to move them there."
                                 : state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
-                                        ? "Move players between top/bottom starts to choose teams."
+                                        ? "Team allies share sight. Click a player, then an open row to move."
                                         : "Click any player, then an open slot, to choose a colour.";
             } else if (hint.isEmpty()) {
                 hint = state.localSlot() < 0
@@ -524,6 +578,12 @@ final class LobbyScreen extends JPanel {
                 ACTION_WIDTH, ROW_HEIGHT - 8);
     }
 
+    /** Where the explicit Move control is drawn for a playing seat. */
+    static Rectangle moveBounds(int index) {
+        Rectangle action = actionBounds(index);
+        return new Rectangle(action.x, action.y, MOVE_WIDTH, action.height);
+    }
+
     /** Where a row's race button is. */
     static Rectangle raceBounds(int index) {
         return new Rectangle(TABLE_X + TABLE_WIDTH - ACTION_WIDTH - RACE_WIDTH - 12,
@@ -555,6 +615,15 @@ final class LobbyScreen extends JPanel {
             }
         }
         return false;
+    }
+
+    /** Which colour slot occupies a visual row after team grouping. */
+    int slotAtRowForTest(int row) {
+        GameLobby.State state = lobby.state();
+        List<GameLobby.Slot> slots = state.gameTemplate()
+                == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                        ? lobbyTeams(state).arrange(state.slots()) : state.slots();
+        return slots.get(row).index();
     }
 
     /** Lays the screen out without a window, so a test can look at it. */

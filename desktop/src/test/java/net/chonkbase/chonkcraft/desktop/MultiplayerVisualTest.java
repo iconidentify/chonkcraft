@@ -93,12 +93,19 @@ class MultiplayerVisualTest {
         unavailable.failed("The online service could not be reached.");
         write(paint(unavailable, 1280, 800), output.resolve("online-recovery-1280x800.png"));
 
-        GameLobby hosted = GameLobby.host("Chris", "Garden of War", new byte[] {1, 2, 3}, 4, 0);
-        Seat seat = new Seat(listing("QD7K3M", "Chris's Game", "Garden of War", 1, 4),
+        byte[] teamMap = assets.map("All You Need BNE.pud");
+        GameLobby hosted = GameLobby.host(
+                "Chris", "All You Need BNE.pud", teamMap, 8, 0);
+        hosted.setOccupant(1, GameLobby.Occupant.COMPUTER);
+        hosted.setOccupant(2, GameLobby.Occupant.COMPUTER);
+        hosted.setOccupant(3, GameLobby.Occupant.COMPUTER);
+        hosted.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
+        Seat seat = new Seat(listing(
+                "QD7K3M", "Chris's Game", "All You Need BNE.pud", 1, 8),
                 "host", "ws://127.0.0.1/relay", "ticket", 0, 0,
                 "https://chonkbase.net/chonkcraft/join/QD7K3M",
                 net.chonkbase.chonkcraft.matchmaking.MatchmakingProtocol.Visibility.PUBLIC);
-        LobbyScreen lobby = new LobbyScreen(data, hosted, "Garden of War",
+        LobbyScreen lobby = new LobbyScreen(data, hosted, "All You Need BNE.pud",
                 new OnlineLobby(new MatchmakingClient(URI.create("http://127.0.0.1:1")), seat),
                 new LobbyScreen.Listener() {
                     @Override
@@ -109,7 +116,8 @@ class MultiplayerVisualTest {
                     public void onCancel() {
                     }
                 });
-        write(paint(lobby, 1920, 1080), output.resolve("invite-lobby-1920x1080.png"));
+        write(paint(lobby, 1920, 1080),
+                output.resolve("invite-lobby-1920x1080.png"));
         hosted.close();
 
         try (var files = Files.list(output)) {

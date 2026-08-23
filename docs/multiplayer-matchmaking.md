@@ -171,8 +171,13 @@ and mute state and drives Enter-to-send into the real network session.
 The settled lobby also carries its game template. In **Top vs Bottom**, the
 host assigns colours/start slots and players whose fixed map starts occupy the
 same vertical area enter as mutual allies with mutual shared vision; the
-two-process network gate starts this mode and requires both peers to report the
-same template before comparing their final simulation hashes.
+screen groups those interleaved colour slots into labelled Top Team and Bottom
+Team rows using the verified map bytes. The two-process network gate recreates
+the reported **All You Need BNE** setup—two people on one displayed team and a
+computer on the other—and requires both peers to report the same non-empty
+alliance, shared-vision, and enemy rosters before comparing their final
+simulation hashes. Diplomacy and shared sight are themselves part of that hash
+from cycle zero.
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.

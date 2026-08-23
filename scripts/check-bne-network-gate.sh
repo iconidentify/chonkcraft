@@ -23,12 +23,12 @@ observed = int(suite.attrib.get("tests", -1))
 skipped = int(suite.attrib.get("skipped", -1))
 failures = int(suite.attrib.get("failures", -1))
 errors = int(suite.attrib.get("errors", -1))
-if observed != 36 or skipped or failures or errors:
+if observed != 37 or skipped or failures or errors:
     raise SystemExit(
-        "LockstepTest: expected 36/0/0/0 tests/skips/failures/errors, "
+        "LockstepTest: expected 37/0/0/0 tests/skips/failures/errors, "
         f"got {observed}/{skipped}/{failures}/{errors}"
     )
-print("lockstep inventory: 36 pass, 0 skipped")
+print("lockstep inventory: 37 pass, 0 skipped")
 PY
 
 echo "network gate passed: independent peers converge through 1800 cycles and adverse UDP"
@@ -75,6 +75,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-host "${port}" --computer-player true --cycles 180 \
+  --map "All You Need BNE.pud" \
   --game-template top-vs-bottom \
   >"${work}/host.log" 2>&1 &
 host_pid=$!
@@ -83,6 +84,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-join "127.0.0.1:${port}" --without-map true --cycles 180 \
+  --map "All You Need BNE.pud" \
   >"${work}/client.log" 2>&1 &
 client_pid=$!
 
@@ -120,6 +122,10 @@ grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/client.log"
 grep -q 'source=host-transfer' "${work}/client.log"
 grep -q 'template=TOP_VS_BOTTOM' "${work}/host.log"
 grep -q 'template=TOP_VS_BOTTOM' "${work}/client.log"
+grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${work}/host.log"
+grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${work}/client.log"
 grep -q 'finished: cycles=180' "${work}/host.log"
 grep -q 'finished: cycles=180' "${work}/client.log"
 host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/host.log" | tail -1)"
@@ -147,6 +153,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-host "${matchmaker_url}" --computer-player true --cycles 180 \
+  --map "All You Need BNE.pud" \
   --game-template top-vs-bottom \
   >"${online_host_log}" 2>&1 &
 host_pid=$!
@@ -172,7 +179,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-join "${room_code}" --matchmaker-url "${matchmaker_url}" \
-  --without-map true --cycles 180 \
+  --without-map true --cycles 180 --map "All You Need BNE.pud" \
   >"${online_client_log}" 2>&1 &
 client_pid=$!
 
@@ -205,6 +212,10 @@ grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${online_
 grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_host_log}"
 grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${online_client_log}"
 grep -q 'source=host-transfer' "${online_client_log}"
+grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${online_host_log}"
+grep -Eq 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
+  "${online_client_log}"
 online_host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_host_log}" | tail -1)"
 online_client_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${online_client_log}" | tail -1)"
 if [[ -z "${online_host_hash}" || "${online_host_hash}" != "${online_client_hash}" ]]; then
