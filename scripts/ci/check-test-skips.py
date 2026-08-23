@@ -9,7 +9,7 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2588 tests,  20 skipped
+    authenticated inputs       2588 tests,  25 skipped
     no external input          2588 tests, 1018 skipped
 
 Both can be green.
@@ -152,15 +152,15 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # CI jobs install them; see .github/workflows/tests.yml.
     #
     # Re-measured 23 August 2026 against the authenticated retail installation
-    # and its derived pack. The twenty that skip are: five
+    # and its derived pack. The twenty-five that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
-    # tests in runtime and desktop, six fixture/source-seam checks, one opt-in
-    # production multiplayer smoke, and one release-dependent test described
-    # below. The parity expansion converted the former custom-map and local-
-    # save skips into ordinary authenticated coverage.
+    # tests in runtime and desktop, four fixture-sensitive checks, four custom-
+    # map referees whose maps are absent from the retail pack, three private
+    # playtest-save referees, one opt-in production multiplayer smoke, and one
+    # release-dependent test described below.
     #
-    # ONE OF THE TWENTY DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
+    # ONE OF THE TWENTY-FIVE DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
     # is the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
@@ -172,13 +172,15 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     "full": {
         "assetpack": (256, 5),
         "runtime": (99, 3),
-        "data": (139, 1),
+        "data": (139, 3),
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        # Four fixture/source-seam checks remain opt-in. The production service
-        # smoke runs in the deploy workflow instead.
-        "engine": (1700, 4),
+        # Three exact-save regressions need the operator's local playtest
+        # saves; the other fixture skips name custom maps absent from the
+        # retail pack. The production service smoke runs in the deploy
+        # workflow instead.
+        "engine": (1700, 7),
         "desktop": (329, 6),
         "matchmaker-server": (5, 1),
     },
