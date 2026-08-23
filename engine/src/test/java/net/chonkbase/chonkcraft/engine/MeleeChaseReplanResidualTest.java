@@ -1275,6 +1275,87 @@ class MeleeChaseReplanResidualTest {
     }
 
     @Test
+    @DisplayName("a dying quarry ends retained-route attack construction before another step")
+    void aDyingQuarryEndsRetainedRouteAttackConstructionBeforeAnotherStep()
+            throws Exception {
+        // XHuman 9 footman 1420 settles its first replan step at (12,120)
+        // after skeleton 1430 has entered Die. Native keeps the retained
+        // route while Attack-start counts 3,2,1, then destroys the Attack
+        // order and opens Still on fixture 132. The next cached E heading is
+        // never given to Move; doing so made the footman glide one tile after
+        // its quarry had died.
+        byte[] script = retailScriptBin();
+        GameMap map = grass(32);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+
+        Unit chaser = world.createUnit(footman(), 0, 12, 20);
+        Unit quarry = world.createUnit(prey(), 1, 16, 20);
+        assertTrue(chaser != null && quarry != null, "units must place");
+        assertTrue(world.orderAttack(chaser, quarry), "attack accepted");
+
+        int east = Direction.fromDelta(1, 0);
+        chaser.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {east, east}));
+        chaser.setPathGoal(quarry.tileX(), quarry.tileY());
+        chaser.setTarget(quarry);
+        chaser.setChasing(true);
+        chaser.setFighting(false);
+        chaser.setAutoTargeting(true);
+        chaser.setOffset(0, 0);
+        chaser.setStepDrained(true);
+        chaser.setBattleNetRetargetResidualRoutePark(true);
+        chaser.setBattleNetOrderDelay(2);
+        int attackStart = world.idle.battleNetSequenceStart(chaser,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int stillStart = world.idle.battleNetStillSequenceStart(chaser);
+        assertTrue(attackStart >= 0 && stillStart >= 0,
+                "retail script must name Attack and Still starts");
+        chaser.setBattleNetSequenceOffset(attackStart);
+        chaser.setBattleNetAnimationTimer(3);
+        chaser.animation().switchTo(
+                chaser.type().animationSet().get(AnimationSet.State.ATTACK));
+        quarry.setOrder(Unit.Order.DYING);
+
+        int holdX = chaser.tileX();
+        int holdY = chaser.tileY();
+        world.combat.stepAttack(chaser);
+        assertEquals(holdX, chaser.tileX(), "Attack constructor 2 holds x");
+        assertEquals(holdY, chaser.tileY(), "Attack constructor 2 holds y");
+        assertEquals(attackStart, chaser.battleNetSequenceOffset(),
+                "constructor 2 stays at Attack start");
+        assertEquals(2, chaser.battleNetAnimationTimer(),
+                "Attack constructor counts 3 to 2");
+
+        world.combat.stepAttack(chaser);
+        assertEquals(holdX, chaser.tileX(), "Attack constructor 1 holds x");
+        assertEquals(holdY, chaser.tileY(), "Attack constructor 1 holds y");
+        assertEquals(attackStart, chaser.battleNetSequenceOffset(),
+                "constructor 1 stays at Attack start");
+        assertEquals(1, chaser.battleNetAnimationTimer(),
+                "Attack constructor counts 2 to 1");
+
+        world.combat.stepAttack(chaser);
+        assertEquals(Unit.Order.STILL, chaser.order(),
+                "timer-one callback destroys the expired Attack order");
+        assertEquals(holdX, chaser.tileX(),
+                "the retained heading cannot move toward a dead quarry");
+        assertEquals(holdY, chaser.tileY(),
+                "the retained heading cannot move toward a dead quarry");
+        assertEquals(0, chaser.pathLength(),
+                "ending the Attack order clears the retained route");
+        assertFalse(chaser.battleNetRetargetResidualRoutePark(),
+                "the destroyed route cannot retain surrogate ownership");
+        assertEquals(stillStart, chaser.battleNetSequenceOffset(),
+                "native opens Still on the timer-one callback");
+        assertEquals(3, chaser.battleNetAnimationTimer(),
+                "Still opens with timer three");
+    }
+
+    @Test
     @DisplayName("move residual refills a usable route before acquiring a hostile")
     void moveResidualRefillsAUsableRouteBeforeAcquiringAHostile() {
         // XHuman 2 ogres 1547/1549 exhaust their opening routes with hostiles

@@ -2395,7 +2395,7 @@ final class BattleNetMovementSystem {
                 && (attackStart < 0 || cursor < attackStart);
     }
 
-    /** Mirrors a newly transferred refusal in native's offset-7 Move timer. */
+    /** Mirrors a surrogate order hold in the native action-program timer. */
     void syncBattleNetAttackRefusalTimer(Unit unit) {
         if (world.battleNetSequence == null || unit == null
                 || unit.battleNetOrderDelay() <= 0) {
@@ -2404,6 +2404,28 @@ final class BattleNetMovementSystem {
         int moveStart = world.idle.battleNetSequenceStart(unit,
                 BattleNetSequence.MOVE_ANIMATION);
         if (moveStart >= 0 && unit.battleNetSequenceOffset() == moveStart) {
+            unit.setBattleNetAnimationTimer(unit.battleNetOrderDelay());
+            return;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int timer = unit.battleNetAnimationTimer();
+        Unit target = unit.target();
+        if (attackStart >= 0
+                && unit.battleNetSequenceOffset() == attackStart
+                && unit.battleNetRetargetResidualRoutePark()
+                && (target == null
+                        || !world.targets.validAttackTarget(unit, target))
+                // Only the cold Attack constructor is 3,2,1. Attack OP0
+                // body holds can share the start offset with much larger
+                // timers and are owned by the sequence interpreter itself.
+                && timer >= 1 && timer <= 3
+                && unit.battleNetOrderDelay() < timer) {
+            // A replan residual whose quarry has entered Die still completes
+            // the two quiet visits after installing Attack-start/3. Native
+            // exposes the sequence timer as 2 then 1 before the order is
+            // destroyed. Keep live-quarry route/refusal ownership unchanged;
+            // its timer lifecycle has additional formation witnesses.
             unit.setBattleNetAnimationTimer(unit.battleNetOrderDelay());
         }
     }

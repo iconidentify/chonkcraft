@@ -861,6 +861,32 @@ final class BattleNetCombatSystem {
                 // formation provenance.
             }
         }
+        Unit residualConstructionGoal = unit.target();
+        int residualAttackStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.ATTACK_ANIMATION);
+        if (unit.battleNetRetargetResidualRoutePark()
+                && unit.chasing() && !unit.isMoving()
+                && unit.battleNetOrderDelay() == 0
+                && unit.pathLength() > 0
+                && residualAttackStart >= 0
+                && unit.battleNetSequenceOffset() == residualAttackStart
+                && unit.battleNetAnimationTimer() == 1
+                && (residualConstructionGoal == null
+                        || !world.targets.validAttackTarget(
+                                unit, residualConstructionGoal))) {
+            // The residual has settled and Attack construction now owns its
+            // timer-one callback. Retail validates the CUnitPtr here, clears
+            // the retained route and opens Still; Move never receives the
+            // next cached heading. XHuman 9 footman 1420 is the sealed
+            // witness: skeleton 1430 is already in Die, Attack counts 3,2,1
+            // at (12,120), then Still starts there on fixture 132. Letting
+            // the generic chase body run first committed an extra east tile
+            // and continued animating it under a Still order.
+            unit.setBattleNetRetargetResidualRoutePark(false);
+            finishStationaryAttackToStill(unit);
+            return;
+        }
         if (armBattleNetBlockedChaseAttackConstruction(unit)) {
             return;
         }
