@@ -473,6 +473,36 @@ first divergence at cycle 22 (3 finding(s)):
             output.getvalue(),
         )
 
+    def test_normalizes_witnessed_internal_human_corpse_type(self):
+        raw_corpse = bytearray(152)
+        raw_corpse[39] = 105
+        raw_corpse[46] = 1
+        cycle_payload = b"".join((
+            bne_compare.CYCLE_HEADER.pack(149, 0x31DFF4F5, 1566, 1),
+            bytes(16 * bne_compare.PLAYER_RECORD.size),
+            bne_compare.UNIT_DELTA_HEADER.pack(1492, 1),
+            raw_corpse,
+        ))
+        state = io.BytesIO(b"".join((
+            bne_compare.STATE_HEADER.pack(
+                b"BNESTATE", 1, 1, bne_compare.STATE_HEADER.size,
+                152, 1600, 16, 15,
+            ),
+            bne_compare.CHUNK_HEADER.pack(b"CYCL", len(cycle_payload)),
+            cycle_payload,
+        )))
+        trace = io.BytesIO(
+            b"cycle 149 seed 31dff4f5\n"
+            b"u 1492 unit-unknown p1 82 88 hp 0 o DYING\n"
+        )
+        output = io.BytesIO()
+        bne_compare.normalize_fixture_trace(trace, state, output, 149)
+        self.assertEqual(
+            b"cycle 149 seed 31dff4f5\n"
+            b"u 1492 unit-human-dead-body p1 82 88 hp 0 o DYING\n",
+            output.getvalue(),
+        )
+
     def test_normalizes_raw_16_stationary_attack_as_attack(self):
         raw_attack = bytearray(152)
         raw_attack[46] = 16

@@ -96,7 +96,18 @@ final class BattleNetIdleSystem {
             // units re-decide either way, which is upstream's rule.
             return true;
         }
-        if (unit.attackScanSleep() > 0) {
+        // Attack-tail path failure is itself a native target-selection clock.
+        // After six retained Move-OP0 refusals, COrder_Attack asks whether any
+        // quarry is actually reachable before it attempts another step. This
+        // is what releases boxed automatic defenders instead of leaving them
+        // permanently attached to a visible but unreachable enemy.
+        boolean exhaustedReachabilityProbe = unit.chasing()
+                && unit.battleNetAttackWrapDestArmPending()
+                && unit.battleNetChaseEmptyRouteReplan()
+                && unit.pathLength() == 1
+                && unit.battleNetCollisionCounter()
+                        > World.ATTACK_SCAN_INTERVAL;
+        if (unit.attackScanSleep() > 0 && !exhaustedReachabilityProbe) {
             unit.setAttackScanSleep(unit.attackScanSleep() - 1);
             return true;
         }
@@ -110,6 +121,15 @@ final class BattleNetIdleSystem {
         Unit candidate = immobile
                 ? world.targets.findHostile(unit, unit.type().minAttackRange(), reach)
                 : world.targets.findBattleNetHostile(unit, scanRange, goal);
+        if (exhaustedReachabilityProbe) {
+            // The retained native route byte is the reachability result. Once
+            // its collision generation is exhausted, the next automatic scan
+            // returns no unit rather than immediately selecting another member
+            // of the same inaccessible formation. Re-running Java's permissive
+            // ordinary pathfinder here treats moving bodies as soft costs and
+            // recreates the frozen chase under a different target pointer.
+            candidate = null;
+        }
 
         // Something already shooting at this unit keeps its attention even
         // once it has walked past the reaction range: attackedByGoal.
@@ -131,7 +151,8 @@ final class BattleNetIdleSystem {
                                 || unit.distanceTo(goal) <= Math.max(reactRange, reach))
                 // While answering an aggressor, a target that cannot shoot
                 // back is not a reason to stay where it is.
-                && !(unit.underAttack() > 0 && !goal.isAggressive());
+                && !(unit.underAttack() > 0 && !goal.isAggressive())
+                && !exhaustedReachabilityProbe;
 
         if (goalStillGood) {
             if (candidate != null && candidate != goal) {
@@ -376,7 +397,8 @@ final class BattleNetIdleSystem {
             Unit unit = ready.get(index);
             if (unit == null || unit.type() == null || !unit.isAlive()
                     || unit.order() != Unit.Order.STILL
-                    || unit.savedOrder() != Unit.Order.PATROL) {
+                    || unit.savedOrder() != Unit.Order.PATROL
+                    || !unit.battleNetScoutPatrol()) {
                 continue;
             }
             unit.takeSavedOrder();
@@ -535,7 +557,6 @@ final class BattleNetIdleSystem {
             // behind the moving formation as BNE does.
             unit.setBattleNetRefusals(0);
             unit.setBattleNetCollisionCounter(0);
-            unit.setBattleNetPatrolStraightRunExhausted(false);
             unit.setBattleNetPendingPatrol(unit.battleNetAiHomeX(),
                     unit.battleNetAiHomeY());
             int quiet = world.battleNetSequence.quietTicksUntilActionMarker(

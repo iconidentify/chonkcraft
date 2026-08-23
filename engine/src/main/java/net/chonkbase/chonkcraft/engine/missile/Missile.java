@@ -86,7 +86,17 @@ public final class Missile {
     private double travelled;
     private double total;
 
-    /** How many further hops a bouncing missile has already taken. */
+    /**
+     * Legacy onward-hop count, or BNE action-7's close-flight counter.
+     *
+     * <p>The retail Dragon/Gryphon action does not reset a Euclidean leg at
+     * the aimed point.  Once its remaining max-axis distance falls below 50,
+     * native offset {@code +0x38} counts every half-speed update.  Every
+     * eighth update pulses damage and the shot enters action 6 after counter
+     * 25 (40 only for the native damage-byte-40 variant).  Reusing this saved
+     * integer keeps that retail state resumable without inventing a second
+     * save-only counter.</p>
+     */
     private int bounces;
 
     /**
@@ -917,6 +927,8 @@ public final class Missile {
      * why the same shot is still in the air through native cycle 13.
      */
     private void stepBattleNetMotion() {
+        boolean piercingFlight = type.missileClass()
+                == MissileClass.POINT_TO_POINT_BOUNCE;
         // Action 6 beat: remaining went negative on an earlier pass; free
         // only after the type-specific wait (1 for most shots, 5 for
         // missile-catapult-rock -- Human 13).
@@ -929,9 +941,17 @@ public final class Missile {
             arrived = true;
             return;
         }
-        if (battleNetRemaining < 0) {
+        if (battleNetRemaining < 0 && !piercingFlight) {
             armBattleNetImpact();
             return;
+        }
+        int stepSpeed = battleNetSpeed;
+        // Native projectile action 7 (0x00410c40) halves its table speed
+        // before moving whenever the pre-step remaining distance is below
+        // 50. XOrc 11's type-2 breath therefore drains 57->45 at speed 12,
+        // then 45->39 at speed 6 and stays visible beyond its aimed ship.
+        if (piercingFlight && battleNetRemaining < 50) {
+            stepSpeed = Math.max(1, stepSpeed >> 1);
         }
         int outA = -1;
         int outB = 0;
@@ -953,18 +973,41 @@ public final class Missile {
         if ((battleNetFlags & 0x20) != 0) {
             outA = -outA;
         }
-        y = (int) y + battleNetSpeed * outA;
-        x = (int) x + battleNetSpeed * outB;
-        battleNetRemaining -= battleNetSpeed;
+        y = (int) y + stepSpeed * outA;
+        x = (int) x + stepSpeed * outB;
+        battleNetRemaining -= stepSpeed;
+        if (piercingFlight) {
+            // The close-flight counter is tested after movement. It begins on
+            // the same update that crosses below 50, pulses at 8/16/24, and
+            // is tested for expiry before it is incremented. This is the
+            // literal action-7 order at 0x00410cab..0x00410cf3.
+            if (battleNetRemaining < 50) {
+                int limit = damage == 40 ? 40 : 25;
+                if (bounces > limit) {
+                    armBattleNetImpact();
+                    return;
+                }
+                bounces++;
+                if ((bounces & 7) == 0) {
+                    // A pulse resolves this cycle but does not free the shot.
+                    // World distinguishes it from the final action-6 hit by
+                    // hasArrived(), which remains false here.
+                    hit = true;
+                }
+            }
+            travelled = Math.min(total, travelled + stepSpeed);
+            // Native action 7 retains frame zero throughout its flight.
+            return;
+        }
         if (type.missileClass() == MissileClass.PARABOLIC) {
             // Native +0x24 advances by speed even on the step that makes
             // remaining negative; the next action-6 visit takes zero motion
             // draws, but the following live parabolic shot's draw count still
             // needs this accumulator for its own stride test.
-            battleNetArcProgress += battleNetSpeed;
+            battleNetArcProgress += stepSpeed;
             updateBattleNetParabolicFrame();
         }
-        travelled = Math.min(total, travelled + battleNetSpeed);
+        travelled = Math.min(total, travelled + stepSpeed);
         // BNE keeps constructor facing (+0x0a) for the complete flight. The
         // point and parabolic actions update position and (for the latter)
         // frame +0x09, but neither writes the facing byte.

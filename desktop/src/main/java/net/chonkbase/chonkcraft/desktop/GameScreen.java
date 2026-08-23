@@ -2116,16 +2116,12 @@ final class GameScreen extends JPanel {
      * every player from the event thread. This walks the published snapshot
      * and adds up exactly what {@code recalculateSupply} adds up.
      *
-     * <p>Departs from {@code World.orderTrain} by the training queue, and it
-     * is worth saying which way. The world adds the demand of every job
-     * already paid for at every barracks before it answers, so a player with
-     * exactly one place left and three footmen on order is refused by the
-     * world and allowed by this. The difference is that this implementation has a queue
-     * and upstream's {@code CheckLimits} does not look at it either, so the
-     * preflight agrees with upstream while the authoritative engine remains
-     * stricter. A local rejection is reported immediately. A network sink can
-     * only confirm that the command entered lockstep, so this screen stays
-     * silent rather than claiming the unit began training before the shared
+     * <p>Departs from {@code World.orderTrain} by the optional training queue.
+     * This preflight follows retail and reads only live demand; the world also
+     * reserves every job in ChonkCraft's paid queue so the extension cannot
+     * overbook food. A local rejection is reported immediately. A network
+     * sink can only confirm that the command entered lockstep, so this screen
+     * stays silent rather than claiming the unit began training before the shared
      * simulation applies it.
      */
     private String noRoom(UnitType what) {

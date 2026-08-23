@@ -19,6 +19,32 @@ class BattleNetAiOilPlatformExitRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("an XOrc 11 tanker uses BNE's unrounded east platform face")
+    void anXOrc11TankerUsesTheUnroundedEastPlatformFace() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (mission.world().cycle() - BNE_INITIALIZATION_TICKS < 160) {
+            mission.tick();
+        }
+
+        Unit tanker = at(mission.world(), "unit-human-oil-tanker", 8, 20);
+        assertNotNull(tanker,
+                "native slot 1552 surfaces on the platform's east face at fixture 160");
+        assertEquals(Unit.Order.STILL, tanker.order());
+        assertTrue(tanker.battleNetDoubleStep(),
+                "the even east-face anchor keeps the doubled naval lattice");
+    }
+
+    @Test
     @DisplayName("an XHuman 8 tanker leaves its platform on BNE's even anchor grid")
     void anXHuman8TankerLeavesItsPlatformOnTheEvenAnchorGrid() {
         AssetSource assets = AssetSource.fromEnvironment();

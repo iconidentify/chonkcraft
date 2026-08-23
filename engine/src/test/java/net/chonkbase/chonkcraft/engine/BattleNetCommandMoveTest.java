@@ -56,6 +56,7 @@ class BattleNetCommandMoveTest {
         unit.setBattleNetAnimationTimer(1);
         unit.setOrder(Unit.Order.STILL);
         unit.setSavedOrder(Unit.Order.PATROL);
+        unit.setBattleNetScoutPatrol(true);
 
         world.idle.fireBattleNetCommandPatrolRestores();
         world.idle.stepStill(unit);

@@ -223,6 +223,59 @@ class MeleeAttackTailWrapRetargetTest {
     }
 
     @Test
+    @DisplayName("a finished presentation cannot end Attack before the native tail wrap")
+    void aFinishedPresentationWaitsForTheNativeTailWrapToRetarget()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        int wrap = wrapGotoOffset(script, attackStart);
+        assumeTrue(attackStart == 643 && wrap >= 0,
+                "retail ogre Attack must expose its tail wrap");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 10);
+        Unit dying = world.createUnit(prey("unit-knight", 0x37), 1, 11, 10);
+        Unit next = world.createUnit(prey("unit-footman", 0x3f), 1, 9, 10);
+        assumeTrue(attacker != null && dying != null && next != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, dying));
+
+        dying.setOrder(Unit.Order.DYING);
+        attacker.setTarget(dying);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(wrap);
+        attacker.setBattleNetAnimationTimer(4);
+        Animation presentation = attacker.type().animationSet()
+                .get(AnimationSet.State.ATTACK);
+        attacker.animation().restore(
+                presentation, presentation.size() - 1, 0, false);
+
+        world.tick();
+        assertEquals(Unit.Order.ATTACK, attacker.order(),
+                "a quiet script.bin tail wait still owns COrder_Attack");
+        assertSame(dying, attacker.target(),
+                "the dying pointer survives until the authoritative OP0 scan");
+        assertEquals(wrap, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+
+        world.tick();
+        world.tick();
+        assertSame(dying, attacker.target(),
+                "the corpse remains banked through native tail timers 2 and 1");
+
+        world.tick();
+        assertEquals(Unit.Order.ATTACK, attacker.order());
+        assertSame(next, attacker.target(),
+                "tail OP0 must hand the attacker to the live replacement");
+        assertEquals(attackStart, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the replacement starts native Attack construction");
+    }
+
+    @Test
     @DisplayName("a melee tail wrap names a dying quarry's out-of-range neighbour and dest-arms leftover")
     void aMeleeTailWrapNamesADyingQuarrysOutOfRangeNeighbourAndDestArmsLeftover()
             throws Exception {

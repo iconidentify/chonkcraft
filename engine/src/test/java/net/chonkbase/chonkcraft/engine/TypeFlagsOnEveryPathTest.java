@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -344,11 +345,16 @@ class TypeFlagsOnEveryPathTest {
                 "restoring a non-solid revealer wrote a phantom land-unit bit");
         assertTrue(world.canEnter(mover, 11, 10),
                 "a combat unit cannot cross the death revealer's square");
+        assertFalse(world.battleNetUnitOccupies(List.of(marker), 11, 10),
+                "the optimizer must not resurrect a non-solid revealer as a geometric wall");
 
         Unit livingBlocker = world.createUnit(footman, 0, 12, 10);
         assertNotNull(livingBlocker, "the solid control could not be placed");
         assertFalse(world.canEnter(mover, 12, 10),
                 "the fix also made a living soldier passable");
+        assertTrue(world.battleNetUnitOccupies(
+                        List.of(livingBlocker), 12, 10),
+                "the optimizer must retain a living soldier as a geometric wall");
     }
 
     @Test

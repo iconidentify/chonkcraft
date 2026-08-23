@@ -7,7 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** Tests for the UDP transport, over the loopback interface. */
@@ -131,6 +134,38 @@ class NetworkSessionTest {
             long elapsedMillis = (System.nanoTime() - start) / 1_000_000;
             // It runs on the simulation thread, so it must return promptly.
             assertTrue(elapsedMillis < 500, "poll took " + elapsedMillis + "ms");
+        }
+    }
+
+    @Test
+    void pollYieldsAtItsReceiveBudgetWithoutDiscardingQueuedBatches() throws Exception {
+        try (NetworkSession sender = new NetworkSession(0, 0);
+                NetworkSession receiver = new NetworkSession(1, 0)) {
+            sender.addPeer(1, InetAddress.getLoopbackAddress(), receiver.localPort());
+            int sentCount = NetworkSession.MAX_DATAGRAMS_PER_POLL + 12;
+            for (int cycle = 0; cycle < sentCount; cycle++) {
+                sender.broadcast(cycle, cycle - 1L, cycle, List.of());
+            }
+
+            // Let the complete burst reach the loopback socket before measuring one poll.
+            Thread.sleep(50);
+            List<NetworkSession.Batch> received = new ArrayList<>(receiver.poll());
+            assertEquals(NetworkSession.MAX_DATAGRAMS_PER_POLL, received.size(),
+                    "one receive burst monopolised the simulation tick");
+
+            for (int attempt = 0; attempt < 100 && received.size() < sentCount; attempt++) {
+                received.addAll(receiver.poll());
+                if (received.size() < sentCount) {
+                    Thread.sleep(2);
+                }
+            }
+            assertEquals(sentCount, received.size(),
+                    "yielding at the budget discarded datagrams queued for a later tick");
+            Set<Long> cycles = new HashSet<>();
+            for (NetworkSession.Batch batch : received) {
+                cycles.add(batch.netCycle());
+            }
+            assertEquals(sentCount, cycles.size(), "a queued batch was duplicated or replaced");
         }
     }
 

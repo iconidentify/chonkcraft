@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.MapField;
@@ -286,6 +287,9 @@ final class BattleNetHarvestSystem {
             if (((worker.tileX() | worker.tileY()) & 1) != 0) {
                 worker.setBattleNetDoubleStep(false);
             }
+        }
+        if (stepBattleNetWoodTerminalRefusal(worker, info)) {
+            return;
         }
         if (worker.battleNetOrderDelay() > 0) {
             // Gold-mine approach soft-wait free-wake: XHuman 7 peon 1446
@@ -1159,6 +1163,84 @@ final class BattleNetHarvestSystem {
         } else {
             gatherInPlace(worker, info, targetX, targetY);
         }
+    }
+
+
+    /**
+     * Serves the terrain-resource RI20 -> action construction -> wall-face
+     * handoff after a terminal residual is refused by an allied worker.
+     */
+    private boolean stepBattleNetWoodTerminalRefusal(
+            Unit worker, ResourceInfo info) {
+        int refused = worker.battleNetWoodTerminalRefusalHeading();
+        if (refused < 0) {
+            return false;
+        }
+        if (info == null || !info.terrainHarvester()
+                || worker.resourceUnit() != null || worker.returningToDepot()) {
+            worker.setBattleNetWoodTerminalRefusalHeading(-1);
+            return false;
+        }
+        int gatherStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        worker, BattleNetSequence.ATTACK_ANIMATION);
+        if (gatherStart < 0) {
+            worker.setBattleNetWoodTerminalRefusalHeading(-1);
+            return false;
+        }
+        if (worker.battleNetSequenceOffset() != gatherStart) {
+            // The parked Move visit is followed by the resource action's
+            // three construction callbacks, with a fresh collision lifetime.
+            worker.setBattleNetCollisionCounter(0);
+            worker.setBattleNetRefusals(0);
+            worker.setWaitCycles(0);
+            worker.setBattleNetOrderDelay(0);
+            worker.setBattleNetSequenceOffset(gatherStart);
+            worker.setBattleNetAnimationTimer(3);
+            AnimationSet set = worker.type().animationSet();
+            Animation attack = set == null ? null
+                    : set.get(AnimationSet.State.ATTACK);
+            if (attack != null && worker.animation().current() != attack) {
+                worker.animation().switchTo(attack);
+            }
+            return true;
+        }
+        if (worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return true;
+        }
+
+        int goalX = worker.battleNetWoodOrderX();
+        int goalY = worker.battleNetWoodOrderY();
+        int currentDistance = Math.max(
+                Math.abs(goalX - worker.tileX()),
+                Math.abs(goalY - worker.tileY()));
+        int admitted = -1;
+        for (int turn = 0; turn < Direction.COUNT; turn++) {
+            int heading = Math.floorMod(refused + turn, Direction.COUNT);
+            int nextX = worker.tileX() + Direction.deltaX(heading);
+            int nextY = worker.tileY() + Direction.deltaY(heading);
+            int nextDistance = Math.max(
+                    Math.abs(goalX - nextX), Math.abs(goalY - nextY));
+            if (nextDistance < currentDistance
+                    && world.canEnter(worker, nextX, nextY)) {
+                admitted = heading;
+                break;
+            }
+        }
+        if (admitted < 0) {
+            // Stay in the bounded construction cadence while the formation
+            // remains closed; do not degrade to an every-cycle path retry.
+            worker.setBattleNetAnimationTimer(3);
+            return true;
+        }
+        worker.setBattleNetWoodTerminalRefusalHeading(-1);
+        worker.setBattleNetWoodReadyPathRequired(false);
+        worker.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND, new int[] {admitted}));
+        worker.setPathGoal(-1, -1);
+        return false;
     }
 
 

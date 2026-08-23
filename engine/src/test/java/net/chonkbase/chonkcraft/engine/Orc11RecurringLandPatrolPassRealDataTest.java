@@ -69,6 +69,15 @@ class Orc11RecurringLandPatrolPassRealDataTest {
         assertEquals(119, archer.tileX(),
                 "the refreshed archer Patrol first-steps on fixture 104");
         assertEquals(39, archer.tileY());
+
+        while (fixtureCycle(world) < 140) {
+            mission.tick();
+        }
+        assertEquals(118, knight.tileX(),
+                "without another fifty-cycle pass, native knight 1558 keeps "
+                        + "the fourth east heading through fixture 140");
+        assertEquals(40, knight.tileY(),
+                "route shape alone must not redirect the knight north-east");
     }
 
     @Test

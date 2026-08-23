@@ -90,6 +90,50 @@ class Human13Ogre1511WrapDestArmRealDataTest {
                 "the north knight is already DYING when leftover dest-arms");
     }
 
+    @Test
+    @DisplayName("human 13's idle ogre retains the native four-heading Attack-tail route")
+    void human13sIdleOgreRetainsTheNativeFourHeadingAttackTailRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit ogre = unitAt(world, "unit-ogre", 125, 22);
+        assertNotNull(ogre, "Human 13 has no northern ogre on 125,22");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 142; fixture++) {
+            mission.tick();
+            if (fixture == 118) {
+                assertEquals(121, ogre.tileX(),
+                        "the first native SE heading lands on 121,27");
+                assertEquals(27, ogre.tileY(),
+                        "the first native SE heading lands on 121,27");
+                assertEquals(3, ogre.pathLength(),
+                        "native retains S,SE,S after spending the first SE");
+            } else if (fixture == 130) {
+                assertEquals(121, ogre.tileX(),
+                        "the retained south heading lands on 121,28");
+                assertEquals(28, ogre.tileY(),
+                        "the retained south heading lands on 121,28");
+                assertEquals(2, ogre.pathLength(),
+                        "native still owns SE,S after the second stride");
+            }
+        }
+
+        assertEquals(Unit.Order.ATTACK, ogre.order(),
+                "retargeting keeps Attack ownership");
+        assertEquals(122, ogre.tileX(),
+                "the retained third heading advances on the retarget tick");
+        assertEquals(29, ogre.tileY(),
+                "the retained third heading advances on the retarget tick");
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null

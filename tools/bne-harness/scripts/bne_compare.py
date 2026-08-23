@@ -35,11 +35,13 @@ BNE_UNIT_ORDER = 46
 BNE_UNIT_FREE_OR_DEAD = 0x05
 
 # Corpse/placeholders live after the 105 map/PUD types and were omitted from
-# the schema-1.1 tracer's name table.  These two are authenticated by direct
-# transitions in the sealed corpus: a 2x2 guard tower becomes 107 and a 3x3
+# the schema-1.1 tracer's name table.  These are authenticated by direct
+# transitions in the sealed corpus: XHuman 10's footman 1492 becomes the human
+# corpse type 105 at cycle 149, a 2x2 guard tower becomes 107, and a 3x3
 # barracks becomes 108.  Keep the correction beside the raw-state normalizer
-# so old fixtures gain the proved name without being resealed.
+# so old fixtures gain the proved names without being resealed.
 BNE_POST_PUD_TYPE_NAMES = {
+    105: b"unit-human-dead-body",
     107: b"unit-destroyed-2x2-place",
     108: b"unit-destroyed-3x3-place",
 }

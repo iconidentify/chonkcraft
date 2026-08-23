@@ -75,10 +75,13 @@ class GameLobbyTest {
         InetAddress local = InetAddress.getLoopbackAddress();
         try (GameLobby host = GameLobby.host("Chris", "garden.pud", 8, BASE_PORT);
                 GameLobby first = GameLobby.join("Ann", local, BASE_PORT);
-                GameLobby second = GameLobby.join("Bob", local, BASE_PORT)) {
+            GameLobby second = GameLobby.join("Bob", local, BASE_PORT)) {
 
             pollUntil("both joiners seated",
-                    () -> host.humanCount() == 3, host, first, second);
+                    () -> host.humanCount() == 3
+                            && first.state().localSlot() > 0
+                            && second.state().localSlot() > 0,
+                    host, first, second);
 
             // The host keeps slot zero; the joiners take the next two, in the
             // order they were let in.

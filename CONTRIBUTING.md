@@ -761,7 +761,7 @@ asked to.
 ## The workflow, end to end
 
 1. **Set the machine up** and prove it: `scripts/check-setup.sh`, then a full
-   test run with all three inputs configured. Confirm you got 18 skips, not 651.
+   test run with all three inputs configured. Confirm you got 25 skips, not 991.
 2. **Find something.** Run the authenticated playability gates, retail
    comparison harness, or the game itself and capture a witness.
 3. **Confirm it with a probe** against the real 1995 data, headless, before

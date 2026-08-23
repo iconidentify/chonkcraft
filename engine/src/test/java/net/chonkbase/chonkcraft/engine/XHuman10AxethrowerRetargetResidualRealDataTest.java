@@ -42,6 +42,18 @@ class XHuman10AxethrowerRetargetResidualRealDataTest {
             mission.tick();
         }
 
+        advanceToFixture(mission, world, 23);
+        assertEquals(830, axethrower.battleNetSequenceOffset(),
+                "fixture 23 must still be on the axethrower Move OP0");
+        assertEquals(1, axethrower.battleNetAnimationTimer(),
+                "fixture 23 exposes the timer-one occupied-step probe");
+
+        mission.tick();
+        assertEquals(830, axethrower.battleNetSequenceOffset(),
+                "a refused OP0 step must restart at Move, not retain its advanced cursor");
+        assertEquals(15, axethrower.battleNetAnimationTimer(),
+                "native arms the complete refusal band on fixture 24");
+
         advanceToFixture(mission, world, 54);
         assertPosition(axethrower, 77, 87, -2, 0,
                 "fixture 54 still owes the last two pixels of the first east stride");
@@ -65,6 +77,18 @@ class XHuman10AxethrowerRetargetResidualRealDataTest {
         mission.tick();
         assertPosition(axethrower, 78, 87, 0, 0,
                 "fixture 71 settles in firing range instead of entering a blocked wait");
+
+        advanceToFixture(mission, world, 77);
+        assertEquals(887, axethrower.battleNetSequenceOffset(),
+                "the exhausted chase residual must reopen at Attack OP0");
+        assertEquals(63, axethrower.battleNetAnimationTimer(),
+                "the replacement quarry owns a fresh native ranged period");
+
+        advanceToFixture(mission, world, 131);
+        assertEquals(887, axethrower.battleNetSequenceOffset(),
+                "the ranged hold must not launch a phantom axe at fixture 131");
+        assertEquals(9, axethrower.battleNetAnimationTimer(),
+                "native is still nine visits from the next OP0 at fixture 131");
     }
 
     private static void advanceToFixture(Mission mission, World world,

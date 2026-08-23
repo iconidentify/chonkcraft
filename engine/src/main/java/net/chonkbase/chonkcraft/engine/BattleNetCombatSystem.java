@@ -377,10 +377,52 @@ final class BattleNetCombatSystem {
                         unit.battleNetPendingCloseHitHelp();
                 boolean spatialHitHandoff =
                         unit.battleNetSpatialHitHelpHandoff();
+                boolean personNavalHitHandoff = world.isPerson(unit.player())
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.NAVAL;
+                boolean personLandSpatialHitHandoff = spatialHitHandoff
+                        && world.isPerson(unit.player())
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.LAND;
                 unit.setBattleNetPendingCloseHitHelp(false);
                 unit.setBattleNetPersonHelpRetargetHandoff(false);
-                unit.setBattleNetSpatialHitHelpHandoff(false);
+                // Person shoreline defenders keep this provenance through
+                // the temporary route's committed residual. Their HitUnit
+                // response ends at that Move tail rather than becoming an
+                // indefinite strong chase. Naval responders consume the
+                // marker here after their fresh target/route handoff.
+                unit.setBattleNetSpatialHitHelpHandoff(
+                        personLandSpatialHitHandoff);
                 unit.setBattleNetOrderDelay(0);
+                if (personNavalHitHandoff && unit.target() != null) {
+                    // Person naval HitUnit banks the shell's source as
+                    // next_order, then AutoSelectTarget owns the timer-one
+                    // handoff. XOrc 11 destroyer 1525 therefore changes from
+                    // the battleship at 16,40 to the nearer destroyer at 6,30
+                    // and first-steps north, rather than blindly chasing the
+                    // original splash source east.
+                    int react = Math.max(
+                            unit.type().reactRange(true),
+                            Math.max(1, unit.type().maxAttackRange()));
+                    Unit navalCandidate = world.targets.findBattleNetHostile(
+                            unit, react, null);
+                    if (navalCandidate != null
+                            && navalCandidate != unit.target()) {
+                        setAutoTarget(unit, navalCandidate);
+                        // The timer-one hit-help handoff selects the new sea
+                        // quarry before committing its first route byte, but
+                        // that route is still owned by the queued Attack.  Keep
+                        // the ownership through the whole pixel residual so
+                        // settlement opens fresh Attack construction instead
+                        // of treating the arrival as an already-open swing.
+                        // XOrc 11 destroyer 1525 changes battleship -> destroyer,
+                        // first-steps north, then exposes 3266/3,2,1 before its
+                        // cannon opcode.  Dropping this bit in SetAutoTarget
+                        // made ranged responders fire as soon as their pixels
+                        // drained, three action visits early.
+                        unit.setBattleNetChaseReplanResidualHold(true);
+                    }
+                }
                 if (liveCloseHitHandoff) {
                     // The queued close-hit Attack owns a fresh target scan,
                     // not the old residual's facing preference. Native
@@ -512,6 +554,24 @@ final class BattleNetCombatSystem {
             return;
         }
         if (stepBattleNetAttackSequence(unit)) {
+            return;
+        }
+        Unit quietSequenceGoal = unit.target();
+        if (world.battleNetSequence != null
+                && unit.fighting() && !unit.chasing()
+                && quietSequenceGoal != null
+                && !world.targets.validAttackTarget(unit, quietSequenceGoal)
+                && !world.battleNetAttackMarkers.contains(unit)) {
+            // The BNE script.bin cursor, not the parallel presentation
+            // animation, owns the next order decision.  A dying quarry may
+            // outlive the renderer's last breakable frame while Attack is
+            // still draining the final wait before its tail goto.  Keep the
+            // COrder_Attack and corpse pointer through those quiet visits so
+            // the tail's OP0 can perform AutoSelectTarget. XHuman 10 knight
+            // 1489 is the sealed witness: its visible swing finishes while
+            // Attack@1945 still counts 3,2,1; native retains Attack and names
+            // grunt 1477 on the wrap, whereas Java used to become Still three
+            // visits early and never re-engage.
             return;
         }
         if (unit.battleNetOrderDelay() > 0) {
@@ -887,6 +947,7 @@ final class BattleNetCombatSystem {
             finishStationaryAttackToStill(unit);
             return;
         }
+        installBattleNetPaidRecoveryDirectRefill(unit);
         if (armBattleNetBlockedChaseAttackConstruction(unit)) {
             return;
         }
@@ -1209,11 +1270,78 @@ final class BattleNetCombatSystem {
                 world.movement.walkPixels(unit);
                 world.actionMoveWalked = true;
             }
+            boolean saturatedWallFacePairSettle =
+                    world.actionMoveWalked && !unit.isMoving()
+                    && unit.pathLength() == 1
+                    && unit.battleNetPathStepsTaken() == 1
+                    && unit.battleNetSaturatedWallFacePairHeading()
+                            == unit.peekHeading()
+                    && !unit.battleNetSaturatedWallFacePairParked()
+                    && unit.battleNetCollisionCounter() >= 5
+                    && unit.battleNetRefusals() >= 2;
+            if (saturatedWallFacePairSettle) {
+                int retainedHeading = unit.peekHeading();
+                int collision = unit.battleNetCollisionCounter() + 1;
+                unit.setBattleNetCollisionCounter(
+                        collision > 14 ? 0 : collision);
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(0);
+                unit.setBattleNetSaturatedWallFacePairParked(true);
+                world.causalTrace.event(world.cycle,
+                        "path.saturated-wall-face-pair-park", unit.id(),
+                        "heading", retainedHeading,
+                        "collision", unit.battleNetCollisionCounter(),
+                        "refusals", unit.battleNetRefusals());
+                int moveStart = world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                    unit.setBattleNetChaseStepReady(false);
+                }
+                return;
+            }
             // After residual drain, a unit that has just settled in range can
             // pay table-0x27 this visit. Human 13 wise-man 1496 and grunt
             // 1507 both settle into Attack and debit at fixture 36; waiting
             // for the next top-of-stepAttack left Java one SyncRand short.
             world.consumeBattleNetPendingMeleeSyncRand(unit);
+            if (world.actionMoveWalked && !unit.isMoving()
+                    && unit.pathLength() == 0
+                    && unit.battleNetSpatialHitHelpHandoff()
+                    && world.isPerson(unit.player())
+                    && unit.type() != null
+                    && unit.type().moveType() == UnitType.Movement.LAND
+                    && unit.target() != null && unit.target().isAlive()
+                    && !world.targets.inAttackRange(unit, unit.target())) {
+                // Person land units pulled into a naval HitUnit response own
+                // only the offered route. When its final residual settles,
+                // native returns the Move program to OP0 and destroys the
+                // temporary Attack instead of continually replanning toward
+                // a distant ship. XOrc 11 axethrower 1507 stores one east
+                // byte, drains it through fixture 154, and is Still on 155.
+                world.finishAttackOrder(unit);
+                int stillStart = world.idle.battleNetStillSequenceStart(unit);
+                if (stillStart >= 0) {
+                    unit.setBattleNetSequenceOffset(stillStart);
+                    unit.setBattleNetAnimationTimer(1);
+                }
+                // This returns through retail's active-order Still dispatcher,
+                // which performs its random-facing callback on the same visit
+                // while leaving the freshly installed Still cursor at OP0.
+                // Its shared asynchronous draw also owns every later damage
+                // and projectile constructor ordinal.
+                world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
+                AnimationSet set = unit.type().animationSet();
+                Animation still = set == null ? null
+                        : set.getOrStill(AnimationSet.State.STILL);
+                if (still != null && unit.animation().current() != still) {
+                    unit.animation().switchTo(still);
+                }
+                return;
+            }
             // Attack animation four, timer 3, when Move residual settles mid-
             // chase before the next heading:
             //   - type 50 wise-man always (Human 13 1496 hold c21-23);
@@ -1251,6 +1379,9 @@ final class BattleNetCombatSystem {
                     && unit.pathLength() == 3
                     && unit.battleNetCollisionCounter() == 1
                     && world.battleNetSequence != null;
+            boolean navalReplanConstruction = replanResidualHold
+                    && unit.type() != null
+                    && unit.type().moveType() == UnitType.Movement.NAVAL;
             // Empty-route free-detour residual: path is only the free heading
             // (or already spent), so ordinary replan residual hold (pathn>0)
             // never arms. Hold delay 2 when that free first step residual
@@ -1343,12 +1474,16 @@ final class BattleNetCombatSystem {
                     // lines look frozen on their residual boundary.
                     world.armBattleNetAttackStart(unit);
                     if (spentSingleReplanConstruction
-                            || paidTailWrapConstruction) {
+                            || paidTailWrapConstruction
+                            || navalReplanConstruction) {
                         // A spent one-byte replacement has no live Move tail
                         // for a surrogate order delay to protect. A paid
                         // four-byte wrap has the complementary proof: native
                         // keeps its three live tail bytes while Attack owns
-                        // 3,2,1. In both cases construction is already
+                        // 3,2,1. Naval refreshed-goal routes likewise retain
+                        // their tail while the real Attack cursor drains
+                        // (XOrc 11 destroyer 1519, fixtures 159..162). In all
+                        // three cases construction is already
                         // exposed, so drain it directly and let timer one
                         // return ownership to Move. XHuman 12 slot 1476 does
                         // this with an empty tail at fixtures 124..127;
@@ -1375,6 +1510,39 @@ final class BattleNetCombatSystem {
                 inRangeReplanSettle = replanResidualHold;
                 unit.setBattleNetChaseReplanResidualHold(false);
                 unit.setBattleNetEmptyRouteFreeDetourHold(false);
+            }
+            if (world.actionMoveWalked && !unit.isMoving()
+                    && inRangeReplanSettle
+                    && unit.type() != null
+                    && unit.type().moveType() == UnitType.Movement.NAVAL
+                    && unit.target() != null && unit.target().isAlive()
+                    && world.targets.inAttackRange(unit, unit.target())
+                    && world.battleNetSequence != null) {
+                // A sea route installed by an Attack handoff remains a Move
+                // residual until its final pixels drain.  Retail then starts
+                // the ranged attack program at construction 3; it does not
+                // resume past OP0 as an ordinary continuous chase arrival.
+                // This is route ownership, not a ship/type exception: it also
+                // prevents a responding fleet from emitting early invisible
+                // shells when several ships settle during the same battle.
+                int attackStart = world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.ATTACK_ANIMATION);
+                if (attackStart >= 0) {
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setChasing(false);
+                    unit.setFighting(true);
+                    unit.setBattleNetSequenceOffset(attackStart);
+                    unit.setBattleNetAnimationTimer(3);
+                    AnimationSet set = unit.type().animationSet();
+                    Animation attack = set == null ? null
+                            : set.get(AnimationSet.State.ATTACK);
+                    if (attack != null
+                            && unit.animation().current() != attack) {
+                        unit.animation().switchTo(attack);
+                    }
+                    return;
+                }
             }
             if (world.actionMoveWalked && !unit.isMoving()) {
                 if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null
@@ -1631,7 +1799,19 @@ final class BattleNetCombatSystem {
                 // and stayed frozen on 81,89.
                 boolean deadMeleeResidual = world.actionMoveWalked
                         && !unit.isMoving()
-                        && unit.pathLength() == 0
+                        // A native route may still expose its terminal byte
+                        // into the quarry's own square. That byte is not a
+                        // third movement permit once the residual has landed
+                        // beside a target already in Die. XHuman 9 knight
+                        // 1414 retains N in its raw buffer at 15,122, then
+                        // clears it and opens Still on fixture 126. Limiting
+                        // this seam to only an empty Java path made preserving
+                        // the authentic full route resurrect Attack against
+                        // the corpse.
+                        && (unit.pathLength() == 0
+                                || (unit.pathLength() == 1
+                                        && world.targets.inAttackRange(
+                                                unit, chased)))
                         && unit.canMove()
                         && unit.type() != null
                         && unit.type().maxAttackRange() <= 1
@@ -1693,6 +1873,61 @@ final class BattleNetCombatSystem {
                         unit.setChasing(false);
                         unit.setBattleNetAttackWrapDestArmPending(true);
                         return;
+                    }
+                }
+                if (world.actionMoveWalked && !unit.isMoving()
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.NAVAL
+                        && unit.type().firesMissile()
+                        && unit.offeredTarget() == chased
+                        && world.targets.inAttackRange(unit, chased)) {
+                    // A struck person warship accepts its aggressor as an
+                    // offered goal, but that offer is not a locked player
+                    // command.  When the response route settles, retail runs
+                    // AutoSelectTarget before accepting the now-in-range goal.
+                    // Null-seeding matters for equal scores: spatial order can
+                    // replace the aggressor with another ship in the battle
+                    // line.  Treating the offer like a direct click skipped
+                    // this boundary and fired at the stale hull immediately.
+                    int reactRange = Math.max(
+                            unit.type().reactRange(world.isPerson(unit.player())),
+                            Math.max(1, unit.type().maxAttackRange()));
+                    Unit reactiveCandidate = world.targets
+                            .findBattleNetHostile(unit, reactRange, null);
+                    if (reactiveCandidate != null
+                            && reactiveCandidate != chased
+                            && reactiveCandidate.isAlive()
+                            && world.targets.inAttackRange(
+                                    unit, reactiveCandidate)) {
+                        setAutoTarget(unit, reactiveCandidate);
+                        unit.clearPath();
+                        unit.setRouteSpent(false);
+                        unit.setChasing(false);
+                        unit.setFighting(true);
+                        int reactiveAttackStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        if (reactiveAttackStart >= 0) {
+                            unit.setBattleNetSequenceOffset(
+                                    reactiveAttackStart);
+                            unit.setBattleNetAnimationTimer(3);
+                            // This is a Move-boundary free scan. After its
+                            // constructor, OP0 serves the unspent wall-clock
+                            // ranged cadence instead of manufacturing a shot.
+                            unit.setBattleNetAttackResumeFromMove(true);
+                            unit.setBattleNetAttackOp0OutOfRange(true);
+                            unit.setBattleNetRangedFreeScanHoldPending(true);
+                            AnimationSet set = unit.type().animationSet();
+                            Animation attack = set == null ? null
+                                    : set.get(AnimationSet.State.ATTACK);
+                            if (attack != null
+                                    && unit.animation().current() != attack) {
+                                unit.animation().switchTo(attack);
+                            }
+                            world.turnToTarget(
+                                    unit, reactiveCandidate, 0, 0);
+                            return;
+                        }
                     }
                 }
                 if ((!unit.isMoving() || !attackOwnsResidual)
@@ -1787,6 +2022,18 @@ final class BattleNetCombatSystem {
                     if (meleeResidualOpen) {
                         unit.setBattleNetResidualEmptyRouteSettle(false);
                         world.openBattleNetAttackAfterChaseResidual(unit, true);
+                        if (!unit.battleNetPendingMeleeSyncRand()
+                                && unit.battleNetMeleeSyncRemaining() == 1) {
+                            // Only an expiring refresh is owned by this fused
+                            // arrival callback. A live clock was already
+                            // advanced by the ordinary sequence visit; ticking
+                            // every positive value double-counted Human 13's
+                            // wise man at 25 and moved its draw one fixture
+                            // early. XHuman 10's paid one-step cavalry arrival
+                            // reaches this otherwise-returning seam at exactly
+                            // one, where native refreshes in the same visit.
+                            world.tickBattleNetMeleeSyncLoop(unit);
+                        }
                         unit.setBattleNetAttackWaitRefillResidual(false);
                         unit.setBattleNetMovingQuarryResidual(false);
                     } else if (rangedResidualOpen) {
@@ -2395,6 +2642,11 @@ final class BattleNetCombatSystem {
                     int personHelpConsumedPrefix =
                             completedPersonHelpRetargetHandoff
                                     ? unit.battleNetPathStepsTaken() : 0;
+                    boolean navalResidualRetarget =
+                            unit.type().moveType()
+                                    == UnitType.Movement.NAVAL
+                            && world.actionMoveWalked
+                            && unit.stepDrained() && !unit.isMoving();
                     boolean behaviorOneStrictBuildingHeading = false;
                     // A settled multi-heading chase that has just paid a
                     // complete cooperative refusal band reaches target scan
@@ -2459,6 +2711,17 @@ final class BattleNetCombatSystem {
                             settledMeleeResidualRetarget
                             && unit.battleNetCollisionCounter() >= 4
                             && unit.battleNetRefusals() == 0;
+                    boolean incumbentPlanBeforePaidRefillRetarget =
+                            settledMeleeResidualRetarget
+                            && unit.battleNetRetargetResidualParkRefill()
+                            && unit.battleNetRetargetResidualParkSteps() == 1
+                            && unit.battleNetPathStepsTaken() >= 3
+                            && unit.battleNetCollisionCounter() == 0
+                            && unit.battleNetRefusals() == 0
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.type() != null
+                            && candidate.type().building();
                     // A fully consumed route has no cached heading, but its
                     // last residual can settle on the same visit target scan
                     // installs a replacement. One cooperative collision still
@@ -2691,14 +2954,6 @@ final class BattleNetCombatSystem {
                             // their replacement routes at fixtures 73/74
                             // without entering Still or owning an async draw.
                             world.idle.battleNetLandIdleChoice(unit);
-                        } else if (saturatedSettledResidualRetarget) {
-                            // Formation pressure has already been paid, so this
-                            // target change may commit its replacement route
-                            // without Attack construction. The target callback
-                            // still owns the one native land-idle draw: retaining
-                            // it preserves the authenticated downstream damage
-                            // stream while slot 1510 moves on fixture 121.
-                            world.idle.battleNetLandIdleChoice(unit);
                         }
                         setAutoTarget(unit, candidate);
                         chased = candidate;
@@ -2816,7 +3071,8 @@ final class BattleNetCombatSystem {
                         // grunts earlier (fixture 19).
                         if ((keepPathn > 0
                                 || completedPersonHelpRetargetHandoff
-                                || unit.battleNetRetargetResidualRoutePark())
+                                || unit.battleNetRetargetResidualRoutePark()
+                                || navalResidualRetarget)
                                 && !World.battleNetRangedChaseUnit(unit)) {
                             // A completed queued-Attack handoff may have
                             // exhausted its retained route before this new
@@ -2826,8 +3082,18 @@ final class BattleNetCombatSystem {
                             // queued Attack belongs behind the replacement's
                             // first residual: XHuman 4 grunt 1505 promotes at
                             // fixtures 105-107 after first-stepping SW on 89.
+                            // Person warships use the same order ownership
+                            // even when the old route was a single spent
+                            // heading. XOrc 11 destroyer 1519 changes ships
+                            // while its southwest residual settles at fixture
+                            // 127, first-steps northwest, then exposes Attack
+                            // 3266/3,2,1 before spending the retained west
+                            // heading on fixture 162.
                             unit.setBattleNetChaseReplanResidualHold(true);
+                            unit.setBattleNetSaturatedRetargetRouteBand(
+                                    saturatedSettledResidualRetarget);
                         } else {
+                            unit.setBattleNetSaturatedRetargetRouteBand(false);
                             // Exhausted route retarget (keepPathn 0): same
                             // empty-route free-detour seam as the pathLength
                             // == 0 arm below (XHuman 12 grunt 1507).
@@ -2998,7 +3264,21 @@ final class BattleNetCombatSystem {
                                     .battleNetRetargetResidualRoutePark();
                             world.actionSettledMeleeReplacementAfterPaidBand =
                                     replacementAfterPaidBand;
-                            if (replacementAfterPaidBand
+                            if (incumbentPlanBeforePaidRefillRetarget) {
+                                // A route which was parked and then refilled
+                                // owns one final NewPath transaction against
+                                // its incumbent before target scan publishes
+                                // the replacement. The new target pointer and
+                                // goal change now, but the already-approved
+                                // compass buffer survives the handoff.
+                                Unit replacement = chased;
+                                unit.setTarget(previous);
+                                world.planTowardsRetainingFirstWallFace(
+                                        unit, previous);
+                                unit.setTarget(replacement);
+                                unit.setPathGoal(replacement.tileX(),
+                                        replacement.tileY());
+                            } else if (replacementAfterPaidBand
                                     || replacementThroughCollidedMover) {
                                 // The paid-band route draw uses native's
                                 // broader moving-ally view. A just-settled
@@ -3008,17 +3288,38 @@ final class BattleNetCombatSystem {
                                 // is restored before the first heading is
                                 // probed, so it can still refuse and buy its
                                 // own band (XHuman 10 grunts 1490 and 1497).
-                                world.planTowardsAfterRefusalBand(unit, chased,
-                                        Direction.isDiagonal(
-                                                oldReplacementHeading)
-                                                || (keepPathn >= 19
-                                                        && chased.type() != null
-                                                        && chased.type()
-                                                                .building()));
+                                boolean saturatedParkedRetarget =
+                                        replacementAfterPaidBand
+                                        && unit.battleNetCollisionCounter()
+                                                >= 5
+                                        && unit.battleNetRefusals() > 0;
+                                if (saturatedParkedRetarget) {
+                                    // A route parked after several formation
+                                    // collisions and at least one hard refusal
+                                    // has already paid its cooperative wait.
+                                    // Its Attack-construction retarget sees the
+                                    // formation as a hard wall and may spend the
+                                    // replacement head immediately. Soft-
+                                    // clearing moving allies drew a blocked
+                                    // south route and bought a second band,
+                                    // leaving packed melee units visibly idle.
+                                    world.planTowards(unit, chased, true);
+                                } else {
+                                    world.planTowardsAfterRefusalBand(
+                                            unit, chased,
+                                            Direction.isDiagonal(
+                                                    oldReplacementHeading)
+                                                    || (keepPathn >= 19
+                                                            && chased.type()
+                                                                    != null
+                                                            && chased.type()
+                                                                    .building()));
+                                }
                                 world.actionSettledMeleeReplacementBroadRoute =
                                         replacementThroughCollidedMover;
                                 if (replacementAfterPaidBand
                                         && settledResidualHeadFree
+                                        && unit.battleNetRefusals() == 0
                                         && Direction.isDiagonal(
                                                 oldReplacementHeading)
                                         && unit.pathLength() > 0) {
@@ -3079,6 +3380,40 @@ final class BattleNetCombatSystem {
                         }
                     }
                 } else if (unit.pathLength() == 0) {
+                    int parkedRefusalHeading =
+                            unit.battleNetParkedRefusalHeading();
+                    int saturatedWallFacePairHeading =
+                            unit.battleNetSaturatedWallFacePairHeading();
+                    boolean saturatedWallFacePairParked =
+                            saturatedWallFacePairHeading >= 0
+                            && unit.battleNetSaturatedWallFacePairParked();
+                    if (saturatedWallFacePairParked) {
+                        if (world.actionMoveWalked) {
+                            return;
+                        }
+                        unit.setPath(new PathFinder.Path(
+                                PathFinder.Result.FOUND,
+                                new int[] {saturatedWallFacePairHeading}));
+                        unit.setPathGoal(chased.tileX(), chased.tileY());
+                        int collision =
+                                unit.battleNetCollisionCounter() + 1;
+                        unit.setBattleNetCollisionCounter(
+                                collision > 14 ? 0 : collision);
+                        unit.setWaitCycles(0);
+                        unit.setBattleNetOrderDelay(14);
+                        unit.setBattleNetRefusalHold(true);
+                        unit.setBattleNetChaseEmptyRouteReplan(false);
+                        unit.setBattleNetSaturatedWallFacePairHeading(-1);
+                        int moveStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.MOVE_ANIMATION);
+                        if (moveStart >= 0) {
+                            unit.setBattleNetSequenceOffset(moveStart);
+                            unit.setBattleNetAnimationTimer(15);
+                            unit.setBattleNetChaseStepReady(false);
+                        }
+                        return;
+                    }
                     boolean sameQuarryCollisionRefill =
                             unit.battleNetRetargetResidualParkRefill()
                             && unit.battleNetCollisionCounter() >= 4
@@ -3120,6 +3455,56 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetChaseEmptyRouteReplan(false);
                         if (!accepted) {
+                            int refusalGeneration = Math.max(
+                                    unit.battleNetDirectRecoveryGeneration(),
+                                    unit.battleNetRefusals()) + 1;
+                            unit.setBattleNetDirectRecoveryGeneration(
+                                    refusalGeneration);
+                            if (unit.battleNetSaturatedNearRecoveryFullRoute()) {
+                                // A paid recovery byte that has already closed
+                                // to range two gets one naked direct retry.
+                                // Once that face refuses, the next completed
+                                // Attack construction belongs to the complete
+                                // wall-route writer. Repeating the direct face
+                                // here can leave a melee unit frozen forever
+                                // behind the same formation square.
+                                unit.setBattleNetDirectRefusalRecoveryProbe(
+                                        false);
+                                if (!rearmBattleNetHardRefusalAttack(unit)) {
+                                    unit.setBattleNetAttackRefusalRecoveryStage(
+                                            0);
+                                    unit.setBattleNetSaturatedNearRecoveryFullRoute(
+                                            false);
+                                }
+                                return;
+                            }
+                            if (refusalGeneration >= 8) {
+                                // Direct Attack-recovery probes are one
+                                // bounded refusal generation. On the eighth
+                                // rejected face retail writes a complete wall
+                                // route and pays Move 15..1 before allowing
+                                // that route to advance. XHuman 12 slot 1501
+                                // repeats the direct south probe, writes the
+                                // retained route at fixture 125, and remains
+                                // on (30,41) through fixture 140.
+                                world.planTowardsAfterRefusalBand(
+                                        unit, retryTarget);
+                                unit.setBattleNetDirectRefusalRecoveryProbe(
+                                        false);
+                                unit.setBattleNetDirectRefusalReplacementBand(
+                                        true);
+                                unit.setBattleNetAttackRefusalRecoveryStage(4);
+                                unit.setBattleNetOrderDelay(14);
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(15);
+                                    unit.setBattleNetChaseStepReady(false);
+                                }
+                                return;
+                            }
                             if (!rearmBattleNetHardRefusalAttack(unit)) {
                                 unit.setBattleNetAttackRefusalRecoveryStage(0);
                                 unit.setBattleNetDirectRefusalRecoveryProbe(false);
@@ -3132,6 +3517,7 @@ final class BattleNetCombatSystem {
                         unit.setPathGoal(
                                 retryTarget.tileX(), retryTarget.tileY());
                         unit.setBattleNetDirectRefusalRecoveryProbe(false);
+                        unit.setBattleNetSaturatedNearRecoveryFullRoute(false);
                     }
                     boolean paidOneStepRefusalApproachSettled =
                             world.actionMoveWalked
@@ -3139,7 +3525,9 @@ final class BattleNetCombatSystem {
                             && unit.routeSpent()
                             && unit.battleNetPathStepsTaken() == 1
                             && unit.battleNetCollisionCounter() == 0
-                            && unit.battleNetRefusals() > 0
+                            && (unit.battleNetRefusals() > 0
+                                    || unit.battleNetDirectRecoveryGeneration()
+                                            > 0)
                             && unit.battleNetAttackRefusalRecoveryStage() == 0
                             && !unit.battleNetChaseEmptyRouteReplan()
                             && unit.target() != null
@@ -3404,7 +3792,7 @@ final class BattleNetCombatSystem {
                         // 1513 therefore redraws SW after grunt 1510 vacates
                         // (34,40); the hardened ordinary ray chose SE and sent
                         // the two attackers away from one another.
-                        world.planTowardsAfterRefusalBand(unit, chased);
+                        world.planTowardsAfterPersonHelpHandoff(unit, chased);
                         if (unit.battleNetRefusals() == 1
                                 && unit.pathLength() > 0) {
                             // A pressured retarget which owns its first
@@ -3482,12 +3870,45 @@ final class BattleNetCombatSystem {
                         world.planTowards(unit, chased,
                                 collidedResidualRefill);
                     }
+                    if (parkedRefusalHeading >= 0
+                            && parkedRefusalHeading < Direction.COUNT) {
+                        int continuedHeading = Math.floorMod(
+                                parkedRefusalHeading + 1, Direction.COUNT);
+                        if (unit.pathLength() > 0) {
+                            world.causalTrace.event(world.cycle,
+                                    "path.parked-refusal-face-continue",
+                                    unit.id(), "target", chased.id(),
+                                    "blocked_heading", parkedRefusalHeading,
+                                    "continued_heading", continuedHeading,
+                                    "collision",
+                                            unit.battleNetCollisionCounter(),
+                                    "refusals", unit.battleNetRefusals());
+                            unit.replacePeekHeading(continuedHeading);
+                        }
+                        unit.setBattleNetParkedRefusalHeading(-1);
+                    }
                     unit.setBattleNetSaturatedResidualFaceRetry(false);
                     if (rangedCollidedResidualRefill) {
                         preserveCollidedRangedWallHead(unit, chased);
                     }
                     if (sameQuarryCollisionRefill) {
                         unit.setBattleNetRetargetResidualParkRefill(false);
+                    }
+                    if (goalMoved
+                            && unit.type().moveType()
+                                    == UnitType.Movement.NAVAL
+                            && world.actionMoveWalked
+                            && unit.stepDrained() && !unit.isMoving()
+                            && unit.pathLength() > 0) {
+                        // A moving quarry can invalidate a warship's
+                        // goal on the exact visit its old residual settles.
+                        // Native constructs a replacement Attack behind the
+                        // first heading of the refreshed route, even though
+                        // the CUnit target pointer itself did not change.
+                        // Preserve that order ownership until the newly
+                        // committed residual lands; the common replan-tail
+                        // handler then exposes Attack start 3,2,1.
+                        unit.setBattleNetChaseReplanResidualHold(true);
                     }
                 } else if (goalMoved) {
                     int staleHeading = unit.pathLength() > 0
@@ -3725,8 +4146,18 @@ final class BattleNetCombatSystem {
                     // owns only the pending SyncRand handoff below.
                     && unit.type() != null
                     && PudUnitTypes.code(unit.type().ident()) == 0;
+            int tileXBeforeChaseWalk = unit.tileX();
+            int tileYBeforeChaseWalk = unit.tileY();
             boolean underWay = stepMoveTowardsTarget(
                     unit, deferSettledRetargetSync, chaseTargetBeforeWalk);
+            boolean committedChaseHeading = underWay && unit.isMoving()
+                    && (unit.tileX() != tileXBeforeChaseWalk
+                            || unit.tileY() != tileYBeforeChaseWalk);
+            boolean retainedTailReachabilityRefusal = underWay
+                    && !unit.isMoving()
+                    && unit.pathLength() == 1
+                    && unit.battleNetAttackWrapDestArmPending()
+                    && unit.battleNetChaseEmptyRouteReplan();
             if (clearCollisionAfterSettledRetargetStep
                     && underWay && unit.isMoving()) {
                 // The collision nibble participates in the replacement ray,
@@ -3842,7 +4273,14 @@ final class BattleNetCombatSystem {
             // `if (unit.Anim.Unbreakable || this->Finished) return;` before it
             // reaches any target check at all. A
             // unit whose step is in the air does not notice its quarry die.
-            if (unit.animation().unbreakable()) {
+            if ((unit.animation().unbreakable()
+                    && !retainedTailReachabilityRefusal)
+                    || committedChaseHeading) {
+                // A successful path element owns this entire MoveToTarget
+                // callback. Native's Move program is unbreakable immediately
+                // after the logical tile commit, even when the presentation
+                // animation is on a Java-breakable frame. Target scan remains
+                // due until the stride's residual pixels have settled.
                 return;
             }
             if (underWay) {
@@ -3859,7 +4297,35 @@ final class BattleNetCombatSystem {
                 }
                 if (!world.idle.autoSelectTarget(unit)) {
                     world.finishAttackOrder(unit);
+                    if (retainedTailReachabilityRefusal
+                            && world.battleNetSequence != null) {
+                        unit.setBattleNetSequenceOffset(
+                                world.idle.battleNetStillSequenceStart(unit));
+                        unit.setBattleNetAnimationTimer(1);
+                        // CheckForTargetInRange released the weak Attack while
+                        // returning from Move OP0's retained-tail refusal.
+                        // Retail continues through HandleUnitAction's newly
+                        // installed active-order Still callback on this same
+                        // visit. That callback owns its random-facing draw but
+                        // leaves the fresh Still cursor at OP0. Deferring the
+                        // draw until the next scheduler visit reassigns every
+                        // later projectile and damage roll: XHuman 10's boxed
+                        // knight (native 1489 / Java 111) is the sealed witness.
+                        world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
+                    }
                     return;
+                }
+                if (World.TRACE_MOVING != null
+                        && unit.id() == World.TRACE_MOVING_ID) {
+                    System.err.printf("JATTACKMOVERETURN cycle=%d unit=%d "
+                                    + "seq=%d/%d path=%d collision=%d target=%d "
+                                    + "sleep=%d chase=%d%n",
+                            world.cycle, unit.id(),
+                            unit.battleNetSequenceOffset(),
+                            unit.battleNetAnimationTimer(), unit.pathLength(),
+                            unit.battleNetCollisionCounter(),
+                            unit.target() == null ? -1 : unit.target().id(),
+                            unit.attackScanSleep(), unit.chasing() ? 1 : 0);
                 }
                 Unit aimed = unit.target();
                 if (aimed != null && aimed != goal
@@ -4160,6 +4626,74 @@ final class BattleNetCombatSystem {
         return true;
     }
 
+    /** Installs the paid direct byte that follows a recovered route residual. */
+    private void installBattleNetPaidRecoveryDirectRefill(Unit unit) {
+        Unit target = unit.target();
+        if (unit.pathLength() != 0
+                || unit.battleNetDirectRecoveryGeneration() <= 0
+                || unit.battleNetAttackRefusalRecoveryStage() != 0
+                || unit.battleNetCollisionCounter() != 1
+                || unit.battleNetRefusals() <= 0
+                || target == null || !target.isAlive()
+                || world.targets.inAttackRange(unit, target)
+                || !unit.chasing() || unit.type() == null
+                || unit.type().maxAttackRange() > 1
+                || World.battleNetRangedChaseUnit(unit)) {
+            return;
+        }
+        int direct = World.battleNetFirstBresenhamHeading(
+                unit.tileX(), unit.tileY(), target.tileX(), target.tileY());
+        if (direct < 0 || direct >= Direction.COUNT) {
+            return;
+        }
+        int stride = world.battleNetMovementStride(unit);
+        int currentDistance = Math.max(
+                Math.abs(unit.tileX() - target.tileX()),
+                Math.abs(unit.tileY() - target.tileY()));
+        int heading = -1;
+        int acceptedDistance = Integer.MAX_VALUE;
+        for (int turn = 0; turn < Direction.COUNT; turn++) {
+            int candidate = Math.floorMod(direct - turn, Direction.COUNT);
+            int nextX = unit.tileX()
+                    + Direction.deltaX(candidate) * stride;
+            int nextY = unit.tileY()
+                    + Direction.deltaY(candidate) * stride;
+            int nextDistance = Math.max(
+                    Math.abs(nextX - target.tileX()),
+                    Math.abs(nextY - target.tileY()));
+            if (nextDistance < currentDistance
+                    && world.canEnter(unit, nextX, nextY)) {
+                heading = candidate;
+                acceptedDistance = nextDistance;
+                break;
+            }
+        }
+        if (heading < 0) {
+            return;
+        }
+        // The first accepted route after Attack recovery can finish into
+        // another formation refusal. Native keeps that paid generation and
+        // writes only the refreshed direct compass byte; a cold wall search
+        // escapes around the battle line. XHuman 12 slot 1504 is the sealed
+        // witness: RI20/collision one at fixture 139, then the one-byte south
+        // route commits on fixture 140.
+        unit.setPath(new PathFinder.Path(
+                PathFinder.Result.FOUND, new int[] {heading}));
+        unit.setPathGoal(target.tileX(), target.tileY());
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetChaseEmptyRouteReplan(false);
+        if (unit.battleNetDirectRecoveryGeneration() >= 2
+                && acceptedDistance <= 2) {
+            // The accepted byte closes an already-paid recovery to the
+            // range-two edge. Preserve that provenance across its pixel
+            // residual so a later blocked direct probe escalates to a full
+            // wall route instead of restarting the same refusal forever.
+            unit.setBattleNetSaturatedNearRecoveryFullRoute(true);
+        }
+        unit.setBattleNetDirectRecoveryGeneration(0);
+    }
+
     /** Completes a paid route whose settle selected a new in-range quarry. */
     private void finishBattleNetPaidWrapRetargetArrival(Unit unit) {
         // The old swing already paid the route which just settled, but the
@@ -4186,11 +4720,16 @@ final class BattleNetCombatSystem {
      * Opens the three-visit Attack-four handoff after a full blocked Move band.
      */
     private boolean armBattleNetBlockedChaseAttackConstruction(Unit unit) {
+        boolean retainedTailReachabilityProbe = unit != null
+                && unit.battleNetAttackWrapDestArmPending()
+                && unit.battleNetChaseEmptyRouteReplan()
+                && unit.pathLength() == 1;
         boolean paidReplacementBand = unit != null
                 && unit.battleNetChaseReplanResidualHold();
         boolean paidEmptyReplacement = paidReplacementBand
                 && unit.pathLength() == 0;
         if (world.battleNetSequence == null || unit == null
+                || retainedTailReachabilityProbe
                 || unit.type() == null || !unit.chasing() || unit.isMoving()
                 || !unit.stepDrained()
                 || (!paidReplacementBand && unit.pathLength() < 4)
@@ -4250,6 +4789,47 @@ final class BattleNetCombatSystem {
         AnimationSet set = unit.type().animationSet();
         Animation attack = set == null
                 ? null : set.get(AnimationSet.State.ATTACK);
+        if (attack != null && unit.animation().current() != attack) {
+            unit.animation().switchTo(attack);
+        }
+        return true;
+    }
+
+    /**
+     * Parks a blocked sea-combat leftover behind native Attack construction.
+     *
+     * <p>This is the combat twin of Patrol's cooperative naval hold. Patrol
+     * keeps the blocked heading under Move timer fifteen because the body in
+     * front is part of the route's traffic contract. An active attack chase
+     * instead discards that heading, pays Attack 3,2,1, exposes an empty Move
+     * start for one visit, and replans. Keeping those cases in the same
+     * fifteen-count arm is a visible combat freeze.</p>
+     */
+    boolean armBattleNetNavalBlockedChaseConstruction(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || unit.type() == null || !unit.type().seaUnit()
+                || !unit.battleNetDoubleStep()
+                || unit.target() == null || !unit.target().isAlive()
+                || !unit.chasing() || unit.isMoving()
+                || !unit.stepDrained()) {
+            return false;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return false;
+        }
+        unit.clearPath();
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(0);
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        unit.setBattleNetChaseReplanResidualHold(true);
+        unit.setBattleNetBlockedChaseAttackConstruction(true);
+        AnimationSet set = unit.type().animationSet();
+        Animation attack = set == null ? null
+                : set.get(AnimationSet.State.ATTACK);
         if (attack != null && unit.animation().current() != attack) {
             unit.animation().switchTo(attack);
         }
@@ -4379,6 +4959,17 @@ final class BattleNetCombatSystem {
                     }
                 }
             }
+        }
+        if (World.TRACE_MOVING != null
+                && unit.id() == World.TRACE_MOVING_ID) {
+            System.err.printf("JMOVEWRAP cycle=%d unit=%d under=%d order=%s "
+                            + "seq=%d/%d path=%d collision=%d empty=%d wrap=%d%n",
+                    world.cycle, unit.id(), underWay ? 1 : 0, unit.order(),
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer(), unit.pathLength(),
+                    unit.battleNetCollisionCounter(),
+                    unit.battleNetChaseEmptyRouteReplan() ? 1 : 0,
+                    unit.battleNetAttackWrapDestArmPending() ? 1 : 0);
         }
         return underWay;
     }
@@ -5549,6 +6140,33 @@ final class BattleNetCombatSystem {
         if (!navalPatrolConstruction && stepBattleNetAttackSequence(unit)) {
             return;
         }
+        if (unit.battleNetPlayerCommandMove()
+                || unit.battleNetStopAfterLeftover()) {
+            // ReleaseOrders has already destroyed this attack-march's goal;
+            // only its committed animation/pixels may outlive the player's
+            // replacement. Do not run AutoSelectTarget again while those
+            // pixels drain. The retained Garden of War replay has the broad
+            // witness: native slot 1539 is redirected from (12,44) to
+            // (12,49) during an adjacent fight. Java cleared the quarry on
+            // the click, reacquired it three visits later, and fought forever
+            // without giving the accepted Move ownership. Patrol uses this
+            // same replacement discipline in World.stepPatrol.
+            if (!unit.isMoving() && unit.offsetX() == 0 && unit.offsetY() == 0
+                    && (unit.residualX() != 0 || unit.residualY() != 0)) {
+                // Once Moving has fallen, a same-sign residual is animation
+                // overshoot banked for a possible next leg, not an old pixel
+                // debt. Replaying it with the old heading grows it forever
+                // (the 1539 witness is west with residual -2). A replacement
+                // has erased that leg, so take the same clean standstill
+                // boundary used before a fresh movement prime.
+                world.movement.resetDisplacement(unit);
+            } else if (unit.isMoving()
+                    || unit.residualX() != 0 || unit.residualY() != 0) {
+                world.movement.walkPixels(unit);
+            }
+            world.movement.finishLeftoverReplacement(unit);
+            return;
+        }
         if (unit.destPathOpeningHold() && unit.battleNetOrderDelay() > 0) {
             // Dest-path GiveOrder 8 dest-arms two visits after install:
             // Human 1 1588 at fixture 8, Orc 1 1592 at fixture 12 after the
@@ -6133,12 +6751,19 @@ final class BattleNetCombatSystem {
                 // witness: settled at 44,119, it looped Move OP0 two-cycle
                 // refusals without ever reconsidering footman 338 or the
                 // nearby cannon tower.
-                boolean battleNetEmptyRouteRefusal = underWay
-                        && world.battleNetSequence != null
+                boolean retainedTailReachabilityRefusal = underWay
                         && unit.chasing() && !unit.isMoving()
-                        && unit.pathLength() == 0 && !unit.routeSpent()
-                        && unit.waitCycles() > 0
+                        && unit.pathLength() == 1
+                        && unit.battleNetAttackWrapDestArmPending()
+                        && unit.battleNetChaseEmptyRouteReplan()
                         && onBattleNetChaseMoveBody(unit);
+                boolean battleNetEmptyRouteRefusal = (underWay
+                                && world.battleNetSequence != null
+                                && unit.chasing() && !unit.isMoving()
+                                && unit.pathLength() == 0 && !unit.routeSpent()
+                                && unit.waitCycles() > 0
+                                && onBattleNetChaseMoveBody(unit))
+                        || retainedTailReachabilityRefusal;
                 if (underWay || unit.animation().unbreakable()) {
                     if (underWay && (!unit.animation().unbreakable()
                             || battleNetEmptyRouteRefusal)) {
@@ -6205,6 +6830,21 @@ final class BattleNetCombatSystem {
                                 world.turnToTarget(unit, retargeted, 0, 0);
                             }
                         }
+                    }
+                    if (World.TRACE_MOVING != null
+                            && unit.id() == World.TRACE_MOVING_ID) {
+                        System.err.printf("JCHASERETURN cycle=%d unit=%d "
+                                        + "empty-refusal=%d seq=%d/%d path=%d "
+                                        + "collision=%d target=%d sleep=%d%n",
+                                world.cycle, unit.id(),
+                                battleNetEmptyRouteRefusal ? 1 : 0,
+                                unit.battleNetSequenceOffset(),
+                                unit.battleNetAnimationTimer(),
+                                unit.pathLength(),
+                                unit.battleNetCollisionCounter(),
+                                unit.target() == null ? -1
+                                        : unit.target().id(),
+                                unit.attackScanSleep());
                     }
                     return;
                 }
@@ -6464,6 +7104,21 @@ final class BattleNetCombatSystem {
                 || unit.walkHolding()
                 || unit.animation().unbreakable()) {
             return false;
+        }
+        // The drain-end shortcut must preserve the same waiting-arrival rule
+        // as the ordinary MoveToTarget boundary below.  A position attack
+        // whose gun can reach the destination converts the spent route's
+        // PF_WAIT to PF_REACHED and finishes on this visit.  Siege engines
+        // cannot attack their own square: distance zero is below MinRange,
+        // so native serves the route's ten-cycle wait before asking again.
+        // Finishing every landed march here made a ballista snap straight
+        // from its last walk frame to Still and erased that native control
+        // seam entirely.
+        int arrivedDistance = unit.distanceTo(toX, toY);
+        boolean inRangeOfSquare = arrivedDistance >= unit.type().minAttackRange()
+                && arrivedDistance <= Math.max(1, unit.type().maxAttackRange());
+        if (!inRangeOfSquare && world.movement.spendTheEmptyRoute(unit)) {
+            return true;
         }
         if (!unit.routeSpent()) {
             world.movement.resetDisplacement(unit);
@@ -6835,10 +7490,22 @@ final class BattleNetCombatSystem {
     }
 
 
-    /** Native ranged residuals open after a tail of at most three or two paid steps. */
+    /**
+     * Whether a ranged chase residual has already paid its Attack OP0.
+     *
+     * <p>Short tails and routes with two paid steps were the first proved
+     * forms. A nearly-full segment is the other native boundary: after the
+     * first heading of a 20-heading cache lands in range, retail discards the
+     * remaining nineteen and opens at the instruction after OP0. XHuman 12
+     * axethrower 1523 is the sealed witness (route index one, Attack 888/1 at
+     * fixture 124, axe born at 134). Treating it as an ordinary one-step
+     * approach charged the unrelated 63-cycle resume hold and suppressed the
+     * shot, which then reassigned every asynchronous combat roll behind it.
+     */
     static boolean battleNetRangedResidualRouteQualifies(
             Unit unit, int pathStepsAtSettle) {
         return unit != null && (unit.pathLength() <= 3
+                || unit.pathLength() >= BattleNetPathFinder.MAX_PATH - 1
                 || pathStepsAtSettle >= 2);
     }
 
@@ -7076,6 +7743,10 @@ final class BattleNetCombatSystem {
             offset = attackStart;
             unit.setBattleNetSequenceOffset(offset);
             unit.setBattleNetAnimationTimer(paidWrapConstruction ? 1 : 3);
+            // This is a new sequence-owned swing.  The duplicate-hit latch
+            // belongs to the Attack body that preceded the chase, not to the
+            // unit: carrying it across Move silently suppresses the next OP10.
+            unit.setBattleNetSequenceMeleeLanded(false);
             // Human 13 axe 1483 re-enters Attack from the Move body then
             // stalls on the opening OP0 (timer 63). Mark the resume so the
             // next in-range OP0 can match that pre-fire hold.
@@ -7092,6 +7763,11 @@ final class BattleNetCombatSystem {
             offset = attackStart;
             unit.setBattleNetSequenceOffset(offset);
             unit.setBattleNetAnimationTimer(1);
+            // Arrival starts another Attack body even when the previous body
+            // landed before this chase began.  Native XHuman 10 knight 1493
+            // proves the lifetime: it hits grunt 1475, chases grunt 1477, and
+            // must hit again at the new body's OP10 on fixture 154.
+            unit.setBattleNetSequenceMeleeLanded(false);
         }
         if (chaseDecision && offset != attackStart) {
             if (attackStart < 0) {
@@ -7133,11 +7809,25 @@ final class BattleNetCombatSystem {
         // those states: XHuman 12 grunt 1448 must retain its footman through
         // timer 23..1 and only scan the knight on the following OP0.
         boolean attackStartHold = unit.battleNetAttackResumeHoldActive();
+        // A tail retarget can temporarily name a spatial quarry while a
+        // still-live hit response remains offered to this same order. Retail
+        // lets the fresh target own the quiet 3,2,1 constructor, then prices
+        // the offer at OP0. Scanning during timer 3 or 2 restored XHuman 4's
+        // offered grunt too early. A settled-leftover scan does not carry
+        // resume provenance, so XHuman 10's deliberately replaced knight
+        // never enters this state.
+        boolean pendingResumeOffer = !rangedOp0
+                && unit.battleNetAttackResumeFromMove()
+                && unit.offeredTarget() != null
+                && unit.offeredTarget().isAlive()
+                && unit.offeredTarget() != sequenceTarget;
         boolean freeScanWindow = unit.battleNetAnimationTimer() > 0
                 && (rangedOp0
                         ? unit.battleNetAnimationTimer() == 1
                                 || resumedFromMove
                         : !attackStartHold
+                                && (!pendingResumeOffer
+                                        || unit.battleNetAnimationTimer() == 1)
                                 || unit.battleNetAnimationTimer() == 1);
         boolean deferMeleeRetarget = false;
         if (attackStart >= 0
@@ -7146,7 +7836,12 @@ final class BattleNetCombatSystem {
                 && unit.canMove()
                 && unit.type() != null
                 && sequenceTarget != null
-                && sequenceTarget.isAlive()) {
+                && (sequenceTarget.isAlive() || sequenceTarget.isDying())) {
+            // A committed ranged OP0 still performs its free scan when the
+            // incumbent has entered Die but remains a live CUnitPtr. Retail
+            // XHuman 10 archer 1502 replaces dying grunt 1495 at fixture 155
+            // and restarts Attack construction; rejecting the dying incumbent
+            // here let action 16 fall through to Still instead.
             int reactRange = Math.max(
                     unit.type().reactRange(world.isPerson(unit.player())),
                     Math.max(1, unit.type().maxAttackRange()));
@@ -7170,11 +7865,13 @@ final class BattleNetCombatSystem {
                     && unit.chasing()
                     && unit.pathLength() == 1
                     && unit.battleNetAnimationTimer() == 1;
+            Unit offered = unit.offeredTarget();
+            Unit scanIncumbent = !settledLeftoverOp0
+                    && (sequenceTarget == offered
+                            || unit.battleNetAttackResumeFromMove())
+                    ? offered : null;
             Unit candidate = world.targets.findBattleNetHostile(
-                    unit, reactRange,
-                    sequenceTarget == unit.offeredTarget()
-                                    && !settledLeftoverOp0
-                            ? sequenceTarget : null);
+                    unit, reactRange, scanIncumbent);
             boolean candidateInRange = candidate != null
                     && candidate != sequenceTarget
                     && candidate.isAlive()
@@ -7231,12 +7928,22 @@ final class BattleNetCombatSystem {
                 }
                 // Construction-open retarget keeps the 3,2,1 countdown.
                 // Re-arming timer 3 here is only for a true OP0 fire visit.
+                // Replacing a temporary tail quarry with its still-live offer
+                // on the final constructor visit flows directly into the
+                // committed body hold; that constructor is already paid.
+                boolean completedResumeOffer = pendingResumeOffer
+                        && unit.battleNetAnimationTimer() == 1;
                 boolean restartConstruction = !rangedOp0
-                        || (unit.battleNetAnimationTimer() == 1
-                                && !resumedFromMove);
+                        ? !completedResumeOffer
+                        : unit.battleNetAnimationTimer() == 1
+                                && !resumedFromMove;
                 if (restartConstruction) {
                     unit.setBattleNetSequenceOffset(attackStart);
                     unit.setBattleNetAnimationTimer(3);
+                    // Retarget construction starts a distinct sequence-owned
+                    // swing.  Do not let the old target's duplicate-hit latch
+                    // suppress this body's OP10.
+                    unit.setBattleNetSequenceMeleeLanded(false);
                 }
                 if (completedMeleeRetargetDelay) {
                     // Installing the deferred target is the first live
@@ -7432,8 +8139,13 @@ final class BattleNetCombatSystem {
                     }
                     unit.setBattleNetSequenceOffset(attackStart);
                     unit.setBattleNetAnimationTimer(3);
-                    world.turnToTarget(unit, candidate, 0, 0);
+                    // Tail -> OP0 replacement creates a fresh Attack body.
+                    // The previous body's landed bit is target/swing scoped;
+                    // carrying it through the new target's chase is the frozen-
+                    // engagement bug witnessed by XHuman 10 knight 1493.
+                    unit.setBattleNetSequenceMeleeLanded(false);
                     if (inRange) {
+                        world.turnToTarget(unit, candidate, 0, 0);
                         unit.setBattleNetAttackResumeFromMove(true);
                         unit.setBattleNetAttackOp0OutOfRange(true);
                         if (rangedOp0) {
@@ -7577,8 +8289,30 @@ final class BattleNetCombatSystem {
                 int remaining = unit.battleNetRangedAttackCadenceRemaining();
                 int bodyWait = world.battleNetSequence
                         .attackBodyWaitSum(attackStart);
-                int hold = remaining > 0
-                        ? remaining : Math.max(0, bodyWait - 1);
+                // A free-scan which replaces a mobile quarry with a building
+                // owns a fresh native OP0 period. Person-to-person scans keep
+                // draining the existing ranged cadence: Human 13 axe 1484
+                // still throws at fixture 101, while XHuman 12 axe 1517's
+                // replacement guard tower restarts the full period.
+                boolean buildingFreeScan =
+                        unit.battleNetRangedFreeScanHoldActive()
+                        && tgt.type() != null && tgt.type().building();
+                // A free-scan performed as the last committed chase stride
+                // is discarded owns a fresh OP0 period too. The old quarry's
+                // wall-clock is no longer the live attack action at this
+                // boundary: XHuman 10 axethrower 1496 parks route index 20,
+                // changes targets, and exposes 887/63 at fixture 77. Serving
+                // the old remaining value (44) launched a phantom axe at 131
+                // while native was still on Move-start/9. Keep ordinary
+                // mid-action mobile retargets on their unspent cadence.
+                boolean exhaustedResidualFreeScan =
+                        unit.battleNetRangedFreeScanHoldActive()
+                        && unit.battleNetRetargetResidualRoutePark()
+                        && unit.stepDrained() && unit.pathLength() == 0;
+                int hold = buildingFreeScan || exhaustedResidualFreeScan
+                        ? Math.max(0, bodyWait - 1)
+                        : remaining > 0
+                                ? remaining : Math.max(0, bodyWait - 1);
                 unit.setBattleNetAnimationTimer(hold);
                 if (unit.chasing() && unit.pathLength() == 0) {
                     // Dest-arm leftover residual already put the thrower in
@@ -7619,8 +8353,7 @@ final class BattleNetCombatSystem {
                 && unit.canMove()) {
             Unit tgt = unit.target();
             if (tgt != null && tgt.isAlive() && world.targets.inAttackRange(unit, tgt)
-                    && !unit.isMoving()
-                    && (tgt.type() == null || !tgt.type().building())) {
+                    && !unit.isMoving()) {
                 int bodySum = world.battleNetSequence.attackBodyWaitSum(attackStart);
                 int hold = bodySum > 0 ? bodySum - 1 : 0;
                 if (hold > 0) {
@@ -7637,6 +8370,13 @@ final class BattleNetCombatSystem {
                                         + "melee-resume bodySum=%d hold=%d%n",
                                 world.cycle, unit.id(), bodySum, hold);
                     }
+                    // Mobile melee uses the same post-construction OP0 hold
+                    // against units and buildings. XHuman 10 ogre 1538 wraps
+                    // from an out-of-range footman to the adjacent guard tower,
+                    // counts Attack 3,2,1, then remains at Attack@643/23 on
+                    // fixture 138. Treating buildings like the ranged direct-
+                    // approach exception walked straight into OP10 and damaged
+                    // the tower seven visits before retail.
                     world.battleNetAttackMarkers.add(unit);
                     return false;
                 }
@@ -7916,6 +8656,9 @@ final class BattleNetCombatSystem {
                 && unit.battleNetCollisionCounter() > 0
                 && unit.battleNetRefusals() > 0;
         if (freshActiveOrderHandoff) {
+            unit.setBattleNetDirectRecoveryGeneration(
+                    Math.max(unit.battleNetDirectRecoveryGeneration(),
+                            unit.battleNetRefusals()));
             unit.setBattleNetCollisionCounter(0);
             unit.setBattleNetRefusals(0);
         }
@@ -7951,6 +8694,9 @@ final class BattleNetCombatSystem {
                         || unit.order() == Unit.Order.ATTACK_MOVE)) {
             unit.setBattleNetAttackRefusalRecoveryStage(0);
             unit.setBattleNetDirectRefusalRecoveryProbe(false);
+            unit.setBattleNetSaturatedNearRecoveryFullRoute(false);
+            unit.setBattleNetDirectRefusalReplacementBand(false);
+            unit.setBattleNetDirectRecoveryGeneration(0);
             return false;
         }
         // A hard-blocked chase retries immediately for seven visits, then
@@ -7965,6 +8711,28 @@ final class BattleNetCombatSystem {
             if (unit.battleNetOrderDelay() > 0) {
                 return false;
             }
+            if (unit.pathLength() == BattleNetPathFinder.MAX_PATH
+                    && unit.battleNetPathStepsTaken() == 0
+                    && unit.battleNetDirectRefusalReplacementBand()) {
+                // The paid band owns a retained replacement route. Retail's
+                // wake parks its cursor and advances the collision generation
+                // for one visit; spending the first heading here makes a
+                // surrounded fighter slide out of formation.
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setBattleNetCollisionCounter(2);
+                unit.setBattleNetDirectRefusalReplacementBand(false);
+                unit.setBattleNetAttackRefusalRecoveryStage(6);
+                int moveStart = world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                    unit.setBattleNetChaseStepReady(false);
+                }
+                return true;
+            }
+            unit.setBattleNetDirectRefusalReplacementBand(false);
             // This saturated-wake path already reached native's explicit
             // refusal-clear arm before entering the Java rearm seam. Clear it
             // before the active-order idle callback to retain that ordering.
@@ -8051,7 +8819,18 @@ final class BattleNetCombatSystem {
         // If its order did not fire, a later Java animation frame must wait
         // for the next native marker rather than borrowing this one.
         world.battleNetInlineAttackMarkers.remove(unit);
-        if (!world.battleNetAttackMarkers.remove(unit)) {
+        boolean hadMarker = world.battleNetAttackMarkers.remove(unit);
+        if (World.TRACE_MOVING != null
+                && unit.id() == World.TRACE_MOVING_ID) {
+            System.err.printf("JATTACKMARKER cycle=%d unit=%d had=%d order=%s "
+                            + "seq=%d/%d chase=%d path=%d moving=%d wait=%d%n",
+                    world.cycle, unit.id(), hadMarker ? 1 : 0, unit.order(),
+                    unit.battleNetSequenceOffset(),
+                    unit.battleNetAnimationTimer(), unit.chasing() ? 1 : 0,
+                    unit.pathLength(), unit.isMoving() ? 1 : 0,
+                    unit.waitCycles());
+        }
+        if (!hadMarker) {
             return;
         }
         // The marker itself is not an idle draw. It becomes one only when the

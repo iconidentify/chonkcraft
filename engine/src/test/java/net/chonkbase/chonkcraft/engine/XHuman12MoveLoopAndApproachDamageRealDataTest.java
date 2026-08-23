@@ -138,6 +138,65 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 "the first native damage at fixture 58 comes from the axe");
     }
 
+    @Test
+    @DisplayName("approach damage expires when a live route tail advances")
+    void oldApproachDamageDoesNotFreezeAMuchLaterAttack() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit longRouteGrunt = unitById(world, 91);
+        Unit guardTower = unitById(world, 115);
+        assertNotNull(longRouteGrunt);
+        assertNotNull(guardTower);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 20) {
+            mission.tick();
+        }
+        assertEquals(47, longRouteGrunt.hitPoints());
+        assertEquals(true, longRouteGrunt.battleNetAttackOp0Damaged(),
+                "the direct hit initially belongs to this approach element");
+
+        while (fixtureCycle(world) < 23) {
+            mission.tick();
+        }
+        assertEquals(false, longRouteGrunt.battleNetAttackOp0Damaged(),
+                "committing a step with a live tail starts a new damage generation");
+
+        while (fixtureCycle(world) < 176) {
+            mission.tick();
+        }
+
+        mission.tick();
+        assertEquals(177, fixtureCycle(world));
+        assertEquals(101, guardTower.hitPoints(),
+                "the old approach hit must not suppress the native fixture-177 blow");
+        assertEquals(2558, longRouteGrunt.battleNetSequenceOffset(),
+                "the grunt advances through its attack body instead of freezing at OP0");
+        assertEquals(5, longRouteGrunt.battleNetAnimationTimer());
+    }
+
+    private static int fixtureCycle(World world) {
+        return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null

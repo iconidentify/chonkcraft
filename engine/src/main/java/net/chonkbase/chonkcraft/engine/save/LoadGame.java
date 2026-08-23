@@ -771,6 +771,10 @@ public final class LoadGame {
             unit.setBattleNetWoodReadyPathRequired(
                     truthy(state.rawGet("woodReadyPathRequired")));
         }
+        if (state.rawGet("woodTerminalRefusalHeading") != null) {
+            unit.setBattleNetWoodTerminalRefusalHeading(
+                    integer(state.rawGet("woodTerminalRefusalHeading")));
+        }
         if (state.rawGet("rangedAttackCadenceRemaining") != null) {
             unit.setBattleNetRangedAttackCadenceRemaining(integer(
                     state.rawGet("rangedAttackCadenceRemaining")));
@@ -815,6 +819,18 @@ public final class LoadGame {
             unit.setBattleNetDirectRefusalRecoveryProbe(
                     truthy(state.rawGet("directRefusalRecoveryProbe")));
         }
+        if (state.rawGet("saturatedNearRecoveryFullRoute") != null) {
+            unit.setBattleNetSaturatedNearRecoveryFullRoute(
+                    truthy(state.rawGet("saturatedNearRecoveryFullRoute")));
+        }
+        if (state.rawGet("directRefusalReplacementBand") != null) {
+            unit.setBattleNetDirectRefusalReplacementBand(
+                    truthy(state.rawGet("directRefusalReplacementBand")));
+        }
+        if (state.rawGet("directRecoveryGeneration") != null) {
+            unit.setBattleNetDirectRecoveryGeneration(
+                    integer(state.rawGet("directRecoveryGeneration")));
+        }
         if (state.rawGet("retargetResidualParkRefill") != null) {
             unit.setBattleNetRetargetResidualParkRefill(
                     truthy(state.rawGet("retargetResidualParkRefill")));
@@ -822,6 +838,22 @@ public final class LoadGame {
                 unit.setBattleNetRetargetResidualParkSteps(
                         integer(state.rawGet("retargetResidualParkSteps")));
             }
+        }
+        if (state.rawGet("parkedRefusalHeading") != null) {
+            unit.setBattleNetParkedRefusalHeading(
+                    integer(state.rawGet("parkedRefusalHeading")));
+        }
+        if (state.rawGet("saturatedWallFacePairHeading") != null) {
+            unit.setBattleNetSaturatedWallFacePairHeading(
+                    integer(state.rawGet("saturatedWallFacePairHeading")));
+        }
+        if (state.rawGet("saturatedWallFacePairParked") != null) {
+            unit.setBattleNetSaturatedWallFacePairParked(
+                    truthy(state.rawGet("saturatedWallFacePairParked")));
+        }
+        if (state.rawGet("saturatedRetargetRouteBand") != null) {
+            unit.setBattleNetSaturatedRetargetRouteBand(
+                    truthy(state.rawGet("saturatedRetargetRouteBand")));
         }
         if (state.rawGet("oilAction") != null) {
             try {

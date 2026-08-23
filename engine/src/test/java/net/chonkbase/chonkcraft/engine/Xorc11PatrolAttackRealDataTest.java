@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -23,6 +24,241 @@ import org.junit.jupiter.api.Test;
 class Xorc11PatrolAttackRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("xorc 11's patrolling destroyer acquires before its residual stride")
+    void xorc11sPatrollingDestroyerAcquiresBeforeItsResidualStride() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit destroyer = nearest(world, "unit-human-destroyer", 4, 18);
+        Unit dragon = nearest(world, "unit-dragon", 2, 34);
+        assertNotNull(destroyer);
+        assertNotNull(dragon);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 135) {
+            mission.tick();
+        }
+        assertEquals(12, destroyer.tileX());
+        assertEquals(24, destroyer.tileY());
+
+        mission.tick();
+        assertNotNull(destroyer.pendingAttack(),
+                "Patrol OP0 banks Attack before consuming the new route");
+        assertSame(dragon, destroyer.pendingAttack());
+        assertEquals(10, destroyer.tileX());
+        assertEquals(26, destroyer.tileY(),
+                "the acquired route first-steps southwest, not southeast");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 167) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, destroyer.order(),
+                "the queued Attack waits for the committed Patrol stride");
+        assertSame(dragon, destroyer.pendingAttack());
+        assertEquals(10, destroyer.tileX());
+        assertEquals(26, destroyer.tileY());
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, destroyer.order(),
+                "next_order promotes on the residual-settle fixture");
+        assertEquals(null, destroyer.pendingAttack());
+        assertEquals(10, destroyer.tileX());
+        assertEquals(26, destroyer.tileY());
+        assertEquals(3, destroyer.battleNetAnimationTimer(),
+                "the promoted attack exposes BNE's timer-three constructor");
+
+        mission.tick();
+        assertEquals(2, destroyer.battleNetAnimationTimer());
+        assertEquals(26, destroyer.tileY(),
+                "constructor timer two must not leak into chase movement");
+
+        mission.tick();
+        assertEquals(1, destroyer.battleNetAnimationTimer());
+        assertEquals(26, destroyer.tileY(),
+                "constructor timer one is still a quiet native visit");
+
+        mission.tick();
+        assertEquals(10, destroyer.tileX());
+        assertEquals(28, destroyer.tileY(),
+                "the promoted attack takes BNE's first southward chase step");
+    }
+
+    @Test
+    @DisplayName("xorc 11's person fleet answers a surviving ally's cannon splash")
+    void xorc11sPersonFleetAnswersASurvivingAllysCannonSplash() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit struck = nearest(world, "unit-orc-destroyer", 10, 42);
+        Unit responder = nearest(world, "unit-orc-destroyer", 6, 36);
+        Unit second = nearest(world, "unit-orc-destroyer", 8, 38);
+        Unit southern = nearest(world, "unit-orc-destroyer", 10, 46);
+        Unit outside = nearest(world, "unit-orc-destroyer", 8, 50);
+        Unit attacker = nearest(world, "unit-battleship", 16, 40);
+        Unit northernAxe = nearest(world, "unit-axethrower", 6, 42);
+        Unit southernAxe = nearest(world, "unit-axethrower", 6, 44);
+        Unit outsideAxe = nearest(world, "unit-axethrower", 5, 41);
+        Unit dragon = nearest(world, "unit-dragon", 2, 34);
+        Unit humanDestroyer = nearest(
+                world, "unit-human-destroyer", 6, 30);
+        Unit reactiveDestroyer = nearest(
+                world, "unit-human-destroyer", 22, 38);
+        assertNotNull(struck);
+        assertNotNull(responder);
+        assertNotNull(second);
+        assertNotNull(southern);
+        assertNotNull(outside);
+        assertNotNull(attacker);
+        assertNotNull(northernAxe);
+        assertNotNull(southernAxe);
+        assertNotNull(outsideAxe);
+        assertNotNull(dragon);
+        assertNotNull(humanDestroyer);
+        assertNotNull(reactiveDestroyer);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 174) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 132) {
+                assertEquals(33, struck.hitPoints(),
+                        "the authenticated cannon roll leaves the struck ship alive");
+                assertSame(attacker, struck.offeredTarget(),
+                        "HitUnit offers the source to the struck ship");
+                assertSame(attacker, responder.battleNetPendingHelpAttack());
+                assertSame(attacker, second.battleNetPendingHelpAttack());
+                assertSame(attacker, southern.battleNetPendingHelpAttack());
+                assertSame(attacker,
+                        northernAxe.battleNetPendingHelpAttack());
+                assertSame(attacker,
+                        southernAxe.battleNetPendingHelpAttack());
+                assertEquals(null, outside.battleNetPendingHelpAttack(),
+                        "the next destroyer beyond the marker-two gap stays idle");
+                assertEquals(null, outsideAxe.battleNetPendingHelpAttack(),
+                        "the axethrower beyond its person reaction radius stays idle");
+            } else if (fixture == 133) {
+                assertEquals(Unit.Order.STILL, responder.order());
+                assertEquals(Unit.Order.STILL, second.order());
+                assertEquals(Unit.Order.STILL, struck.order());
+                assertEquals(Unit.Order.STILL, southern.order());
+            } else if (fixture == 134) {
+                assertEquals(Unit.Order.ATTACK, responder.order(),
+                        "timer-two responder promotes first on its own idle boundary");
+                assertEquals(Unit.Order.STILL, second.order());
+                assertEquals(Unit.Order.STILL, struck.order());
+                assertEquals(Unit.Order.STILL, southern.order());
+            } else if (fixture == 135) {
+                assertEquals(Unit.Order.ATTACK, responder.order());
+                assertEquals(Unit.Order.ATTACK, second.order());
+                assertEquals(Unit.Order.ATTACK, struck.order());
+                assertSame(attacker, struck.target(),
+                        "the struck hull accepts its offered attacker");
+                assertEquals(Unit.Order.ATTACK, southern.order());
+            } else if (fixture == 136) {
+                assertEquals(Unit.Order.ATTACK, northernAxe.order(),
+                        "the first ranged shore defender promotes at its idle boundary");
+                assertEquals(Unit.Order.STILL, southernAxe.order());
+            } else if (fixture == 137) {
+                assertEquals(Unit.Order.ATTACK, northernAxe.order());
+                assertEquals(Unit.Order.ATTACK, southernAxe.order());
+            } else if (fixture == 155) {
+                assertEquals(Unit.Order.STILL, northernAxe.order(),
+                        "the first shoreline helper releases its temporary chase at Move OP0");
+                assertEquals(Unit.Order.ATTACK, southernAxe.order());
+                assertEquals(825, northernAxe.battleNetSequenceOffset(),
+                        "the native Still program is installed immediately");
+                assertEquals(1, northernAxe.battleNetAnimationTimer());
+                assertEquals(2_555_427_864L,
+                        Integer.toUnsignedLong(world.battleNetRandomSeed()),
+                        "the same-visit active-order idle draw must precede "
+                                + "the Dragon and cannon constructors");
+            } else if (fixture == 156) {
+                assertEquals(Unit.Order.STILL, northernAxe.order());
+                assertEquals(Unit.Order.STILL, southernAxe.order(),
+                        "each helper releases on its own residual-settle visit");
+                assertEquals(4983,
+                        northernAxe.battleNetSequenceOffset());
+                assertEquals(1, northernAxe.battleNetAnimationTimer());
+            } else if (fixture == 157) {
+                assertEquals(4985,
+                        northernAxe.battleNetSequenceOffset());
+                assertEquals(4, northernAxe.battleNetAnimationTimer());
+            } else if (fixture == 165) {
+                assertEquals(85, dragon.hitPoints(),
+                        "the opposing cannon must use BNE's aligned splash roll");
+                assertEquals(100, humanDestroyer.hitPoints(),
+                        "Dragon breath remains in flight until its first "
+                                + "native action-seven pulse");
+            } else if (fixture == 169) {
+                assertEquals(92, humanDestroyer.hitPoints(),
+                        "the first action-seven pulse applies native area damage");
+                assertSame(humanDestroyer, responder.target(),
+                        "the naval helper keeps its timer-one replacement target");
+                assertEquals(3, responder.battleNetAnimationTimer(),
+                        "settling the response route opens native Attack construction");
+            } else if (fixture == 170) {
+                assertSame(reactiveDestroyer, struck.target(),
+                        "the struck ship rescans the battle line when its response route settles");
+                assertEquals(3, struck.battleNetAnimationTimer(),
+                        "the reactive retarget owns fresh Attack construction");
+            } else if (fixture == 172) {
+                assertEquals(92, humanDestroyer.hitPoints(),
+                        "action seven keeps flying past its aim point instead "
+                                + "of applying an early direct hit");
+                assertEquals(1, struck.battleNetAnimationTimer(),
+                        "the reactive constructor counts 3,2,1 without firing a stale shell");
+                assertEquals(36, second.tileY(),
+                        "the combat chase first parks its blocked Patrol tail");
+            } else if (fixture == 173) {
+                assertSame(reactiveDestroyer, struck.target());
+                assertEquals(118, struck.battleNetAnimationTimer(),
+                        "OP0 serves the remaining ranged cadence after the retarget");
+                assertEquals(8, second.tileX());
+                assertEquals(36, second.tileY(),
+                        "Attack construction keeps the parked route quiet");
+            } else if (fixture == 174) {
+                assertEquals(8, second.tileX());
+                assertEquals(34, second.tileY(),
+                        "the engaged destroyer replans north after BNE's 3,2,1 handoff");
+            }
+            assertEquals(Unit.Order.STILL, outside.order(),
+                    "the outside destroyer must not join the response");
+            assertEquals(Unit.Order.STILL, outsideAxe.order(),
+                    "the outside axethrower must not join the response");
+        }
+
+        assertEquals(6, responder.tileX());
+        assertEquals(34, responder.tileY(),
+                "the timer-one scan retargets the nearer northern destroyer");
+        assertEquals(8, second.tileX());
+        assertEquals(34, second.tileY());
+        assertEquals(12, struck.tileX());
+        assertEquals(40, struck.tileY());
+        assertEquals(12, southern.tileX());
+        assertEquals(44, southern.tileY());
+        assertEquals(7, northernAxe.tileX());
+        assertEquals(42, northernAxe.tileY());
+        assertEquals(7, southernAxe.tileX());
+        assertEquals(44, southernAxe.tileY());
+    }
 
     @Test
     @DisplayName("xorc 11's opening battleship is attacking on cycle 58")
@@ -234,6 +470,23 @@ class Xorc11PatrolAttackRealDataTest {
         assertEquals(10, destroyer.attackGoalX(),
                 "the Attack order union retains the target's BNE point anchor");
         assertEquals(42, destroyer.attackGoalY());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 162) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 159 && fixture <= 161) {
+                assertEquals(18, destroyer.tileX(),
+                        "the replacement Attack owns the settled naval residual");
+                assertEquals(38, destroyer.tileY());
+                assertEquals(3266, destroyer.battleNetSequenceOffset());
+                assertEquals(162 - fixture,
+                        destroyer.battleNetAnimationTimer(),
+                        "native naval retarget construction counts 3,2,1");
+            }
+        }
+        assertEquals(16, destroyer.tileX(),
+                "timer one hands the retained west heading back to Move");
+        assertEquals(38, destroyer.tileY());
     }
 
     @Test

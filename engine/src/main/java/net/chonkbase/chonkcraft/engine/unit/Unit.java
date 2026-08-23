@@ -1,5 +1,6 @@
 package net.chonkbase.chonkcraft.engine.unit;
 
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.pathfinder.PathFinder;
 
@@ -2415,6 +2416,23 @@ public final class Unit {
     private boolean battleNetChaseReplanResidualHold;
 
     /**
+     * A mobile retarget accepted from saturated collision pressure.
+     *
+     * <p>The replacement commits immediately, but the remaining approved
+     * route stays owned by that paid generation through Attack construction
+     * and its following Move refusal band.</p>
+     */
+    public boolean battleNetSaturatedRetargetRouteBand() {
+        return battleNetSaturatedRetargetRouteBand;
+    }
+
+    public void setBattleNetSaturatedRetargetRouteBand(boolean band) {
+        battleNetSaturatedRetargetRouteBand = band;
+    }
+
+    private boolean battleNetSaturatedRetargetRouteBand;
+
+    /**
      * Whether a melee retarget route has paid its first residual Attack hold
      * and still owes retail's route-index-20 movement visit.
      */
@@ -2467,6 +2485,56 @@ public final class Unit {
     }
 
     private int battleNetRetargetResidualParkSteps;
+
+    /**
+     * Refused compass byte retained by a native route-index-twenty park.
+     *
+     * <p>Java represents that parked cursor as an empty path. Keep the byte
+     * separately for the immediately following route draw so wall following
+     * continues from the refused face instead of restarting cold.</p>
+     */
+    public int battleNetParkedRefusalHeading() {
+        return battleNetParkedRefusalHeading;
+    }
+
+    public void setBattleNetParkedRefusalHeading(int heading) {
+        battleNetParkedRefusalHeading = heading >= 0
+                && heading < Direction.COUNT ? heading : -1;
+    }
+
+    private int battleNetParkedRefusalHeading = -1;
+
+    /**
+     * Opposite wall-face byte retained by a saturated shared-buffer route.
+     *
+     * <p>At high collision/refusal pressure native's two obstacle probes can
+     * share the same route buffer. The first opening byte commits while this
+     * second byte remains behind the parked route cursor.</p>
+     */
+    public int battleNetSaturatedWallFacePairHeading() {
+        return battleNetSaturatedWallFacePairHeading;
+    }
+
+    public void setBattleNetSaturatedWallFacePairHeading(int heading) {
+        battleNetSaturatedWallFacePairHeading = heading >= 0
+                && heading < Direction.COUNT ? heading : -1;
+        if (battleNetSaturatedWallFacePairHeading < 0) {
+            battleNetSaturatedWallFacePairParked = false;
+        }
+    }
+
+    private int battleNetSaturatedWallFacePairHeading = -1;
+
+    public boolean battleNetSaturatedWallFacePairParked() {
+        return battleNetSaturatedWallFacePairParked;
+    }
+
+    public void setBattleNetSaturatedWallFacePairParked(boolean parked) {
+        battleNetSaturatedWallFacePairParked = parked
+                && battleNetSaturatedWallFacePairHeading >= 0;
+    }
+
+    private boolean battleNetSaturatedWallFacePairParked;
 
     /**
      * A full Move refusal band that hands an out-of-range chase through
@@ -2552,6 +2620,53 @@ public final class Unit {
     }
 
     private boolean battleNetDirectRefusalRecoveryProbe;
+
+    /**
+     * The direct recovery probe came from a paid one-step approach that
+     * finished at range two after repeated formation pressure. One rejected
+     * direct face returns its next construction handoff to the complete wall
+     * route writer instead of repeating the direct probe indefinitely.
+     */
+    public boolean battleNetSaturatedNearRecoveryFullRoute() {
+        return battleNetSaturatedNearRecoveryFullRoute;
+    }
+
+    public void setBattleNetSaturatedNearRecoveryFullRoute(boolean fullRoute) {
+        battleNetSaturatedNearRecoveryFullRoute = fullRoute;
+    }
+
+    private boolean battleNetSaturatedNearRecoveryFullRoute;
+
+    /**
+     * The bounded direct-recovery ladder installed a complete replacement
+     * route and is paying its Move band. Its wake parks that retained route
+     * for one callback instead of spending the first heading immediately.
+     */
+    public boolean battleNetDirectRefusalReplacementBand() {
+        return battleNetDirectRefusalReplacementBand;
+    }
+
+    public void setBattleNetDirectRefusalReplacementBand(boolean band) {
+        battleNetDirectRefusalReplacementBand = band;
+    }
+
+    private boolean battleNetDirectRefusalReplacementBand;
+
+    /**
+     * Refusal generation retained across the native active-order boundary.
+     * The packed collision/refusal projections clear there; this separate
+     * provenance decides whether later accepted residuals retry a direct face
+     * or begin another cold wall search.
+     */
+    public int battleNetDirectRecoveryGeneration() {
+        return battleNetDirectRecoveryGeneration;
+    }
+
+    public void setBattleNetDirectRecoveryGeneration(int generation) {
+        battleNetDirectRecoveryGeneration = Math.max(0, generation);
+    }
+
+    private int battleNetDirectRecoveryGeneration;
 
     /**
      * A detached heading or paid bounded prefix has been approved but has not
@@ -2786,7 +2901,9 @@ public final class Unit {
     /**
      * This attack was promoted from a person's lethal-splash help offer.
      * Retained through the first chase so its later command-to-auto handoff
-     * can pay native's Attack construction delay exactly once.
+     * can pay native's Attack construction delay exactly once. After a person
+     * shoreline spatial-help route ends, the same order-owned bit spans the
+     * single Move-OP0 to Still-constructor visit; it is cleared there.
      */
     public boolean battleNetPersonSplashHelpAttack() {
         return battleNetPersonSplashHelpAttack;
@@ -2813,9 +2930,10 @@ public final class Unit {
     private boolean battleNetPersonHelpRetargetHandoff;
 
     /**
-     * A computer unit's queued {@code 0x0040a9d0} hit-help order is paying
+     * A queued {@code 0x0040a9d0} spatial hit-help order is pending or paying
      * its opening Attack construction. The timer-one handoff owns the first
-     * native compass byte toward the aggressor.
+     * native compass byte toward the aggressor. Person naval HitUnit also
+     * uses this provenance for its land shoreline defenders.
      */
     public boolean battleNetSpatialHitHelpHandoff() {
         return battleNetSpatialHitHelpHandoff;
@@ -2919,43 +3037,6 @@ public final class Unit {
     }
 
     private boolean battleNetRepairStride;
-
-    /**
-     * Consecutive tile steps that shared one heading on the current route.
-     *
-     * <p>Orc 11's type-two land assault pack (knight 1558 and archers
-     * 1559/1560/1563) discards leftover path after a trailing run of three
-     * identical headings -- not after a fixed {@code stepsTaken} count
-     * (the knight took NW then three NE). A player GiveOrder 5 dest-arm
-     * keeps its Bresenham leftover. Cleared on {@link #setPath} /
-     * {@link #clearPath}.
-     */
-    public int battleNetSameHeadingRun() {
-        return battleNetSameHeadingRun;
-    }
-
-    public void setBattleNetSameHeadingRun(int run) {
-        battleNetSameHeadingRun = Math.max(0, run);
-    }
-
-    private int battleNetSameHeadingRun;
-
-    /**
-     * Patrol walk just spent its path after a three-heading straight run.
-     *
-     * <p>Residual of that step still drains; on settle the unit holds Still
-     * animation timer 3 / order delay 2 before replanning (Orc 11 archer
-     * 1559: clear mid-residual at fixture 49, Still@50, step@53).
-     */
-    public boolean battleNetPatrolStraightRunExhausted() {
-        return battleNetPatrolStraightRunExhausted;
-    }
-
-    public void setBattleNetPatrolStraightRunExhausted(boolean exhausted) {
-        battleNetPatrolStraightRunExhausted = exhausted;
-    }
-
-    private boolean battleNetPatrolStraightRunExhausted;
 
     /**
      * Approach+resume OP0 hold is active (timer 63 on attackStart). Presentation
@@ -3938,7 +4019,6 @@ public final class Unit {
         // A fresh route replaces whatever the last one had left, exactly as
         // the twenty bytes at offset 48 are overwritten.
         this.battleNetSpentHeading = -1;
-        this.battleNetSameHeadingRun = 0;
         // One-heading chase leftovers need a fresh soft-wait count so the
         // SE generation after SSSS does not inherit counter 1 and replan
         // without waiting (XHuman 12 grunt 1503). Resetting every setPath
@@ -3965,7 +4045,6 @@ public final class Unit {
         this.battleNetPathInitialLength = 0;
         this.routeSpent = false;
         this.battleNetSpentHeading = -1;
-        this.battleNetSameHeadingRun = 0;
         this.battleNetGoldLongApproach = false;
         this.battleNetGoldFreePrefix = false;
         this.battleNetGoldFreePrefixLength = 0;
@@ -4124,6 +4203,22 @@ public final class Unit {
     public void setBattleNetWoodReadyPathRequired(boolean required) {
         battleNetWoodReadyPathRequired = required;
     }
+
+    /**
+     * A terrain-harvest route's terminal residual was refused by an allied
+     * worker. The resource action owns one 3,2,1 construction before retrying
+     * the stored wall face; the heading identifies that refused face.
+     */
+    public int battleNetWoodTerminalRefusalHeading() {
+        return battleNetWoodTerminalRefusalHeading;
+    }
+
+    public void setBattleNetWoodTerminalRefusalHeading(int heading) {
+        battleNetWoodTerminalRefusalHeading = heading >= 0
+                && heading < Direction.COUNT ? heading : -1;
+    }
+
+    private int battleNetWoodTerminalRefusalHeading = -1;
 
     /**
      * A harvest command that landed mid-swing and waits for the animation to

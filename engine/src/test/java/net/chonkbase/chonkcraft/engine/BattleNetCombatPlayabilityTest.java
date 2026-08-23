@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -171,6 +172,142 @@ class BattleNetCombatPlayabilityTest {
                 "the retail ballista blast missed its ground target");
         assertEquals(flyerBefore, flyer.hitPoints(),
                 "land-only ballista splash damaged an aircraft");
+    }
+
+    @Test
+    @DisplayName("a Ballista attack can be replaced by a player move")
+    void aBallistaAttackCanBeReplacedByAPlayerMove() {
+        Fixture fixture = fixture();
+        Unit ballista = place(fixture, "unit-ballista", 0, 4, 4);
+        Unit grunt = place(fixture, "unit-grunt", 1, 11, 4);
+
+        assertTrue(fixture.commands().apply(GameCommand.attack(
+                        0, ballista.id(), grunt.id())),
+                "the Ballista attack was refused");
+        boolean fired = false;
+        for (int cycle = 0; cycle < 400 && !fired; cycle++) {
+            fixture.world().tick();
+            fired = fixture.world().missiles().stream().anyMatch(missile ->
+                    "missile-ballista-bolt".equals(missile.type().ident()));
+        }
+        assertTrue(fired, "the Ballista never entered its committed volley");
+
+        assertTrue(fixture.commands().apply(GameCommand.move(
+                        0, ballista.id(), 4, 24)),
+                "the player Move was refused during the Ballista volley");
+        boolean moved = false;
+        for (int cycle = 0; cycle < 4_000
+                && (ballista.order() != Unit.Order.STILL
+                        || ballista.hasQueuedOrders()); cycle++) {
+            fixture.world().tick();
+            moved |= ballista.tileY() > 4;
+        }
+
+        assertTrue(moved, "the Ballista never moved after accepting the command");
+        assertEquals(Unit.Order.STILL, ballista.order(),
+                "the Ballista never completed the replacement Move");
+        assertTrue(ballista.tileY() >= 22,
+                "the Ballista stopped before the player's destination: "
+                        + ballista.tileX() + "," + ballista.tileY());
+        assertEquals(null, ballista.target(),
+                "the replaced attack kept ownership of its old target");
+        assertFalse(ballista.fighting(),
+                "the Ballista completed Move while still marked as firing");
+        assertFalse(ballista.chasing(),
+                "the Ballista completed Move while still marked as chasing");
+    }
+
+    @Test
+    @DisplayName("a commanded Gryphon damages a building and can be redirected")
+    void aCommandedGryphonDamagesABuildingAndCanBeRedirected() {
+        Fixture fixture = fixture();
+        Unit gryphon = place(fixture, "unit-gryphon-rider", 0, 4, 8);
+        Unit farm = place(fixture, "unit-farm", 1, 12, 8);
+        int before = farm.hitPoints();
+
+        assertTrue(fixture.commands().apply(GameCommand.attack(
+                        0, gryphon.id(), farm.id())),
+                "the Gryphon attack on the building was refused");
+        LinkedHashSet<String> missilesSeen = new LinkedHashSet<>();
+        for (int cycle = 0; cycle < 2_000 && farm.hitPoints() == before; cycle++) {
+            fixture.world().tick();
+            fixture.world().missiles().forEach(missile ->
+                    missilesSeen.add(missile.type().ident()));
+        }
+        assertTrue(farm.hitPoints() < before,
+                "the Gryphon projectile never damaged the building: order="
+                        + gryphon.order() + ", at=" + gryphon.tileX() + ","
+                        + gryphon.tileY() + ", target="
+                        + (gryphon.target() == null ? "null"
+                                : gryphon.target().type().ident())
+                        + ", fighting=" + gryphon.fighting() + ", chasing="
+                        + gryphon.chasing() + ", missile="
+                        + gryphon.type().missile() + ", seen=" + missilesSeen);
+
+        assertTrue(fixture.commands().apply(GameCommand.move(
+                        0, gryphon.id(), 20, 24)),
+                "the Gryphon refused a player redirect after attacking");
+        boolean moved = false;
+        for (int cycle = 0; cycle < 4_000
+                && (gryphon.order() != Unit.Order.STILL
+                        || gryphon.hasQueuedOrders()); cycle++) {
+            fixture.world().tick();
+            moved |= gryphon.tileX() > 4 || gryphon.tileY() > 8;
+        }
+        assertTrue(moved, "the Gryphon never moved after accepting the redirect");
+        assertEquals(Unit.Order.STILL, gryphon.order(),
+                "the Gryphon never completed the redirect");
+        assertEquals(null, gryphon.target(),
+                "the redirected Gryphon retained the building attack order");
+        assertFalse(gryphon.fighting(),
+                "the redirected Gryphon retained its firing state");
+        assertFalse(gryphon.chasing(),
+                "the redirected Gryphon retained its chase state");
+    }
+
+    @Test
+    @DisplayName("a player move cannot be stolen by an attack-move reacquire")
+    void aPlayerMoveReplacesAnEngagedAttackMoveAfterCommittedPixels() {
+        Fixture fixture = fixture();
+        fixture.data().configureWorld(fixture.world(), PudMap.Tileset.FOREST);
+        Unit grunt = place(fixture, "unit-grunt", 0, 8, 8);
+        Unit enemy = place(fixture, "unit-footman", 1, 12, 8);
+
+        assertTrue(fixture.commands().apply(GameCommand.attackMove(
+                        0, grunt.id(), 24, 8)),
+                "the opening attack-move was refused");
+        boolean engaged = false;
+        for (int cycle = 0; cycle < 1_000 && !engaged; cycle++) {
+            fixture.world().tick();
+            engaged = grunt.target() == enemy
+                    && (grunt.fighting() || grunt.chasing())
+                    && (grunt.residualX() != 0 || grunt.residualY() != 0);
+        }
+        assertTrue(engaged,
+                "the attack-move never acquired with committed pixels in flight");
+
+        // The retained retail replay's record 3771 applies this same Move to
+        // native slot 1539 while it reports Attack-Move. The pinned binary's
+        // GiveOrder path (451070 -> 4513d0 -> 438410) releases the old attack
+        // goal at unit+0x88 after installing the replacement. A live stride
+        // may delay Move; settled animation overshoot must be discarded. In
+        // neither case may the destroyed Attack-Move reacquire its quarry.
+        assertTrue(fixture.commands().apply(GameCommand.move(
+                        0, grunt.id(), 8, 24)),
+                "the redirect was refused during the engagement");
+        boolean moved = false;
+        for (int cycle = 0; cycle < 1_000 && !moved; cycle++) {
+            fixture.world().tick();
+            moved = grunt.tileY() > 8 || grunt.offsetY() != 0;
+        }
+
+        assertTrue(moved,
+                "the old attack-move reacquired its target and stole the redirect");
+        assertEquals(null, grunt.target(),
+                "the replaced attack-move regained combat ownership");
+        assertTrue(grunt.order() == Unit.Order.MOVE
+                        || grunt.order() == Unit.Order.STILL,
+                "the replacement never became the current order: " + grunt.order());
     }
 
     private static Unit place(Fixture fixture, String ident, int player, int x, int y) {

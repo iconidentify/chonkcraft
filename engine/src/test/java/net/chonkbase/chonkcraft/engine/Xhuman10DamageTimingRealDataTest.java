@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,6 +30,188 @@ import org.junit.jupiter.api.Test;
 class Xhuman10DamageTimingRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("xhuman 10's knight can hit again after chasing a new target")
+    void xhuman10KnightClearsItsLandedLatchForTheNextChase() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1493 / Java 107 lands its prior swing on
+        // grunt 1475, then follows replacement grunt 1477 west and opens a
+        // fresh Attack body.  The old body's duplicate-hit latch must not cross
+        // that chase: native 1485 hits for nine and 1493 immediately follows
+        // for ten on fixture 154, taking the target from 29 to 10 HP.
+        Unit knight = unitById(world, 107);
+        Unit grunt = unitById(world, 123);
+        assertNotNull(knight, "XHuman 10 has no arriving knight 107");
+        assertNotNull(grunt, "XHuman 10 has no replacement grunt 123");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 153) {
+            mission.tick();
+        }
+
+        assertSame(grunt, knight.target());
+        assertEquals(29, grunt.hitPoints());
+        assertEquals(1935, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertTrue(!knight.battleNetSequenceMeleeLanded(),
+                "the prior target's landed latch must be clear for this Attack body");
+
+        mission.tick();
+        assertEquals(10, grunt.hitPoints(),
+                "both authenticated knight blows land on fixture 154");
+        assertEquals(1941, knight.battleNetSequenceOffset());
+        assertEquals(5, knight.battleNetAnimationTimer());
+        assertTrue(knight.battleNetSequenceMeleeLanded(),
+                "the new body's OP10 now owns the duplicate-hit latch");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's boxed defender retries and releases its unreachable target")
+    void xhuman10BoxedDefenderRetriesAndReleasesItsUnreachableTarget() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1489 / Java 111. After its dying quarry's
+        // Attack tail names slot 1477, BNE keeps the blocked north-west route
+        // byte and revisits Move OP0 on six consecutive scheduler calls. Each
+        // refusal advances both the collision nibble and AutoSelectTarget's
+        // six-beat clock. The sixth scan proves that every visible hostile is
+        // unreachable and releases the weak computer-owned attack to Still.
+        Unit knight = unitAt(world, "unit-knight", 84, 89);
+        Unit replacement = unitById(world, 123);
+        Unit arrivingKnight = unitById(world, 107);
+        Unit retargetingOgre = unitById(world, 62);
+        Unit southernGuardTower = unitById(world, 63);
+        assertNotNull(knight, "XHuman 10 has no boxed eastern knight");
+        assertNotNull(replacement, "XHuman 10 has no replacement grunt");
+        assertNotNull(arrivingKnight, "XHuman 10 has no western residual knight");
+        assertNotNull(retargetingOgre, "XHuman 10 has no southern retargeting ogre");
+        assertNotNull(southernGuardTower, "XHuman 10 has no southern guard tower");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 145) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture >= 136 && fixture <= 138) {
+                assertEquals(Unit.Order.ATTACK, knight.order());
+                assertSame(replacement, knight.target());
+                assertEquals(1922, knight.battleNetSequenceOffset());
+                assertEquals(139 - fixture,
+                        knight.battleNetAnimationTimer(),
+                        "native Attack construction counts 3,2,1");
+                if (fixture == 138) {
+                    assertEquals(Direction.fromDelta(-1, -1), knight.heading(),
+                            "the finished swing leaves the native north-west face");
+                    assertEquals(643, retargetingOgre.battleNetSequenceOffset());
+                    assertEquals(23,
+                            retargetingOgre.battleNetAnimationTimer(),
+                            "an in-range building retarget enters BNE's melee OP0 hold");
+                }
+            } else if (fixture >= 139 && fixture <= 144) {
+                assertEquals(83, knight.tileX());
+                assertEquals(89, knight.tileY());
+                assertEquals(Unit.Order.ATTACK, knight.order());
+                assertSame(replacement, knight.target());
+                assertEquals(1874, knight.battleNetSequenceOffset(),
+                        "the boxed chase remains on native Move OP0");
+                assertEquals(1, knight.battleNetAnimationTimer());
+                assertEquals(fixture - 138,
+                        knight.battleNetCollisionCounter(),
+                        "every native refusal advances the collision nibble");
+                assertEquals(643, retargetingOgre.battleNetSequenceOffset());
+                assertEquals(161 - fixture,
+                        retargetingOgre.battleNetAnimationTimer(),
+                        "the building retarget must not enter its damage opcode early");
+                if (fixture == 144) {
+                    assertEquals(25,
+                            arrivingKnight.battleNetMeleeSyncRemaining(),
+                            "the settled residual refreshes table 0x27 on BNE's "
+                                    + "arrival callback");
+                    assertEquals(0xe4880eeb, world.randomSeed(),
+                            "fixture 144 consumes all three authenticated "
+                                    + "0x4234CD draws");
+                }
+            }
+        }
+
+        assertEquals(83, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(Unit.Order.STILL, knight.order(),
+                "the sixth reachability scan releases the boxed defender");
+        assertNull(knight.target());
+        assertEquals(1869, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(0x20873cbc, world.battleNetRandomSeed(),
+                "the Attack-to-Still handoff pays native's same-visit active-order "
+                        + "idle draw before the later idle and projectile callbacks");
+        assertEquals(130, southernGuardTower.hitPoints(),
+                "BNE has not damaged the southern tower by fixture 145");
+        assertEquals(16, retargetingOgre.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's knight retains Attack until the dead-quarry tail scan")
+    void xhuman10KnightRetainsAttackUntilTheDeadQuarryTailScan() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        Unit knight = unitAt(world, "unit-knight", 84, 89);
+        // Authenticated native slot 1477 / Java action-table id 123. Its
+        // 81,89 coordinate belongs to the later fixture, not mission load.
+        Unit replacement = unitById(world, 123);
+        assertNotNull(knight, "XHuman 10 has no eastern knight on 84,89");
+        assertNotNull(replacement, "XHuman 10 has no replacement grunt on 81,89");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 136) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 133) {
+                Unit dyingGrunt = knight.target();
+                assertNotNull(dyingGrunt,
+                        "native keeps the dying quarry banked at fixture 133");
+                assertEquals("unit-grunt", dyingGrunt.type().ident(),
+                        "the banked quarry is the authenticated central grunt");
+                assertEquals(Unit.Order.DYING, dyingGrunt.order());
+                assertEquals(Unit.Order.ATTACK, knight.order(),
+                        "native keeps Attack while its script tail drains");
+                assertSame(dyingGrunt, knight.target(),
+                        "the dead quarry remains banked until the OP0 wrap");
+                assertEquals(1945, knight.battleNetSequenceOffset());
+                assertEquals(3, knight.battleNetAnimationTimer());
+            }
+        }
+
+        assertEquals(Unit.Order.ATTACK, knight.order());
+        assertSame(replacement, knight.target(),
+                "native tail OP0 hands the knight to the next adjacent grunt");
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(3, knight.battleNetAnimationTimer(),
+                "the replacement opens knight Attack construction 3");
+    }
 
     @Test
     @DisplayName("xhuman 10's opening grunt is hurt on cycle 54")
@@ -729,8 +912,12 @@ class Xhuman10DamageTimingRealDataTest {
         // grunt 1471 / Java 129 from native eight to four.
         Unit archer = unitAt(world, "unit-archer", 84, 85);
         Unit grunt = unitAt(world, "unit-grunt", 78, 93);
+        Unit dyingIncumbent = unitById(world, 105);
+        Unit thirdTarget = unitById(world, 118);
         assertNotNull(archer, "XHuman 10 has no archer on 84,85");
         assertNotNull(grunt, "XHuman 10 has no opening grunt on 78,93");
+        assertNotNull(dyingIncumbent, "XHuman 10 has no second archer target");
+        assertNotNull(thirdTarget, "XHuman 10 has no third archer target");
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
@@ -757,6 +944,25 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(51, archer.battleNetAnimationTimer());
         assertEquals(34, grunt.hitPoints(),
                 "fixture-104 melee must retain BNE's eight-damage async roll");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 154) {
+            mission.tick();
+        }
+        assertSame(dyingIncumbent, archer.target());
+        assertEquals(Unit.Order.DYING, dyingIncumbent.order());
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, archer.order(),
+                "a dying incumbent must not drop stationary ranged combat to Still");
+        assertSame(thirdTarget, archer.target(),
+                "native's OP0 free scan installs the live 80,88 grunt");
+        assertEquals(80, thirdTarget.tileX());
+        assertEquals(88, thirdTarget.tileY());
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(3, archer.battleNetAnimationTimer(),
+                "the third ranged engagement restarts Attack construction");
     }
 
     @Test
@@ -1022,4 +1228,5 @@ class Xhuman10DamageTimingRealDataTest {
         }
         return null;
     }
+
 }

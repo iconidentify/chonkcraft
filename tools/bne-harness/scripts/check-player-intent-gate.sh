@@ -102,9 +102,9 @@ minimums = {
     "processed_records": 3935,
     "processed_commands": 543,
     "submitted_orders": 189,
-    "accepted_orders": 159,
-    "progressed_orders": 154,
-    "fulfilled_orders": 153,
+    "accepted_orders": 158,
+    "progressed_orders": 151,
+    "fulfilled_orders": 150,
     "bound_native_units": 37,
 }
 for name, floor in minimums.items():
@@ -134,5 +134,5 @@ if stop.get("record") == 3935 and (
         or stop.get("native_unit") != 1526
         or stop.get("opcode") != 16):
     raise SystemExit(f"replay smoke gate: changed h3935 identity boundary {stop!r}")
-print("real BNE replay execution: PASS — 3935+ records, 153 objectives fulfilled")
+print("real BNE replay execution: PASS — 3935+ records, 150 objectives fulfilled")
 PY

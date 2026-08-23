@@ -48,6 +48,17 @@ public final class NetworkSession implements Closeable {
     private static final int MAX_PACKET_BYTES = 1200;
 
     /**
+     * Maximum receive work one simulation tick may perform.
+     *
+     * <p>Draining until the socket observes a quiet millisecond lets a resend
+     * storm monopolise the game thread indefinitely. That presents as a black
+     * or frozen client even though the process and network are still alive.
+     * Packets beyond this budget remain in the socket for the next tick; the
+     * lockstep resend path already recovers ordinary UDP loss.
+     */
+    static final int MAX_DATAGRAMS_PER_POLL = 128;
+
+    /**
      * How many commands fit in one packet.
      *
      * <p>Derived rather than written down, and that is the point. It used to
@@ -298,7 +309,9 @@ public final class NetworkSession implements Closeable {
         List<Batch> received = new ArrayList<>();
         byte[] buffer = new byte[MAX_PACKET_BYTES];
 
-        while (!closed.get()) {
+        for (int datagrams = 0;
+                datagrams < MAX_DATAGRAMS_PER_POLL && !closed.get();
+                datagrams++) {
             DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
             try {
                 socket.receive(packet);

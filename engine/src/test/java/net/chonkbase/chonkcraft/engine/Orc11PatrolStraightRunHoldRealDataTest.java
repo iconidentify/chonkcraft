@@ -11,22 +11,22 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Orc 11's type-two assault archer holds after a three-heading straight run.
+ * Orc 11's type-two assault archer is reissued by the periodic AI force pass.
  *
  * <p>Authenticated campaign-1800 fixture {@code retail-orc-11-idle}: archer
- * 1559 consumes its third consecutive north-east route byte onto 115,41, then
- * moves the route cursor to 20 on fixture 49. Native serves Still construction
- * 3,2,1 on fixtures 50 through 52 and commits the replacement north-east step
- * only on fixture 53. Java used to consume the fourth cached heading on
- * fixture 50.</p>
+ * 1559 is draining a north-east stride when the fifty-cycle player pass moves
+ * its route cursor to 20 on fixture 49 and writes Patrol as the replacement.
+ * Native serves Still construction 3,2,1 on fixtures 50 through 52 and commits
+ * the replacement north-east step only on fixture 53. The heading pattern is
+ * incidental; the periodic executive pass is the authenticated cause.</p>
  */
 class Orc11PatrolStraightRunHoldRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
-    @DisplayName("orc 11's assault archer holds through fixture 52 after three NE steps")
-    void orc11AssaultArcherHoldsThroughFixture52AfterThreeNorthEastSteps() {
+    @DisplayName("orc 11's periodic force pass holds the assault archer through fixture 52")
+    void orc11PeriodicForcePassHoldsAssaultArcherThroughFixture52() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
@@ -75,11 +75,11 @@ class Orc11PatrolStraightRunHoldRealDataTest {
         }
 
         assertEquals(115, xAt49,
-                "the third north-east step lands on 115,41 before the hold");
+                "the archer is draining on 115,41 when the periodic pass runs");
         assertEquals(41, yAt49,
                 "the third north-east step lands on native's 115,41");
         assertEquals(115, xAt50,
-                "Still construction must prevent the fourth step on fixture 50");
+                "replacement Still construction prevents a stale step on fixture 50");
         assertEquals(41, yAt50,
                 "the archer stays on 115,41 at the hold's first visit");
         assertEquals(115, xAt52,

@@ -548,6 +548,35 @@ class ConstructionTest {
     }
 
     @Test
+    void theOptionalTrainingQueueReservesFoodForPaidJobs() {
+        World world = richWorld(30);
+        world.setTrainingQueueEnabled(true);
+        UnitType trainerType = barracks();
+        trainerType.setSupply(1);
+        Unit trainer = world.createUnit(trainerType, 0, 5, 5);
+        world.recalculateSupply();
+
+        assertTrue(world.orderTrain(trainer, peasant()));
+        assertFalse(world.orderTrain(trainer, peasant()),
+                "the optional paid queue sold more food than the player owns");
+        assertEquals(1, trainer.trainingJobCount());
+    }
+
+    @Test
+    void nativeSingleJobTrainingDoesNotReserveAnotherBuildingsTrainee() {
+        World world = richWorld(30);
+        UnitType trainerType = barracks();
+        trainerType.setSupply(1);
+        Unit first = world.createUnit(trainerType, 0, 5, 5);
+        Unit second = world.createUnit(trainerType, 0, 10, 10);
+        world.recalculateSupply();
+
+        assertTrue(world.orderTrain(first, peasant()));
+        assertTrue(world.orderTrain(second, peasant()),
+                "retail CheckLimits reads live demand, not another building's trainee");
+    }
+
+    @Test
     void theTrainingQueueRefusesASeventhJobBeforeCharging() {
         World world = richWorld(30);
         world.setTrainingQueueEnabled(true);

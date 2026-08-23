@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test;
  * <p>Native single-player capacity 200 with ambient 0–2 never free. XHuman 10
  * free@42 is arrows 3/4/6 and rock 5; creation-order step put rock first and
  * spent the wrong splash ordinal. A traveler-count reorder fixed one map but
- * REGd others. Pool free/reuse is the general rule.
+ * REGd others. A presentation-only placeholder owns no pool slot until its
+ * native constructor, and pool free/reuse is the general rule.
  */
 class BattleNetProjectilePoolOrderTest {
 
@@ -118,6 +119,36 @@ class BattleNetProjectilePoolOrderTest {
         assertEquals(3, third.battleNetPoolSlot(),
                 "a freed low slot is reused before higher free indices "
                         + "(XHuman 10 free@42 arrows 3/4/6 rock 5)");
+    }
+
+    @Test
+    @DisplayName("a presentation placeholder takes its pool slot only at construction")
+    void presentationPlaceholderDoesNotReserveAheadOfARealProjectile() {
+        World world = new World(grass(16));
+        world.setMissileTypes(Map.of(
+                "missile-catapult-rock", rock(),
+                "missile-axe", axe()));
+        world.restoreRandom(1, 0);
+        Unit firstAttacker = world.createUnit(catapult(), 0, 2, 2);
+        Unit secondAttacker = world.createUnit(thrower(), 0, 2, 4);
+        Unit target = world.createUnit(footman(), 1, 8, 2);
+        assertTrue(firstAttacker != null && secondAttacker != null && target != null,
+                "units place");
+
+        Missile pendingRock = world.projectiles.launch(
+                firstAttacker, target, rock());
+        world.projectiles.queuePendingAttack(firstAttacker, pendingRock, 3);
+        assertEquals(-1, pendingRock.battleNetPoolSlot(),
+                "a pre-constructor presentation sprite reserved native state");
+
+        Missile realAxe = world.projectiles.launch(secondAttacker, target, axe());
+        world.prepareBattleNetProjectile(realAxe, true);
+        assertEquals(3, realAxe.battleNetPoolSlot(),
+                "the earlier real constructor did not take the lowest free slot");
+
+        world.prepareBattleNetProjectile(pendingRock, true);
+        assertEquals(4, pendingRock.battleNetPoolSlot(),
+                "the later constructor did not follow the earlier real shot");
     }
 
     @Test

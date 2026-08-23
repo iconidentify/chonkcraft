@@ -682,6 +682,11 @@ public final class SaveGame {
         if (unit.battleNetWoodReadyPathRequired()) {
             state.append(" woodReadyPathRequired = true,");
         }
+        if (unit.battleNetWoodTerminalRefusalHeading() >= 0) {
+            state.append(" woodTerminalRefusalHeading = ")
+                    .append(unit.battleNetWoodTerminalRefusalHeading())
+                    .append(",");
+        }
         if (unit.battleNetRangedAttackCadenceRemaining() != 0) {
             state.append(" rangedAttackCadenceRemaining = ")
                     .append(unit.battleNetRangedAttackCadenceRemaining())
@@ -723,11 +728,38 @@ public final class SaveGame {
         if (unit.battleNetDirectRefusalRecoveryProbe()) {
             state.append(" directRefusalRecoveryProbe = true,");
         }
+        if (unit.battleNetSaturatedNearRecoveryFullRoute()) {
+            state.append(" saturatedNearRecoveryFullRoute = true,");
+        }
+        if (unit.battleNetDirectRefusalReplacementBand()) {
+            state.append(" directRefusalReplacementBand = true,");
+        }
+        if (unit.battleNetDirectRecoveryGeneration() > 0) {
+            state.append(" directRecoveryGeneration = ")
+                    .append(unit.battleNetDirectRecoveryGeneration())
+                    .append(",");
+        }
         if (unit.battleNetRetargetResidualParkRefill()) {
             state.append(" retargetResidualParkRefill = true,");
             state.append(" retargetResidualParkSteps = ")
                     .append(unit.battleNetRetargetResidualParkSteps())
                     .append(",");
+        }
+        if (unit.battleNetParkedRefusalHeading() >= 0) {
+            state.append(" parkedRefusalHeading = ")
+                    .append(unit.battleNetParkedRefusalHeading())
+                    .append(",");
+        }
+        if (unit.battleNetSaturatedWallFacePairHeading() >= 0) {
+            state.append(" saturatedWallFacePairHeading = ")
+                    .append(unit.battleNetSaturatedWallFacePairHeading())
+                    .append(",");
+        }
+        if (unit.battleNetSaturatedWallFacePairParked()) {
+            state.append(" saturatedWallFacePairParked = true,");
+        }
+        if (unit.battleNetSaturatedRetargetRouteBand()) {
+            state.append(" saturatedRetargetRouteBand = true,");
         }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");

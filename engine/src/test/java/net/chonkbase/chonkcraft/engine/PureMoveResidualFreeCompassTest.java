@@ -300,10 +300,11 @@ class PureMoveResidualFreeCompassTest {
     }
 
     @Test
-    @DisplayName("a patrol walk discards leftover path after three consecutive ne steps")
-    void aPatrolWalkDiscardsLeftoverPathAfterThreeConsecutiveNeSteps() {
-        // Orc 11 archer 1559: native ri→20 after three NE; Java free-stepped
-        // the fourth at fixture 50 (native step@53).
+    @DisplayName("a type-two patrol keeps its fourth identical route heading")
+    void aTypeTwoPatrolKeepsItsFourthIdenticalRouteHeading() {
+        // Route shape does not dispatch BNE's AI executive. The recurring
+        // fifty-cycle force pass owns route-index 20; an uninterrupted patrol
+        // must keep every cached heading between those passes.
         GameMap map = grass(40);
         World world = new World(map);
         world.fog().revealAll(0);
@@ -323,14 +324,19 @@ class PureMoveResidualFreeCompassTest {
         takePatrolTileSteps(world, archer, 3);
         assertEquals(13, archer.tileX(), "three NE from 10,20 lands x 13");
         assertEquals(17, archer.tileY(), "three NE from 10,20 lands y 17");
-        assertEquals(0, archer.pathLength(),
-                "third consecutive NE discards leftover path (native ri 20)");
+        assertEquals(5, archer.pathLength(),
+                "three identical steps do not synthesize an AI force pass");
+
+        takePatrolTileSteps(world, archer, 1);
+        assertEquals(14, archer.tileX(), "the fourth NE remains executable");
+        assertEquals(16, archer.tileY(), "the fourth NE remains executable");
+        assertEquals(4, archer.pathLength(),
+                "only the committed fourth heading is consumed");
     }
 
     @Test
-    @DisplayName("a patrol walk keeps leftover until the third consecutive same heading")
-    void aPatrolWalkKeepsLeftoverUntilTheThirdConsecutiveSameHeading() {
-        // Knight 1558: NW then NE×3 -- only the third consecutive NE discards.
+    @DisplayName("a heading change followed by three equal headings keeps its tail")
+    void aHeadingChangeFollowedByThreeEqualHeadingsKeepsItsTail() {
         GameMap map = grass(40);
         World world = new World(map);
         world.fog().revealAll(0);
@@ -352,8 +358,8 @@ class PureMoveResidualFreeCompassTest {
                 "after NW+NE+NE leftover remains (trailing run is only 2)");
 
         takePatrolTileSteps(world, knight, 1);
-        assertEquals(0, knight.pathLength(),
-                "third consecutive NE (fourth tile step) discards leftover");
+        assertEquals(3, knight.pathLength(),
+                "the route tail survives NW+NE+NE+NE until the AI pass");
     }
 
     @Test

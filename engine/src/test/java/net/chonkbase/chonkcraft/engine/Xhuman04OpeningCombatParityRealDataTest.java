@@ -21,6 +21,59 @@ class Xhuman04OpeningCombatParityRealDataTest {
     private static final int INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("xhuman 4's melee loop restores its banked retaliation target")
+    void xhuman4MeleeLoopRestoresItsBankedRetaliationTarget() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        // Sealed native slot 1510 / Java 90 begins at 71,60. Its completed
+        // swing temporarily selects the northern grunt on fixture 110, while
+        // the central grunt which struck it remains the order's offered
+        // target. Native prices that offer again after Attack construction
+        // and restores it on fixture 113. Losing the offer makes the next
+        // swing hit the north grunt five points early on fixture 146.
+        Unit footman = unitAt(world, "unit-footman", 71, 60);
+        Unit northGrunt = unitAt(world, "unit-grunt", 77, 59);
+        Unit offeredGrunt = unitAt(world, "unit-grunt", 77, 60);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1510 footman");
+        assertNotNull(northGrunt, "XHuman 4 has no native-slot-1520 grunt");
+        assertNotNull(offeredGrunt, "XHuman 4 has no native-slot-1515 grunt");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 110) {
+            mission.tick();
+        }
+        assertSame(northGrunt, footman.target(),
+                "the Attack tail must first select the northern grunt");
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(3, footman.battleNetAnimationTimer(),
+                "the tail retarget restarts native Attack construction");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 113) {
+            mission.tick();
+        }
+        assertSame(offeredGrunt, footman.target(),
+                "the completed constructor must restore the banked attacker");
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(23, footman.battleNetAnimationTimer(),
+                "the restored retaliation target owns the committed body hold");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 146) {
+            mission.tick();
+        }
+        assertEquals(37, northGrunt.hitPoints(),
+                "the footman must not redirect its next blow to the wrong grunt");
+    }
+
+    @Test
     @DisplayName("xhuman 4's blocked attackers keep native combat cadence")
     void xhuman4BlockedAttackersKeepNativeCombatCadence() {
         AssetSource assets = AssetSource.fromEnvironment();

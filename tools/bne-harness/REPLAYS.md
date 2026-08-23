@@ -32,10 +32,11 @@ aggregate, compiles all 764,756 native dispatcher records, then checks Java's
 exact ordered fan-out, nine-unit cap, acceptance recording, and progress by
 every member of a congested 3×3 group. It also reconstructs the authenticated
 Garden of War startup and executes the proved command subset in the Java
-engine. The current certified floor is 3,935 dispatcher records, 543 decoded
-commands, 189 submitted unit orders, 159 dispatcher acceptances, 154 orders
-with a physical effect or proved blocked-goal settlement, and 153 fulfilled
-objectives across 37 bound native units. Those figures describe the retained
+engine with ChonkCraft's optional multi-job training queue disabled, as it is
+in retail BNE. The current certified floor is 3,935 dispatcher records, 543
+decoded commands, 189 submitted unit orders, 158 dispatcher acceptances, 151
+orders with a physical effect or proved blocked-goal settlement, and 150
+fulfilled objectives across 37 bound native units. Those figures describe the retained
 Garden of War prefix gate, not complete replay-corpus outcome certification.
 Execution stops fail-closed at native unit 1526's first unsupported
 identity at record 3,935; moving that proved boundary forward is an

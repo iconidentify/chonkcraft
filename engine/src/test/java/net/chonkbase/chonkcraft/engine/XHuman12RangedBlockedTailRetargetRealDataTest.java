@@ -73,11 +73,105 @@ class XHuman12RangedBlockedTailRetargetRealDataTest {
                 "an exhausted blocked tail does not buy a ranged teardown hold");
     }
 
+    @Test
+    @DisplayName("xhuman 12 knight takes native melee damage on fixture 132")
+    void xhuman12KnightTakesNativeMeleeDamageOnFixture132() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx12h",
+                GameData.personIn(data.campaignMap(
+                        "campaigns/human-exp/levelx12h")), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Java unit 125 pairs with sealed-native slot 1475. Native remains at
+        // 90 HP through fixture 131 and the grunt hit lowers it to 87 at 132.
+        Unit knight = unitById(world, 125);
+        Unit detourOgre = unitById(world, 102);
+        Unit longRouteAxe = unitById(world, 77);
+        Unit retainedRouteGrunt = unitById(world, 137);
+        assertNotNull(knight, "XHuman 12 has no Java/native-paired knight 125");
+        assertNotNull(detourOgre,
+                "XHuman 12 has no Java/native-paired detour ogre 102");
+        assertNotNull(longRouteAxe,
+                "XHuman 12 has no Java/native-paired long-route axe 77");
+        assertNotNull(retainedRouteGrunt,
+                "XHuman 12 has no Java/native-paired retained-route grunt 137");
+        assertEquals("unit-knight", knight.type().ident(),
+                "the stable fixture ID must still identify the focus knight");
+        assertEquals("unit-ogre", detourOgre.type().ident(),
+                "the stable fixture ID must still identify the detour ogre");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        int hpAt131 = -1;
+        int hpAt132 = -1;
+        int hpAt138 = -1;
+        int axeSequenceAt124 = -1;
+        int retainedGruntXAt139 = -1;
+        int retainedGruntYAt139 = -1;
+        Unit.Order ogreOrderAt133 = null;
+        while (world.cycle() < BNE_INITIALIZATION_TICKS + 139) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 124) {
+                axeSequenceAt124 = longRouteAxe.battleNetSequenceOffset();
+            }
+            if (fixture == 131) {
+                hpAt131 = knight.hitPoints();
+            }
+            if (fixture == 132) {
+                hpAt132 = knight.hitPoints();
+            }
+            if (fixture == 133) {
+                ogreOrderAt133 = detourOgre.order();
+            }
+            if (fixture == 138) {
+                hpAt138 = knight.hitPoints();
+            }
+            if (fixture == 139) {
+                retainedGruntXAt139 = retainedRouteGrunt.tileX();
+                retainedGruntYAt139 = retainedRouteGrunt.tileY();
+            }
+        }
+
+        assertEquals(90, hpAt131,
+                "the focus knight must be undamaged through fixture 131");
+        assertEquals(87, hpAt132,
+                "native damage draw 12252 deals three on fixture 132");
+        assertEquals(Unit.Order.STILL, ogreOrderAt133,
+                "a one-heading detour ending beside an occupied Move goal "
+                        + "must stand down instead of gliding along stale tail bytes");
+        assertEquals(888, axeSequenceAt124,
+                "a nearly-full ranged route that lands in range has already "
+                        + "paid OP0 and must enter the attack body");
+        assertEquals(83, hpAt138,
+                "the resulting projectile constructor must preserve BNE's "
+                        + "later combat-damage ownership");
+        assertEquals(21, retainedGruntXAt139,
+                "the first cooperative refusal of a retained route must not "
+                        + "insert an extra staged-refill callback");
+        assertEquals(58, retainedGruntYAt139);
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null
                     && ident.equals(unit.type().ident())
                     && unit.tileX() == x && unit.tileY() == y) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }

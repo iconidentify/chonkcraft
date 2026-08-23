@@ -72,6 +72,7 @@ class BattleNetMovementPlayabilityTest {
 
     private static boolean playerMoveInFlight(Unit unit) {
         return unit.order() == Unit.Order.MOVE
+                || unit.battleNetPlayerCommandMove()
                 || unit.hasQueuedOrders()
                 || unit.queuedReplacementPending();
     }
@@ -86,7 +87,12 @@ class BattleNetMovementPlayabilityTest {
             world.tick();
         }
         assertEquals(Unit.Order.STILL, unit.order(),
-                "the player move never reached a completed state");
+                "the player move never reached a completed state: saved="
+                        + unit.savedOrder() + ", scout="
+                        + unit.battleNetScoutPatrol() + ", playerMove="
+                        + unit.battleNetPlayerCommandMove() + ", at="
+                        + unit.tileX() + "," + unit.tileY() + ", goal="
+                        + unit.orderTargetX() + "," + unit.orderTargetY());
         assertTrue(!unit.hasQueuedOrders() && !unit.queuedReplacementPending(),
                 "the player move never popped its queued dest");
     }
@@ -140,6 +146,79 @@ class BattleNetMovementPlayabilityTest {
         assertTrue(gryphon.tileX() >= 24,
                 "the aircraft treated an impassable ground wall as flight terrain: "
                         + gryphon.tileX() + "," + gryphon.tileY());
+    }
+
+    @Test
+    @DisplayName("a player move permanently replaces a footman's patrol")
+    void aPlayerMovePermanentlyReplacesAFootmanPatrol() {
+        Fixture fixture = fixture(map(40, 32, TileFlag.LAND_ALLOWED));
+        Unit footman = place(fixture, "unit-footman", 8, 16);
+
+        assertTrue(fixture.commands().apply(GameCommand.patrol(
+                        0, footman.id(), 28, 16)),
+                "the player Patrol command was refused");
+        for (int cycle = 0; cycle < 200
+                && !(footman.order() == Unit.Order.PATROL
+                        && (footman.isMoving() || footman.offsetX() != 0)); cycle++) {
+            fixture.world().tick();
+        }
+        assertEquals(Unit.Order.PATROL, footman.order(),
+                "the fixture never entered the player's Patrol");
+
+        assertTrue(fixture.commands().apply(GameCommand.move(
+                        0, footman.id(), 8, 24)),
+                "the replacement Move command was refused");
+        runToRest(fixture.world(), footman, 4_000);
+        int settledX = footman.tileX();
+        int settledY = footman.tileY();
+        for (int cycle = 0; cycle < 120; cycle++) {
+            fixture.world().tick();
+        }
+
+        assertEquals(Unit.Order.STILL, footman.order(),
+                "the old player Patrol resumed after the replacement Move");
+        assertEquals(null, footman.savedOrder(),
+                "a player Patrol was retained as an autonomous scout order");
+        assertEquals(settledX, footman.tileX(),
+                "the footman left the player's replacement destination");
+        assertEquals(settledY, footman.tileY(),
+                "the footman left the player's replacement destination");
+    }
+
+    @Test
+    @DisplayName("Stop breaks a footman's patrol after its committed pixels land")
+    void stopBreaksAFootmanPatrolAfterItsCommittedPixelsLand() {
+        Fixture fixture = fixture(map(40, 32, TileFlag.LAND_ALLOWED));
+        Unit footman = place(fixture, "unit-footman", 8, 16);
+
+        assertTrue(fixture.commands().apply(GameCommand.patrol(
+                        0, footman.id(), 28, 16)),
+                "the player Patrol command was refused");
+        for (int cycle = 0; cycle < 200
+                && !(footman.order() == Unit.Order.PATROL
+                        && (footman.isMoving() || footman.offsetX() != 0)); cycle++) {
+            fixture.world().tick();
+        }
+        assertEquals(Unit.Order.PATROL, footman.order(),
+                "the fixture never entered Patrol");
+        assertTrue(fixture.commands().apply(GameCommand.stop(0, footman.id())),
+                "the player Stop command was refused");
+
+        for (int cycle = 0; cycle < 200
+                && (footman.order() != Unit.Order.STILL
+                        || footman.offsetX() != 0 || footman.offsetY() != 0); cycle++) {
+            fixture.world().tick();
+        }
+        assertEquals(Unit.Order.STILL, footman.order(),
+                "Stop never released the Patrol order");
+        assertEquals(0, footman.offsetX(),
+                "Stop froze the committed Patrol pixels horizontally");
+        assertEquals(0, footman.offsetY(),
+                "Stop froze the committed Patrol pixels vertically");
+        assertEquals(null, footman.savedOrder(),
+                "Stop left a Patrol continuation behind");
+        assertFalse(footman.hasBattleNetPendingPatrol(),
+                "Stop left an autonomous Patrol constructor armed");
     }
 
     @Test

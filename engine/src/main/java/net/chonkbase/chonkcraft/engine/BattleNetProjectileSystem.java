@@ -83,6 +83,17 @@ final class BattleNetProjectileSystem {
             return;
         }
 
+        // This object exists early only for ChonkCraft's independent attack
+        // presentation. Retail has not called FUN_0040fb10 yet, so it cannot
+        // reserve a fixed projectile-pool slot. Reserving one here swapped a
+        // later native arrow and rock in XHuman 10: the rock occupied slot 4
+        // before its constructor while the earlier real arrow was forced to
+        // slot 5. At free@42 Java then resolved the rock between the wrong two
+        // travelers, assigning the splash and every later damage roll the
+        // wrong asynchronous RNG draw.
+        world.freeBattleNetProjectileSlot(shot.battleNetPoolSlot());
+        shot.setBattleNetPoolSlot(-1);
+
         // A broken save records an overwritten placeholder as pending=false,
         // because only the newer value remains in the owner map. It is still
         // recognizable: same source, no constructor, no motion and no start.
@@ -194,6 +205,12 @@ final class BattleNetProjectileSystem {
         if (shot.battleNetConstructorDrawn()) {
             return;
         }
+        // A presentation placeholder deliberately owns no native pool entry.
+        // Allocate at the real constructor boundary so simultaneous shots take
+        // the same low-free-slot order BNE does.
+        if (shot.battleNetPoolSlot() < 0) {
+            shot.setBattleNetPoolSlot(world.allocateBattleNetProjectileSlot());
+        }
         Unit attacker = shot.source();
         Unit target = shot.target();
         long queued = world.battleNetPendingProjectileQueuedCycle
@@ -231,6 +248,10 @@ final class BattleNetProjectileSystem {
             shot.applyBattleNetAimJitter(offsetX, offsetY);
         }
         shot.setBattleNetConstructorDrawn(true);
+        // Constructor ownership also owns the attack sound and causal birth.
+        // Recording this later at motion-arm made an early constructor audible
+        // several cycles after the projectile became native state.
+        recordProjectileCreate(shot);
     }
 
 
@@ -247,6 +268,10 @@ final class BattleNetProjectileSystem {
         boolean presentationAhead = shot.battleNetConstructorDrawn();
         if (!presentationAhead) {
             debitBattleNetProjectileConstructor(shot, mobileShot);
+        } else if (shot.battleNetPoolSlot() < 0) {
+            // Compatibility for a loaded pending shot saved between an older
+            // constructor debit and motion arm.
+            shot.setBattleNetPoolSlot(world.allocateBattleNetProjectileSlot());
         }
         // Remaining distance and the 0x00429fa0 direction state are part of the
         // same constructor boundary. Without them a ChonkCraft arrow at speed 32
@@ -286,7 +311,6 @@ final class BattleNetProjectileSystem {
             }
         }
         world.battleNetProjectileStartCycles.put(shot, startCycle);
-        recordProjectileCreate(shot);
     }
 
     /** Numeric identities proved against BNE's type byte for corpus weapons. */
@@ -334,6 +358,7 @@ final class BattleNetProjectileSystem {
                 "target_pixel_y", target == null ? -1 : target.pixelY(),
                 "target_residual_x", target == null ? 0 : target.residualX(),
                 "target_residual_y", target == null ? 0 : target.residualY(),
+                "damage", missile.damage(),
                 "remaining", missile.battleNetRemaining());
     }
 
@@ -354,6 +379,7 @@ final class BattleNetProjectileSystem {
                 "type_ident", missile.type() == null ? null : missile.type().ident(),
                 "source", source == null ? -1 : source.id(),
                 "target", target == null ? -1 : target.id(),
+                "damage", missile.damage(),
                 "remaining", missile.battleNetRemaining());
     }
 
@@ -376,7 +402,11 @@ final class BattleNetProjectileSystem {
             // update. The legacy declaration's 20 landed both crossing
             // battleship shells five fixture cycles early.
             case "missile-big-cannon" -> 12;
-            case "missile-arrow", "missile-axe" -> 12;
+            case "missile-arrow", "missile-axe",
+                    // Native action 7 reads 12 for type-2 Dragon breath. The
+                    // generated legacy declaration says 16, which made both
+                    // flying factions reach the target and disappear early.
+                    "missile-dragon-breath", "missile-griffon-hammer" -> 12;
             // Table 0x00494e0c type 24 is 16; ChonkCraft missiles.legacy-declaration used 22 and
             // delivered XHuman 10 cannon bolts several ticks early.
             case "missile-small-cannon" -> 16;
@@ -424,7 +454,7 @@ final class BattleNetProjectileSystem {
         // floor of 1). Equal-armor tower vs ogre is therefore piercing only
         // (12). With the half-band below, native seed result 8100 stores 7
         // (6 + 8100%7); flooring basic-armor at 1 made maximum 13 and 11.
-        if (missile.splashes()) {
+        if (usesBattleNetFixedSplashDamage(missile)) {
             // BNE's siege projectile types take the fixed/max arm at
             // 0x0040fbe0: weapon basic+piercing only, no target armor. Armor
             // is applied per splash victim in resolveBattleNetSplash. Storing
@@ -449,6 +479,19 @@ final class BattleNetProjectileSystem {
         }
         int rolled = half + world.battleNetRand() % (half + 1);
         return Math.min(0xff, rolled);
+    }
+
+    /** Whether this is one of BNE's artillery fixed-damage splash weapons. */
+    private static boolean usesBattleNetFixedSplashDamage(MissileType type) {
+        if (type == null || type.ident() == null) {
+            return false;
+        }
+        return switch (type.ident()) {
+            case "missile-big-cannon", "missile-catapult-rock",
+                    "missile-ballista-bolt", "missile-small-cannon",
+                    "missile-small-cannon-super" -> true;
+            default -> false;
+        };
     }
 
 
@@ -592,7 +635,11 @@ final class BattleNetProjectileSystem {
                         world.battleNetRand();
                     }
                 } else if (missile.type().missileClass()
-                        == MissileClass.POINT_TO_POINT) {
+                        == MissileClass.POINT_TO_POINT
+                        || missile.type().missileClass()
+                                == MissileClass.POINT_TO_POINT_BOUNCE) {
+                    // Action 7 begins with the same asynchronous draw on
+                    // every update as native point motion (0x00410c45).
                     world.battleNetRand();
                 }
             }
@@ -805,11 +852,14 @@ final class BattleNetProjectileSystem {
             if (hit.metric() > 0x1ff) {
                 maximum >>= 2;
             }
-            UpgradeState targetUpgrades = world.upgrades(candidate.player());
-            int armor = targetUpgrades != null
-                    ? targetUpgrades.armor(candidate.type())
-                    : candidate.type().armor();
-            maximum -= armor;
+            if (missile.type().missileClass()
+                    != MissileClass.POINT_TO_POINT_BOUNCE) {
+                UpgradeState targetUpgrades = world.upgrades(candidate.player());
+                int armor = targetUpgrades != null
+                        ? targetUpgrades.armor(candidate.type())
+                        : candidate.type().armor();
+                maximum -= armor;
+            }
             if (maximum < 1) {
                 continue;
             }
@@ -834,12 +884,21 @@ final class BattleNetProjectileSystem {
             // non-lethal bridge to AI defenders; person melee splash
             // recruitment has its separately proved lethal-only policy below.
             AiPlayer targetAi = world.ais.get(candidate.player());
-            if (targetAi != null
-                    && !world.isPerson(candidate.player())
+            boolean person = world.isPerson(candidate.player());
+            boolean personNavalHit = person && candidate.type() != null
+                    && candidate.type().moveType() == UnitType.Movement.NAVAL;
+            if ((!person || personNavalHit)
                     && source != null
                     && (candidate.type() == null
                             || !candidate.type().wall())) {
-                targetAi.helpMe(world, source, candidate);
+                // HitUnit's local offer exists even when this map-authored
+                // computer has no Lua AI object. The force roster is an
+                // optional second response; coupling the spatial offer to it
+                // left XOrc 11's unrostered destroyers inert after taking a
+                // cannon splash.
+                if (targetAi != null && !person) {
+                    targetAi.helpMe(world, source, candidate);
+                }
                 world.battleNetSpatialHitHelp(source, candidate);
             }
             // Lethal splash keeps last living HP on the corpse (melee path
@@ -884,6 +943,26 @@ final class BattleNetProjectileSystem {
             // building hit itself the moment it was repaired.
             return;
         }
+        // BNE action 7 is a piercing close-flight state machine, not the
+        // legacy onward-bounce arm and not a one-time goal hit. Every eighth
+        // close update calls the native area resolver and then creates its
+        // impact sprite while the original shot continues. Its eventual
+        // action-6 visit instead applies the stored direct damage to the
+        // original target, with no extra pulse sprite.
+        if (type.missileClass() == MissileClass.POINT_TO_POINT_BOUNCE
+                && world.battleNetProjectileStartCycles.containsKey(missile)) {
+            impactSound(missile);
+            if (!missile.hasArrived()) {
+                resolveBattleNetSplash(missile);
+                impactMissile(missile);
+            } else {
+                Unit target = missile.target();
+                if (target != null && target.isAlive() && !target.isDying()) {
+                    world.combat.applyDamage(source, target, 1, missile);
+                }
+            }
+            return;
+        }
         // Both of these come before the ownerless early return below, which is
         // where upstream puts them (above the "no owner -
         // green-cross ..." guard). That ordering is the reason a crater is
@@ -898,7 +977,7 @@ final class BattleNetProjectileSystem {
         // ChonkCraft tile falloff + damageFor treating stored 50 as a spell
         // override selected six units for 16 each on XHuman 10; native hits
         // four for 10/7/7/8. Flight/impact coordinate are already correct.
-        if (type.splashes() && missile.damage() != 0
+        if (usesBattleNetFixedSplashDamage(type) && missile.damage() != 0
                 && world.battleNetProjectileStartCycles.containsKey(missile)) {
             resolveBattleNetSplash(missile);
             return;

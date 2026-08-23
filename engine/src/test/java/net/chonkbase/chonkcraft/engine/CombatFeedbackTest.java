@@ -256,22 +256,22 @@ class CombatFeedbackTest {
     // ------------------------------------------------ finding 4: NumBounces
 
     @Test
-    @DisplayName("retail dragon breath does not inherit ChonkCraft onward bounces")
-    void battleNetDragonBreathDoesNotReuseChonkCraftNumBounces() {
+    @DisplayName("retail dragon breath uses action-seven pulses, not NumBounces hops")
+    void battleNetDragonBreathUsesActionSevenPulses() {
         World world = new World(grass(40));
         world.setMissileTypes(Map.of(
                 "missile-dragon-breath", shot("missile-dragon-breath", null, null,
-                        2, 3, MissileClass.POINT_TO_POINT_BOUNCE)));
+                        2, 0, MissileClass.POINT_TO_POINT_BOUNCE)));
 
         UnitType dragon = soldier("unit-dragon");
         dragon.setMissile("missile-dragon-breath");
         dragon.setMaxAttackRange(20);
         Unit flier = world.createUnit(dragon, 0, 4, 20);
 
-        // A line of enemies a tile and a half apart along the flight path, so
-        // each detonation catches a different one. Upstream extends the
-        // destination by forty-eight pixels a hop, so the second lands between
-        // the sixteenth and seventeenth columns and the third past that.
+        // Action seven keeps flying straight past the aimed unit and pulses
+        // every eight close-flight updates. Give this synthetic type zero
+        // declared bounces: all three units are still on action seven's line,
+        // proving the native counter is independent of NumBounces.
         Unit first = world.createUnit(post("unit-a"), 1, 16, 20);
         Unit second = world.createUnit(post("unit-b"), 1, 18, 20);
         Unit third = world.createUnit(post("unit-c"), 1, 19, 20);
@@ -283,10 +283,10 @@ class CombatFeedbackTest {
         }
 
         assertTrue(first.hitPoints() < whole, "the shot never hit what it was aimed at");
-        assertEquals(whole, second.hitPoints(),
-                "the BNE projectile action grew a LegacyEngine onward-bounce arm");
-        assertEquals(whole, third.hitPoints(),
-                "the BNE projectile action travelled onward a third time");
+        assertTrue(second.hitPoints() < whole,
+                "the native close-flight pulse never reached the second unit");
+        assertTrue(third.hitPoints() < whole,
+                "the BNE action incorrectly stopped at declared NumBounces zero");
     }
 
     @Test

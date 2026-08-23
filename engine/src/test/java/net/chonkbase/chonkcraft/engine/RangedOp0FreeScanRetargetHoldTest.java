@@ -166,7 +166,10 @@ class RangedOp0FreeScanRetargetHoldTest {
         assertEquals(attackStart, attacker.battleNetSequenceOffset(),
                 "retarget must stay on attack-start, not enter windup");
 
-        // Next in-range OP0 seals timer 63 (approach-style post-retarget hold).
+        // The authenticated XHuman 10 visit has exhausted its prior cadence;
+        // the next in-range OP0 therefore seals timer 63. A synthetic partial
+        // cadence is not equivalent: Human 13 proves mobile-to-mobile scans
+        // preserve that remaining wall-clock state.
         guard = 0;
         while (attacker.battleNetAnimationTimer() != 63 && guard++ < 16) {
             world.tick();

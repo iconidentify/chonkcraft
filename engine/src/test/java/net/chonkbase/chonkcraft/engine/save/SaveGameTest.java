@@ -792,6 +792,7 @@ class SaveGameTest {
         worker.setCarrying(UnitType.Resource.WOOD);
         worker.setBattleNetOrderDelay(2);
         worker.setBattleNetWoodReadyPathRequired(true);
+        worker.setBattleNetWoodTerminalRefusalHeading(3);
 
         Unit loaded = find(reload(bench), "unit-peasant");
 
@@ -799,6 +800,8 @@ class SaveGameTest {
         assertEquals(2, loaded.battleNetOrderDelay());
         assertTrue(loaded.battleNetWoodReadyPathRequired(),
                 "reload must not turn native's path-gated retry into an immediate chop");
+        assertEquals(3, loaded.battleNetWoodTerminalRefusalHeading(),
+                "reload must preserve the terminal resource wall face");
     }
 
     @Test
@@ -853,6 +856,14 @@ class SaveGameTest {
         attacker.setOrder(Unit.Order.ATTACK);
         attacker.setTarget(target);
         attacker.setBattleNetAttackRefusalRecoveryStage(5);
+        attacker.setBattleNetDirectRefusalRecoveryProbe(true);
+        attacker.setBattleNetSaturatedNearRecoveryFullRoute(true);
+        attacker.setBattleNetDirectRefusalReplacementBand(true);
+        attacker.setBattleNetDirectRecoveryGeneration(7);
+        attacker.setBattleNetParkedRefusalHeading(1);
+        attacker.setBattleNetSaturatedWallFacePairHeading(5);
+        attacker.setBattleNetSaturatedWallFacePairParked(true);
+        attacker.setBattleNetSaturatedRetargetRouteBand(true);
 
         Unit loaded = find(reload(bench), "unit-knight");
 
@@ -860,6 +871,19 @@ class SaveGameTest {
         assertEquals(5, loaded.battleNetAttackRefusalRecoveryStage(),
                 "reloading during hard-refusal Attack 3,2,1 must not free "
                         + "the chase early");
+        assertTrue(loaded.battleNetDirectRefusalRecoveryProbe());
+        assertTrue(loaded.battleNetSaturatedNearRecoveryFullRoute(),
+                "the saturated near-approach handoff must survive a save");
+        assertTrue(loaded.battleNetDirectRefusalReplacementBand());
+        assertEquals(7, loaded.battleNetDirectRecoveryGeneration(),
+                "the bounded refusal generation must survive a mid-jam save");
+        assertEquals(1, loaded.battleNetParkedRefusalHeading(),
+                "the parked native wall face must survive a mid-jam save");
+        assertEquals(5, loaded.battleNetSaturatedWallFacePairHeading());
+        assertTrue(loaded.battleNetSaturatedWallFacePairParked(),
+                "the shared route buffer must survive a mid-jam save");
+        assertTrue(loaded.battleNetSaturatedRetargetRouteBand(),
+                "the paid retarget buffer must survive a mid-jam save");
     }
 
     @Test

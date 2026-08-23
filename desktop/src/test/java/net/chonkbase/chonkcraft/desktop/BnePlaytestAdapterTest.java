@@ -82,8 +82,8 @@ class BnePlaytestAdapterTest {
     }
 
     @Test
-    @DisplayName("a human 1 footman accepts a field move as the person player")
-    void aHuman1FootmanAcceptsAFieldMoveAsThePersonPlayer() throws Exception {
+    @DisplayName("the native injector rejects a human 1 owner outside local slot zero")
+    void theNativeInjectorRejectsAHuman1OwnerOutsideLocalSlotZero() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
                 "No Warcraft II installation configured (-Dwc2.install.dir). ");
         Path directory = Files.createTempDirectory("bne-playtest-human01-");
@@ -128,10 +128,10 @@ class BnePlaytestAdapterTest {
         List<?> observations = (List<?>) result.get("observations");
         assertEquals(1, observations.size(), "the footman order must be observed");
         Map<?, ?> observation = (Map<?, ?>) observations.getFirst();
-        assertEquals(Boolean.TRUE, observation.get("accepted"),
-                "Human 1's person is owner 1; the starting footman must accept");
-        assertNotNull(observation.get("first_progress_cycle"),
-                "the footman must physically start walking");
+        assertEquals(Boolean.FALSE, observation.get("accepted"),
+                "the fixture injector guards GiveOrder with BNE local slot zero");
+        assertEquals("rejected", observation.get("terminal_reason"),
+                "an out-of-slot fixture command is a refusal, not no-progress");
     }
 
     @Test

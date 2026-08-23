@@ -40,6 +40,32 @@ class BattleNetFlyerPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 7's balloon keeps its cached north heading near the scout point")
+    void xOrc7BalloonDoesNotInheritTheNavalFreeCloserRewrite() {
+        Mission mission = mission("campaigns/orc-exp/levelx07o");
+        Unit balloon = at(mission.world(), "unit-balloon", 78, 50);
+        assertNotNull(balloon, "XOrc 7 has no native slot-1511 balloon");
+
+        tickThrough(mission, 125);
+        assertEquals(Unit.Order.PATROL, balloon.order());
+        assertEquals(68, balloon.tileX());
+        assertEquals(36, balloon.tileY());
+        assertEquals(2, balloon.pathLength(),
+                "native retains N,NW after the seventh doubled stride");
+        assertEquals(0, balloon.peekHeading(),
+                "the next native compass byte is north");
+
+        tickThrough(mission, 145);
+        assertEquals(Unit.Order.PATROL, balloon.order());
+        assertEquals(68, balloon.tileX(),
+                "air Patrol must not take the destroyer-only free-closer NW");
+        assertEquals(34, balloon.tileY(),
+                "the cached north byte lands on the native air lattice");
+        assertEquals(1, balloon.pathLength(),
+                "the final cached NW byte remains after the north stride");
+    }
+
+    @Test
     @DisplayName("XOrc 8's corner gryphon waits for Patrol construction and detours")
     void xOrc8CornerGryphonWaitsForPatrolConstructionAndDetours() {
         Mission mission = mission("campaigns/orc-exp/levelx08o");

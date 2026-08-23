@@ -85,6 +85,13 @@ public final class BneReplaySmokeCertification {
             World world = new World(
                     GameMap.from(source, data.loadTileset(source.tileset()).tileset()), players);
             data.configureWorld(world, source);
+            // The desktop enables ChonkCraft's optional multi-job production
+            // queue. Retail BNE has no paid backlog at this command boundary:
+            // a train click while the building is already producing is
+            // refused. Replay execution must exercise that native contract,
+            // especially now that the authenticated training animation lasts
+            // long enough for several later packets to reach the same hall.
+            world.setTrainingQueueEnabled(false);
             int placed = data.populate(world, source);
             world.recalculateSupply();
             world.fireBattleNetReadyForAll();

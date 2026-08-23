@@ -615,15 +615,16 @@ class PresentationAheadProjectilePrepareTest {
         Missile pending = world.missiles().get(0);
         assertFalse(pending.battleNetConstructorDrawn(),
                 "the fixture must still be before opcode ten");
-        int slot = pending.battleNetPoolSlot();
+        assertEquals(-1, pending.battleNetPoolSlot(),
+                "a presentation-only shot must not reserve a native pool slot");
 
         world.kill(shooter);
 
         assertTrue(world.missiles().isEmpty(),
                 "an unconstructed axe survived destruction of its attack order");
         assertTrue(world.battleNetPendingProjectileShots.isEmpty());
-        assertFalse(world.battleNetProjectileSlots[slot],
-                "the cancelled placeholder leaked its fixed BNE pool slot");
+        assertEquals(-1, pending.battleNetPoolSlot(),
+                "cancelling the placeholder manufactured a pool reservation");
     }
 
     @Test
@@ -643,8 +644,9 @@ class PresentationAheadProjectilePrepareTest {
 
         assertEquals(1, world.missiles().size(), "one pre-opcode placeholder");
         Missile oldMuzzle = world.missiles().get(0);
-        int oldSlot = oldMuzzle.battleNetPoolSlot();
         assertFalse(oldMuzzle.battleNetConstructorDrawn());
+        assertEquals(-1, oldMuzzle.battleNetPoolSlot(),
+                "the old muzzle is presentation, not a native projectile");
 
         assertTrue(world.orderMove(shooter, 8, 14), "move order accepted");
 
@@ -652,8 +654,8 @@ class PresentationAheadProjectilePrepareTest {
                 "the projectile sprite remained at the siege unit's old position");
         assertTrue(world.battleNetPendingProjectileShots.isEmpty(),
                 "the replaced attack order still owned a projectile");
-        assertFalse(world.battleNetProjectileSlots[oldSlot],
-                "the cancelled placeholder leaked its projectile-pool slot");
+        assertEquals(-1, oldMuzzle.battleNetPoolSlot(),
+                "cancelling the old muzzle manufactured a pool reservation");
     }
 
     @Test
@@ -735,12 +737,16 @@ class PresentationAheadProjectilePrepareTest {
 
         assertEquals(1, world.missiles().size(),
                 "load retained both the orphan and the owned placeholder");
+        owned.setBattleNetPoolSlot(-1);
         assertEquals(owned.savedState(), world.missiles().get(0).savedState(),
-                "load discarded the attack order's newest placeholder");
+                "load discarded the attack order's newest placeholder or "
+                        + "failed to normalize its pre-constructor slot");
         assertEquals(world.missiles().get(0),
                 world.battleNetPendingProjectileShots.get(shooter));
         assertFalse(world.battleNetProjectileSlots[3],
                 "healing the old save leaked the orphan's pool slot");
+        assertFalse(world.battleNetProjectileSlots[4],
+                "the retained presentation placeholder kept its obsolete pool slot");
     }
 
     @Test
@@ -767,9 +773,10 @@ class PresentationAheadProjectilePrepareTest {
         world.hit(ship, victim);
         assertEquals(1, world.missiles().size(), "one pending cannonball");
         Missile orphan = world.missiles().get(0);
-        int orphanSlot = orphan.battleNetPoolSlot();
         assertFalse(orphan.battleNetConstructorDrawn(),
                 "the fixture must still be before opcode ten");
+        assertEquals(-1, orphan.battleNetPoolSlot(),
+                "a visible placeholder reserved a BNE projectile slot");
         world.kill(victim, ship);
         world.tick();
 
@@ -777,8 +784,8 @@ class PresentationAheadProjectilePrepareTest {
                 "the dead attack order left its cannonball painted in the water");
         assertTrue(world.battleNetPendingProjectileShots.isEmpty(),
                 "the next attack could revive the orphaned shell");
-        assertFalse(world.battleNetProjectileSlots[orphanSlot],
-                "the abandoned cannonball leaked its fixed BNE projectile slot");
+        assertEquals(-1, orphan.battleNetPoolSlot(),
+                "the abandoned cannonball manufactured a pool reservation");
     }
 
     @Test
