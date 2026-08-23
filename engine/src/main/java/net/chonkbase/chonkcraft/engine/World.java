@@ -6401,6 +6401,8 @@ public final class World {
                     path = ranged;
                 }
             }
+            path = battleNetQueuedTankerCollisionPrefix(
+                    unit, target, goalX, goalY, path);
             traceBattleNetPath(unit, goalX, goalY, path);
             return path;
         } finally {
@@ -6409,6 +6411,70 @@ public final class World {
                 setMovementFieldFlags(candidate, true);
             }
         }
+    }
+
+    /**
+     * Restores the blocked direct byte BNE keeps in a crowded tanker lane.
+     *
+     * <p>A loaded doubled tanker returning to an oil depot can begin its
+     * route on the same cycle that another loaded tanker surfaces Still in
+     * its direct lane. Native's writer retains the blocked direct heading at
+     * the head of the bounded wall prefix; DoActionMove then collision-
+     * refuses that heading and retries it. Orc 8 slots 1478/1479 prove the
+     * transition: at fixture 190 the south tanker stores N,NW,NE and stays at
+     * (84,106), while the new tanker holds (84,104). Taking the optimized
+     * free west face instead makes the first tanker jump sideways through a
+     * packed platform queue.
+     *
+     * <p>This seam belongs specifically to the naval resource queue: the
+     * blocker is itself in the timed Still-with-Return-Goods state, both
+     * actors carry oil home, and the goal is an oil depot. Ordinary combat,
+     * patrol and empty-tanker routes retain their independently authenticated
+     * wall selection.</p>
+     */
+    private PathFinder.Path battleNetQueuedTankerCollisionPrefix(
+            Unit unit, Unit target, int goalX, int goalY,
+            PathFinder.Path path) {
+        if (path == null || path.result() != PathFinder.Result.FOUND
+                || path.length() == 0 || unit == null || target == null
+                || unit.type() == null || !unit.type().seaUnit()
+                || battleNetMovementStride(unit) != 2
+                || !unit.returningToDepot() || unit.carried() <= 0
+                || unit.carrying() != UnitType.Resource.OIL
+                || target.type() == null
+                || !target.type().storesResource(UnitType.Resource.OIL)) {
+            return path;
+        }
+        int direct = battleNetFirstBresenhamHeading(
+                unit.tileX(), unit.tileY(), goalX, goalY);
+        if (direct < 0 || direct >= Direction.COUNT
+                || path.headings()[path.length() - 1] == direct) {
+            return path;
+        }
+        int stride = battleNetMovementStride(unit);
+        int directX = unit.tileX() + Direction.deltaX(direct) * stride;
+        int directY = unit.tileY() + Direction.deltaY(direct) * stride;
+        Unit blocker = blockerOnLayer(unit, directX, directY);
+        if (blocker == null || blocker == unit || blocker.type() == null
+                || blocker.type().building()
+                || !isAllied(unit.player(), blocker.player())
+                || blocker.order() != Unit.Order.STILL
+                || !blocker.returningToDepot() || blocker.carried() <= 0
+                || blocker.carrying() != UnitType.Resource.OIL
+                || blocker.battleNetOrderDelay() <= 0
+                || blocker.queuedOrders().isEmpty()
+                || blocker.queuedOrders().getFirst().kind()
+                        != Unit.QueuedOrderKind.RETURN_GOODS) {
+            return path;
+        }
+        int[] optimized = path.headings();
+        int retained = Math.max(1, optimized.length - 1);
+        int[] nativePrefix = new int[retained];
+        if (retained > 1) {
+            System.arraycopy(optimized, 1, nativePrefix, 0, retained - 1);
+        }
+        nativePrefix[retained - 1] = direct;
+        return new PathFinder.Path(PathFinder.Result.FOUND, nativePrefix);
     }
 
     /**
@@ -7092,9 +7158,24 @@ public final class World {
             return at == PathFinder.Occupancy.STATIONARY_ENEMY
                     ? PathFinder.Occupancy.STATIONARY : at;
         };
+        int stride = battleNetMovementStride(src);
+        // BNE's doubled *returning-oil* path asks whether the top-left route
+        // anchor is reachable. The 2x2 tanker hull is drawing/occupancy
+        // geometry, not the PlaceReachable shape for this homeward leg. This
+        // matters immediately after a platform drops a laden tanker on an
+        // anchor whose drawn hull overlaps the platform: testing the full
+        // hull makes every refinery look unreachable and silently discards
+        // the queued return-goods order. Keep ordinary empty-tanker resource
+        // searches on their full SeaUnit footprint; their cache/field
+        // behavior is a separately authenticated BNE rule.
+        boolean returningOilAnchor = stride > 1 && src.returningToDepot()
+                && (src.carrying() == UnitType.Resource.OIL
+                        || src.heldResource() == UnitType.Resource.OIL)
+                && overlapsOilPlatform(src);
+        int routeWidth = returningOilAnchor ? 1 : src.type().tileWidth();
+        int routeHeight = returningOilAnchor ? 1 : src.type().tileHeight();
         PathFinder.Mover mover = new PathFinder.Mover(src.movementMask(),
-                src.blockingFlags(), src.type().tileWidth(),
-                src.type().tileHeight(), walled);
+                src.blockingFlags(), routeWidth, routeHeight, walled);
         PathFinder.Goal goal = new PathFinder.Goal(dst.tileX(), dst.tileY(),
                 Math.max(1, dst.type().tileWidth()),
                 Math.max(1, dst.type().tileHeight()), 0, range);
@@ -7125,6 +7206,31 @@ public final class World {
             }
         }
         return 0;
+    }
+
+    /** Whether a tanker's drawn hull still covers the platform it left. */
+    private boolean overlapsOilPlatform(Unit tanker) {
+        int left = tanker.tileX();
+        int top = tanker.tileY();
+        int right = left + Math.max(1, tanker.type().tileWidth());
+        int bottom = top + Math.max(1, tanker.type().tileHeight());
+        for (Unit candidate : units) {
+            if (candidate == tanker || !candidate.isAlive() || !candidate.isOnMap()
+                    || candidate.type() == null
+                    || !BattleNetHarvestSystem.isBattleNetOilPlatform(
+                            candidate.type().ident())) {
+                continue;
+            }
+            int candidateRight = candidate.tileX()
+                    + Math.max(1, candidate.type().tileWidth());
+            int candidateBottom = candidate.tileY()
+                    + Math.max(1, candidate.type().tileHeight());
+            if (left < candidateRight && right > candidate.tileX()
+                    && top < candidateBottom && bottom > candidate.tileY()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int travelOf(PathFinder.Path path) {
@@ -8366,10 +8472,24 @@ public final class World {
         int width = Math.max(1, type.tileWidth());
         int height = Math.max(1, type.tileHeight());
         int stride = battleNetMovementStride(unit);
-        int x = container.tileX() - (width - 1);
-        int y = container.tileY() - (height - 1);
-        int addx = Math.max(1, container.type().tileWidth()) + width - 1;
-        int addy = Math.max(1, container.type().tileHeight()) + height - 1;
+        // Doubled naval movement validates top-left anchors, not every visual
+        // tile covered by the hull. Orc 8's contained 2x2 tanker therefore
+        // leaves its platform at (84,104): the anchor is legal water while
+        // the eastern half of the drawn hull still overlaps the platform.
+        // Applying ordinary footprint geometry starts the west leg one tile
+        // too far out, rejects every odd anchor, and incorrectly falls around
+        // to (84,106) on the south face. The route planner uses this same
+        // anchor lattice once the tanker starts home.
+        int placementWidth = stride > 1 ? 1 : width;
+        int placementHeight = stride > 1 ? 1 : height;
+        int x = container.tileX() - (placementWidth - 1);
+        int y = container.tileY() - (placementHeight - 1);
+        int addx = Math.max(1, container.type().tileWidth()) + placementWidth - 1;
+        int addy = Math.max(1, container.type().tileHeight()) + placementHeight - 1;
+        String tracedDropout = System.getenv("CHONKCRAFT_TRACE_DROPOUT");
+        boolean traceDropout = tracedDropout != null
+                && (tracedDropout.isBlank()
+                        || unit.id() == Integer.parseInt(tracedDropout.trim()));
         int leg;
         switch (initialSide) {
             case LEG_NORTH -> {
@@ -8407,8 +8527,17 @@ public final class World {
                 boolean onMovementGrid = battleNetSequence == null || stride == 1
                         || (Math.floorMod(x, stride) == 0
                                 && Math.floorMod(y, stride) == 0);
-                if (onMovementGrid
-                        && map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                boolean free = map.isFootprintFree(
+                        x, y, placementWidth, placementHeight, mask, blocking);
+                if (traceDropout) {
+                    System.err.printf("JDROPRESOURCE cycle=%d unit=%d type=%s container=%d "
+                                    + "goal=%d,%d side=%d step=%d candidate=%d,%d "
+                                    + "grid=%d free=%d%n",
+                            cycle, unit.id(), unit.type().ident(), container.id(), goalX, goalY,
+                            initialSide, step, x, y,
+                            onMovementGrid ? 1 : 0, free ? 1 : 0);
+                }
+                if (onMovementGrid && free) {
                     // Only the face selected from the resource destination
                     // is distance-scored. Once that face is exhausted,
                     // DropOutNearest resumes DropOutOnSide's traversal and
@@ -9824,6 +9953,7 @@ public final class World {
                                 + " pos=%d,%d ix=%d iy=%d"
                                 + " residual=%d,%d resource=%d depot=%d"
                                 + " worksite=%d returning=%d carried=%d"
+                                + " delay=%d queued=%d replacement=%d"
                                 + " target=%d offered=%d ai=%d home=%d,%d"
                                 + " patrol=%d,%d goal=%d,%d%n",
                         cycle, unit.id(), unit.order(), unit.currentAction(),
@@ -9854,6 +9984,8 @@ public final class World {
                         unit.returnDepotGoal() == null ? -1 : unit.returnDepotGoal().id(),
                         unit.worksite() == null ? -1 : unit.worksite().id(),
                         unit.returningToDepot() ? 1 : 0, unit.carried(),
+                        unit.battleNetOrderDelay(), unit.queuedOrders().size(),
+                        unit.queuedReplacementPending() ? 1 : 0,
                         unit.target() == null ? -1 : unit.target().id(),
                         unit.offeredTarget() == null ? -1 : unit.offeredTarget().id(),
                         unit.battleNetAiBehavior(),

@@ -19,6 +19,72 @@ class BattleNetAiOilPlatformExitRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("an Orc 8 tanker tests the exit anchor instead of its drawn hull")
+    void anOrc8TankerUsesTheNativeOverlappingWestAnchor() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level08o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int cycle = 1; cycle < 155; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit tanker = at(mission.world(), "unit-human-oil-tanker", 84, 104);
+        assertNotNull(tanker,
+                "native slot 1482 surfaces on the platform's west anchor at fixture 155");
+        assertEquals(Unit.Order.STILL, tanker.order());
+        assertTrue(tanker.battleNetDoubleStep());
+        assertEquals(0, (tanker.tileX() | tanker.tileY()) & 1);
+
+        Unit platform = at(mission.world(), "unit-human-oil-platform", 85, 103);
+        assertNotNull(platform);
+        assertTrue(tanker.tileX() + tanker.type().tileWidth() > platform.tileX(),
+                "the proof must retain native's visual hull/platform overlap");
+
+        for (int cycle = 156; cycle <= 179; cycle++) {
+            mission.tick();
+            assertEquals(Unit.Order.STILL, tanker.order(),
+                    "native's queued return must respect the ready delay on cycle " + cycle);
+            assertEquals(84, tanker.tileX());
+            assertEquals(104, tanker.tileY());
+        }
+        mission.tick();
+        assertEquals(Unit.Order.RETURN_GOODS, tanker.order(),
+                "native promotes the delayed return order on fixture cycle 180");
+        assertEquals(84, tanker.tileX());
+        assertEquals(104, tanker.tileY());
+
+        mission.tick();
+        mission.tick();
+        assertEquals(84, tanker.tileX(),
+                "native holds the route anchor through fixture cycle 182");
+        assertEquals(104, tanker.tileY());
+        mission.tick();
+        assertEquals(84, tanker.tileX(),
+                "native takes its first doubled north stride on fixture cycle 183");
+        assertEquals(102, tanker.tileY());
+
+        Unit southTanker = at(mission.world(), "unit-human-oil-tanker", 84, 106);
+        assertNotNull(southTanker,
+                "the neighboring native tanker is the non-overlap control");
+        for (int cycle = 184; cycle <= 200; cycle++) {
+            mission.tick();
+            assertEquals(84, southTanker.tileX(),
+                    "a clear south-face hull must not inherit the overlap rule on cycle "
+                            + cycle);
+            assertEquals(106, southTanker.tileY());
+        }
+    }
+
+    @Test
     @DisplayName("an XOrc 11 tanker uses BNE's unrounded east platform face")
     void anXOrc11TankerUsesTheUnroundedEastPlatformFace() {
         AssetSource assets = AssetSource.fromEnvironment();
