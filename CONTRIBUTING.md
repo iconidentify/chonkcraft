@@ -441,7 +441,7 @@ Use the same two messages verbatim; 79 classes already do, and grepping for
 them is how you audit the skip surface.
 
 **Understand what this means for a green build.** With all three inputs configured,
-18 of 2,014 tests skip. With none, 651 skip and Maven still says `BUILD
+27 of 2,642 tests skip. With none, 1,061 skip and Maven still says `BUILD
 SUCCESS`. See
 [docs/development-setup.md](docs/development-setup.md#reading-a-test-run-skips-are-not-passes)
 for the numbers and how to tell which run you got. Never report a passing run
@@ -761,7 +761,7 @@ asked to.
 ## The workflow, end to end
 
 1. **Set the machine up** and prove it: `scripts/check-setup.sh`, then a full
-   test run with all three inputs configured. Confirm you got 25 skips, not 991.
+   test run with all three inputs configured. Confirm you got 27 skips, not 1,061.
 2. **Find something.** Run the authenticated playability gates, retail
    comparison harness, or the game itself and capture a witness.
 3. **Confirm it with a probe** against the real 1995 data, headless, before

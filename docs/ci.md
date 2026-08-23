@@ -57,7 +57,7 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **27 skips of 2,640**, re-measured after the BNE
+Asserts the `full` profile: **27 skips of 2,642**, re-measured after the BNE
 parity and production-multiplayer coverage additions against the runner's
 authenticated retail installation. One of the twenty-seven depends on which release
 the installation is: a source exposing the Battle.net Edition stereo video
@@ -89,7 +89,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,060 |
+| `data-free` | none | 1,061 |
 | `full` | installation, pack, Opus vectors | 27 |
 
 The twenty-seven that skip even in `full` want nothing anyone should have to
