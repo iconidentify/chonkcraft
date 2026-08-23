@@ -12,7 +12,7 @@ The current authenticated release candidate has been compared with Warcraft II:
 Battle.net Edition 2.02b on all 52 campaign fixtures through cycle 400:
 
 - **52/52 maps are exact through cycle 131.** The first semantic mismatches are
-  XHuman 9, XHuman 10, and XHuman 12 at cycle 132.
+  XHuman 9 and XHuman 12 at cycle 132; XHuman 10 now reaches cycle 133.
 - **46/52 maps remain exact through cycle 140.** The six earlier boundaries
   are Human 13, XHuman 9, XHuman 10, XHuman 12, XOrc 11, and Orc 11.
 - **14/52 maps are exact for the complete 400-cycle measurement window.** The
@@ -23,10 +23,9 @@ Battle.net Edition 2.02b on all 52 campaign fixtures through cycle 400:
 
 These figures come from the sealed native corpus and the same authenticated BNE
 asset source. The current candidate preserves all 14 maps that were already
-exact through cycle 400 while moving the shared frontier from cycle 129 to 131.
-It moves Human 8's first mismatch from cycle 130 to 156 by matching BNE's
-same-visit chase handoff when an attacker's old quarry enters a mine; no map's
-first boundary moved backward.
+exact through cycle 400 and the cycle-131 shared frontier. It moves XHuman 10's
+first mismatch from cycle 132 to 133 by keeping non-solid death revealers
+passable during combat path planning; no map's first boundary moved backward.
 
 ## Measured online playability
 

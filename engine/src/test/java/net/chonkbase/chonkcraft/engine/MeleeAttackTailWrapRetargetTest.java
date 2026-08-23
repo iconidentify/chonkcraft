@@ -317,6 +317,55 @@ class MeleeAttackTailWrapRetargetTest {
     }
 
     @Test
+    @DisplayName("a melee tail-wrap retarget keeps its fresh diagonal instead of the old face")
+    void aMeleeTailWrapRetargetDoesNotInheritTheOldCombatFace()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        int wrap = wrapGotoOffset(script, attackStart);
+        assumeTrue(attackStart == 643 && wrap >= 0,
+                "retail ogre Attack must expose its tail wrap");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 16, 24);
+        Unit dying = world.createUnit(prey("unit-knight", 0x37), 1, 17, 24);
+        Unit next = world.createUnit(prey("unit-footman", 0x3f), 1, 15, 21);
+        assumeTrue(attacker != null && dying != null && next != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, dying),
+                "ogre must accept the adjacent attack order");
+
+        // The completed east-facing fight leaves the actor facing north,
+        // while its newly selected quarry is north-west.  North is a legal,
+        // distance-reducing step, so the generic offered-target face rule
+        // would overwrite the route unless tail-wrap provenance is retained.
+        attacker.setHeading(0);
+        dying.setOrder(Unit.Order.DYING);
+        attacker.setTarget(dying);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(wrap);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetMeleeSyncRemaining(1);
+
+        world.tick();
+        assertSame(next, attacker.target(),
+                "the wrap must name the out-of-range north-west quarry");
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "tail-wrap retarget pays Attack construction 3");
+
+        world.tick();
+        world.tick();
+        world.tick();
+        assertEquals(15, attacker.tileX(),
+                "retail keeps the fresh north-west first heading");
+        assertEquals(23, attacker.tileY(),
+                "the paid dest-arm must advance one north-west tile");
+    }
+
+    @Test
     @DisplayName("a melee tail replaces a mine-contained quarry and chases in the same visit")
     void aMeleeTailReplacesAMineContainedQuarryAndChasesInTheSameVisit()
             throws Exception {

@@ -3684,6 +3684,21 @@ public final class World {
 
     /** The field-flag-only half of {@link #findMovementPath}. */
     void setMovementFieldFlags(Unit unit, boolean marked) {
+        // CUnit::MarkUnitFieldFlags / UnmarkUnitFieldFlags are no-ops for
+        // bodies which never own an occupancy bit.  In particular, every
+        // dead-vision revealer is both Vanishes and NonSolid: it remains in
+        // CMapField::UnitCache for sight/selection bookkeeping, but soldiers
+        // walk through its square.  The route planner temporarily calls this
+        // helper for soft bodies and then restores them.  Restoring a revealer
+        // as though it were a land unit left a phantom LAND_UNIT bit behind:
+        // A* planned through the apparently empty corpse square, while the
+        // final DoActionMove probe refused it forever.  XHuman 10 knight 1493
+        // is the sealed witness (fixture 132, dead-vision slot 1413 on 82,88).
+        if (unit.type() == null
+                || unit.type().vanishes()
+                || unit.type().nonSolid()) {
+            return;
+        }
         long ownFlag = unit.occupancyFlag();
         for (int dy = 0; dy < Math.max(1, unit.type().tileHeight()); dy++) {
             for (int dx = 0; dx < Math.max(1, unit.type().tileWidth()); dx++) {
@@ -10670,7 +10685,17 @@ public final class World {
             // park marker is the CUnit-side ownership that distinguishes this
             // from an ordinary settled retarget. (Offered 1500 face 7 → NW;
             // 1493 SE still wins.)
-            path = preferBattleNetFaceFirstHeading(unit, path, target);
+            // A tail-wrap retarget has already paid Attack construction and
+            // owns a freshly drawn chase route.  It is not the standing
+            // offered-hit / queued-Attack promotion case above: preserving
+            // the old combat face here rewrites retail's new diagonal into a
+            // stale cardinal step.  XHuman 9 knight 1414 is the sealed
+            // witness (fixture 102: fresh NW from 16,124 toward 15,121, not
+            // its old north face).  Keep the later skirt and dest-arm rules;
+            // only face inheritance is provenance-specific.
+            if (!unit.battleNetAttackWrapDestArmPending()) {
+                path = preferBattleNetFaceFirstHeading(unit, path, target);
+            }
             // An old attack-back offer may remain as the incumbent for target
             // scoring after a settled residual chooses another quarry. It no
             // longer owns the replacement route: XHuman 12 grunt 1468 changes

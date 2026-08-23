@@ -313,6 +313,45 @@ class TypeFlagsOnEveryPathTest {
     }
 
     @Test
+    @DisplayName("a path-planning pass cannot turn a death revealer into an invisible wall")
+    void restoringMovementFlagsKeepsADeadVisionMarkerNonSolid() {
+        GameData data = load();
+        World world = plain(data);
+        UnitType footman = data.unitTypes().types().get("unit-footman");
+        UnitType revealer = data.unitTypes().types().get(
+                "unit-dead-vision-1-4");
+        assertNotNull(footman, "no footman in the roster");
+        assertNotNull(revealer, "no death revealer in the roster");
+        assertTrue(revealer.vanishes(),
+                "the witness must not own a persistent field flag");
+        assertTrue(revealer.nonSolid(),
+                "the witness must be passable rather than merely invisible");
+
+        Unit mover = world.createUnit(footman, 0, 10, 10);
+        Unit marker = world.createUnit(revealer, 0, 11, 10);
+        assertNotNull(mover, "the mover could not be placed");
+        assertNotNull(marker, "the death revealer could not be placed");
+
+        // Combat path planning temporarily unmarks and restores every soft
+        // body in its corridor.  That bookkeeping must not grant a marker an
+        // occupancy bit it never owned.  Otherwise A* accepts this square,
+        // the final movement probe refuses it, and the attacker appears to
+        // freeze beside a corpse.
+        world.setMovementFieldFlags(marker, false);
+        world.setMovementFieldFlags(marker, true);
+
+        assertFalse(world.map().field(11, 10).hasFlag(TileFlag.LAND_UNIT),
+                "restoring a non-solid revealer wrote a phantom land-unit bit");
+        assertTrue(world.canEnter(mover, 11, 10),
+                "a combat unit cannot cross the death revealer's square");
+
+        Unit livingBlocker = world.createUnit(footman, 0, 12, 10);
+        assertNotNull(livingBlocker, "the solid control could not be placed");
+        assertFalse(world.canEnter(mover, 12, 10),
+                "the fix also made a living soldier passable");
+    }
+
+    @Test
     @DisplayName("an oil platform is a building that stands in the sea, not on the beach")
     void theTypeKeyDecidesWhatGroundABuildingStandsOn() {
         GameData data = load();
