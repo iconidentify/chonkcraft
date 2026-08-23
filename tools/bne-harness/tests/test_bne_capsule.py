@@ -94,6 +94,28 @@ class SourceCapsuleTest(unittest.TestCase):
             "a committed workspace failed to replay its own identity",
         )
 
+    def test_parent_private_excludes_cannot_hide_a_sealed_input(self):
+        """Replay identity is historical evidence, not current Git policy."""
+        self.dirty_workspace()
+        self.seal()
+        git_directory = Path(git(
+            self.root, "rev-parse", "--absolute-git-dir").strip())
+        exclude = git_directory / "info/exclude"
+        exclude.write_text("*Missile.java\n", encoding="utf-8")
+        self.assertIn(
+            "Missile.java",
+            git(self.root, "check-ignore", "-v",
+                "engine/src/main/java/Missile.java"),
+        )
+
+        result = bne_capsule.replay_identity(
+            self.capsules / "capsule", self.root)
+
+        self.assertTrue(
+            result["reproduced_exactly"],
+            "a later parent .git/info/exclude rewrote historical evidence",
+        )
+
     def test_sealing_leaves_the_operator_index_alone(self):
         self.dirty_workspace()
         before = git(self.root, "status", "--porcelain")
@@ -250,7 +272,7 @@ class SourceCapsuleTest(unittest.TestCase):
             "a changed workspace sealed to the same capsule identity",
         )
 
-    def test_the_replay_worktree_is_disposed_of(self):
+    def test_the_replay_workspace_is_disposed_of(self):
         self.dirty_workspace()
         self.seal()
         with bne_capsule.materialize(self.capsules / "capsule", self.root) as (
@@ -258,7 +280,7 @@ class SourceCapsuleTest(unittest.TestCase):
             self.assertTrue(replay.is_dir())
             location = replay
         self.assertFalse(
-            location.exists(), "the disposable replay worktree was left behind")
+            location.exists(), "the disposable replay workspace was left behind")
         self.assertNotIn(
             str(location), git(self.root, "worktree", "list"),
             "the replay worktree stayed registered with the repository",

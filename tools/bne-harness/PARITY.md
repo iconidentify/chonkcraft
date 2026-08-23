@@ -15,6 +15,33 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-08-22
+
+The authenticated semantic-v1 campaign gate currently reports:
+
+- 52/52 fixtures executed and compared through fixture cycle 400;
+- a shared exact frontier of cycle 120, with the first mismatch in
+  `retail-xhuman-12-idle` at cycle 121;
+- 14 cases exact through the entire 400-cycle window, 38 later-divergent, and
+  zero failed; and
+- a passing retained-baseline gate using the same BNE ChonkPack identity.
+
+Keep the nouns separate in status reports. A **run horizon** says how many
+cycles were inspected. A **per-case frontier** is the last exact cycle for one
+fixture. The **shared frontier** is the minimum per-case frontier across all 52.
+Thus "52 maps run through 400" is coverage, not "all maps exact through 400."
+
+The release candidate deliberately retains the cycle-120 production engine. A
+cycle-123 candidate is preserved at branch
+`codex/bne-all52-h123-release-candidate` (commit `41a04aa5`), but it is not a
+release: the broader playability suite caught regressions in a late XHuman 10
+AI assault, XHuman 12 Zeppelin movement, and packed melee-chase behavior. A
+subsequent XHuman12-local experiment is preserved at branch
+`codex/xhuman12-c200-research` (commit `f786bae9`), but it regressed Human 8,
+Human 13, XHuman 4, XHuman 8, XHuman 9, and XHuman 10. Do not promote either
+state until it passes both the all-map retained-boundary gate and the broad
+playability/failure-identity gate.
+
 ## Target and boundary
 
 The Java engine is a single simulation: retail BNE rules only. There is no

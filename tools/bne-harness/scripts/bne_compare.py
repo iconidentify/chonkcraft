@@ -30,8 +30,19 @@ UNIT = re.compile(
 )
 BNE_UNIT_BYTES = 152
 BNE_UNIT_FLAGS = 30
+BNE_UNIT_TYPE = 39
 BNE_UNIT_ORDER = 46
 BNE_UNIT_FREE_OR_DEAD = 0x05
+
+# Corpse/placeholders live after the 105 map/PUD types and were omitted from
+# the schema-1.1 tracer's name table.  These two are authenticated by direct
+# transitions in the sealed corpus: a 2x2 guard tower becomes 107 and a 3x3
+# barracks becomes 108.  Keep the correction beside the raw-state normalizer
+# so old fixtures gain the proved name without being resealed.
+BNE_POST_PUD_TYPE_NAMES = {
+    107: b"unit-destroyed-2x2-place",
+    108: b"unit-destroyed-3x3-place",
+}
 
 
 def normalize_fixture_trace(trace_source, state_source, output,
@@ -54,6 +65,7 @@ def normalize_fixture_trace(trace_source, state_source, output,
         raise ValueError(f"unexpected BNE unit size {unit_bytes}")
 
     raw_orders: dict[int, int] = {}
+    raw_types: dict[int, int] = {}
     current_cycle = 0
 
     def advance_state(wanted_cycle: int) -> None:
@@ -82,11 +94,14 @@ def normalize_fixture_trace(trace_source, state_source, output,
                     raise ValueError("truncated BNE unit state")
                 if (raw[BNE_UNIT_FLAGS] & BNE_UNIT_FREE_OR_DEAD) == 0:
                     raw_orders[slot] = raw[BNE_UNIT_ORDER]
+                    raw_types[slot] = raw[BNE_UNIT_TYPE]
                 else:
                     raw_orders.pop(slot, None)
+                    raw_types.pop(slot, None)
             for slot in tuple(raw_orders):
                 if slot >= pool_count:
                     raw_orders.pop(slot)
+                    raw_types.pop(slot, None)
             current_cycle = cycle
         if current_cycle != wanted_cycle:
             raise ValueError(
@@ -161,6 +176,21 @@ def normalize_fixture_trace(trace_source, state_source, output,
                     # (Human 13 peon train, XOrc 11 footman train). Coarse
                     # semantic compare treats both as idle-with-job.
                     raw_line = raw_line.replace(b" o BUILD", b" o STILL", 1)
+                # The old textual tracer stopped its type-name table at the
+                # two wall types (104), but state byte 39 retained the real
+                # post-PUD corpse type.  XHuman 12 guard tower 1370 is 107 on
+                # fixture 175, exactly when Java becomes its 2x2 destroyed
+                # place; Human 5 barracks 1529 likewise proves 108 at 1608.
+                # Correct only raw ids with sealed witnesses, leaving every
+                # genuinely unknown extension visible as unknown.
+                if unit_type == b"unit-unknown":
+                    corrected_type = BNE_POST_PUD_TYPE_NAMES.get(
+                        raw_types.get(int(unit_match.group(1)))
+                    )
+                    if corrected_type is not None:
+                        raw_line = raw_line.replace(
+                            b" unit-unknown ", b" " + corrected_type + b" ", 1
+                        )
         output.write(raw_line)
 
     if current_cycle != expected_cycles:

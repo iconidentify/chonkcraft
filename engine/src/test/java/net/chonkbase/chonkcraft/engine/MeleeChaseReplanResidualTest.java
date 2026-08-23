@@ -77,6 +77,50 @@ class MeleeChaseReplanResidualTest {
         return type;
     }
 
+    private static UnitType grunt() {
+        UnitType type = ogre();
+        UnitType infantry = new UnitType("unit-grunt");
+        infantry.setTileSize(type.tileWidth(), type.tileHeight());
+        infantry.setBoxSize(type.boxWidth(), type.boxHeight());
+        infantry.setHitPoints(type.hitPoints());
+        infantry.setSpeed(type.speed());
+        infantry.setLandUnit(true);
+        infantry.setCanAttack(true);
+        infantry.setCanTargetLand(true);
+        infantry.setBasicDamage(type.basicDamage());
+        infantry.setPiercingDamage(type.piercingDamage());
+        infantry.setMaxAttackRange(type.maxAttackRange());
+        infantry.setSightRange(type.sightRange());
+        infantry.setReactRangeComputer(type.reactRangeComputer());
+        infantry.setReactRangePerson(type.reactRangePerson());
+        infantry.setPriority(60);
+        infantry.setNumDirections(type.numDirections());
+        infantry.setAnimationSet(type.animationSet());
+        return infantry;
+    }
+
+    private static UnitType footman() {
+        UnitType type = grunt();
+        UnitType infantry = new UnitType("unit-footman");
+        infantry.setTileSize(type.tileWidth(), type.tileHeight());
+        infantry.setBoxSize(type.boxWidth(), type.boxHeight());
+        infantry.setHitPoints(type.hitPoints());
+        infantry.setSpeed(type.speed());
+        infantry.setLandUnit(true);
+        infantry.setCanAttack(true);
+        infantry.setCanTargetLand(true);
+        infantry.setBasicDamage(type.basicDamage());
+        infantry.setPiercingDamage(type.piercingDamage());
+        infantry.setMaxAttackRange(type.maxAttackRange());
+        infantry.setSightRange(type.sightRange());
+        infantry.setReactRangeComputer(type.reactRangeComputer());
+        infantry.setReactRangePerson(type.reactRangePerson());
+        infantry.setPriority(type.priority());
+        infantry.setNumDirections(type.numDirections());
+        infantry.setAnimationSet(type.animationSet());
+        return infantry;
+    }
+
     private static UnitType prey() {
         UnitType type = new UnitType("unit-wise-man");
         type.setTileSize(1, 1);
@@ -261,7 +305,7 @@ class MeleeChaseReplanResidualTest {
         world.setAllied(0, 1, false);
         world.setBattleNetSequenceData(script);
 
-        Unit chaser = world.createUnit(ogre(), 0, 10, 10);
+        Unit chaser = world.createUnit(grunt(), 0, 10, 10);
         Unit quarry = world.createUnit(prey(), 1, 10, 9);
         assertTrue(chaser != null && quarry != null, "units must place");
         assertTrue(world.orderAttack(chaser, quarry), "attack accepted");
@@ -1080,7 +1124,7 @@ class MeleeChaseReplanResidualTest {
         world.fog().revealAll(1);
         world.setAllied(0, 1, false);
         Unit chaser = world.createUnit(ogre(), 0, 20, 20);
-        Unit quarry = world.createUnit(prey(), 1, 24, 22);
+        Unit quarry = world.createUnit(tower(), 1, 24, 22);
         Unit ally = world.createUnit(ogre(), 0, 21, 20);
         assertTrue(chaser != null && quarry != null && ally != null,
                 "units must place");
@@ -1233,6 +1277,7 @@ class MeleeChaseReplanResidualTest {
         type.setPiercingDamage(12);
         type.setMaxAttackRange(5);
         type.setSightRange(9);
+        type.setPriority(40);
         type.setNumDirections(1);
         AnimationSet set = new AnimationSet("tower");
         set.put(AnimationSet.State.STILL,
@@ -1256,9 +1301,9 @@ class MeleeChaseReplanResidualTest {
         world.fog().revealAll(0);
         world.fog().revealAll(1);
         world.setAllied(0, 1, false);
-        Unit chaser = world.createUnit(ogre(), 0, 23, 41);
+        Unit chaser = world.createUnit(grunt(), 0, 23, 41);
         Unit tower = world.createUnit(tower(), 1, 25, 42);
-        Unit footman = world.createUnit(prey(), 1, 29, 43);
+        Unit footman = world.createUnit(footman(), 1, 29, 43);
         Unit neAlly = world.createUnit(ogre(), 0, 24, 40);
         Unit southAlly = world.createUnit(ogre(), 0, 23, 42);
         assertTrue(chaser != null && tower != null && footman != null
@@ -1287,6 +1332,7 @@ class MeleeChaseReplanResidualTest {
         chaser.setStepDrained(true);
         chaser.setBattleNetOrderDelay(0);
         chaser.setBattleNetCollisionCounter(0);
+        chaser.setBattleNetAiBehavior(1);
         chaser.animation().switchTo(
                 chaser.type().animationSet().get(AnimationSet.State.MOVE));
         world.actionMoveWalked = false;
@@ -1295,14 +1341,20 @@ class MeleeChaseReplanResidualTest {
 
         assertEquals(22, chaser.tileX(),
                 "1480 free-compasses SW before free-scan; x="
-                        + chaser.tileX());
+                        + chaser.tileX() + " target="
+                        + (chaser.target() == null ? "null"
+                                : chaser.target().type().ident())
+                        + " pathn=" + chaser.pathLength()
+                        + " head=" + (chaser.pathLength() == 0
+                                ? -1 : chaser.peekHeading())
+                        + " delay=" + chaser.battleNetOrderDelay());
         assertEquals(42, chaser.tileY(),
                 "1480 free-compasses SW before free-scan; y="
                         + chaser.tileY());
         assertEquals(sw, chaser.lastStepHeading(),
                 "first free after blocked NE residual is SW; heading="
                         + chaser.lastStepHeading());
-        assertSame(tower, chaser.target(),
-                "free-scan is deferred; target stays the building this visit");
+        assertSame(footman, chaser.target(),
+                "behavior-one target scan upgrades the building after path work");
     }
 }

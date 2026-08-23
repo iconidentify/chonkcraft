@@ -83,6 +83,46 @@ class BattleNetNavalMapPatrolRefusalRealDataTest {
         assertStoodDown(loadedNorth, loadedSouth);
     }
 
+    @Test
+    @DisplayName("XHuman 7 relaunches a moved destroyer from its stable naval home")
+    void xHuman7RelaunchesMovedDestroyerFromStableNavalHome() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        Mission mission = mission(new GameData(assets));
+        Unit north = at(mission.world(), 6, 28, 26);
+        assertNotNull(north, "XHuman 7 has no northern startup destroyer");
+        assertEquals(22, north.battleNetAiHomeX(),
+                "behavior-six home is the shipyard selected at ready time");
+        assertEquals(27, north.battleNetAiHomeY());
+
+        tickThrough(mission, 102);
+        assertEquals(Unit.Order.STILL, north.order());
+        assertEquals(26, north.tileX());
+        assertEquals(26, north.tileY());
+
+        tickThrough(mission, 103);
+        assertEquals(Unit.Order.PATROL, north.order(),
+                "the recurring naval pass promotes on native fixture 103");
+        assertEquals(23, north.orderTargetX(),
+                "the shore point is recomputed from stable home and new hull position");
+        assertEquals(27, north.orderTargetY());
+
+        tickThrough(mission, 105);
+        assertEquals(26, north.tileX(),
+                "the Patrol constructor holds through fixture 105");
+        assertEquals(26, north.tileY());
+
+        tickThrough(mission, 106);
+        assertEquals(Unit.Order.PATROL, north.order());
+        assertEquals(24, north.tileX(),
+                "native slot 1570 takes its doubled northwest stride on 106");
+        assertEquals(24, north.tileY());
+        assertEquals(64, north.offsetX(),
+                "logical NW commits while the rendered hull starts at the old anchor");
+        assertEquals(64, north.offsetY());
+    }
+
     private static void assertRefusalBand(Unit north, Unit south,
             int refusals) {
         assertEquals(refusals, north.battleNetRefusals());

@@ -95,6 +95,56 @@ class BattleNetSmallWarshipPatrolRealDataTest {
                 loaded.battleNetSequenceOffset());
     }
 
+    @Test
+    @DisplayName("XOrc 8 preserves naval refusal provenance across a free stride")
+    void xOrc8PreservesNavalRefusalProvenanceAcrossAFreeStride() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = at(mission.world(), "unit-human-destroyer",
+                2, 102, 92);
+        assertNotNull(destroyer,
+                "XOrc 8 has no player-two human destroyer at 102,92");
+
+        tickThrough(mission, 84);
+        assertEquals(100, destroyer.tileX());
+        assertEquals(88, destroyer.tileY());
+        assertEquals(1, destroyer.battleNetRefusals(),
+                "the first blocked cached heading remains sticky after c53's "
+                        + "successful stride");
+
+        tickThrough(mission, 85);
+        assertEquals(2, destroyer.battleNetRefusals(),
+                "the fresh route's first blocked probe advances the sticky count");
+        assertEquals(1, destroyer.battleNetAnimationTimer(),
+                "counts below eight retry on the one-cycle Move seam");
+
+        tickThrough(mission, 90);
+        assertEquals(7, destroyer.battleNetRefusals());
+        assertEquals(100, destroyer.tileX());
+        assertEquals(88, destroyer.tileY());
+
+        tickThrough(mission, 91);
+        assertEquals(8, destroyer.battleNetRefusals());
+        assertEquals(15, destroyer.battleNetAnimationTimer(),
+                "refusal eight opens the native fifteen-count cooperative band");
+
+        tickThrough(mission, 100);
+        assertEquals(100, destroyer.tileX(),
+                "the destroyer must not move on Java's former early c100 beat");
+        assertEquals(88, destroyer.tileY());
+        assertEquals(6, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 106);
+        assertEquals(98, destroyer.tileX(),
+                "timer-one wake consumes northwest on native fixture 106");
+        assertEquals(86, destroyer.tileY());
+        assertEquals(8, destroyer.battleNetRefusals(),
+                "a successful step does not clear the native sticky nibble");
+    }
+
     private static Mission mission(GameData data) {
         Mission mission = data.loadMission(MAP,
                 GameData.personIn(data.campaignMap(MAP)), 1);

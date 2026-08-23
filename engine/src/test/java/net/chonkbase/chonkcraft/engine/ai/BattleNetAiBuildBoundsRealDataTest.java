@@ -198,12 +198,14 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
-    @DisplayName("a human 5 computer rewrites the land-building box on a later fifty-cycle beat")
-    void aHuman5ComputerRewritesTheLandBuildingBoxOnALaterFiftyCycleBeat() {
-        // Native seed-1 shrinks at 1649. Java's counted building leaves a
-        // beat later, so the same 7b31757b rectangle lands at 1699.
-        assertBuildBox("campaigns/human/level05h", 0, 1698, 0x7b, 0x36, 0x75, 0x7b);
-        assertBuildBox("campaigns/human/level05h", 0, 1699, 0x7b, 0x31, 0x75, 0x7b);
+    @DisplayName("a human 5 computer rewrites the land-building box on the native fifty-cycle beat")
+    void aHuman5ComputerRewritesTheLandBuildingBoxOnTheNativeFiftyCycleBeat() {
+        // Native seed-1 shrinks at 1649. Java formerly kept the counted
+        // building for one extra fifty-cycle interval and did not expose the
+        // same 7b31757b rectangle until 1699. The corrected combat/removal
+        // lifecycle now reaches the retail boundary on its actual beat.
+        assertBuildBox("campaigns/human/level05h", 0, 1648, 0x7b, 0x36, 0x75, 0x7b);
+        assertBuildBox("campaigns/human/level05h", 0, 1649, 0x7b, 0x31, 0x75, 0x7b);
     }
 
     @Test

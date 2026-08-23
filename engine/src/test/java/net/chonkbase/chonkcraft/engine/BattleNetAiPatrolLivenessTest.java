@@ -29,29 +29,31 @@ class BattleNetAiPatrolLivenessTest {
     }
 
     @Test
-    @DisplayName("the late Human X10 assault crosses the map and engages")
-    void lateHumanExpansionTenAssaultCrossesTheMapAndEngages() {
+    @DisplayName("the native Orc 11 assault moves and every member engages")
+    void nativeOrcElevenAssaultMovesAndEveryMemberEngages() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No BNE asset pack; set CHONKCRAFT_ASSET_PACK");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission("campaigns/human-exp/levelx10h");
+        Mission mission = data.loadMission("campaigns/orc/level11o");
         Assumptions.assumeTrue(mission != null,
-                "Human expansion mission 10 is not in the pack");
+                "Orc mission 11 is not in the pack");
         World world = mission.world();
 
-        // The authenticated retail ai.bin profile's first full ground force
-        // launches at 6201. This is deliberately beyond the earlier
-        // three-minute competence window: the playtest defect left these
-        // patrols alive but motionless on the long road to the human
-        // cannon-tower region.
+        // Sealed BNE fixture retail-orc-11-idle records four player-one
+        // behavior-two attackers on cycle one. Every member moves, and the
+        // untouched 2.02b binary puts them into real attack orders between
+        // cycles 324 and 397. This is the native end-to-end liveness witness;
+        // the old Human X10 referee incorrectly treated a Java-only cycle-6201
+        // launch as retail behavior even though a 6,500-cycle native capture
+        // records no behavior-two X10 unit at that boundary.
         Map<Integer, Pixel> firstWave = new HashMap<>();
         Set<Integer> moved = new HashSet<>();
         Set<Integer> engaged = new HashSet<>();
-        for (int elapsed = 1; elapsed <= 8_000; elapsed++) {
+        for (int elapsed = 1; elapsed <= 600; elapsed++) {
             mission.tick();
-            if (elapsed == 6_201) {
-                world.playerUnits(2).stream()
+            if (elapsed == 1) {
+                world.playerUnits(1).stream()
                         .filter(Unit::isAlive)
                         .filter(Unit::isOnMap)
                         .filter(unit -> unit.battleNetAiBehavior() == 2)
@@ -61,7 +63,7 @@ class BattleNetAiPatrolLivenessTest {
             if (firstWave.isEmpty()) {
                 continue;
             }
-            for (Unit unit : world.playerUnits(2)) {
+            for (Unit unit : world.playerUnits(1)) {
                 Pixel start = firstWave.get(unit.id());
                 if (start == null) {
                     continue;
@@ -79,8 +81,8 @@ class BattleNetAiPatrolLivenessTest {
             }
         }
 
-        assertEquals(6, firstWave.size(),
-                "retail ai.bin no longer launched the six-member first wave");
+        assertEquals(4, firstWave.size(),
+                "the sealed BNE four-member Orc 11 assault was not present");
         assertEquals(firstWave.keySet(), moved,
                 "a launched behavior-two unit remained visibly frozen");
         assertEquals(firstWave.keySet(), engaged,

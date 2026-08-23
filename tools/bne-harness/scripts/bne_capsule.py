@@ -229,7 +229,15 @@ def verify(capsule: Path) -> dict[str, Any]:
 
 @contextmanager
 def materialize(capsule: Path, repository: Path) -> Iterator[tuple[Path, dict]]:
-    """Rebuild the sealed workspace in a disposable detached worktree."""
+    """Rebuild the sealed workspace in a disposable isolated clone.
+
+    A linked worktree shares ``.git/info/exclude`` with its parent.  That file
+    is operator-local and can change after a capsule is sealed, so using a
+    worktree can make a historical untracked input disappear from the replay
+    identity.  A local shared clone is just as cheap, but has independent Git
+    metadata.  Disabling any current global excludes makes the capsule's own
+    authenticated untracked list authoritative during replay.
+    """
     capsule = Path(capsule).expanduser().resolve()
     repository = Path(repository).expanduser().resolve()
     manifest = verify(capsule)
@@ -244,36 +252,32 @@ def materialize(capsule: Path, repository: Path) -> Iterator[tuple[Path, dict]]:
         )
     with tempfile.TemporaryDirectory(prefix="bne-capsule-replay-") as temporary:
         replay = Path(temporary) / "workspace"
-        _git(repository, "worktree", "add", "--detach", str(replay), head)
-        try:
-            worktree_patch = capsule / WORKTREE_PATCH_NAME
-            staged_patch = capsule / STAGED_PATCH_NAME
-            if worktree_patch.stat().st_size:
-                _git(replay, "apply", "--binary", "--whitespace=nowarn",
-                     str(worktree_patch))
-            if staged_patch.stat().st_size:
-                _git(replay, "apply", "--cached", "--binary",
-                     "--whitespace=nowarn", str(staged_patch))
-            for record in manifest["untracked"]:
-                relative = _safe_relative(record["path"])
-                target = (replay / relative).resolve()
-                if not target.is_relative_to(replay.resolve()):
-                    raise CapsuleError(
-                        f"capsule input escapes the replay root: {record['path']}"
-                    )
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(
-                    capsule / UNTRACKED_DIRECTORY / relative, target,
+        _git(repository, "clone", "--shared", "--no-checkout", "--quiet",
+             str(repository), str(replay))
+        _git(replay, "checkout", "--detach", "--quiet", head)
+        _git(replay, "config", "core.excludesFile", os.devnull)
+        worktree_patch = capsule / WORKTREE_PATCH_NAME
+        staged_patch = capsule / STAGED_PATCH_NAME
+        if worktree_patch.stat().st_size:
+            _git(replay, "apply", "--binary", "--whitespace=nowarn",
+                 str(worktree_patch))
+        if staged_patch.stat().st_size:
+            _git(replay, "apply", "--cached", "--binary",
+                 "--whitespace=nowarn", str(staged_patch))
+        for record in manifest["untracked"]:
+            relative = _safe_relative(record["path"])
+            target = (replay / relative).resolve()
+            if not target.is_relative_to(replay.resolve()):
+                raise CapsuleError(
+                    f"capsule input escapes the replay root: {record['path']}"
                 )
-                if record.get("mode") == "100755":
-                    target.chmod(0o755)
-            yield replay, manifest
-        finally:
-            subprocess.run(
-                ["git", "-C", str(repository), "worktree", "remove",
-                 "--force", str(replay)],
-                check=False, capture_output=True,
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(
+                capsule / UNTRACKED_DIRECTORY / relative, target,
             )
+            if record.get("mode") == "100755":
+                target.chmod(0o755)
+        yield replay, manifest
 
 
 def replay_identity(capsule: Path, repository: Path) -> dict[str, Any]:

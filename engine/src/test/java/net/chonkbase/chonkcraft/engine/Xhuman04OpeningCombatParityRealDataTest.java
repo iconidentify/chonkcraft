@@ -70,11 +70,22 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Integer defenderTimer60 = null;
         Integer adjacentHp68 = null;
         Integer adjacentHp70 = null;
+        Integer retargetFaceGruntX69 = null;
+        Integer retargetFaceGruntY69 = null;
+        Boolean retargetFaceGruntMoving69 = null;
+        Integer retargetFaceGruntCollision69 = null;
         Integer mineApproachX72 = null;
         Integer mineApproachY72 = null;
         Integer syncSeed82 = null;
         Integer syncSeed83 = null;
         Integer syncSeed85 = null;
+        Integer syncSeed102 = null;
+        Integer syncSeed104 = null;
+        Integer syncSeed105 = null;
+        Integer residualRetargetSequence102 = null;
+        Integer residualRetargetTimer102 = null;
+        Integer residualRetargetSequence104 = null;
+        Integer residualRetargetTimer104 = null;
         Integer retargetFootmanX83 = null;
         Integer retargetFootmanY83 = null;
         Integer retargetFootmanX85 = null;
@@ -100,7 +111,11 @@ class Xhuman04OpeningCombatParityRealDataTest {
         Boolean blockedGruntMoving108 = null;
         Unit blockedGruntTarget73 = null;
         Integer retaliatingFootmanHp109 = null;
-        for (int fixture = 1; fixture <= 109; fixture++) {
+        Integer parkedRetargetSequence110 = null;
+        Integer parkedRetargetTimer110 = null;
+        Integer parkedRetargetTimer120 = null;
+        Integer parkedRetargetFootmanHp120 = null;
+        for (int fixture = 1; fixture <= 120; fixture++) {
             mission.tick();
             for (Missile missile : world.missiles()) {
                 if (missile.source() != null
@@ -125,6 +140,12 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 defenderTimer60 = defender.battleNetAnimationTimer();
             } else if (fixture == 68) {
                 adjacentHp68 = adjacentGrunt.hitPoints();
+            } else if (fixture == 69) {
+                retargetFaceGruntX69 = retargetFaceGrunt.tileX();
+                retargetFaceGruntY69 = retargetFaceGrunt.tileY();
+                retargetFaceGruntMoving69 = retargetFaceGrunt.isMoving();
+                retargetFaceGruntCollision69 =
+                        retargetFaceGrunt.battleNetCollisionCounter();
             } else if (fixture == 70) {
                 adjacentHp70 = adjacentGrunt.hitPoints();
             } else if (fixture == 72) {
@@ -134,6 +155,16 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 blockedGruntTarget73 = retaliatingGrunt.target();
             } else if (fixture == 109) {
                 retaliatingFootmanHp109 = retaliatingFootman.hitPoints();
+            } else if (fixture == 110) {
+                parkedRetargetSequence110 = retargetFaceGrunt
+                        .battleNetSequenceOffset();
+                parkedRetargetTimer110 = retargetFaceGrunt
+                        .battleNetAnimationTimer();
+            } else if (fixture == 120) {
+                parkedRetargetTimer120 = retargetFaceGrunt
+                        .battleNetAnimationTimer();
+                parkedRetargetFootmanHp120 = blockedRetargetFootman
+                        .hitPoints();
             }
             if (fixture == 83) {
                 retargetFootmanX83 = residualRetargetFootman.tileX();
@@ -166,6 +197,20 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 syncSeed83 = world.randomSeed();
             } else if (fixture == 85) {
                 syncSeed85 = world.randomSeed();
+            } else if (fixture == 102) {
+                syncSeed102 = world.randomSeed();
+                residualRetargetSequence102 =
+                        residualRetargetFootman.battleNetSequenceOffset();
+                residualRetargetTimer102 =
+                        residualRetargetFootman.battleNetAnimationTimer();
+            } else if (fixture == 104) {
+                syncSeed104 = world.randomSeed();
+                residualRetargetSequence104 =
+                        residualRetargetFootman.battleNetSequenceOffset();
+                residualRetargetTimer104 =
+                        residualRetargetFootman.battleNetAnimationTimer();
+            } else if (fixture == 105) {
+                syncSeed105 = world.randomSeed();
             }
             if (fixture == 105) {
                 blockedGruntX105 = blockedGrunt.tileX();
@@ -198,6 +243,14 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the delayed melee retarget must enter the native OP0 hold");
         assertEquals(51, adjacentHp68,
                 "the defender must not land Java's former early fixture-68 hit");
+        assertEquals(74, retargetFaceGruntX69,
+                "the completed refusal band spends the replacement route");
+        assertEquals(59, retargetFaceGruntY69,
+                "a mobile retarget takes BNE's fresh NW, not stale west");
+        assertEquals(Boolean.TRUE, retargetFaceGruntMoving69,
+                "fixture 69 must own the live northwest residual");
+        assertEquals(0, retargetFaceGruntCollision69,
+                "the accepted replacement byte clears collision two");
         assertEquals(36, adjacentHp70,
                 "the other native attacks still land through fixture 70");
         assertEquals(120, mineApproachX72,
@@ -212,6 +265,20 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the two standing melee loops retain native fixture-83 cadence");
         assertEquals(0xbf54bc7e, syncSeed85,
                 "the residual retarget spends at OP0 alongside the native loop");
+        assertEquals(0x0abd322c, syncSeed102,
+                "a fresh retarget residual must not spend SyncRand on settle");
+        assertEquals(2539, residualRetargetSequence102,
+                "the retained replacement byte cold-opens Attack at fixture 102");
+        assertEquals(3, residualRetargetTimer102,
+                "fixture 102 begins the native three-beat Attack constructor");
+        assertEquals(0x0abd322c, syncSeed104,
+                "Attack construction 3,2,1 must keep the RNG arm pending");
+        assertEquals(2539, residualRetargetSequence104,
+                "the replacement residual stays on Attack start through 104");
+        assertEquals(1, residualRetargetTimer104,
+                "fixture 104 is the final quiet constructor callback");
+        assertEquals(0x31dff4f5, syncSeed105,
+                "OP0 consumes the retained route byte and melee draw on 105");
         assertEquals(72, retargetFootmanX83,
                 "the settled footman keeps its old route during Attack construction");
         assertEquals(63, retargetFootmanY83,
@@ -260,6 +327,14 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the resumed SW heading owns a live residual");
         assertEquals(56, retaliatingFootmanHp109,
                 "the grunt's first blow lands on its native retaliation target");
+        assertEquals(2539, parkedRetargetSequence110,
+                "a route-park retarget remains on Attack start after 3,2,1");
+        assertEquals(23, parkedRetargetTimer110,
+                "the new in-range quarry owns the native melee body hold");
+        assertEquals(13, parkedRetargetTimer120,
+                "the committed hold counts down without entering windup");
+        assertEquals(60, parkedRetargetFootmanHp120,
+                "the parked retarget must not land Java's early fixture-120 blow");
         assertTrue(defender.battleNetMeleeSyncRemaining() > 0,
                 "the delayed target handoff must retain its melee RNG cadence");
     }

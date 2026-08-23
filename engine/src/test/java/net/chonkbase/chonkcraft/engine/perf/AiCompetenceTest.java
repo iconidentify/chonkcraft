@@ -117,26 +117,26 @@ class AiCompetenceTest {
         // Somebody has to actually swing. Two slots own live attack orders in
         // this native-cadence sample; the other scripted forces either keep
         // mustering or correctly refuse a flood with no reachable enemy.
-        // The five-minute horizon observes Human X10's first retail ai.bin
-        // ground launch at cycle 6201. BattleNetAiPatrolLivenessTest provides
-        // the stronger per-unit proof that all six members move and engage.
+        // BattleNetAiPatrolLivenessTest separately follows all four members
+        // of a binary-observed Orc 11 assault through movement and combat.
         long fighting = slots.stream().filter(AiProbe.Slot::attacked).count();
         assertTrue(fighting >= 2, "only " + fighting + " of " + slots.size()
                 + " computer players ever put a unit into an attack order");
 
-        // The readiness promise is one complete autonomous opponent, not a
-        // collage in which one slot farms, another builds and a third attacks.
-        // Observe every link on the same slot: worker orders plus treasury
-        // credits, production and payment, a formed force leaving Gathering,
-        // and a live attack order. The harness issued no opponent commands.
-        List<AiProbe.Slot> complete = slots.stream().filter(slot ->
+        // Keep the economy promise on one autonomous slot rather than letting
+        // one computer harvest while another spends. Battle liveness has its
+        // own binary-observed referee: BattleNetAiPatrolLivenessTest follows
+        // the native Orc 11 force through movement and combat. The old
+        // same-slot force clause depended on a Java-only X10 launch at cycle
+        // 6201; a sealed 6,500-cycle BNE capture proves that launch does not
+        // happen in retail and therefore cannot be an authenticity gate.
+        List<AiProbe.Slot> completeEconomies = slots.stream().filter(slot ->
                 slot.harvestCycles > 0
                 && slot.credited[0] + slot.credited[1] + slot.credited[2] > 0
-                && slot.built() && slot.spentAnything()
-                && slot.battleNetForceCycles > 0 && slot.attacked()).toList();
-        assertFalse(complete.isEmpty(),
-                "no one computer slot gathered, built, formed a force and attacked; "
-                        + "the aggregate can pass by distributing a broken loop across players");
+                && slot.built() && slot.spentAnything()).toList();
+        assertFalse(completeEconomies.isEmpty(),
+                "no one computer slot gathered, banked, built, and spent; "
+                        + "the aggregate can pass by distributing a broken economy across players");
 
         // Human 1's inert control must stay inert. This catches accidentally
         // turning the old generic built-in plan back on for every slot.

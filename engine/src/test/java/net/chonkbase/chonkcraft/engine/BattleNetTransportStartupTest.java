@@ -133,6 +133,38 @@ class BattleNetTransportStartupTest {
     }
 
     @Test
+    @DisplayName("Transport rebuilds its shoreline route after dropping to single stride")
+    void transportReplansOnSingleStrideBeforeItsNextShoreStep() {
+        // Human 5 transport 1556 reaches (120,48) with its doubled leg fully
+        // drained and the shoreline order point at (117,47). Native clears
+        // unit+0x1c&2 before asking for the next route, stores NW,W,W, and
+        // first-steps to (119,47). Planning on the stale doubled grid ties W
+        // and NW, stores W, then consumes that heading at stride one and
+        // incorrectly lands on (119,48).
+        GameMap map = new GameMap(128, 64, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+
+        World world = new World(map, players(PudMap.PlayerType.COMPUTER));
+        Unit ship = world.createUnit(transport(), 0, 120, 48);
+        Unit depot = world.createUnit(hall(), 0, 109, 41);
+        ship.setTarget(depot);
+        ship.setOrder(Unit.Order.HARVEST);
+        ship.setOrderTarget(117, 47);
+        ship.setBattleNetDoubleStep(true);
+        ship.clearPath();
+
+        world.stepBattleNetTransportToHall(ship, depot);
+
+        assertEquals(119, ship.tileX());
+        assertEquals(47, ship.tileY(),
+                "the new single-stride route begins north-west, not west");
+    }
+
+    @Test
     @DisplayName("BNE does not issue the AI transport order to a person")
     void personOwnedTransportKeepsItsPlacedGuardOrder() {
         GameMap map = new GameMap(32, 32, new Tileset());

@@ -87,6 +87,54 @@ class BneRngLedgerTest(unittest.TestCase):
         self.assertIsNone(report["first_mismatch"])
         self.assertEqual(0, bne_rng_ledger.exit_code(report))
 
+    def test_java_map_construction_prefix_is_outside_native_capture_window(self):
+        # The native async hook starts at scenario-loaded while Java causal
+        # tracing also sees unit-pool construction. The shared post-load seed
+        # is an evidence boundary, not hundreds of gameplay-only Java draws.
+        draws = chain(1, 8)
+        native = draws[2:]
+        report = self.ledger(
+            native_trace(native, ["0x0040ad58"] * len(native)),
+            java_causal(draws,
+                        ["World.initializeBattleNetUnit"] * 2
+                        + ["BattleNetIdleSystem.battleNetLandIdleChoice"]
+                        * len(native)),
+        )
+        self.assertEqual("identical", report["classification"])
+        self.assertEqual({"native": 0, "java": 2},
+                         report["capture_prefix_excluded"])
+        self.assertEqual(6, report["matched"])
+        self.assertEqual(6, report["java"]["compared_draw_count"])
+
+    def test_two_native_callsites_may_share_one_java_consumer(self):
+        # Java deliberately folds native projectile X/Y aim call sites into
+        # one helper. That many-to-one implementation mapping does not mean
+        # the random stream changed consumers.
+        draws = chain(1, 4)
+        report = self.ledger(
+            native_trace(draws, ["0x0040fbf7", "0x0040fc06"] * 2),
+            java_causal(draws,
+                        ["BattleNetProjectileSystem.aimJitter"] * 4),
+        )
+        self.assertEqual("identical", report["classification"])
+        self.assertIsNone(report["first_mismatch"])
+
+    def test_native_damage_consumer_may_be_split_across_java_helpers(self):
+        # Native shares one physical-damage RNG routine. Java splits melee
+        # and projectile resolution without changing the stream consumer.
+        draws = chain(1, 4)
+        report = self.ledger(
+            native_trace(draws, ["0x00418412"] * 4),
+            java_causal(draws, [
+                "BattleNetProjectileSystem.battleNetProjectileDamage",
+                "World.battleNetMeleeDamage",
+                "World.battleNetMeleeDamage",
+                "BattleNetProjectileSystem.battleNetProjectileDamage",
+            ]),
+        )
+        self.assertEqual("identical", report["classification"])
+        self.assertIsNone(report["first_mismatch"])
+
     def test_one_extra_java_draw_is_named_where_the_consumers_shift(self):
         # Both engines take numbers out of one generator, so an extra Java
         # draw leaves every later seed exactly where it was and moves who
@@ -127,9 +175,10 @@ class BneRngLedgerTest(unittest.TestCase):
                          report["classification"],
                          "a number native took and Java did not was not "
                          "identified as a missing draw")
-        self.assertEqual(2, report["first_mismatch"]["at_match_index"],
+        self.assertEqual(3, report["first_mismatch"]["at_match_index"],
                          "the missing draw is reported somewhere other than "
-                         "the draw whose consumer first shifted")
+                         "the first established native call site whose Java "
+                         "consumer shifted")
         self.assertEqual(-1, report["surplus_java_draws"])
 
     def test_a_shorter_capture_alone_is_not_reported_as_a_missing_draw(self):

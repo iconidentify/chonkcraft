@@ -224,7 +224,9 @@ class MeleeAttackTailWrapRetargetTest {
         attacker.setChasing(false);
         attacker.setBattleNetSequenceOffset(wrap);
         attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetMeleeSyncRemaining(1);
 
+        int syncSeedBeforeWrap = world.battleNetRandomSeed();
         world.tick();
         assertEquals(Unit.Order.ATTACK, attacker.order(),
                 "a tail wrap after the quarry dies must keep Attack, not Still");
@@ -238,6 +240,9 @@ class MeleeAttackTailWrapRetargetTest {
                 "construction 3 holds the tile; dest-arm leftover is later");
         assertEquals(10, attacker.tileY(),
                 "construction 3 holds the tile; dest-arm leftover is later");
+        assertEquals(syncSeedBeforeWrap, world.battleNetRandomSeed(),
+                "an out-of-range replacement cannot refresh the expired melee "
+                        + "variant; retail drops that arm before chase");
 
         world.tick();
         world.tick();
@@ -321,6 +326,53 @@ class MeleeAttackTailWrapRetargetTest {
                 "in-range wrap retarget restarts Attack construction 3");
         assertEquals(Unit.Order.ATTACK, attacker.order(),
                 "in-range wrap retarget keeps Attack");
+    }
+
+    @Test
+    @DisplayName("a melee tail wrap prices an offered target before equal spatial hits")
+    void aMeleeTailWrapPricesAnOfferedTargetBeforeEqualSpatialHits()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 643,
+                "retail ogre Attack must start at script offset 643");
+        int wrap = wrapGotoOffset(script, attackStart);
+        assumeTrue(wrap >= 0, "ogre Attack must loop back to its opening OP0");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 10);
+        Unit spatialFirst = world.createUnit(
+                prey("unit-ogre", 0x3f), 1, 11, 10);
+        Unit offered = world.createUnit(
+                prey("unit-ogre", 0x3f), 1, 10, 11);
+        assumeTrue(attacker != null && spatialFirst != null && offered != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, spatialFirst),
+                "ogre must accept the first adjacent quarry");
+        assertTrue(world.targets.inAttackRange(attacker, offered),
+                "the equally scored offer starts in melee range");
+
+        attacker.setOfferedTarget(offered);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(wrap);
+        attacker.setBattleNetAnimationTimer(1);
+
+        world.tick();
+        assertSame(offered, attacker.target(),
+                "the banked hit offer wins an equal-score spatial tie");
+        assertEquals(attackStart, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the offered retarget restarts Attack construction");
+
+        world.tick();
+        world.tick();
+        world.tick();
+        assertEquals(attackStart, attacker.battleNetSequenceOffset());
+        assertEquals(23, attacker.battleNetAnimationTimer(),
+                "the offered retarget enters native's committed melee hold");
     }
 
     @Test

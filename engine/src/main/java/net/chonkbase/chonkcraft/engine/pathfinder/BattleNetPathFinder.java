@@ -21,8 +21,8 @@ import net.chonkbase.chonkcraft.engine.map.Direction;
  */
 public final class BattleNetPathFinder {
 
-    /** BNE's unit route buffer at {@code CUnit + 0x30} is twenty bytes. */
-    private static final int MAX_PATH = 20;
+    /** Number of route bytes in the retail unit record. */
+    public static final int MAX_PATH = 20;
 
     /** Native {@code DAT_00490e88}, indexed by two consecutive headings. */
     private static final int[][] TURN_OPTIMIZATION = {
@@ -194,6 +194,49 @@ public final class BattleNetPathFinder {
             boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
             boolean preferPureMajorFreePrefix,
             boolean preferMarkedWallOnTie) {
+        return find(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, false);
+    }
+
+    /**
+     * Finds a route with the native shared wall buffer enabled when the caller
+     * has authenticated carry-over from an earlier collision face.
+     *
+     * <p>Retail traces both rotations through one twenty-byte buffer. Most
+     * cold searches are currently kept on the independently compensated path,
+     * but saturated residual recovery has concrete buffer carry-over and must
+     * let the first face's writes influence the second.</p>
+     */
+    public static PathFinder.Path find(int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces) {
+        return find(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, shareWallBufferBetweenFaces,
+                shareWallBufferBetweenFaces, false);
+    }
+
+    /**
+     * Finds a route with independent control over wall-face order and buffer
+     * carry-over. Retail can enter the opposite rotation first without yet
+     * retaining the failed face's writes; saturated recovery needs both.
+     */
+    public static PathFinder.Path find(int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace) {
         if (stride != 1 && stride != 2) {
             throw new IllegalArgumentException("BNE movement stride must be 1 or 2");
         }
@@ -290,7 +333,9 @@ public final class BattleNetPathFinder {
                     PathFinder.Path escaped = escapeObstacle(direct, x, y,
                             heading, toX, toY, stride, laterLine, passability,
                             optimizationPassability, goalMarker,
-                            scoreToX, scoreToY);
+                            scoreToX, scoreToY,
+                            shareWallBufferBetweenFaces,
+                            reverseWallFaceOrder, retainFirstWallFace);
                     if (escaped.length() == 0) {
                         return prefix;
                     }
@@ -320,7 +365,9 @@ public final class BattleNetPathFinder {
                 PathFinder.Path escaped = escapeObstacle(direct, x, y, heading,
                         toX, toY, stride, laterLine, passability,
                         optimizationPassability, goalMarker,
-                        scoreToX, scoreToY);
+                        scoreToX, scoreToY,
+                        shareWallBufferBetweenFaces,
+                        reverseWallFaceOrder, retainFirstWallFace);
                 // 0x4508f0 marks the target skirt and the target itself. When
                 // the ray is stopped by a marked square that is not the goal
                 // point, wall-follow can still invent a long detour whose first
@@ -450,15 +497,22 @@ public final class BattleNetPathFinder {
             int x, int y, int blockedHeading, int toX, int toY,
             int stride, Set<Long> laterLine, Passability passability,
             Passability optimizationPassability, GoalMarker goalMarker,
-            int scoreToX, int scoreToY) {
+            int scoreToX, int scoreToY,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace) {
         Map<Long, Integer> directRoute = routeFromPrefix(prefix, x, y, stride);
+        Map<Long, Integer> sharedRoute = new HashMap<>(directRoute);
+        List<Integer> failedSharedFace = null;
         Candidate best = null;
         // progressFrom and the optimizer both need the route's true starting
         // point. Reconstruct it from the prefix once rather than exposing more
         // state to callers.
         int startX = xFromPrefix(prefix, x, stride);
         int startY = yFromPrefix(prefix, y, stride);
-        for (int turn : new int[] {-1, 1}) {
+        int[] turns = reverseWallFaceOrder
+                ? new int[] {1, -1} : new int[] {-1, 1};
+        for (int turn : turns) {
             // A deviation, and a measured one. Native keeps a single route
             // array at 0x4ad64c for the whole search: the second rotation runs
             // on whatever the first left off the ray line, because 0x0044ff33
@@ -467,10 +521,31 @@ public final class BattleNetPathFinder {
             // being faithful here costs four of the 808 sealed routes, 743
             // down to 739 -- so something else compensates for it today and
             // the copy stays until that is found. focused tests has the measurement.
-            Map<Long, Integer> route = new HashMap<>(directRoute);
+            Map<Long, Integer> route = shareWallBufferBetweenFaces
+                    ? sharedRoute : new HashMap<>(directRoute);
+            if (shareWallBufferBetweenFaces) {
+                // 0x44ff33 redraws the direct ray into the same buffer. It does
+                // not clear successful off-ray writes left by the first face.
+                route.putAll(directRoute);
+            }
             int[] join = traceWall(route, x, y, blockedHeading, turn,
                     toX, toY, stride, laterLine, passability, goalMarker);
             if (join == null) {
+                if (shareWallBufferBetweenFaces) {
+                    List<Integer> partial = partialHeadings(route,
+                            startX, startY, stride);
+                    if (failedSharedFace == null && !partial.isEmpty()) {
+                        failedSharedFace = partial;
+                    }
+                    if (System.getenv("CHONKCRAFT_TRACE_BNE_WALL") != null) {
+                        System.err.printf("JBNEWALL from=%d,%d goal=%d,%d "
+                                        + "turn=%d failed route=%s shared=1%n",
+                                startX, startY, toX, toY, turn, partial);
+                    }
+                    // A failed face is the one case retail erases before trying
+                    // the other rotation.
+                    sharedRoute = new HashMap<>(directRoute);
+                }
                 continue;
             }
             int remaining = progressFrom(join[0], join[1],
@@ -507,6 +582,15 @@ public final class BattleNetPathFinder {
             List<Integer> headings = steps;
             Candidate candidate = new Candidate(headings,
                     routeLength + remaining);
+            if (System.getenv("CHONKCRAFT_TRACE_BNE_WALL") != null) {
+                System.err.printf("JBNEWALL from=%d,%d goal=%d,%d turn=%d "
+                                + "join=%d,%d route=%s len=%d remaining=%d "
+                                + "score=%d shared=%d%n",
+                        startX, startY, toX, toY, turn,
+                        join[0], join[1], headings, routeLength, remaining,
+                        candidate.distance(),
+                        shareWallBufferBetweenFaces ? 1 : 0);
+            }
             if (best == null) {
                 best = candidate;
             } else if (candidate.distance() < best.distance()) {
@@ -532,6 +616,25 @@ public final class BattleNetPathFinder {
             if (best == candidate && candidate.distance() < 8) {
                 break;
             }
+            if (retainFirstWallFace && best != null) {
+                // A route rebuilt after a fully paid cooperative refusal band
+                // keeps the first successful rotation in the native buffer;
+                // the ordinary shortest-face comparison belongs to a cold
+                // search. XHuman 12 slot 1508 records the entire first face
+                // NE,NE,E,SE... at fixture 72 even though the opposite face
+                // joins in nine steps and scores ten versus nineteen.
+                break;
+            }
+        }
+        if (shareWallBufferBetweenFaces && failedSharedFace != null) {
+            // Saturated recovery has already failed the direct face for two
+            // action visits. Retail's shared writer leaves the opening byte of
+            // the opposite failed wall in the unit buffer even when the other
+            // face can produce a complete route. Preserve that authenticated
+            // byte as the bounded recovery prefix; the following residual
+            // boundary will ask for the continuation against then-current
+            // formation occupancy.
+            return found(List.of(failedSharedFace.get(0)));
         }
         if (best != null) {
             // XOrc 10 destroyer 1483 (stride 2) at (124,74) toward oil
@@ -582,6 +685,9 @@ public final class BattleNetPathFinder {
             // runs the wall route extends unchanged still take wall-follow.
             // A broader "any free prefix" keep regressed early campaign maps.
             return found(best.headings());
+        }
+        if (failedSharedFace != null) {
+            return found(failedSharedFace);
         }
         // A unit-target route owns 0x4508f0's marked target skirt. When both
         // wall traces fail, native 0x44fbd0 preserves only the direct prefix;
@@ -681,6 +787,10 @@ public final class BattleNetPathFinder {
             int anchorX, int anchorY, int blockedHeading, int turn,
             int toX, int toY, int stride, Set<Long> laterLine,
             Passability passability, GoalMarker goalMarker) {
+        String tracedWallStart = System.getenv(
+                "CHONKCRAFT_TRACE_BNE_WALL_STEPS");
+        boolean traceSteps = tracedWallStart != null
+                && tracedWallStart.trim().equals(anchorX + "," + anchorY);
         int x = anchorX;
         int y = anchorY;
         int heading = blockedHeading;
@@ -696,14 +806,33 @@ public final class BattleNetPathFinder {
                 ny = y + Direction.deltaY(chosen) * stride;
                 // OOB fails the whole face without rotating (0x45015c/0x45016a).
                 if (passability.isOutOfBounds(nx, ny)) {
+                    if (traceSteps) {
+                        System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                        + "step=%d at=%d,%d try=%d next=%d,%d "
+                                        + "result=oob%n",
+                                anchorX, anchorY, turn, steps, x, y, chosen,
+                                nx, ny);
+                    }
                     return null;
                 }
                 if (passability.canEnter(nx, ny)) {
                     break;
                 }
+                if (traceSteps) {
+                    System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                    + "step=%d at=%d,%d try=%d next=%d,%d "
+                                    + "result=blocked%n",
+                            anchorX, anchorY, turn, steps, x, y, chosen,
+                            nx, ny);
+                }
                 // Blocked terrain only: rotate until the first heading returns.
                 chosen = Math.floorMod(chosen + turn, Direction.COUNT);
                 if (chosen == first) {
+                    if (traceSteps) {
+                        System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                        + "step=%d at=%d,%d result=boxed%n",
+                                anchorX, anchorY, turn, steps, x, y);
+                    }
                     return null;
                 }
             }
@@ -722,6 +851,13 @@ public final class BattleNetPathFinder {
             // chain below does not replace this: taking the test out costs
             // Human 5 forty-nine cycles of parity, 57 down to 8.
             if (nx == anchorX && ny == anchorY) {
+                if (traceSteps) {
+                    System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                    + "step=%d at=%d,%d choose=%d next=%d,%d "
+                                    + "result=anchor%n",
+                            anchorX, anchorY, turn, steps, x, y, chosen,
+                            nx, ny);
+                }
                 return null;
             }
             // Native 0x0045020f erases whatever route this square already
@@ -741,6 +877,13 @@ public final class BattleNetPathFinder {
                     || (goalMarker != null
                             ? goalMarker.contains(nx, ny)
                             : nearGoal(nx, ny, toX, toY, stride));
+            if (traceSteps) {
+                System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                + "step=%d at=%d,%d choose=%d next=%d,%d "
+                                + "marked=%d%n",
+                        anchorX, anchorY, turn, steps, x, y, chosen,
+                        nx, ny, landingMarked ? 1 : 0);
+            }
             if (landingMarked) {
                 return new int[] {nx, ny};
             }
@@ -752,11 +895,20 @@ public final class BattleNetPathFinder {
                             ? goalMarker.contains(besideX, besideY)
                             : nearGoal(besideX, besideY, toX, toY, stride));
             if (besideMarked) {
+                if (traceSteps) {
+                    System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
+                                    + "step=%d at=%d,%d result=beside-marked%n",
+                            anchorX, anchorY, turn, steps, x, y);
+                }
                 return new int[] {x, y};
             }
             heading = Math.floorMod(chosen - 3 * turn, Direction.COUNT);
             x = nx;
             y = ny;
+        }
+        if (traceSteps) {
+            System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d result=limit%n",
+                    anchorX, anchorY, turn);
         }
         return null;
     }
@@ -881,6 +1033,25 @@ public final class BattleNetPathFinder {
             Integer heading = route.get(point(x, y));
             if (heading == null) {
                 return null;
+            }
+            result.add(heading);
+            x += Direction.deltaX(heading) * stride;
+            y += Direction.deltaY(heading) * stride;
+        }
+        return result;
+    }
+
+    /** Follows whatever bounded prefix remains in the shared native buffer. */
+    private static List<Integer> partialHeadings(Map<Long, Integer> route,
+            int startX, int startY, int stride) {
+        List<Integer> result = new ArrayList<>(MAX_PATH);
+        Set<Long> seen = new HashSet<>();
+        int x = startX;
+        int y = startY;
+        while (result.size() < MAX_PATH && seen.add(point(x, y))) {
+            Integer heading = route.get(point(x, y));
+            if (heading == null) {
+                break;
             }
             result.add(heading);
             x += Direction.deltaX(heading) * stride;

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
+import net.chonkbase.chonkcraft.engine.ai.AiPlayer;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -66,6 +67,39 @@ class BattleNetAiWoodTest {
 
         assertArrayEquals(new int[] {5, 12}, world.findAiWood(worker, 20),
                 "retail BNE 2.02 scans each expanding ring east, south, west, north");
+    }
+
+    @Test
+    @DisplayName("BNE's failed-gold wood fallback searches one row north")
+    void failedGoldReadyFallbackUsesTheNorthShiftedUnitCenter() {
+        GameMap map = grass(24);
+        map.field(9, 8).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+        map.field(9, 9).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+
+        World world = new World(map);
+        Unit worker = world.createUnit(woodcutter(), 0, 10, 10);
+        assertTrue(worker != null, "the worker must place");
+        worker.setBattleNetWoodReadyPathRequired(true);
+
+        assertArrayEquals(new int[] {9, 8, 1}, world.findAiWood(worker, 20),
+                "failed-gold UnitReady shifts the terrain ring north before searching");
+    }
+
+    @Test
+    @DisplayName("a distant failed-gold wood fallback keeps the ordinary ring")
+    void distantFailedGoldFallbackRetainsTheAnchorCenteredSearch() {
+        GameMap map = grass(24);
+        map.field(14, 10).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+
+        World world = new World(map);
+        Unit worker = world.createUnit(woodcutter(), 0, 10, 10);
+        assertTrue(worker != null, "the worker must place");
+        worker.setBattleNetWoodReadyPathRequired(true);
+
+        assertArrayEquals(new int[] {14, 10}, world.findAiWood(worker, 20),
+                "distant fallbacks use the same ring as ordinary lumber assignment");
+        assertTrue(!worker.battleNetWoodReadyPathRequired(),
+                "a distant terrain result does not retain the adjacent retry marker");
     }
 
     private static UnitType woodcutter() {
@@ -550,4 +584,51 @@ class BattleNetAiWoodTest {
         assertSame(mine, world.findBattleNetReadyGoldMine(worker),
                 "retail's ready callback only checks the terrain component");
     }
+
+    @Test
+    @DisplayName("an empty gold route makes the ready callback switch resource class")
+    void failedGoldWalkFallsThroughToWoodInsteadOfAnotherMine() {
+        GameMap map = grass(20);
+        map.field(13, 10).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+        World world = new World(map);
+        world.player(0).setType(
+                net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER);
+        Unit worker = world.createUnit(woodcutter(), 0, 10, 10);
+
+        UnitType depotType = building("unit-town-hall", 3, 3);
+        depotType.stores().add(UnitType.Resource.GOLD);
+        world.createUnit(depotType, 0, 2, 2);
+        UnitType mineType = building("unit-gold-mine", 3, 3);
+        mineType.setGivesResource(UnitType.Resource.GOLD);
+        Unit failed = world.createUnit(mineType, 15, 5, 5);
+        failed.setResourcesHeld(25_000);
+        Unit alternative = world.createUnit(mineType, 15, 15, 15);
+        alternative.setResourcesHeld(25_000);
+
+        AiPlayer ai = new AiPlayer(0);
+        assertTrue(ai.battleNetUnitReadyAfterResourceFailure(
+                        world, worker, failed),
+                "the native ready callback must find replacement work");
+        assertEquals(Unit.Order.HARVEST, worker.order());
+        assertEquals(UnitType.Resource.WOOD, worker.carrying(),
+                "another connected gold mine must not restart the failed class");
+        assertEquals(13, worker.resourceTileX());
+        assertEquals(10, worker.resourceTileY());
+        assertTrue(alternative.isAlive(), "the alternative mine is available");
+    }
+
+    @Test
+    @DisplayName("a wall between a worker and tree is the blocked wood order point")
+    void wallBetweenWorkerAndTreeBecomesTheBlockedOrderPoint() {
+        GameMap map = grass(100);
+        map.field(14, 89).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+        map.field(13, 89).setFlags(TileFlag.WALL | TileFlag.UNPASSABLE);
+        World world = new World(map);
+        Unit worker = world.createUnit(woodcutter(), 0, 9, 88);
+
+        assertArrayEquals(new int[] {13, 89},
+                world.harvest.battleNetWoodOrderPoint(worker, 14, 89),
+                "retail stores the last static blocker before open terrain");
+    }
+
 }

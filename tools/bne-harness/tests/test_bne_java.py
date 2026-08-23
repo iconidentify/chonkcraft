@@ -124,9 +124,17 @@ class BneJavaAdapterTest(unittest.TestCase):
             "triage", "corpus-index.json", "--baseline-survey", "proof.json",
         ])
         self.assertTrue(args.compose_lab)
+        self.assertFalse(args.allow_asset_migration)
         self.assertEqual(
             bne_java.ROOT / ".bne-lab", args.lab_artifact_root,
         )
+
+    def test_cli_autopilot_exposes_fail_closed_asset_migration(self):
+        args = bne_java.parser().parse_args([
+            "autopilot", "corpus-index.json",
+            "--baseline-survey", "proof.json", "--allow-asset-migration",
+        ])
+        self.assertTrue(args.allow_asset_migration)
 
     def test_cli_triage_cannot_skip_lab_pointer_promotion(self):
         args = argparse.Namespace(compose_lab=True)
@@ -432,6 +440,36 @@ first divergence at cycle 22 (3 finding(s)):
             b"cycle 1 seed 00000001\n"
             b"u 3 unit-human-guard-tower p1 1 1 hp 130 o STILL\n"
             b"u 4 unit-human-guard-tower p1 2 2 hp 130 o ATTACK\n",
+            output.getvalue(),
+        )
+
+    def test_normalizes_witnessed_internal_destroyed_place_type(self):
+        raw_rubble = bytearray(152)
+        raw_rubble[39] = 107
+        raw_rubble[46] = 1
+        cycle_payload = b"".join((
+            bne_compare.CYCLE_HEADER.pack(175, 0x0586EAEC, 1371, 1),
+            bytes(16 * bne_compare.PLAYER_RECORD.size),
+            bne_compare.UNIT_DELTA_HEADER.pack(1370, 1),
+            raw_rubble,
+        ))
+        state = io.BytesIO(b"".join((
+            bne_compare.STATE_HEADER.pack(
+                b"BNESTATE", 1, 1, bne_compare.STATE_HEADER.size,
+                152, 1600, 16, 15,
+            ),
+            bne_compare.CHUNK_HEADER.pack(b"CYCL", len(cycle_payload)),
+            cycle_payload,
+        )))
+        trace = io.BytesIO(
+            b"cycle 175 seed 0586eaec\n"
+            b"u 1370 unit-unknown p1 13 86 hp 1 o DYING\n"
+        )
+        output = io.BytesIO()
+        bne_compare.normalize_fixture_trace(trace, state, output, 175)
+        self.assertEqual(
+            b"cycle 175 seed 0586eaec\n"
+            b"u 1370 unit-destroyed-2x2-place p1 13 86 hp 1 o DYING\n",
             output.getvalue(),
         )
 

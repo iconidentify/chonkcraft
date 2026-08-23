@@ -783,6 +783,25 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a failed-resource wood-ready retry survives a save")
+    void failedResourceWoodReadyPathRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit worker = bench.world().createUnit(
+                bench.types().get("unit-peasant"), 0, 10, 10);
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setCarrying(UnitType.Resource.WOOD);
+        worker.setBattleNetOrderDelay(2);
+        worker.setBattleNetWoodReadyPathRequired(true);
+
+        Unit loaded = find(reload(bench), "unit-peasant");
+
+        assertEquals(Unit.Order.HARVEST, loaded.order());
+        assertEquals(2, loaded.battleNetOrderDelay());
+        assertTrue(loaded.battleNetWoodReadyPathRequired(),
+                "reload must not turn native's path-gated retry into an immediate chop");
+    }
+
+    @Test
     @DisplayName("a queued BNE point command keeps both of its clocks")
     void playerCommandBoundaryRoundTrips() throws IOException {
         Bench bench = bench();

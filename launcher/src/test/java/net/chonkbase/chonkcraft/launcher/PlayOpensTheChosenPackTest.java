@@ -96,6 +96,16 @@ class PlayOpensTheChosenPackTest {
         assertTrue(Files.isRegularFile(log));
         assertTrue(Files.size(log) > 0,
                 "the child failed but its diagnostics were still discarded");
+
+        Process next = launcher.launch(installedVersion(), chosen);
+        assertTrue(next.waitFor(10, java.util.concurrent.TimeUnit.SECONDS));
+        try (var files = Files.list(home.logs())) {
+            Path archived = files.filter(path -> path.getFileName().toString()
+                            .startsWith("game-development-1-"))
+                    .findFirst().orElseThrow();
+            assertTrue(Files.size(archived) > 0,
+                    "pressing Play again erased the only evidence of the prior failure");
+        }
     }
 
     /** Applies the command's {@code -D} settings, as the child JVM would. */
