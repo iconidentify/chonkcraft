@@ -7444,6 +7444,23 @@ final class BattleNetCombatSystem {
                     unit.setFighting(false);
                     unit.setChasing(false);
                     unit.setBattleNetAttackWrapDestArmPending(true);
+                    if (!rangedOp0 && sequenceTarget != null
+                            && sequenceTarget.removed()
+                            && !sequenceTarget.isDying()
+                            && sequenceTarget.order() == Unit.Order.HARVEST) {
+                        // A worker hidden inside a mine is unavailable, not a
+                        // dying quarry. Its Attack-tail replacement hands
+                        // straight to Move OP0: target scan, route creation
+                        // and the first chase step share this callback. Human
+                        // 8 attack-peasant 1538 is the sealed witness: the
+                        // old mine-contained peasant remains on Harvest while
+                        // native names slot 1525 and steps W on fixture 130.
+                        // Charging the dying-quarry construction 3,2,1 here
+                        // leaves attackers visibly staring at vanished
+                        // workers before they resume combat.
+                        unit.setBattleNetAnimationTimer(1);
+                        return false;
+                    }
                     if (World.BNE_IDLE_TRACE) {
                         System.err.printf("JBNEATTACKLOOPDESTARM cycle=%d "
                                         + "unit=%d from=%d to=%d timer=3%n",

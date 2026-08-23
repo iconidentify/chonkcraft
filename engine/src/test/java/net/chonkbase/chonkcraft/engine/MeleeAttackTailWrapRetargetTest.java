@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.zip.ZipFile;
+import net.chonkbase.chonkcraft.data.map.PudUnitTypes;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
@@ -79,6 +80,35 @@ class MeleeAttackTailWrapRetargetTest {
         type.setNumDirections(8);
         type.setPriority(0x3f);
         AnimationSet set = new AnimationSet("ogre");
+        set.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        set.put(AnimationSet.State.MOVE, Animation.parse("move", List.of(
+                "unbreakable begin", "frame 0", "move 16", "wait 1",
+                "frame 5", "move 16", "unbreakable end", "wait 1")));
+        set.put(AnimationSet.State.ATTACK, Animation.parse("attack", List.of(
+                "frame 0", "wait 3", "attack", "wait 1")));
+        type.setAnimationSet(set);
+        return type;
+    }
+
+    private static UnitType attackPeasant() {
+        UnitType type = new UnitType("unit-attack-peasant");
+        type.setTileSize(1, 1);
+        type.setBoxSize(31, 31);
+        type.setHitPoints(30);
+        type.setSpeed(13);
+        type.setLandUnit(true);
+        type.setCanAttack(true);
+        type.setCanTargetLand(true);
+        type.setBasicDamage(2);
+        type.setPiercingDamage(1);
+        type.setMaxAttackRange(1);
+        type.setSightRange(4);
+        type.setReactRangeComputer(4);
+        type.setReactRangePerson(4);
+        type.setNumDirections(8);
+        type.setPriority(0x20);
+        AnimationSet set = new AnimationSet("attack-peasant");
         set.put(AnimationSet.State.STILL,
                 Animation.parse("still", List.of("frame 0", "wait 1")));
         set.put(AnimationSet.State.MOVE, Animation.parse("move", List.of(
@@ -284,6 +314,57 @@ class MeleeAttackTailWrapRetargetTest {
                 "the paid tail-wrap leftover must cross OP0 on its arrival visit");
         assertEquals(1, attacker.battleNetAnimationTimer(),
                 "the first attack-body byte begins with the native timer");
+    }
+
+    @Test
+    @DisplayName("a melee tail replaces a mine-contained quarry and chases in the same visit")
+    void aMeleeTailReplacesAMineContainedQuarryAndChasesInTheSameVisit()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int type = PudUnitTypes.code("unit-attack-peasant");
+        int attackStart = sequence.sequenceStart(
+                type, BattleNetSequence.ATTACK_ANIMATION);
+        int moveStart = sequence.sequenceStart(
+                type, BattleNetSequence.MOVE_ANIMATION);
+        int wrap = wrapGotoOffset(script, attackStart);
+        assumeTrue(attackStart >= 0 && moveStart >= 0 && wrap >= 0,
+                "retail attack-peasant must have Move and Attack sequences");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(attackPeasant(), 0, 10, 10);
+        Unit contained = world.createUnit(
+                prey("unit-peasant", 0x20), 1, 11, 10);
+        Unit replacement = world.createUnit(
+                prey("unit-peasant", 0x20), 1, 8, 10);
+        assumeTrue(attacker != null && contained != null
+                        && replacement != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, contained),
+                "attack-peasant must accept the first quarry");
+
+        contained.setOrder(Unit.Order.HARVEST);
+        contained.setRemoved(true);
+        attacker.setTarget(contained);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(wrap);
+        attacker.setBattleNetAnimationTimer(1);
+
+        world.tick();
+
+        assertSame(replacement, attacker.target(),
+                "the tail scan must replace the mine-contained quarry");
+        assertEquals(9, attacker.tileX(),
+                "the replacement scan and first west chase step share a visit");
+        assertEquals(10, attacker.tileY(),
+                "the immediate chase must stay on the replacement's row");
+        assertEquals(moveStart + 3, attacker.battleNetSequenceOffset(),
+                "the same visit must execute Move OP0's first step");
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "native exposes Move-start timer one after the committed step");
+        assertEquals(1, attacker.pathLength(),
+                "one west heading remains after the immediate first step");
     }
 
     @Test
