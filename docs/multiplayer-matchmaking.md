@@ -168,6 +168,11 @@ in both directions and proves the service drops the seventh message in one
 burst. `ChatTransportTest` covers selected-recipient routing and UTF-8 bounds;
 `InGameChatVisualTest` renders the live message line, roster, recipient controls,
 and mute state and drives Enter-to-send into the real network session.
+The settled lobby also carries its game template. In **Top vs Bottom**, the
+host assigns colours/start slots and players whose fixed map starts occupy the
+same vertical area enter as mutual allies with mutual shared vision; the
+two-process network gate starts this mode and requires both peers to report the
+same template before comparing their final simulation hashes.
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.

@@ -10,6 +10,7 @@ import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
+import net.chonkbase.chonkcraft.engine.unit.ResourceInfo;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import net.chonkbase.chonkcraft.engine.unit.UnitType.Resource;
@@ -70,6 +71,30 @@ class BuildCommandLatchTest {
         type.setLandUnit(true);
         type.setSightRange(4);
         type.setAnimationSet(walker());
+        ResourceInfo gold = new ResourceInfo(Resource.GOLD);
+        gold.setCapacity(100);
+        gold.setWaitAtResource(3);
+        gold.setWaitAtDepot(3);
+        type.gathering().put(Resource.GOLD, gold);
+        return type;
+    }
+
+    private static UnitType mine() {
+        UnitType type = new UnitType("unit-gold-mine");
+        type.setTileSize(3, 3);
+        type.setHitPoints(25_500);
+        type.setBuilding(true);
+        type.setGivesResource(Resource.GOLD);
+        type.setCanHarvest(true);
+        return type;
+    }
+
+    private static UnitType hall() {
+        UnitType type = new UnitType("unit-town-hall");
+        type.setTileSize(4, 4);
+        type.setHitPoints(1_200);
+        type.setBuilding(true);
+        type.stores().add(Resource.GOLD);
         return type;
     }
 
@@ -138,5 +163,46 @@ class BuildCommandLatchTest {
                 "the popped build order must found on the spot once the step lands:"
                         + " a ten-cycle pause here is the walked builder's PF_WAIT, which"
                         + " this builder -- whose build order never walked -- does not owe");
+    }
+
+    @Test
+    @DisplayName("a build released after its worker enters a mine waits for the worker to emerge")
+    void aNetworkDelayedBuildCannotLoseAWorkerInsideAMine() {
+        World world = new World(grass(30), onePlayer());
+        world.player(0).set(Resource.GOLD, 2_000);
+        Unit depot = world.createUnit(hall(), 0, 2, 2);
+        Unit source = world.createUnit(mine(), World.NEUTRAL_PLAYER, 12, 12);
+        Unit worker = world.createUnit(peasant(), 0, 10, 13);
+        source.setResourcesHeld(25_500);
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setCarrying(Resource.GOLD);
+        worker.setResourceUnit(source);
+        worker.setResourceTile(source.tileX(), source.tileY());
+        worker.setResourceDepot(depot);
+        worker.setReturnDepotGoal(depot);
+        world.harvest.enterResource(worker, source);
+        worker.setWaitCycles(2);
+
+        UnitType what = farm();
+        assertTrue(world.orderBuild(worker, what, 20, 20),
+                "the build was clicked while the worker was visible and must survive"
+                        + " lockstep releasing it just after mine entry");
+        assertEquals(Unit.Order.HARVEST, worker.order(),
+                "only Harvest can drive a contained worker back onto the map");
+
+        boolean surfacedIntoBuild = false;
+        for (int cycle = 0; cycle < 80; cycle++) {
+            world.tick();
+            assertTrue(worker.isOnMap() || worker.order() == Unit.Order.HARVEST,
+                    "a contained worker switched to " + worker.order()
+                            + " and can never be stepped out of its mine");
+            if (worker.isOnMap() && worker.order() == Unit.Order.BUILD) {
+                surfacedIntoBuild = true;
+                break;
+            }
+        }
+        assertTrue(surfacedIntoBuild,
+                "the acknowledged farm order did not resume after the miner emerged");
+        assertEquals(what, worker.pendingBuild());
     }
 }

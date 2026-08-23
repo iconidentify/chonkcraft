@@ -260,9 +260,15 @@ final class LobbyScreen extends JPanel {
             holding = -1;
             return;
         }
-        if (slot.occupant() == GameLobby.Occupant.HUMAN && index != 0) {
+        if (slot.occupant() == GameLobby.Occupant.HUMAN) {
             holding = index;
         }
+    }
+
+    /** Cycles the creator's synchronized game template. */
+    private void cycleGameTemplate() {
+        GameLobby.GameTemplate current = lobby.state().gameTemplate();
+        lobby.setGameTemplate(current.next());
     }
 
     // ---- drawing ------------------------------------------------------
@@ -378,7 +384,7 @@ final class LobbyScreen extends JPanel {
                                 "orc".equals(slot.race()) ? "human" : "orc") : null);
             }
 
-            if (lobby.isHost() && i > 0) {
+            if (lobby.isHost() && !mine) {
                 if (slot.occupant() == GameLobby.Occupant.HUMAN) {
                     button(g2, actionX, y + 4, ACTION_WIDTH, ROW_HEIGHT - 8, "Remove",
                             () -> lobby.kick(slot.index()));
@@ -432,7 +438,9 @@ final class LobbyScreen extends JPanel {
                                         : "Share code " + online.code() + " or copy the invite."
                         : holding >= 0
                                 ? "Now click an open slot to move them there."
-                                : "Click a player to move them. Click a slot to open or close it.";
+                                : state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                                        ? "Move players between top/bottom starts to choose teams."
+                                        : "Click any player, then an open slot, to choose a colour.";
             } else if (hint.isEmpty()) {
                 hint = state.localSlot() < 0
                         ? "Looking for the host..."
@@ -452,6 +460,9 @@ final class LobbyScreen extends JPanel {
                             : state.allPlayersReady() ? "Start Game" : "Syncing Map...",
                     canStart ? this::begin : null);
         }
+        button(g2, TABLE_X + 180, FOOT_Y, 200, FOOT_HEIGHT,
+                "Mode: " + state.gameTemplate().caption(),
+                lobby.isHost() ? this::cycleGameTemplate : null);
         button(g2, TABLE_X + TABLE_WIDTH - 160, FOOT_Y, 160, FOOT_HEIGHT,
                 state.updateRequired() ? "Quit to Update" : "Cancel (Esc)",
                 state.updateRequired() ? this::quitForUpdate : this::cancel);
@@ -523,6 +534,11 @@ final class LobbyScreen extends JPanel {
     /** Where the Start button is. */
     static Rectangle startBounds() {
         return new Rectangle(TABLE_X, FOOT_Y, 160, FOOT_HEIGHT);
+    }
+
+    /** Where the synchronized game-template control is drawn. */
+    static Rectangle templateBounds() {
+        return new Rectangle(TABLE_X + 180, FOOT_Y, 200, FOOT_HEIGHT);
     }
 
     /** Where Cancel, or the build-mismatch update action, is drawn. */

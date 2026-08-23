@@ -78,6 +78,7 @@ public final class NetworkPeer {
         String matchmakerUrl = "https://match.chonkbase.net";
         boolean withoutMap = false;
         boolean computerPlayer = false;
+        GameLobby.GameTemplate gameTemplate = GameLobby.GameTemplate.MELEE;
 
         for (int i = 0; i + 1 < args.length; i += 2) {
             switch (args[i]) {
@@ -93,6 +94,9 @@ public final class NetworkPeer {
                 case "--matchmaker-url" -> matchmakerUrl = args[i + 1];
                 case "--without-map" -> withoutMap = Boolean.parseBoolean(args[i + 1]);
                 case "--computer-player" -> computerPlayer = Boolean.parseBoolean(args[i + 1]);
+                case "--game-template" -> gameTemplate = "top-vs-bottom".equalsIgnoreCase(
+                        args[i + 1]) ? GameLobby.GameTemplate.TOP_VS_BOTTOM
+                                : GameLobby.GameTemplate.MELEE;
                 default -> { }
             }
         }
@@ -126,13 +130,13 @@ public final class NetworkPeer {
         if (onlineHost != null || onlineJoin != null) {
             URI service = URI.create(onlineHost != null ? onlineHost : matchmakerUrl);
             lobbyRun = meetOnline(assets, mapName, selectedMap, service,
-                    onlineJoin, withoutMap, computerPlayer);
+                    onlineJoin, withoutMap, computerPlayer, gameTemplate);
             localPlayer = lobbyRun.localPlayer();
             mapName = lobbyRun.mapName();
             selectedMap = lobbyRun.mapBytes();
         } else if (lobbyHost != null || lobbyJoin != null) {
             lobbyRun = meetInLobby(assets, mapName, selectedMap,
-                    lobbyHost, lobbyJoin, withoutMap, computerPlayer);
+                    lobbyHost, lobbyJoin, withoutMap, computerPlayer, gameTemplate);
             localPlayer = lobbyRun.localPlayer();
             mapName = lobbyRun.mapName();
             selectedMap = lobbyRun.mapBytes();
@@ -143,11 +147,16 @@ public final class NetworkPeer {
         GameMap map = GameMap.from(source, data.loadTileset(source.tileset()).tileset());
         Set<Integer> directPeers = lobbyRun == null
                 ? peerPlayers(localPlayer, peers) : Set.of();
-        World world = new World(map, lobbyRun == null
+        LobbySetup lobbySetup = lobbyRun == null ? null
+                : new LobbySetup(Paths.get(mapName), lobbyRun.lobby());
+        World world = new World(map, lobbySetup == null
                 ? directPlayers(source, directPeers)
-                : new LobbySetup(Paths.get(mapName), lobbyRun.lobby()).players(source));
+                : lobbySetup.players(source));
         data.configureWorld(world, source);
         data.populate(world, source);
+        if (lobbySetup != null) {
+            lobbySetup.applyGameTemplate(world, source);
+        }
         world.recalculateSupply();
         int visibleTiles = visibleTiles(world, localPlayer);
         if (visibleTiles == 0) {
@@ -175,7 +184,7 @@ public final class NetworkPeer {
             // implementation here once hid a production startup deadlock.
             listeningPort = lobbyRun.lobby().localPort();
             peerCount = lobbyRun.lobby().peers().size();
-            game = new LobbySetup(Paths.get(mapName), lobbyRun.lobby()).start(data, world).game();
+            game = lobbySetup.start(data, world).game();
         } else {
             List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
             CommandApplier applier = new CommandApplier(world, roster);
@@ -331,7 +340,7 @@ public final class NetworkPeer {
     /** Meets another process through the same public HTTPS/WSS path as the desktop menus. */
     private static LobbyRun meetOnline(AssetSource assets, String mapName, byte[] selectedMap,
             URI service, String joinCode, boolean withoutMap,
-            boolean computerPlayer) throws Exception {
+            boolean computerPlayer, GameLobby.GameTemplate gameTemplate) throws Exception {
         boolean hosting = joinCode == null;
         MatchmakingClient client = new MatchmakingClient(service);
         MatchmakingProtocol.Seat seat;
@@ -369,7 +378,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer);
+                settleAndStart(lobby, computerPlayer, gameTemplate);
                 relay.markRoomStarted();
                 lobby.start();
             }
@@ -379,9 +388,10 @@ public final class NetworkPeer {
             lobby.close();
             throw new IllegalStateException("the online lobby did not synchronize and start");
         }
-        System.out.printf("online lobby slot %d map %s bytes=%d source=%s%n",
+        System.out.printf("online lobby slot %d map %s bytes=%d source=%s template=%s%n",
                 lobby.state().localSlot(), lobby.state().map(), lobby.mapBytes().length,
-                lobby.mapWasTransferred() ? "host-transfer" : "local");
+                lobby.mapWasTransferred() ? "host-transfer" : "local",
+                lobby.state().gameTemplate());
         return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
                 lobby.mapBytes());
     }
@@ -389,7 +399,7 @@ public final class NetworkPeer {
     /** Meets one other process, synchronizes the map, and leaves the socket ready for play. */
     private static LobbyRun meetInLobby(AssetSource assets, String mapName, byte[] selectedMap,
             String hostPort, String joinAddress, boolean withoutMap,
-            boolean computerPlayer) throws Exception {
+            boolean computerPlayer, GameLobby.GameTemplate gameTemplate) throws Exception {
         boolean hosting = hostPort != null;
         GameLobby lobby;
         if (hosting) {
@@ -414,7 +424,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer);
+                settleAndStart(lobby, computerPlayer, gameTemplate);
                 lobby.start();
             }
             Thread.sleep(2);
@@ -423,14 +433,17 @@ public final class NetworkPeer {
             lobby.close();
             throw new IllegalStateException("the lobby did not synchronize and start");
         }
-        System.out.printf("lobby slot %d map %s bytes=%d source=%s%n",
+        System.out.printf("lobby slot %d map %s bytes=%d source=%s template=%s%n",
                 lobby.state().localSlot(), lobby.state().map(), lobby.mapBytes().length,
-                lobby.mapWasTransferred() ? "host-transfer" : "local");
+                lobby.mapWasTransferred() ? "host-transfer" : "local",
+                lobby.state().gameTemplate());
         return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
                 lobby.mapBytes());
     }
 
-    private static void settleAndStart(GameLobby lobby, boolean computerPlayer) {
+    private static void settleAndStart(GameLobby lobby, boolean computerPlayer,
+            GameLobby.GameTemplate gameTemplate) {
+        lobby.setGameTemplate(gameTemplate);
         if (computerPlayer) {
             for (GameLobby.Slot slot : lobby.state().slots()) {
                 if (slot.occupant() == GameLobby.Occupant.OPEN) {

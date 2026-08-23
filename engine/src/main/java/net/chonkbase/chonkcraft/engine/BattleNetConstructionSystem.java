@@ -889,7 +889,18 @@ final class BattleNetConstructionSystem {
      * @return whether the order was accepted
      */
     boolean orderBuild(Unit worker, UnitType what, int tileX, int tileY) {
-        boolean liveContainedBuilder = world.battleNetDepotReadyDispatching()
+        // A network command is released on an agreed future cycle. A worker
+        // that was selected in the open can therefore have entered its mine
+        // by the time every peer applies the build. The command is still the
+        // player's valid replacement order; rejecting it here makes the UI's
+        // placement chime and acknowledgement a lie. Keep it behind the
+        // container-driven Harvest order until the worker comes back out.
+        boolean containedHarvester = !worker.isOnMap()
+                && worker.worksite() != null
+                && worker.order() == Unit.Order.HARVEST
+                && worker.hitPoints() > 0;
+        boolean liveContainedBuilder = (world.battleNetDepotReadyDispatching()
+                    || containedHarvester)
                 && worker.hitPoints() > 0 && worker.order() != Unit.Order.DYING;
         if (worker.type().building() || !what.building()
                 || (!worker.isAlive() && !liveContainedBuilder)) {
@@ -984,7 +995,7 @@ final class BattleNetConstructionSystem {
         // 40, and this implementation used to flip on the spot, bill the build order
         // for the step still in flight, and serve a walked builder's
         // ten-cycle arrival pause a builder that never walked does not owe.
-        if (worker.animation().unbreakable()) {
+        if (worker.animation().unbreakable() || containedHarvester) {
             worker.setBuildLatchedFrom(before);
             return true;
         }

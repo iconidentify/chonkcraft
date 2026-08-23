@@ -11,6 +11,10 @@ import java.nio.file.Path;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.engine.Player;
+import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.map.TileFlag;
+import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -45,7 +49,21 @@ class LobbyMapSetupTest {
         }
         int[] nothing = new int[PudMap.PLAYER_MAX];
         return new PudMap("network seats", PudMap.Tileset.FOREST, 8, 8, new int[64],
-                slots, races, nothing, nothing, nothing, nothing, null, null, List.of());
+                slots, races, nothing, nothing, nothing, nothing, null, null, List.of(
+                        new PudMap.PudUnit(1, 1, 0x5E, 0, 0),
+                        new PudMap.PudUnit(6, 1, 0x5E, 1, 0),
+                        new PudMap.PudUnit(1, 6, 0x5E, 2, 0),
+                        new PudMap.PudUnit(6, 6, 0x5E, 3, 0)));
+    }
+
+    private static GameMap grass(int size) {
+        GameMap map = new GameMap(size, size, new Tileset());
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        return map;
     }
 
     @Test
@@ -118,6 +136,32 @@ class LobbyMapSetupTest {
             assertEquals(PudMap.PlayerType.COMPUTER, players[2].type(),
                     "the deterministic AI slot disappeared from the network world");
             assertEquals(PudMap.PlayerType.NOBODY, players[3].type());
+        }
+    }
+
+    @Test
+    @DisplayName("Top vs Bottom creates two mutual teams with shared vision")
+    void topVsBottomAppliesAlliancesAndSharedVision() throws Exception {
+        PudMap source = multiplayerMap();
+        try (GameLobby host = GameLobby.host("Chris", "network.pud", 4, PORT + 2)) {
+            host.setOccupant(1, GameLobby.Occupant.COMPUTER);
+            host.setOccupant(2, GameLobby.Occupant.COMPUTER);
+            host.setOccupant(3, GameLobby.Occupant.COMPUTER);
+            host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
+            LobbySetup setup = new LobbySetup(Path.of("network.pud"), host);
+            World world = new World(grass(8), setup.players(source));
+
+            setup.applyGameTemplate(world, source);
+
+            assertTrue(world.isAllied(0, 1));
+            assertTrue(world.isAllied(1, 0));
+            assertTrue(world.sharesVisionWith(0, 1));
+            assertTrue(world.sharesVisionWith(1, 0));
+            assertTrue(world.isAllied(2, 3));
+            assertTrue(world.sharesVisionWith(2, 3));
+            assertFalse(world.isAllied(0, 2));
+            assertTrue(world.isEnemyPlayer(0, 2));
+            assertFalse(world.sharesVisionWith(0, 2));
         }
     }
 

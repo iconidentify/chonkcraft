@@ -13,7 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
 import org.junit.jupiter.api.Assumptions;
@@ -33,10 +33,10 @@ class LobbyScreenTest {
     private static final int PORT = 7501;
 
     private static GameData load() {
-        InstallSource install = InstallSource.fromEnvironment();
-        Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
-        return new GameData(install);
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II media configured. Set CHONKCRAFT_ASSET_PACK.");
+        return new GameData(assets);
     }
 
     /** A listener that records what the screen asked for. */
@@ -138,6 +138,24 @@ class LobbyScreenTest {
             screen.render();
             click(screen, LobbyScreen.raceBounds(0));
             assertEquals("human", lobby.state().slots().get(0).race());
+        }
+    }
+
+    @Test
+    @DisplayName("The host selects the Top vs Bottom team template")
+    void gameTemplateToggles() throws Exception {
+        GameData data = load();
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 21)) {
+            LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", new Recording());
+            screen.render();
+
+            assertEquals(GameLobby.GameTemplate.MELEE, lobby.state().gameTemplate());
+            assertTrue(click(screen, LobbyScreen.templateBounds()));
+            assertEquals(GameLobby.GameTemplate.TOP_VS_BOTTOM,
+                    lobby.state().gameTemplate());
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.templateBounds()));
+            assertEquals(GameLobby.GameTemplate.MELEE, lobby.state().gameTemplate());
         }
     }
 
@@ -274,6 +292,29 @@ class LobbyScreenTest {
         }
     }
 
+    @Test
+    @DisplayName("The creator can move itself to another colour and start location")
+    void theHostCanChooseItsOwnColour() throws Exception {
+        GameData data = load();
+        try (GameLobby host = GameLobby.host("Chris", "garden.pud", 8, PORT + 22)) {
+            LobbyScreen screen = new LobbyScreen(data, host, "garden.pud", new Recording());
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.rowBounds(0)));
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.rowBounds(6)));
+
+            assertEquals(6, host.state().localSlot());
+            assertEquals(GameLobby.Occupant.OPEN, host.state().slots().get(0).occupant());
+            assertEquals("Chris", host.state().slots().get(6).name());
+
+            screen.render();
+            assertTrue(click(screen, LobbyScreen.actionBounds(0)),
+                    "the creator's former colour must remain a usable lobby slot");
+            assertEquals(GameLobby.Occupant.COMPUTER,
+                    host.state().slots().get(0).occupant());
+        }
+    }
+
     /**
      * A client's screen must offer nothing it cannot deliver. Every control is
      * the host's, and the wire enforces that; showing buttons that quietly do
@@ -293,6 +334,8 @@ class LobbyScreenTest {
                     "a joiner was offered a slot control");
             assertFalse(click(screen, LobbyScreen.rowBounds(1)),
                     "a joiner was able to pick a player up");
+            assertFalse(click(screen, LobbyScreen.templateBounds()),
+                    "a joiner was offered the game-template control");
         }
     }
 

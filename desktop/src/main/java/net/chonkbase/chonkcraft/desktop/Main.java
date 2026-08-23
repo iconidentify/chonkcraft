@@ -820,6 +820,7 @@ public final class Main {
                 lobby.players(source));
         data.configureWorld(world, source);
         data.populate(world, source);
+        lobby.applyGameTemplate(world, source);
         world.recalculateSupply();
 
         LobbySetup.Started started;

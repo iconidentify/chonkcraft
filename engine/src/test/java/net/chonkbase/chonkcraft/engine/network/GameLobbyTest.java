@@ -159,7 +159,7 @@ class GameLobbyTest {
             byte[] name = "Old client".getBytes(StandardCharsets.UTF_8);
             ByteBuffer oldJoin = ByteBuffer.allocate(32);
             oldJoin.putInt(0x57474C59);
-            oldJoin.putShort((short) 4);
+            oldJoin.putShort((short) 5);
             oldJoin.put((byte) 1);
             oldJoin.put((byte) name.length);
             oldJoin.put(name);
@@ -197,6 +197,7 @@ class GameLobbyTest {
             assertTrue(host.setOccupant(3, GameLobby.Occupant.COMPUTER));
             assertTrue(host.setOccupant(4, GameLobby.Occupant.CLOSED));
             assertTrue(host.setRace(seat, "orc"));
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
 
             pollUntil("the client saw the changes",
                     () -> client.state().slots().size() > 4
@@ -204,7 +205,9 @@ class GameLobbyTest {
                                     == GameLobby.Occupant.COMPUTER
                             && client.state().slots().get(4).occupant()
                                     == GameLobby.Occupant.CLOSED
-                            && "orc".equals(client.state().slots().get(seat).race()),
+                            && "orc".equals(client.state().slots().get(seat).race())
+                            && client.state().gameTemplate()
+                                    == GameLobby.GameTemplate.TOP_VS_BOTTOM,
                     host, client);
 
             // A slot somebody is sitting in is not the host's to overwrite:

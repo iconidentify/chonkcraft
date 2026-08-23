@@ -53,10 +53,10 @@ public final class GameLobby implements Closeable {
     /** Marks a packet as ours and pins the wire format. */
     private static final int MAGIC = 0x57474C59; // "WGLY"
 
-    // Version 5 carries the exact game build in admission and authoritative
-    // state. A different build is not allowed to receive a slot, map bytes or
-    // START: deterministic peers must run identical gameplay code.
-    private static final int VERSION = 5;
+    // Version 6 carries the exact game build plus the authoritative game
+    // template. A different build is not allowed to receive a slot, map bytes
+    // or START: deterministic peers must run identical gameplay code.
+    private static final int VERSION = 6;
 
     private static final int MAX_PACKET_BYTES = 1200;
 
@@ -103,6 +103,29 @@ public final class GameLobby implements Closeable {
         CLOSED
     }
 
+    /** The BNE game templates currently exposed by ChonkCraft's lobby. */
+    public enum GameTemplate {
+        /** Ordinary opponents; in-game diplomacy can add alliances later. */
+        MELEE("Melee"),
+        /** Players whose fixed starts are in the same vertical area form a team. */
+        TOP_VS_BOTTOM("Top vs Bottom");
+
+        private final String caption;
+
+        GameTemplate(String caption) {
+            this.caption = caption;
+        }
+
+        public String caption() {
+            return caption;
+        }
+
+        public GameTemplate next() {
+            GameTemplate[] templates = values();
+            return templates[(ordinal() + 1) % templates.length];
+        }
+    }
+
     /**
      * One line of the lobby.
      *
@@ -131,9 +154,9 @@ public final class GameLobby implements Closeable {
     }
 
     /** Everything a screen needs to draw the lobby. */
-    public record State(String map, List<Slot> slots, int localSlot, int hostSlot, boolean started,
-            boolean mapReady, int mapPercent, boolean allPlayersReady, String mapProblem,
-            String localBuild, String requiredBuild) {
+    public record State(String map, List<Slot> slots, GameTemplate gameTemplate,
+            int localSlot, int hostSlot, boolean started, boolean mapReady, int mapPercent,
+            boolean allPlayersReady, String mapProblem, String localBuild, String requiredBuild) {
 
         /** Whether admission stopped because this process cannot simulate the same game. */
         public boolean updateRequired() {
@@ -156,6 +179,7 @@ public final class GameLobby implements Closeable {
 
     private String map;
     private String localName;
+    private GameTemplate gameTemplate = GameTemplate.MELEE;
 
     /** The slots, index 0 to capacity - 1. */
     private final List<Slot> slots = new ArrayList<>();
@@ -341,7 +365,7 @@ public final class GameLobby implements Closeable {
                 ? connectionWarning(localSlot, mapReady, openedAt, lastMapProgressAt,
                         hostPort(), System.currentTimeMillis(), relayed)
                 : mapProblem;
-        return new State(map, List.copyOf(slots), localSlot,
+        return new State(map, List.copyOf(slots), gameTemplate, localSlot,
                 hosting ? localSlot : remoteHostSlot, started,
                 mapReady, mapPercent(), hosting ? everyHumanHasMap() : allPlayersReady,
                 problem, gameBuild, requiredBuild);
@@ -478,8 +502,7 @@ public final class GameLobby implements Closeable {
 
     /** Sets what a slot holds. Refuses to disturb a slot a person is in. */
     public synchronized boolean setOccupant(int index, Occupant occupant) {
-        if (!hosting || index <= 0 || index >= slots.size()) {
-            // Slot zero is the host's own and is not on offer.
+        if (!hosting || index < 0 || index >= slots.size()) {
             return false;
         }
         if (slots.get(index).occupant() == Occupant.HUMAN) {
@@ -499,6 +522,16 @@ public final class GameLobby implements Closeable {
         String wanted = "orc".equalsIgnoreCase(race) ? "orc" : "human";
         Slot slot = slots.get(index);
         slots.set(index, new Slot(index, slot.occupant(), slot.name(), wanted));
+        lastSent = 0;
+        return true;
+    }
+
+    /** Selects the synchronized BNE game template. Only the creator decides it. */
+    public synchronized boolean setGameTemplate(GameTemplate template) {
+        if (!hosting || template == null) {
+            return false;
+        }
+        gameTemplate = template;
         lastSent = 0;
         return true;
     }
@@ -539,7 +572,7 @@ public final class GameLobby implements Closeable {
 
     /** Turns somebody out. Their slot opens again. */
     public synchronized boolean kick(int index) {
-        if (!hosting || index <= 0 || index >= slots.size()) {
+        if (!hosting || index < 0 || index >= slots.size() || index == localSlot) {
             return false;
         }
         if (slots.get(index).occupant() != Occupant.HUMAN) {
@@ -711,6 +744,7 @@ public final class GameLobby implements Closeable {
         buffer.putInt(mapLength);
         buffer.put(mapHash.length == 32 ? mapHash : new byte[32]);
         buffer.put((byte) (everyHumanHasMap() ? 1 : 0));
+        buffer.put((byte) gameTemplate.ordinal());
         buffer.put((byte) slots.size());
         for (Slot slot : slots) {
             buffer.put((byte) slot.occupant().ordinal());
@@ -963,13 +997,17 @@ public final class GameLobby implements Closeable {
             return;
         }
         String heardMap = readString(in);
-        if (in.remaining() < Integer.BYTES + 32 + 2) {
+        if (in.remaining() < Integer.BYTES + 32 + 3) {
             return;
         }
         int heardLength = in.getInt();
         byte[] heardHash = new byte[32];
         in.get(heardHash);
         boolean heardAllReady = in.get() != 0;
+        int templateOrdinal = in.get() & 0xFF;
+        GameTemplate heardTemplate = templateOrdinal < GameTemplate.values().length
+                ? GameTemplate.values()[templateOrdinal]
+                : GameTemplate.MELEE;
         int count = in.get() & 0xFF;
         List<Slot> heard = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -984,6 +1022,7 @@ public final class GameLobby implements Closeable {
         localSlot = mySlot;
         remoteHostSlot = heardHostSlot;
         map = heardMap == null ? "" : heardMap;
+        gameTemplate = heardTemplate;
         slots.clear();
         slots.addAll(heard);
         allPlayersReady = heardAllReady;

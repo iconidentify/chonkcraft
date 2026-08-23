@@ -9613,10 +9613,17 @@ public final class World {
                     // order.
                     unit.setBuildLatchedFrom(null);
                     unit.setPendingBuild(null);
-                } else if (!unit.animation().unbreakable()) {
+                } else if (!unit.animation().unbreakable()
+                        && unit.isOnMap()) {
                     // The pop: the finished order leaves, the build becomes
                     // current with the wait cleared -- "unit.Wait = 0" on
-                    // the erase -- and runs this cycle.
+                    // the erase -- and runs this cycle. A network build can
+                    // reach a miner after it has crossed the mine boundary;
+                    // its Harvest order is the only thing able to bring it
+                    // back. Do not replace that container-driven order while
+                    // it is off-map. It emerges normally, then pops the build
+                    // on its next visit instead of becoming an unreachable
+                    // off-map BUILD forever.
                     unit.setBuildLatchedFrom(null);
                     unit.setOrder(Unit.Order.BUILD);
                     unit.setWaitCycles(0);

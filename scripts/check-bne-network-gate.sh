@@ -75,6 +75,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-host "${port}" --computer-player true --cycles 180 \
+  --game-template top-vs-bottom \
   >"${work}/host.log" 2>&1 &
 host_pid=$!
 sleep 1
@@ -117,6 +118,8 @@ grep -Eq 'initial view: visible=[1-9][0-9]* start=\[[0-9]+, [0-9]+\]' "${work}/c
 grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/host.log"
 grep -Eq 'rendered frame: nonblack=[1-9][0-9]*' "${work}/client.log"
 grep -q 'source=host-transfer' "${work}/client.log"
+grep -q 'template=TOP_VS_BOTTOM' "${work}/host.log"
+grep -q 'template=TOP_VS_BOTTOM' "${work}/client.log"
 grep -q 'finished: cycles=180' "${work}/host.log"
 grep -q 'finished: cycles=180' "${work}/client.log"
 host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/host.log" | tail -1)"
@@ -144,6 +147,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-host "${matchmaker_url}" --computer-player true --cycles 180 \
+  --game-template top-vs-bottom \
   >"${online_host_log}" 2>&1 &
 host_pid=$!
 
