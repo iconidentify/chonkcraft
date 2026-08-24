@@ -149,6 +149,65 @@ class BattleNetMovementPlayabilityTest {
     }
 
     @Test
+    @DisplayName("a gryphon promotes Move after its committed attack releases")
+    void gryphonAttackToMoveKeepsTheCommittedSwingAndThenObeysTheClick() {
+        // Pinned BNE 2.02b's GiveOrder/ReleaseOrders boundary keeps an
+        // unbreakable current animation at Orders[0] and places the flushed
+        // replacement behind it. This is the player-visible air-unit case:
+        // replacing ATTACK semantically while its long gryphon animation was
+        // still current erased the attack state underneath that animation.
+        // The flyer then appeared to ignore Move and a following Attack until
+        // Stop happened to reset the presentation body.
+        Fixture fixture = fixture(map(40, 32, TileFlag.LAND_ALLOWED));
+        fixture.world().setAllied(0, 1, false);
+        fixture.world().fog().revealAll(0);
+        Unit gryphon = place(fixture, "unit-gryphon-rider", 8, 16);
+        UnitType footmanType = fixture.data().unitTypes().types().get("unit-footman");
+        assertNotNull(footmanType, "retail roster has no footman target");
+        Unit target = fixture.world().createUnit(footmanType, 1, 10, 16);
+        assertNotNull(target, "could not place the gryphon's target");
+
+        assertTrue(fixture.commands().apply(GameCommand.attack(
+                        0, gryphon.id(), target.id())),
+                "the gryphon refused the opening attack");
+        for (int cycle = 0; cycle < 500
+                && !(gryphon.order() == Unit.Order.ATTACK
+                        && gryphon.animation().unbreakable()); cycle++) {
+            fixture.world().tick();
+        }
+        assertEquals(Unit.Order.ATTACK, gryphon.order(),
+                "the fixture never entered the gryphon attack");
+        assertTrue(gryphon.animation().unbreakable(),
+                "the fixture never reached the committed gryphon swing");
+
+        assertTrue(fixture.commands().apply(GameCommand.move(
+                        0, gryphon.id(), 24, 16)),
+                "the replacement Move was refused");
+        assertEquals(Unit.Order.ATTACK, gryphon.order(),
+                "Move replaced the order beneath the committed attack body");
+        assertTrue(gryphon.queuedReplacementPending(),
+                "the BNE flush replacement was not queued behind the swing");
+
+        runToRest(fixture.world(), gryphon, 4_000);
+        assertTrue(gryphon.tileX() >= 24,
+                "the gryphon never obeyed Move after its committed attack: "
+                        + gryphon.tileX() + "," + gryphon.tileY());
+
+        Unit secondTarget = fixture.world().createUnit(footmanType, 1, 27, 16);
+        assertNotNull(secondTarget, "could not place the post-Move target");
+        int startingHealth = secondTarget.hitPoints();
+        assertTrue(fixture.commands().apply(GameCommand.attack(
+                        0, gryphon.id(), secondTarget.id())),
+                "the gryphon refused Attack after completing Move");
+        for (int cycle = 0; cycle < 4_000
+                && secondTarget.hitPoints() == startingHealth; cycle++) {
+            fixture.world().tick();
+        }
+        assertTrue(secondTarget.hitPoints() < startingHealth,
+                "the gryphon sat after its post-Move Attack command");
+    }
+
+    @Test
     @DisplayName("a player move permanently replaces a footman's patrol")
     void aPlayerMovePermanentlyReplacesAFootmanPatrol() {
         Fixture fixture = fixture(map(40, 32, TileFlag.LAND_ALLOWED));

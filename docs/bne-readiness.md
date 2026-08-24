@@ -136,7 +136,7 @@ Grade: **GREEN**.
 
 Automated driver: Player wire commands move retail land, naval and air units through authenticated maps and unit data.
 
-Success means: Real units complete formation detours and terrain-domain passages while 99 large-footprint, congestion and refusal checks pass with zero skips.
+Success means: Real units complete formation detours and terrain-domain passages while 111 large-footprint, congestion, command-handoff and refusal checks pass with zero skips.
 
 Implementation:
 
@@ -162,7 +162,8 @@ Automated checks:
 Retail evidence:
 
 - The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.
-- The movement gate runs 99 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
+- An authenticated gryphon commanded to Move during its committed attack keeps the unbreakable BNE order head until the animation releases, then completes Move and damages a second target after a new Attack without an intervening Stop.
+- The movement gate runs 111 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.
 - Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes.
 
 Known blockers:
@@ -706,6 +707,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundChoiceTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/CritterVoiceRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BuilderReportsWorkCompleteTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/EconomyTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java`
 
 Retail evidence:
@@ -713,6 +715,7 @@ Retail evidence:
 - All 371 sound bindings and all 398 voice-event bindings for 107 voiced units were sealed only after full declaration differentials, while every decoded clip comes from the retail BNE asset pack.
 - Neutral critters resolve their audible selection and death voice from the map tileset: sheep, seal, pig or warthog; death never falls through to the old explosion placeholder.
 - The authenticated town-hall dead binding renders audible PCM from BNE's three-clip building-destroyed group even when destroying the local hall removes the last sight that made it visible.
+- A worker taking a gold mine's final load commits one witnessed death event before the neutral building and its sight disappear; the authenticated mine dead binding renders audible PCM from the same three-clip building-destroyed group across that fog transition and survives a saturated presentation queue.
 - The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer.
 
 Known blockers:
@@ -739,10 +742,17 @@ Implementation:
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/NetworkGame.java`
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/NetworkSession.java`
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/SyncHash.java`
+- `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/MultiplayerOutcome.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/LobbyScreen.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameScreen.java`
 
 Automated checks:
 
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/network/LockstepTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/network/MultiplayerOutcomeTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/LobbyScreenTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/LobbyMapSetupTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/MultiplayerGameOverTest.java`
 - `scripts/check-bne-network-gate.sh`
 
 Retail evidence:
@@ -750,6 +760,8 @@ Retail evidence:
 - The official Warcraft II Battle.net Edition manual establishes simultaneous network play as a shipped game mode, while the implementation follows the deterministic command-batch and timeout rules documented by the contemporary LegacyEngine network path.
 - Two actual loopback UDP peers exchange independently issued commands and retain identical simulation hashes through a full 1,800-cycle battle.
 - A deterministic adverse-link referee really drops, delays, duplicates and reorders traffic in both directions; independent peers recover through resend, converge on the same 1,800-cycle prefix and retain equal hashes.
+- The host can assign every occupied human or computer slot to Team 1–8 independently of colour; the committed roster drives symmetric alliance/shared-sight tables and the retail AI attachment on both peers.
+- The synchronized BNE opponent census counts a half-built structure as a surviving real unit, decides victory only after every hostile team is empty, and decides defeat only after the local player's entire alliance is empty. The desktop presents Quit Game and a non-destructive Keep Playing path.
 
 Known blockers:
 

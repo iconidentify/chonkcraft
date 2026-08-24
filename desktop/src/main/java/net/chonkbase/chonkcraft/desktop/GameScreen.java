@@ -1375,6 +1375,10 @@ final class GameScreen extends JPanel {
             public void mousePressed(MouseEvent event) {
                 // Clicking the game gives the game the keyboard.
                 requestFocusInWindow();
+                if (clickMultiplayerGameOver(event.getX(), event.getY())) {
+                    repaint();
+                    return;
+                }
                 // The menu sits over the game and swallows anything aimed at
                 // the map behind it.
                 if (menu != null && menu.isOpen()) {
@@ -4456,7 +4460,9 @@ final class GameScreen extends JPanel {
             // World.kill darkens the map before this queue is drained.
             if ("dead".equals(event.event())) {
                 if (isOnScreen(unit)
-                        && (world.canControl(localPlayer, unit.player()) || isUnitVisible(unit))) {
+                        && (event.targets(localPlayer)
+                                || world.canControl(localPlayer, unit.player())
+                                || isUnitVisible(unit))) {
                     playUnit(unit, "dead", this::chooseSample);
                 }
                 continue;
@@ -4888,6 +4894,7 @@ final class GameScreen extends JPanel {
             g2.drawRect(dragged.x, dragged.y, dragged.width, dragged.height);
         }
         drawOutcome(g2);
+        drawMultiplayerGameOver(g2);
         if (menu != null) {
             var savedTransform = g2.getTransform();
             g2.scale(interfaceScale, interfaceScale);
@@ -4966,9 +4973,139 @@ final class GameScreen extends JPanel {
     /** How the mission ended, or null while it is still running. */
     private volatile net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome outcome;
 
+    /** A network result remains a choice: quit, or dismiss it and explore. */
+    private volatile net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome
+            multiplayerOutcome;
+
+    private volatile boolean multiplayerOutcomeDismissed;
+
+    private Runnable multiplayerQuitAction;
+
     /** Records that the mission is over, so the result can be shown. */
     void setOutcome(net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome outcome) {
         this.outcome = outcome;
+    }
+
+    /** Gives the multiplayer Game Over dialog its safe route back to the menu. */
+    void setMultiplayerQuitAction(Runnable action) {
+        multiplayerQuitAction = action;
+    }
+
+    /** Shows a synchronized team result once; Keep Playing makes it stay dismissed. */
+    void setMultiplayerOutcome(
+            net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome result) {
+        if (result == null
+                || result == net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome.RUNNING
+                || multiplayerOutcome != null) {
+            return;
+        }
+        multiplayerOutcome = result;
+        multiplayerOutcomeDismissed = false;
+        repaint();
+    }
+
+    /** Whether this client has already presented the match's one final result. */
+    boolean hasMultiplayerOutcome() {
+        return multiplayerOutcome != null;
+    }
+
+    boolean multiplayerOutcomeDismissedForTest() {
+        return multiplayerOutcomeDismissed;
+    }
+
+    java.awt.Rectangle multiplayerKeepPlayingBounds() {
+        int width = Math.min(460, Math.max(280, viewportWidth() - 24));
+        int left = viewportX() + (viewportWidth() - width) / 2;
+        int top = viewportY() + (viewportHeight() - 180) / 2;
+        int buttonWidth = Math.max(90, (width - 80) / 2);
+        return new java.awt.Rectangle(left + 30, top + 122, buttonWidth, 34);
+    }
+
+    java.awt.Rectangle multiplayerQuitBounds() {
+        java.awt.Rectangle keep = multiplayerKeepPlayingBounds();
+        return new java.awt.Rectangle(keep.x + keep.width + 20, keep.y,
+                keep.width, keep.height);
+    }
+
+    private boolean clickMultiplayerGameOver(int x, int y) {
+        if (multiplayerOutcome == null || multiplayerOutcomeDismissed) {
+            return false;
+        }
+        if (multiplayerKeepPlayingBounds().contains(x, y)) {
+            multiplayerOutcomeDismissed = true;
+            status = "Game over — continuing to explore.";
+            return true;
+        }
+        if (multiplayerQuitBounds().contains(x, y)) {
+            multiplayerOutcomeDismissed = true;
+            Runnable quit = multiplayerQuitAction;
+            if (quit != null) {
+                quit.run();
+            }
+            return true;
+        }
+        // The result is modal until one of its two explicit choices is made.
+        return true;
+    }
+
+    /** Draws the BNE-style multiplayer decision over the still-live field. */
+    private void drawMultiplayerGameOver(Graphics2D g2) {
+        var result = multiplayerOutcome;
+        if (result == null || multiplayerOutcomeDismissed) {
+            return;
+        }
+        java.awt.Rectangle keep = multiplayerKeepPlayingBounds();
+        java.awt.Rectangle quit = multiplayerQuitBounds();
+        int left = keep.x - 30;
+        int top = keep.y - 122;
+        int right = quit.x + quit.width + 30;
+        int width = right - left;
+        PanelArt.panel(g2, left, top, width, 180, StoneTexture.Tint.STONE);
+        g2.setColor(new Color(0, 0, 0, 120));
+        g2.fillRect(left + 8, top + 8, width - 16, 102);
+
+        String resultText = switch (result) {
+            case VICTORY -> "YOUR TEAM IS VICTORIOUS";
+            case DEFEAT -> "YOUR TEAM HAS BEEN DEFEATED";
+            default -> "THE MATCH IS A DRAW";
+        };
+        GameFont.Ink resultInk = result
+                == net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome.VICTORY
+                        ? GameFont.Ink.YELLOW : GameFont.Ink.RED;
+        if (font != null) {
+            font.drawCentred(g2, "GAME OVER", left + width / 2, top + 26,
+                    GameFont.Ink.WHITE);
+            font.drawCentred(g2, resultText, left + width / 2, top + 62, resultInk);
+            drawMultiplayerChoice(g2, keep, "Keep Playing");
+            drawMultiplayerChoice(g2, quit, "Quit Game");
+            return;
+        }
+        g2.setFont(g2.getFont().deriveFont(java.awt.Font.BOLD, 22f));
+        g2.setColor(Color.WHITE);
+        drawCentredAwt(g2, "GAME OVER", left + width / 2, top + 34);
+        g2.setColor(result == net.chonkbase.chonkcraft.engine.trigger.TriggerSystem.Outcome.VICTORY
+                ? Color.YELLOW : Color.RED);
+        drawCentredAwt(g2, resultText, left + width / 2, top + 74);
+        drawMultiplayerChoice(g2, keep, "Keep Playing");
+        drawMultiplayerChoice(g2, quit, "Quit Game");
+    }
+
+    private void drawMultiplayerChoice(Graphics2D g2, java.awt.Rectangle bounds,
+            String caption) {
+        PanelArt.panel(g2, bounds.x, bounds.y, bounds.width, bounds.height,
+                StoneTexture.Tint.SLATE);
+        if (font != null) {
+            font.drawCentred(g2, caption, bounds.x + bounds.width / 2,
+                    bounds.y + (bounds.height - font.height()) / 2, GameFont.Ink.WHITE);
+            return;
+        }
+        g2.setColor(Color.WHITE);
+        drawCentredAwt(g2, caption, bounds.x + bounds.width / 2,
+                bounds.y + bounds.height / 2 + 5);
+    }
+
+    private static void drawCentredAwt(Graphics2D g2, String text, int centre, int baseline) {
+        g2.drawString(text, centre - g2.getFontMetrics().stringWidth(text) / 2, baseline);
     }
 
     /**

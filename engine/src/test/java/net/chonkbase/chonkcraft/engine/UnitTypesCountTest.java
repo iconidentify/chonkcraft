@@ -122,13 +122,7 @@ class UnitTypesCountTest {
         site.setOrder(Unit.Order.UNDER_CONSTRUCTION);
         site.setProgressGoal(10_000);
 
-        int total = 0;
-        for (Unit unit : world.units()) {
-            if (unit.player() == 0 && unit.isAlive()) {
-                total++;
-            }
-        }
-        assertEquals(1, total,
+        assertEquals(1, world.unitTypesCount(0, null),
                 "a player whose only possession is a building site should not read as having"
                         + " nothing, or they lose the moment they start their first building");
     }

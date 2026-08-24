@@ -72,6 +72,11 @@ final class BattleNetMovementSystem {
         // autonomous-order entry point added its separate two-visit startup
         // delay after the old wait had correctly been cleared, making every
         // shifted move visibly hesitate.
+        // ReleaseOrders erases the old combat order at this pop, not when a
+        // committed attack animation first receives the player click. Doing
+        // it at issue time left long air-unit attack bodies executing over
+        // an already-empty target/chase record.
+        world.releaseBattleNetCombatOrderForPlayerReplacement(unit);
         return orderMove(unit, toX, toY, 0);
     }
 
@@ -310,6 +315,29 @@ final class BattleNetMovementSystem {
         Unit.Order before = unit.currentAction();
         boolean restoreScoutPatrol = before == Unit.Order.PATROL
                 && unit.battleNetScoutPatrol();
+        // The flushed replacement is not allowed to become Orders[0] while
+        // that order's animation is committed. BNE keeps the current swing
+        // visible and executable, then erases its order and promotes Move on
+        // the first breakable visit. This is especially visible on gryphons:
+        // their long attack body used to remain active after the code below
+        // had already changed the semantic order to MOVE and erased all
+        // combat state, so Move and the next Attack appeared unresponsive
+        // until Stop reset the body.
+        if (before != Unit.Order.STILL
+                && unit.animation() != null
+                && unit.animation().unbreakable()
+                && !leftoverWalkBearing(before, unit)) {
+            int[] dest = projectPlayerMovePoint(unit, toX, toY);
+            unit.clearQueuedOrders();
+            unit.setSavedOrder(null);
+            unit.enqueueOrder(new Unit.QueuedOrder(
+                    Unit.QueuedOrderKind.MOVE, dest[0], dest[1],
+                    null, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.setBattleNetPlayerCommandMove(true);
+            unit.rememberActionBeforeQueued(before);
+            return true;
+        }
         // ReleaseOrders destroys the replaced order object. Combat state is
         // projected onto Unit in this implementation, so release its target
         // and chase state explicitly when the player's Move replaces it.

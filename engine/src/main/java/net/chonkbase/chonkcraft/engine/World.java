@@ -824,8 +824,23 @@ public final class World {
      *              unit's voice events. The two are looked up differently:
      *              a voice goes through the unit type's own Sounds table, a
      *              named sound straight to the bank.
+     * @param audienceMask players who witnessed a transition that removes its
+     *                     own source of sight before the presentation queue is
+     *                     drained; zero leaves the ordinary ownership/visibility
+     *                     rules in charge
      */
-    public record SoundEvent(Unit unit, String event, boolean named) {}
+    public record SoundEvent(Unit unit, String event, boolean named, int audienceMask) {
+        /** Source-compatible constructor for ordinary, untargeted events. */
+        public SoundEvent(Unit unit, String event, boolean named) {
+            this(unit, event, named, 0);
+        }
+
+        /** Whether this transition was directly witnessed by {@code player}. */
+        public boolean targets(int player) {
+            return player >= 0 && player < Integer.SIZE
+                    && (audienceMask & (1 << player)) != 0;
+        }
+    }
 
     private final List<SoundEvent> soundEvents = new ArrayList<>();
 
@@ -856,9 +871,32 @@ public final class World {
 
     /** Notes something worth hearing. */
     void announce(Unit unit, String event) {
-        if (unit != null && unit.type() != null && soundEvents.size() < 64) {
-            soundEvents.add(new SoundEvent(unit, event, false));
+        announce(unit, event, 0);
+    }
+
+    /** Notes a transition witnessed by players whose bits are set in the mask. */
+    private void announce(Unit unit, String event, int audienceMask) {
+        if (unit == null || unit.type() == null) {
+            return;
         }
+        if (soundEvents.size() >= 64) {
+            if (audienceMask == 0) {
+                return;
+            }
+            // A mine exhausted during a busy battle is still one transition,
+            // not optional ambience. Preserve the bounded queue by replacing
+            // its oldest ordinary event; if every event is already targeted,
+            // replace the oldest one rather than growing without bound.
+            int evict = 0;
+            for (int i = 0; i < soundEvents.size(); i++) {
+                if (soundEvents.get(i).audienceMask() == 0) {
+                    evict = i;
+                    break;
+                }
+            }
+            soundEvents.remove(evict);
+        }
+        soundEvents.add(new SoundEvent(unit, event, false, audienceMask));
     }
 
     /**
@@ -2662,7 +2700,8 @@ public final class World {
                     || unit.hitPoints() <= 0 || unit.order() == Unit.Order.DYING) {
                 continue;
             }
-            if (unit.order() == Unit.Order.UNDER_CONSTRUCTION) {
+            if (typeIdent != null
+                    && unit.order() == Unit.Order.UNDER_CONSTRUCTION) {
                 continue;
             }
             // Revealer units are short-lived vision markers (holy vision,
@@ -2702,6 +2741,45 @@ public final class World {
             }
             if (typeIdent == null || typeIdent.equals(unit.type().ident())) {
                 count++;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Active hostile players which still own a real unit.
+     *
+     * <p>This is BNE's {@code CclGetNumOpponents} question, narrowed to the
+     * active network roster. A multiplayer map may still contain placements
+     * for an unused PUD slot; those do not turn a closed lobby seat into an
+     * opponent. Enmity is deliberately checked in both directions, matching
+     * the native trigger query and its asymmetric diplomacy table.</p>
+     */
+    public int multiplayerOpponentsRemaining(int asking) {
+        int count = 0;
+        for (Player player : players) {
+            int other = player.index();
+            if (other == asking || !player.isActive()
+                    || unitTypesCount(other, null) == 0) {
+                continue;
+            }
+            if (isEnemyPlayer(asking, other) || isEnemyPlayer(other, asking)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** Real units left across the active alliance containing {@code asking}. */
+    public int multiplayerTeamUnitsRemaining(int asking) {
+        int count = 0;
+        for (Player player : players) {
+            int other = player.index();
+            if (!player.isActive()) {
+                continue;
+            }
+            if (other == asking || isAllied(asking, other) || isAllied(other, asking)) {
+                count += unitTypesCount(other, null);
             }
         }
         return count;
@@ -12041,7 +12119,7 @@ public final class World {
     }
 
     public void kill(Unit unit) {
-        kill(unit, null);
+        kill(unit, null, 0);
     }
 
     /**
@@ -12055,6 +12133,27 @@ public final class World {
      *               than guessing
      */
     public void kill(Unit unit, Unit killer) {
+        kill(unit, killer, 0);
+    }
+
+    /**
+     * Exhausts a resource building for the player whose worker took the last load.
+     *
+     * <p>The mine is neutral, and the worker is removed while it is inside.
+     * By the time the desktop drains the death event, {@link #kill(Unit)} has
+     * removed the mine's sight and the harvesting witness may only just have
+     * been dropped back onto the map. Remembering that witness at the resource
+     * transition prevents a post-mortem fog query from randomly suppressing
+     * the BNE building-destroyed binding. Presentation still requires the mine
+     * to be on the listener's screen.
+     */
+    public void killDepletedResource(Unit unit, int harvestingPlayer) {
+        int audience = harvestingPlayer >= 0 && harvestingPlayer < Integer.SIZE
+                ? 1 << harvestingPlayer : 0;
+        kill(unit, null, audience);
+    }
+
+    private void kill(Unit unit, Unit killer, int deathAudienceMask) {
         if (unit.order() == Unit.Order.DYING) {
             return;
         }
@@ -12072,7 +12171,7 @@ public final class World {
                 ownerAi.reduceMade(this, unit.pendingBuild());
             }
         }
-        announce(unit, "dead");
+        announce(unit, "dead", deathAudienceMask);
         // LetUnitDie destroys the attack order. Any unconstructed
         // presentation-ahead missile or melee handoff is owned by that order
         // and must not outlive it.

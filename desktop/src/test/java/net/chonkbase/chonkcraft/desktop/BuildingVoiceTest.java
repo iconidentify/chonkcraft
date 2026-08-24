@@ -290,6 +290,38 @@ class BuildingVoiceTest {
     }
 
     @Test
+    @DisplayName("the miner hears an on-screen gold mine collapse across its fog transition")
+    void anExhaustedGoldMineKeepsItsCollapseSound() {
+        Scene scene = scene(false);
+        Unit mine = findAny(scene, "unit-gold-mine");
+        assertEquals(World.NEUTRAL_PLAYER, mine.player(),
+                "the authenticated gold mine must be neutral, not locally owned");
+
+        // Reproduce the intermittent case: no local unit is left to reveal the
+        // mine after the last load transition, but the camera is watching it.
+        for (Unit unit : scene.world().unitsSnapshot()) {
+            if (unit.player() == ME && unit.isAlive()) {
+                scene.world().kill(unit);
+            }
+        }
+        scene.world().drainSoundEvents();
+        scene.screen().centreOn(mine.tileX(), mine.tileY());
+        assertTrue(!scene.world().fog().isVisible(ME, mine.tileX(), mine.tileY()),
+                "the fixture did not reproduce the post-collapse fog boundary");
+
+        silence(scene);
+        scene.world().killDepletedResource(mine, ME);
+        scene.screen().playAnnouncements();
+        float[] heard = render(scene);
+
+        assertTrue(difference(heard, alone(scene, mine, "dead")) < SAME_SOUND,
+                "the last-load witness was filtered through post-collapse fog instead of"
+                        + " reaching the authenticated mine `dead` binding");
+        assertTrue(peak(heard) > 1e-4f,
+                "the BNE gold-mine collapse resolved to silence");
+    }
+
+    @Test
     @DisplayName("a building site hammers away on its own, without being clicked")
     void aBuildingSiteMakesItsOwnNoise() {
         Scene scene = scene();
@@ -513,6 +545,17 @@ class BuildingVoiceTest {
             }
         }
         Assumptions.assumeTrue(false, MAP + " places no " + ident + " for player " + ME);
+        return null;
+    }
+
+    private static Unit findAny(Scene scene, String ident) {
+        for (Unit unit : scene.world().unitsSnapshot()) {
+            if (unit.isAlive() && unit.isOnMap() && unit.type() != null
+                    && ident.equals(unit.type().ident())) {
+                return unit;
+            }
+        }
+        Assumptions.assumeTrue(false, MAP + " places no " + ident);
         return null;
     }
 

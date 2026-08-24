@@ -3639,7 +3639,7 @@ final class BattleNetHarvestSystem {
         }
         mine.setResourcesHeld(mine.resourcesHeld() - available);
         if (mine.resourcesHeld() <= 0) {
-            world.kill(mine);
+            world.killDepletedResource(mine, worker.player());
         }
         return available;
     }

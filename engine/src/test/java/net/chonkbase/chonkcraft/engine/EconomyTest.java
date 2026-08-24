@@ -200,6 +200,36 @@ class EconomyTest {
     }
 
     @Test
+    void theLastLoadPreservesTheMineCollapseForItsHarvester() {
+        World world = new World(grass(30));
+        Unit mine = world.createUnit(goldMine(100), World.NEUTRAL_PLAYER, 12, 2);
+        Unit worker = world.createUnit(peasant(), 0, 7, 3);
+        worker.setResourceUnit(mine);
+
+        // Saturate the presentation queue first. The collapse is a committed
+        // resource transition, so incidental voices from the same simulation
+        // slice must not be able to discard it.
+        for (int i = 0; i < 64; i++) {
+            world.announce(worker, "selected");
+        }
+        ResourceInfo gold = worker.type().gathering().get(Resource.GOLD);
+        assertEquals(100, world.harvest.takeResource(worker, gold,
+                mine.tileX(), mine.tileY(), 100));
+
+        List<World.SoundEvent> events = world.drainSoundEvents();
+        assertEquals(64, events.size(), "the bounded sound queue grew or lost extra events");
+        List<World.SoundEvent> deaths = events.stream()
+                .filter(event -> event.unit() == mine && "dead".equals(event.event()))
+                .toList();
+        assertEquals(1, deaths.size(), "the exhausted mine did not announce exactly one death");
+        assertTrue(deaths.get(0).targets(worker.player()),
+                "the transition forgot the player whose worker took the last load");
+        assertFalse(deaths.get(0).targets(1),
+                "an unrelated player was made a direct audience for the collapse");
+        assertFalse(mine.isAlive(), "the depleted mine remained alive");
+    }
+
+    @Test
     void choppingWoodClearsTheForestSquare() {
         World world = new World(grass(30));
         world.createUnit(townHall(), 0, 2, 2);

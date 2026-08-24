@@ -2257,6 +2257,9 @@ public final class Main {
             }
         };
         screen.setSession(session);
+        if (network != null) {
+            screen.setMultiplayerQuitAction(session::endScenario);
+        }
         screen.setMenu(new GameMenu(data, race, session));
         BattleShowcase.Director showcaseDirector = openingShowcase == null
                 ? null : new BattleShowcase.Director(world, openingShowcase);
@@ -2368,6 +2371,14 @@ public final class Main {
                         delay.setRepeats(false);
                         delay.start();
                     }
+                }
+            } else if (network != null && world.cycle() > 0
+                    && world.cycle() % World.CYCLES_PER_SECOND == 0
+                    && !screen.hasMultiplayerOutcome()) {
+                var result = net.chonkbase.chonkcraft.engine.network.MultiplayerOutcome
+                        .evaluate(world, localPlayer);
+                if (result != TriggerSystem.Outcome.RUNNING) {
+                    screen.setMultiplayerOutcome(result);
                 }
             }
             screen.playAnnouncements();
