@@ -163,6 +163,53 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a near-full retained tail leaves Attack through one-count Move")
+    void nearFullRetainedTailDoesNotBorrowShortTailMoveConstruction() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 83);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1517 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 91) {
+            mission.tick();
+        }
+        for (int fixture = 91; fixture <= 93; fixture++) {
+            assertEquals(2539, grunt.battleNetSequenceOffset(),
+                    "the paid east residual owns fresh Attack construction");
+            assertEquals(94 - fixture, grunt.battleNetAnimationTimer(),
+                    "native exposes Attack construction as 3,2,1");
+            assertEquals(19, grunt.pathLength(),
+                    "construction retains the near-full route buffer");
+            mission.tick();
+        }
+
+        assertEquals(94, fixtureCycle(world));
+        assertEquals(2482, grunt.battleNetSequenceOffset(),
+                "the near-full park exits through Move construction");
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "a near-full park must not borrow the short tail's Move 15 band");
+        assertEquals(26, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+
+        mission.tick();
+        assertEquals(95, fixtureCycle(world));
+        assertEquals(27, grunt.tileX(),
+                "the one-byte refill must consume southeast immediately");
+        assertEquals(40, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, 1), grunt.lastStepHeading());
+    }
+
+    @Test
     @DisplayName("a pressured cardinal tail stays live through its Move band")
     void pressuredCardinalTailStaysLiveThroughMoveBand() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -247,7 +294,7 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
-    @DisplayName("a saturated two-face buffer parks its retained opposite face")
+    @DisplayName("a saturated two-face buffer parks beyond its opposite face")
     void saturatedTwoFaceBufferParksRetainedOppositeFace() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -270,9 +317,8 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(32, grunt.tileX(),
                 "the retained wall face owns a refusal band, not a southeast escape");
         assertEquals(39, grunt.tileY());
-        assertEquals(1, grunt.pathLength(),
-                "the opposite southwest face is restored as a bounded buffer");
-        assertEquals(Direction.fromDelta(-1, 1), grunt.peekHeading());
+        assertEquals(0, grunt.pathLength(),
+                "the written southwest byte remains behind native route index twenty");
         assertEquals(8, grunt.battleNetCollisionCounter());
         assertEquals(15, grunt.battleNetAnimationTimer());
     }

@@ -890,6 +890,23 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(2039, archer.battleNetSequenceOffset());
         assertEquals(62, archer.battleNetAnimationTimer(),
                 "native owns the first quiet committed-hold visit at fixture 94");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 155) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, archer.order());
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, archer.order(),
+                "the prior quarry's recovery must not end the replacement engagement");
+        assertNotNull(archer.target());
+        assertEquals(81, archer.target().tileX());
+        assertEquals(90, archer.target().tileY());
+        assertEquals(2040, archer.battleNetSequenceOffset(),
+                "native advances the replacement attack body at fixture 156");
+        assertEquals(1, archer.battleNetAnimationTimer());
     }
 
     @Test

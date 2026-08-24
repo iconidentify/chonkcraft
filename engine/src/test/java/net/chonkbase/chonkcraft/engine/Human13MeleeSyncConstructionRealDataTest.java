@@ -9,7 +9,7 @@ import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
-/** Locks a cached melee approach's first synchronized draw to native BNE. */
+/** Locks cached melee approach construction and its first draw to native BNE. */
 class Human13MeleeSyncConstructionRealDataTest {
 
     private static final int INITIALIZATION_TICKS = 2;
@@ -60,6 +60,56 @@ class Human13MeleeSyncConstructionRealDataTest {
         mission.tick();
         assertEquals(0xbf54bc7e, world.randomSeed(),
                 "fixture 44 includes grunt 1485's OP0 draw before the wood draw");
+    }
+
+    @Test
+    void grunt1507RetainsItsKnightRouteThroughAttackAndMoveConstruction() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level13h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 93);
+        assertNotNull(grunt,
+                "Human 13 must contain native grunt 1507 / Java 93");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 166; fixture++) {
+            mission.tick();
+            if (fixture >= 162 && fixture <= 164) {
+                assertEquals(2539, grunt.battleNetSequenceOffset(),
+                        "the settled south residual owns fresh Attack construction");
+                assertEquals(165 - fixture,
+                        grunt.battleNetAnimationTimer(),
+                        "native exposes Attack construction as 3,2,1");
+                assertEquals(4, grunt.pathLength(),
+                        "Attack construction retains S,SE,S,SE behind the spent S");
+            } else if (fixture == 165 || fixture == 166) {
+                assertEquals(2482, grunt.battleNetSequenceOffset(),
+                        "timer one hands the retained buffer back to Move");
+                assertEquals(180 - fixture,
+                        grunt.battleNetAnimationTimer(),
+                        "the retained route owns a full Move 15..1 band");
+                assertEquals(120, grunt.tileX(),
+                        "Move construction must not spend a cached heading early");
+                assertEquals(25, grunt.tileY(),
+                        "Move construction must remain on the residual landing tile");
+                assertEquals(4, grunt.pathLength(),
+                        "the retained knight route remains parked during Move construction");
+            }
+        }
+    }
+
+    private static Unit unitById(World world, int id) {
+        return world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == id)
+                .findFirst().orElse(null);
     }
 
     private static int fixtureCycle(World world) {

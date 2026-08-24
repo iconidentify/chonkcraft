@@ -155,6 +155,63 @@ class BattleNetMovingQuarryChaseRealDataTest {
         assertEquals(3, attacker.battleNetAnimationTimer());
     }
 
+    @Test
+    void aHuman8HiddenMinerRetargetPaysFreshArrivalConstruction() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (fixtureCycle(mission.world()) < 129) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 78, 61);
+        Unit quarry = unitAt(mission.world(), 2,
+                "unit-peasant", 76, 61);
+        assertNotNull(attacker,
+                "native slot 1538 has not finished its prior attack loop");
+        assertNotNull(quarry, "native slot 1525 is the replacement quarry");
+
+        mission.tick();
+        assertChaser(attacker, 77, 61, 32, 0, true);
+        assertEquals(quarry, attacker.target(),
+                "the mine-contained worker is replaced before the west chase");
+
+        while (fixtureCycle(mission.world()) < 145) {
+            mission.tick();
+        }
+        assertChaser(attacker, 77, 61, 2, 0, true);
+        assertEquals(2652, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertChaser(attacker, 77, 61, 0, 0, false);
+        assertEquals(2657, attacker.battleNetSequenceOffset(),
+                "the replacement quarry owns fresh Attack construction");
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "native counts construction 3,2,1 after the chase settles");
+
+        while (fixtureCycle(mission.world()) < 156) {
+            mission.tick();
+        }
+        assertEquals(19, quarry.hitPoints(),
+                "the second attacker must not strike three fixtures early");
+
+        while (fixtureCycle(mission.world()) < 159) {
+            mission.tick();
+        }
+        assertEquals(14, quarry.hitPoints(),
+                "native slot 1538 lands its first replacement blow at 159");
+    }
+
     private static Unit unitAt(World world, int player, String ident,
             int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {

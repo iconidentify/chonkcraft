@@ -1,0 +1,125 @@
+package net.chonkbase.chonkcraft.engine;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.unit.Unit;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+
+/** Locks crowded paid-route handoffs on XHuman 12 fixtures 166 through 172. */
+class XHuman12Cycle166FormationHandoffRealDataTest {
+
+    private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("paid route handoffs preserve the cycle 166 melee formation")
+    void paidRouteHandoffsPreserveTheCycle166MeleeFormation() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit northMover = unitById(world, 166);
+        Unit residualMover = unitById(world, 153);
+        Unit spentRoutePark = unitById(world, 121);
+        Unit fullRoutePark = unitById(world, 119);
+        Unit settledRoutePark = unitById(world, 120);
+        Unit paidSingleHeadingPark = unitById(world, 94);
+        Unit laterGenerationRoutePark = unitById(world, 104);
+        assertNotNull(northMover, "XHuman 12 has no native-slot-1434 grunt");
+        assertNotNull(residualMover, "XHuman 12 has no native-slot-1447 grunt");
+        assertNotNull(spentRoutePark, "XHuman 12 has no native-slot-1479 grunt");
+        assertNotNull(fullRoutePark, "XHuman 12 has no native-slot-1481 grunt");
+        assertNotNull(settledRoutePark,
+                "XHuman 12 has no native-slot-1480 grunt");
+        assertNotNull(paidSingleHeadingPark,
+                "XHuman 12 has no native-slot-1506 grunt");
+        assertNotNull(laterGenerationRoutePark,
+                "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 165) {
+            mission.tick();
+        }
+
+        assertPosition(northMover, 24, 61,
+                "the blocked northern guard starts on its native square");
+        assertPosition(residualMover, 23, 61,
+                "the residual guard starts on its native square");
+        assertPosition(spentRoutePark, 26, 39,
+                "the near-full route starts on its native square");
+        assertPosition(fullRoutePark, 25, 38,
+                "the full route starts on its native square");
+
+        mission.tick();
+        assertEquals(166, fixtureCycle(world));
+        assertAll(
+                () -> assertPosition(northMover, 24, 60,
+                        "the newly written north detour must move the guard"),
+                () -> assertPosition(residualMover, 24, 61,
+                        "the committed northeast residual must settle east"),
+                () -> assertPosition(spentRoutePark, 26, 39,
+                        "the near-full paid route must park without stepping east"),
+                () -> assertPosition(fullRoutePark, 25, 38,
+                        "the saturated paid route must park without stepping southeast"));
+
+        mission.tick();
+        assertEquals(167, fixtureCycle(world));
+        assertAll(
+                () -> assertPosition(settledRoutePark, 27, 38,
+                        "the settled long route must park before its redraw"),
+                () -> assertPosition(paidSingleHeadingPark, 32, 39,
+                        "the paid one-heading route must remain parked through timer one"));
+
+        mission.tick();
+        assertEquals(168, fixtureCycle(world));
+        assertAll(
+                () -> assertPosition(settledRoutePark, 28, 39,
+                        "the parked long route must redraw and step southeast"),
+                () -> assertPosition(paidSingleHeadingPark, 31, 38,
+                        "the paid one-heading route must redraw and step northwest"));
+
+        while (fixtureCycle(world) < 171) {
+            mission.tick();
+        }
+        assertPosition(laterGenerationRoutePark, 34, 37,
+                "the later collided residual must park before its south redraw");
+
+        mission.tick();
+        assertEquals(172, fixtureCycle(world));
+        assertPosition(laterGenerationRoutePark, 34, 38,
+                "the parked later generation must redraw and step south");
+    }
+
+    private static int fixtureCycle(World world) {
+        return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static void assertPosition(Unit unit, int x, int y,
+            String message) {
+        assertEquals(x, unit.tileX(), message + " (x)");
+        assertEquals(y, unit.tileY(), message + " (y)");
+    }
+
+}

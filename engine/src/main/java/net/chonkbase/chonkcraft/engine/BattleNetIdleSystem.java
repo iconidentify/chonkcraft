@@ -517,10 +517,11 @@ final class BattleNetIdleSystem {
      * <p>Orc 11's behavior-two knight and three archers are already moving
      * under Patrol when the native player pass reaches them on fixture cycles
      * 49 and 99. It nevertheless writes Patrol as their next order and parks
-     * every route cursor at 20. The old pixels finish, the replacement
-     * promotes at the next action marker, and the group resumes after the
-     * Patrol constructor. Without this pass Java's knight and lead archer
-     * first-step on fixture 101 while retail holds them through 103.</p>
+     * every route cursor at 20. A member which has completed its prior attack
+     * and returned to Still is included too: XHuman 12 ogre 1356 is Still
+     * through fixture 198 and receives next-order Patrol on 199. The old
+     * pixels or Still program finish, the replacement promotes at the next
+     * action marker, and the group resumes after the Patrol constructor.</p>
      */
     void fireBattleNetLandPatrolPass() {
         if (world.battleNetSequence == null) {
@@ -531,7 +532,8 @@ final class BattleNetIdleSystem {
             Unit unit = ready.get(index);
             if (unit == null || unit.type() == null || !unit.isAlive()
                     || unit.type().moveType() != UnitType.Movement.LAND
-                    || unit.order() != Unit.Order.PATROL
+                    || (unit.order() != Unit.Order.PATROL
+                        && unit.order() != Unit.Order.STILL)
                     || unit.battleNetAiBehavior() != 2
                     || !unit.hasBattleNetAiHome()
                     || !unit.type().canAttack() || unit.type().canGather()) {
@@ -539,10 +541,11 @@ final class BattleNetIdleSystem {
             }
             Player owner = world.player(unit.player());
             AiPlayer ai = world.ais.get(unit.player());
+            int profile = ai == null ? -1 : ai.battleNetBuildProfileId();
             if (owner == null
                     || owner.type()
                             != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
-                    || ai == null || ai.battleNetBuildProfileId() != 18) {
+                    || (profile != 18 && profile != 0)) {
                 continue;
             }
             // GiveOrder replaces the cached route immediately but does not
@@ -559,6 +562,12 @@ final class BattleNetIdleSystem {
             unit.setBattleNetCollisionCounter(0);
             unit.setBattleNetPendingPatrol(unit.battleNetAiHomeX(),
                     unit.battleNetAiHomeY());
+            if (unit.order() == Unit.Order.STILL) {
+                // The live Still cursor owns the rest of this visit. Its next
+                // action marker promotes the Patrol; native does not replace
+                // the current animation timer on the player-pass write.
+                continue;
+            }
             int quiet = world.battleNetSequence.quietTicksUntilActionMarker(
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
@@ -578,6 +587,60 @@ final class BattleNetIdleSystem {
                         unit.battleNetAiHomeY(),
                         unit.battleNetSequenceOffset(),
                         unit.battleNetAnimationTimer(), quiet);
+            }
+        }
+    }
+
+    /**
+     * Reissues behavior-one land regroup orders on the fifty-cycle AI beat.
+     *
+     * <p>The creation-time ready walk is not the only caller of the native
+     * behavior-one callback. A fighter which has chased well away from its
+     * recorded service home is reconsidered by the recurring player pass. The
+     * pass writes Move behind the unit's current Still program; if that program
+     * reaches its action marker on the same beat, the Move becomes current
+     * immediately. XHuman 12 slot 1363 is the authenticated boundary: it is
+     * Still at (12,88), home (26,87), through fixture 198 and exposes Move
+     * construction on the fixture-199 player beat.</p>
+     */
+    void fireBattleNetLandRegroupPass() {
+        List<Unit> ready = world.unitsSnapshot();
+        for (int index = ready.size() - 1; index >= 0; index--) {
+            Unit unit = ready.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || !unit.isOnMap()
+                    || unit.order() != Unit.Order.STILL
+                    || unit.battleNetAiBehavior() != 1
+                    || !unit.battleNetMapPlaced()
+                    || !unit.hasBattleNetAiHome()
+                    || unit.battleNetReadySuppressed()
+                    || unit.type().moveType() != UnitType.Movement.LAND
+                    || unit.type().building() || !unit.type().canAttack()
+                    || unit.type().canGather()) {
+                continue;
+            }
+            Player owner = world.player(unit.player());
+            if (owner == null
+                    || owner.type()
+                            != net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER) {
+                continue;
+            }
+            int homeX = unit.battleNetAiHomeX();
+            int homeY = unit.battleNetAiHomeY();
+            int distance = Math.max(Math.abs(unit.tileX() - homeX),
+                    Math.abs(unit.tileY() - homeY));
+            int regroupDistance =
+                    (unit.type().reactRange(false) >> 1) + 4;
+            if (distance < regroupDistance) {
+                continue;
+            }
+            unit.setBattleNetPendingMove(homeX, homeY);
+            if (World.BNE_IDLE_TRACE) {
+                System.err.printf("JBNEHOME cycle=%d unit=%d recurring=1 "
+                                + "at=%d,%d home=%d,%d distance=%d "
+                                + "threshold=%d%n",
+                        world.cycle, unit.id(), unit.tileX(), unit.tileY(),
+                        homeX, homeY, distance, regroupDistance);
             }
         }
     }
@@ -922,6 +985,20 @@ final class BattleNetIdleSystem {
             }
         } else {
             stepIdle(unit);
+            boolean resourceReadyHold = unit.queuedReplacementPending()
+                    && unit.returningToDepot()
+                    && unit.carried() > 0
+                    && unit.battleNetOrderDelay() > 0;
+            if (resourceReadyHold) {
+                // A worker surfaced from action 26 is sleeping behind the
+                // native 25-count ready head.  Its visible order is Still,
+                // but COrder_Still is not scheduled and therefore cannot
+                // enter the land-idle random dispatcher during this window.
+                // XHuman 12 peon 1491 surfaces at fixture 176 and owns no
+                // 0040AD58 draw at 177; Java's synthetic Still visit stole
+                // the immediately following melee-damage value.
+                return;
+            }
             stepBattleNetIdle(unit);
             // Nothing else runs here, which is the point.  ChonkCraft went on to
             // AutoAttack and moveRandomly; doing that queued an attack during

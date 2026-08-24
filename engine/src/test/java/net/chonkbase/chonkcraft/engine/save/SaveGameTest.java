@@ -498,6 +498,8 @@ class SaveGameTest {
         LoadGame.apply(reloaded, script, fixture.data().unitTypes().types());
 
         assertEquals(before, describe(reloaded));
+        assertTrue(reloaded.units().stream().allMatch(Unit::battleNetMapPlaced),
+                "authored units lost their map-roster provenance");
     }
 
     @Test
@@ -793,6 +795,8 @@ class SaveGameTest {
         worker.setBattleNetOrderDelay(2);
         worker.setBattleNetWoodReadyPathRequired(true);
         worker.setBattleNetWoodTerminalRefusalHeading(3);
+        worker.setBattleNetWoodCornerRefusalHeading(5);
+        worker.setBattleNetWoodCornerRefusalVisits(2);
 
         Unit loaded = find(reload(bench), "unit-peasant");
 
@@ -802,6 +806,10 @@ class SaveGameTest {
                 "reload must not turn native's path-gated retry into an immediate chop");
         assertEquals(3, loaded.battleNetWoodTerminalRefusalHeading(),
                 "reload must preserve the terminal resource wall face");
+        assertEquals(5, loaded.battleNetWoodCornerRefusalHeading(),
+                "reload must preserve the parked soft-corner face");
+        assertEquals(2, loaded.battleNetWoodCornerRefusalVisits(),
+                "reload must preserve the parked soft-corner visit count");
     }
 
     @Test
@@ -855,8 +863,10 @@ class SaveGameTest {
                 bench.types().get("unit-grunt"), 1, 10, 12);
         attacker.setOrder(Unit.Order.ATTACK);
         attacker.setTarget(target);
-        attacker.setBattleNetAttackRefusalRecoveryStage(5);
+        attacker.setBattleNetAttackRefusalRecoveryStage(6);
         attacker.setBattleNetDirectRefusalRecoveryProbe(true);
+        attacker.setBattleNetStageSixCardinalProbePark(true);
+        attacker.setBattleNetSaturatedCardinalRetryLoop(true);
         attacker.setBattleNetSaturatedNearRecoveryFullRoute(true);
         attacker.setBattleNetDirectRefusalReplacementBand(true);
         attacker.setBattleNetDirectRecoveryGeneration(7);
@@ -868,10 +878,14 @@ class SaveGameTest {
         Unit loaded = find(reload(bench), "unit-knight");
 
         assertNotNull(loaded.target());
-        assertEquals(5, loaded.battleNetAttackRefusalRecoveryStage(),
+        assertEquals(6, loaded.battleNetAttackRefusalRecoveryStage(),
                 "reloading during hard-refusal Attack 3,2,1 must not free "
                         + "the chase early");
         assertTrue(loaded.battleNetDirectRefusalRecoveryProbe());
+        assertTrue(loaded.battleNetStageSixCardinalProbePark(),
+                "the parked final Move probe must survive a mid-jam save");
+        assertTrue(loaded.battleNetSaturatedCardinalRetryLoop(),
+                "the cardinal settle retry must survive Attack construction");
         assertTrue(loaded.battleNetSaturatedNearRecoveryFullRoute(),
                 "the saturated near-approach handoff must survive a save");
         assertTrue(loaded.battleNetDirectRefusalReplacementBand());

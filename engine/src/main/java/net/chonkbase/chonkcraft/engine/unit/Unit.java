@@ -540,6 +540,16 @@ public final class Unit {
     private boolean battleNetReadySuppressed;
 
     /**
+     * Whether this unit came from an authored PUD placement.
+     *
+     * <p>Native's recurring behavior-one regroup pass walks the campaign
+     * roster. Runtime constructions and trainees have their own AI admission
+     * callbacks and must not inherit that map-roster pass merely because they
+     * belong to a computer player.</p>
+     */
+    private boolean battleNetMapPlaced;
+
+    /**
      * Whether the current Attack is native action 16 (stationary auto-scan).
      *
      * <p>BNE idle acquisition uses action 16 when the auxiliary order
@@ -2193,6 +2203,9 @@ public final class Unit {
     }
 
     public void setResourceUnit(Unit resourceUnit) {
+        if (this.resourceUnit != resourceUnit) {
+            clearBattleNetWoodCornerRefusal();
+        }
         this.resourceUnit = resourceUnit;
     }
 
@@ -2221,6 +2234,9 @@ public final class Unit {
     }
 
     public void setResourceTile(int x, int y) {
+        if (resourceTileX != x || resourceTileY != y) {
+            clearBattleNetWoodCornerRefusal();
+        }
         this.resourceTileX = x;
         this.resourceTileY = y;
     }
@@ -2300,6 +2316,9 @@ public final class Unit {
             // with the native eight-pixel arrival band.
             battleNetAttackWaitRefillResidual = false;
             battleNetMovingQuarryResidual = false;
+            battleNetWrappedCollisionRetryPark = false;
+            battleNetStageSixCardinalProbePark = false;
+            battleNetSaturatedCardinalRetryLoop = false;
         }
         this.target = target;
         if (target == null) {
@@ -2607,6 +2626,46 @@ public final class Unit {
     private boolean battleNetSaturatedResidualFaceRetry;
 
     /**
+     * A saturated cardinal chase tail entered Attack construction directly
+     * from its residual-settle Still callback.
+     *
+     * <p>When the first construction timer one remains blocked, retail
+     * repeats that Still callback and opens one more 3,2,1 construction. The
+     * retry consumes this bit. A visually equal route state first observed on
+     * a later callback instead returns to Move, so the originating settle
+     * visit must remain explicit provenance.</p>
+     */
+    public boolean battleNetSaturatedCardinalRetryLoop() {
+        return battleNetSaturatedCardinalRetryLoop;
+    }
+
+    public void setBattleNetSaturatedCardinalRetryLoop(boolean retry) {
+        battleNetSaturatedCardinalRetryLoop = retry;
+    }
+
+    private boolean battleNetSaturatedCardinalRetryLoop;
+
+    /**
+     * A one-heading melee retry was the visit which wrapped the native
+     * collision nibble from fourteen to zero.
+     *
+     * <p>The following replacement byte is not a fresh cooperative refusal.
+     * Retail exposes Move-start timers two and one, parks the route cursor at
+     * twenty, then returns through the active-order idle callback. Keeping this
+     * one-generation provenance separate prevents that byte from buying a new
+     * fifteen-count refusal band.</p>
+     */
+    public boolean battleNetWrappedCollisionRetryPark() {
+        return battleNetWrappedCollisionRetryPark;
+    }
+
+    public void setBattleNetWrappedCollisionRetryPark(boolean park) {
+        battleNetWrappedCollisionRetryPark = park;
+    }
+
+    private boolean battleNetWrappedCollisionRetryPark;
+
+    /**
      * A one-byte route admitted by Attack-refusal recovery has settled. Its
      * subsequent stage-six Move probes test only the refreshed direct compass
      * face until one is accepted; they do not start a full wall escape.
@@ -2620,6 +2679,25 @@ public final class Unit {
     }
 
     private boolean battleNetDirectRefusalRecoveryProbe;
+
+    /**
+     * A duplicate-cardinal route written by the final hard-refusal Move probe.
+     *
+     * <p>Retail keeps only the direct byte behind route index twenty and
+     * revisits that same blocked face on every Move callback.  Java normally
+     * rotates a refused route head around the blocker, so retain the native
+     * parked-cursor provenance until the direct square opens or the refusal
+     * handoff ends.</p>
+     */
+    public boolean battleNetStageSixCardinalProbePark() {
+        return battleNetStageSixCardinalProbePark;
+    }
+
+    public void setBattleNetStageSixCardinalProbePark(boolean parked) {
+        battleNetStageSixCardinalProbePark = parked;
+    }
+
+    private boolean battleNetStageSixCardinalProbePark;
 
     /**
      * The direct recovery probe came from a paid one-step approach that
@@ -2850,6 +2928,9 @@ public final class Unit {
         // keeping the phases here also prevents a mid-jam reload from
         // turning a blocked combatant into a permanently frozen one.
         battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(6, stage));
+        if (battleNetAttackRefusalRecoveryStage != 6) {
+            battleNetStageSixCardinalProbePark = false;
+        }
     }
 
     private int battleNetAttackRefusalRecoveryStage;
@@ -3575,6 +3656,14 @@ public final class Unit {
         battleNetReadySuppressed = suppressed;
     }
 
+    public boolean battleNetMapPlaced() {
+        return battleNetMapPlaced;
+    }
+
+    public void setBattleNetMapPlaced(boolean mapPlaced) {
+        battleNetMapPlaced = mapPlaced;
+    }
+
     public boolean battleNetStationaryAttack() {
         return battleNetStationaryAttack;
     }
@@ -4219,6 +4308,42 @@ public final class Unit {
     }
 
     private int battleNetWoodTerminalRefusalHeading = -1;
+
+    /**
+     * A one-byte terrain-resource route whose diagonal head is repeatedly
+     * refused by an allied body that the route writer had temporarily made
+     * passable. Retail parks the cached face for three Move visits, then makes
+     * that face solid to the next wall-follow query. The heading identifies
+     * the face and {@code visits} is the number of parked visits already paid.
+     */
+    public int battleNetWoodCornerRefusalHeading() {
+        return battleNetWoodCornerRefusalHeading;
+    }
+
+    public void setBattleNetWoodCornerRefusalHeading(int heading) {
+        battleNetWoodCornerRefusalHeading = heading >= 0
+                && heading < Direction.COUNT ? heading : -1;
+        if (battleNetWoodCornerRefusalHeading < 0) {
+            battleNetWoodCornerRefusalVisits = 0;
+        }
+    }
+
+    private int battleNetWoodCornerRefusalHeading = -1;
+
+    public int battleNetWoodCornerRefusalVisits() {
+        return battleNetWoodCornerRefusalVisits;
+    }
+
+    public void setBattleNetWoodCornerRefusalVisits(int visits) {
+        battleNetWoodCornerRefusalVisits = Math.max(0, visits);
+    }
+
+    private int battleNetWoodCornerRefusalVisits;
+
+    public void clearBattleNetWoodCornerRefusal() {
+        battleNetWoodCornerRefusalHeading = -1;
+        battleNetWoodCornerRefusalVisits = 0;
+    }
 
     /**
      * A harvest command that landed mid-swing and waits for the animation to

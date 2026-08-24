@@ -24,7 +24,9 @@ import org.junit.jupiter.api.Test;
  * <p>Ogre 1511 arrives on 120,26 chasing knight 1500. That knight goes
  * DYING at fixture 112. Native wraps Attack 666/1 onto 643/3 at 115, names
  * knight 1493, and dest-arms leftover SW,S onto 119,27 at 118. Java used
- * to Still on 120,26, so 1493's wrap at 123 could not see it.
+ * to Still on 120,26, so 1493's wrap at 123 could not see it. After that paid
+ * tail reaches a dying wise-man, a new one-heading route to knight 1493 owns a
+ * fresh queued Attack constructor when its residual settles at fixture 154.
  */
 class Human13Ogre1511WrapDestArmRealDataTest {
 
@@ -92,7 +94,7 @@ class Human13Ogre1511WrapDestArmRealDataTest {
     }
 
     @Test
-    @DisplayName("human 13 retains its Attack-tail route and dying-target ranged OP10")
+    @DisplayName("human 13 retains its paid Attack tail but freshly constructs after its later retarget")
     void human13sIdleOgreRetainsTheNativeFourHeadingAttackTailRoute() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -105,15 +107,19 @@ class Human13Ogre1511WrapDestArmRealDataTest {
         Unit ogre = unitAt(world, "unit-ogre", 125, 22);
         Unit thrower = unitById(world, 114);
         Unit wiseMan = unitById(world, 104);
+        Unit southKnight = unitById(world, 107);
         assertNotNull(ogre, "Human 13 has no northern ogre on 125,22");
         assertNotNull(thrower, "Human 13 has no eastern axethrower on 124,33");
         assertNotNull(wiseMan, "Human 13 has no eastern wise man on 122,30");
+        assertNotNull(southKnight, "Human 13 has no south knight on 121,30");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
         int throwerMissilesBefore = -1;
-        for (int fixture = 1; fixture <= 147; fixture++) {
+        int seedAt147 = 0;
+        Missile throwerShotAt147 = null;
+        for (int fixture = 1; fixture <= 164; fixture++) {
             mission.tick();
             if (fixture == 118) {
                 assertEquals(121, ogre.tileX(),
@@ -136,6 +142,12 @@ class Human13Ogre1511WrapDestArmRealDataTest {
                         "the retained third heading advances on the retarget tick");
                 assertEquals(29, ogre.tileY(),
                         "the retained third heading advances on the retarget tick");
+                assertSame(southKnight, ogre.target(),
+                        "the dying wise-man is replaced by knight 1493");
+                assertTrue(ogre.battleNetChaseReplanResidualHold(),
+                        "the new one-heading route owns a queued Attack");
+                assertTrue(ogre.battleNetAttackWrapDestArmPending(),
+                        "the old paid tail remains distinguishable until settlement");
             } else if (fixture == 146) {
                 assertEquals(Unit.Order.DYING, wiseMan.order(),
                         "the retained ranged target has entered Die");
@@ -150,23 +162,47 @@ class Human13Ogre1511WrapDestArmRealDataTest {
                 throwerMissilesBefore = (int) world.missiles().stream()
                         .filter(missile -> missile.source() == thrower)
                         .count();
+            } else if (fixture == 147) {
+                seedAt147 = world.battleNetRandomSeed();
+                List<Missile> throwerMissiles = world.missiles().stream()
+                        .filter(missile -> missile.source() == thrower)
+                        .toList();
+                assertEquals(throwerMissilesBefore + 1,
+                        throwerMissiles.size(),
+                        "dying-target OP10 creates the visible eastern axe");
+                throwerShotAt147 = throwerMissiles.get(
+                        throwerMissiles.size() - 1);
+            } else if (fixture >= 154 && fixture <= 156) {
+                assertSame(southKnight, ogre.target(),
+                        "the replacement Attack belongs to knight 1493");
+                assertEquals(643, ogre.battleNetSequenceOffset(),
+                        "the fresh queued Attack starts at construction");
+                assertEquals(157 - fixture,
+                        ogre.battleNetAnimationTimer(),
+                        "native exposes construction 3,2,1 on fixtures 154-156");
+            } else if (fixture == 157) {
+                assertEquals(644, ogre.battleNetSequenceOffset(),
+                        "OP0 follows the fresh queued Attack constructor");
+                assertEquals(1, ogre.battleNetAnimationTimer(),
+                        "OP0 is entered with native timer one");
+            } else if (fixture == 162) {
+                assertEquals(76, southKnight.hitPoints(),
+                        "the retargeted swing has not landed two fixtures early");
+            } else if (fixture == 164) {
+                assertEquals(68, southKnight.hitPoints(),
+                        "native lands the eight-damage blow on fixture 164");
             }
         }
 
-        assertEquals(0x51323ee9, world.battleNetRandomSeed(),
+        assertEquals(0x51323ee9, seedAt147,
                 "fixture 147 spends damage, two constructor and later callbacks "
                         + "in authenticated BNE order");
-        List<Missile> throwerMissiles = world.missiles().stream()
-                .filter(missile -> missile.source() == thrower)
-                .toList();
-        assertEquals(throwerMissilesBefore + 1, throwerMissiles.size(),
-                "dying-target OP10 creates the visible eastern axe");
-        Missile shot = throwerMissiles.get(throwerMissiles.size() - 1);
-        assertSame(wiseMan, shot.target());
-        assertEquals(5, shot.damage(),
+        assertNotNull(throwerShotAt147);
+        assertSame(wiseMan, throwerShotAt147.target());
+        assertEquals(5, throwerShotAt147.damage(),
                 "native fixture 147 rolls five damage before constructor jitter");
-        assertTrue(shot.battleNetConstructorDrawn());
-        assertTrue(shot.battleNetMotion());
+        assertTrue(throwerShotAt147.battleNetConstructorDrawn());
+        assertTrue(throwerShotAt147.battleNetMotion());
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

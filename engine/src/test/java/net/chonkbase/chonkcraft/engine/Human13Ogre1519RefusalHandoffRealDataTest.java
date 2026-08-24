@@ -19,14 +19,17 @@ import org.junit.jupiter.api.Test;
  * Retail pays Attack 643/3,2,1 once, exposes Move 586 for two visits, then
  * commits the open southeast detour on fixture 154. Re-arming the generic
  * blocked-chase constructor after that paid handoff inserted a second 3,2,1
- * pause and left a live attacker visibly frozen through fixture 155.</p>
+ * pause and left a live attacker visibly frozen through fixture 155. That
+ * queued-Attack promotion owns no active-order Still callback: charging one
+ * shifted the shared asynchronous stream and made critter 1404 miss its
+ * fixture-156 north-east wander.</p>
  */
 class Human13Ogre1519RefusalHandoffRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
-    @DisplayName("human 13's eastern ogre pays one blocked-retarget constructor and resumes on fixture 154")
+    @DisplayName("human 13's queued-Attack refusal handoff resumes without an idle draw")
     void easternOgrePaysOneBlockedRetargetConstructorAndResumesOn154() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -37,13 +40,15 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
         World world = mission.world();
 
         Unit ogre = unitAt(world, "unit-ogre", 123, 19);
+        Unit critter = unitAt(world, "unit-critter", 41, 113);
         assertNotNull(ogre, "Human 13 has no eastern ogre on 123,19");
+        assertNotNull(critter, "Human 13 has no native-slot-1404 critter");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
         Unit knight = null;
-        for (int fixture = 1; fixture <= 154; fixture++) {
+        for (int fixture = 1; fixture <= 156; fixture++) {
             mission.tick();
             if (fixture == 148) {
                 knight = ogre.target();
@@ -69,6 +74,12 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
                         "the empty cursor remains parked before its redraw");
                 assertEquals(28, ogre.tileY(),
                         "the empty cursor remains parked before its redraw");
+            } else if (fixture == 156) {
+                assertEquals(Unit.Order.MOVE, critter.order(),
+                        "the queued-Attack handoff must not steal the "
+                                + "critter's native wander draw");
+                assertEquals(43, critter.orderTargetX());
+                assertEquals(112, critter.orderTargetY());
             }
         }
 

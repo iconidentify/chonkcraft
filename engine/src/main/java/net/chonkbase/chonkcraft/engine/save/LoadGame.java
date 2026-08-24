@@ -680,6 +680,9 @@ public final class LoadGame {
         if (state.rawGet("aiBehavior") != null) {
             unit.setBattleNetAiBehavior(integer(state.rawGet("aiBehavior")));
         }
+        if (state.rawGet("mapPlaced") != null) {
+            unit.setBattleNetMapPlaced(truthy(state.rawGet("mapPlaced")));
+        }
         if (state.rawGet("aiHomeX") != null) {
             unit.setBattleNetAiHome(integer(state.rawGet("aiHomeX")),
                     integer(state.rawGet("aiHomeY")));
@@ -774,6 +777,12 @@ public final class LoadGame {
         if (state.rawGet("woodTerminalRefusalHeading") != null) {
             unit.setBattleNetWoodTerminalRefusalHeading(
                     integer(state.rawGet("woodTerminalRefusalHeading")));
+        }
+        if (state.rawGet("woodCornerRefusalHeading") != null) {
+            unit.setBattleNetWoodCornerRefusalHeading(
+                    integer(state.rawGet("woodCornerRefusalHeading")));
+            unit.setBattleNetWoodCornerRefusalVisits(
+                    integer(state.rawGet("woodCornerRefusalVisits")));
         }
         if (state.rawGet("rangedAttackCadenceRemaining") != null) {
             unit.setBattleNetRangedAttackCadenceRemaining(integer(
@@ -885,8 +894,16 @@ public final class LoadGame {
         if (state.rawGet("target") != null) {
             unit.setTarget(byId.get(integer(state.rawGet("target"))));
         }
-        // Restore this after the target. Unit.setTarget deliberately clears a
-        // marker inherited from a different quarry.
+        // Restore quarry-bound state after the target. Unit.setTarget
+        // deliberately clears markers inherited from a different quarry.
+        if (state.rawGet("saturatedCardinalRetryLoop") != null) {
+            unit.setBattleNetSaturatedCardinalRetryLoop(
+                    truthy(state.rawGet("saturatedCardinalRetryLoop")));
+        }
+        if (state.rawGet("stageSixCardinalProbePark") != null) {
+            unit.setBattleNetStageSixCardinalProbePark(
+                    truthy(state.rawGet("stageSixCardinalProbePark")));
+        }
         if (state.rawGet("attackWaitRefillResidual") != null) {
             unit.setBattleNetAttackWaitRefillResidual(
                     truthy(state.rawGet("attackWaitRefillResidual")));

@@ -609,6 +609,9 @@ public final class SaveGame {
         // whose behavior-two marker had not yet become durable.
         state.append(" aiBehavior = ")
                 .append(unit.battleNetAiBehavior()).append(",");
+        if (unit.battleNetMapPlaced()) {
+            state.append(" mapPlaced = true,");
+        }
         if (unit.hasBattleNetAiHome()) {
             state.append(" aiHomeX = ").append(unit.battleNetAiHomeX()).append(",");
             state.append(" aiHomeY = ").append(unit.battleNetAiHomeY()).append(",");
@@ -687,6 +690,14 @@ public final class SaveGame {
                     .append(unit.battleNetWoodTerminalRefusalHeading())
                     .append(",");
         }
+        if (unit.battleNetWoodCornerRefusalHeading() >= 0) {
+            state.append(" woodCornerRefusalHeading = ")
+                    .append(unit.battleNetWoodCornerRefusalHeading())
+                    .append(",");
+            state.append(" woodCornerRefusalVisits = ")
+                    .append(unit.battleNetWoodCornerRefusalVisits())
+                    .append(",");
+        }
         if (unit.battleNetRangedAttackCadenceRemaining() != 0) {
             state.append(" rangedAttackCadenceRemaining = ")
                     .append(unit.battleNetRangedAttackCadenceRemaining())
@@ -725,8 +736,14 @@ public final class SaveGame {
         if (unit.battleNetSaturatedResidualFaceRetry()) {
             state.append(" saturatedResidualFaceRetry = true,");
         }
+        if (unit.battleNetSaturatedCardinalRetryLoop()) {
+            state.append(" saturatedCardinalRetryLoop = true,");
+        }
         if (unit.battleNetDirectRefusalRecoveryProbe()) {
             state.append(" directRefusalRecoveryProbe = true,");
+        }
+        if (unit.battleNetStageSixCardinalProbePark()) {
+            state.append(" stageSixCardinalProbePark = true,");
         }
         if (unit.battleNetSaturatedNearRecoveryFullRoute()) {
             state.append(" saturatedNearRecoveryFullRoute = true,");
