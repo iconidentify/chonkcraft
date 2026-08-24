@@ -144,14 +144,18 @@ class LobbyMapSetupTest {
     }
 
     @Test
-    @DisplayName("Top vs Bottom creates two mutual teams with shared vision")
-    void topVsBottomAppliesAlliancesAndSharedVision() throws Exception {
+    @DisplayName("Explicit team numbers create mutual alliances with shared vision")
+    void explicitTeamsApplyAlliancesAndSharedVision() throws Exception {
         PudMap source = multiplayerMap();
         try (GameLobby host = GameLobby.host("Chris", "network.pud", 4, PORT + 2)) {
             host.setOccupant(1, GameLobby.Occupant.COMPUTER);
             host.setOccupant(2, GameLobby.Occupant.COMPUTER);
             host.setOccupant(3, GameLobby.Occupant.COMPUTER);
-            host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
+            host.setTeam(0, 1);
+            host.setTeam(1, 1);
+            host.setTeam(2, 2);
+            host.setTeam(3, 2);
+            host.setGameTemplate(GameLobby.GameTemplate.TEAMS);
             LobbySetup setup = new LobbySetup(Path.of("network.pud"), host);
             World world = new World(grass(8), setup.players(source));
 
@@ -170,8 +174,8 @@ class LobbyMapSetupTest {
     }
 
     @Test
-    @DisplayName("All You Need starts the displayed Top Team as allies with shared sight")
-    void allYouNeedTopTeamCrossesTheStartCommit() throws Exception {
+    @DisplayName("Two humans on Team 1 can start against a computer on Team 2")
+    void explicitTeamsCrossTheStartCommit() throws Exception {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null, "No BNE media configured");
         byte[] bytes = assets.map("All You Need BNE.pud");
@@ -197,13 +201,13 @@ class LobbyMapSetupTest {
             int connor = host.state().slots().stream()
                     .filter(slot -> "Connor".equals(slot.name()))
                     .findFirst().orElseThrow().index();
-            LobbyTeams teams = LobbyTeams.from(source, 8);
-            assertFalse(teams.together(0, connor),
-                    "the regression needs the default second seat in the other area");
-            assertTrue(host.move(connor, 3),
-                    "Violet is the open Top Team seat displayed below Red");
             assertTrue(host.setOccupant(7, GameLobby.Occupant.COMPUTER));
-            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
+            assertTrue(host.setTeam(0, 1));
+            assertTrue(host.setTeam(connor, 1));
+            assertTrue(host.setTeam(7, 2));
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TEAMS));
+            assertTrue(host.state().hasValidMatchup(),
+                    "Chris and Connor versus one computer was rejected");
 
             // Start immediately. START must commit the move and template even
             // if the last ordinary STATE datagram is still in flight.
@@ -214,34 +218,36 @@ class LobbyMapSetupTest {
                 Thread.sleep(5);
             }
             assertTrue(client.isStarted());
-            assertEquals(3, client.state().localSlot());
-            assertEquals(GameLobby.GameTemplate.TOP_VS_BOTTOM,
+            assertEquals(connor, client.state().localSlot());
+            assertEquals(GameLobby.GameTemplate.TEAMS,
                     client.state().gameTemplate());
+            assertEquals(1, client.state().slots().get(connor).team());
+            assertEquals(2, client.state().slots().get(7).team());
 
             LobbySetup hostSetup = new LobbySetup(Path.of("All You Need BNE.pud"), host);
             LobbySetup clientSetup = new LobbySetup(Path.of("All You Need BNE.pud"), client);
             World hostWorld = populatedWorld(data, source, hostSetup);
             World clientWorld = populatedWorld(data, source, clientSetup);
-            int[] connorStart = source.startLocation(3);
+            int[] connorStart = source.startLocation(connor);
 
             for (World world : List.of(hostWorld, clientWorld)) {
-                assertTrue(world.isAllied(0, 3));
-                assertTrue(world.isAllied(3, 0));
-                assertTrue(world.sharesVisionWith(0, 3));
-                assertTrue(world.sharesVisionWith(3, 0));
+                assertTrue(world.isAllied(0, connor));
+                assertTrue(world.isAllied(connor, 0));
+                assertTrue(world.sharesVisionWith(0, connor));
+                assertTrue(world.sharesVisionWith(connor, 0));
                 assertTrue(world.isVisibleTo(0, connorStart[0], connorStart[1]),
                         "Connor's opening sight did not reach Chris's gameboard");
                 assertFalse(world.isAllied(0, 7),
-                        "the bottom computer was silently put on Chris's team");
+                        "the Team 2 computer was silently put on Chris's team");
                 assertTrue(world.isEnemyPlayer(0, 7));
                 assertEquals(PudMap.PlayerType.COMPUTER, world.player(7).type(),
-                        "the bottom lobby seat did not become a computer player");
+                        "the Team 2 lobby seat did not become a computer player");
                 assertEquals(1, world.enableAiForComputerPlayers(),
                         "the displayed computer did not start exactly one live AI");
                 assertTrue(world.ais().containsKey(7),
-                        "the bottom computer's AI was absent from the running world");
+                        "the Team 2 computer's AI was absent from the running world");
                 assertEquals(1, data.attachRetailAi(world, source, java.util.Map.of()).size(),
-                        "the bottom computer did not receive its retail ai.bin profile");
+                        "the Team 2 computer did not receive its retail ai.bin profile");
             }
         }
     }

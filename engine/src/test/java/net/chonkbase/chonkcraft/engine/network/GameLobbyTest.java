@@ -159,7 +159,7 @@ class GameLobbyTest {
             byte[] name = "Old client".getBytes(StandardCharsets.UTF_8);
             ByteBuffer oldJoin = ByteBuffer.allocate(32);
             oldJoin.putInt(0x57474C59);
-            oldJoin.putShort((short) 5);
+            oldJoin.putShort((short) 6);
             oldJoin.put((byte) 1);
             oldJoin.put((byte) name.length);
             oldJoin.put(name);
@@ -197,7 +197,8 @@ class GameLobbyTest {
             assertTrue(host.setOccupant(3, GameLobby.Occupant.COMPUTER));
             assertTrue(host.setOccupant(4, GameLobby.Occupant.CLOSED));
             assertTrue(host.setRace(seat, "orc"));
-            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
+            assertTrue(host.setTeam(seat, 1));
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TEAMS));
 
             pollUntil("the client saw the changes",
                     () -> client.state().slots().size() > 4
@@ -206,8 +207,9 @@ class GameLobbyTest {
                             && client.state().slots().get(4).occupant()
                                     == GameLobby.Occupant.CLOSED
                             && "orc".equals(client.state().slots().get(seat).race())
+                            && client.state().slots().get(seat).team() == 1
                             && client.state().gameTemplate()
-                                    == GameLobby.GameTemplate.TOP_VS_BOTTOM,
+                                    == GameLobby.GameTemplate.TEAMS,
                     host, client);
 
             // A slot somebody is sitting in is not the host's to overwrite:
@@ -229,10 +231,15 @@ class GameLobbyTest {
             int from = client.state().localSlot();
             int to = 6;
 
+            assertTrue(host.setTeam(from, 4));
             assertTrue(host.move(from, to), "the host should be able to reseat a player");
             assertEquals(GameLobby.Occupant.OPEN,
                     host.state().slots().get(from).occupant(), "the old slot opens");
             assertEquals("Ann", host.state().slots().get(to).name());
+            assertEquals(4, host.state().slots().get(to).team(),
+                    "team membership changed with colour");
+            assertEquals(1, host.state().slots().get(from).team(),
+                    "the emptied slot retained the departed player's team");
 
             pollUntil("the client learned where it now sits",
                     () -> client.state().localSlot() == to, host, client);
@@ -328,6 +335,47 @@ class GameLobbyTest {
             pollUntil("both clients heard the start",
                     () -> first.isStarted() && second.isStarted(), first, second);
             assertTrue(host.isStarted());
+        }
+    }
+
+    @Test
+    @DisplayName("Two humans can team up against one explicitly assigned computer")
+    void explicitHumanTeamVersusComputerCanStart() throws Exception {
+        InetAddress local = InetAddress.getLoopbackAddress();
+        try (GameLobby host = GameLobby.host("Chris", "garden.pud", 8, BASE_PORT + 23);
+                GameLobby connor = GameLobby.join("Connor", local, BASE_PORT + 23)) {
+            pollUntil("Connor seated", () -> host.humanCount() == 2, host, connor);
+            int connorSlot = connor.state().localSlot();
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TEAMS));
+            assertTrue(host.setTeam(0, 1));
+            assertTrue(host.setTeam(connorSlot, 1));
+            assertTrue(host.setOccupant(2, GameLobby.Occupant.COMPUTER));
+            assertTrue(host.setTeam(2, 2));
+
+            assertTrue(host.state().hasValidMatchup());
+            host.start();
+            pollUntil("Connor heard start", connor::isStarted, host, connor);
+            assertTrue(host.isStarted());
+            assertEquals(1, connor.state().slots().get(connorSlot).team());
+            assertEquals(2, connor.state().slots().get(2).team());
+        }
+    }
+
+    @Test
+    @DisplayName("Teams mode refuses a roster with no opposing team")
+    void teamsRequireAtLeastTwoOccupiedTeamNumbers() throws Exception {
+        try (GameLobby host = GameLobby.host("Chris", "garden.pud", 4, BASE_PORT + 24)) {
+            assertTrue(host.setOccupant(1, GameLobby.Occupant.COMPUTER));
+            assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TEAMS));
+            assertTrue(host.setTeam(1, 1));
+
+            assertFalse(host.state().hasValidMatchup());
+            host.start();
+            assertFalse(host.isStarted(), "the engine accepted a team with no opponent");
+
+            assertTrue(host.setTeam(1, 2));
+            host.start();
+            assertTrue(host.isStarted(), "explicit opposing teams did not unlock Start");
         }
     }
 

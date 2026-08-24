@@ -142,16 +142,16 @@ class LobbyScreenTest {
     }
 
     @Test
-    @DisplayName("The host selects the Top vs Bottom team template")
+    @DisplayName("The host selects explicit Teams mode")
     void gameTemplateToggles() throws Exception {
-        GameData data = load();
+        GameData data = null;
         try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 21)) {
             LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", new Recording());
             screen.render();
 
             assertEquals(GameLobby.GameTemplate.MELEE, lobby.state().gameTemplate());
             assertTrue(click(screen, LobbyScreen.templateBounds()));
-            assertEquals(GameLobby.GameTemplate.TOP_VS_BOTTOM,
+            assertEquals(GameLobby.GameTemplate.TEAMS,
                     lobby.state().gameTemplate());
             screen.render();
             assertTrue(click(screen, LobbyScreen.templateBounds()));
@@ -160,41 +160,33 @@ class LobbyScreenTest {
     }
 
     @Test
-    @DisplayName("Top vs Bottom groups the map's real teams instead of implying row order")
-    void topVsBottomShowsTheMapDefinedTeams() throws Exception {
-        GameData data = load();
-        byte[] map = data.source().map("All You Need BNE.pud");
-        Assumptions.assumeTrue(map != null,
-                "This BNE installation does not carry the supplemental All You Need map");
-        try (GameLobby lobby = GameLobby.host(
-                "Chris", "All You Need BNE.pud", map, 8, PORT + 23)) {
-            lobby.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
-            LobbyScreen screen = new LobbyScreen(data, lobby,
-                    "All You Need BNE.pud", new Recording());
+    @DisplayName("The host assigns teams without changing colour or row")
+    void teamsAreExplicitAndIndependentFromColour() throws Exception {
+        GameData data = null;
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 23)) {
+            assertTrue(lobby.setOccupant(1, GameLobby.Occupant.COMPUTER));
+            assertTrue(lobby.setGameTemplate(GameLobby.GameTemplate.TEAMS));
+            LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", new Recording());
             screen.render();
 
-            // This retail map interleaves north and south colour slots. A
-            // plain colour-order table put Blue directly below Red and made
-            // them look like teammates even though their starts are on
-            // opposite halves of the map.
-            int[] expected = {0, 3, 4, 6, 1, 2, 5, 7};
-            for (int row = 0; row < expected.length; row++) {
-                assertEquals(expected[row], screen.slotAtRowForTest(row),
-                        "visual row " + row + " names the wrong starting area");
+            for (int row = 0; row < 8; row++) {
+                assertEquals(row, screen.slotAtRowForTest(row),
+                        "team selection reordered colour/start slots");
             }
+            assertEquals(2, lobby.state().slots().get(1).team());
+            assertTrue(click(screen, LobbyScreen.teamBounds(1)));
+            assertEquals(3, lobby.state().slots().get(1).team());
 
-            // Computers use the same visible move gesture as people. Moving
-            // the bottom team's Yellow AI to the second Top Team row changes
-            // the real colour/start slot, not merely its presentation.
-            assertTrue(lobby.setOccupant(7, GameLobby.Occupant.COMPUTER));
             screen.render();
-            assertTrue(click(screen, LobbyScreen.moveBounds(7)));
+            assertTrue(click(screen, LobbyScreen.moveBounds(1)));
             screen.render();
-            assertTrue(click(screen, LobbyScreen.rowBounds(1)));
+            assertTrue(click(screen, LobbyScreen.rowBounds(4)));
             assertEquals(GameLobby.Occupant.COMPUTER,
-                    lobby.state().slots().get(3).occupant());
+                    lobby.state().slots().get(4).occupant());
+            assertEquals(3, lobby.state().slots().get(4).team(),
+                    "moving to a new colour changed the computer's team");
             assertEquals(GameLobby.Occupant.OPEN,
-                    lobby.state().slots().get(7).occupant());
+                    lobby.state().slots().get(1).occupant());
         }
     }
 
@@ -226,29 +218,28 @@ class LobbyScreenTest {
     }
 
     @Test
-    @DisplayName("Top vs Bottom cannot start with everybody on one team")
-    void topVsBottomRequiresBothDisplayedTeams() throws Exception {
-        GameData data = load();
+    @DisplayName("Teams mode starts after the host assigns an opponent")
+    void teamsRequireTwoExplicitAssignments() throws Exception {
+        GameData data = null;
         Recording heard = new Recording();
         try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 24)) {
             assertTrue(lobby.setOccupant(1, GameLobby.Occupant.COMPUTER));
-            assertTrue(lobby.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM));
+            assertTrue(lobby.setGameTemplate(GameLobby.GameTemplate.TEAMS));
+            assertTrue(lobby.setTeam(1, 1));
             LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", heard);
             screen.render();
 
             assertFalse(click(screen, LobbyScreen.startBounds()),
-                    "Top vs Bottom offered Start while the opposing team was empty");
+                    "Teams offered Start while everybody had the same team number");
             assertFalse(heard.started.get(),
                     "the one-sided team lobby began an unwinnable match");
 
-            assertTrue(click(screen, LobbyScreen.moveBounds(1)),
-                    "the computer could not be picked up from the Top Team");
-            screen.render();
-            assertTrue(click(screen, LobbyScreen.rowBounds(4)),
-                    "the computer could not be placed on the Bottom Team");
+            assertTrue(click(screen, LobbyScreen.teamBounds(1)),
+                    "the computer's Team button was not available");
+            assertEquals(2, lobby.state().slots().get(1).team());
             screen.render();
             assertTrue(click(screen, LobbyScreen.startBounds()),
-                    "Start stayed unavailable after both displayed teams were occupied");
+                    "Start stayed unavailable after an opposing team was assigned");
             assertTrue(heard.started.get(),
                     "the valid two-sided team lobby did not begin");
         }

@@ -75,7 +75,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-host "${port}" --computer-player true --cycles 180 \
-  --game-template top-vs-bottom \
+  --game-template teams \
   >"${work}/host.log" 2>&1 &
 host_pid=$!
 sleep 1
@@ -133,8 +133,8 @@ require_log 'rendered frame: nonblack=[1-9][0-9]*' \
   "${work}/client.log" "client-render"
 require_log '^selected map ' "${work}/host.log" "host-map-selection"
 require_log 'source=host-transfer' "${work}/client.log" "client-map-transfer"
-require_log 'template=TOP_VS_BOTTOM' "${work}/host.log" "host-template"
-require_log 'template=TOP_VS_BOTTOM' "${work}/client.log" "client-template"
+require_log 'template=TEAMS' "${work}/host.log" "host-template"
+require_log 'template=TEAMS' "${work}/client.log" "client-template"
 require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
   "${work}/host.log" "host-team"
 require_log 'team: allies=\[[0-9]+\] shared-vision=\[[0-9]+\] enemies=\[[0-9]+\]' \
@@ -170,7 +170,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   -Dchonkcraft.network.build="${online_build}" \
   -cp "${classpath}" net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --online-host "${matchmaker_url}" --computer-player true --cycles 180 \
-  --game-template top-vs-bottom \
+  --game-template teams \
   >"${online_host_log}" 2>&1 &
 host_pid=$!
 

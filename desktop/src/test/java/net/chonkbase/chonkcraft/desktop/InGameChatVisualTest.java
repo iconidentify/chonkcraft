@@ -78,6 +78,30 @@ class InGameChatVisualTest {
     }
 
     @Test
+    @DisplayName("Team chat selects only connected human teammates")
+    void teamChatUsesTheRunningTeamAlliance() throws Exception {
+        try (Scene scene = scene()) {
+            InGameChat chat = scene.chat();
+            assertEquals(1 << 2, scene.game().alliesChatMask(),
+                    "the opposing human was included in private team chat");
+
+            render(chat);
+            chat.click(610, 28); // Messages
+            render(chat);
+            chat.click(550, 94); // Team audience
+            chat.keyPressed(key(KeyEvent.VK_ENTER, '\n'));
+            for (char character : "Attack now".toCharArray()) {
+                chat.keyPressed(key(KeyEvent.VK_UNDEFINED, character));
+            }
+            chat.keyPressed(key(KeyEvent.VK_ENTER, '\n'));
+
+            NetworkGame.ChatEvent sent = scene.game().drainChatEvents().getFirst();
+            assertEquals(1 << 2, sent.recipientMask());
+            assertEquals("Attack now", sent.text());
+        }
+    }
+
+    @Test
     @DisplayName("the battlefield names the ally whose sight is shared")
     void theRunningAllianceIsConfirmedOnEntry() throws Exception {
         try (Scene scene = scene()) {

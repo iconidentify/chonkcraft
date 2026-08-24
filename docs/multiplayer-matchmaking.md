@@ -60,8 +60,8 @@ relay topology.
 The controls follow the Battle.net Edition manual: **Enter** opens the message
 line, **Enter** sends it, **Escape** cancels it, and the **Messages** control at
 the top-right of the battlefield selects the recipients. The connected-player
-panel keeps the eight player colours and offers Everyone, mutual Allies, or an
-individual set. Its Mute control is local: it hides that player's later text
+panel keeps the eight player colours and offers Everyone, the private Team, or
+an individual set. Its Mute control is local: it hides that player's later text
 and sound without changing the match, recipient choices, or another player's
 client. Departure and connection notices are system events and are never
 silenced by a player mute.
@@ -87,7 +87,7 @@ The rule is enforced in two independent places:
 
 1. The online room directory filters browsing by build and returns HTTP 426 to
    a code join from another build. No relay seat or ticket is issued.
-2. Lobby wire version 5 carries the build in `JOIN`, authoritative `STATE`, and
+2. Lobby wire version 7 carries the build in `JOIN`, authoritative `STATE`, and
    `START`. A direct or relayed host compares it before allocating a player
    slot. A rejected peer receives no roster seat, map chunk, readiness state,
    or start packet.
@@ -168,17 +168,14 @@ in both directions and proves the service drops the seventh message in one
 burst. `ChatTransportTest` covers selected-recipient routing and UTF-8 bounds;
 `InGameChatVisualTest` renders the live message line, roster, recipient controls,
 and mute state and drives Enter-to-send into the real network session.
-The settled lobby also carries its game template. In **Top vs Bottom**, the
-host assigns colours/start slots and players whose fixed map starts occupy the
-same vertical area enter as mutual allies with mutual shared vision; the
-screen groups those interleaved colour slots into labelled Top Team and Bottom
-Team rows using the verified map bytes. The roster summary names the occupied
-colour on each side and confirms shared sight; a one-sided Top-vs-Bottom lobby
-cannot start. Authenticated UI and startup regressions recreate the reported
-**All You Need BNE** setup exactly. The portable two-process release gate
-selects a retail map present in that particular pack whose fixed starts can
-represent the same two-people-versus-one-computer team shape. Both peers must
-prove exactly one mutual human ally with shared vision, exactly one mutual
+The settled lobby also carries its game type and an explicit team number for
+every slot. In **Teams**, the host assigns Team 1–8 independently of colour and
+starting position; equal team numbers become mutual allies with mutual shared
+vision. At least two occupied team numbers are required, so two humans on Team
+1 versus a computer on Team 2 is valid regardless of where the map places their
+starts. The in-game Team chat selector uses those same mutual alliances and
+sends only to connected human teammates. The portable two-process release gate
+proves exactly one mutual human teammate with shared vision, exactly one mutual
 computer enemy with its retail `ai.bin` profile active, and matching final
 simulation hashes after 180 cycles. Diplomacy and shared sight are themselves
 part of that hash from cycle zero.

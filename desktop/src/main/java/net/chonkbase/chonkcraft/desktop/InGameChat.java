@@ -256,7 +256,7 @@ final class InGameChat {
         int half = (PANEL_WIDTH - 30) / 2;
         audienceButton(g2, new Rectangle(x + 10, controlsY, half, 23), "EVERYONE",
                 () -> recipientMask = network.everyoneChatMask());
-        audienceButton(g2, new Rectangle(x + 20 + half, controlsY, half, 23), "ALLIES",
+        audienceButton(g2, new Rectangle(x + 20 + half, controlsY, half, 23), "TEAM",
                 () -> recipientMask = network.alliesChatMask());
 
         int rowY = controlsY + 31;
@@ -276,7 +276,7 @@ final class InGameChat {
                         selected ? GameFont.Ink.YELLOW : GameFont.Ink.GREY);
             }
             String suffix = player.host() ? " (host)" : player.allied() && !player.local()
-                    ? " (ally)" : "";
+                    ? " (teammate)" : "";
             String label = player.name() + (player.local() ? " (you)" : "") + suffix;
             int nameX = x + (player.local() ? 32 : 61);
             int muteWidth = player.local() ? 0 : 52;
@@ -327,7 +327,7 @@ final class InGameChat {
             return "Everyone";
         }
         if (selected != 0 && selected == network.alliesChatMask()) {
-            return "Allies";
+            return "Team";
         }
         int count = Integer.bitCount(selected);
         return count == 1 ? "1 player" : count + " players";

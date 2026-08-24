@@ -94,8 +94,8 @@ public final class NetworkPeer {
                 case "--matchmaker-url" -> matchmakerUrl = args[i + 1];
                 case "--without-map" -> withoutMap = Boolean.parseBoolean(args[i + 1]);
                 case "--computer-player" -> computerPlayer = Boolean.parseBoolean(args[i + 1]);
-                case "--game-template" -> gameTemplate = "top-vs-bottom".equalsIgnoreCase(
-                        args[i + 1]) ? GameLobby.GameTemplate.TOP_VS_BOTTOM
+                case "--game-template" -> gameTemplate = "teams".equalsIgnoreCase(
+                        args[i + 1]) ? GameLobby.GameTemplate.TEAMS
                                 : GameLobby.GameTemplate.MELEE;
                 default -> { }
             }
@@ -111,11 +111,10 @@ public final class NetworkPeer {
         // path is the one thing the two machines cannot agree on: they are
         // different machines. --map has always been a name.
         String wantedMap = mapName;
-        boolean provingTopVsBottom = wantedMap == null
-                && gameTemplate == GameLobby.GameTemplate.TOP_VS_BOTTOM
+        boolean provingTeams = wantedMap == null
+                && gameTemplate == GameLobby.GameTemplate.TEAMS
                 && (lobbyHost != null || onlineHost != null);
-        mapName = provingTopVsBottom
-                ? findTopVsBottomMap(assets) : findMap(assets, wantedMap);
+        mapName = provingTeams ? findTeamsMap(assets) : findMap(assets, wantedMap);
         if (mapName == null && lobbyJoin == null) {
             System.err.println("No map found.");
             System.exit(2);
@@ -169,7 +168,7 @@ public final class NetworkPeer {
         var aiAssignments = data.attachRetailAi(world, source, java.util.Map.of());
         if (lobbySetup != null
                 && lobbyRun.lobby().state().gameTemplate()
-                        == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+                        == GameLobby.GameTemplate.TEAMS) {
             System.out.printf("peer %d team: allies=%s shared-vision=%s enemies=%s%n",
                     localPlayer,
                     relatedPlayers(lobbyRun.lobby(), world, localPlayer,
@@ -178,7 +177,7 @@ public final class NetworkPeer {
                             Relation.SHARED_VISION),
                     relatedPlayers(lobbyRun.lobby(), world, localPlayer,
                             Relation.ENEMY));
-            proveTopVsBottomScenario(lobbyRun.lobby(), world, localPlayer,
+            proveTeamsScenario(lobbyRun.lobby(), world, localPlayer,
                     activeComputerAis, aiAssignments.size());
         }
         int visibleTiles = visibleTiles(world, localPlayer);
@@ -401,8 +400,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate,
-                        PudReader.read(selectedMap));
+                settleAndStart(lobby, computerPlayer, gameTemplate);
                 relay.markRoomStarted();
                 lobby.start();
             }
@@ -448,8 +446,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate,
-                        PudReader.read(selectedMap));
+                settleAndStart(lobby, computerPlayer, gameTemplate);
                 lobby.start();
             }
             Thread.sleep(2);
@@ -467,35 +464,25 @@ public final class NetworkPeer {
     }
 
     private static void settleAndStart(GameLobby lobby, boolean computerPlayer,
-            GameLobby.GameTemplate gameTemplate, PudMap source) {
+            GameLobby.GameTemplate gameTemplate) {
         lobby.setGameTemplate(gameTemplate);
-        LobbyTeams teams = LobbyTeams.from(source, lobby.capacity());
-        int host = lobby.state().hostSlot();
-        if (gameTemplate == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
-            // The production gate deliberately exercises the user's setup:
-            // two people on one displayed team, one computer on the other.
-            // A joining human initially takes the first colour slot, which
-            // can belong to the opposite area on an interleaved retail map.
+        if (gameTemplate == GameLobby.GameTemplate.TEAMS) {
+            // Exercise the common user setup directly: two people on Team 1,
+            // one computer on Team 2. Colour and map position do not matter.
+            int humanTeam = 1;
             for (GameLobby.Slot slot : lobby.state().slots()) {
-                if (slot.occupant() != GameLobby.Occupant.HUMAN
-                        || slot.index() == host || teams.together(host, slot.index())) {
-                    continue;
-                }
-                for (GameLobby.Slot target : lobby.state().slots()) {
-                    if (target.occupant() == GameLobby.Occupant.OPEN
-                            && teams.together(host, target.index())) {
-                        lobby.move(slot.index(), target.index());
-                        break;
-                    }
+                if (slot.occupant() == GameLobby.Occupant.HUMAN) {
+                    lobby.setTeam(slot.index(), computerPlayer ? 1 : humanTeam++);
                 }
             }
         }
         if (computerPlayer) {
             for (GameLobby.Slot slot : lobby.state().slots()) {
-                if (slot.occupant() == GameLobby.Occupant.OPEN
-                        && (gameTemplate != GameLobby.GameTemplate.TOP_VS_BOTTOM
-                                || !teams.together(host, slot.index()))) {
+                if (slot.occupant() == GameLobby.Occupant.OPEN) {
                     lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
+                    if (gameTemplate == GameLobby.GameTemplate.TEAMS) {
+                        lobby.setTeam(slot.index(), 2);
+                    }
                     break;
                 }
             }
@@ -516,14 +503,14 @@ public final class NetworkPeer {
     /**
      * Proves the exact player-reported layout rather than merely finding some alliance.
      *
-     * <p>The release referee creates two people on one displayed team and one
+     * <p>The release referee creates two people on one explicit team and one
      * computer on the other. Its old regular expression accepted any non-empty
      * ally/enemy lists, so it passed even if the human was allied to the
      * computer and the other human was the enemy. This assertion names the
      * occupants and also starts the computer's retail AI before allowing the
      * two-process proof to continue.
      */
-    private static void proveTopVsBottomScenario(GameLobby lobby, World world,
+    private static void proveTeamsScenario(GameLobby lobby, World world,
             int localPlayer, int activeComputerAis, int attachedComputerAis) {
         long humanAllies = lobby.state().slots().stream()
                 .filter(slot -> slot.index() != localPlayer)
@@ -544,7 +531,7 @@ public final class NetworkPeer {
                 .count();
         if (humanAllies != 1 || sharedHumanAllies != 1 || computerEnemies != 1
                 || activeComputerAis != 1 || attachedComputerAis != 1) {
-            throw new IllegalStateException("Top vs Bottom did not produce one human ally "
+            throw new IllegalStateException("Teams did not produce one human teammate "
                     + "with shared sight and one live computer enemy: human-allies="
                     + humanAllies + " shared-human-allies=" + sharedHumanAllies
                     + " computer-enemies=" + computerEnemies + " active-computer-ais="
@@ -594,7 +581,7 @@ public final class NetworkPeer {
     }
 
     /** A real map capable of the release gate's two-people-versus-one-AI proof. */
-    private static String findTopVsBottomMap(AssetSource assets) {
+    private static String findTeamsMap(AssetSource assets) {
         for (String candidate : assets.mapNames()) {
             byte[] bytes = assets.map(candidate);
             if (bytes == null) {
@@ -610,20 +597,13 @@ public final class NetworkPeer {
             if (capacity < 3 || source.startLocation(0) == null) {
                 continue;
             }
-            LobbyTeams teams = LobbyTeams.from(source, capacity);
-            boolean openAlly = false;
-            boolean openEnemy = false;
+            int starts = 0;
             for (int slot = 1; slot < capacity; slot++) {
-                if (source.startLocation(slot) == null) {
-                    continue;
-                }
-                if (teams.together(0, slot)) {
-                    openAlly = true;
-                } else {
-                    openEnemy = true;
+                if (source.startLocation(slot) != null) {
+                    starts++;
                 }
             }
-            if (openAlly && openEnemy) {
+            if (starts >= 2) {
                 return candidate;
             }
         }

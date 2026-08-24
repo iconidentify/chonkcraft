@@ -103,7 +103,10 @@ class MultiplayerVisualTest {
         for (int slot = 1; slot < Math.min(4, teamCapacity); slot++) {
             hosted.setOccupant(slot, GameLobby.Occupant.COMPUTER);
         }
-        hosted.setGameTemplate(GameLobby.GameTemplate.TOP_VS_BOTTOM);
+        hosted.setGameTemplate(GameLobby.GameTemplate.TEAMS);
+        hosted.setTeam(0, 1);
+        hosted.setTeam(1, 1);
+        hosted.setTeam(2, 2);
         Seat seat = new Seat(listing(
                 "QD7K3M", "Chris's Game", teamMapName, 1, teamCapacity),
                 "host", "ws://127.0.0.1/relay", "ticket", 0, 0,

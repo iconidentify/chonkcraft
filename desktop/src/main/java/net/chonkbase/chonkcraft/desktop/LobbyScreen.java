@@ -12,21 +12,19 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import javax.swing.JPanel;
-import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.map.PudReader;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.network.GameLobby;
 
 /**
  * The table everybody sits at before the game starts.
  *
- * <p>Eight rows, one per slot. Melee keeps Warcraft II's own colour order;
- * Top vs Bottom groups those same colour/start slots by their map-defined
- * starting area. The slot is not merely a line in a list: it is your colour,
- * starting position and, in a team template, your side. A lobby that hides
- * any one of those makes the first minute of the game a surprise.
+ * <p>Eight rows, one per slot. A slot determines colour and starting position;
+ * in Teams mode a separate, explicit team number determines alliances. The
+ * host can change either without silently changing the other.
  *
  * <p>The host decides and everyone else watches. Every control here is the
  * host's; a client sees the same table and can change nothing on it, which is
@@ -129,9 +127,6 @@ final class LobbyScreen extends JPanel {
 
     private BufferedImage design;
     private BufferedImage scaleCache;
-
-    /** Parsed from the lobby's verified bytes, so the UI and simulation use one map. */
-    private PudMap synchronizedMap;
 
     LobbyScreen(GameData data, GameLobby lobby, String mapName, Listener listener) {
         this(data, lobby, mapName, null, listener);
@@ -236,21 +231,26 @@ final class LobbyScreen extends JPanel {
             notice = "Waiting for every player to receive the map.";
             return;
         }
-        if (state.slots().stream().filter(GameLobby.Slot::isPlaying).count() < 2) {
+        long playing = state.slots().stream().filter(GameLobby.Slot::isPlaying).count();
+        if (playing < 2) {
             notice = "A game needs at least two players.";
             return;
         }
-        if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
-                && !bothTeamsHavePlayers(state)) {
-            notice = "Top vs Bottom needs at least one player on each team.";
+        if (state.gameTemplate() == GameLobby.GameTemplate.TEAMS
+                && !state.hasValidMatchup()) {
+            notice = "Put the players on at least two different teams.";
             return;
         }
         try {
+            lobby.start();
+            if (!lobby.isStarted()) {
+                notice = "The roster changed. Check the team assignments and try again.";
+                return;
+            }
             if (online != null) {
                 online.starting(lobby);
             }
             lobby.markOnlineRoomStarted();
-            lobby.start();
         } catch (java.io.IOException failed) {
             notice = "Could not tell everyone to start: " + failed.getMessage();
             return;
@@ -283,10 +283,17 @@ final class LobbyScreen extends JPanel {
         }
     }
 
-    /** Cycles the creator's synchronized game template. */
+    /** Cycles the creator's synchronized game type. */
     private void cycleGameTemplate() {
         GameLobby.GameTemplate current = lobby.state().gameTemplate();
         lobby.setGameTemplate(current.next());
+    }
+
+    /** Advances one player's explicit team without changing colour or start. */
+    private void cycleTeam(GameLobby.Slot slot) {
+        int teamCount = Math.min(8, Math.max(2, lobby.capacity()));
+        lobby.setTeam(slot.index(), slot.team() % teamCount + 1);
+        notice = "";
     }
 
     // ---- drawing ------------------------------------------------------
@@ -353,19 +360,16 @@ final class LobbyScreen extends JPanel {
     }
 
     private void drawTable(Graphics2D g2, GameLobby.State state) {
-        LobbyTeams teams = lobbyTeams(state);
-        List<GameLobby.Slot> slots = state.gameTemplate()
-                == GameLobby.GameTemplate.TOP_VS_BOTTOM
-                        ? teams.arrange(state.slots()) : state.slots();
+        List<GameLobby.Slot> slots = state.slots();
         for (int i = 0; i < slots.size(); i++) {
             GameLobby.Slot slot = slots.get(i);
             int y = TABLE_Y + i * (ROW_HEIGHT + ROW_GAP);
             boolean mine = slot.index() == state.localSlot();
             PanelArt.sunken(g2, TABLE_X, y, TABLE_WIDTH, ROW_HEIGHT,
                     mine ? StoneTexture.Tint.SLATE : StoneTexture.Tint.STONE);
-            if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
-                g2.setColor(teams.sideOf(slot.index()) == LobbyTeams.Side.TOP
-                        ? new Color(72, 116, 176, 34) : new Color(176, 94, 52, 34));
+            if (state.gameTemplate() == GameLobby.GameTemplate.TEAMS && slot.isPlaying()) {
+                Color team = PlayerColours.of(slot.team() - 1);
+                g2.setColor(new Color(team.getRed(), team.getGreen(), team.getBlue(), 34));
                 g2.fillRect(TABLE_X + 2, y + 2, TABLE_WIDTH - 4, ROW_HEIGHT - 4);
             }
             if (holding == slot.index()) {
@@ -388,11 +392,6 @@ final class LobbyScreen extends JPanel {
                 font.draw(g2, PlayerColours.nameOf(slot.index()),
                         TABLE_X + COLOUR_COLUMN, text,
                         GameFont.Ink.GREY);
-                if (state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM) {
-                    font.draw(g2, teams.sideOf(slot.index()).caption(),
-                            TABLE_X + TEAM_COLUMN, text,
-                            mine ? GameFont.Ink.WHITE : GameFont.Ink.GREY);
-                }
                 String who = switch (slot.occupant()) {
                     case HUMAN -> slot.name() + (mine ? " (you)" : "");
                     case COMPUTER -> "Computer";
@@ -409,6 +408,10 @@ final class LobbyScreen extends JPanel {
             }
 
             int actionX = TABLE_X + TABLE_WIDTH - ACTION_WIDTH - 6;
+            if (state.gameTemplate() == GameLobby.GameTemplate.TEAMS && slot.isPlaying()) {
+                button(g2, TABLE_X + TEAM_COLUMN - 4, y + 4, 84, ROW_HEIGHT - 8,
+                        "Team " + slot.team(), lobby.isHost() ? () -> cycleTeam(slot) : null);
+            }
             if (slot.occupant() != GameLobby.Occupant.CLOSED) {
                 button(g2, raceX, y + 4, RACE_WIDTH, ROW_HEIGHT - 8,
                         "orc".equals(slot.race()) ? "Orc" : "Human",
@@ -447,22 +450,6 @@ final class LobbyScreen extends JPanel {
         }
     }
 
-    /** The exact fixed-start assignment shared with game startup. */
-    private LobbyTeams lobbyTeams(GameLobby.State state) {
-        if (synchronizedMap == null) {
-            byte[] bytes = lobby.mapBytes();
-            if (bytes != null) {
-                try {
-                    synchronizedMap = PudReader.read(bytes);
-                } catch (RuntimeException malformed) {
-                    // A protocol-only test can have no PUD. The deterministic
-                    // slot-half fallback still gives it a readable lobby.
-                }
-            }
-        }
-        return LobbyTeams.from(synchronizedMap, state.slots().size());
-    }
-
     /** What the cycling button offers next, which is what it should say. */
     private static String captionFor(GameLobby.Occupant occupant) {
         return switch (occupant) {
@@ -498,7 +485,7 @@ final class LobbyScreen extends JPanel {
                                         : "Share code " + online.code() + " or copy the invite."
                         : holding >= 0
                                 ? "Now click an open slot to move them there."
-                                : state.gameTemplate() == GameLobby.GameTemplate.TOP_VS_BOTTOM
+                                : state.gameTemplate() == GameLobby.GameTemplate.TEAMS
                                         ? teamSummary(state)
                                         : "Click any player, then an open slot, to choose a colour.";
             } else if (hint.isEmpty()) {
@@ -514,12 +501,12 @@ final class LobbyScreen extends JPanel {
         if (lobby.isHost()) {
             boolean enoughPlayers = state.slots().stream().filter(GameLobby.Slot::isPlaying)
                     .count() >= 2;
-            boolean bothTeams = state.gameTemplate() != GameLobby.GameTemplate.TOP_VS_BOTTOM
-                    || bothTeamsHavePlayers(state);
-            boolean canStart = state.allPlayersReady() && enoughPlayers && bothTeams;
+            boolean opposingTeams = state.gameTemplate() != GameLobby.GameTemplate.TEAMS
+                    || state.hasValidMatchup();
+            boolean canStart = state.canStart();
             button(g2, TABLE_X, FOOT_Y, 160, FOOT_HEIGHT,
                     !enoughPlayers ? "Waiting for Players"
-                            : !bothTeams ? "Fill Both Teams"
+                            : !opposingTeams ? "Assign Opponents"
                             : state.allPlayersReady() ? "Start Game" : "Syncing Map...",
                     canStart ? this::begin : null);
         }
@@ -531,29 +518,9 @@ final class LobbyScreen extends JPanel {
                 state.updateRequired() ? this::quitForUpdate : this::cancel);
     }
 
-    /** Whether Top vs Bottom has somebody to fight on both map-defined sides. */
-    private boolean bothTeamsHavePlayers(GameLobby.State state) {
-        LobbyTeams teams = lobbyTeams(state);
-        boolean top = false;
-        boolean bottom = false;
-        for (GameLobby.Slot slot : state.slots()) {
-            if (!slot.isPlaying()) {
-                continue;
-            }
-            if (teams.sideOf(slot.index()) == LobbyTeams.Side.TOP) {
-                top = true;
-            } else {
-                bottom = true;
-            }
-        }
-        return top && bottom;
-    }
-
     /** A compact, literal account of who will share sight and who will not. */
     private String teamSummary(GameLobby.State state) {
-        LobbyTeams teams = lobbyTeams(state);
-        List<String> top = new ArrayList<>();
-        List<String> bottom = new ArrayList<>();
+        Map<Integer, List<String>> teams = new LinkedHashMap<>();
         for (GameLobby.Slot slot : state.slots()) {
             if (!slot.isPlaying()) {
                 continue;
@@ -561,11 +528,13 @@ final class LobbyScreen extends JPanel {
             String name = slot.occupant() == GameLobby.Occupant.COMPUTER
                     ? "Computer" : slot.name();
             String member = name + " (" + PlayerColours.nameOf(slot.index()) + ")";
-            (teams.sideOf(slot.index()) == LobbyTeams.Side.TOP ? top : bottom).add(member);
+            teams.computeIfAbsent(slot.team(), ignored -> new ArrayList<>()).add(member);
         }
-        String topNames = top.isEmpty() ? "empty" : String.join(" + ", top);
-        String bottomNames = bottom.isEmpty() ? "empty" : String.join(" + ", bottom);
-        return "Top: " + topNames + " | Bottom: " + bottomNames + " | Shared sight ON";
+        List<String> summaries = new ArrayList<>();
+        for (Map.Entry<Integer, List<String>> team : teams.entrySet()) {
+            summaries.add("Team " + team.getKey() + ": " + String.join(" + ", team.getValue()));
+        }
+        return String.join(" | ", summaries) + " | Team chat and shared sight ON";
     }
 
     private void copyInvite() {
@@ -637,6 +606,13 @@ final class LobbyScreen extends JPanel {
                 RACE_WIDTH, ROW_HEIGHT - 8);
     }
 
+    /** Where a playing row's explicit team control is drawn. */
+    static Rectangle teamBounds(int index) {
+        return new Rectangle(TABLE_X + TEAM_COLUMN - 4,
+                TABLE_Y + index * (ROW_HEIGHT + ROW_GAP) + 4,
+                84, ROW_HEIGHT - 8);
+    }
+
     /** Where the Start button is. */
     static Rectangle startBounds() {
         return new Rectangle(TABLE_X, FOOT_Y, 160, FOOT_HEIGHT);
@@ -663,13 +639,9 @@ final class LobbyScreen extends JPanel {
         return false;
     }
 
-    /** Which colour slot occupies a visual row after team grouping. */
+    /** Which colour slot occupies a visual row. */
     int slotAtRowForTest(int row) {
-        GameLobby.State state = lobby.state();
-        List<GameLobby.Slot> slots = state.gameTemplate()
-                == GameLobby.GameTemplate.TOP_VS_BOTTOM
-                        ? lobbyTeams(state).arrange(state.slots()) : state.slots();
-        return slots.get(row).index();
+        return lobby.state().slots().get(row).index();
     }
 
     /** Lays the screen out without a window, so a test can look at it. */

@@ -3768,7 +3768,7 @@ final class GameScreen extends JPanel {
         if (allies.isEmpty()) {
             return "";
         }
-        // A Top-vs-Bottom lobby used to arrive at the map with no visible
+        // A team lobby used to arrive at the map with no visible
         // confirmation of what it had done. The first status line now states
         // the relationship the running simulation actually holds; if setup
         // loses the alliance, this line disappears with it.

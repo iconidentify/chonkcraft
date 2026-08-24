@@ -53,10 +53,10 @@ public final class GameLobby implements Closeable {
     /** Marks a packet as ours and pins the wire format. */
     private static final int MAGIC = 0x57474C59; // "WGLY"
 
-    // Version 6 carries the exact game build plus the authoritative game
-    // template. A different build is not allowed to receive a slot, map bytes
-    // or START: deterministic peers must run identical gameplay code.
-    private static final int VERSION = 6;
+    // Version 7 carries an explicit team number for every slot. A different
+    // build is not allowed to receive a slot, map bytes or START: deterministic
+    // peers must run identical gameplay code.
+    private static final int VERSION = 7;
 
     private static final int MAX_PACKET_BYTES = 1200;
 
@@ -103,12 +103,12 @@ public final class GameLobby implements Closeable {
         CLOSED
     }
 
-    /** The BNE game templates currently exposed by ChonkCraft's lobby. */
+    /** The game types currently exposed by ChonkCraft's lobby. */
     public enum GameTemplate {
         /** Ordinary opponents; in-game diplomacy can add alliances later. */
         MELEE("Melee"),
-        /** Players whose fixed starts are in the same vertical area form a team. */
-        TOP_VS_BOTTOM("Top vs Bottom");
+        /** The host assigns every player to a numbered team. */
+        TEAMS("Teams");
 
         private final String caption;
 
@@ -133,8 +133,9 @@ public final class GameLobby implements Closeable {
      * @param occupant who holds it
      * @param name     what they are called, empty unless a person holds it
      * @param race     "human" or "orc"
+     * @param team     the explicit team number, from 1 through 8
      */
-    public record Slot(int index, Occupant occupant, String name, String race) {
+    public record Slot(int index, Occupant occupant, String name, String race, int team) {
 
         /** Whether this slot participates in the simulated game. */
         public boolean isPlaying() {
@@ -161,6 +162,21 @@ public final class GameLobby implements Closeable {
         /** Whether admission stopped because this process cannot simulate the same game. */
         public boolean updateRequired() {
             return requiredBuild != null && !requiredBuild.isEmpty();
+        }
+
+        /** Whether the roster contains enough opponents for the selected mode. */
+        public boolean hasValidMatchup() {
+            List<Slot> playing = slots.stream().filter(Slot::isPlaying).toList();
+            if (playing.size() < 2) {
+                return false;
+            }
+            return gameTemplate != GameTemplate.TEAMS
+                    || playing.stream().map(Slot::team).distinct().count() >= 2;
+        }
+
+        /** Whether Start is currently a valid operation. */
+        public boolean canStart() {
+            return allPlayersReady && hasValidMatchup();
         }
     }
 
@@ -294,10 +310,12 @@ public final class GameLobby implements Closeable {
         lobby.mapReady = true;
         int room = Math.max(2, Math.min(8, capacity));
         for (int i = 0; i < room; i++) {
-            lobby.slots.add(new Slot(i, Occupant.OPEN, "", "human"));
+            // The useful default is cooperative humans versus computers.
+            // Teams are ignored in Melee, and the host can change any one.
+            lobby.slots.add(new Slot(i, Occupant.OPEN, "", "human", 1));
         }
         lobby.localSlot = 0;
-        lobby.slots.set(0, new Slot(0, Occupant.HUMAN, lobby.localName, "human"));
+        lobby.slots.set(0, new Slot(0, Occupant.HUMAN, lobby.localName, "human", 1));
         return lobby;
     }
 
@@ -509,7 +527,9 @@ public final class GameLobby implements Closeable {
             return false;
         }
         String name = occupant == Occupant.COMPUTER ? "Computer" : "";
-        slots.set(index, new Slot(index, occupant, name, slots.get(index).race()));
+        Slot slot = slots.get(index);
+        int team = occupant == Occupant.COMPUTER ? 2 : 1;
+        slots.set(index, new Slot(index, occupant, name, slot.race(), team));
         lastSent = 0;
         return true;
     }
@@ -521,12 +541,23 @@ public final class GameLobby implements Closeable {
         }
         String wanted = "orc".equalsIgnoreCase(race) ? "orc" : "human";
         Slot slot = slots.get(index);
-        slots.set(index, new Slot(index, slot.occupant(), slot.name(), wanted));
+        slots.set(index, new Slot(index, slot.occupant(), slot.name(), wanted, slot.team()));
         lastSent = 0;
         return true;
     }
 
-    /** Selects the synchronized BNE game template. Only the creator decides it. */
+    /** Assigns a player to a numbered team. Only the host may decide it. */
+    public synchronized boolean setTeam(int index, int team) {
+        if (!hosting || outside(index) || team < 1 || team > 8) {
+            return false;
+        }
+        Slot slot = slots.get(index);
+        slots.set(index, new Slot(index, slot.occupant(), slot.name(), slot.race(), team));
+        lastSent = 0;
+        return true;
+    }
+
+    /** Selects the synchronized game type. Only the creator decides it. */
     public synchronized boolean setGameTemplate(GameTemplate template) {
         if (!hosting || template == null) {
             return false;
@@ -539,8 +570,8 @@ public final class GameLobby implements Closeable {
     /**
      * Moves whoever is in one slot to another.
      *
-     * <p>Slot is colour and starting position both, so this is not cosmetic:
-     * it is how a host puts two players on the same side of a map.
+     * <p>Slot is colour and starting position both. Team is independent and
+     * follows the player, so choosing a colour cannot silently change sides.
      */
     public synchronized boolean move(int from, int to) {
         if (!hosting || from == to || outside(from) || outside(to)) {
@@ -553,8 +584,9 @@ public final class GameLobby implements Closeable {
         if (slots.get(to).occupant() != Occupant.OPEN) {
             return false;
         }
-        slots.set(to, new Slot(to, moving.occupant(), moving.name(), moving.race()));
-        slots.set(from, new Slot(from, Occupant.OPEN, "", moving.race()));
+        slots.set(to, new Slot(to, moving.occupant(), moving.name(), moving.race(),
+                moving.team()));
+        slots.set(from, new Slot(from, Occupant.OPEN, "", moving.race(), 1));
         SocketAddress where = addresses.remove(from);
         if (where != null) {
             addresses.put(to, where);
@@ -578,7 +610,7 @@ public final class GameLobby implements Closeable {
         if (slots.get(index).occupant() != Occupant.HUMAN) {
             return false;
         }
-        slots.set(index, new Slot(index, Occupant.OPEN, "", slots.get(index).race()));
+        slots.set(index, new Slot(index, Occupant.OPEN, "", slots.get(index).race(), 1));
         addresses.remove(index);
         lastHeard.remove(index);
         mapsReady.remove(index);
@@ -603,7 +635,7 @@ public final class GameLobby implements Closeable {
             if (!hosting || started) {
                 return;
             }
-            if (!everyHumanHasMap()) {
+            if (!everyHumanHasMap() || !state().hasValidMatchup()) {
                 return;
             }
             started = true;
@@ -628,7 +660,8 @@ public final class GameLobby implements Closeable {
             addresses.remove(index);
             mapsReady.remove(index);
             if (index > 0 && index < slots.size()) {
-                slots.set(index, new Slot(index, Occupant.OPEN, "", slots.get(index).race()));
+                slots.set(index, new Slot(index, Occupant.OPEN, "", slots.get(index).race(),
+                        1));
             }
             lastSent = 0;
         }
@@ -749,6 +782,7 @@ public final class GameLobby implements Closeable {
         for (Slot slot : slots) {
             buffer.put((byte) slot.occupant().ordinal());
             buffer.put((byte) ("orc".equals(slot.race()) ? 1 : 0));
+            buffer.put((byte) slot.team());
             byte[] name = trimmed(slot.name());
             buffer.put((byte) name.length);
             buffer.put(name);
@@ -758,7 +792,7 @@ public final class GameLobby implements Closeable {
     private synchronized byte[] encodeStart(int forSlot) {
         ByteBuffer buffer = packet(START);
         // START is the commit record, not merely a bell. Carrying the final
-        // slot/race snapshot prevents a fast host from starting before its
+        // slot/race/team snapshot prevents a fast host from starting before its
         // last ordinary STATE datagram reaches a client.
         putState(buffer, forSlot);
         return trim(buffer);
@@ -868,7 +902,7 @@ public final class GameLobby implements Closeable {
                 } else {
                     slots.set(free, new Slot(free, Occupant.HUMAN,
                             name == null || name.isBlank() ? "Player" : name,
-                            slots.get(free).race()));
+                            slots.get(free).race(), slots.get(free).team()));
                     addresses.put(free, from);
                     lastHeard.put(free, System.currentTimeMillis());
                     mapsReady.put(free, mapLength < 0);
@@ -920,7 +954,7 @@ public final class GameLobby implements Closeable {
         addresses.remove(seat);
         lastHeard.remove(seat);
         mapsReady.remove(seat);
-        slots.set(seat, new Slot(seat, Occupant.OPEN, "", slots.get(seat).race()));
+        slots.set(seat, new Slot(seat, Occupant.OPEN, "", slots.get(seat).race(), 1));
         lastSent = 0;
     }
 
@@ -1013,11 +1047,13 @@ public final class GameLobby implements Closeable {
         for (int i = 0; i < count; i++) {
             int occupant = in.get() & 0xFF;
             String race = (in.get() & 0xFF) == 1 ? "orc" : "human";
+            int team = in.get() & 0xFF;
             String name = readString(in);
             Occupant kind = occupant < Occupant.values().length
                     ? Occupant.values()[occupant]
                     : Occupant.OPEN;
-            heard.add(new Slot(i, kind, name == null ? "" : name, race));
+            heard.add(new Slot(i, kind, name == null ? "" : name, race,
+                    team >= 1 && team <= 8 ? team : 1));
         }
         localSlot = mySlot;
         remoteHostSlot = heardHostSlot;

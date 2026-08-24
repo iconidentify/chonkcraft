@@ -96,7 +96,7 @@ public final class SyncHash {
         for (Player player : world.players()) {
             hash = mix(hash, world.departedControlMask(player.index()));
             // Diplomacy and shared sight are simulation state too. A peer
-            // that missed the final Top-vs-Bottom template used to report the
+            // that missed the final explicit-team setup used to report the
             // same hash until the different target/fog decision happened to
             // alter a unit. Cover the tables at cycle zero so the network
             // names the setup divergence immediately.

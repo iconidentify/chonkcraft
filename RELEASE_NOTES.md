@@ -1,12 +1,11 @@
 # Explicit Multiplayer Teams and Reliable Worker Orders
 
-- Made **Top vs Bottom** literal: every lobby row names its map-defined team,
-  the summary names each occupied colour on both sides, and it says when shared
-  sight is on. Two adjacent-looking colour slots can no longer masquerade as a
-  team on maps whose starting positions alternate between north and south.
-- Top vs Bottom will not start with everybody on one side. The host can move
-  people, computers, or themselves between open colour/start slots, and the
-  battlefield opens by naming the human ally whose sight is actually shared.
+- Replaced **Top vs Bottom** with explicit numbered teams. The host assigns each
+  human or computer to Team 1–8 independently of colour and starting position;
+  moving somebody to a new colour preserves their team.
+- Teams mode starts whenever at least two occupied team numbers are present, so
+  two humans on Team 1 can play one or more computers on Team 2. The same team
+  assignment controls mutual alliances, shared sight, and private Team chat.
 - Strengthened the production multiplayer referee around the reported family
   setup: two separate game processes must place both humans on the same team,
   put one computer on the opposing team, attach its retail `ai.bin` profile,

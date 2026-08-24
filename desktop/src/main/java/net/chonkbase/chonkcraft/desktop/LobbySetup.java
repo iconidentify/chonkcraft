@@ -71,29 +71,26 @@ record LobbySetup(Path map, GameLobby lobby) {
     }
 
     /**
-     * Applies the selected BNE game template to the already-identical world.
+     * Applies the selected game type to the already-identical world.
      *
-     * <p>Top vs Bottom is defined by the map's fixed starting areas, not by
-     * race or the slot's unsorted row. The lobby draws the same
-     * {@link LobbyTeams} assignment used here, so moving a player between the
-     * displayed teams also changes the alliance and shared-vision tables that
-     * every peer starts with. Melee retains the world's ordinary opponent
-     * table.
+     * <p>In Teams mode the host's explicit team numbers are authoritative.
+     * Colour and starting position remain independent, so moving a player to a
+     * different colour cannot silently change their allies. Melee retains the
+     * world's ordinary opponent table.
      */
     void applyGameTemplate(World world, PudMap source) {
-        if (lobby.state().gameTemplate() != GameLobby.GameTemplate.TOP_VS_BOTTOM) {
+        if (lobby.state().gameTemplate() != GameLobby.GameTemplate.TEAMS) {
             return;
         }
         List<GameLobby.Slot> playing = lobby.state().slots().stream()
                 .filter(GameLobby.Slot::isPlaying)
                 .toList();
-        LobbyTeams teams = LobbyTeams.from(source, lobby.capacity());
         for (GameLobby.Slot player : playing) {
             for (GameLobby.Slot other : playing) {
                 if (player.index() == other.index()) {
                     continue;
                 }
-                boolean teammates = teams.together(player.index(), other.index());
+                boolean teammates = player.team() == other.team();
                 world.setAllied(player.index(), other.index(), teammates);
                 world.setSharedVision(player.index(), other.index(), teammates);
             }
