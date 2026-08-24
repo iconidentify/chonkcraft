@@ -2021,6 +2021,7 @@ final class BattleNetConstructionSystem {
                 world.markSight(worker, true);
             }
         }
+        world.completeTerrainWall(site);
         world.recalculateSupply();
     }
 

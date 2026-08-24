@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2642 tests,   27 skipped
-    no external input          2642 tests, 1061 skipped
+    authenticated inputs       2648 tests,   26 skipped
+    no external input          2648 tests, 1059 skipped
 
 Both can be green.
 
@@ -94,7 +94,7 @@ MODULES = (
 # Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
 # authenticated retail installation and derived pack.
 #
-# Twenty-seven skip on the current `full` runner. One is release-dependent and
+# Twenty-six skip on the current `full` runner. One is release-dependent and
 # is described at the `full` profile below.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
@@ -137,8 +137,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # they run in `full` and join this profile's skip inventory. The
         # production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1747, 744),
-        "desktop": (336, 258),
+        "engine": (1751, 744),
+        "desktop": (338, 256),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -151,21 +151,21 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # this project's FLAC and Ogg writers against the reference decoders. Both
     # CI jobs install them; see .github/workflows/tests.yml.
     #
-    # Re-measured 23 August 2026 against the authenticated retail installation
-    # and its derived pack. The twenty-seven that skip are: five
+    # Re-measured 24 August 2026 against the authenticated retail installation
+    # and its derived pack. The twenty-six that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
-    # tests in runtime and desktop, four fixture-sensitive checks, six custom-
+    # tests in runtime and desktop, four fixture-sensitive checks, five custom-
     # map referees whose maps are absent from the retail pack, three private
     # playtest-save referees, one opt-in production multiplayer smoke, and one
     # release-dependent test described below.
     #
-    # ONE OF THE TWENTY-SEVEN DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
+    # ONE OF THE TWENTY-SIX DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
     # is the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
-    # baseline is measured on Battle.net Edition, so that test runs. A classic
-    # Tides of Darkness installation skips it and reports one additional skip.
+    # baseline is measured on the mounted classic source, so that test skips. A
+    # Battle.net Edition source runs it and reports one fewer skip.
     # That is a correct release-dependent difference, not a regression. Nothing here can tell
     # the two apart, because the profile is a pair of numbers per module and
     # the release is not an input the profile knows about.
@@ -180,8 +180,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1747, 7),
-        "desktop": (336, 8),
+        "engine": (1751, 7),
+        "desktop": (338, 7),
         "matchmaker-server": (5, 1),
     },
 }

@@ -7882,6 +7882,48 @@ public final class World {
     }
 
     /**
+     * Removes a completed wall construction unit and leaves its map wall.
+     *
+     * <p>The construction site is targetable while it goes up, but a finished
+     * Warcraft II wall is terrain. Keeping the site in the unit table used to
+     * leave a one-tile building that neither joined wall runs nor entered the
+     * terrain damage path.
+     *
+     * @return whether the completed type was one of BNE's two wall types
+     */
+    boolean completeTerrainWall(Unit site) {
+        if (site == null || site.type() == null) {
+            return false;
+        }
+        String ident = site.type().ident();
+        boolean human = "unit-human-wall".equals(ident);
+        if (!human && !"unit-orc-wall".equals(ident)) {
+            return false;
+        }
+
+        int x = site.tileX();
+        int y = site.tileY();
+        int hitPoints = Math.max(1, site.type().hitPoints());
+        markOccupancy(site, false);
+        markSight(site, false);
+        unregisterPlayerUnit(site);
+        site.clearPath();
+        site.clearQueuedOrders();
+        site.setTarget(null);
+        site.setSelected(false);
+        site.setRemoved(true);
+        site.setOrder(Unit.Order.DYING);
+        site.setDeathTimer(0);
+        map.setWall(x, y, human, hitPoints);
+        if (approximateUnitRefs(site) > 1) {
+            site.setDestroyed(true);
+        } else {
+            releaseUnitFromActionTable(site);
+        }
+        return true;
+    }
+
+    /**
      * Puts back the thing a destroyed building had been founded on top of.
      *
      * <p>Implements the tail of {@code UnitLost},

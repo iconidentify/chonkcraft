@@ -82,6 +82,7 @@ final class CommandPanel {
     private final GameData.Interface ui;
     private final net.chonkbase.chonkcraft.engine.upgrade.DependencyRules dependencies;
     private final int localPlayer;
+    private final boolean networked;
 
     /** The icon sheet for this tileset, one 46 by 38 cell per frame. */
     private final BufferedImage icons;
@@ -109,7 +110,7 @@ final class CommandPanel {
             net.chonkbase.chonkcraft.engine.upgrade.DependencyRules dependencies,
             int localPlayer, String tilesetName, String race,
             java.util.Map<String, net.chonkbase.chonkcraft.engine.unit.UnitType> types) {
-        this(world, data, ui, dependencies, localPlayer, tilesetName, race, types, null);
+        this(world, data, ui, dependencies, localPlayer, tilesetName, race, types, null, false);
     }
 
     CommandPanel(World world, GameData data, GameData.Interface ui,
@@ -117,6 +118,16 @@ final class CommandPanel {
             int localPlayer, String tilesetName, String race,
             java.util.Map<String, net.chonkbase.chonkcraft.engine.unit.UnitType> types,
             net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout layout) {
+        this(world, data, ui, dependencies, localPlayer, tilesetName, race, types,
+                layout, false);
+    }
+
+    CommandPanel(World world, GameData data, GameData.Interface ui,
+            net.chonkbase.chonkcraft.engine.upgrade.DependencyRules dependencies,
+            int localPlayer, String tilesetName, String race,
+            java.util.Map<String, net.chonkbase.chonkcraft.engine.unit.UnitType> types,
+            net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout layout,
+            boolean networked) {
         java.util.List<net.chonkbase.chonkcraft.engine.ui.UiLayout.Box> positions =
                 new java.util.ArrayList<>();
         if (layout != null && layout.buttons().size() == 9) {
@@ -140,6 +151,7 @@ final class CommandPanel {
         this.ui = ui;
         this.dependencies = dependencies;
         this.localPlayer = localPlayer;
+        this.networked = networked;
         this.race = race == null || race.isBlank() ? "human" : race.toLowerCase(java.util.Locale.ROOT);
 
         // The small face, because a hotkey letter shares a 46 pixel icon with
@@ -386,11 +398,11 @@ final class CommandPanel {
     private net.chonkbase.chonkcraft.engine.ui.ButtonSet.Availability availability(Unit selected) {
         java.util.List<Unit> chosen = selection();
         if (chosen.size() <= 1) {
-            return new ButtonAvailability(world, selected, dependencies, false);
+            return new ButtonAvailability(world, selected, dependencies, networked);
         }
         java.util.List<ButtonAvailability> each = new java.util.ArrayList<>();
         for (Unit unit : chosen) {
-            each.add(new ButtonAvailability(world, unit, dependencies, false));
+            each.add(new ButtonAvailability(world, unit, dependencies, networked));
         }
         return button -> each.stream().allMatch(check -> check.test(button));
     }

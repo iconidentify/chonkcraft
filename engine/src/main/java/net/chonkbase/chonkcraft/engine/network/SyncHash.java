@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine.network;
 
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.map.MapField;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 
@@ -17,8 +18,8 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
  * <p>What goes into the hash is a judgement. It must cover everything the
  * simulation decides, so a divergence is caught, and nothing that is merely
  * presentational, or two machines with different window sizes would appear to
- * disagree. So: unit positions, health, orders and ownership, and the players'
- * banks. Not animation frames, not the camera, not sound.
+ * disagree. So: terrain state, unit positions, health, orders and ownership,
+ * and the players' banks. Not animation frames, not the camera, not sound.
  */
 public final class SyncHash {
 
@@ -39,6 +40,17 @@ public final class SyncHash {
         hash = mix(hash, world.cycle());
         hash = mix(hash, world.randomSeed());
         hash = mix(hash, world.randomDraws());
+
+        hash = mix(hash, world.map().width());
+        hash = mix(hash, world.map().height());
+        for (int y = 0; y < world.map().height(); y++) {
+            for (int x = 0; x < world.map().width(); x++) {
+                MapField field = world.map().field(x, y);
+                hash = mix(hash, field.tile());
+                hash = mix(hash, field.flags());
+                hash = mix(hash, field.value());
+            }
+        }
 
         // Units in list order, which is creation order and therefore the same
         // on every machine.

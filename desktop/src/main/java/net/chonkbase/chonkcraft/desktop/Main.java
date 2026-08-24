@@ -1896,7 +1896,7 @@ public final class Main {
         CommandPanel commands = new CommandPanel(world, data, data.userInterface(tilesetName),
                 mission == null ? data.upgrades().dependencies() : mission.dependencies(),
                 localPlayer, tilesetName, race,
-                data.unitTypes().types(), layout);
+                data.unitTypes().types(), layout, network != null);
 
         // Every order goes through the applier, in single player as well as
         // multiplayer, so the two share one path and cannot drift apart.

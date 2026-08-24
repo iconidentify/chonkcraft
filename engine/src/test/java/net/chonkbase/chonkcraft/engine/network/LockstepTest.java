@@ -601,6 +601,20 @@ class LockstepTest {
     }
 
     @Test
+    @DisplayName("the multiplayer hash covers destructible and constructed terrain")
+    void theHashCoversTerrainChanges() {
+        World first = battlefield();
+        World second = battlefield();
+        assertEquals(SyncHash.of(first), SyncHash.of(second));
+
+        second.map().field(0, 0).addFlags(TileFlag.WALL | TileFlag.UNPASSABLE);
+        second.map().field(0, 0).setValue(GameMap.WALL_HIT_POINTS);
+
+        assertNotEquals(SyncHash.of(first), SyncHash.of(second),
+                "a wall present on only one peer must be reported as a desync");
+    }
+
+    @Test
     void theHashCoversTheSynchronizedRandomStream() {
         World first = battlefield();
         World second = battlefield();

@@ -126,6 +126,37 @@ public final class GameMap {
     public static final int WALL_HIT_POINTS = 40;
 
     /**
+     * Replaces a completed wall site with the terrain square BNE fights over.
+     *
+     * <p>Walls used to finish as ordinary one-tile buildings. That made the
+     * multiplayer-only build command incomplete: the result did not join its
+     * neighbours and the terrain damage path could never hit it. A finished
+     * segment carries its hit points in the map field, redraws itself from the
+     * four matching-race neighbours, and makes those neighbours redraw too.
+     */
+    public void setWall(int x, int y, boolean human, int maxHitPoints) {
+        MapField field = fieldOrNull(x, y);
+        if (field == null) {
+            return;
+        }
+        int hitPoints = Math.max(1, maxHitPoints);
+        long occupancy = field.flags() & OCCUPANCY_FLAGS;
+        int code = tileset.wallTileCodeFor(human, 0, hitPoints, hitPoints, field.tile());
+        repaintTile(field, x, y, code);
+        long terrain = tileset.flagsFor(code) & ~OCCUPANCY_FLAGS;
+        terrain |= TileFlag.LAND_ALLOWED | TileFlag.WALL | TileFlag.UNPASSABLE;
+        if (human) {
+            terrain |= TileFlag.HUMAN;
+        } else {
+            terrain &= ~TileFlag.HUMAN;
+        }
+        field.setFlags(terrain | occupancy);
+        field.setValue(hitPoints);
+        fixWallTile(x, y, hitPoints);
+        fixWallNeighbours(x, y, hitPoints);
+    }
+
+    /**
      * Takes a piece out of a wall, and the wall itself once it is spent.
      *
      * <p>{@code CMap::HitWall},, plus the
