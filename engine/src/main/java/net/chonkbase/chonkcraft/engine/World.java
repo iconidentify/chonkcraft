@@ -359,6 +359,11 @@ public final class World {
         return harvest.orderHarvest(worker, tileX, tileY);
     }
 
+    /** Applies a Harvest command whose wire kind already resolved the click. */
+    public boolean orderHarvestCommand(Unit worker, int tileX, int tileY) {
+        return harvest.orderHarvestCommand(worker, tileX, tileY);
+    }
+
     /** Quiet visits a player harvest or move click waits before the walk. */
     public int playerCommandDelay(Unit unit) {
         return movement.playerCommandDelay(unit);
@@ -4580,6 +4585,32 @@ public final class World {
             }
         }
         return false;
+    }
+
+    /**
+     * How a square should be drawn, counting the eyes and memories of everyone
+     * who shares vision with this player.
+     *
+     * <p>Implements {@code CMapFieldPlayerInfo::TeamVisibilityState}: current
+     * sight wins, then any explored memory, then unexplored. Keeping this next
+     * to {@link #isVisibleTo(int, int, int)} gives the field and minimap one
+     * answer; using {@link FogOfWar#visibility(int, int, int)} directly is a
+     * local-player query and makes allied ground stay black on the minimap.
+     */
+    public FogOfWar.Visibility visibilityTo(int player, int x, int y) {
+        if (isVisibleTo(player, x, y)) {
+            return FogOfWar.Visibility.VISIBLE;
+        }
+        if (fog.isExplored(player, x, y)) {
+            return FogOfWar.Visibility.EXPLORED;
+        }
+        for (int other = 0; other < Player.MAX; other++) {
+            if (other != player && sharesVisionWith(player, other)
+                    && fog.isExplored(other, x, y)) {
+                return FogOfWar.Visibility.EXPLORED;
+            }
+        }
+        return FogOfWar.Visibility.UNEXPLORED;
     }
 
     public boolean isVisibleTo(int player, Unit unit) {
@@ -9514,7 +9545,7 @@ public final class World {
                 case ATTACK -> orderAttack(unit, queued.target());
                 case HARVEST -> queued.target() != null
                         ? harvest.orderHarvest(unit, queued.target())
-                        : harvest.orderHarvest(unit, queued.x(), queued.y());
+                        : harvest.orderHarvestCommand(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());
                 case CAST -> queued.target() != null
                         ? orderCast(unit, queued.value(), queued.target())

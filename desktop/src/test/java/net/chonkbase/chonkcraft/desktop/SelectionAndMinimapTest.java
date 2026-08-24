@@ -12,6 +12,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.graphic.IndexedImage;
 import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.data.source.InstallSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.Player;
@@ -68,8 +69,22 @@ class SelectionAndMinimapTest {
         return new GameData(install);
     }
 
+    private static GameData packedData() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set -Dchonkcraft.pack=... or wc2.install.dir.");
+        return new GameData(assets);
+    }
+
     private static Scene scene() {
-        GameData data = data();
+        return scene(true);
+    }
+
+    private static Scene scene(boolean revealMap) {
+        return scene(data(), revealMap);
+    }
+
+    private static Scene scene(GameData data, boolean revealMap) {
         PudMap pud = data.campaignMap(MAP);
         Assumptions.assumeTrue(pud != null, "no campaign map available");
         var tileset = data.loadTileset(pud.tileset());
@@ -77,7 +92,9 @@ class SelectionAndMinimapTest {
         world.setUnitTypes(data.unitTypes().types());
         world.setUpgrades(data.upgrades().upgrades());
         world.setMissileTypes(data.missiles().types());
-        world.fog().revealAll(0);
+        if (revealMap) {
+            world.fog().revealAll(0);
+        }
         String tilesetName = pud.tileset() == PudMap.Tileset.FOREST
                 ? "summer"
                 : pud.tileset().name().toLowerCase(java.util.Locale.ROOT);
@@ -104,6 +121,169 @@ class SelectionAndMinimapTest {
         screen.setLayout((UiLayout.Layout) null);
         screen.setGameScale(1);
         return new Scene(screen, panel, commands, world, layout, data);
+    }
+
+    @Test
+    @DisplayName("the minimap reveals ground seen only through a teammate's eyes")
+    void theMinimapUsesSharedTeamSight() {
+        Scene scene = scene(packedData(), false);
+        var box = scene.layout().minimap();
+        int mapX = scene.world().map().width() * 3 / 4;
+        int mapY = scene.world().map().height() * 3 / 4;
+
+        // Isolate the rendering seam: no unit dot is involved, only player
+        // one's live fog count over ground player zero has never explored.
+        scene.world().fog().addSight(1, mapX, mapY, 1, 1, 3);
+        assertEquals(net.chonkbase.chonkcraft.engine.map.FogOfWar.Visibility.UNEXPLORED,
+                scene.world().fog().visibility(0, mapX, mapY));
+        BufferedImage privateMap = paintPanel(scene);
+
+        scene.world().setSharedVision(0, 1, true);
+        assertTrue(scene.world().isVisibleTo(0, mapX, mapY),
+                "the world view has not accepted the teammate's sight");
+        BufferedImage teamMap = paintPanel(scene);
+
+        int changed = 0;
+        for (int y = box.y(); y < box.y() + box.width(); y++) {
+            for (int x = box.x(); x < box.x() + box.width(); x++) {
+                if (privateMap.getRGB(x, y) != teamMap.getRGB(x, y)) {
+                    changed++;
+                }
+            }
+        }
+        assertTrue(changed > 20,
+                "sharing a teammate's live sight changed only " + changed
+                        + " minimap pixels: the minimap is still reading local fog alone");
+
+        // When the teammate walks away, their explored memory remains shared
+        // and becomes the minimap's lighter remembered veil rather than going
+        // all the way back to never-seen black.
+        scene.world().fog().removeSight(1, mapX, mapY, 1, 1, 3);
+        assertEquals(net.chonkbase.chonkcraft.engine.map.FogOfWar.Visibility.EXPLORED,
+                scene.world().visibilityTo(0, mapX, mapY));
+        BufferedImage teamMemory = paintPanel(scene);
+        int remembered = 0;
+        int dimmed = 0;
+        for (int y = box.y(); y < box.y() + box.width(); y++) {
+            for (int x = box.x(); x < box.x() + box.width(); x++) {
+                if (privateMap.getRGB(x, y) != teamMemory.getRGB(x, y)) {
+                    remembered++;
+                }
+                if (teamMap.getRGB(x, y) != teamMemory.getRGB(x, y)) {
+                    dimmed++;
+                }
+            }
+        }
+        assertTrue(remembered > 20,
+                "the teammate's explored ground disappeared from the minimap");
+        assertTrue(dimmed > 20,
+                "live teammate sight and remembered teammate ground draw identically");
+    }
+
+    @Test
+    @DisplayName("two allied sight fields join without triangular fog seams")
+    void alliedSightFieldsJoinWithoutTriangularFogSeams() {
+        Scene scene = scene(packedData(), false);
+        var tileset = scene.data().loadTileset(PudMap.Tileset.FOREST);
+        scene.screen().setFogTiles(FogTiles.from(
+                tileset.sheet(), scene.data().fogOfWar().levels()));
+        scene.world().setSharedVision(0, 1, true);
+        int splitX = 7;
+        int toX = Math.min(11, scene.world().map().width() - 1);
+        int toY = Math.min(16, scene.world().map().height() - 1);
+        for (int y = 0; y <= toY; y++) {
+            for (int x = 0; x <= toX; x++) {
+                scene.world().fog().addSight(x <= splitX ? 0 : 1,
+                        x, y, 1, 1, 0);
+            }
+        }
+        BufferedImage allied = paintWorld(scene.screen());
+
+        // The effective picture must not change when the local player's own
+        // counts replace the teammate's half of the exact same visible area.
+        // Local-only corner masks used to change hundreds of pixels here into
+        // the black wedges visible in the multiplayer screenshots.
+        for (int y = 0; y <= toY; y++) {
+            for (int x = splitX + 1; x <= toX; x++) {
+                scene.world().fog().addSight(0, x, y, 1, 1, 0);
+            }
+        }
+        BufferedImage local = paintWorld(scene.screen());
+        int changed = 0;
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                if (allied.getRGB(x, y) != local.getRGB(x, y)) {
+                    changed++;
+                }
+            }
+        }
+        assertEquals(0, changed,
+                "replacing allied sight with identical local sight changed " + changed
+                        + " pixels, so the renderer still has a local-only fog seam");
+    }
+
+    private static BufferedImage paintPanel(Scene scene) {
+        BufferedImage frame = new BufferedImage(WIDTH, HEIGHT, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2 = frame.createGraphics();
+        scene.panel().draw(g2, WIDTH, HEIGHT, null, 0, 0, WIDTH, HEIGHT);
+        g2.dispose();
+        return frame;
+    }
+
+    @Test
+    @DisplayName("Option-click pings the field and minimap with one restrained sound")
+    void optionClickPingsWithoutSoundSpam() {
+        Scene scene = scene(packedData(), true);
+        var box = scene.layout().minimap();
+        BufferedImage quietMap = paintPanel(scene);
+        long quietSounds = scene.screen().soundChoicesForTest();
+
+        java.awt.event.MouseEvent optionClick = new java.awt.event.MouseEvent(scene.screen(),
+                java.awt.event.MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(),
+                java.awt.event.InputEvent.BUTTON1_DOWN_MASK
+                        | java.awt.event.InputEvent.ALT_DOWN_MASK,
+                WIDTH / 2, HEIGHT / 2, 1, false,
+                java.awt.event.MouseEvent.BUTTON1);
+        for (var listener : scene.screen().getMouseListeners()) {
+            listener.mousePressed(optionClick);
+        }
+
+        assertEquals(1, scene.world().pings().size(),
+                "Option-click did not issue the synchronized map ping");
+        scene.screen().playAnnouncements();
+        assertEquals(quietSounds + 1, scene.screen().soundChoicesForTest(),
+                "the arriving ping made no sound");
+        scene.screen().playAnnouncements();
+        assertEquals(quietSounds + 1, scene.screen().soundChoicesForTest(),
+                "one ping sounded again on the next presentation pass");
+
+        BufferedImage pingMap = paintPanel(scene);
+        int changed = 0;
+        for (int y = box.y(); y < box.y() + box.width(); y++) {
+            for (int x = box.x(); x < box.x() + box.width(); x++) {
+                if (quietMap.getRGB(x, y) != pingMap.getRGB(x, y)) {
+                    changed++;
+                }
+            }
+        }
+        assertTrue(changed > 4,
+                "the synchronized ping changed only " + changed + " minimap pixels");
+
+        // Visual messages are never discarded, but teammates leaning on the
+        // key cannot turn the notification into an audio alarm.
+        scene.world().addPing(1, 2, 2);
+        scene.screen().playAnnouncements();
+        assertEquals(quietSounds + 1, scene.screen().soundChoicesForTest(),
+                "a second ping inside the cooldown produced another sound");
+        for (int cycle = 0; cycle < GameScreen.PING_SOUND_COOLDOWN; cycle++) {
+            scene.world().tick();
+        }
+        scene.world().addPing(1, 3, 3);
+        scene.screen().playAnnouncements();
+        assertEquals(quietSounds + 2, scene.screen().soundChoicesForTest(),
+                "the ping chime stayed suppressed after its cooldown");
+        assertEquals(3, scene.world().pings().size(),
+                "audio throttling discarded a visual ping");
     }
 
     private static BufferedImage paintWorld(GameScreen screen) {

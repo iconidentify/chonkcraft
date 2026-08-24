@@ -115,4 +115,77 @@ class BnePhysicalAdapterTest {
         assertTrue(six.contains("\"order\":\"MOVE\""),
                 "retail promotes the queued Move at cycle 6, not " + six);
     }
+
+    @Test
+    @DisplayName("an xhuman 2 wood click dest-spreads five retail harvest wires")
+    void anXhuman2WoodClickDestSpreadsFiveRetailHarvestWires() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-physical-xhuman02-wood-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("evidence.json");
+        Map<String, Object> scenario = Json.parseObject("""
+                {
+                  "schema": "chonkcraft-bne-physical-scenario-1",
+                  "setup": {
+                    "scenario": "Campaign\\\\XHuman\\\\2XHum02.pud",
+                    "seed": 1,
+                    "java_map": "campaigns/human-exp/levelx02h"
+                  },
+                  "select": [
+                    {"native_id": 1496, "player": 1, "x": 2, "y": 123},
+                    {"native_id": 1497, "player": 1, "x": 4, "y": 123},
+                    {"native_id": 1498, "player": 1, "x": 3, "y": 122},
+                    {"native_id": 1499, "player": 1, "x": 1, "y": 122},
+                    {"native_id": 1500, "player": 1, "x": 2, "y": 121}
+                  ],
+                  "gesture": {
+                    "origin": "field",
+                    "detail": "right-click",
+                    "tile_x": 13,
+                    "tile_y": 123,
+                    "modifiers": "plain"
+                  },
+                  "issue_cycle": 5,
+                  "cycles": 20
+                }
+                """);
+        Files.writeString(scenarioPath, Json.write(scenario), StandardCharsets.UTF_8);
+
+        BnePhysicalAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "a".repeat(64),
+        });
+
+        Map<String, Object> evidence = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        Map<Integer, Integer> javaToNative = new java.util.LinkedHashMap<>();
+        Map<?, ?> identities = (Map<?, ?>) evidence.get("unit_identities");
+        for (Object item : (List<?>) identities.get("units")) {
+            Map<?, ?> row = (Map<?, ?>) item;
+            javaToNative.put(((Number) row.get("local_id")).intValue(),
+                    ((Number) row.get("native_id")).intValue());
+        }
+        Map<Integer, String> destinations = new java.util.LinkedHashMap<>();
+        for (Object item : (List<?>) evidence.get("player_intents")) {
+            Object body = ((Map<?, ?>) item).get("command");
+            if (!(body instanceof Map<?, ?> command)) {
+                continue;
+            }
+            int localId = ((Number) command.get("unit_id")).intValue();
+            assertEquals(Boolean.TRUE, ((Map<?, ?>) item).get("accepted"),
+                    "every authenticated harvest wire must enter the simulation");
+            destinations.put(javaToNative.get(localId),
+                    command.get("kind") + "@" + command.get("x") + ',' + command.get("y"));
+        }
+        assertEquals(Map.of(
+                1496, "HARVEST@13,124",
+                1497, "HARVEST@15,124",
+                1498, "HARVEST@14,123",
+                1499, "HARVEST@12,123",
+                1500, "HARVEST@13,122"), destinations,
+                "authenticated fixture bbae3ba6489f6f31bb1386c21a62ed100a6a7b8a2b3f9a2b7b032b483361b995"
+                        + " dest-spreads all five workers without changing Harvest to Move");
+    }
 }

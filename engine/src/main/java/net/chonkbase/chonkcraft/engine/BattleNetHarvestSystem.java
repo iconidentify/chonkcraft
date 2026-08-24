@@ -105,6 +105,42 @@ final class BattleNetHarvestSystem {
         return false;
     }
 
+    /**
+     * Applies an already-authored action-23 wire command.
+     *
+     * <p>The command kind records what the original click meant. Retail
+     * dest-spreads its coordinates only after choosing Harvest, so a compact
+     * formation can legitimately send action 23 to bare ground beside the
+     * clicked trees. MoveToResource_Terrain then finds the forest around that
+     * point. Revalidating the spread coordinate as though it were a new click
+     * rejected two of XHuman 2's five authenticated group wires.</p>
+     */
+    boolean orderHarvestCommand(Unit worker, int tileX, int tileY) {
+        if (worker == null || worker.type() == null) {
+            return false;
+        }
+        Unit.Order beforeHarvest = worker.order();
+        if (orderHarvest(worker, tileX, tileY)) {
+            return true;
+        }
+        if (!worker.type().canGather() || !worker.isAlive()
+                || world.map.fieldOrNull(tileX, tileY) == null) {
+            return false;
+        }
+        ResourceInfo wood = worker.type().gathering().get(UnitType.Resource.WOOD);
+        if (wood == null) {
+            return false;
+        }
+        if (world.battleNetDepotReadyDispatching()) {
+            return queueDepotHarvest(worker, wood, null, tileX, tileY);
+        }
+        if (!beginHarvest(worker, wood, null, tileX, tileY)) {
+            return false;
+        }
+        worker.rememberActionBeforeQueued(beforeHarvest);
+        return true;
+    }
+
 
     /**
      * Sends a worker to a resource unit already selected by the AI finder.

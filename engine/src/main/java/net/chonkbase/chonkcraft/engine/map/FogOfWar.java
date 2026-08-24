@@ -269,6 +269,19 @@ public final class FogOfWar {
     }
 
     /**
+     * Team-aware form of {@link #fogFrame(int, int, int)}.
+     *
+     * <p>Retail {@code CFogOfWar::GetFogTile} asks
+     * {@code CMapFieldPlayerInfo::TeamVisibilityState} for every neighbour.
+     * The lookup therefore has to be the same combined view used to decide
+     * whether the centre tile is lit; mixing a team centre with local-only
+     * neighbours cuts black triangular masks into the seam between allies.</p>
+     */
+    public int fogFrame(int x, int y, VisibilityLookup lookup) {
+        return frame(x, y, false, lookup);
+    }
+
+    /**
      * The same, for the boundary between explored ground and ground never
      * seen at all.
      *
@@ -277,6 +290,17 @@ public final class FogOfWar {
      */
     public int blackFrame(int player, int x, int y) {
         return frame(player, x, y, true);
+    }
+
+    /** Team-aware form of {@link #blackFrame(int, int, int)}. */
+    public int blackFrame(int x, int y, VisibilityLookup lookup) {
+        return frame(x, y, true, lookup);
+    }
+
+    /** Supplies the effective visibility state used to choose a fog mask. */
+    @FunctionalInterface
+    public interface VisibilityLookup {
+        Visibility visibility(int x, int y);
     }
 
     /**
@@ -292,6 +316,12 @@ public final class FogOfWar {
     };
 
     private int frame(int player, int x, int y, boolean unexploredOnly) {
+        return frame(x, y, unexploredOnly,
+                (tileX, tileY) -> visibility(player, tileX, tileY));
+    }
+
+    private int frame(int x, int y, boolean unexploredOnly,
+            VisibilityLookup lookup) {
         int index = 0;
         boolean hasNorth = y > 0;
         boolean hasSouth = y < height - 1;
@@ -299,30 +329,30 @@ public final class FogOfWar {
         boolean hasEast = x < width - 1;
 
         if (hasNorth) {
-            if (hasWest && covered(player, x - 1, y - 1, unexploredOnly)) {
+            if (hasWest && covered(lookup, x - 1, y - 1, unexploredOnly)) {
                 index |= 2;
             }
-            if (covered(player, x, y - 1, unexploredOnly)) {
+            if (covered(lookup, x, y - 1, unexploredOnly)) {
                 index |= 3;
             }
-            if (hasEast && covered(player, x + 1, y - 1, unexploredOnly)) {
+            if (hasEast && covered(lookup, x + 1, y - 1, unexploredOnly)) {
                 index |= 1;
             }
         }
-        if (hasWest && covered(player, x - 1, y, unexploredOnly)) {
+        if (hasWest && covered(lookup, x - 1, y, unexploredOnly)) {
             index |= 10;
         }
-        if (hasEast && covered(player, x + 1, y, unexploredOnly)) {
+        if (hasEast && covered(lookup, x + 1, y, unexploredOnly)) {
             index |= 5;
         }
         if (hasSouth) {
-            if (hasWest && covered(player, x - 1, y + 1, unexploredOnly)) {
+            if (hasWest && covered(lookup, x - 1, y + 1, unexploredOnly)) {
                 index |= 8;
             }
-            if (covered(player, x, y + 1, unexploredOnly)) {
+            if (covered(lookup, x, y + 1, unexploredOnly)) {
                 index |= 12;
             }
-            if (hasEast && covered(player, x + 1, y + 1, unexploredOnly)) {
+            if (hasEast && covered(lookup, x + 1, y + 1, unexploredOnly)) {
                 index |= 4;
             }
         }
@@ -337,8 +367,11 @@ public final class FogOfWar {
      * two different accumulators. Unexplored ground is also not visible, so
      * the visible test alone covers both.
      */
-    private boolean covered(int player, int x, int y, boolean unexploredOnly) {
-        return unexploredOnly ? !isExplored(player, x, y) : !isVisible(player, x, y);
+    private static boolean covered(VisibilityLookup lookup,
+            int x, int y, boolean unexploredOnly) {
+        Visibility seen = lookup.visibility(x, y);
+        return unexploredOnly ? seen == Visibility.UNEXPLORED
+                : seen != Visibility.VISIBLE;
     }
 
     /** Reveals the whole map to a player, as the reveal-map cheat does. */

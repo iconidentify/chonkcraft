@@ -2421,8 +2421,13 @@ final class GameScreen extends JPanel {
 
     private void playNamedAt(String name,
             java.util.function.IntUnaryOperator pick, float pan) {
+        playNamedAt(name, pick, pan, 0f);
+    }
+
+    private void playNamedAt(String name,
+            java.util.function.IntUnaryOperator pick, float pan, float gainDb) {
         if (audio != null) {
-            audio.playNamedAt(name, pick, pan);
+            audio.playNamedAt(name, pick, pan, gainDb);
         } else {
             pick.applyAsInt(1);
         }
@@ -3081,8 +3086,20 @@ final class GameScreen extends JPanel {
             if (setRallyPoint(unit, tileX, tileY)) {
                 continue;
             }
-            String said = rightClick(unit, spread.destX(unit, tileX),
-                    spread.destY(unit, tileY), under, keys);
+            int destX = spread.destX(unit, tileX);
+            int destY = spread.destY(unit, tileY);
+            // DoRightButton decides that a ground click is Harvest from the
+            // square under the pointer, then dest-spreads the wire coordinate
+            // for each selected worker. Some spread squares need not contain
+            // trees. XHuman 2's sealed five-peasant click on 13,123 sends
+            // Harvest to 12,123 and 13,122 even though both are bare ground;
+            // deciding again at those per-unit squares turned them into Move
+            // and left the compact crew funnelling through one approach.
+            String said = under == null && world.canHarvestAt(unit, tileX, tileY)
+                    ? issueStatus(GameCommand.harvest(
+                            localPlayer, unit.id(), destX, destY)
+                            .withQueued(keys.shift()))
+                    : rightClick(unit, destX, destY, under, keys);
             if (said == null) {
                 // This kind of unit does not take orders.
                 continue;
@@ -4323,8 +4340,19 @@ final class GameScreen extends JPanel {
      */
     private void ping(int tileX, int tileY) {
         commands.issue(GameCommand.ping(localPlayer, tileX, tileY));
-        playUi("click");
     }
+
+    /** Half a second: enough separation to read as a signal, not an alarm. */
+    static final int PING_SOUND_COOLDOWN = World.CYCLES_PER_SECOND / 2;
+
+    /** The message chime is already gentle; six decibels down keeps it below combat. */
+    private static final float PING_SOUND_GAIN_DB = -6f;
+
+    /** Pings already offered to this screen's local sound policy. */
+    private final java.util.Set<World.Ping> heardPings = new java.util.HashSet<>();
+
+    /** Simulation cycle of the last audible ping, or the sentinel before any. */
+    private long lastPingSoundCycle = Long.MIN_VALUE;
 
     /** The four arrows, which always scroll and are never a command. */
     private static boolean isArrowKey(int code) {
@@ -4397,6 +4425,7 @@ final class GameScreen extends JPanel {
      * on a busy map would be unlistenable.
      */
     void playAnnouncements() {
+        playPingAnnouncements();
         for (var notice : world.drainAttackNotices()) {
             Unit unit = notice.unit();
             if (!world.canControl(localPlayer, unit.player())) {
@@ -4462,6 +4491,36 @@ final class GameScreen extends JPanel {
             }
         }
         hammerAwayAtBuildingSites();
+    }
+
+    /**
+     * Sounds newly arrived map pings once on this machine.
+     *
+     * <p>The marker itself is synchronized simulation state and is never
+     * throttled. Sound is local presentation: several pings inside half a
+     * second collapse to one restrained chime, while all their rings remain
+     * visible on the field and minimap. The newest arrival supplies the stereo
+     * direction, so an off-screen ping gently points toward the place to look.
+     */
+    private void playPingAnnouncements() {
+        java.util.List<World.Ping> current = world.pings();
+        heardPings.retainAll(current);
+        World.Ping newest = null;
+        for (World.Ping ping : current) {
+            if (heardPings.add(ping)) {
+                newest = ping;
+            }
+        }
+        if (newest == null) {
+            return;
+        }
+        long since = world.cycle() - lastPingSoundCycle;
+        if (lastPingSoundCycle != Long.MIN_VALUE && since < PING_SOUND_COOLDOWN) {
+            return;
+        }
+        lastPingSoundCycle = world.cycle();
+        playNamedAt("chat-message", this::chooseSample, panOf(newest.tileX()),
+                PING_SOUND_GAIN_DB);
     }
 
     /**
@@ -4553,6 +4612,13 @@ final class GameScreen extends JPanel {
     private float panOf(Unit unit) {
         int width = Math.max(1, visibleWorldWidth());
         int x = unit.pixelX() - cameraX;
+        return Math.max(-1f, Math.min(1f, (x - width / 2f) / (width / 2f)));
+    }
+
+    /** Stereo direction of a map tile, including places outside the view. */
+    private float panOf(int tileX) {
+        int width = Math.max(1, visibleWorldWidth());
+        int x = tileX * TILE + TILE / 2 - cameraX;
         return Math.max(-1f, Math.min(1f, (x - width / 2f) / (width / 2f)));
     }
 
@@ -5127,6 +5193,11 @@ final class GameScreen extends JPanel {
      * original's does. Filling squares instead -- which is what this did --
      * produces exactly the staircase the player is looking at.
      *
+     * <p>The visibility state and all eight neighbours used for each fringe
+     * frame include everyone sharing vision with the local player. They used
+     * to disagree at the seam: a team-visible centre with local-only corner
+     * masks produced the black triangular cutouts between allied sight discs.
+     *
      * <p>Only the squares on screen are considered.
      */
     private void drawFog(Graphics2D g2) {
@@ -5137,12 +5208,31 @@ final class GameScreen extends JPanel {
         int toY = Math.min(world.map().height() - 1,
                 (cameraY + visibleWorldHeight()) / TILE);
         var fog = world.fog();
+        int teamFromX = Math.max(0, fromX - 1);
+        int teamFromY = Math.max(0, fromY - 1);
+        int teamToX = Math.min(world.map().width() - 1, toX + 1);
+        int teamToY = Math.min(world.map().height() - 1, toY + 1);
+        int teamWidth = teamToX - teamFromX + 1;
+        FogOfWar.Visibility[] teamSeen = new FogOfWar.Visibility[
+                teamWidth * (teamToY - teamFromY + 1)];
+        for (int y = teamFromY; y <= teamToY; y++) {
+            for (int x = teamFromX; x <= teamToX; x++) {
+                teamSeen[(y - teamFromY) * teamWidth + x - teamFromX] =
+                        world.visibilityTo(localPlayer, x, y);
+            }
+        }
+        FogOfWar.VisibilityLookup teamVisibility = (x, y) -> {
+            if (x < teamFromX || x > teamToX || y < teamFromY || y > teamToY) {
+                return FogOfWar.Visibility.UNEXPLORED;
+            }
+            return teamSeen[(y - teamFromY) * teamWidth + x - teamFromX];
+        };
 
         for (int y = fromY; y <= toY; y++) {
             for (int x = fromX; x <= toX; x++) {
                 int left = x * TILE - cameraX;
                 int top = y * TILE - cameraY;
-                var visibility = teamVisibility(x, y);
+                var visibility = teamVisibility.visibility(x, y);
 
                 if (visibility == FogOfWar.Visibility.UNEXPLORED) {
                     // Never seen: the whole square is fog, so there is no
@@ -5164,8 +5254,8 @@ final class GameScreen extends JPanel {
                     continue;
                 }
 
-                int fogFrame = fog.fogFrame(localPlayer, x, y);
-                int blackFrame = fog.blackFrame(localPlayer, x, y);
+                int fogFrame = fog.fogFrame(x, y, teamVisibility);
+                int blackFrame = fog.blackFrame(x, y, teamVisibility);
 
                 if (visibility == FogOfWar.Visibility.VISIBLE) {
                     // Watched ground takes only the fringe of whatever is
@@ -5185,50 +5275,6 @@ final class GameScreen extends JPanel {
                 }
             }
         }
-    }
-
-    /**
-     * How a square should be drawn, counting the eyes of everybody who shows
-     * this player their map.
-     *
-     * <p>Implements {@code CMapFieldPlayerInfo::TeamVisibilityState}, which is what
-     * {@code IsTeamVisible} is and what draws from. Two
-     * clauses: the square is lit if this player or anyone they have vision
-     * from lights it, and explored if this player or any of them has ever seen
-     * it.
-     *
-     * <p>The fog used to ask {@code fog.visibility(localPlayer...)} and so
-     * knew nothing about shared vision, while the units beside it were chosen
-     * by {@link World#isVisibleTo(int, int, int)}, which does. In a team game
-     * or a save with shared vision restored, an ally's units would be drawn
-     * correctly and then veiled by a fog that never lifted off the ground they
-     * were standing on -- the same fault that had ally units showing through
-     * fog, arriving by the other door.
-     *
-     * <p>What is still single-player here is the <em>shape</em> of the fringe.
-     * {@code FogOfWar.fogFrame} and {@code blackFrame} pick their corner masks
-     * from one player's own counts, so under shared vision the veil lifts on
-     * the right squares and the mask at the boundary is cut from this player's
-     * map rather than the team's. The bounded consequence is a wrong sixteenth
-     * of a tile along a shared-vision border and nothing anywhere else; a
-     * complete fix wants the team test inside {@code FogOfWar.covered}, which
-     * is not this file.
-     */
-    private FogOfWar.Visibility teamVisibility(int x, int y) {
-        if (world.isVisibleTo(localPlayer, x, y)) {
-            return FogOfWar.Visibility.VISIBLE;
-        }
-        var fog = world.fog();
-        if (fog.isExplored(localPlayer, x, y)) {
-            return FogOfWar.Visibility.EXPLORED;
-        }
-        for (int other = 0; other < net.chonkbase.chonkcraft.engine.Player.MAX; other++) {
-            if (other != localPlayer && world.sharesVisionWith(localPlayer, other)
-                    && fog.isExplored(other, x, y)) {
-                return FogOfWar.Visibility.EXPLORED;
-            }
-        }
-        return FogOfWar.Visibility.UNEXPLORED;
     }
 
     /**

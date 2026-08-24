@@ -248,8 +248,20 @@ public final class GameAudio implements AutoCloseable {
      * compete with acknowledgements for the voice priority.
      */
     public void playNamedAt(String name, IntUnaryOperator pick, float panFromCentre) {
+        playNamedAt(name, pick, panFromCentre, 0f);
+    }
+
+    /**
+     * Plays a positioned named effect at a deliberately restrained level.
+     *
+     * <p>Used by map pings: the ordinary world-effect path is the right bus
+     * and supplies stereo direction, but a notification repeated by several
+     * teammates should sit below combat rather than compete with it.
+     */
+    public void playNamedAt(String name, IntUnaryOperator pick, float panFromCentre,
+            float gainDb) {
         String path = choose(name, pick, NO_SOURCE);
-        play(path, AudioBus.WORLD, clampPan(panFromCentre), EFFECT_PRIORITY);
+        play(path, AudioBus.WORLD, gainDb, clampPan(panFromCentre), EFFECT_PRIORITY);
     }
 
     /**
@@ -400,6 +412,10 @@ public final class GameAudio implements AutoCloseable {
     }
 
     private void play(String path, AudioBus bus, float pan, int priority) {
+        play(path, bus, 0f, pan, priority);
+    }
+
+    private void play(String path, AudioBus bus, float gainDb, float pan, int priority) {
         if (!available || path == null) {
             return;
         }
@@ -407,7 +423,7 @@ public final class GameAudio implements AutoCloseable {
         if (clip == null) {
             return;
         }
-        mixer.play(clip, bus, false, 0f, pan, priority);
+        mixer.play(clip, bus, false, gainDb, pan, priority);
     }
 
     private static float clampPan(float pan) {

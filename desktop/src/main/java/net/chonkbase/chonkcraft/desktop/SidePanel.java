@@ -541,7 +541,7 @@ final class SidePanel {
             int tileY = y * mapHeight / minimapSize;
             for (int x = 0; x < minimapSize; x++) {
                 int tileX = x * mapWidth / minimapSize;
-                FogOfWar.Visibility seen = world.fog().visibility(localPlayer, tileX, tileY);
+                FogOfWar.Visibility seen = world.visibilityTo(localPlayer, tileX, tileY);
                 // Ground never seen is veiled at the unseen level rather than
                 // painted black outright, which is upstream's shape and is the
                 // same picture at the 0xFF the script asks for.

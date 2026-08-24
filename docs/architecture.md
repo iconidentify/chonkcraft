@@ -266,6 +266,6 @@ and proves 180 lockstep cycles converge to one world hash. A recorded match
 between two physically separate player machines remains useful field
 confirmation; it is no longer the only evidence for the public network path.
 
-The test suite is **2,631 tests**. On a fully configured CI machine 25 skip; with
-no external inputs 1,054 do. Both numbers matter and the difference between them is the
+The test suite is **2,653 tests**. On a fully configured CI machine 26 skip; with
+no external inputs 1,063 do. Both numbers matter and the difference between them is the
 subject of [ci.md](ci.md).

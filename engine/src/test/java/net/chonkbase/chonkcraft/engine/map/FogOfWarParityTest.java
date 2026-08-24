@@ -220,6 +220,33 @@ class FogOfWarParityTest {
         assertEquals(0, fog.fogFrame(0, 3, 4), "a square well inside sight needs no fog");
     }
 
+    @Test
+    @DisplayName("allied sight uses one combined fog mask across the meeting seam")
+    void alliedSightUsesOneCombinedFogMaskAcrossTheMeetingSeam() {
+        FogOfWar fog = new FogOfWar(9, 9, 2);
+        for (int y = 0; y < 9; y++) {
+            for (int x = 0; x < 9; x++) {
+                fog.addSight(x <= 4 ? 0 : 1, x, y, 1, 1, 0);
+            }
+        }
+        FogOfWar.VisibilityLookup team = (x, y) -> {
+            if (fog.isVisible(0, x, y) || fog.isVisible(1, x, y)) {
+                return FogOfWar.Visibility.VISIBLE;
+            }
+            if (fog.isExplored(0, x, y) || fog.isExplored(1, x, y)) {
+                return FogOfWar.Visibility.EXPLORED;
+            }
+            return FogOfWar.Visibility.UNEXPLORED;
+        };
+
+        assertEquals(6, fog.fogFrame(0, 4, 4),
+                "the local-only mask demonstrates the false eastern triangle");
+        assertEquals(0, fog.fogFrame(4, 4, team),
+                "BNE TeamVisibilityState leaves no fog edge where allied sight joins");
+        assertEquals(0, fog.blackFrame(4, 4, team),
+                "allied explored memory must not cut a black wedge into the seam");
+    }
+
     /**
      * Off-map neighbours contribute nothing, or every map would be permanently
      * fringed with fog around its border.
