@@ -174,9 +174,24 @@ public final class GameLobby implements Closeable {
                     || playing.stream().map(Slot::team).distinct().count() >= 2;
         }
 
+        /** Whether the obvious cooperative roster can supply its own opposing side. */
+        public boolean canInferComputerOpponents() {
+            if (gameTemplate != GameTemplate.TEAMS) {
+                return false;
+            }
+            List<Slot> playing = slots.stream().filter(Slot::isPlaying).toList();
+            return playing.size() >= 2
+                    && playing.stream().map(Slot::team).distinct().count() == 1
+                    && playing.stream().anyMatch(
+                            slot -> slot.occupant() == Occupant.HUMAN)
+                    && playing.stream().anyMatch(
+                            slot -> slot.occupant() == Occupant.COMPUTER);
+        }
+
         /** Whether Start is currently a valid operation. */
         public boolean canStart() {
-            return allPlayersReady && hasValidMatchup();
+            return allPlayersReady
+                    && (hasValidMatchup() || canInferComputerOpponents());
         }
     }
 
@@ -635,7 +650,11 @@ public final class GameLobby implements Closeable {
             if (!hosting || started) {
                 return;
             }
-            if (!everyHumanHasMap() || !state().hasValidMatchup()) {
+            if (!everyHumanHasMap()) {
+                return;
+            }
+            inferComputerOpponentsIfNeeded();
+            if (!state().hasValidMatchup()) {
                 return;
             }
             started = true;
@@ -647,6 +666,35 @@ public final class GameLobby implements Closeable {
                 socket.send(new DatagramPacket(packet, packet.length, target.getValue()));
             }
         }
+    }
+
+    /**
+     * Makes the common cooperative intent seamless without overriding an
+     * explicit multi-team roster.
+     *
+     * <p>If every occupied slot still has the same team number, humans versus
+     * computers is unambiguous: the people stay together and every AI becomes
+     * their opponent. As soon as the host has assigned two team numbers this
+     * fallback is inactive and those explicit choices remain authoritative.
+     */
+    private void inferComputerOpponentsIfNeeded() {
+        State current = state();
+        if (!current.canInferComputerOpponents()) {
+            return;
+        }
+        int humanTeam = slots.stream()
+                .filter(slot -> slot.occupant() == Occupant.HUMAN)
+                .mapToInt(Slot::team)
+                .findFirst().orElse(1);
+        int computerTeam = humanTeam % 8 + 1;
+        for (int index = 0; index < slots.size(); index++) {
+            Slot slot = slots.get(index);
+            if (slot.occupant() == Occupant.COMPUTER) {
+                slots.set(index, new Slot(index, slot.occupant(), slot.name(),
+                        slot.race(), computerTeam));
+            }
+        }
+        lastSent = 0;
     }
 
     /** Frees a slot whose holder has stopped speaking. */

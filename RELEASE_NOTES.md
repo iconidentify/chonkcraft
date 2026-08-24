@@ -1,5 +1,10 @@
 # Explicit Multiplayer Teams, Walls, and Reliable Worker Orders
 
+- Fixed the Teams-mode Start gate for the ordinary cooperative setup. If every
+  occupied slot still has one team number, Start now keeps all humans together
+  and makes every computer the opposing team automatically. Two humans versus
+  one AI and one human versus five AIs no longer require manual team repair;
+  any explicit multi-team assignments remain authoritative.
 - Replaced **Top vs Bottom** with explicit numbered teams. The host assigns each
   human or computer to Team 1–8 independently of colour and starting position;
   moving somebody to a new colour preserves their team.

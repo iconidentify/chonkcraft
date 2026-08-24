@@ -350,9 +350,12 @@ class GameLobbyTest {
             assertTrue(host.setTeam(0, 1));
             assertTrue(host.setTeam(connorSlot, 1));
             assertTrue(host.setOccupant(2, GameLobby.Occupant.COMPUTER));
-            assertTrue(host.setTeam(2, 2));
+            assertTrue(host.setTeam(2, 1));
 
-            assertTrue(host.state().hasValidMatchup());
+            assertFalse(host.state().hasValidMatchup(),
+                    "the regression requires the unsplit roster that reached production");
+            assertTrue(host.state().canStart(),
+                    "two humans versus one AI should be startable without team repair");
             host.start();
             pollUntil("Connor heard start", connor::isStarted, host, connor);
             assertTrue(host.isStarted());
@@ -362,20 +365,25 @@ class GameLobbyTest {
     }
 
     @Test
-    @DisplayName("Teams mode refuses a roster with no opposing team")
-    void teamsRequireAtLeastTwoOccupiedTeamNumbers() throws Exception {
-        try (GameLobby host = GameLobby.host("Chris", "garden.pud", 4, BASE_PORT + 24)) {
-            assertTrue(host.setOccupant(1, GameLobby.Occupant.COMPUTER));
+    @DisplayName("Teams mode infers human versus computer when every slot has one team")
+    void teamsInferComputerOpponentsForAnUnsplitRoster() throws Exception {
+        try (GameLobby host = GameLobby.host("Chris", "garden.pud", 8, BASE_PORT + 24)) {
+            for (int slot = 1; slot <= 5; slot++) {
+                assertTrue(host.setOccupant(slot, GameLobby.Occupant.COMPUTER));
+                assertTrue(host.setTeam(slot, 1));
+            }
             assertTrue(host.setGameTemplate(GameLobby.GameTemplate.TEAMS));
-            assertTrue(host.setTeam(1, 1));
 
             assertFalse(host.state().hasValidMatchup());
             host.start();
-            assertFalse(host.isStarted(), "the engine accepted a team with no opponent");
-
-            assertTrue(host.setTeam(1, 2));
-            host.start();
-            assertTrue(host.isStarted(), "explicit opposing teams did not unlock Start");
+            assertTrue(host.isStarted(),
+                    "one human versus five computers should not need manual team repair");
+            assertEquals(1, host.state().slots().get(0).team());
+            for (int slot = 1; slot <= 5; slot++) {
+                assertEquals(2, host.state().slots().get(slot).team(),
+                        "every computer should become the opposing team at Start");
+            }
+            assertTrue(host.state().hasValidMatchup());
         }
     }
 

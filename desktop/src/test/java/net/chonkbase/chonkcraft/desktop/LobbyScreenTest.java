@@ -218,8 +218,8 @@ class LobbyScreenTest {
     }
 
     @Test
-    @DisplayName("Teams mode starts after the host assigns an opponent")
-    void teamsRequireTwoExplicitAssignments() throws Exception {
+    @DisplayName("Teams mode starts humans versus computers without manual repair")
+    void teamsInferTheComputerOpponentAtStart() throws Exception {
         GameData data = null;
         Recording heard = new Recording();
         try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 24)) {
@@ -229,19 +229,13 @@ class LobbyScreenTest {
             LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", heard);
             screen.render();
 
-            assertFalse(click(screen, LobbyScreen.startBounds()),
-                    "Teams offered Start while everybody had the same team number");
-            assertFalse(heard.started.get(),
-                    "the one-sided team lobby began an unwinnable match");
-
-            assertTrue(click(screen, LobbyScreen.teamBounds(1)),
-                    "the computer's Team button was not available");
-            assertEquals(2, lobby.state().slots().get(1).team());
-            screen.render();
             assertTrue(click(screen, LobbyScreen.startBounds()),
-                    "Start stayed unavailable after an opposing team was assigned");
+                    "the obvious human-versus-computer matchup was disabled");
             assertTrue(heard.started.get(),
-                    "the valid two-sided team lobby did not begin");
+                    "the obvious human-versus-computer lobby did not begin");
+            assertEquals(1, lobby.state().slots().get(0).team());
+            assertEquals(2, lobby.state().slots().get(1).team(),
+                    "Start should put the computer on the opposing team");
         }
     }
 

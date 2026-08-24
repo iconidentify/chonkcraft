@@ -237,8 +237,9 @@ final class LobbyScreen extends JPanel {
             return;
         }
         if (state.gameTemplate() == GameLobby.GameTemplate.TEAMS
-                && !state.hasValidMatchup()) {
-            notice = "Put the players on at least two different teams.";
+                && !state.hasValidMatchup()
+                && !state.canInferComputerOpponents()) {
+            notice = "Add a computer opponent or assign someone to another team.";
             return;
         }
         try {
@@ -502,7 +503,8 @@ final class LobbyScreen extends JPanel {
             boolean enoughPlayers = state.slots().stream().filter(GameLobby.Slot::isPlaying)
                     .count() >= 2;
             boolean opposingTeams = state.gameTemplate() != GameLobby.GameTemplate.TEAMS
-                    || state.hasValidMatchup();
+                    || state.hasValidMatchup()
+                    || state.canInferComputerOpponents();
             boolean canStart = state.canStart();
             button(g2, TABLE_X, FOOT_Y, 160, FOOT_HEIGHT,
                     !enoughPlayers ? "Waiting for Players"

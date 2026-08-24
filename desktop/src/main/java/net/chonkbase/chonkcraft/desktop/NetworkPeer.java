@@ -467,8 +467,9 @@ public final class NetworkPeer {
             GameLobby.GameTemplate gameTemplate) {
         lobby.setGameTemplate(gameTemplate);
         if (gameTemplate == GameLobby.GameTemplate.TEAMS) {
-            // Exercise the common user setup directly: two people on Team 1,
-            // one computer on Team 2. Colour and map position do not matter.
+            // Exercise the common user setup directly: the two people begin
+            // together, while the deliberately unsplit computer proves Start
+            // can infer the obvious opposing side before committing state.
             int humanTeam = 1;
             for (GameLobby.Slot slot : lobby.state().slots()) {
                 if (slot.occupant() == GameLobby.Occupant.HUMAN) {
@@ -481,7 +482,7 @@ public final class NetworkPeer {
                 if (slot.occupant() == GameLobby.Occupant.OPEN) {
                     lobby.setOccupant(slot.index(), GameLobby.Occupant.COMPUTER);
                     if (gameTemplate == GameLobby.GameTemplate.TEAMS) {
-                        lobby.setTeam(slot.index(), 2);
+                        lobby.setTeam(slot.index(), 1);
                     }
                     break;
                 }
