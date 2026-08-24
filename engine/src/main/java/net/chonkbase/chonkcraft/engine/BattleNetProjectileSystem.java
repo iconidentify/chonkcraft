@@ -632,6 +632,7 @@ final class BattleNetProjectileSystem {
                         == MissileClass.PARABOLIC) {
                     int draws = missile.battleNetParabolicDrawsOnNextStep();
                     for (int draw = 0; draw < draws; draw++) {
+                        recordProjectileMotionDraw(missile, draw, draws);
                         world.battleNetRand();
                     }
                 } else if (missile.type().missileClass()
@@ -640,6 +641,7 @@ final class BattleNetProjectileSystem {
                                 == MissileClass.POINT_TO_POINT_BOUNCE) {
                     // Action 7 begins with the same asynchronous draw on
                     // every update as native point motion (0x00410c45).
+                    recordProjectileMotionDraw(missile, 0, 1);
                     world.battleNetRand();
                 }
             }
@@ -672,6 +674,26 @@ final class BattleNetProjectileSystem {
         // Last, after anything an impact added, so the renderer never
         // sees a half-built cycle.
         world.missileSnapshot = List.copyOf(world.missiles);
+    }
+
+    /** Attributes an asynchronous flight draw to its fixed-pool record. */
+    private void recordProjectileMotionDraw(
+            Missile missile, int drawIndex, int drawCount) {
+        Unit source = missile.source();
+        Unit target = missile.target();
+        world.causalTrace.event(world.cycle, "projectile.motion.draw",
+                source == null ? null : source.id(),
+                "fixture_cycle", Math.max(0, world.cycle - 2),
+                "pool_slot", missile.battleNetPoolSlot(),
+                "type", battleNetProjectileType(missile.type()),
+                "type_ident", missile.type() == null
+                        ? null : missile.type().ident(),
+                "source", source == null ? -1 : source.id(),
+                "target", target == null ? -1 : target.id(),
+                "remaining", missile.battleNetRemaining(),
+                "pending_impact", missile.battleNetPendingImpact(),
+                "draw_index", drawIndex,
+                "draw_count", drawCount);
     }
 
     /** World-aware setup for runes and the roaming Whirlwind. */
