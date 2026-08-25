@@ -39,14 +39,16 @@ save/load, rendering and input, sound, and clean/adverse network lockstep.
 
 The complete suite now contains **2,751 tests**. The no-data profile ran 1,598
 and intentionally skipped 1,153, with the exact expected 89-test specification
-failure set. The canonical authenticated contract discovers all 2,751 with 26
-intentional skips; current-head certification is held open until the private
-authenticated CI runner completes.
+failure set. The canonical authenticated profile discovered all 2,751, ran
+2,725, intentionally skipped 26, and kept the exact expected 110-test
+specification failure set.
 
 Source-boundary, native-runtime, comment-provenance, documentation, and BNE
-readiness checks pass. Signed engine OTA `2026.0825.66` remains the public
-release while this candidate completes certification. No matchmaking protocol,
-service, or infrastructure path changed, so no server rollout is planned.
+readiness checks pass. Signed engine OTA `2026.0825.67` was published from
+revision `dd0a75bcab1931764d8e56d861a357d79959367a`; the release workflow proved
+both local installation and a fresh launcher install from the public endpoint.
+No matchmaking protocol, service, or infrastructure path changed, so no
+server rollout was needed.
 
 ## Broader fidelity frontier
 
