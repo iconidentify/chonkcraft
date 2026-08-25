@@ -553,6 +553,91 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         assertEquals(39, paidRetarget.tileY());
     }
 
+    @Test
+    @DisplayName("late crowded retargets refill their route before the shared frontier")
+    void lateCrowdedRetargetsRefillTheirRouteBeforeTheSharedFrontier() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1510 / Java 90 parks the old tower route on fixture
+        // 206, then writes E,SE,S,... and consumes E on 207. Java previously
+        // kept E,SE,SE,...; both engines consequently occupied the same tiles
+        // through 238 and only exposed the stale third byte at fixture 239.
+        Unit towerChaser = unitAt(world, "unit-grunt", 34, 38);
+        // Native slot 1453 / Java 147 is routeless when its knight quarry
+        // enters Die on fixture 239. Retail installs the replacement footman
+        // immediately but restarts cold Attack 3,2,1 before any new route.
+        Unit dyingQuarryChaser = unitAt(world, "unit-grunt", 18, 57);
+        assertNotNull(towerChaser, "XHuman 12 has no native-slot-1510 grunt");
+        assertNotNull(dyingQuarryChaser,
+                "XHuman 12 has no native-slot-1453 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 245) {
+            mission.tick();
+            int fixture = fixtureCycle(world);
+            if (fixture == 206) {
+                assertEquals(0, towerChaser.pathLength(),
+                        "native parks the old route at index twenty");
+            }
+            if (fixture == 207) {
+                assertEquals(41, towerChaser.tileX(),
+                        "the replacement route opens east");
+                assertEquals(38, towerChaser.tileY());
+                assertEquals(Direction.fromDelta(1, 1),
+                        towerChaser.peekHeadingAtDepth(0),
+                        "the replacement route then turns south-east");
+                assertEquals(Direction.fromDelta(0, 1),
+                        towerChaser.peekHeadingAtDepth(1),
+                        "the refill rewrites the stale duplicate diagonal");
+            }
+            if (fixture == 239 || fixture == 242 || fixture == 245) {
+                assertEquals(23, dyingQuarryChaser.tileX(),
+                        "a boxed retarget must not take a non-progressing detour at "
+                                + fixture);
+                assertEquals(60, dyingQuarryChaser.tileY(),
+                        "the cold refusal loop retains the battle square at "
+                                + fixture);
+                assertEquals(3, dyingQuarryChaser.battleNetAnimationTimer(),
+                        "each refused probe reopens Attack construction");
+                assertEquals(0, dyingQuarryChaser.pathLength(),
+                        "a no-progress retry keeps native route index twenty");
+                if (fixture == 239) {
+                    assertEquals(0x6a0aecce, world.battleNetRandomSeed(),
+                            "the initial three cold constructors pay land-idle");
+                }
+            }
+        }
+
+        assertEquals(42, towerChaser.tileX(),
+                "the third replacement heading is south, not south-east");
+        assertEquals(40, towerChaser.tileY());
+        assertEquals(23, dyingQuarryChaser.tileX(),
+                "a dying-quarry retarget must not move during construction");
+        assertEquals(60, dyingQuarryChaser.tileY());
+        assertTargetAt(dyingQuarryChaser, "unit-footman", 26, 59,
+                "the replacement is selected on the dying-quarry visit");
+        assertEquals(world.idle.battleNetSequenceStart(dyingQuarryChaser,
+                        net.chonkbase.chonkcraft.engine.animation
+                                .BattleNetSequence.ATTACK_ANIMATION),
+                dyingQuarryChaser.battleNetSequenceOffset());
+        assertEquals(3, dyingQuarryChaser.battleNetAnimationTimer(),
+                "the replacement reopens cold Attack construction");
+        assertEquals(0, dyingQuarryChaser.pathLength(),
+                "construction precedes the replacement route writer");
+        assertTrue(dyingQuarryChaser.battleNetColdNoProgressRefusalLoop(),
+                "the authenticated active-order retry remains the loop owner");
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

@@ -5757,7 +5757,31 @@ final class BattleNetMovementSystem {
                                                     unit, unit.target(), true);
                                     if (rewritten == PathFinder.Result.FOUND
                                             && unit.pathLength() > 0) {
-                                        unit.replacePeekHeading(freeHeading);
+                                        int redrawnHeading =
+                                                unit.peekHeading();
+                                        int redrawnX = unit.tileX()
+                                                + Direction.deltaX(
+                                                        redrawnHeading)
+                                                * strideDetour;
+                                        int redrawnY = unit.tileY()
+                                                + Direction.deltaY(
+                                                        redrawnHeading)
+                                                * strideDetour;
+                                        if (world.canEnter(
+                                                unit, redrawnX, redrawnY)) {
+                                            // A complete redraw which already
+                                            // opens on a free square owns that
+                                            // byte. Replacing it with an axis
+                                            // component of the stale blocked
+                                            // diagonal sent XHuman 12 slot
+                                            // 1470 north at fixture 243 even
+                                            // though both native and the fresh
+                                            // route writer chose free south.
+                                            freeHeading = redrawnHeading;
+                                        } else {
+                                            unit.replacePeekHeading(
+                                                    freeHeading);
+                                        }
                                     } else {
                                         unit.setPath(new PathFinder.Path(
                                                 PathFinder.Result.FOUND,

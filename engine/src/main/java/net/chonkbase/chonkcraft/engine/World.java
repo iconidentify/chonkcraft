@@ -6650,6 +6650,29 @@ public final class World {
                 int allyDistance = Math.max(
                         Math.abs(candidate.tileX() - target.tileX()),
                         Math.abs(candidate.tileY() - target.tileY()));
+                boolean stickyMobileQuarryFormationWall =
+                        target.type() != null
+                        && !target.type().building()
+                        && candidate.target() == target
+                        && candidate.type() != null
+                        && candidate.type().moveType()
+                                == UnitType.Movement.LAND
+                        && candidate.type().maxAttackRange() <= 1
+                        && candidate.isMoving()
+                        && candidate.pathLength() >= 16
+                        && candidate.battleNetPathStepsTaken() >= 1
+                        && candidate.battleNetCollisionCounter() > 0
+                        && candidate.battleNetRefusals() > 0
+                        && allyDistance < routerDistance;
+                if (stickyMobileQuarryFormationWall) {
+                    // Native keeps a collision-marked front-rank chaser in
+                    // the wall view while a rear unit draws its first route
+                    // to the same mobile quarry. XHuman 12 slot 1501 is one
+                    // step into a saturated pressure route when slot 1489
+                    // retargets the knight at fixture 192; preserving that
+                    // body writes the second SE byte consumed at fixture 243.
+                    continue;
+                }
                 boolean saturatedFormationWall = keepSaturatedAlliesHard
                         && candidate.battleNetCollisionCounter() >= 4
                         // The paid help-handoff view clears ordinary moving
@@ -14233,6 +14256,24 @@ public final class World {
                 && unit.pendingAttack() == null) {
             restartBattleNetArmedPatrol(unit);
             return;
+        }
+        // A non-capital warship that spends the last byte of a Patrol route
+        // asks NewPath on the same visit its doubled-stride pixels settle.
+        // It does not pay Move's generic empty-buffer PF_WAIT. XOrc 10
+        // destroyer 1483 drains the final southwest leg onto (110,76), then
+        // redraws W,W,SW,W,W,W and commits west on fixture 244. Serving the
+        // ten-count pause left Java parked until fixture 255. Keep combat
+        // handoffs, endpoint turns and sequence-owned capital/flyer patrols
+        // on their established branches above.
+        if (residualSettledThisVisit
+                && !standingPatrol
+                && battleNetArmedSmallWarshipPatrol(unit)
+                && unit.pendingAttack() == null
+                && unit.pathLength() == 0
+                && unit.routeSpent()
+                && !battleNetPatrolEndpointReached(unit)) {
+            unit.setRouteSpent(false);
+            unit.setWaitCycles(0);
         }
         // A recurring behaviour-four ray can spend a saturated cardinal
         // prefix on the skirt of its literal point.  That is not the same

@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -436,6 +437,69 @@ class BattleNetMovingQuarryChaseRealDataTest {
         assertEquals(1, native1513.battleNetAnimationTimer());
         assertEquals(2, native1513.pathLength(),
                 "Java removes the committed NE head from native's NE,E,E buffer");
+    }
+
+    @Test
+    void offeredHarvestQuarryRouteKeepsItsCompletePaidWait() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 95);
+        Unit quarry = unitById(world, 81);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1505");
+        assertNotNull(quarry,
+                "Human 8 has no offered harvesting quarry for slot 1505");
+
+        while (fixtureCycle(world) < 226) {
+            mission.tick();
+        }
+        assertEquals(quarry, attacker.target());
+        assertEquals(quarry, attacker.offeredTarget());
+        assertEquals(3, attacker.pathLength());
+        assertEquals(Direction.fromDelta(1, 0),
+                attacker.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, 0),
+                attacker.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(1, 0),
+                attacker.peekHeadingAtDepth(2));
+        assertEquals(1, attacker.battleNetCollisionCounter());
+        assertEquals(15, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(227, fixtureCycle(world));
+        assertEquals(3, attacker.pathLength(),
+                "the paid wait retains the complete offered-quarry route");
+        assertEquals(Direction.fromDelta(1, 0), attacker.peekHeading(),
+                "a free diagonal must not cancel the offered-quarry band");
+        assertEquals(1, attacker.battleNetCollisionCounter());
+        assertEquals(14, attacker.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 240) {
+            mission.tick();
+        }
+        assertChaser(attacker, 76, 62, 0, 0, false);
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "native exposes the last paid Move visit at fixture 240");
+        mission.tick();
+        assertEquals(241, fixtureCycle(world));
+        assertChaser(attacker, 76, 62, 0, 0, false);
+        assertEquals(0, attacker.pathLength(),
+                "the moved quarry parks the stale east route at index twenty");
+        mission.tick();
+        assertEquals(242, fixtureCycle(world));
+        assertEquals(77, attacker.tileX());
+        assertEquals(61, attacker.tileY(),
+                "the fresh route begins north-east, not south-east");
     }
 
     @Test

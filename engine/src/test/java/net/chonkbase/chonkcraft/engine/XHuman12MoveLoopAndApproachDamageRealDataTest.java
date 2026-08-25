@@ -306,8 +306,9 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         // The native target upgrade writes a twelve-byte tower route and
         // spends east on fixture 187. Its residual settles into real Attack
         // construction 3,2,1 on fixtures 203..205. Move owns a route-index-20
-        // replay visit on 206, then consumes that approved east opening again
-        // on 207; a free-compass south detour is not this route's owner.
+        // replay visit on 206, then redraws and consumes that approved east
+        // opening again on 207; a free-compass south detour is not this
+        // route's owner.
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
@@ -334,8 +335,8 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                                 .BattleNetSequence.MOVE_ANIMATION),
                 grunt.battleNetSequenceOffset());
         assertEquals(1, grunt.battleNetAnimationTimer());
-        assertEquals(Direction.fromDelta(1, 0), grunt.peekHeading(),
-                "route replay restores the consumed cardinal opening");
+        assertEquals(0, grunt.pathLength(),
+                "route index twenty parks the old tower buffer");
         assertEquals(1, grunt.battleNetCollisionCounter(),
                 "the route-index-twenty replay park owns native collision one");
 
@@ -345,6 +346,12 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 "the cached tower route replays east after construction");
         assertEquals(38, grunt.tileY());
         assertEquals(Direction.fromDelta(1, 0), grunt.lastStepHeading());
+        assertEquals(Direction.fromDelta(1, 1),
+                grunt.peekHeadingAtDepth(0),
+                "the footprint redraw turns south-east after replayed east");
+        assertEquals(Direction.fromDelta(0, 1),
+                grunt.peekHeadingAtDepth(1),
+                "the footprint redraw replaces the stale duplicate diagonal");
         assertEquals(1, grunt.battleNetCollisionCounter(),
                 "the replayed opening retains its formation-wall provenance");
     }

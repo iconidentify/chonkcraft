@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -31,6 +32,8 @@ class Human13RemovedQuarryHandoffRealDataTest {
         Unit ogre = unitById(world, 118);
         Unit knight = unitById(world, 107);
         assertNotNull(catapult, "Human 13 has no native-slot-1488 catapult");
+        assertEquals(2, catapult.type().minAttackRange(),
+                "the BNE catapult carries the positive siege dead zone");
         assertNotNull(ogre, "Human 13 has no native-slot-1482 ogre");
         assertNotNull(knight, "Human 13 has no native-slot-1493 knight");
 
@@ -61,6 +64,31 @@ class Human13RemovedQuarryHandoffRealDataTest {
                 "the parked melee chase must end instead of stepping at the removed quarry");
         assertEquals(123, ogre.tileX());
         assertEquals(31, ogre.tileY());
+
+        while (fixtureCycle(world) < 241) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, catapult.order(),
+                "the siege residual keeps Attack until its final pixels settle");
+        assertSame(knight, catapult.target(),
+                "the dying quarry pointer remains owned by the committed stride");
+
+        mission.tick();
+        assertEquals(242, fixtureCycle(world));
+        assertNull(catapult.target(),
+                "the settled siege stride releases its dying quarry");
+        assertEquals(Unit.Order.STILL, catapult.order(),
+                "settlement validates the corpse before reopening Attack");
+        assertEquals(113, catapult.tileX());
+        assertEquals(30, catapult.tileY());
+        assertEquals(0, catapult.offsetX(),
+                "fixture 242 reaches the exact native pixel anchor");
+        assertEquals(0, catapult.offsetY());
+        assertEquals(0, catapult.pathLength(),
+                "native parks the committed route at index twenty");
+        assertEquals(413, catapult.battleNetSequenceOffset(),
+                "retail installs the catapult Still constructor");
+        assertEquals(3, catapult.battleNetAnimationTimer());
     }
 
     private static int fixtureCycle(World world) {

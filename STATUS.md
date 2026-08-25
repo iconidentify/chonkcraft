@@ -11,17 +11,18 @@ media supplied by the player.
 The current release candidate has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 238.** The lowest common divergence is
-  cycle 239, so the shared proven frontier is cycle 238.
-- Expansion Human 12 is the sole cycle-239 frontier case; its first difference
-  is the position of two grunts in a crowded movement handoff.
+- **52/52 maps are exact through cycle 245.** The lowest common divergence is
+  cycle 246, so the shared proven frontier is cycle 245.
+- Expansion Human 11 and 12 tie at cycle 246 through two independent seams: a
+  resource worker's claimed-tree reassignment and a grunt's crowded combat
+  route choice.
 - **24/52 maps are exact through the full 400-cycle window**, with 28 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 17,432 cycles, up 234 from the preceding
-  accepted candidate's 17,198; no map moved backward.
+  frontiers, capped at 400, is 17,542 cycles, up 110 from the preceding
+  accepted candidate's 17,432; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  31,718, up 340 from the preceding accepted candidate's 31,378.
+  31,828, up 110 from the preceding accepted candidate's 31,718.
   The eight are Human 1, 2, and 9; Orc 1, 2, and 6; and expansion Orc 1 and 9.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
@@ -36,19 +37,16 @@ assets, deterministic scheduling, movement, orders, economy, construction,
 combat, projectiles, naval oil, spells, retail AI, campaign triggers,
 save/load, rendering and input, sound, and clean/adverse network lockstep.
 
-The complete suite now contains **2,748 tests**. The no-data profile ran 1,598
-and intentionally skipped 1,150, with the expected 89-test specification
-failure set. The matched authenticated local profile discovered all 2,748 and
-kept the exact expected 110-test failure set. It ran three optional local-save
-checks that the fixed CI profile intentionally skips, so local skips were 23
-while the canonical CI contract remains 26.
+The complete suite now contains **2,751 tests**. The no-data profile ran 1,598
+and intentionally skipped 1,153, with the exact expected 89-test specification
+failure set. The canonical authenticated contract discovers all 2,751 with 26
+intentional skips; current-head certification is held open until the private
+authenticated CI runner completes.
 
 Source-boundary, native-runtime, comment-provenance, documentation, and BNE
-readiness checks pass. Signed engine OTA `2026.0825.66` was published from
-revision `4970cf761b3a4756e0dbc05a5be433156aa7e7a9`; the release workflow proved
-both local installation and a fresh launcher install from the public endpoint.
-No matchmaking protocol, service, or infrastructure path changed, so no
-server rollout was needed.
+readiness checks pass. Signed engine OTA `2026.0825.66` remains the public
+release while this candidate completes certification. No matchmaking protocol,
+service, or infrastructure path changed, so no server rollout is planned.
 
 ## Broader fidelity frontier
 

@@ -2321,6 +2321,7 @@ public final class Unit {
             battleNetParkedRefusalHeading = -1;
             battleNetSaturatedCardinalRetryLoop = false;
             battleNetRangedCloseHitHelpWallFace = false;
+            battleNetColdNoProgressRefusalLoop = false;
         }
         this.target = target;
         if (target == null) {
@@ -3351,6 +3352,17 @@ public final class Unit {
     }
 
     private boolean battleNetChaseEmptyRouteReplan;
+
+    /** A cold mobile-quarry handoff keeps retrying while no free step closes. */
+    public boolean battleNetColdNoProgressRefusalLoop() {
+        return battleNetColdNoProgressRefusalLoop;
+    }
+
+    public void setBattleNetColdNoProgressRefusalLoop(boolean retry) {
+        battleNetColdNoProgressRefusalLoop = retry;
+    }
+
+    private boolean battleNetColdNoProgressRefusalLoop;
 
     public int battleNetIdlePhase() {
         return battleNetIdlePhase;
