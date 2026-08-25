@@ -166,6 +166,206 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's struck knight recruits its adjacent idle brother")
+    void xhuman10DirectHitRecruitsTheAdjacentIdleKnight() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slots 1489 / 1477, Java ids 111 / 123.
+        // Grunt 1477 hits knight 1493 on fixture 176. Retail 0x40a9d0's
+        // person two-tile loop selects idle knight 1489 and writes that grunt
+        // as its target. Attack remains visible for construction 3,2,1; the
+        // grunt then dies on fixture 179 and the helper returns to Still.
+        Unit knight = unitById(world, 111);
+        Unit grunt = unitById(world, 123);
+        Unit struckKnight = unitById(world, 107);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1489 knight");
+        assertNotNull(grunt, "XHuman 10 has no native-slot-1477 grunt");
+        assertNotNull(struckKnight, "XHuman 10 has no native-slot-1493 knight");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 175) {
+            mission.tick();
+        }
+
+        assertEquals(Unit.Order.STILL, knight.order());
+        assertNull(knight.target());
+        assertNull(knight.battleNetPendingHelpAttack());
+        assertSame(grunt, struckKnight.target());
+        assertEquals(83, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(81, grunt.tileX());
+        assertEquals(89, grunt.tileY());
+        assertEquals(5, grunt.hitPoints());
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, knight.order());
+        assertSame(grunt, knight.target());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(3, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(2, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(0x2d83452a, world.battleNetRandomSeed(),
+                "native async stream is aligned before the helper's OP0 handoff");
+        mission.tick();
+        assertEquals(Unit.Order.STILL, knight.order());
+        assertNull(knight.target());
+        assertEquals(1869, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(0xe933771a, world.battleNetRandomSeed(),
+                "fresh Still dispatch owns its native same-visit idle draw");
+        assertEquals(83, knight.tileX(), "construction must not move the helper");
+        assertEquals(89, knight.tileY(), "construction must not move the helper");
+        assertEquals(Unit.Order.DYING, grunt.order());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's queued helper drops a quarry killed by the landing arrow")
+    void xhuman10QueuedHitHelpDropsQuarryKilledByCycleEndArrow() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slots 1489 / 1471, Java ids 111 / 129. The
+        // knight accepts the grunt's HitUnit offer and pays Attack construction
+        // on fixtures 200..202. On fixture 203 an already-landed arrow from
+        // guard tower 1468 frees and kills the offered grunt. Retail's unit
+        // visit observes that owed projectile free before spending the queued
+        // helper handoff, clears the target and exposes fresh Still@1869/1.
+        Unit knight = unitById(world, 111);
+        Unit grunt = unitById(world, 129);
+        Unit laterVictim = unitById(world, 107);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1489 knight");
+        assertNotNull(grunt, "XHuman 10 has no native-slot-1471 grunt");
+        assertNotNull(laterVictim,
+                "XHuman 10 has no native-slot-1493 later projectile victim");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 199) {
+            mission.tick();
+        }
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, knight.order());
+        assertSame(grunt, knight.target());
+        assertEquals(83, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(3, knight.battleNetAnimationTimer());
+        assertEquals(11, grunt.hitPoints());
+        mission.tick();
+        assertEquals(2, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(1, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(Unit.Order.STILL, knight.order());
+        assertNull(knight.target());
+        assertEquals(83, knight.tileX(),
+                "the lethal projectile free must preempt the helper's route step");
+        assertEquals(89, knight.tileY(),
+                "the lethal projectile free must preempt the helper's route step");
+        assertEquals(1869, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(Unit.Order.DYING, grunt.order());
+        assertEquals(0x20c9b54f, world.battleNetRandomSeed(),
+                "fresh Still dispatch must own the native same-visit idle draw");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 228) {
+            mission.tick();
+        }
+        assertEquals(70, laterVictim.hitPoints(),
+                "fixture 203's draw must feed the native five-point axe impact");
+        assertEquals(0xb45bf651, world.randomSeed(),
+                "the fixture-228 impact must retain the authenticated sync seed");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's residual park owns refusal one and Attack recovery")
+    void xhuman10ResidualParkCountsItsRefusalBeforeThePaidRecovery() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1475 / Java id 125. Its northwest pixel
+        // residual settles on fixture 182 with the next east byte parked
+        // at route index 20. FUN_004379e0 owns that same visit, raising the
+        // sticky refusal nibble to one. Refusals two through seven follow on
+        // fixtures 183..188; eight installs Move 15 on 189. After the complete
+        // band, the attack chase clears the nibble and opens Attack 3 on 204
+        // without taking the newly available southeast route.
+        Unit grunt = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 10 has no native-slot-1475 grunt");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 181) {
+            mission.tick();
+        }
+
+        for (int fixture = 182; fixture <= 188; fixture++) {
+            mission.tick();
+            assertEquals(80, grunt.tileX());
+            assertEquals(89, grunt.tileY());
+            assertEquals(2482, grunt.battleNetSequenceOffset(),
+                    "fixture " + fixture + " parks at native Move start");
+            assertEquals(1, grunt.battleNetAnimationTimer(),
+                    "fixture " + fixture + " owns a one-visit refusal");
+            assertEquals(fixture - 181, grunt.battleNetRefusals(),
+                    "the settle visit itself is refusal one");
+        }
+        mission.tick();
+        assertEquals(2482, grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+        assertEquals(8, grunt.battleNetRefusals());
+        for (int fixture = 190; fixture <= 203; fixture++) {
+            mission.tick();
+            assertEquals(204 - fixture, grunt.battleNetAnimationTimer(),
+                    "fixture " + fixture + " drains the paid Move band");
+            assertEquals(80, grunt.tileX());
+            assertEquals(89, grunt.tileY());
+        }
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, grunt.order());
+        assertEquals(80, grunt.tileX());
+        assertEquals(89, grunt.tileY());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertEquals(0, grunt.battleNetCollisionCounter());
+        mission.tick();
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(2, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(80, grunt.tileX(),
+                "the paid recovery probe remains blocked on fixture 207");
+        assertEquals(89, grunt.tileY(),
+                "the paid recovery probe remains blocked on fixture 207");
+        assertEquals(2539, grunt.battleNetSequenceOffset(),
+                "the blocked Move probe re-arms native Attack construction");
+        assertEquals(3, grunt.battleNetAnimationTimer());
+    }
+
+    @Test
     @DisplayName("xhuman 10's knight retains Attack until the dead-quarry tail scan")
     void xhuman10KnightRetainsAttackUntilTheDeadQuarryTailScan() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -211,6 +411,129 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(1922, knight.battleNetSequenceOffset());
         assertEquals(3, knight.battleNetAnimationTimer(),
                 "the replacement opens knight Attack construction 3");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's adjacent tail retarget keeps the melee sync clock live")
+    void xhuman10AdjacentTailRetargetKeepsMeleeSyncClockLive() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slots 1485 and 1493 / Java 115 and 107 both
+        // finish their old grunt's Attack tail on fixture 194, retarget the
+        // adjacent slot-1482 grunt, and debit FUN_004234b0. Their fresh
+        // constructor plus committed OP0 hold then drains the same table-0x27
+        // clock, so both refresh together when OP0 advances on fixture 220.
+        // Java 107 used to retain an obsolete out-of-range destination arm;
+        // that surrogate froze only its sync clock through the whole hold.
+        Unit southernKnight = unitById(world, 115);
+        Unit northernKnight = unitById(world, 107);
+        Unit grunt = unitById(world, 118);
+        assertNotNull(southernKnight, "XHuman 10 has no native-slot-1485 knight");
+        assertNotNull(northernKnight, "XHuman 10 has no native-slot-1493 knight");
+        assertNotNull(grunt, "XHuman 10 has no native-slot-1482 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 194) {
+            mission.tick();
+        }
+
+        for (Unit knight : new Unit[] {southernKnight, northernKnight}) {
+            assertSame(grunt, knight.target());
+            assertEquals(1922, knight.battleNetSequenceOffset());
+            assertEquals(3, knight.battleNetAnimationTimer());
+            assertEquals(25, knight.battleNetMeleeSyncRemaining());
+            assertTrue(!knight.battleNetAttackWrapDestArmPending(),
+                    "an adjacent tail replacement has no destination arm left");
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 219) {
+            mission.tick();
+        }
+        for (Unit knight : new Unit[] {southernKnight, northernKnight}) {
+            assertEquals(1922, knight.battleNetSequenceOffset());
+            assertEquals(1, knight.battleNetAnimationTimer());
+            assertEquals(1, knight.battleNetMeleeSyncRemaining(),
+                    "the refresh is due on the next native action visit");
+        }
+        assertEquals(0x102f11d5, world.randomSeed());
+
+        mission.tick();
+        for (Unit knight : new Unit[] {southernKnight, northernKnight}) {
+            assertEquals(1923, knight.battleNetSequenceOffset());
+            assertEquals(1, knight.battleNetAnimationTimer());
+            assertEquals(25, knight.battleNetMeleeSyncRemaining());
+        }
+        assertEquals(0x7aae88db, world.randomSeed(),
+                "fixture 220 owns both authenticated knight refreshes");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's northern knight routes through a same-pass mover")
+    void xhuman10KnightRoutesThroughASamePassAcceptedMover() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slots 1485/1493, Java 115/107, finish Attack construction
+        // against axethrower 1496 together. Slot 1485 is visited first on
+        // fixture 324 and commits SW from (82,90) with collision nibble zero.
+        // Slot 1493's path writer then sees that action-three body as soft,
+        // stores SW,NW,N, and collision-waits at (82,88) under Move 1874/15.
+        // The dead-quarry handoff leaves Java's historical refusal proxy on
+        // 1485 for committed-swing timing, but that retired generation must
+        // not turn the accepted mover back into a wall and select the free
+        // east face.
+        Unit southernKnight = unitById(world, 115);
+        Unit northernKnight = unitById(world, 107);
+        Unit axethrower = unitById(world, 104);
+        assertNotNull(southernKnight, "XHuman 10 has no native-slot-1485 knight");
+        assertNotNull(northernKnight, "XHuman 10 has no native-slot-1493 knight");
+        assertNotNull(axethrower, "XHuman 10 has no native-slot-1496 axethrower");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 323) {
+            mission.tick();
+        }
+
+        for (Unit knight : new Unit[] {southernKnight, northernKnight}) {
+            assertSame(axethrower, knight.target());
+            assertEquals(1922, knight.battleNetSequenceOffset());
+            assertEquals(1, knight.battleNetAnimationTimer());
+            assertEquals(0, knight.battleNetCollisionCounter());
+        }
+        assertEquals(1, southernKnight.battleNetRefusals(),
+                "the committed swing still owns Java's historical timing proxy");
+
+        mission.tick();
+        assertEquals(81, southernKnight.tileX());
+        assertEquals(89, southernKnight.tileY());
+        assertEquals(32, southernKnight.offsetX());
+        assertEquals(32, southernKnight.offsetY());
+        Unit collisionOccupant = world.blockerOnLayer(
+                northernKnight, 81, 89);
+        assertSame(southernKnight, collisionOccupant,
+                () -> "same-layer lookup selected "
+                        + (collisionOccupant == null ? "null"
+                                : collisionOccupant.id() + ":"
+                                        + collisionOccupant.type().ident()));
+        assertEquals(82, northernKnight.tileX(),
+                "the north knight must collision-wait instead of stepping east");
+        assertEquals(88, northernKnight.tileY());
+        assertEquals(1874, northernKnight.battleNetSequenceOffset());
+        assertEquals(15, northernKnight.battleNetAnimationTimer());
     }
 
     @Test
@@ -489,6 +812,125 @@ class Xhuman10DamageTimingRealDataTest {
                 "the first melee draw must no longer be pending");
         assertTrue(knight.battleNetMeleeSyncRemaining() > 0,
                 "the draw arms the recurring melee cadence");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's knight finishes construction before replacing a dying quarry")
+    void xhuman10KnightReplacesDyingQuarryOnThePaidOp0Visit() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1480 / Java id 120. After its completed swing replaces
+        // grunt 1477 with footman 1471, that footman enters Die while Attack
+        // construction is on timer two. Retail retains the dying CUnitPtr for
+        // the timer-two -> timer-one tick. The paid OP0 visit then installs
+        // adjacent grunt 1482 directly into the 23-count body hold, preserving
+        // the table-0x27 synchronized debit on fixture 228.
+        Unit knight = unitById(world, 120);
+        Unit oldGrunt = unitById(world, 123);
+        Unit dyingFootman = unitById(world, 129);
+        Unit replacementGrunt = unitById(world, 118);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1480 knight");
+        assertNotNull(oldGrunt, "XHuman 10 has no native-slot-1477 grunt");
+        assertNotNull(dyingFootman, "XHuman 10 has no native-slot-1471 footman");
+        assertNotNull(replacementGrunt, "XHuman 10 has no native-slot-1482 grunt");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 201) {
+            mission.tick();
+        }
+
+        assertSame(oldGrunt, knight.target());
+        assertEquals(1945, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+
+        mission.tick();
+        assertSame(dyingFootman, knight.target());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(3, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertSame(dyingFootman, knight.target());
+        assertEquals(2, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertSame(dyingFootman, knight.target(),
+                "timer two must not free-scan away from the dying incumbent");
+        assertEquals(Unit.Order.DYING, dyingFootman.order());
+        assertEquals(1, knight.battleNetAnimationTimer());
+
+        mission.tick();
+        assertSame(replacementGrunt, knight.target());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(23, knight.battleNetAnimationTimer(),
+                "the timer-one replacement enters the already-paid body hold");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 228) {
+            mission.tick();
+        }
+        assertEquals(0xb45bf651, world.randomSeed(),
+                "the paid constructor keeps the recurring melee debit on fixture 228");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's grunt resumes past OP0 after its paid chase")
+    void xhuman10GruntResumesPastOp0AfterItsPaidChase() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slots 1475 / 1493, Java ids 125 / 107. The
+        // grunt pays Attack construction through fixtures 228..230 while the
+        // knight remains out of range, then follows its cached east route.
+        // When the stride settles on fixture 247, retail resumes directly at
+        // 2540/1 past OP0 rather than charging a second 2539/3,2,1 constructor.
+        // That body reaches OP10 on fixture 257 and deals the native three HP.
+        Unit grunt = unitById(world, 125);
+        Unit knight = unitById(world, 107);
+        assertNotNull(grunt, "XHuman 10 has no native-slot-1475 grunt");
+        assertNotNull(knight, "XHuman 10 has no native-slot-1493 knight");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 230) {
+            mission.tick();
+        }
+
+        assertSame(knight, grunt.target());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "fixture 230 finishes the one and only Attack constructor");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 247) {
+            mission.tick();
+        }
+        assertEquals(81, grunt.tileX());
+        assertEquals(89, grunt.tileY());
+        assertSame(knight, grunt.target());
+        assertEquals(2540, grunt.battleNetSequenceOffset(),
+                "the paid chase resumes immediately past Attack OP0");
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(2544, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "fixture 248 enters the authenticated melee wind-up");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 257) {
+            mission.tick();
+        }
+        assertEquals(67, knight.hitPoints(),
+                "fixture 257 owns native slot 1475's three-point OP10 blow");
+        assertEquals(2558, grunt.battleNetSequenceOffset());
+        assertEquals(5, grunt.battleNetAnimationTimer());
     }
 
     @Test
@@ -1248,6 +1690,246 @@ class Xhuman10DamageTimingRealDataTest {
                 "native wakes after the bounded band and replans south");
         assertEquals(8, peon.battleNetCollisionCounter(),
                 "the paid refusal generation remains attached to the route");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's laden peon retains its refused return route")
+    void xhuman10LadenPeonRetainsItsRefusedReturnRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1588 / Java 12 leaves the mine carrying
+        // 100 gold and caches SW,S,S,S,SW toward the stronghold. After SW's
+        // residual settles at (56,2), the next S is occupied. Retail retains
+        // all four tail bytes and restarts peon Move at 2600/15 on fixture
+        // 270; it repeats that refusal at fixture 285 with collision nibble
+        // two. Clearing the cached tail lets the resource order replan and
+        // step SE immediately on fixture 271.
+        Unit peon = unitById(world, 12);
+        assertNotNull(peon, "XHuman 10 has no native-slot-1588 return peon");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 248) {
+            mission.tick();
+        }
+        assertEquals(56, peon.tileX());
+        assertEquals(2, peon.tileY());
+        assertTrue(peon.returningToDepot());
+        assertEquals(100, peon.carried());
+        assertEquals(4, peon.pathLength(),
+                "the SW step leaves the authenticated S,S,S,SW tail");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 270) {
+            mission.tick();
+        }
+        assertEquals(56, peon.tileX());
+        assertEquals(2, peon.tileY());
+        assertEquals(4, peon.pathLength(),
+                "the first laden refusal parks the cursor without erasing its bytes");
+        assertEquals(1, peon.battleNetCollisionCounter());
+        assertEquals(2600, peon.battleNetSequenceOffset());
+        assertEquals(15, peon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(56, peon.tileX(),
+                "the refused return must remain on its native tile at fixture 271");
+        assertEquals(2, peon.tileY());
+        assertEquals(4, peon.pathLength());
+        assertEquals(14, peon.battleNetAnimationTimer());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 285) {
+            mission.tick();
+        }
+        assertEquals(56, peon.tileX());
+        assertEquals(2, peon.tileY());
+        assertEquals(4, peon.pathLength());
+        assertEquals(2, peon.battleNetCollisionCounter(),
+                "the second timer-one refusal advances the same generation");
+        assertEquals(2600, peon.battleNetSequenceOffset());
+        assertEquals(15, peon.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's laden peon redraws behind a collided returner")
+    void xhuman10LadenPeonRedrawsBehindACollidedReturner() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1584 / Java 16 exits its mine with the
+        // old approach collision generation cleared, then caches S,S,SW after
+        // its opening SW return stride. On fixture 290, collided returner
+        // 1590 still occupies the next S at the start of the pass. Retail
+        // raises collision one and parks the cursor at 20/Move 2600/1; it
+        // redraws SE,S,SW,NW and commits SE on the following fixture. Treating
+        // every far laden blocker as cooperative freezes this peon for 15.
+        Unit peon = unitById(world, 16);
+        assertNotNull(peon, "XHuman 10 has no native-slot-1584 return peon");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 268) {
+            mission.tick();
+        }
+        assertEquals(56, peon.tileX());
+        assertEquals(3, peon.tileY());
+        assertTrue(peon.returningToDepot());
+        assertEquals(100, peon.carried());
+        assertEquals(0, peon.battleNetCollisionCounter(),
+                "DropOutNearest clears the mine-approach collision generation");
+        assertEquals(3, peon.pathLength());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 290) {
+            mission.tick();
+        }
+        assertEquals(56, peon.tileX());
+        assertEquals(3, peon.tileY());
+        assertEquals(0, peon.pathLength(),
+                "the collided block parks native route index at twenty");
+        assertEquals(1, peon.battleNetCollisionCounter());
+        assertEquals(2600, peon.battleNetSequenceOffset());
+        assertEquals(1, peon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(57, peon.tileX());
+        assertEquals(4, peon.tileY(),
+                "the following action visit commits the replacement SE head");
+        assertEquals(3, peon.pathLength());
+        assertEquals(1, peon.battleNetCollisionCounter());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's laden peon refills before the depot skirt")
+    void xhuman10LadenPeonRefillsBeforeTheDepotSkirt() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1596 / Java 4 consumes SW,S,S,SW on its
+        // laden walk. The last residual reaches exact tile centre at (55,6)
+        // on fixture 310. That point is two anchors from the stronghold's
+        // contracted entry, so retail remains in action 24, refills SW,SE,
+        // and commits SW to (54,7) in the same visit. Action 25 begins only
+        // after this new stride settles; staging it at (55,6) is three cycles
+        // late at the first observable tile boundary.
+        Unit peon = unitById(world, 4);
+        assertNotNull(peon, "XHuman 10 has no native-slot-1596 return peon");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 309) {
+            mission.tick();
+        }
+        assertEquals(55, peon.tileX());
+        assertEquals(6, peon.tileY());
+        assertTrue(peon.returningToDepot());
+        assertEquals(100, peon.carried());
+
+        mission.tick();
+        assertEquals(54, peon.tileX(),
+                "action 24 must refill and commit on the residual-settle visit");
+        assertEquals(7, peon.tileY());
+        assertEquals(0, peon.battleNetOrderDelay(),
+                "the outer point is not yet action 25's depot skirt");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's return route honors a surfaced worker's departure")
+    void xhuman10ReturnRouteHonorsASurfacedWorkersDeparture() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1436 / Java 164 surfaces at (15,116) under a 25-visit
+        // ready Still whose queued next action is Return Goods. When slot 1434
+        // / Java 166 plans north from (15,117), native treats that ready body
+        // as a promised departure, writes a north-led route through it, then
+        // refuses the still-occupied first byte. Fixture 318 is Move 2600/1,
+        // collision one, route index twenty. Keeping every Still body solid
+        // made Java wall-follow NW and move immediately.
+        Unit returner = unitById(world, 166);
+        Unit surfaced = unitById(world, 164);
+        assertNotNull(returner, "XHuman 10 has no native-slot-1434 returner");
+        assertNotNull(surfaced, "XHuman 10 has no native-slot-1436 blocker");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 317) {
+            mission.tick();
+        }
+        assertEquals(15, returner.tileX());
+        assertEquals(117, returner.tileY());
+        assertEquals(Unit.Order.STILL, surfaced.order());
+        assertEquals(15, surfaced.tileX());
+        assertEquals(116, surfaced.tileY());
+        assertTrue(surfaced.returningToDepot());
+        assertEquals(100, surfaced.carried());
+        assertTrue(surfaced.battleNetOrderDelay() > 0);
+        assertTrue(surfaced.queuedReplacementPending());
+        assertTrue(surfaced.hasQueuedOrders());
+        assertEquals(Unit.QueuedOrderKind.RETURN_GOODS,
+                surfaced.queuedOrders().getFirst().kind());
+
+        mission.tick();
+        assertEquals(15, returner.tileX(),
+                "the direct north route must refuse instead of detouring NW");
+        assertEquals(117, returner.tileY());
+        assertEquals(0, returner.pathLength(),
+                "the refused route projects native route index twenty");
+        assertEquals(1, returner.battleNetCollisionCounter());
+        assertEquals(2600, returner.battleNetSequenceOffset());
+        assertEquals(1, returner.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's expansion peon receives the native eastern hall site")
+    void xhuman10ExpansionPeonReceivesTheNativeEasternHallSite() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+        Unit peon = unitById(world, 49);
+        assertNotNull(peon, "XHuman 10 has no native-slot-1551 expansion peon");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        mission.tick();
+
+        assertEquals(Unit.Order.BUILD, peon.order());
+        assertNotNull(peon.pendingBuild());
+        assertEquals("unit-great-hall", peon.pendingBuild().ident());
+        assertEquals(40, peon.buildTileX(),
+                "authenticated native action 28 stores priority-list hall "
+                        + "top-left (40,79)");
+        assertEquals(79, peon.buildTileY());
+        assertEquals(40, peon.buildGoalX());
+        assertEquals(79, peon.buildGoalY());
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

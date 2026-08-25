@@ -390,6 +390,32 @@ class BattleNetPathFinderTest {
     }
 
     @Test
+    @DisplayName("doubled air Patrol keeps a moving ally hard only on its direct ray")
+    void doubledAirPatrolUsesHardDirectAndSoftWallViews() {
+        BattleNetPathFinder.Passability wall = new BattleNetPathFinder.Passability() {
+            @Override
+            public boolean canEnter(int x, int y) {
+                return x >= 0 && y >= 0;
+            }
+
+            @Override
+            public boolean isOutOfBounds(int x, int y) {
+                return x < 0 || y < 0;
+            }
+        };
+        BattleNetPathFinder.Passability direct = (x, y) ->
+                x >= 0 && y >= 0 && (x != 0 || y != 16);
+
+        PathFinder.Path path = BattleNetPathFinder.find(
+                2, 10, 0, 16, 2, wall, direct, null,
+                false, false, false, true,
+                false, false, false, true);
+
+        assertArrayEquals(new int[] {4, 4, 4}, path.headings(),
+                "native XOrc 8 gryphon 1550 stores S,S,S beside the ally");
+    }
+
+    @Test
     @DisplayName("wood reverse-free blocked goal keeps Bresenham south-west prefix")
     void xhumanTwelvePeonWoodKeepsSouthwestTowardBlockedOrderPoint() {
         // XHuman 12 peon 1497 at 76,38 with reverse-free order point 74,40

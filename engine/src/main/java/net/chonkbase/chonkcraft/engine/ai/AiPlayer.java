@@ -3070,7 +3070,7 @@ public final class AiPlayer {
                 && world.dependenciesSatisfied(playerIndex, hall.ident())
                 && world.mayBuild(unit.type(), hall)
                 && player.canAfford(hall.costs())) {
-            int[] site = world.aiFindBattleNetHallPlace(unit, hall);
+            int[] site = world.aiFindBattleNetReadyHallPlace(unit, hall);
             if (site != null && world.orderBattleNetAiBuild(
                     unit, hall, site[0], site[1])) {
                 BuildRequest started = new BuildRequest(hall, 1);
@@ -4799,6 +4799,15 @@ public final class AiPlayer {
                     || candidate.order() != Unit.Order.PATROL
                     || !candidate.isMoving()
                     || candidate.hasBattleNetPendingPatrol()
+                    // A later blow from the same hidden attacker does not
+                    // enqueue the same guard rendezvous again. The first hit
+                    // sends XHuman 7 submarine 1511 toward destroyer 1420;
+                    // the second, at fixture 155, leaves its live twenty-byte
+                    // route and route index intact so its next SE byte lands
+                    // on fixture 180. Reissuing the identical position order
+                    // parked that route and added three action visits.
+                    || (candidate.orderTargetX() == defender.tileX()
+                            && candidate.orderTargetY() == defender.tileY())
                     || !canTargetType(candidate, attacker)) {
                 continue;
             }

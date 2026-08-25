@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -210,6 +211,190 @@ class BattleNetMovingQuarryChaseRealDataTest {
         }
         assertEquals(14, quarry.hitPoints(),
                 "native slot 1538 lands its first replacement blow at 159");
+    }
+
+    @Test
+    void aMovingQuarryKeepsOwnershipOfItsCollidedChaseHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 77, 69);
+        assertNotNull(attacker);
+
+        while (fixtureCycle(mission.world()) < 179) {
+            mission.tick();
+        }
+        Unit quarry = attacker.target();
+        assertNotNull(quarry);
+        assertChaser(attacker, 73, 65, 0, 0, false);
+
+        while (fixtureCycle(mission.world()) < 183) {
+            mission.tick();
+        }
+        assertChaser(attacker, 73, 65, 0, 0, false);
+        assertSame(quarry, attacker.target(),
+                "a vacating ally must not release a hold drawn for the quarry's old tile");
+
+        while (fixtureCycle(mission.world()) < 189) {
+            mission.tick();
+        }
+        assertChaser(attacker, 73, 65, 0, 0, false);
+        assertSame(quarry, attacker.target(),
+                "a free stale heading must not release the quarry's paid Move countdown");
+
+        while (fixtureCycle(mission.world()) < 194) {
+            mission.tick();
+        }
+        assertChaser(attacker, 73, 65, 0, 0, false);
+
+        mission.tick();
+        assertChaser(attacker, 74, 64, -32, 32, true);
+        assertTrue(attacker.target() != quarry,
+                "the paid Move OP0 must select the nearer live quarry");
+        assertEquals(76, attacker.target().tileX());
+        assertEquals(61, attacker.target().tileY());
+        assertEquals(2603, attacker.battleNetSequenceOffset(),
+                "fixture 195 spends the fresh route's north-east head");
+        assertEquals(1, attacker.battleNetAnimationTimer());
+    }
+
+    @Test
+    void anAdjacentMovingQuarryStartsWithTheCommittedAttackHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 87, 77);
+        assertNotNull(attacker);
+        assertFalse(attacker.type().firesMissile());
+
+        while (fixtureCycle(mission.world()) < 172) {
+            mission.tick();
+        }
+        Unit quarry = attacker.target();
+        assertNotNull(quarry);
+        assertTrue(quarry.isMoving());
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+        assertTrue(attacker.battleNetAttackResumeFromMove(),
+                "the Attack-tail replacement owns a committed OP0 hold");
+
+        while (fixtureCycle(mission.world()) < 175) {
+            mission.tick();
+        }
+        assertSame(quarry, attacker.target());
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(23, attacker.battleNetAnimationTimer(),
+                "native parks at Attack start instead of swinging at a moving quarry");
+    }
+
+    @Test
+    void aHuman8MeleeOp0RetargetEntersTheCommittedAttackHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (fixtureCycle(mission.world()) < 197) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 86, 81);
+        assertNotNull(attacker,
+                "native slot 1501 has not completed its prior attack body");
+
+        mission.tick();
+        Unit quarry = unitAt(mission.world(), 2,
+                "unit-peasant", 86, 82);
+        assertNotNull(quarry, "native slot 1499 must still be chopping at 86,82");
+        assertSame(quarry, attacker.target(),
+                "the completed OP0 scan selects the adjacent chopping peasant");
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the replacement quarry opens fresh Attack construction");
+
+        while (fixtureCycle(mission.world()) < 201) {
+            mission.tick();
+        }
+        assertEquals(2657, attacker.battleNetSequenceOffset(),
+                "the paid constructor must remain at Attack start");
+        assertEquals(23, attacker.battleNetAnimationTimer(),
+                "native enters bodyWaitSum-1 after the OP0 retarget constructor");
+        assertEquals(11, quarry.hitPoints());
+
+        while (fixtureCycle(mission.world()) < 211) {
+            mission.tick();
+        }
+        assertEquals(13, attacker.battleNetAnimationTimer(),
+                "the native body hold is still draining at the old damage cycle");
+        assertEquals(11, quarry.hitPoints(),
+                "the chopping peasant must not take Java's premature fixture-211 blow");
+        Unit critter = unitAt(mission.world(), 15,
+                "unit-critter", 19, 54);
+        assertNotNull(critter);
+        assertEquals(Unit.Order.MOVE, critter.order(),
+                "removing the phantom melee draw restores the native critter wander");
+        assertEquals(20, critter.orderTargetX());
+        assertEquals(55, critter.orderTargetY());
+    }
+
+    @Test
+    void anExpiredQuarryHandsTimerOneConstructionToItsReplacementRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitAt(mission.world(), 4,
+                "unit-attack-peasant", 77, 69);
+        assertNotNull(attacker);
+
+        while (fixtureCycle(mission.world()) < 213) {
+            mission.tick();
+        }
+        assertChaser(attacker, 74, 64, 0, 0, false);
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer(),
+                "the expired quarry is validated on Attack construction timer one");
+
+        Unit expired = attacker.target();
+        mission.tick();
+        assertEquals(214, fixtureCycle(mission.world()));
+        assertChaser(attacker, 75, 63, -32, 32, true);
+        assertTrue(attacker.target() != expired,
+                "timer-one validation must name the live replacement quarry");
+        assertEquals(2603, attacker.battleNetSequenceOffset(),
+                "the already-paid construction hands directly to Move body");
     }
 
     private static Unit unitAt(World world, int player, String ident,

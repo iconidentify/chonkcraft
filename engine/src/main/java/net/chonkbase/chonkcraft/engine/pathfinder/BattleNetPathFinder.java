@@ -251,6 +251,29 @@ public final class BattleNetPathFinder {
             boolean shareWallBufferBetweenFaces,
             boolean reverseWallFaceOrder,
             boolean retainFirstWallFace) {
+        return find(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, shareWallBufferBetweenFaces,
+                reverseWallFaceOrder, retainFirstWallFace, false);
+    }
+
+    /**
+     * Finds a route with an independently authenticated direct-ray view.
+     *
+     * @param hardDirectRay use the optimizer's unmodified occupancy view for
+     *     the direct writer while retaining the softened wall traversal view
+     */
+    public static PathFinder.Path find(int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace,
+            boolean hardDirectRay) {
         if (stride != 1 && stride != 2) {
             throw new IllegalArgumentException("BNE movement stride must be 1 or 2");
         }
@@ -271,13 +294,15 @@ public final class BattleNetPathFinder {
 
         List<Integer> direct = new ArrayList<>(MAX_PATH);
         Line line = new Line(fromX, fromY, toX, toY);
+        Passability directPassability = hardDirectRay
+                ? optimizationPassability : passability;
         int x = fromX;
         int y = fromY;
         while (direct.size() < MAX_PATH && (x != toX || y != toY)) {
             int heading = line.next();
             int nx = x + Direction.deltaX(heading) * stride;
             int ny = y + Direction.deltaY(heading) * stride;
-            if (!passability.canEnter(nx, ny)) {
+            if (!directPassability.canEnter(nx, ny)) {
                 // A terrain-resource order aimed at its intrinsically
                 // blocked square keeps the clear part of its ray. Human 13
                 // captures 7,ff... from 80,7 toward the tree at 78,5: the

@@ -43,6 +43,11 @@ __pycache__/
 
 # Content-addressed run root for compiled native capture plans. Dry runs only.
 /.bne-capture-plan/
+/.bne-capture-plans/
+/.bne-causal-evidence/
+/.bne-debug/
+/.bne-decision-captures/
+/.bne-triage/
 
 # Focused sub-tile Java diagnostic reruns, retained per blocker so cadence
 # stops asking for the same rerun twice.

@@ -76,6 +76,23 @@ class XHuman12MovingLandLaunchRealDataTest {
         }
         assertEquals(Unit.Order.ATTACK, ogre.order(),
                 "the queued direct Attack promotes on the stride's settle visit");
+
+        while (fixtureCycle(world) < 215) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, ogre.order());
+        assertEquals(10, ogre.tileX());
+        assertEquals(88, ogre.tileY());
+        assertEquals(2, ogre.offsetX(),
+                "fixture 215 retains the final two westbound pixels");
+
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, ogre.order());
+        assertEquals(9, ogre.tileX(),
+                "fixture 216 settles west and immediately commits the northwest refill");
+        assertEquals(87, ogre.tileY());
+        assertEquals(32, ogre.offsetX());
+        assertEquals(32, ogre.offsetY());
     }
 
     private static int fixtureCycle(World world) {

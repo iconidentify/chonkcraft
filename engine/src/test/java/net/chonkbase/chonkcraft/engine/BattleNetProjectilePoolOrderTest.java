@@ -52,6 +52,19 @@ class BattleNetProjectilePoolOrderTest {
                 null, 0);
     }
 
+    private static MissileType bigCannon() {
+        return new MissileType("missile-big-cannon", null,
+                MissileClass.POINT_TO_POINT, 16, 16, 20, 9, 16, 1, 2, 4, 50,
+                "missile-cannon-tower-explosion", null, false, 0, 0, false,
+                null, 0);
+    }
+
+    private static MissileType cannonExplosion() {
+        return new MissileType("missile-cannon-tower-explosion", null,
+                MissileClass.STAY, 32, 32, 4, 1, 16, 2, 1, 1, 50, null, null,
+                false, 0, 0, false, null, 0);
+    }
+
     private static UnitType catapult() {
         UnitType type = new UnitType("unit-catapult");
         type.setTileSize(1, 1);
@@ -149,6 +162,37 @@ class BattleNetProjectilePoolOrderTest {
         world.prepareBattleNetProjectile(pendingRock, true);
         assertEquals(4, pendingRock.battleNetPoolSlot(),
                 "the later constructor did not follow the earlier real shot");
+    }
+
+    @Test
+    @DisplayName("a BNE cannon constructor reserves its source effect pool entry")
+    void cannonConstructorReservesTheFollowingNativePoolEntry() {
+        World world = new World(grass(16));
+        MissileType cannon = bigCannon();
+        world.setMissileTypes(Map.of(
+                "missile-big-cannon", cannon,
+                "missile-cannon-tower-explosion", cannonExplosion()));
+        world.restoreRandom(1, 0);
+        Unit firstAttacker = world.createUnit(catapult(), 0, 2, 2);
+        Unit secondAttacker = world.createUnit(catapult(), 0, 2, 4);
+        Unit target = world.createUnit(footman(), 1, 8, 2);
+        assertTrue(firstAttacker != null && secondAttacker != null
+                && target != null, "units place");
+
+        Missile first = world.projectiles.launch(firstAttacker, target, cannon);
+        world.projectiles.queuePendingAttack(firstAttacker, first, 3);
+        world.prepareBattleNetProjectile(first, true);
+        Missile second = world.projectiles.launch(secondAttacker, target, cannon);
+        world.projectiles.queuePendingAttack(secondAttacker, second, 3);
+        world.prepareBattleNetProjectile(second, true);
+
+        assertEquals(3, first.battleNetPoolSlot());
+        assertTrue(world.battleNetProjectileSlots[4],
+                "native type-25 cannon source effect owns the following slot");
+        assertEquals(5, second.battleNetPoolSlot(),
+                "the second real cannon shell follows the first source effect");
+        assertTrue(world.battleNetProjectileSlots[6],
+                "the second cannon source effect reserves its own pool entry");
     }
 
     @Test

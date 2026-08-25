@@ -796,6 +796,10 @@ public final class LoadGame {
             unit.setBattleNetAttackRefusalRecoveryStage(
                     integer(state.rawGet("attackRefusalRecoveryStage")));
         }
+        if (state.rawGet("paidRefusalRecoveryApproach") != null) {
+            unit.setBattleNetPaidRefusalRecoveryApproach(
+                    truthy(state.rawGet("paidRefusalRecoveryApproach")));
+        }
         if (state.rawGet("actionBeforeQueued") != null) {
             try {
                 Unit.Order before = Unit.Order.valueOf(
@@ -848,10 +852,6 @@ public final class LoadGame {
                         integer(state.rawGet("retargetResidualParkSteps")));
             }
         }
-        if (state.rawGet("parkedRefusalHeading") != null) {
-            unit.setBattleNetParkedRefusalHeading(
-                    integer(state.rawGet("parkedRefusalHeading")));
-        }
         if (state.rawGet("saturatedWallFacePairHeading") != null) {
             unit.setBattleNetSaturatedWallFacePairHeading(
                     integer(state.rawGet("saturatedWallFacePairHeading")));
@@ -903,6 +903,10 @@ public final class LoadGame {
         if (state.rawGet("stageSixCardinalProbePark") != null) {
             unit.setBattleNetStageSixCardinalProbePark(
                     truthy(state.rawGet("stageSixCardinalProbePark")));
+        }
+        if (state.rawGet("parkedRefusalHeading") != null) {
+            unit.setBattleNetParkedRefusalHeading(
+                    integer(state.rawGet("parkedRefusalHeading")));
         }
         if (state.rawGet("attackWaitRefillResidual") != null) {
             unit.setBattleNetAttackWaitRefillResidual(

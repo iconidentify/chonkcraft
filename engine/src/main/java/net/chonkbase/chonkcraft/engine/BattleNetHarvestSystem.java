@@ -343,6 +343,26 @@ final class BattleNetHarvestSystem {
                         && worker.returningToDepot() && worker.carried() > 0;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
+                // A laden return counts the native Move program itself rather
+                // than sleeping through a generic Still animation. XHuman 10
+                // peon 1588 is 2600/15 on its fixture-270 cooperative refusal,
+                // 2600/14 on 271, and reaches timer one on 284 before refusing
+                // S again on 285. A refusalHold return counts the same program,
+                // then parks its stale route when this delay expires (1498
+                // below).
+                if (worker.returningToDepot() && worker.carried() > 0
+                        && worker.pathLength() > 0
+                        && worker.battleNetCollisionCounter() > 0
+                        && world.battleNetSequence != null) {
+                    int moveStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0
+                            && worker.battleNetSequenceOffset() == moveStart
+                            && worker.battleNetAnimationTimer() > 1) {
+                        worker.setBattleNetAnimationTimer(
+                                worker.battleNetAnimationTimer() - 1);
+                    }
+                }
                 // A terrain resource whose exhausted route could not yet be
                 // rebuilt stays in action 23's three-call construction body.
                 // Keep the raw cursor in step with the same 3,2,1 cadence as
@@ -1409,7 +1429,8 @@ final class BattleNetHarvestSystem {
      * constructs 24. Player-issued resource orders keep their own continuous
      * loop; this boundary is the computer ready callback at {@code 0x439280}.</p>
      */
-    private boolean pauseOilForReadyDispatch(Unit worker, ResourceInfo info) {
+    private boolean pauseOilForReadyDispatch(Unit worker, ResourceInfo info,
+            int[] returnPoint) {
         if (info.resource() != UnitType.Resource.OIL) {
             return false;
         }
@@ -1425,12 +1446,14 @@ final class BattleNetHarvestSystem {
         Unit home = worker.returnDepotGoal();
         if (worker.carried() > 0 && home != null
                 && world.battleNetSequence != null) {
+            int goalX = returnPoint == null ? home.tileX() : returnPoint[0];
+            int goalY = returnPoint == null ? home.tileY() : returnPoint[1];
             worker.clearPath();
             worker.setReturningToDepot(true);
-            worker.setOrderTarget(home.tileX(), home.tileY());
+            worker.setOrderTarget(goalX, goalY);
             worker.enqueueOrder(new Unit.QueuedOrder(
                     Unit.QueuedOrderKind.RETURN_GOODS,
-                    home.tileX(), home.tileY(), home, null, null));
+                    goalX, goalY, home, null, null));
             worker.setQueuedReplacementPending(true);
             // This unit tick decrements the queue once after StopGathering,
             // leaving the authenticated timer 25 at the cycle boundary.
@@ -1439,6 +1462,10 @@ final class BattleNetHarvestSystem {
         worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
         worker.setBattleNetOilActionTicks(0);
         return true;
+    }
+
+    private boolean pauseOilForReadyDispatch(Unit worker, ResourceInfo info) {
+        return pauseOilForReadyDispatch(worker, info, null);
     }
 
     private boolean pauseComputerForReadyDispatch(Unit worker) {
@@ -1472,6 +1499,10 @@ final class BattleNetHarvestSystem {
         Unit home = bestDepotByTravel(worker, info.resource(), 1000);
         Unit rememberedDepot = worker.resourceDepot();
         Unit dropTowards = home;
+        int[] returnPoint = home != null && world.battleNetSequence != null
+                ? world.battleNetSpreadUnitGoal(
+                        worker, home.tileX(), home.tileY())
+                : null;
         String resourceTrace = System.getenv("CHONKCRAFT_TRACE_RESOURCE");
         if (resourceTrace != null
                 && worker.id() == Integer.parseInt(resourceTrace)) {
@@ -1486,16 +1517,26 @@ final class BattleNetHarvestSystem {
                 && rememberedDepot.isAlive() && !rememberedDepot.isDying()) {
             dropTowards = rememberedDepot;
         }
-        if (!leaveResource(worker, dropTowards)) {
+        boolean leftResource = returnPoint != null
+                ? leaveResource(worker, returnPoint[0], returnPoint[1])
+                : leaveResource(worker, dropTowards);
+        if (!leftResource) {
             return;
         }
         worker.setResourceDepot(home);
         worker.setReturnDepotGoal(home);
+        if (returnPoint != null) {
+            // The native order constructor authors and spreads unit+0x84
+            // before 0x4519d0 reads it for dropout. Preserve that same point
+            // through the timed Still head and the eventual queue pop.
+            worker.setOrderTarget(returnPoint[0], returnPoint[1]);
+        }
 
-        if (pauseOilForReadyDispatch(worker, info)) {
+        if (pauseOilForReadyDispatch(worker, info, returnPoint)) {
             return;
         }
-        if (pauseGoldMinerForReturnDispatch(worker, info, home)) {
+        if (pauseGoldMinerForReturnDispatch(
+                worker, info, home, returnPoint)) {
             return;
         }
         beginReturnToDepot(worker, info);
@@ -1525,7 +1566,7 @@ final class BattleNetHarvestSystem {
      * and advances the worker an extra tile immediately.</p>
      */
     private boolean pauseGoldMinerForReturnDispatch(Unit worker,
-            ResourceInfo info, Unit home) {
+            ResourceInfo info, Unit home, int[] returnPoint) {
         if (info.resource() != UnitType.Resource.GOLD
                 || home == null || world.battleNetSequence == null) {
             return false;
@@ -1533,10 +1574,12 @@ final class BattleNetHarvestSystem {
         beginReturnToDepot(worker, info);
         worker.clearPath();
         worker.setOrder(Unit.Order.STILL);
-        worker.setOrderTarget(home.tileX(), home.tileY());
+        int goalX = returnPoint == null ? home.tileX() : returnPoint[0];
+        int goalY = returnPoint == null ? home.tileY() : returnPoint[1];
+        worker.setOrderTarget(goalX, goalY);
         worker.enqueueOrder(new Unit.QueuedOrder(
                 Unit.QueuedOrderKind.RETURN_GOODS,
-                home.tileX(), home.tileY(), home, null, null));
+                goalX, goalY, home, null, null));
         worker.setQueuedReplacementPending(true);
         // The queue is visited once more at the bottom of this same unit
         // tick, so store 26 to leave the authenticated end-of-cycle 25.
@@ -1953,8 +1996,20 @@ final class BattleNetHarvestSystem {
                                 + Direction.deltaY(shortcut);
                         if (world.canEnter(worker, shortcutX, shortcutY)) {
                             worker.setBattleNetWoodRouteIndex20(true);
+                            return;
                         }
                     }
+                    // A repeated diagonal has no two-heading shortcut. Native
+                    // parks that stale tail at route index twenty on the
+                    // residual-settle visit, so the next resource callback
+                    // draws against current occupancy instead of spending a
+                    // visit refusing the cached square. XHuman 11 peon 1584
+                    // settles SE at fixture 215 with another SE occupied,
+                    // then redraws east and commits it at 216.
+                    worker.clearPath();
+                    worker.setRouteSpent(false);
+                    worker.setWaitCycles(0);
+                    worker.setBattleNetOrderDelay(0);
                     return;
                 }
                 if (worker.battleNetWoodRouteIndex20()) {
@@ -2043,8 +2098,40 @@ final class BattleNetHarvestSystem {
             // NE,N,N,N,N,N, which is exactly what that gives. When something
             // else is in the way first, it does not: Human 5's peasant 1512
             // has a farm between it and its tree and aims at the farm.
+            int terminalHeading = worker.lastStepHeading();
+            int terminalX = terminalHeading >= 0
+                    && terminalHeading < Direction.COUNT
+                            ? worker.tileX()
+                                    + Direction.deltaX(terminalHeading)
+                            : worker.tileX();
+            int terminalY = terminalHeading >= 0
+                    && terminalHeading < Direction.COUNT
+                            ? worker.tileY()
+                                    + Direction.deltaY(terminalHeading)
+                            : worker.tileY();
+            Unit terminalBlocker = world.unitAt(terminalX, terminalY);
+            boolean diagonalTerminalRedraw = worker.pathLength() == 0
+                    && worker.stepDrained()
+                    && worker.battleNetCollisionCounter() == 2
+                    && Direction.isDiagonal(terminalHeading)
+                    && Math.max(Math.abs(treeX - worker.tileX()),
+                            Math.abs(treeY - worker.tileY())) <= 2
+                    && terminalBlocker != null
+                    && terminalBlocker != worker
+                    && terminalBlocker.isOnMap()
+                    && !terminalBlocker.isDying()
+                    && world.isAllied(worker.player(),
+                            terminalBlocker.player());
             boolean aimAtResource =
-                    world.battleNetRayReachesResource(worker, treeX, treeY);
+                    world.battleNetRayReachesResource(worker, treeX, treeY)
+                    // The blocked diagonal which ended the previous direct
+                    // forest ray remains part of that ray's collision
+                    // generation. XHuman 11 slot 1588 parks RI20/collision
+                    // two at fixture 210 while peon 1586 holds SE. Its next
+                    // visit must still aim at tree 20,18, producing E,SE
+                    // around the blocker; recomputing an intermediate order
+                    // point chooses a one-byte south route instead.
+                    || diagonalTerminalRedraw;
             int[] orderPoint = aimAtResource
                     ? new int[] {treeX, treeY}
                     : battleNetWoodOrderPoint(worker, treeX, treeY);
@@ -3418,12 +3505,36 @@ final class BattleNetHarvestSystem {
             return false;
         }
         int[] spot = world.placeResourceBeside(worker, resource, towards);
+        return finishLeaveResource(worker, spot);
+    }
+
+    /** Leaves a resource toward an already-authored native order point. */
+    boolean leaveResource(Unit worker, int goalX, int goalY) {
+        Unit resource = worker.worksite();
+        if (resource == null) {
+            return false;
+        }
+        int[] spot = world.placeResourceBesidePoint(
+                worker, resource, goalX, goalY);
+        return finishLeaveResource(worker, spot);
+    }
+
+    private boolean finishLeaveResource(Unit worker, int[] spot) {
         if (spot == null) {
             return false;
         }
         worker.setTile(spot[0], spot[1]);
         worker.setRemoved(false);
         worker.setWorksite(null);
+        // DropOutNearest starts the worker's outward walk in a fresh collision
+        // generation. The mine-approach nibble is not part of the carried
+        // return route: XHuman 10 slot 1584 is collision two while inside the
+        // mine, then zero from its fixture-240 drop-out until the first return
+        // refusal at fixture 290. Letting that stale generation escape the
+        // mine also made other returners classify this worker as collided and
+        // redraw paths which retail retains.
+        worker.setBattleNetCollisionCounter(0);
+        worker.setBattleNetRefusals(0);
         world.markOccupancy(worker, true);
         world.unitCountSeen(worker);
         world.markSight(worker, true);
@@ -3859,7 +3970,16 @@ final class BattleNetHarvestSystem {
         // its depot is FindDeposit's: nearest by the walked route,
         // unreachable ones excluded (NewActionReturnGoods,
         // The game ).
-        Unit depot = bestDepotByTravel(unit, resource, 1000);
+        // A queued mine/platform exit has already selected its weak depot
+        // goal before dropout. Keep that choice through the ready boundary;
+        // only a missing or invalidated goal needs a fresh FindDeposit.
+        Unit depot = unit.returnDepotGoal();
+        if (depot == null || !depot.isAlive() || !depot.isOnMap()
+                || depot.player() != unit.player() || depot.type() == null
+                || !depot.type().storesResource(resource)
+                || depot.order() == Unit.Order.UNDER_CONSTRUCTION) {
+            depot = bestDepotByTravel(unit, resource, 1000);
+        }
         if (depot == null) {
             // Born in SUB_UNREACHABLE_DEPOT: the first cycle's Execute is
             // ResourceGiveUp, which keeps the load -- a goalless order has

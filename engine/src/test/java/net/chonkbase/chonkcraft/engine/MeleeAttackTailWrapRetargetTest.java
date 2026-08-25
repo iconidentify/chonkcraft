@@ -371,6 +371,96 @@ class MeleeAttackTailWrapRetargetTest {
     }
 
     @Test
+    @DisplayName("an expired melee OP0 hold names a dying quarry's out-of-range neighbour")
+    void anExpiredMeleeOp0HoldNamesADyingQuarrysOutOfRangeNeighbour()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 643,
+                "retail ogre Attack must start at script offset 643");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 10);
+        Unit dying = world.createUnit(prey("unit-knight", 0x37), 1, 11, 10);
+        Unit next = world.createUnit(prey("unit-footman", 0x3f), 1, 10, 12);
+        assumeTrue(attacker != null && dying != null && next != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, dying),
+                "ogre must accept the adjacent attack order");
+        assertTrue(!world.targets.inAttackRange(attacker, next),
+                "the replacement starts two tiles off");
+
+        // The old swing has completed construction and is parked on its
+        // committed OP0 body hold. The quarry enters Die before timer one is
+        // serviced. Human 13 slot 1519 reaches this exact boundary on fixture
+        // 192: retail scans from the existing OP0, names knight 1493 at
+        // (121,30), and starts fresh construction without visiting Still.
+        dying.setOrder(Unit.Order.DYING);
+        attacker.setTarget(dying);
+        attacker.setFighting(true);
+        attacker.setChasing(false);
+        attacker.setBattleNetSequenceOffset(attackStart);
+        attacker.setBattleNetAnimationTimer(1);
+        attacker.setBattleNetAttackResumeHoldActive(true);
+        attacker.setBattleNetMeleeSyncRemaining(1);
+        attacker.setAutoTargeting(true);
+
+        int syncSeedBeforeOp0 = world.battleNetRandomSeed();
+        world.tick();
+
+        assertEquals(Unit.Order.ATTACK, attacker.order(),
+                "the existing OP0 must retarget directly instead of entering Still");
+        assertSame(next, attacker.target(),
+                "the OP0 scan must name the live out-of-range replacement");
+        assertEquals(attackStart, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the replacement starts fresh Attack construction");
+        assertEquals(syncSeedBeforeOp0, world.battleNetRandomSeed(),
+                "an out-of-range replacement cannot refresh the expired melee variant");
+    }
+
+    @Test
+    @DisplayName("an expired direct-owned melee OP0 releases its dying quarry")
+    void anExpiredDirectOwnedMeleeOp0ReleasesItsDyingQuarry()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
+                7, BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 643,
+                "retail ogre Attack must start at script offset 643");
+
+        World world = armedWorld(script);
+        Unit attacker = world.createUnit(meleeOgre(), 0, 10, 10);
+        Unit dying = world.createUnit(prey("unit-knight", 0x37), 1, 11, 10);
+        Unit nearby = world.createUnit(prey("unit-footman", 0x3f), 1, 10, 12);
+        assumeTrue(attacker != null && dying != null && nearby != null,
+                "units must place");
+        assertTrue(world.orderAttack(attacker, dying),
+                "ogre must accept the adjacent attack order");
+
+        // A person's temporary/direct target does not become an unbounded
+        // automatic chase when its constructor reaches OP0. XHuman 10 knight
+        // 1489 is the held-out witness: fixtures 176..178 pay Attack 3,2,1
+        // against the offered grunt, then fixture 179 returns to Still even
+        // though another grunt is visible two tiles away.
+        dying.setOrder(Unit.Order.DYING);
+        attacker.setTarget(dying);
+        attacker.setFighting(false);
+        attacker.setChasing(false);
+        attacker.setAutoTargeting(false);
+        attacker.setBattleNetSequenceOffset(attackStart);
+        attacker.setBattleNetAnimationTimer(1);
+
+        world.tick();
+
+        assertEquals(Unit.Order.STILL, attacker.order(),
+                "a direct-owned OP0 must release instead of chasing a replacement");
+    }
+
+    @Test
     @DisplayName("a melee tail-wrap retarget keeps its fresh diagonal instead of the old face")
     void aMeleeTailWrapRetargetDoesNotInheritTheOldCombatFace()
             throws Exception {

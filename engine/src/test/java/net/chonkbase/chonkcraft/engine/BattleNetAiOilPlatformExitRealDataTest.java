@@ -75,7 +75,7 @@ class BattleNetAiOilPlatformExitRealDataTest {
         Unit southTanker = at(mission.world(), "unit-human-oil-tanker", 84, 106);
         assertNotNull(southTanker,
                 "the neighboring native tanker is the non-overlap control");
-        for (int cycle = 184; cycle <= 200; cycle++) {
+        for (int cycle = 184; cycle <= 256; cycle++) {
             mission.tick();
             assertEquals(84, southTanker.tileX(),
                     "a clear south-face hull must not inherit the overlap rule on cycle "

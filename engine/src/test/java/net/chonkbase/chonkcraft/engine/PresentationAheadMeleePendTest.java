@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -244,5 +245,42 @@ class PresentationAheadMeleePendTest {
                 "retail OP10 itself must own the melee damage");
         assertTrue(attacker.battleNetSequenceMeleeLanded(),
                 "a later visual callback must not duplicate the OP10 blow");
+    }
+
+    @Test
+    @DisplayName("retargeting before op10 replaces the presentation-pending victim")
+    void retargetingBeforeOp10ReplacesThePresentationPendingVictim()
+            throws Exception {
+        byte[] script = retailScriptBin();
+        GameMap map = grass(16);
+        World world = new World(map);
+        world.fog().revealAll(0);
+        world.fog().revealAll(1);
+        world.setAllied(0, 1, false);
+        world.setBattleNetSequenceData(script);
+        world.restoreRandom(1, 0);
+
+        Unit attacker = world.createUnit(knight(), 0, 4, 4);
+        Unit oldTarget = world.createUnit(prey(), 1, 5, 4);
+        Unit replacement = world.createUnit(prey(), 1, 4, 5);
+        assumeTrue(attacker != null && oldTarget != null
+                && replacement != null, "units must place");
+
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(oldTarget);
+        world.battleNetPendingMeleeHits.put(attacker, oldTarget);
+        world.combat.setAutoTarget(attacker, replacement);
+        assertSame(replacement, attacker.target());
+        attacker.setBattleNetSequenceOffset(1935);
+        attacker.setBattleNetAnimationTimer(1);
+        int oldHp = oldTarget.hitPoints();
+        int replacementHp = replacement.hitPoints();
+
+        world.combat.stepBattleNetAttackSequence(attacker);
+
+        assertEquals(oldHp, oldTarget.hitPoints(),
+                "a completed target handoff invalidates the old swing victim");
+        assertTrue(replacement.hitPoints() < replacementHp,
+                "retail OP10 lands on the replacement current at the handoff");
     }
 }

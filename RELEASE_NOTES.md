@@ -1,41 +1,27 @@
-# Multiplayer Teams, Shared Vision, and BNE Interaction Fixes
+# Battle.net Fleet Fidelity and Crowded Combat Fixes
 
-- Fixed the Teams-mode Start gate for the ordinary cooperative setup. If every
-  occupied slot still has one team number, Start now keeps all humans together
-  and makes every computer the opposing team automatically. Two humans versus
-  one AI and one human versus five AIs no longer require manual team repair;
-  any explicit multi-team assignments remain authoritative.
-- Replaced **Top vs Bottom** with explicit numbered teams. The host assigns each
-  human or computer to Team 1–8 independently of colour and starting position;
-  moving somebody to a new colour preserves their team.
-- Teams mode starts whenever at least two occupied team numbers are present, so
-  two humans on Team 1 can play one or more computers on Team 2. The same team
-  assignment controls mutual alliances, shared sight, and private Team chat.
-- Restored Battle.net Edition's multiplayer-only wall buttons for both human
-  and orc workers. Completed wall sites now become connected, destructible wall
-  terrain, and terrain changes participate in the multiplayer synchronization
-  hash so peers cannot silently disagree about a wall.
-- Strengthened the production multiplayer referee around the reported family
-  setup: two separate game processes must place both humans on the same team,
-  put one computer on the opposing team, attach its retail `ai.bin` profile,
-  share human vision in both directions, and stay synchronized for 180 cycles.
-- Fixed the lost-worker failure where a farm order released as a peasant or
-  peon entered a mine could strand that worker off-map forever while it still
-  consumed food. The worker now emerges and resumes the acknowledged build.
-- Allied exploration now combines cleanly on both the main field and minimap.
-  Teammates reveal the same territory and units without black triangular seams
-  where their fog boundaries first meet.
-- Option-click now sends teammates a synchronized map and minimap ping with a
-  restrained positional chime and anti-spam cooldown.
-- Wood crews keep their harvest intent when a group order spreads workers
-  around a crowded forest, instead of leaving displaced peasants idle.
-- A gryphon commanded to Move during a committed attack now finishes that
-  unbreakable BNE animation and then obeys the replacement order. A following
-  Attack also resumes normally without requiring a manual Stop first.
-- Multiplayer team elimination now displays Game Over when the last hostile
-  team loses its real units. The result is based on the whole alliance, so an
-  eliminated player does not lose while a teammate survives. Players may Quit
-  Game or Keep Playing to explore the synchronized map.
-- Gold mines depleted by the last working load now reliably play their retail
-  BNE collapse sound when watched, including the fog transition caused by the
-  neutral mine disappearing and busy scenes with a full sound-event queue.
+- Advanced the authenticated campaign fleet substantially: all 52 maps now
+  match Battle.net Edition through at least cycle 216, 21 remain exact through
+  cycle 400, and eight remain exact through cycle 1,800 without regressing any
+  map's previous boundary.
+- Corrected attack and chase handoffs around moving, dying, and replacement
+  targets. Units now preserve Battle.net Edition's paid attack cadence, cached
+  route ownership, collision waits, and same-visit retargets in crowded fights.
+- Restored artillery safety and timing. Ballistae, catapults, battleships, and
+  juggernauts avoid unsafe splash shots through friendly formations, mobile
+  siege retargets correctly, and cannon flashes and impacts keep retail pool
+  order without changing damage timing.
+- Improved formation movement and patrol recovery for land, naval, and air
+  units. Obstructed routes keep the correct endpoint, refusal band, and cached
+  tail instead of stepping early, rotating around the wrong body, or idling.
+- Fixed crowded resource traffic. Miners, lumber crews, and oil tankers keep
+  their chosen depot and return point through mine or platform exits, blocked
+  approaches, and route refills, including loaded workers converging on the
+  same hall.
+- Aligned computer-player hall placement and several construction, idle,
+  projectile, and unit-removal scheduling seams with authenticated retail
+  behavior.
+- Save/load now preserves the parked movement and refusal state needed to
+  resume the same combat and resource route after loading.
+- Expanded the authenticated referee suite to 2,724 tests and certified all 17
+  player-facing playability lanes, including clean and adverse lockstep play.

@@ -74,6 +74,40 @@ class Xhuman04OpeningCombatParityRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 4 discards a dead helper offer before its next target scan")
+    void xhuman4DiscardsADeadHelperOfferBeforeItsNextTargetScan() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        Unit footman = unitAt(world, "unit-footman", 71, 60);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1510 footman");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 215) {
+            mission.tick();
+        }
+
+        assertEquals(73, footman.tileX(),
+                "the stale helper pointer must not pull the footman northwest");
+        assertEquals(60, footman.tileY(),
+                "native keeps the footman on the central combat rank");
+        assertEquals(Unit.Order.ATTACK, footman.order(),
+                "the ordinary live-target scan must retain a combat order");
+        assertNotNull(footman.target(),
+                "the dead helper offer must fall through to a live target scan");
+        assertTrue(footman.target().isAlive());
+        assertTrue(!footman.target().isDying());
+    }
+
+    @Test
     @DisplayName("xhuman 4's blocked attackers keep native combat cadence")
     void xhuman4BlockedAttackersKeepNativeCombatCadence() {
         AssetSource assets = AssetSource.fromEnvironment();

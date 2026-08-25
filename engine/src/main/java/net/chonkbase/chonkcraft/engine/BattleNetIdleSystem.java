@@ -71,6 +71,14 @@ final class BattleNetIdleSystem {
                     unit.autoTargeting() ? 1 : 0, unit.underAttack());
         }
         Unit helpOffer = unit.battleNetPendingHelpAttack();
+        if (helpOffer != null && (!helpOffer.isAlive()
+                || helpOffer.isDying() || !helpOffer.isOnMap())) {
+            // Native stores this offer as a weak CUnitPtr. Once the attacker
+            // enters death or leaves the map the pointer is empty; it cannot
+            // replace the live result of the ordinary Attack target scan.
+            unit.setBattleNetPendingHelpAttack(null);
+            helpOffer = null;
+        }
         if (helpOffer != null && unit.order() == Unit.Order.ATTACK
                 && unit.target() != null && unit.target() != helpOffer) {
             // OfferNewTarget may bank a better aggressor while an existing

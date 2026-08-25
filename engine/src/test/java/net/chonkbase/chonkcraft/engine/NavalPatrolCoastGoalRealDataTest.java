@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -86,6 +87,7 @@ class NavalPatrolCoastGoalRealDataTest {
         }
         assertTrue(guard.hitPoints() < guard.type().hitPoints(),
                 "the cloaked submarine hits the guarded destroyer on 55");
+        int guardHpAfterFirstHit = guard.hitPoints();
         assertEquals(6, sub.battleNetAiBehavior());
         assertEquals(22, sub.battleNetAiHomeX());
         assertEquals(27, sub.battleNetAiHomeY());
@@ -115,5 +117,29 @@ class NavalPatrolCoastGoalRealDataTest {
         assertEquals(20, sub.tileX(),
                 "native recurring patrol first-steps SE on fixture 94");
         assertEquals(54, sub.tileY());
+
+        // The same hidden attacker lands another blow on the same guard at
+        // fixture 155. Native sees that the roaming submarine is already
+        // answering this guard and does not replace its live route a second
+        // time. Java used to clear the remaining eighteen bytes here, then
+        // replan only after the current residual and a two-visit constructor.
+        while (mission.world().cycle() < 157) {
+            mission.tick();
+        }
+        assertTrue(guard.hitPoints() < guardHpAfterFirstHit,
+                "the later authenticated hidden-submarine hit has landed");
+        assertFalse(sub.hasBattleNetPendingPatrol(),
+                "an identical guard rendezvous is not queued twice");
+        assertEquals(18, sub.pathLength(),
+                "the second guard hit retains the native route tail");
+
+        while (mission.world().cycle() < 182) {
+            mission.tick();
+        }
+        assertEquals(24, sub.tileX(),
+                "the retained southeast byte lands on fixture 180");
+        assertEquals(58, sub.tileY());
+        assertEquals(17, sub.pathLength(),
+                "fixture 180 consumes exactly one retained route byte");
     }
 }

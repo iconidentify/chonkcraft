@@ -1146,11 +1146,32 @@ final class BattleNetMovementSystem {
         // counter alone answers this square the way 0x00450766 does 98.36% of
         // the time and the pair 99.13%, and every one of the mistakes it
         // removes is a unit this implementation stood aside where native holds.
+        Unit retainedMeleeTarget =
+                world.battleNetPendingMeleeHits.get(candidate);
+        boolean retiredMeleeRefusal = candidate.isMoving()
+                && candidate.battleNetPathStepsTaken() > 0
+                && Math.max(Math.abs(candidate.offsetX()),
+                        Math.abs(candidate.offsetY())) == 32
+                && retainedMeleeTarget != null
+                && retainedMeleeTarget != candidate.target()
+                && (retainedMeleeTarget.isDying()
+                        || !retainedMeleeTarget.isAlive());
         if (!armedDrainedMove
                 && (candidate.battleNetCollisionCounter() > 0
-                        || candidate.battleNetRefusals() > 0)) {
+                        || (candidate.battleNetRefusals() > 0
+                                && !retiredMeleeRefusal))) {
             return false;
         }
+        // A committed melee swing may still name the retired quarry after
+        // AutoSelectTarget has installed the next one. Native has already
+        // cleared the old collision nibble at that active-order boundary;
+        // Java's separate refusal proxy remains only to finish the committed
+        // swing's refusal timing. At the exact same-pass full-tile commit the
+        // body is therefore soft for path occupancy. XHuman 10 knight 1485
+        // changes dying grunt 1475 for axethrower 1496, commits SW on fixture
+        // 324, and raw unit+0x1d stays zero while knight 1493 routes through
+        // it. The paired XHuman 4 axes retain their current quarry and raw
+        // nibble one at their full-tile commits, so they remain hard.
         if (pendingLandRegroupMove) {
             // Its current animation is deliberately still the Still body;
             // the queued departure is the native passability evidence.
@@ -1688,6 +1709,23 @@ final class BattleNetMovementSystem {
                 worker.setRouteSpent(false);
                 worker.setWaitCycles(0);
             }
+            boolean ladenLandReturnBufferRefill = worker.routeSpent()
+                    && worker.order() == Unit.Order.HARVEST
+                    && worker.returningToDepot() && worker.carried() > 0
+                    && world.battleNetMovementStride(worker) == 1
+                    && worker.type().landUnit()
+                    && worker.distanceTo(building) > 1;
+            if (ladenLandReturnBufferRefill) {
+                // Action 24 refills an exhausted land-return buffer on the
+                // residual-settle visit while the worker is still outside the
+                // depot skirt. XHuman 10 peon 1596 drains its fourth heading
+                // at (55,6), writes SW,SE, and commits SW to (54,7) on fixture
+                // 310. Treating Chebyshev two from the depot path point as
+                // action 25 inserted two quiet visits; serving PF_WAIT would
+                // be later still. The one-tile skirt below remains action 25.
+                worker.setRouteSpent(false);
+                worker.setWaitCycles(0);
+            }
             if (!depotDestArm && !stageSpentBattleNetGold && spendTheEmptyRoute(worker)) {
                 return true;
             }
@@ -1826,7 +1864,31 @@ final class BattleNetMovementSystem {
             worker.setBattleNetBorrowedMoveForStep(false);
         }
         if (worker.order() != Unit.Order.DYING) {
+            int retainedSequence = worker.battleNetSequenceOffset();
+            int retainedTimer = worker.battleNetAnimationTimer();
             worker.setOrder(saved);
+            // Restoring HARVEST after its borrowed Move normally clears the
+            // action cursor. A refused laden route has just installed the
+            // authoritative Move cursor, which remains the native action-24
+            // program after the order enum returns to Resource. A cooperative
+            // refusal keeps Move-start/15 throughout its quiet band (XHuman
+            // 10 peon 1588: 2600/15 on fixture 270); a hard refusal exposes
+            // Move-start/1 with route index twenty until the next action visit
+            // redraws (peon 1584 at fixture 290). Keep only those live refusal
+            // cursors; ordinary successful resource strides continue to use
+            // the separate residual-pace projection.
+            if (saved == Unit.Order.HARVEST
+                    && worker.returningToDepot() && worker.carried() > 0
+                    && worker.battleNetCollisionCounter() > 0
+                    && retainedSequence >= 0
+                    && (worker.pathLength() > 0
+                            && worker.battleNetOrderDelay() > 0
+                            || worker.pathLength() == 0
+                                    && worker.battleNetOrderDelay() == 0
+                                    && retainedTimer == 1)) {
+                worker.setBattleNetSequenceOffset(retainedSequence);
+                worker.setBattleNetAnimationTimer(retainedTimer);
+            }
         }
         return true;
     }
@@ -2174,7 +2236,17 @@ final class BattleNetMovementSystem {
         }
         int cheb = Math.max(Math.abs(entry[0] - worker.tileX()),
                 Math.abs(entry[1] - worker.tileY()));
-        if (cheb >= 1 && cheb <= 2) {
+        // An empty Return Goods order can leftover-land two anchors from its
+        // exact entry point and then dest-arm (Orc 1/2). A laden land worker
+        // remains in action 24 at that outer point and refills its route; its
+        // action-25 skirt begins one anchor from the contracted depot point
+        // (XHuman 10 peon 1596: (55,6) continues, (54,7) stages). Doubled
+        // tankers retain their wider hull-specific arm below.
+        boolean ladenLandOutsideFootprintRange = worker.carried() > 0
+                && world.battleNetMovementStride(worker) == 1
+                && worker.distanceTo(building) > 1;
+        if (cheb >= 1 && cheb <= 2
+                && !ladenLandOutsideFootprintRange) {
             return true;
         }
         // A doubled laden route can finish one anchor beyond that point ring
@@ -2351,6 +2423,8 @@ final class BattleNetMovementSystem {
      * abandoned headings back, and none is known.
      */
     private int battleNetRefuse(Unit unit) {
+        int refusedHeading = unit.pathLength() > 0
+                ? unit.peekHeading() : -1;
         int refusals = unit.battleNetRefusals() + 1;
         if (refusals >= 15) {
             // 0x00437a9c, the only instruction in the game that clears the
@@ -2378,6 +2452,54 @@ final class BattleNetMovementSystem {
         // quiet on 46 with its wait at nought and stepping on 47, one visit
         // late for the rest of the walk.
         unit.setWaitCycles(refusals >= 8 ? 14 : 0);
+        boolean meleeAttackChase = unit.target() != null
+                && unit.target().isAlive()
+                && unit.chasing()
+                && !World.battleNetRangedChaseUnit(unit)
+                && (unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE
+                        || unit.battleNetBorrowedMoveForStep());
+        if (meleeAttackChase && refusals < 15) {
+            // FUN_004379e0 returns every parked Attack approach to Move OP0;
+            // it does not let the live animation cursor advance while the
+            // same occupied route head is retried. Callers which add a full
+            // cooperative band may overwrite the timer with fifteen, but the
+            // cursor owner is common to every melee chase refusal.
+            // Attack dispatch owns the paid delay too. A generic Unit.Wait is
+            // drained before stepAttack and therefore cannot mirror the live
+            // Move 15..1 cursor or reach the stage-four Attack handoff.
+            unit.setWaitCycles(0);
+            unit.setBattleNetOrderDelay(refusals >= 8 ? 14 : 0);
+            int moveStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                unit.setBattleNetSequenceOffset(moveStart);
+                unit.setBattleNetAnimationTimer(refusals >= 8 ? 15 : 1);
+                unit.setBattleNetChaseStepReady(false);
+            }
+        }
+        if (refusals == 8 && meleeAttackChase
+                && unit.battleNetCollisionCounter() == 0) {
+            // The eighth refusal of a melee Attack approach does not wake
+            // directly into another route probe.  Its complete Move band
+            // returns through active-order Attack construction 3,2,1 first.
+            // Keep that ownership with the native refusal primitive itself:
+            // several route-park callers reach FUN_004379e0 outside the main
+            // multi-step hard-refusal arm, but the recovery rule is identical.
+            // Collision-zero is the parked-residual form: the byte itself
+            // remains behind native route index twenty for the complete paid
+            // band. Preserve it separately from Java's empty-path projection
+            // so Attack construction's later Move probes retry this exact
+            // face instead of drawing a fresh wall route. XHuman 10 slot 1475
+            // keeps blocked E through fixture 210; a fresh draw selects the
+            // free SE face. Ordinary collided approaches do not retain it:
+            // XHuman 4 grunt 1505 enters refusal eight with collision one and
+            // redraws until its north route frees on fixture 54.
+            if (refusedHeading >= 0 && refusedHeading < Direction.COUNT) {
+                unit.setBattleNetParkedRefusalHeading(refusedHeading);
+            }
+            unit.setBattleNetAttackRefusalRecoveryStage(4);
+        }
         return refusals;
     }
 
@@ -2446,7 +2568,8 @@ final class BattleNetMovementSystem {
         // every ready unit instead put the grunt into a fifteen-count wait
         // and let an axethrower steal its square at fixture 39.
         boolean refusedOnActionMarker = unit.battleNetChaseStepReady()
-                && World.battleNetRangedChaseUnit(unit);
+                && (World.battleNetRangedChaseUnit(unit)
+                        || unit.battleNetMovingQuarryResidual());
         // An ordinary refusal inside an unfinished Move body keeps its live
         // cursor. A refusal on the OP0 visit is different: the interpreter
         // has already exposed ChaseStepReady and advanced past Move start,
@@ -2463,6 +2586,13 @@ final class BattleNetMovementSystem {
         // through OP0 while the logical refusal delay counted down retargeted
         // it at 53 and armed a second hold; native remains on Move start and
         // steps east at 57 after one band.
+        //
+        // A settled moving-quarry melee route is the other OP0-owned refusal,
+        // even though ordinary melee residuals keep their live body cursor.
+        // Human 8 attack-peasant 1520 refreshes its stale quarry point and
+        // refuses the cached north-east head on fixture 180; native rewinds
+        // directly to Move 2600/15. Leaving Java on 2603/1 drained two body
+        // visits before its logical delay began and shifted the wake to 197.
         boolean settledMultiResidual = settledMultiResidualRefusal(unit);
         boolean stagedMobileResidualRefill = settledMultiResidual
                 && (unit.battleNetRefusals() > 0
@@ -2556,7 +2686,17 @@ final class BattleNetMovementSystem {
         }
         int moveStart = world.idle.battleNetSequenceStart(unit,
                 BattleNetSequence.MOVE_ANIMATION);
-        if (moveStart >= 0 && unit.battleNetSequenceOffset() == moveStart) {
+        boolean retainedStageSixCardinalBand =
+                unit.battleNetAttackRefusalRecoveryStage() == 4
+                && unit.battleNetStageSixCardinalProbePark();
+        if (moveStart >= 0
+                && (unit.battleNetSequenceOffset() == moveStart
+                        || retainedStageSixCardinalBand)) {
+            // The retained route-index-twenty probe can enter its paid band
+            // after the Move interpreter has already exposed the next body
+            // offset. Its stage-six provenance is the authority to pin the
+            // native cursor back to Move-start for the whole 15..1 band.
+            unit.setBattleNetSequenceOffset(moveStart);
             unit.setBattleNetAnimationTimer(unit.battleNetOrderDelay());
             return;
         }
@@ -3661,6 +3801,153 @@ final class BattleNetMovementSystem {
             }
             if (!canTakeStep) {
                 Unit stageSixBlocker = world.unitAt(nextX, nextY);
+                boolean paidRecoveryResidualTailPark =
+                        unit.battleNetPaidRefusalRecoveryApproach()
+                        && world.actionMoveWalked
+                        && unit.stepDrained() && !unit.isMoving()
+                        // A direct three-byte recovery ray has exactly two
+                        // cached bytes behind its granted first probe. Long
+                        // formation routes retain their own paid-pressure
+                        // lifecycle and must not be collapsed here.
+                        && unit.pathLength() == 2
+                        && unit.battleNetPathStepsTaken() == 1
+                        && unit.target() != null
+                        && unit.target().isAlive()
+                        && !world.targets.inAttackRange(
+                                unit, unit.target())
+                        && !World.battleNetRangedChaseUnit(unit);
+                if (paidRecoveryResidualTailPark) {
+                    // Attack construction granted the route's first heading
+                    // as its single Move probe. If the residual settles onto
+                    // a blocked cached tail, native parks the remaining bytes
+                    // at route index twenty on this visit and enters the
+                    // active-order callback on the next one. Trying the tail
+                    // immediately converts that callback into ordinary path
+                    // refusals and drops its asynchronous idle draw.
+                    world.causalTrace.event(world.cycle,
+                            "path.paid-recovery-residual-tail-park", unit.id(),
+                            "path_length", unit.pathLength(),
+                            "heading", heading,
+                            "blocker", stageSixBlocker == null
+                                    ? -1 : stageSixBlocker.id(),
+                            "target", unit.target().id());
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    unit.setBattleNetChaseEmptyRouteReplan(true);
+                    unit.setBattleNetPaidRefusalRecoveryApproach(false);
+                    unit.setBattleNetResidualEmptyApproachIdlePending(true);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
+                Unit cleanDestinationArmBlocker =
+                        world.blockerOnLayer(unit, nextX, nextY);
+                Unit cleanDestinationArmTarget = unit.target();
+                boolean cleanNearMeleeDestinationArmRefusal =
+                        unit.battleNetAttackWrapDestArmPending()
+                        && !unit.battleNetChaseEmptyRouteReplan()
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.pathLength() == 2
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.chasing()
+                        && (unit.order() == Unit.Order.ATTACK
+                                || unit.order() == Unit.Order.ATTACK_MOVE
+                                || unit.battleNetBorrowedMoveForStep())
+                        && unit.type() != null
+                        && unit.type().maxAttackRange() <= 1
+                        && world.battleNetMovementStride(unit) == 1
+                        && cleanDestinationArmTarget != null
+                        && cleanDestinationArmTarget.isAlive()
+                        && cleanDestinationArmTarget.type() != null
+                        && !cleanDestinationArmTarget.type().building()
+                        && unit.offeredTarget()
+                                == cleanDestinationArmTarget
+                        && unit.tileX()
+                                != cleanDestinationArmTarget.tileX()
+                        && unit.tileY()
+                                != cleanDestinationArmTarget.tileY()
+                        && Math.max(Math.abs(unit.tileX()
+                                                - cleanDestinationArmTarget
+                                                        .tileX()),
+                                        Math.abs(unit.tileY()
+                                                - cleanDestinationArmTarget
+                                                        .tileY())) == 2
+                        && heading == World.battleNetFirstBresenhamHeading(
+                                unit.tileX(), unit.tileY(),
+                                cleanDestinationArmTarget.tileX(),
+                                cleanDestinationArmTarget.tileY())
+                        && cleanDestinationArmBlocker != null
+                        && cleanDestinationArmBlocker != unit
+                        && cleanDestinationArmBlocker.isOnMap()
+                        && !cleanDestinationArmBlocker.isDying()
+                        && cleanDestinationArmBlocker.type() != null
+                        && !cleanDestinationArmBlocker.type().building()
+                        && world.isAllied(unit.player(),
+                                cleanDestinationArmBlocker.player());
+                if (cleanNearMeleeDestinationArmRefusal) {
+                    // A clean Attack-tail destination arm writes its direct
+                    // two-byte target-skirt ray with mobile bodies absent.
+                    // Move then restores real occupancy before consuming the
+                    // head. If an allied fighter owns that square, retail
+                    // retains both bytes and enters FUN_004379e0's complete
+                    // refusal band immediately: collision one and Move 15.
+                    // Parking the ray after a one-count probe redraws around
+                    // the formation on the next visit and loses the native
+                    // target-skirt contract.
+                    world.causalTrace.event(world.cycle,
+                            "path.clean-destination-arm-refusal", unit.id(),
+                            "path_length", unit.pathLength(),
+                            "heading", heading,
+                            "blocker", cleanDestinationArmBlocker.id(),
+                            "target", cleanDestinationArmTarget.id());
+                    unit.setBattleNetCollisionCounter(1);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    unit.setBattleNetRefusalHold(true);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(15);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
+                boolean retainedPaidRefusalFace =
+                        unit.battleNetAttackRefusalRecoveryStage() == 6
+                        && unit.battleNetChaseEmptyRouteReplan()
+                        && unit.pathLength() == 1
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetParkedRefusalHeading() == heading
+                        && unit.target() != null
+                        && unit.target().isAlive()
+                        && unit.chasing();
+                if (retainedPaidRefusalFace) {
+                    // Attack 3,2,1 exposes exactly one probe of the route byte
+                    // parked by refusal eight. It is not a cooperative-body
+                    // wait and it must not rotate around the blocker: another
+                    // refusal returns directly to Attack construction while
+                    // retaining the same native byte for the next probe.
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    if (!world.combat
+                            .rearmBattleNetHardRefusalAttack(unit)) {
+                        unit.setBattleNetAttackRefusalRecoveryStage(0);
+                    }
+                    return;
+                }
                 boolean tailReachabilityProbe =
                         unit.battleNetAttackWrapDestArmPending()
                         && unit.battleNetChaseEmptyRouteReplan()
@@ -3772,17 +4059,37 @@ final class BattleNetMovementSystem {
                 if (retainedCardinalStageSixProbe) {
                     // Route index twenty makes this a naked collision visit,
                     // not another cooperative wait or a wall-follow search.
+                    // The eighth visit still owns the common native refusal
+                    // transition: generation eight writes a complete Move
+                    // 15..1 band, whose wake clears the generation and enters
+                    // Attack construction 3..1. This is visible across the
+                    // sealed corpus, including independent cardinal probes in
+                    // XHuman 4, XHuman 10, and XHuman 12. Letting this retained
+                    // cursor wrap through generations eight to fifteen skips
+                    // the active-order idle callback and shifts every later
+                    // asynchronous consumer.
                     int collision = unit.battleNetCollisionCounter() + 1;
-                    unit.setBattleNetCollisionCounter(
-                            collision > 14 ? 0 : collision);
+                    unit.setBattleNetCollisionCounter(collision);
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
-                    unit.setBattleNetOrderDelay(0);
+                    if (collision >= 8) {
+                        unit.setBattleNetAttackRefusalRecoveryStage(4);
+                        unit.setBattleNetOrderDelay(14);
+                        // A paid generation-eight band is indivisible even
+                        // when the cooperative blocker vacates meanwhile.
+                        // Without the sticky refusal owner, the generic chase
+                        // free-wake spends this retained byte on the very next
+                        // visit and skips the native timer band.
+                        unit.setBattleNetRefusalHold(true);
+                    } else {
+                        unit.setBattleNetOrderDelay(0);
+                    }
                     int moveStart = world.idle.battleNetSequenceStart(unit,
                             BattleNetSequence.MOVE_ANIMATION);
                     if (moveStart >= 0) {
                         unit.setBattleNetSequenceOffset(moveStart);
-                        unit.setBattleNetAnimationTimer(1);
+                        unit.setBattleNetAnimationTimer(
+                                collision >= 8 ? 15 : 1);
                         unit.setBattleNetChaseStepReady(false);
                     }
                     return;
@@ -3795,6 +4102,7 @@ final class BattleNetMovementSystem {
                         && unit.battleNetPathStepsTaken() == 0
                         && unit.battleNetCollisionCounter() == 0
                         && unit.battleNetRefusals() == 0
+                        && unit.offeredTarget() == null
                         && stageSixBlocker != null
                         && stageSixBlocker.isOnMap()
                         && !stageSixBlocker.isDying()
@@ -3804,10 +4112,13 @@ final class BattleNetMovementSystem {
                     // This stage-six route byte is physically written behind
                     // native's parked cursor. It starts a collision generation
                     // instead of returning through active-order Still. XHuman
-                    // 12 slot 1457 writes E/collision one at fixture 166 and
+                    // 12 slot 1457 has no banked hit offer, writes
+                    // E/collision one at fixture 166, and
                     // reaches the complete Move band at fixture 173. Re-arming
                     // Attack here burned two extra asynchronous draws before
-                    // fixture 171's melee damage.
+                    // fixture 171's melee damage. A banked aggressor retains
+                    // the active-order Still callback instead; it is not this
+                    // Patrol-owned probe.
                     unit.clearPath();
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
@@ -4076,7 +4387,7 @@ final class BattleNetMovementSystem {
                         return;
                     }
                     if (temporaryBody && unit.target() == null
-                            && unit.stepDrained() && !unit.isMoving()
+                            && !unit.isMoving()
                             && unit.pathLength() > 0) {
                         // Cooperative naval refusals retain both the route and
                         // FUN_004379e0's sticky high nibble. A cached leftover
@@ -4245,7 +4556,13 @@ final class BattleNetMovementSystem {
                 // quiet c6..c19, retry on c20.  A blocker which has itself
                 // collided is no longer cooperative (XHuman 12 grunt 96 at
                 // c20), and a head-on swap takes the invalidate arm.
-                Unit movingBlocker = world.unitAt(nextX, nextY);
+                // Collision refusal is a movement-layer query, not a click or
+                // resource lookup. A transient dead-vision marker can share
+                // the committed square with the live mover and wins unitAt's
+                // pointable roster walk. Native UnitOnMapTile asks for this
+                // unit's move type, so select the live same-layer occupant.
+                Unit movingBlocker = world.blockerOnLayer(
+                        unit, nextX, nextY);
                 boolean postRetargetParkRefill =
                         unit.battleNetRetargetResidualParkRefill();
                 boolean firstPaidFullRouteResidualPark =
@@ -4577,6 +4894,7 @@ final class BattleNetMovementSystem {
                                 && unit.pathLength() == 1
                                 && unit.target() != null
                                 && !World.battleNetRangedChaseUnit(unit)
+                                && !unit.battleNetMovingQuarryResidual()
                                 && (unit.order() == Unit.Order.ATTACK
                                             || unit.order()
                                                     == Unit.Order.ATTACK_MOVE
@@ -4842,6 +5160,25 @@ final class BattleNetMovementSystem {
                                             && !retainedBuildingResidual
                                                     ? 1 : 0));
                             armBattleNetAttackRefusalMove(unit);
+                            if (unit.returningToDepot()
+                                    && unit.carried() > 0
+                                    && unit.pathLength() > 0) {
+                                // Resource orders borrow MOVE only for the
+                                // step, so the attack-only helper above has no
+                                // live quarry from which to arm the refusal
+                                // program. A cooperative laden return owns the
+                                // same full Move-start/15 band: XHuman 10 peon
+                                // 1588 retains S,S,S,SW behind clean moving
+                                // peon 1584 at fixtures 270 and 285.
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(15);
+                                    unit.setBattleNetChaseStepReady(false);
+                                }
+                            }
                             if (retainedProgressPathn1) {
                                 // This is a residual Move-body refusal, so the
                                 // native program restarts at its opening with
@@ -4861,7 +5198,9 @@ final class BattleNetMovementSystem {
                                     // Retain that visit in the Java countdown
                                     // so the exposed native timer falls 15→14,
                                     // not 15→13.
-                                    unit.setBattleNetOrderDelay(15);
+                                    unit.setBattleNetOrderDelay(
+                                            unit.battleNetMovingQuarryResidual()
+                                                    ? quiet : 15);
                                     unit.setBattleNetChaseStepReady(false);
                                 }
                             }
@@ -5484,6 +5823,14 @@ final class BattleNetMovementSystem {
                     }
                 }
                 if (canTakeStep) {
+                    if (unit.battleNetAttackRefusalRecoveryStage() == 6
+                            && unit.battleNetParkedRefusalHeading()
+                                    == heading) {
+                        // The parked byte's lifetime ends when its paid probe
+                        // is finally accepted. Later route generations must
+                        // choose their own wall face.
+                        unit.setBattleNetParkedRefusalHeading(-1);
+                    }
                     unit.clearBattleNetWoodCornerRefusal();
                     unit.setBattleNetChaseEmptyRouteReplan(false);
                     unit.setBattleNetRetargetResidualParkRefill(false);
@@ -5578,6 +5925,28 @@ final class BattleNetMovementSystem {
                                     && unit.battleNetCollisionCounter() > 0
                                     && woodOrderDistance <= 2;
                             if (terminalWoodResidual) {
+                                if (Direction.isDiagonal(heading)) {
+                                    // A diagonal terminal byte is still a
+                                    // path collision, not the resource
+                                    // action's construction handoff. Native
+                                    // XHuman 11 slot 1588 settles its sixth
+                                    // SE at fixture 210, refuses the final SE
+                                    // against a worker, raises collision one
+                                    // to two and parks RI20. The next resource
+                                    // visit redraws E,SE and commits E. The
+                                    // cardinal XHuman 12 slot 1364 contrast
+                                    // below instead rewrites its stored wall
+                                    // face and pays 2657/3,2,1.
+                                    int collision = unit
+                                            .battleNetCollisionCounter() + 1;
+                                    unit.setBattleNetCollisionCounter(
+                                            collision > 14 ? 0 : collision);
+                                    unit.clearPath();
+                                    unit.setRouteSpent(false);
+                                    unit.setWaitCycles(0);
+                                    unit.setBattleNetOrderDelay(0);
+                                    return;
+                                }
                                 // A refused final terrain-harvest byte near
                                 // the stored order point belongs to the
                                 // resource action, not another empty-route
@@ -6063,6 +6432,33 @@ final class BattleNetMovementSystem {
                             && (unit.order() == Unit.Order.ATTACK
                                     || unit.order() == Unit.Order.ATTACK_MOVE
                                     || unit.chasing())) {
+                        if (postRetargetParkRefill) {
+                            // This path was laid by the native NewPath callback
+                            // which owns the just-settled residual's route park.
+                            // Its occupied first byte is therefore refused now,
+                            // not parked for another Java action and refused on
+                            // the following one. XHuman 10 slot 1475 settles NW,
+                            // writes the blocked SE byte and raises refusal one
+                            // on fixture 182 in a single Move OP0 callback.
+                            unit.setBattleNetRetargetResidualParkRefill(false);
+                            unit.setBattleNetCollisionCounter(0);
+                            int refusal = battleNetRefuse(unit);
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(
+                                    refusal >= 8 ? 14 : 0);
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                                unit.setBattleNetAnimationTimer(
+                                        refusal >= 8 ? 15 : 1);
+                                unit.setBattleNetChaseStepReady(false);
+                            }
+                            unit.setBattleNetChaseEmptyRouteReplan(true);
+                            return;
+                        }
                         if (System.getenv("CHONKCRAFT_TRACE_BNE_RESIDUAL") != null) {
                             String resEnv = System.getenv(
                                     "CHONKCRAFT_TRACE_BNE_RESIDUAL").trim();
@@ -6293,25 +6689,47 @@ final class BattleNetMovementSystem {
                         }
                     }
                 }
-                // Retail parks the route cursor on a refusal but leaves the
-                // route bytes in the unit record. Most Java callers can
-                // safely rebuild after clearPath, but a laden land worker
-                // entering its depot's skirt reads an empty route as arrival
-                // and enters action 25. XHuman 8 peon 1575 refuses its
-                // buffered NE from distance two every fixture cycle from 228
-                // through 235; keeping that byte lets the eighth refusal arm
-                // timer 15 and take NE on 250. Clearing it staged action 25
-                // for three cycles and did not step until 253. Constrain the
-                // retention to the authenticated skirt boundary: keeping
-                // routes for refused return walks farther afield changes
-                // unrelated AI economy and patrol timing.
+                // Retail parks the route cursor on a hard refusal but leaves
+                // cooperative handling to the moving-blocker arm above. A
+                // laden land return therefore has three authenticated forms.
+                // On the depot skirt it revisits the cached byte at Move/1
+                // until refusal eight buys the complete band (XHuman 8 peon
+                // 1575, fixtures 228..250). Farther out, a clean moving blocker
+                // retains the bytes under Move/15 (XHuman 10 peon 1588 at
+                // fixture 270). A blocker already carrying a collision
+                // generation is hard: peon 1584 parks S at fixture 290 under
+                // Move/1, replans, and commits SE on fixture 291.
                 PathFinder.Path ladenReturnRoute = null;
                 Unit returnDepot = unit.returnDepotGoal();
-                if (world.battleNetMovementStride(unit) == 1
+                boolean ladenLandReturn =
+                        world.battleNetMovementStride(unit) == 1
                         && unit.type().landUnit()
                         && unit.returningToDepot() && unit.carried() > 0
-                        && returnDepot != null && unit.distanceTo(returnDepot) <= 2
-                        && unit.pathLength() > 0) {
+                        && returnDepot != null && unit.pathLength() > 0;
+                if (ladenLandReturn && unit.distanceTo(returnDepot) > 2) {
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    int refusals = battleNetRefuse(unit);
+                    if (refusals >= 15) {
+                        unit.setBattleNetCollisionCounter(0);
+                        unit.setBattleNetOrderDelay(0);
+                        return;
+                    }
+                    unit.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    unit.setBattleNetRefusalHold(false);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
+                if (ladenLandReturn && unit.distanceTo(returnDepot) <= 2) {
                     int remaining = unit.pathLength();
                     int[] headings = new int[remaining];
                     for (int depth = 0; depth < remaining; depth++) {
@@ -6707,7 +7125,7 @@ final class BattleNetMovementSystem {
     }
 
     /** Whether one passable compass step strictly improves BNE range. */
-    private boolean battleNetHasStrictlyCloserFreeNeighbour(
+    boolean battleNetHasStrictlyCloserFreeNeighbour(
             Unit unit, Unit target) {
         if (unit == null || target == null || target.type() == null) {
             return false;

@@ -40,6 +40,20 @@ class BattleNetFlyerPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("Human 12's unarmed zeppelin keeps its open direct Patrol ray")
+    void human12UnarmedZeppelinDoesNotUseTheArmedFlyerWallTie() {
+        Mission mission = mission("campaigns/human/level12h");
+        Unit zeppelin = at(mission.world(), "unit-zeppelin", 92, 14);
+        assertNotNull(zeppelin, "Human 12 has no native slot-1559 zeppelin");
+
+        tickThrough(mission, 2);
+        assertEquals(Unit.Order.PATROL, zeppelin.order());
+        assertEquals(90, zeppelin.tileX());
+        assertEquals(14, zeppelin.tileY(),
+                "the unarmed scout retains its west direct ray, not north-west");
+    }
+
+    @Test
     @DisplayName("XOrc 7's balloon keeps its cached north heading near the scout point")
     void xOrc7BalloonDoesNotInheritTheNavalFreeCloserRewrite() {
         Mission mission = mission("campaigns/orc-exp/levelx07o");
@@ -100,6 +114,30 @@ class BattleNetFlyerPatrolRealDataTest {
         assertEquals(0, rider.tileX());
         assertEquals(12, rider.tileY(),
                 "the retained south-west byte returns the far rider to line");
+
+        tickThrough(mission, 180);
+        assertEquals(Unit.Order.STILL, rider.order(),
+                "the three-leg scout ray ends when its final pixels settle");
+        assertEquals(0, rider.tileX());
+        assertEquals(16, rider.tileY());
+        assertEquals(2233, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer(),
+                "a multi-leg completion reconstructs the Still head");
+
+        tickThrough(mission, 199);
+        assertEquals(Unit.Order.STILL, rider.order());
+        assertEquals(true, rider.hasBattleNetPendingPatrol(),
+                "the periodic air launch writes Patrol as next_order");
+        assertEquals(4, rider.battleNetPendingPatrolX());
+        assertEquals(7, rider.battleNetPendingPatrolY());
+        assertEquals(2247, rider.battleNetSequenceOffset());
+        assertEquals(1, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 200);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "the queued force Patrol promotes on the native marker");
+        assertEquals(2233, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer());
     }
 
     @Test
@@ -154,6 +192,19 @@ class BattleNetFlyerPatrolRealDataTest {
         assertEquals(2233, edgeRider.battleNetSequenceOffset());
         assertEquals(2, edgeRider.battleNetAnimationTimer(),
                 "native seals 2233/3 at fixture 157 and counts down at 158");
+
+        tickThrough(mission, 182);
+        assertEquals(Unit.Order.PATROL, rider.order());
+        assertEquals(2, rider.tileX(),
+                "the direct ray must see the moving ally at the point goal");
+        assertEquals(14, rider.tileY(),
+                "native retains the second pure-south wall-follow stride");
+        assertEquals(0, rider.offsetX());
+        assertEquals(-64, rider.offsetY(),
+                "the logical south stride opens with the native full residual");
+        assertEquals(1, rider.pathLength(),
+                "one final south byte remains in the three-byte wall route");
+        assertEquals(4, rider.peekHeading());
     }
 
     @Test

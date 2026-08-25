@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -91,6 +92,112 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
                 "native commits the southeast detour on fixture 154");
         assertEquals(1, ogre.pathLength(),
                 "the south-west tail remains after the southeast step");
+    }
+
+    @Test
+    @DisplayName("human 13's expired melee OP0 retargets without visiting Still")
+    void easternOgreRetargetsDirectlyFromItsExpiredBodyHoldOn192() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit ogre = unitAt(world, "unit-ogre", 123, 19);
+        assertNotNull(ogre, "Human 13 has no eastern ogre on 123,19");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 195; fixture++) {
+            mission.tick();
+            if (fixture == 191) {
+                assertEquals(Unit.Order.ATTACK, ogre.order());
+                assertEquals(124, ogre.target().tileX(),
+                        "the dying east knight owns the last body-hold visit");
+                assertEquals(30, ogre.target().tileY());
+                assertEquals(643, ogre.battleNetSequenceOffset());
+                assertEquals(1, ogre.battleNetAnimationTimer());
+            } else if (fixture == 192) {
+                assertEquals(Unit.Order.ATTACK, ogre.order(),
+                        "native keeps action 12 across the OP0 replacement");
+                assertNotNull(ogre.target(),
+                        "the OP0 scan must install the western knight");
+                assertEquals(121, ogre.target().tileX());
+                assertEquals(30, ogre.target().tileY());
+                assertEquals(643, ogre.battleNetSequenceOffset());
+                assertEquals(3, ogre.battleNetAnimationTimer(),
+                        "the replacement opens fresh construction on 192");
+            } else if (fixture == 193) {
+                assertEquals(2, ogre.battleNetAnimationTimer());
+            } else if (fixture == 194) {
+                assertEquals(1, ogre.battleNetAnimationTimer());
+            }
+        }
+
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(122, ogre.tileX(),
+                "native dest-arms southwest on fixture 195");
+        assertEquals(30, ogre.tileY(),
+                "native dest-arms southwest on fixture 195");
+        assertEquals(121, ogre.target().tileX());
+        assertEquals(30, ogre.target().tileY());
+    }
+
+    @Test
+    @DisplayName("human 13's clean near-target route pays the complete refusal band")
+    void southernOgreRetainsItsDirectTargetSkirtRayThroughRefusal() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit ogre = unitAt(world, "unit-ogre", 126, 34);
+        assertNotNull(ogre, "Human 13 has no southern ogre on 126,34");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit knight = null;
+        for (int fixture = 1; fixture <= 201; fixture++) {
+            mission.tick();
+            if (fixture == 197) {
+                knight = ogre.target();
+                assertNotNull(knight,
+                        "the expired east hold must select the western knight");
+                assertEquals("unit-knight", knight.type().ident());
+                assertEquals(121, knight.tileX());
+                assertEquals(30, knight.tileY());
+                assertEquals(643, ogre.battleNetSequenceOffset());
+                assertEquals(3, ogre.battleNetAnimationTimer());
+            } else if (fixture == 200) {
+                assertSame(knight, ogre.target());
+                assertEquals(123, ogre.tileX());
+                assertEquals(31, ogre.tileY());
+                assertEquals(2, ogre.pathLength(),
+                        "the direct north-west,west skirt ray stays cached");
+                assertEquals(Direction.fromDelta(-1, -1),
+                        ogre.peekHeading());
+                assertEquals(Direction.fromDelta(-1, 0),
+                        ogre.peekHeadingAtDepth(1));
+                assertEquals(1, ogre.battleNetCollisionCounter());
+                assertEquals(586, ogre.battleNetSequenceOffset());
+                assertEquals(15, ogre.battleNetAnimationTimer(),
+                        "the occupied first byte enters the full Move band");
+                assertEquals(14, ogre.battleNetOrderDelay());
+            } else if (fixture == 201) {
+                assertEquals(123, ogre.tileX());
+                assertEquals(31, ogre.tileY());
+                assertEquals(2, ogre.pathLength(),
+                        "the quiet band must not cold-replan the native ray");
+                assertEquals(14, ogre.battleNetAnimationTimer());
+            }
+        }
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {

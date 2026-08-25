@@ -65,6 +65,15 @@ class Human07OilTankerDepotExitRealDataTest {
         assertEquals(Unit.Order.STILL, tanker.order(),
                 "the AI tanker surfaces behind native's ready boundary");
         assertSame(easternRefinery, tanker.returnDepotGoal());
+
+        while (fixtureCycle(world) < 185) {
+            mission.tick();
+        }
+        assertSame(easternRefinery, tanker.returnDepotGoal(),
+                "the queued return must retain the depot selected before dropout");
+        assertEquals(62, tanker.tileX());
+        assertEquals(76, tanker.tileY(),
+                "the first doubled return stride must continue southeast toward home");
     }
 
     private static Unit unitById(World world, int id) {

@@ -211,6 +211,14 @@ final class BattleNetProjectileSystem {
         if (shot.battleNetPoolSlot() < 0) {
             shot.setBattleNetPoolSlot(world.allocateBattleNetProjectileSlot());
         }
+        if (usesBattleNetCannonSourceEffect(shot.type())) {
+            // BNE creates a source-less type-25 cannon flash immediately
+            // after each real shell. It owns the next low pool slot for 24
+            // fixture cycles even though Java draws the flash as part of the
+            // weapon presentation. Omitting that record reorders later live
+            // shells in the fixed-pool timed pass.
+            world.reserveBattleNetProjectileAuxiliarySlot(world.cycle + 24);
+        }
         Unit attacker = shot.source();
         Unit target = shot.target();
         long queued = world.battleNetPendingProjectileQueuedCycle
@@ -581,6 +589,10 @@ final class BattleNetProjectileSystem {
      */
     void stepMissiles() {
         discardInterruptedPlaceholders();
+        // Constructors ran during the unit pass. Native frees expired visual
+        // records only now, so a same-cycle constructor cannot claim a slot
+        // that was still occupied at the cycle boundary.
+        world.releaseBattleNetProjectileAuxiliarySlots(world.cycle);
         if (world.missiles.isEmpty()) {
             return;
         }
@@ -606,7 +618,6 @@ final class BattleNetProjectileSystem {
         });
         // Per-missile motion RNG, step, and impact resolve. Parabolic motion
         // takes one or two async draws per FUN_00410260.
-        List<Missile> finishedNow = new ArrayList<>();
         for (Missile missile : flying) {
             preparePersistentEffect(missile);
             Long started = world.battleNetProjectileStartCycles.get(missile);
@@ -661,19 +672,45 @@ final class BattleNetProjectileSystem {
                 }
             }
             if (missile.hasArrived()) {
-                finishedNow.add(missile);
+                // Native frees each record as the ascending pool walk reaches
+                // it. A later impact in this same pass can therefore reuse a
+                // lower slot; deferring every free until the end of the walk
+                // changes both allocation and asynchronous damage ordering.
+                world.missiles.remove(missile);
+                recordProjectileFree(missile);
+                world.battleNetProjectileStartCycles.remove(missile);
+                int slot = missile.battleNetPoolSlot();
+                if (isBattleNetCannonImpactEffect(missile.type())) {
+                    // Java's four-frame effect finishes seven visits before
+                    // BNE's type-26 pool record. Preserve only native pool
+                    // occupancy; the already-finished Java visual stays gone.
+                    world.retainBattleNetProjectileAuxiliarySlot(
+                            slot, world.cycle + 7);
+                } else {
+                    world.freeBattleNetProjectileSlot(slot);
+                }
+                missile.setBattleNetPoolSlot(-1);
             }
-        }
-        world.missiles.removeAll(finishedNow);
-        for (Missile missile : finishedNow) {
-            recordProjectileFree(missile);
-            world.battleNetProjectileStartCycles.remove(missile);
-            world.freeBattleNetProjectileSlot(missile.battleNetPoolSlot());
-            missile.setBattleNetPoolSlot(-1);
         }
         // Last, after anything an impact added, so the renderer never
         // sees a half-built cycle.
         world.missileSnapshot = List.copyOf(world.missiles);
+    }
+
+    private static boolean usesBattleNetCannonSourceEffect(MissileType type) {
+        if (type == null || type.ident() == null) {
+            return false;
+        }
+        return switch (type.ident()) {
+            case "missile-big-cannon", "missile-small-cannon",
+                    "missile-small-cannon-super" -> true;
+            default -> false;
+        };
+    }
+
+    private static boolean isBattleNetCannonImpactEffect(MissileType type) {
+        return type != null
+                && "missile-cannon-tower-explosion".equals(type.ident());
     }
 
     /** Attributes an asynchronous flight draw to its fixed-pool record. */
@@ -722,6 +759,41 @@ final class BattleNetProjectileSystem {
             missile.redirect(tileX * Unit.TILE_PIXELS + Unit.TILE_PIXELS / 2.0,
                     tileY * Unit.TILE_PIXELS + Unit.TILE_PIXELS / 2.0);
         }
+    }
+
+    /**
+     * Whether a landed retail direct shot already owes this unit a lethal
+     * free on the current projectile pass.
+     *
+     * <p>The constructor has already rolled and stored ordinary weapon damage,
+     * and action 6 with wait one has no motion or RNG left before impact. This
+     * is therefore an observation of committed state, not speculative damage.
+     * It lets a queued HitUnit order observe the same native scheduler seam as
+     * the projectile pool without resolving the shot or its hit effects early.
+     * Splash and type-declared spell damage stay with the projectile resolver:
+     * their victim or damage is not represented by this direct stored pair.</p>
+     */
+    boolean hasLethalDirectImpactDueThisCycle(Unit target) {
+        if (target == null || !target.isAlive() || target.type() == null
+                || target.type().indestructible()
+                || target.hasBuff(Unit.Buff.UNHOLY_ARMOR)) {
+            return false;
+        }
+        for (Missile missile : world.missiles) {
+            if (missile.target() != target || missile.source() == null
+                    || missile.type() == null || missile.type().range() > 0
+                    || missile.type().declaresDamage()
+                    || !world.battleNetProjectileStartCycles.containsKey(missile)
+                    || !missile.battleNetPendingImpact()
+                    || missile.battleNetImpactWait() > 1) {
+                continue;
+            }
+            if (missile.damage() > 0
+                    && missile.damage() >= target.hitPoints()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** Damage beat for Flame Shield's ring and the roaming Whirlwind. */

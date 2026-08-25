@@ -15,6 +15,7 @@ import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
+import net.chonkbase.chonkcraft.engine.unit.UnitTypeCatalog;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -45,6 +46,18 @@ import org.junit.jupiter.api.Test;
  * afterwards differed. That map's first divergence moved from cycle 120 to 158.
  */
 class CorpseTest {
+
+    @Test
+    @DisplayName("BNE uses its type-105 body for both land-unit race families")
+    void generatedLandUnitsUseTheRetailUnifiedCorpseType() {
+        UnitTypeCatalog catalog = UnitTypeCatalog.generated(
+                AnimationCatalog.generated());
+        for (String ident : List.of("unit-grunt", "unit-ogre", "unit-peon",
+                "unit-axethrower")) {
+            assertEquals("unit-human-dead-body",
+                    catalog.types().get(ident).corpse(), ident);
+        }
+    }
 
     @Test
     @DisplayName("BNE infantry bodies hold four visible decay intervals")

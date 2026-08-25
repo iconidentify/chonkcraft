@@ -2,6 +2,8 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -309,6 +311,32 @@ class CombatTest {
         world.fog().revealAll(0);
         world.fog().revealAll(1);
         return world;
+    }
+
+    @Test
+    @DisplayName("a struck person guard tower recruits only fighters in its two-tile band")
+    void aStruckPersonGuardTowerRecruitsOnlyFightersInItsTwoTileBand() {
+        // BNE 2.02b FUN_0040a9d0 runs for buildings too. The authenticated
+        // XHuman 10 call enters its person-owned scan with band two, then
+        // gives the tower's ogre aggressor to the idle footman below it.
+        World world = open(30);
+        Unit attacker = world.createUnit(soldier("ogre", 1), 0, 10, 7);
+        UnitType towerType = soldier("guard-tower", 6);
+        towerType.setBuilding(true);
+        towerType.setTileSize(2, 2);
+        towerType.setSpeed(0);
+        Unit tower = world.createUnit(towerType, 1, 10, 10);
+        Unit inBand = world.createUnit(soldier("footman-in-band", 1),
+                1, 10, 13);
+        Unit outsideBand = world.createUnit(soldier("footman-outside-band", 1),
+                1, 10, 14);
+
+        world.battleNetSpatialHitHelp(attacker, tower);
+
+        assertSame(attacker, inBand.battleNetPendingHelpAttack(),
+                "the building-origin hit help did not bank its nearby defender");
+        assertNull(outsideBand.battleNetPendingHelpAttack(),
+                "person building hit help escaped native's two-tile band");
     }
 
     @Test

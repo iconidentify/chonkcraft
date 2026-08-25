@@ -104,13 +104,13 @@
       "retail_evidence": [
         "The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.",
         "An authenticated gryphon commanded to Move during its committed attack keeps the unbreakable BNE order head until the animation releases, then completes Move and damages a second target after a new Attack without an intervening Stop.",
-        "The movement gate runs 111 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.",
+        "The movement gate runs 114 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.",
         "Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes."
       ],
       "blockers": [],
       "gate": {
         "driver": "Player wire commands move retail land, naval and air units through authenticated maps and unit data.",
-        "success": "Real units complete formation detours and terrain-domain passages while 111 large-footprint, congestion, command-handoff and refusal checks pass with zero skips.",
+        "success": "Real units complete formation detours and terrain-domain passages while 114 large-footprint, congestion, command-handoff and refusal checks pass with zero skips.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-movement-gate.sh"]
       }
@@ -307,12 +307,12 @@
         "Pinned BNE 2.02b constructors write facing at projectile +0x0a once; point action 0x004101f0 and parabolic action 0x00410260 never rewrite it. An efficacy-proved rendered-frame regression fails on the old alternating shallow-arrow sprite and passes when launch facing is preserved.",
         "Pinned BNE 2.02b function 0x00410260 advances the parabolic arc accumulator at projectile +0x24, divides by the stride at +0x26 and selects flattened frames 0,5,10,5,0 from table 0x0049067c without adding a fake height coordinate; the zero-skip player/referee lane proves those phases, post-zero impact timing, visible flight and visible impact art.",
         "All 35 retail missile declarations are loaded. Land mines now persist until triggered or expired, Whirlwinds move and pulse, Flame Shields orbit and pulse without striking their protected center, and Death Coil returns life; their live state also survives save/load.",
-        "The retail green-cross map confirmation is a first-class projectile lifecycle: the issued location is retained, its visible cycles are counted, and it is covered by the same 54-check zero-skip referee."
+        "The retail green-cross map confirmation is a first-class projectile lifecycle: the issued location is retained, its visible cycles are counted, and it is covered by the same 63-check zero-skip referee."
       ],
       "blockers": [],
       "gate": {
         "driver": "A retail-data firer launches arrows and boulders while the referee follows native construction, pool order, integer flight, parabolic frame phases, impact damage, art and screen pixels.",
-        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its complete transient or persistent effect once and renders flight, impact and green-cross feedback across 54 zero-skip checks.",
+        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its complete transient or persistent effect once and renders flight, impact and green-cross feedback across 63 zero-skip checks.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-projectile-gate.sh"]
       }

@@ -114,6 +114,26 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 9 peon keeps traversal order across an equally near mine face")
+    void anXHuman9PeonKeepsTraversalOrderAcrossAnEquallyNearMineFace() {
+        Mission mission = mission("campaigns/human-exp/levelx09h");
+        for (int cycle = 1; cycle < 188; cycle++) {
+            mission.tick();
+        }
+
+        mission.tick();
+        Unit peon = mission.world().unitsSnapshot().stream()
+                .filter(unit -> unit.id() == 50)
+                .findFirst().orElse(null);
+        assertNotNull(peon, "native slot 1550 must remain paired with Java peon 50");
+        assertEquals(109, peon.tileX());
+        assertEquals(21, peon.tileY(),
+                "equal footprint distance keeps the first free west-face square");
+        assertMineExitReady(peon,
+                "native slot 1550 must surface on fixture cycle 188");
+    }
+
+    @Test
     @DisplayName("an XHuman 8 hall exit queues and pays its BNE watch-tower job")
     void anXHuman8HallExitQueuesAndPaysItsWatchTowerJob() {
         Mission mission = mission("campaigns/human-exp/levelx08h");

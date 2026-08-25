@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -24,6 +25,44 @@ import org.junit.jupiter.api.Test;
 class Xorc11PatrolAttackRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("xorc 11 cannon source effects preserve the native pool order")
+    void xorc11CannonSourceEffectsPreserveNativePoolOrder() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit battleship = unitById(world, 89);
+        assertNotNull(battleship, "native slot 1511 battleship is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 181) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 171) {
+                assertEquals(9, constructedMissileFrom(world, 107)
+                                .battleNetPoolSlot(),
+                        "native slot 1493's cannon shell owns projectile slot 9");
+            } else if (fixture == 173) {
+                assertEquals(11, constructedMissileFrom(world, 75)
+                                .battleNetPoolSlot(),
+                        "native slot 1525's later shell owns projectile slot 11");
+            } else if (fixture == 180) {
+                assertEquals(127, battleship.hitPoints());
+            } else if (fixture == 181) {
+                assertEquals(117, battleship.hitPoints(),
+                        "slot-9 impact resolves before slot-11 flight draws");
+            }
+        }
+    }
 
     @Test
     @DisplayName("xorc 11's patrolling destroyer acquires before its residual stride")
@@ -91,6 +130,44 @@ class Xorc11PatrolAttackRealDataTest {
         assertEquals(10, destroyer.tileX());
         assertEquals(28, destroyer.tileY(),
                 "the promoted attack takes BNE's first southward chase step");
+    }
+
+    @Test
+    @DisplayName("xorc 11's destroyer retains Attack while its chase stride drains")
+    void xorc11sDestroyerRetainsAttackWhileItsChaseStrideDrains() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit destroyer = nearest(world, "unit-human-destroyer", 4, 18);
+        Unit dragon = nearest(world, "unit-dragon", 2, 34);
+        assertNotNull(destroyer);
+        assertNotNull(dragon);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 182) {
+            mission.tick();
+        }
+
+        assertEquals(10, destroyer.tileX());
+        assertEquals(28, destroyer.tileY());
+        assertEquals(-42, destroyer.offsetY(),
+                "the native south stride still owes forty-two pixels");
+        assertTrue(destroyer.isMoving());
+        assertEquals(Unit.Order.ATTACK, destroyer.order(),
+                "MoveToTarget owns the committed residual before target rescanning");
+        assertSame(dragon, destroyer.target(),
+                "the native Attack order retains its original CUnitPtr");
+        assertTrue(dragon.isAlive());
+        assertEquals(3181, destroyer.battleNetSequenceOffset(),
+                "the native Move body advances instead of restoring Patrol");
     }
 
     @Test
@@ -591,6 +668,23 @@ class Xorc11PatrolAttackRealDataTest {
         assertEquals(896, ship.pixelY());
         assertEquals(3092, ship.battleNetSequenceOffset());
         assertEquals(3, ship.battleNetAnimationTimer());
+    }
+
+    private static Missile constructedMissileFrom(World world, int sourceId) {
+        for (Missile missile : world.missiles()) {
+            if (missile.source() != null
+                    && missile.source().id() == sourceId
+                    && world.battleNetProjectileConstructed(missile)) {
+                return missile;
+            }
+        }
+        throw new AssertionError("no constructed missile from unit " + sourceId);
+    }
+
+    private static Unit unitById(World world, int id) {
+        return world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == id)
+                .findFirst().orElse(null);
     }
 
     private static Unit nearest(World world, String ident, int x, int y) {

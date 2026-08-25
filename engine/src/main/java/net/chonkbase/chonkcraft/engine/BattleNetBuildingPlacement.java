@@ -188,10 +188,25 @@ final class BattleNetBuildingPlacement {
      * second base, while XHuman 8's mine is already served by its stronghold
      * and its build scan correctly advances to a lumber mill.</p>
      */
-    int[] aiFindBattleNetHallPlace(Unit worker, UnitType type) {
+    int[] aiFindBattleNetReadyHallPlace(Unit worker, UnitType type) {
         int[] site = aiFindBattleNetHallPlace(worker, type, true);
         return site != null ? site
                 : aiFindBattleNetHallPlace(worker, type, false);
+    }
+
+
+    /**
+     * Hall placement reached from the ordinary build-priority list.
+     *
+     * <p>Unlike the missing-hall branch in {@code 0x438a50}, native
+     * {@code 0x439740} does not set global byte {@code 0x4b508c} around its
+     * indirect hall finder call. The shared lattice therefore uses only the
+     * ordinary building predicate. XHuman 10's priority slot four is the
+     * compact witness: its peon receives (40,79), while applying the
+     * ready-only clear skirt changes the answer to (37,79).</p>
+     */
+    int[] aiFindBattleNetHallPlace(Unit worker, UnitType type) {
+        return aiFindBattleNetHallPlace(worker, type, false);
     }
 
 

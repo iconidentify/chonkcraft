@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -182,6 +183,278 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         assertEquals(2558, longRouteGrunt.battleNetSequenceOffset(),
                 "the grunt advances through its attack body instead of freezing at OP0");
         assertEquals(5, longRouteGrunt.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("paid refusal recovery settles with one cached heading")
+    void paidRefusalRecoveryWithOneCachedHeadingPaysFixture204Reseed() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit recoveryGrunt = unitById(world, 153);
+        Unit nearbyFootman = unitById(world, 151);
+        assertNotNull(recoveryGrunt,
+                "XHuman 12 has no native-slot-1447 recovery grunt");
+        assertNotNull(nearbyFootman,
+                "XHuman 12 has no native-slot-1449 footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 203) {
+            mission.tick();
+        }
+        assertEquals(0xd358cbee, world.randomSeed(),
+                "the agreeing prefix ends before the recovery arrival debit");
+        assertEquals(2534, recoveryGrunt.battleNetSequenceOffset());
+        assertEquals(1, recoveryGrunt.battleNetAnimationTimer());
+        assertEquals(1, recoveryGrunt.pathLength(),
+                "the successful diagonal retains one cached cardinal heading");
+        assertEquals(true,
+                recoveryGrunt.battleNetPaidRefusalRecoveryApproach(),
+                "the residual belongs to a completed paid refusal probe");
+
+        mission.tick();
+        assertEquals(204, fixtureCycle(world));
+        assertEquals(0x3305888f, world.randomSeed(),
+                "paid recovery settlement must debit on the native arrival");
+        assertEquals(2540, recoveryGrunt.battleNetSequenceOffset(),
+                "the paid residual opens past Attack OP0 on settlement");
+        assertEquals(1, recoveryGrunt.battleNetAnimationTimer());
+        assertEquals(0, recoveryGrunt.pathLength(),
+                "native parks the retained route at cursor twenty");
+        assertEquals(false, recoveryGrunt.battleNetPendingMeleeSyncRand());
+        assertEquals(2539, nearbyFootman.battleNetSequenceOffset(),
+                "the adjacent footman does not own the fixture-204 draw");
+        assertEquals(1, nearbyFootman.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("a paid same-quarry residual retains its full move band")
+    void paidSameQuarryResidualRetainsItsFullMoveBand() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 137);
+        assertNotNull(grunt,
+                "XHuman 12 has no native-slot-1463 recovery grunt");
+
+        // The sealed native route consumes its southeast opening on fixture
+        // 188. When those pixels settle on 204, the retained east byte is
+        // still occupied by a cooperative unit. Retail advances collision
+        // generation three to four and exposes the complete Move 15 band
+        // without replacing the approved route. It therefore remains on the
+        // formation square through the cycle-207 comparison frontier.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 204) {
+            mission.tick();
+        }
+
+        assertEquals(23, grunt.tileX());
+        assertEquals(61, grunt.tileY());
+        assertEquals(4, grunt.battleNetCollisionCounter());
+        assertEquals(2, grunt.battleNetRefusals());
+        assertEquals(2, grunt.pathLength(),
+                "the paid residual keeps both cached route bytes");
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        net.chonkbase.chonkcraft.engine.animation
+                                .BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 207) {
+            mission.tick();
+        }
+        assertEquals(23, grunt.tileX(),
+                "the full refusal band keeps the formation square");
+        assertEquals(61, grunt.tileY());
+        assertEquals(12, grunt.battleNetAnimationTimer(),
+                "native Move construction counts 15,14,13,12");
+    }
+
+    @Test
+    @DisplayName("a retained building retarget replays its approved opening")
+    void retainedBuildingRetargetReplaysItsApprovedOpening() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 90);
+        Unit guardTower = unitById(world, 115);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1510 grunt");
+        assertNotNull(guardTower, "XHuman 12 has no paired guard tower");
+
+        // The native target upgrade writes a twelve-byte tower route and
+        // spends east on fixture 187. Its residual settles into real Attack
+        // construction 3,2,1 on fixtures 203..205. Move owns a route-index-20
+        // replay visit on 206, then consumes that approved east opening again
+        // on 207; a free-compass south detour is not this route's owner.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 203) {
+            mission.tick();
+        }
+        assertEquals(guardTower, grunt.target());
+        assertEquals(11, grunt.pathLength());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(204, fixtureCycle(world));
+        assertEquals(2, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(205, fixtureCycle(world));
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(206, fixtureCycle(world));
+        assertEquals(40, grunt.tileX());
+        assertEquals(38, grunt.tileY());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        net.chonkbase.chonkcraft.engine.animation
+                                .BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(Direction.fromDelta(1, 0), grunt.peekHeading(),
+                "route replay restores the consumed cardinal opening");
+        assertEquals(1, grunt.battleNetCollisionCounter(),
+                "the route-index-twenty replay park owns native collision one");
+
+        mission.tick();
+        assertEquals(207, fixtureCycle(world));
+        assertEquals(41, grunt.tileX(),
+                "the cached tower route replays east after construction");
+        assertEquals(38, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, 0), grunt.lastStepHeading());
+        assertEquals(1, grunt.battleNetCollisionCounter(),
+                "the replayed opening retains its formation-wall provenance");
+    }
+
+    @Test
+    @DisplayName("settled formation retargets preserve the native wall faces")
+    void settledFormationRetargetsPreserveTheNativeWallFaces() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit towerRetarget = unitById(world, 100);
+        Unit mobileRetarget = unitById(world, 86);
+        Unit guardTower = unitById(world, 115);
+        Unit footman = unitById(world, 123);
+        assertNotNull(towerRetarget);
+        assertNotNull(mobileRetarget);
+        assertNotNull(guardTower);
+        assertNotNull(footman);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 209) {
+            mission.tick();
+        }
+        assertEquals(39, towerRetarget.tileX());
+        assertEquals(37, towerRetarget.tileY());
+        assertEquals(14, towerRetarget.pathLength());
+        assertEquals(2, towerRetarget.battleNetPathStepsTaken());
+        assertEquals(35, mobileRetarget.tileX());
+        assertEquals(40, mobileRetarget.tileY());
+        assertEquals(2, mobileRetarget.battleNetCollisionCounter());
+        assertEquals(2, mobileRetarget.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(210, fixtureCycle(world));
+        assertEquals(guardTower, towerRetarget.target());
+        assertEquals(40, towerRetarget.tileX(),
+                "the collision-marked formation wall selects native east");
+        assertEquals(37, towerRetarget.tileY());
+        assertEquals(Direction.fromDelta(1, 0),
+                towerRetarget.lastStepHeading());
+        assertEquals(footman, mobileRetarget.target());
+        assertEquals(36, mobileRetarget.tileX(),
+                "the paid collision-two buffer retains northeast");
+        assertEquals(39, mobileRetarget.tileY());
+        assertEquals(Direction.fromDelta(1, -1),
+                mobileRetarget.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("a reversing paid recovery keeps collision-marked movers solid")
+    void reversingPaidRecoveryKeepsCollisionMarkedMoversSolid() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit recoveryGrunt = unitById(world, 96);
+        Unit formationMate = unitById(world, 105);
+        Unit knight = unitById(world, 125);
+        assertNotNull(recoveryGrunt,
+                "XHuman 12 has no native-slot-1504 recovery grunt");
+        assertNotNull(formationMate,
+                "XHuman 12 has no native-slot-1495 formation mate");
+        assertNotNull(knight, "XHuman 12 has no paired knight");
+
+        // Native slot 1504 has just drained a north step away from its quarry
+        // at fixture 194. The paid recovery returns to the full route writer
+        // on 195. Slot 1495 is then crossing (30,40) on action-state Move with
+        // packed collision two, so native keeps it solid and writes exactly
+        // SE,SW. Clearing that body produces a saturated twenty-byte route
+        // whose wrong second heading is not exposed until fixture 211.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 194) {
+            mission.tick();
+        }
+        assertEquals(knight, recoveryGrunt.target());
+        assertEquals(30, recoveryGrunt.tileX());
+        assertEquals(39, recoveryGrunt.tileY());
+        assertEquals(0, recoveryGrunt.pathLength());
+        assertEquals(1, recoveryGrunt.battleNetCollisionCounter());
+        assertEquals(1, recoveryGrunt.battleNetRefusals());
+        assertEquals(30, formationMate.tileX());
+        assertEquals(40, formationMate.tileY());
+        assertEquals(2, formationMate.battleNetCollisionCounter(),
+                "the paired native mover carries packed collision two");
+
+        mission.tick();
+        assertEquals(195, fixtureCycle(world));
+        assertEquals(31, recoveryGrunt.tileX());
+        assertEquals(40, recoveryGrunt.tileY());
+        assertEquals(Direction.fromDelta(1, 1),
+                recoveryGrunt.lastStepHeading());
+        assertEquals(1, recoveryGrunt.pathLength(),
+                "native consumes SE and retains only the SW tail");
+        assertEquals(Direction.fromDelta(-1, 1),
+                recoveryGrunt.peekHeading());
     }
 
     private static int fixtureCycle(World world) {

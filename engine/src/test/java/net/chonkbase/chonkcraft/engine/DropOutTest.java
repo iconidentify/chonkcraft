@@ -246,11 +246,12 @@ class DropOutTest {
         world.tick();
 
         assertFalse(worker.removed(), "the full worker never surfaced");
-        assertEquals(15, worker.tileY(),
-                "the failed fresh depot search forgot COrder_Resource::Depot and used the"
-                        + " west-side fallback instead of the old hall to the south");
-        assertTrue(worker.tileX() >= 12 && worker.tileX() <= 15,
-                "the worker did not emerge along the mine's south face");
+        // The remembered hall's x coordinate is exactly the mine's left
+        // boundary. Native 0x443a40 gives that signed boundary to the west
+        // traversal, then enters it from the bottom because the hall is south.
+        assertEquals(11, worker.tileX());
+        assertEquals(14, worker.tileY(),
+                "the failed fresh depot search forgot COrder_Resource::Depot");
     }
 
     @Test
@@ -359,11 +360,11 @@ class DropOutTest {
         assertFalse(worker.removed(), "the worker never left the depot");
         assertEquals(mine, worker.resourceUnit(),
                 "WaitInDepot did not run UnitFindResource after its weak Mine vanished");
-        assertEquals(14, worker.tileY(),
-                "the replacement mine was found only after the worker had already dropped"
-                        + " out of the hall's west face");
-        assertTrue(worker.tileX() >= 10 && worker.tileX() <= 13,
-                "the worker did not emerge on the south face towards the mine");
+        // Exact-left is the same asymmetric native boundary as the mine-exit
+        // control above, so a southern mine seeds the hall's west-bottom tile.
+        assertEquals(9, worker.tileX());
+        assertEquals(13, worker.tileY(),
+                "the replacement mine was found only after drop-out was planned");
     }
 
     /**

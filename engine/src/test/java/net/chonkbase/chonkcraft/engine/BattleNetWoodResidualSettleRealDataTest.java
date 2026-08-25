@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,62 @@ class BattleNetWoodResidualSettleRealDataTest {
         }
         assertPosition(worker, 15, 10, -32, -32,
                 "later repeated southeast headings must not inherit the one-shot hold");
+
+        while (fixtureCycle(world) < 215) {
+            mission.tick();
+        }
+        assertPosition(worker, 19, 15, 0, 0,
+                "fixture 215 settles the northeast residual at its pixel anchor");
+        assertEquals(0, worker.pathLength(),
+                "native parks the ally-blocked southeast tail at route index 20");
+
+        mission.tick();
+        assertPosition(worker, 20, 15, -32, 0,
+                "fixture 216 redraws around the allied peon and commits east");
+        assertEquals(Direction.fromDelta(1, 0), worker.lastStepHeading());
+    }
+
+    @Test
+    void xhuman11FirstGenerationTerminalRefusalRedrawsImmediately() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx11h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 11 is not in the pack");
+        World world = mission.world();
+        Unit worker = world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == 12)
+                .findFirst().orElse(null);
+        assertNotNull(worker,
+                "XHuman 11 must contain native peon 1588 / Java 12");
+
+        // The final southeast residual settles beside allied peon 1586 on
+        // fixture 210. Native raises packed collision one to two and parks
+        // route index 20. Because this is only the first terminal generation,
+        // fixture 211 redraws E,SE and commits E immediately. The later
+        // XHuman 12 witness enters with collision two, advances to three, and
+        // therefore owns the separate 3,2,1 resource construction cadence.
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 210) {
+            mission.tick();
+        }
+        assertPosition(worker, 19, 16, 0, 0,
+                "fixture 210 parks the refused terminal route");
+        assertEquals(2, worker.battleNetCollisionCounter());
+        assertEquals(0, worker.pathLength());
+
+        mission.tick();
+        assertPosition(worker, 20, 16, -32, 0,
+                "fixture 211 immediately consumes the redrawn east head");
+        assertEquals(Direction.fromDelta(1, 0), worker.lastStepHeading());
+        assertEquals(1, worker.pathLength(),
+                "native retains the southeast tail of E,SE");
+        assertEquals(Direction.fromDelta(1, 1), worker.peekHeading());
     }
 
     private static int fixtureCycle(World world) {

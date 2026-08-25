@@ -106,6 +106,88 @@ class Human13MeleeSyncConstructionRealDataTest {
         }
     }
 
+    @Test
+    void grunt1507CleanWrapRefillKeepsTheNativeAxialTargetSkirt() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level13h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 93);
+        assertNotNull(grunt,
+                "Human 13 must contain native grunt 1507 / Java 93");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 197) {
+            mission.tick();
+        }
+
+        assertEquals(122, grunt.tileX());
+        assertEquals(27, grunt.tileY());
+        assertEquals(3, grunt.pathLength(),
+                "after consuming the first SE, native retains SE,S,SW");
+        assertEquals(3, grunt.peekHeading(),
+                "the occupied diagonal skirt corner does not end the route");
+        assertEquals(4, grunt.peekHeadingAtDepth(1));
+        assertEquals(5, grunt.peekHeadingAtDepth(2));
+
+        while (fixtureCycle(world) < 213) {
+            mission.tick();
+        }
+        assertEquals(123, grunt.tileX(),
+                "the retained second SE commits on fixture 213");
+        assertEquals(28, grunt.tileY());
+    }
+
+    @Test
+    void knight1490DamageHoldSupersedesItsRetargetConstructionHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level13h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+        Unit knight = unitById(world, 110);
+        Unit ogre = unitById(world, 118);
+        assertNotNull(knight,
+                "Human 13 must contain native knight 1490 / Java 110");
+        assertNotNull(ogre,
+                "Human 13 must contain native ogre 1482 / Java 118");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 37) {
+            mission.tick();
+        }
+        assertEquals(ogre, knight.target());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(23, knight.battleNetAnimationTimer(),
+                "the fixture-35 splash replaces construction with one native body hold");
+
+        while (fixtureCycle(world) < 59) {
+            mission.tick();
+        }
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer(),
+                "the damaged OP0 hold must drain exactly once");
+
+        mission.tick();
+        assertEquals(1923, knight.battleNetSequenceOffset(),
+                "fixture 60 advances into windup instead of charging a second hold");
+        assertEquals(0x0abd322c, world.randomSeed(),
+                "fixture 60 owns native knight 1490's attack-loop SyncRand debit");
+    }
+
     private static Unit unitById(World world, int id) {
         return world.unitsSnapshot().stream()
                 .filter(unit -> unit.id() == id)

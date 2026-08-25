@@ -89,10 +89,16 @@ class XHuman12RangedBlockedTailRetargetRealDataTest {
         // Java unit 125 pairs with sealed-native slot 1475. Native remains at
         // 90 HP through fixture 131 and the grunt hit lowers it to 87 at 132.
         Unit knight = unitById(world, 125);
+        Unit offeredAxe = unitById(world, 76);
+        Unit selectedGrunt = unitById(world, 95);
         Unit detourOgre = unitById(world, 102);
         Unit longRouteAxe = unitById(world, 77);
         Unit retainedRouteGrunt = unitById(world, 137);
         assertNotNull(knight, "XHuman 12 has no Java/native-paired knight 125");
+        assertNotNull(offeredAxe,
+                "XHuman 12 has no Java/native-paired offered axe 76");
+        assertNotNull(selectedGrunt,
+                "XHuman 12 has no Java/native-paired selected grunt 95");
         assertNotNull(detourOgre,
                 "XHuman 12 has no Java/native-paired detour ogre 102");
         assertNotNull(longRouteAxe,
@@ -112,6 +118,10 @@ class XHuman12RangedBlockedTailRetargetRealDataTest {
         int hpAt132 = -1;
         int hpAt138 = -1;
         int axeSequenceAt124 = -1;
+        Unit knightTargetAt84 = null;
+        int knightPathLengthAt84 = -1;
+        Unit knightTargetAt96 = null;
+        int syncSeedAt99 = 0;
         int retainedGruntXAt139 = -1;
         int retainedGruntYAt139 = -1;
         Unit.Order ogreOrderAt133 = null;
@@ -120,6 +130,16 @@ class XHuman12RangedBlockedTailRetargetRealDataTest {
             int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
             if (fixture == 124) {
                 axeSequenceAt124 = longRouteAxe.battleNetSequenceOffset();
+            }
+            if (fixture == 84) {
+                knightTargetAt84 = knight.target();
+                knightPathLengthAt84 = knight.pathLength();
+            }
+            if (fixture == 96) {
+                knightTargetAt96 = knight.target();
+            }
+            if (fixture == 99) {
+                syncSeedAt99 = world.randomSeed();
             }
             if (fixture == 131) {
                 hpAt131 = knight.hitPoints();
@@ -141,6 +161,15 @@ class XHuman12RangedBlockedTailRetargetRealDataTest {
 
         assertEquals(90, hpAt131,
                 "the focus knight must be undamaged through fixture 131");
+        assertSame(offeredAxe, knightTargetAt84,
+                "projectile HitUnit help keeps its source through the first "
+                        + "chase residual");
+        assertEquals(4, knightPathLengthAt84,
+                "fixture 84 retains the axe route behind the spent north byte");
+        assertSame(selectedGrunt, knightTargetAt96,
+                "the settled residual owns the later AutoSelectTarget scan");
+        assertEquals(0xe4880eeb, syncSeedAt99,
+                "knight 1475 pays its authenticated melee draw on fixture 99");
         assertEquals(87, hpAt132,
                 "native damage draw 12252 deals three on fixture 132");
         assertEquals(Unit.Order.STILL, ogreOrderAt133,

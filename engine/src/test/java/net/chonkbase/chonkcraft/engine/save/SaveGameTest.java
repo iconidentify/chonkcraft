@@ -864,6 +864,7 @@ class SaveGameTest {
         attacker.setOrder(Unit.Order.ATTACK);
         attacker.setTarget(target);
         attacker.setBattleNetAttackRefusalRecoveryStage(6);
+        attacker.setBattleNetPaidRefusalRecoveryApproach(true);
         attacker.setBattleNetDirectRefusalRecoveryProbe(true);
         attacker.setBattleNetStageSixCardinalProbePark(true);
         attacker.setBattleNetSaturatedCardinalRetryLoop(true);
@@ -881,6 +882,8 @@ class SaveGameTest {
         assertEquals(6, loaded.battleNetAttackRefusalRecoveryStage(),
                 "reloading during hard-refusal Attack 3,2,1 must not free "
                         + "the chase early");
+        assertTrue(loaded.battleNetPaidRefusalRecoveryApproach(),
+                "an accepted paid probe must not buy construction after reload");
         assertTrue(loaded.battleNetDirectRefusalRecoveryProbe());
         assertTrue(loaded.battleNetStageSixCardinalProbePark(),
                 "the parked final Move probe must survive a mid-jam save");

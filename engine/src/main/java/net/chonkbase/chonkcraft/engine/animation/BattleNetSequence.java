@@ -124,11 +124,31 @@ public final class BattleNetSequence {
      * the program is not a well-formed OP0-headed Attack loop.</p>
      */
     public int attackBodyWaitSum(int attackStart) {
-        if (!contains(attackStart, 1)
-                || Byte.toUnsignedInt(program[attackStart]) != 0) {
+        int cursor = attackStart;
+        // Most Attack programs begin directly with OP0. A few begin with a
+        // frame selection and then OP0; the sequence owner still parks at
+        // attackStart, but the body whose waits are summed starts after that
+        // marker. Accept only this inert prelude so malformed bytecode still
+        // fails closed.
+        boolean openingMarker = false;
+        for (int prelude = 0; prelude < MAX_INSTRUCTIONS_PER_TICK; prelude++) {
+            if (!contains(cursor, 1)) {
+                return -1;
+            }
+            int opcode = Byte.toUnsignedInt(program[cursor]);
+            if (opcode == 0) {
+                cursor++;
+                openingMarker = true;
+                break;
+            }
+            if (opcode != 4 || !contains(cursor, 2)) {
+                return -1;
+            }
+            cursor += 2;
+        }
+        if (!openingMarker) {
             return -1;
         }
-        int cursor = attackStart + 1;
         int sum = 0;
         for (int instructions = 0;
                 instructions < MAX_INSTRUCTIONS_PER_TICK;

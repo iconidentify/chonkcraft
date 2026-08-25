@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.zip.ZipFile;
+import net.chonkbase.chonkcraft.data.map.PudUnitTypes;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
@@ -57,6 +58,20 @@ class BattleNetAttackResumeHoldTest {
                 return in.readAllBytes();
             }
         }
+    }
+
+    @Test
+    @DisplayName("an Attack frame prelude still exposes the complete body wait")
+    void anAttackFramePreludeStillExposesTheCompleteBodyWait()
+            throws Exception {
+        BattleNetSequence sequence = new BattleNetSequence(retailScriptBin());
+        int attackStart = sequence.sequenceStart(
+                PudUnitTypes.code("unit-attack-peasant"),
+                BattleNetSequence.ATTACK_ANIMATION);
+        assumeTrue(attackStart == 2657,
+                "retail attack-peasant Attack must start at script offset 2657");
+        assertEquals(24, sequence.attackBodyWaitSum(attackStart),
+                "the leading frame byte must not hide the OP0-headed body");
     }
 
     private static UnitType axethrower() {

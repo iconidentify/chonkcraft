@@ -2318,6 +2318,7 @@ public final class Unit {
             battleNetMovingQuarryResidual = false;
             battleNetWrappedCollisionRetryPark = false;
             battleNetStageSixCardinalProbePark = false;
+            battleNetParkedRefusalHeading = -1;
             battleNetSaturatedCardinalRetryLoop = false;
         }
         this.target = target;
@@ -2936,6 +2937,21 @@ public final class Unit {
     private int battleNetAttackRefusalRecoveryStage;
 
     /**
+     * A hard-refusal stage-six probe was accepted after Attack construction
+     * completed. Its live chase residual returns past OP0 instead of buying a
+     * second constructor when it settles in range.
+     */
+    public boolean battleNetPaidRefusalRecoveryApproach() {
+        return battleNetPaidRefusalRecoveryApproach;
+    }
+
+    public void setBattleNetPaidRefusalRecoveryApproach(boolean paid) {
+        battleNetPaidRefusalRecoveryApproach = paid;
+    }
+
+    private boolean battleNetPaidRefusalRecoveryApproach;
+
+    /**
      * Melee Attack tail wrap named an out-of-range quarry after the old one
      * died. Construction 3,2,1 stays on Attack start; the next OP0 dest-arms
      * leftover instead of walking into windup or Still.
@@ -3009,6 +3025,22 @@ public final class Unit {
     }
 
     private boolean battleNetPersonHelpRetargetHandoff;
+
+    /**
+     * A person's standing land defender promoted a native HitUnit offer and
+     * still owes AutoSelectTarget on the queued Attack's timer-one handoff.
+     * Kept separate from the generic construction handoff because settled
+     * chase retargets use that constructor without owning a hit-help scan.
+     */
+    public boolean battleNetPersonHitHelpAutoSelectHandoff() {
+        return battleNetPersonHitHelpAutoSelectHandoff;
+    }
+
+    public void setBattleNetPersonHitHelpAutoSelectHandoff(boolean handoff) {
+        battleNetPersonHitHelpAutoSelectHandoff = handoff;
+    }
+
+    private boolean battleNetPersonHitHelpAutoSelectHandoff;
 
     /**
      * A queued {@code 0x0040a9d0} spatial hit-help order is pending or paying

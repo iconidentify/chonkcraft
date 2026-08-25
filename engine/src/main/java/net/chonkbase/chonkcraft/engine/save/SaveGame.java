@@ -712,6 +712,9 @@ public final class SaveGame {
                     .append(unit.battleNetAttackRefusalRecoveryStage())
                     .append(",");
         }
+        if (unit.battleNetPaidRefusalRecoveryApproach()) {
+            state.append(" paidRefusalRecoveryApproach = true,");
+        }
         if (unit.reportsActionBeforeQueued()) {
             state.append(" actionBeforeQueued = ")
                     .append(quote(unit.currentAction().name())).append(",");
