@@ -29,8 +29,11 @@ class Orc10LoadedTankerReturnRouteRealDataTest {
         Assumptions.assumeTrue(mission != null, "Orc 10 is not in the pack");
         World world = mission.world();
         Unit tanker = unitById(world, 59);
+        Unit blockedTanker = unitById(world, 67);
         assertNotNull(tanker,
                 "Orc 10 has no Java unit 59 / native tanker 1541");
+        assertNotNull(blockedTanker,
+                "Orc 10 has no Java unit 67 / native tanker 1533");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -60,6 +63,37 @@ class Orc10LoadedTankerReturnRouteRealDataTest {
                 "the replacement route begins north, not north-west");
         assertEquals(4, tanker.pathLength(),
                 "four native return headings remain after the first stride");
+
+        while (fixtureCycle(world) < 252) {
+            mission.tick();
+        }
+        assertEquals(14, blockedTanker.tileX());
+        assertEquals(34, blockedTanker.tileY());
+        mission.tick();
+        assertEquals(253, fixtureCycle(world));
+        assertEquals(14, blockedTanker.tileX(),
+                "native retains the occupied north route head");
+        assertEquals(34, blockedTanker.tileY());
+        assertEquals(1, blockedTanker.battleNetCollisionCounter());
+        assertEquals(0, blockedTanker.battleNetRefusals());
+        assertEquals(14, blockedTanker.battleNetOrderDelay());
+        assertEquals(15, blockedTanker.battleNetAnimationTimer());
+        assertEquals(5, blockedTanker.pathLength(),
+                "native retains N,N,NW,NW,N behind cursor zero");
+        assertEquals(Direction.fromDelta(0, -1),
+                blockedTanker.peekHeading());
+
+        while (fixtureCycle(world) < 267) {
+            mission.tick();
+        }
+        assertEquals(14, blockedTanker.tileX());
+        assertEquals(34, blockedTanker.tileY(),
+                "the second sealed tanker holds through timer one");
+        mission.tick();
+        assertEquals(268, fixtureCycle(world));
+        assertEquals(14, blockedTanker.tileX());
+        assertEquals(32, blockedTanker.tileY(),
+                "the retained north head commits after its full Move band");
     }
 
     private static int fixtureCycle(World world) {

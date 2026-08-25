@@ -579,6 +579,16 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         // rolls behind by fixture 249.
         Unit buildingRetargetChaser = unitAt(
                 world, "unit-grunt", 36, 37);
+        // Native slot 1503 / Java 97 lands from a long retained chase on
+        // fixture 252 as the target changes from footman 1477 to guard tower
+        // 1485. The fourteen-byte incumbent tail is not the compact-pressure
+        // constructor witnessed by slot 1513: retail redraws, commits E and
+        // gives the cycle's next async value to melee damage instead of an
+        // idle callback.
+        Unit longTailRetargetChaser = unitAt(
+                world, "unit-grunt", 31, 38);
+        Unit guardTower = unitAt(
+                world, "unit-human-guard-tower", 39, 41);
         Unit defenderKnight = unitAt(world, "unit-knight", 30, 44);
         // Native slot 1453 / Java 147 is routeless when its knight quarry
         // enters Die on fixture 239. Retail installs the replacement footman
@@ -587,6 +597,10 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         assertNotNull(towerChaser, "XHuman 12 has no native-slot-1510 grunt");
         assertNotNull(buildingRetargetChaser,
                 "XHuman 12 has no native-slot-1513 grunt");
+        assertNotNull(longTailRetargetChaser,
+                "XHuman 12 has no native-slot-1503 grunt");
+        assertNotNull(guardTower,
+                "XHuman 12 has no native-slot-1485 guard tower");
         assertNotNull(defenderKnight,
                 "XHuman 12 has no native-slot-1475 knight");
         assertNotNull(dyingQuarryChaser,
@@ -677,6 +691,25 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                         + "native damage five");
         assertEquals(0x7aeac18f, world.battleNetRandomSeed(),
                 "the complete asynchronous ledger agrees through fixture 249");
+
+        while (fixtureCycle(world) < 252) {
+            mission.tick();
+        }
+        assertEquals(40, longTailRetargetChaser.tileX(),
+                "a long collided tail redraws and commits east immediately");
+        assertEquals(38, longTailRetargetChaser.tileY());
+        assertTargetAt(longTailRetargetChaser,
+                "unit-human-guard-tower", 39, 41,
+                "the landing callback installs the native building target");
+        assertEquals(11, longTailRetargetChaser.pathLength(),
+                "the committed east byte leaves the native route tail");
+        assertEquals(Direction.fromDelta(1, 1),
+                longTailRetargetChaser.peekHeading(),
+                "the replacement route next turns south-east");
+        assertEquals(0, longTailRetargetChaser.battleNetCollisionCounter(),
+                "NewPath clears the obsolete collision generation");
+        assertEquals(76, guardTower.hitPoints(),
+                "the retarget does not steal the native melee-damage draw");
     }
 
     private static int fixtureCycle(World world) {

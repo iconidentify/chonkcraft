@@ -2482,12 +2482,18 @@ public final class AiPlayer {
         int tankers = 0;
         int destroyers = 0;
         int transports = 0;
+        boolean hasFoundry = false;
         for (Unit candidate : world.units()) {
             if (candidate.player() != playerIndex || candidate.type() == null
                     || candidate.hitPoints() <= 0) {
                 continue;
             }
             String ident = candidate.type().ident();
+            if ("unit-human-foundry".equals(ident)
+                    || "unit-orc-foundry".equals(ident)) {
+                hasFoundry = true;
+                continue;
+            }
             // Oil census counts every living tanker, including PUD Data
             // guards. XHuman 8 p7 places a data=1 tanker that satisfies
             // want 1; skipping ready-suppressed / non-zero Data made the
@@ -2518,13 +2524,53 @@ public final class AiPlayer {
                 transports++;
             }
         }
+        // Native 0x40eef0 gives the first missing member of the tanker,
+        // destroyer and foundry-backed transport families an immediate arm.
+        // Once at least one destroyer exists but the +0x19 want still exceeds
+        // the AI-accounted census, every eligible shipyard instead consumes
+        // FUN_00479820 and gives the destroyer a 1-in-4 early-priority arm.
+        // The later fallback still offers the same deficit, so a failed roll
+        // is not a random burn: it leaves the other naval-family arms a chance
+        // to pre-empt it. XOrc 7 authenticates two independent calls on
+        // fixture cycle 18: native shipyards 1537 and 1567 consume 1377 and
+        // 16172 respectively before the next ordinary idle draw.
+        boolean immediateTanker = wantTankers != 0 && tankers == 0;
+        boolean immediateDestroyer = wantDestroyers != 0 && destroyers == 0;
+        boolean immediateTransport = wantTransports != 0 && transports == 0
+                && hasFoundry;
+        boolean earlyDestroyer = false;
+        if (!immediateTanker && !immediateDestroyer && !immediateTransport
+                && wantDestroyers > destroyers) {
+            earlyDestroyer = (world.battleNetRandomForAi() & 3) == 1;
+        }
         UnitType choice = null;
         // Prefer empty-tanker / deficit tanker, then destroyer top-up, then
         // transport top-up. Matches the early sealed arms without the full
         // ten-branch naval selector. Prefer the race lane, then the opposite
         // if only one tanker type is registered (focused unit tests place a
         // human tanker on a computer seat whose default race is orc).
-        if (wantTankers != 0 && (tankers == 0 || tankers < wantTankers)) {
+        if (immediateTanker) {
+            choice = registeredType(world,
+                    orc ? "unit-orc-oil-tanker" : "unit-human-oil-tanker");
+            if (choice == null) {
+                choice = registeredType(world,
+                        orc ? "unit-human-oil-tanker" : "unit-orc-oil-tanker");
+            }
+        } else if (immediateDestroyer || earlyDestroyer) {
+            choice = registeredType(world,
+                    orc ? "unit-troll-destroyer" : "unit-elven-destroyer");
+            if (choice == null) {
+                choice = registeredType(world,
+                        orc ? "unit-orc-destroyer" : "unit-human-destroyer");
+            }
+        } else if (immediateTransport) {
+            choice = registeredType(world,
+                    orc ? "unit-orc-transport" : "unit-human-transport");
+            if (choice == null) {
+                choice = registeredType(world,
+                        orc ? "unit-human-transport" : "unit-orc-transport");
+            }
+        } else if (wantTankers != 0 && tankers < wantTankers) {
             choice = registeredType(world,
                     orc ? "unit-orc-oil-tanker" : "unit-human-oil-tanker");
             if (choice == null) {
@@ -2575,6 +2621,15 @@ public final class AiPlayer {
     /** Test-only arm for action-33 tanker wants when the profile blob is synthetic. */
     public void setBattleNetWantedTankersForTest(int want) {
         battleNetWantedTankers = Math.max(0, want);
+    }
+
+    /** Test-only arm for the native action-33 destroyer want byte. */
+    public void setBattleNetWantedDestroyersForTest(int want) {
+        if (battleNetAiState == null) {
+            battleNetAiState = new byte[BattleNetAiBytecode.STATE_BYTES];
+        }
+        battleNetAiState[BattleNetAiBytecode.OFF_WANTED_DESTROYERS] =
+                (byte) Math.max(0, Math.min(255, want));
     }
 
     public int battleNetWantedTankersForTestPeek() {

@@ -3,10 +3,12 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Assumptions;
@@ -17,6 +19,177 @@ import org.junit.jupiter.api.Test;
 class BattleNetAiOilPlatformExitRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("an XOrc 7 loaded tanker pays the native first-refusal Move band")
+    void anXOrc7LoadedTankerPaysTheFirstRefusalMoveBand() {
+        Mission mission = loadMission("campaigns/orc-exp/levelx07o");
+        World world = mission.world();
+        Unit tanker = unitById(world, 13);
+        assertNotNull(tanker,
+                "XOrc 7 has no Java unit 13 / native tanker 1587");
+
+        tickThrough(mission, 251);
+        assertEquals(26, tanker.tileX());
+        assertEquals(8, tanker.tileY());
+        assertTrue(tanker.returningToDepot());
+        assertEquals(100, tanker.carried());
+
+        mission.tick();
+        assertEquals(252, fixtureCycle(world));
+        assertEquals(26, tanker.tileX(),
+                "the occupied SW head must not be retried on the next visit");
+        assertEquals(8, tanker.tileY());
+        assertEquals(1, tanker.battleNetCollisionCounter(),
+                "native raises unit+0x1d's collision nibble from zero to one");
+        assertEquals(0, tanker.battleNetRefusals(),
+                "the generic eight-visit naval refusal ladder does not own action 24");
+        assertEquals(14, tanker.battleNetOrderDelay());
+        assertEquals(15, tanker.battleNetAnimationTimer());
+        assertEquals(6, tanker.pathLength(),
+                "native retains SW,SW,W,SW,SW,NW behind cursor zero");
+        assertEquals(Direction.fromDelta(-1, 1), tanker.peekHeading());
+
+        tickThrough(mission, 266);
+        assertEquals(26, tanker.tileX(),
+                "the full Move band holds the loaded tanker through fixture 266");
+        assertEquals(8, tanker.tileY());
+        mission.tick();
+        assertEquals(267, fixtureCycle(world));
+        assertEquals(24, tanker.tileX(),
+                "the preserved SW head commits when the paid band expires");
+        assertEquals(10, tanker.tileY());
+        assertEquals(1, tanker.battleNetCollisionCounter());
+    }
+
+    @Test
+    @DisplayName("an Orc 7 loaded tanker refills its first exhausted return buffer inline")
+    void anOrc7LoadedTankerRefillsItsFirstReturnBufferInline() {
+        Mission mission = loadMission("campaigns/orc/level07o");
+        World world = mission.world();
+        Unit tanker = unitById(world, 68);
+        Unit refinery = unitById(world, 64);
+        assertNotNull(tanker, "Orc 7 has no Java unit 68 / native tanker 1532");
+        assertNotNull(refinery, "Orc 7 has no human refinery at 50,35");
+
+        tickThrough(mission, 219);
+        assertEquals(56, tanker.tileX());
+        assertEquals(50, tanker.tileY());
+        assertTrue(tanker.returningToDepot());
+        assertEquals(100, tanker.carried());
+        assertSame(refinery, tanker.returnDepotGoal());
+        assertTrue(tanker.routeSpent(),
+                "native has consumed the one-byte NW return buffer on cycle 219");
+
+        tickThrough(mission, 250);
+        assertEquals(56, tanker.tileX());
+        assertEquals(50, tanker.tileY());
+        mission.tick();
+        assertEquals(251, fixtureCycle(world));
+        assertEquals(54, tanker.tileX(),
+                "native refills NW,NW,N,N,N and commits NW on the residual-settle visit");
+        assertEquals(48, tanker.tileY());
+        assertEquals(0, tanker.waitCycles(),
+                "action 24 must not serve the generic empty-route ten at open sea");
+    }
+
+    @Test
+    @DisplayName("an Orc 7 loaded tanker repeats the inline return refill on its next trip")
+    void anOrc7LoadedTankerRepeatsTheReturnRefillOnItsNextTrip() {
+        Mission mission = loadMission("campaigns/orc/level07o");
+        World world = mission.world();
+        Unit tanker = unitById(world, 68);
+        assertNotNull(tanker, "Orc 7 has no Java unit 68 / native tanker 1532");
+
+        tickThrough(mission, 1029);
+        assertEquals(56, tanker.tileX());
+        assertEquals(50, tanker.tileY());
+        assertTrue(tanker.routeSpent(),
+                "the second authenticated trip consumes the same one-byte NW buffer");
+
+        tickThrough(mission, 1060);
+        mission.tick();
+        assertEquals(1061, fixtureCycle(world));
+        assertEquals(54, tanker.tileX(),
+                "native repeats the inline NW refill on cycle 1061");
+        assertEquals(48, tanker.tileY());
+        assertEquals(0, tanker.waitCycles());
+    }
+
+    @Test
+    @DisplayName("an XOrc 8 loaded tanker chooses the refinery over the shipyard")
+    void anXOrc8LoadedTankerChoosesTheNativeRefinery() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx08o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        World world = mission.world();
+        Unit tanker = unitById(world, 134);
+        Unit shipyard = unitById(world, 150);
+        Unit refinery = unitById(world, 155);
+        assertNotNull(tanker,
+                "XOrc 8 has no Java unit 134 / native tanker 1466");
+        assertNotNull(shipyard, "XOrc 8 has no human shipyard at 83,69");
+        assertNotNull(refinery, "XOrc 8 has no human refinery at 87,71");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 189) {
+            mission.tick();
+        }
+
+        int hiddenShipyardTravel = world.unitReachableTravel(
+                tanker, shipyard, 1);
+        int hiddenRefineryTravel = world.unitReachableTravel(
+                tanker, refinery, 1);
+        assertSame(refinery,
+                world.harvest.bestDepotByTravel(
+                        tanker, UnitType.Resource.OIL, 1000),
+                "native selects refinery slot 1445 before platform dropout; "
+                        + "Java hidden straight/travel lengths were shipyard="
+                        + tanker.distanceTo(shipyard) + "/"
+                        + hiddenShipyardTravel + ", refinery="
+                        + tanker.distanceTo(refinery) + "/"
+                        + hiddenRefineryTravel);
+
+        while (fixtureCycle(world) < 210) {
+            mission.tick();
+        }
+
+        assertEquals(114, tanker.tileX());
+        assertEquals(54, tanker.tileY());
+        int shipyardTravel = world.unitReachableTravel(tanker, shipyard, 1);
+        int refineryTravel = world.unitReachableTravel(tanker, refinery, 1);
+        assertSame(refinery, tanker.returnDepotGoal(),
+                "native slot 1466 targets refinery slot 1445 through cycle 210; "
+                        + "Java travel lengths were shipyard=" + shipyardTravel
+                        + ", refinery=" + refineryTravel);
+        assertEquals(97, tanker.orderTargetX(),
+                "native retains the refinery-corner SpreadUnit point through cycle 210");
+        assertEquals(65, tanker.orderTargetY());
+
+        while (fixtureCycle(world) < 218) {
+            mission.tick();
+        }
+        assertEquals(112, tanker.tileX(),
+                "native commits the first south-west refinery-route stride on cycle 218");
+        assertEquals(56, tanker.tileY());
+        assertEquals(89, tanker.orderTargetX(),
+                "MoveToDepot replaces the spread point with the refinery edge");
+        assertEquals(71, tanker.orderTargetY());
+
+        while (fixtureCycle(world) < 250) {
+            mission.tick();
+        }
+        assertEquals(110, tanker.tileX(),
+                "native consumes the route's second south-west heading on cycle 250");
+        assertEquals(58, tanker.tileY());
+    }
 
     @Test
     @DisplayName("an Orc 8 tanker tests the exit anchor instead of its drawn hull")
@@ -206,5 +379,32 @@ class BattleNetAiOilPlatformExitRealDataTest {
             }
         }
         return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        return world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == id)
+                .findFirst().orElse(null);
+    }
+
+    private static Mission loadMission(String map) {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        return mission;
+    }
+
+    private static void tickThrough(Mission mission, int fixtureCycle) {
+        while (fixtureCycle(mission.world()) < fixtureCycle) {
+            mission.tick();
+        }
+    }
+
+    private static int fixtureCycle(World world) {
+        return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }
 }

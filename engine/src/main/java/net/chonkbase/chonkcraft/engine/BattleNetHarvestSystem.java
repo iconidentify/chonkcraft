@@ -342,6 +342,12 @@ final class BattleNetHarvestSystem {
             } else {
                 boolean parkCooperativeReturn = worker.battleNetRefusalHold()
                         && worker.returningToDepot() && worker.carried() > 0;
+                boolean parkSaturatedWoodRoute =
+                        worker.battleNetRefusalHold()
+                        && info != null && info.terrainHarvester()
+                        && worker.resourceUnit() == null
+                        && worker.pathLength() > 0
+                        && worker.battleNetCollisionCounter() >= 4;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
                 // A laden return counts the native Move program itself rather
@@ -381,6 +387,35 @@ final class BattleNetHarvestSystem {
                             && worker.battleNetAnimationTimer() > 1) {
                         worker.setBattleNetAnimationTimer(
                                 worker.battleNetAnimationTimer() - 1);
+                    }
+                }
+                // Saturated terrain-wall refusals retain their cached route,
+                // so they are not part of the empty action-23 construction
+                // body above. They own Move 15..1 instead. XHuman 12 peon
+                // 1385 keeps SE,NE through fixtures 235..249 and wakes to
+                // consume SE on 250; leaving the cursor at fifteen made the
+                // semantic position right but the authenticated program state
+                // fourteen cycles wrong.
+                if (parkSaturatedWoodRoute
+                        && world.battleNetSequence != null) {
+                    int moveStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        // orderDelay is the number of quiet callbacks which
+                        // remain after this one; the native timer displayed on
+                        // the current callback is therefore exactly left + 1.
+                        // Re-pin the cursor as timer two expires: the general
+                        // sequence player otherwise advances it before this
+                        // action owns native's final Move/1 visit.
+                        worker.setBattleNetSequenceOffset(moveStart);
+                        worker.setBattleNetAnimationTimer(left + 1);
+                    }
+                    if (left == 0) {
+                        // setBattleNetOrderDelay(0) normally retires a refusal
+                        // owner. This cached route still needs that provenance
+                        // on its timer-one wake so the accepted saturated step
+                        // keeps collision four.
+                        worker.setBattleNetRefusalHold(true);
                     }
                 }
                 if (left == 0 && parkCooperativeReturn) {
@@ -615,6 +650,7 @@ final class BattleNetHarvestSystem {
                 worker.setRouteSpent(false);
                 worker.setBattleNetOrderDelay(2);
                 worker.setBattleNetResourceApproachStaged(true);
+                worker.setBattleNetAnimationTimer(3);
                 return;
             }
             // A doubled tanker is already at BNE's legal outer anchor when
@@ -1536,12 +1572,15 @@ final class BattleNetHarvestSystem {
             boolean verticalMajor = Math.abs(worker.tileY() - returnGoalY)
                     > Math.abs(worker.tileX() - returnGoalX);
             verticalDoubledTankerSpread = verticalMajor;
+            // The captured midpoint projection belongs to the vertical
+            // shoreline form: Orc 10 turns corner 12,23 into 11,23. The
+            // horizontal form retains its nearest corner; XOrc 8 feeds
+            // 89,71 to SpreadUnit and stores native 97,65. Applying the
+            // midpoint symmetrically changed that to the unauthenticated
+            // 96,67.
             if (verticalMajor) {
                 returnGoalX = home.tileX()
                         + Math.max(1, home.type().tileWidth()) / 2;
-            } else {
-                returnGoalY = home.tileY()
-                        + Math.max(1, home.type().tileHeight()) / 2;
             }
         }
         boolean doubledTankerSpread = home != null
@@ -2066,6 +2105,38 @@ final class BattleNetHarvestSystem {
                     int woodOrderDistance = Math.max(
                             Math.abs(woodOrderX - worker.tileX()),
                             Math.abs(woodOrderY - worker.tileY()));
+                    boolean saturatedWoodRouteHold =
+                            worker.pathLength() >= 2
+                            && worker.battleNetCollisionCounter() >= 3
+                            && !Direction.isDiagonal(worker.lastStepHeading())
+                            && Direction.isDiagonal(heading)
+                            && woodOrderDistance >= 3;
+                    if (saturatedWoodRouteHold) {
+                        // A terrain wall which already paid three occupied
+                        // probes keeps its residual bytes on the fourth.
+                        // XHuman 12 peon 1385 retains SE,NE behind RI2 at
+                        // fixture 235 and advances 3 -> 4; peon 1376 repeats
+                        // the same native handler at fixture 236 and advances
+                        // 5 -> 6. Both count a complete Move 15..1 band, then
+                        // consume the cached diagonal after the allied peon
+                        // vacates it. The lower-collision XHuman 11 terminal
+                        // and corner-redraw families remain outside this band.
+                        int collision =
+                                worker.battleNetCollisionCounter() + 1;
+                        worker.setBattleNetCollisionCounter(
+                                collision > 14 ? 0 : collision);
+                        worker.setRouteSpent(false);
+                        worker.setWaitCycles(0);
+                        worker.setBattleNetOrderDelay(14);
+                        worker.setBattleNetRefusalHold(true);
+                        int moveStart = world.idle.battleNetSequenceStart(
+                                worker, BattleNetSequence.MOVE_ANIMATION);
+                        if (moveStart >= 0) {
+                            worker.setBattleNetSequenceOffset(moveStart);
+                            worker.setBattleNetAnimationTimer(15);
+                        }
+                        return;
+                    }
                     boolean saturatedRepeatedCardinalResidual = shortcut < 0
                             && worker.pathLength() == 3
                             && worker.battleNetPathInitialLength() == 4
@@ -3510,14 +3581,21 @@ final class BattleNetHarvestSystem {
                 continue;
             }
             int straight = measureFrom.distanceTo(candidate);
-            // Large movers compare a raw tile-distance lower bound with a
-            // route cost counted in doubled movement-table steps. Equality
-            // is therefore not a proof that the candidate cannot improve:
-            // Human 7's refinery 105 has straight distance seven behind an
-            // incumbent cost seven, but its reachable cost is six. Normal
-            // one-tile workers retain the ordinary equal-bound skip.
-            if (straight > range || straight > bestDistance
-                    || (straight == bestDistance && stride == 1)) {
+            // A doubled tanker evaluates the first refinery even when a
+            // shipyard has already supplied the raw-distance skip. XOrc 8's
+            // shipyard is seen first at straight/travel 33/22; its refinery
+            // is 31/18 and native selects it. Once a refinery is incumbent,
+            // retain the ordinary skip: Human 7 must keep eastern refinery
+            // 105 rather than Java's apparently shorter southern 113.
+            boolean doubledRefineryAfterShipyard = stride > 1
+                    && best != null && best.type() != null
+                    && World.isBattleNetShipyard(best.type().ident())
+                    && World.isBattleNetRefinery(candidate.type().ident());
+            if (straight > range
+                    || (!doubledRefineryAfterShipyard
+                            && (straight > bestDistance
+                                    || (straight == bestDistance
+                                            && stride == 1)))) {
                 continue;
             }
             int travel = world.unitReachableTravel(worker, candidate, 1);

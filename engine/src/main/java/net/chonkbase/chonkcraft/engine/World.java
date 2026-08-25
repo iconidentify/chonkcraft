@@ -6003,6 +6003,12 @@ public final class World {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> optimizerBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
+        boolean recurringLandRegroupRoute = unit.order() == Unit.Order.MOVE
+                && !unit.battleNetPlayerCommandMove()
+                && unit.battleNetAiBehavior() == 1
+                && unit.hasBattleNetAiHome()
+                && unit.orderTargetX() == unit.battleNetAiHomeX()
+                && unit.orderTargetY() == unit.battleNetAiHomeY();
         boolean restoreWoodCorner = unit.order() == Unit.Order.HARVEST
                 && !unit.returningToDepot()
                 && unit.resourceUnit() == null
@@ -6045,6 +6051,18 @@ public final class World {
                                 && candidate.orderTargetY()
                                         == candidate.battleNetAiHomeY())
                             || queuedRegroupConstruction);
+                boolean regroupThroughMovingWorker =
+                        recurringLandRegroupRoute
+                        && candidate.isMoving()
+                        && candidate.order() == Unit.Order.HARVEST
+                        && candidate.type() != null
+                        && candidate.type().moveType()
+                                == UnitType.Movement.LAND;
+                // The recurring behavior-one regroup planner draws through a
+                // moving worker even when that worker still owns a collision
+                // nibble. Execution remains hard: XHuman 12 axethrower 1359
+                // stores N,NW,SE,E,E at fixture 252, then refuses the occupied
+                // north head instead of walking through peasant 1335.
                 // Native 0x4500f0 clears the occupancy bit for an allied unit
                 // whose current animation is Move. Attack-sequence allies keep
                 // hard occupancy even while residual/path leftover makes
@@ -6058,7 +6076,8 @@ public final class World {
                 if (candidate == restoredCornerBlocker
                         || (unit.order() != Unit.Order.HARVEST
                                 && pendingRegroupConstruction)
-                        || (!movement.battleNetSoftClearMoveAlly(candidate)
+                        || (!regroupThroughMovingWorker
+                                && !movement.battleNetSoftClearMoveAlly(candidate)
                         && !movement.battleNetPendingLandAssaultYieldsToWood(
                                 unit, candidate))) {
                     continue;
@@ -15887,14 +15906,19 @@ public final class World {
 
     static boolean isBattleNetNavalBase(String ident) {
         return isBattleNetShipyard(ident)
-                || "unit-human-refinery".equals(ident)
-                || "unit-orc-refinery".equals(ident);
+                || isBattleNetRefinery(ident);
     }
 
     /** The ship-repair target accepted by native type flag {@code 0x1000000}. */
-    private static boolean isBattleNetShipyard(String ident) {
+    static boolean isBattleNetShipyard(String ident) {
         return "unit-human-shipyard".equals(ident)
                 || "unit-orc-shipyard".equals(ident);
+    }
+
+    /** The oil-bonus depot distinguished from an ordinary naval base. */
+    static boolean isBattleNetRefinery(String ident) {
+        return "unit-human-refinery".equals(ident)
+                || "unit-orc-refinery".equals(ident);
     }
 
     /** The nearest free square against the closest hostile unit. */

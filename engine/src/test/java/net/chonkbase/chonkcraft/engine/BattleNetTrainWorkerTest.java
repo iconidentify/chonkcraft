@@ -323,6 +323,19 @@ class BattleNetTrainWorkerTest {
         return type;
     }
 
+    private static UnitType humanDestroyer() {
+        UnitType type = new UnitType("unit-human-destroyer");
+        type.setTileSize(2, 2);
+        type.setHitPoints(100);
+        type.setSeaUnit(true);
+        type.costs().put(UnitType.Resource.GOLD, 700);
+        type.costs().put(UnitType.Resource.WOOD, 350);
+        type.costs().put(UnitType.Resource.OIL, 700);
+        type.costs().put(UnitType.Resource.TIME, 90);
+        type.setDemand(1);
+        return type;
+    }
+
     private static UnitType orcShipyard() {
         UnitType type = new UnitType("unit-orc-shipyard");
         type.setTileSize(3, 3);
@@ -413,6 +426,43 @@ class BattleNetTrainWorkerTest {
                 "XHuman 5 p3 debits exactly 400 gold for the tanker");
         assertEquals(9800, world.player(0).get(UnitType.Resource.WOOD),
                 "XHuman 5 p3 debits exactly 200 wood for the tanker");
+    }
+
+    @Test
+    @DisplayName("two destroyer-deficit shipyards consume the authenticated XOrc 7 random pair")
+    void twoDestroyerDeficitShipyardsConsumeTheAuthenticatedXOrcSevenRandomPair() {
+        // XOrc 7 fixture c18: native shipyards 1537 (11,38) and 1567 (6,18)
+        // both enter 0x40eef0 with one destroyer against want three. Calls at
+        // 0x40efb2 produce 1377 (the 1-in-4 arm) and then 16172 (fallback).
+        World world = new World(grass(48));
+        world.setTrainers(Map.of(
+                "unit-human-destroyer", Set.of("unit-human-shipyard")));
+        world.player(0).setType(
+                net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER);
+        Unit firstShipyard = world.createUnit(humanShipyard(), 0, 11, 38);
+        Unit secondShipyard = world.createUnit(humanShipyard(), 0, 6, 18);
+        world.createUnit(humanDestroyer(), 0, 24, 24);
+        world.createUnit(farm(), 0, 2, 2);
+        world.player(0).set(UnitType.Resource.GOLD, 700);
+        world.player(0).set(UnitType.Resource.WOOD, 350);
+        world.player(0).set(UnitType.Resource.OIL, 700);
+        world.recalculateSupply();
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetWantedDestroyersForTest(3);
+        world.restoreBattleNetRandom(0x2baa6f64, 0);
+
+        assertTrue(ai.battleNetTryTrainTanker(world, firstShipyard),
+                "1377 & 3 == 1 gives the first yard early destroyer priority");
+        assertEquals(0x856187b5, world.battleNetRandomSeed(),
+                "the first native-positive shipyard consumes exactly one draw");
+        assertEquals("unit-human-destroyer", firstShipyard.producing().ident());
+
+        assertFalse(ai.battleNetTryTrainTanker(world, secondShipyard),
+                "the second yard still rolls before its unpaid fallback is refused");
+        assertEquals(0xbf2c3e7a, world.battleNetRandomSeed(),
+                "the held-out shipyard consumes 16172 and no extra draw");
+        assertEquals(2, world.battleNetRandomDraws());
+        assertNull(secondShipyard.producing());
     }
 
     @Test

@@ -607,14 +607,20 @@ final class BattleNetConstructionSystem {
                 || worker.orderTargetX() > targetRight + stride
                 || worker.orderTargetY() < targetTop - stride
                 || worker.orderTargetY() > targetBottom + stride;
-        boolean loadedDoubledTankerReturn = stride > 1
+        boolean loadedDoubledVerticalTankerReturn = stride > 1
                 && worker.returningToDepot() && worker.carried() > 0
                 && worker.carrying() == UnitType.Resource.OIL
                 && worker.type().seaUnit()
                 && target.type().storesResource(UnitType.Resource.OIL)
                 && worker.orderTargetX() >= 0 && worker.orderTargetY() >= 0
-                && spreadPointOutsideTargetSkirt;
-        if (loadedDoubledTankerReturn) {
+                && spreadPointOutsideTargetSkirt
+                // The exceptional preserved point is the vertical shoreline
+                // form: Orc 10 keeps 11,23 and only normalizes x. XOrc 8's
+                // horizontal 97,65 spread is instead replaced by the
+                // refinery edge before the ordinary marked-target route.
+                && Math.abs(worker.orderTargetY() - worker.tileY())
+                        > Math.abs(worker.orderTargetX() - worker.tileX());
+        if (loadedDoubledVerticalTankerReturn) {
             // When SpreadUnit had to leave the depot's ordinary marked skirt
             // to clear an obstructed shoreline, MoveToDepot preserves that
             // point instead of replacing it with the nearest footprint cell.
@@ -634,8 +640,13 @@ final class BattleNetConstructionSystem {
         if (stride > 1
                 || (worker.type().landUnit()
                         && worker.returningToDepot() && worker.carried() > 0)) {
-            if (stride == 1 && worker.type().landUnit()
-                    && worker.returningToDepot() && worker.carried() > 0) {
+            boolean authoredDepotReturn = worker.returningToDepot()
+                    && worker.carried() > 0;
+            if (authoredDepotReturn
+                    && (worker.type().landUnit()
+                            || (worker.type().seaUnit()
+                                    && worker.carrying()
+                                            == UnitType.Resource.OIL))) {
                 int[] edge = world.battleNetDepotEntryPoint(worker, target);
                 worker.setOrderTarget(edge[0], edge[1]);
             }

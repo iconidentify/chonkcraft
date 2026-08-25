@@ -11,19 +11,19 @@ media supplied by the player.
 The current release candidate has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 245.** The lowest common divergence is
-  cycle 246, so the shared proven frontier is cycle 245.
-- Expansion Human 11 and 12 tie at cycle 246 through two independent seams: a
-  resource worker's claimed-tree reassignment and a grunt's crowded combat
-  route choice.
-- **24/52 maps are exact through the full 400-cycle window**, with 28 later
+- **52/52 maps are exact through cycle 252.** The lowest common divergence is
+  cycle 253, so the shared proven frontier is cycle 252. The three maps at that
+  boundary are Orc 8, expansion Human 7, and expansion Orc 11.
+- **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 17,542 cycles, up 110 from the preceding
-  accepted candidate's 17,432; no map moved backward.
+  frontiers, capped at 400, is 18,164 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  31,828, up 110 from the preceding accepted candidate's 31,718.
-  The eight are Human 1, 2, and 9; Orc 1, 2, and 6; and expansion Orc 1 and 9.
+  32,826; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  and 6; and expansion Orc 1 and 9.
+- In the latest full-fleet pass, Orc 10 advanced from cycle 255 to 440 and
+  expansion Orc 7 from cycle 252 to 542. Both are now exact through the entire
+  400-cycle window; the other 50 maps retained their prior boundaries.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
@@ -31,42 +31,44 @@ always one cycle before the earliest authenticated mismatch across the fleet.
 
 ## Playability and release gates
 
-The current player-contract receipt certifies **17/17 playability lanes** with
-zero failures, skips, blocks, or timeouts. It covers authenticated boot and
-assets, deterministic scheduling, movement, orders, economy, construction,
-combat, projectiles, naval oil, spells, retail AI, campaign triggers,
-save/load, rendering and input, sound, and clean/adverse network lockstep.
+The last completed player-contract receipt certifies **17/17 playability
+lanes** with zero failures, skips, blocks, or timeouts. The cycle-252 candidate
+re-ran 13 lanes successfully with no failures before the checkpoint was
+stopped; its remaining four-lane receipt is intentionally pending. The gate
+covers authenticated boot and assets, deterministic scheduling, movement,
+orders, economy, construction, combat, projectiles, naval oil, spells, retail
+AI, campaign triggers, save/load, rendering and input, sound, and clean/adverse
+network lockstep.
 
-The complete suite now contains **2,751 tests**. The no-data profile ran 1,598
-and intentionally skipped 1,153, with the exact expected 89-test specification
-failure set. The canonical authenticated profile discovered all 2,751, ran
-2,725, intentionally skipped 26, and kept the exact expected 110-test
-specification failure set.
+The complete suite now contains **2,760 tests**. The canonical authenticated
+profile ran 2,734 and intentionally skipped exactly 26, while keeping the exact
+expected 110-test specification-failure set. Three optional private
+playtest-save checks also ran and passed on the development workstation before
+the CI-equivalent skip receipt was produced.
 
-Source-boundary, native-runtime, comment-provenance, documentation, and BNE
-readiness checks pass. Signed engine OTA `2026.0825.67` was published from
-revision `dd0a75bcab1931764d8e56d861a357d79959367a`; the release workflow proved
-both local installation and a fresh launcher install from the public endpoint.
-No matchmaking protocol, service, or infrastructure path changed, so no
-server rollout was needed.
+The next-level readiness gate also passes its present fail-closed contract.
+Signed engine OTA `2026.0825.68` remains the public release, published from
+revision `979c4a21613b40405fad03a0158b1c80d0a31e84`; its workflow proved both
+local installation and a fresh launcher install from the public endpoint. The
+cycle-252 candidate is fleet-verified but not yet published. It changes
+only engine behavior and authenticated referees: no matchmaking protocol,
+service, or infrastructure path changed, so a server rollout is not required.
 
 ## Broader fidelity frontier
 
 These denominators are deliberately strict and remain open work rather than
 being inferred from the playable campaign fleet:
 
-- Commanded scenarios: **198/240 exact**, **206/240 comparable**, eight
-  materially divergent, zero infrastructure failures, and 34 not yet
-  comparable.
+- Commanded scenarios: **206/240 exact and comparable**, zero materially
+  divergent, zero infrastructure failures, and 34 not yet comparable.
 - Physical player transactions: **0/532** paired native/Java certifications.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
-- AI fleet: **0/52** current-head mission twins; a retained legacy diagnostic
-  window records 12 differences across 93,600 scenario-cycles but is not a
-  current complete-fleet proof.
+- AI fleet: **0/52** current-head mission twins. Forty-five authenticated
+  native captures are discoverable, seven are missing, and none has yet been
+  materialized into a complete current-head conductor receipt.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
-- Field parity has no accepted paired report yet.
 
 The zero numerators do not mean those game systems are absent. The 52-map
 `semantic-v1` survey and the playability lanes do not emit these proof types.

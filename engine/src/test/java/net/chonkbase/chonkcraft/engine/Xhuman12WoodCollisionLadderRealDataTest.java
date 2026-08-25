@@ -101,6 +101,45 @@ class Xhuman12WoodCollisionLadderRealDataTest {
                 "the successful redraw consumes the transient ladder marker");
         assertEquals(-1, peon.battleNetWoodCornerRefusalHeading(),
                 "the refused south-west wall face is retired");
+
+        while (fixtureCycle(world) < 235) {
+            mission.tick();
+        }
+        assertEquals(10, peon.tileX());
+        assertEquals(87, peon.tileY());
+        assertTrue(peon.isMoving(),
+                "fixture 235 retains the final two south residual pixels");
+        assertEquals(5, peon.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(236, fixtureCycle(world));
+        assertFalse(peon.isMoving());
+        assertEquals(2, peon.pathLength(),
+                "collision six keeps southeast,east behind native route index one");
+        assertEquals(Direction.fromDelta(1, 1), peon.peekHeading());
+        assertEquals(6, peon.battleNetCollisionCounter());
+        assertEquals(14, peon.battleNetOrderDelay());
+        assertEquals(15, peon.battleNetAnimationTimer());
+
+        for (int fixture = 237; fixture <= 250; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertEquals(250 - fixture, peon.battleNetOrderDelay());
+            assertEquals(251 - fixture, peon.battleNetAnimationTimer());
+        }
+        assertEquals(10, peon.tileX());
+        assertEquals(87, peon.tileY());
+        assertEquals(2, peon.pathLength());
+
+        mission.tick();
+        assertEquals(251, fixtureCycle(world));
+        assertEquals(11, peon.tileX());
+        assertEquals(88, peon.tileY());
+        assertEquals(Direction.fromDelta(1, 1), peon.lastStepHeading());
+        assertEquals(1, peon.pathLength(),
+                "the east tail remains after the accepted southeast step");
+        assertEquals(6, peon.battleNetCollisionCounter(),
+                "the accepted saturated route keeps native collision six");
     }
 
     private static int fixtureCycle(World world) {

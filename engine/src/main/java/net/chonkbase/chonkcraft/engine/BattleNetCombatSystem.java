@@ -3855,18 +3855,23 @@ final class BattleNetCombatSystem {
                     boolean collisionOwnsRetargetConstruction =
                             ((((unit.battleNetRefusals() == 0
                                             && unit.battleNetPathStepsTaken()
-                                                    >= 2)
+                                                    >= 2
+                                            && keepPathn <= 6)
                                     || (unit.battleNetRefusals() > 0
                                             && (keepPathn < 6
                                                     || unit
                                                             .battleNetCollisionCounter()
                                                             >= 3)))
                                 // Pressure has to own the route, not merely be
-                                // nearby. An unrefused route earns ownership
-                                // after two consumed headings; a hard-refused
-                                // route earns it in the compact buffer or paid
-                                // collision band. Generations four and above
-                                // have already paid and commit directly.
+                                // nearby. An unrefused compact route earns
+                                // ownership after two consumed headings; a
+                                // long retained tail is redrawn immediately
+                                // (XHuman 12 slot 1503 retains fourteen bytes
+                                // when it switches to the guard tower at
+                                // fixture 252). A hard-refused route earns it
+                                // in the compact buffer or paid collision band.
+                                // Generations four and above have already paid
+                                // and commit directly.
                                 && unit.battleNetCollisionCounter() > 1
                                 && unit.battleNetCollisionCounter() < 4
                                 && (!settledResidualHeadFree
@@ -10409,6 +10414,12 @@ final class BattleNetCombatSystem {
                 if (hold > 0) {
                     unit.setBattleNetAttackResumeFromMove(false);
                     unit.setBattleNetAttackOp0OutOfRange(false);
+                    // The completed 3,2,1 constructor now owns an
+                    // unbreakable OP0 body hold. Keep spatial free-scans out
+                    // until timer one; XHuman 4 grunt 1505 otherwise replaces
+                    // its live footman at fixture 242 instead of 250 and
+                    // carries FUN_004234b0's due draw one visit late.
+                    unit.setBattleNetAttackResumeHoldActive(true);
                     unit.setBattleNetSequenceOffset(attackStart);
                     unit.setBattleNetAnimationTimer(hold);
                     if (unit.chasing() && unit.pathLength() == 0) {

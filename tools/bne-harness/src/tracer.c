@@ -2468,6 +2468,17 @@ static int __cdecl traced_sync_random(void) {
  * gameplay seed. Reproduce this 18-byte function exactly so its callers can
  * be identified without perturbing the random sequence. */
 static int __cdecl traced_async_random(void) {
+    BYTE *caller_esi;
+#if defined(__GNUC__) && defined(__i386__)
+    /* Force the incoming callee-saved register into a C value before the
+     * compiler is free to reuse ESI for this hook's own locals. */
+    __asm__ __volatile__("" : "=S" (caller_esi));
+#else
+    caller_esi = NULL;
+#endif
+    BYTE *pool = *BNE_202_UNIT_POOL_POINTER;
+    DWORD pool_count = *BNE_202_UNIT_POOL_COUNT;
+    LONG caller_esi_slot = -1;
     DWORD before = *BNE_202_ASYNC_RANDOM_SEED;
     DWORD after = before * 0x015a4e35UL + 1;
     int result = (int) ((after >> 16) & 0x7fffUL);
@@ -2475,12 +2486,29 @@ static int __cdecl traced_async_random(void) {
      * traced_cycles still names the preceding snapshot. */
     LONG cycle = match_ready ? traced_cycles + 1 : 0;
 
+    /* Several AI-ready callbacks consume the asynchronous stream outside the
+     * ordinary unit-action/idle hook.  Those callbacks retain their subject
+     * unit in ESI across the random call, so active_idle_slot is necessarily
+     * -1 even though a concrete unit owns the decision.  Preserve that
+     * register at the hook boundary and report it only when it is an exact
+     * member of the live unit pool.  A random caller that uses ESI for
+     * something else remains -1 rather than being assigned a fabricated
+     * unit identity. */
+    if (pool != NULL && caller_esi != NULL && caller_esi >= pool
+            && caller_esi < pool + pool_count * BNE_UNIT_BYTES
+            && (caller_esi - pool) % BNE_UNIT_BYTES == 0) {
+        caller_esi_slot = (LONG) ((caller_esi - pool) / BNE_UNIT_BYTES);
+    }
+
     *BNE_202_ASYNC_RANDOM_SEED = after;
     if (trace_async_random_calls) {
         trace_write("# bne-trace event=async-random cycle=%ld caller=%p "
-                "unit=%ld before=%lu after=%lu result=%d", cycle,
+                "unit=%ld caller-esi=%p caller-esi-unit=%ld "
+                "before=%lu after=%lu result=%d", cycle,
                 __builtin_return_address(0),
                 active_idle_slot,
+                caller_esi,
+                caller_esi_slot,
                 (unsigned long) before, (unsigned long) after, result);
     }
     return result;

@@ -1529,6 +1529,43 @@ final class BattleNetMovementSystem {
             worker.setOrderFinished(true);
             return false;
         }
+        // A doubled laden tanker can finish the residual pixels of its last
+        // accepted stride with one cached heading still behind the cursor.
+        // MoveToDepot judges that boundary against the stored 0x41f430 order
+        // point before NextPathElement may consume the leftover: throughout
+        // the sealed campaign corpus, every residual settle at Chebyshev one
+        // or two promotes action 24 to action 25 and parks route_index 20
+        // (105 arrivals, including Human 7 tanker 1491 at fixture 252), while
+        // every settle at three or farther remains action 24 (19 controls).
+        // Letting stepMove see the remaining W in Human 7 moved the tanker
+        // from (76,76) to (74,76) on that same visit instead of staging beside
+        // the refinery.  Drain the pixels first, then expose an empty spent
+        // route to depotRingAction25 below; do not pre-clear on earlier
+        // residual visits because native retains the raw cursor until the
+        // exact settle cycle.
+        int resourceStride = world.battleNetMovementStride(worker);
+        int depotOrderCheb = Math.max(
+                Math.abs(worker.orderTargetX() - worker.tileX()),
+                Math.abs(worker.orderTargetY() - worker.tileY()));
+        boolean ladenTankerResidualAtDepotRing = worker.order()
+                == Unit.Order.HARVEST
+                && worker.returningToDepot() && worker.carried() > 0
+                && resourceStride > 1
+                && ("unit-human-oil-tanker".equals(worker.type().ident())
+                        || "unit-orc-oil-tanker".equals(
+                                worker.type().ident()))
+                && worker.pathLength() > 0 && worker.isMoving()
+                && depotOrderCheb <= resourceStride;
+        if (ladenTankerResidualAtDepotRing) {
+            int parkedHeading = worker.peekHeading();
+            walkPixels(worker);
+            if (worker.isMoving()) {
+                return true;
+            }
+            worker.clearPath();
+            worker.setRouteSpent(true);
+            worker.setBattleNetSpentHeading(parkedHeading);
+        }
         // After the last heading is spent (or a near-approach wrong leftover
         // was cleared) the worker still owes residual pixels for that tile
         // snap. stepMove's decide gate would spendTheEmptyRoute (PF_WAIT 10)
@@ -1665,6 +1702,9 @@ final class BattleNetMovementSystem {
                 worker.setRouteSpent(false);
                 worker.setBattleNetOrderDelay(2);
                 worker.setBattleNetResourceApproachStaged(true);
+                // Every authenticated action-25 arrival starts its retained
+                // movement sheet at delay three (105/105 corpus witnesses).
+                worker.setBattleNetAnimationTimer(3);
                 return true;
             }
             if (depotRingDestArm(worker, building)) {
@@ -1730,20 +1770,35 @@ final class BattleNetMovementSystem {
                 worker.setRouteSpent(false);
                 worker.setWaitCycles(0);
             }
+            int returnStride = world.battleNetMovementStride(worker);
             boolean ladenLandReturnBufferRefill = worker.routeSpent()
                     && worker.order() == Unit.Order.HARVEST
                     && worker.returningToDepot() && worker.carried() > 0
-                    && world.battleNetMovementStride(worker) == 1
+                    && returnStride == 1
                     && worker.type().landUnit()
                     && worker.distanceTo(building) > 1;
-            if (ladenLandReturnBufferRefill) {
+            boolean ladenTankerReturnBufferRefill = worker.routeSpent()
+                    && worker.order() == Unit.Order.HARVEST
+                    && worker.returningToDepot() && worker.carried() > 0
+                    && returnStride > 1
+                    && ("unit-human-oil-tanker".equals(worker.type().ident())
+                            || "unit-orc-oil-tanker".equals(
+                                    worker.type().ident()))
+                    && worker.distanceTo(building) > returnStride;
+            if (ladenLandReturnBufferRefill
+                    || ladenTankerReturnBufferRefill) {
                 // Action 24 refills an exhausted land-return buffer on the
                 // residual-settle visit while the worker is still outside the
                 // depot skirt. XHuman 10 peon 1596 drains its fourth heading
                 // at (55,6), writes SW,SE, and commits SW to (54,7) on fixture
                 // 310. Treating Chebyshev two from the depot path point as
                 // action 25 inserted two quiet visits; serving PF_WAIT would
-                // be later still. The one-tile skirt below remains action 25.
+                // be later still. Doubled tankers use the same action-24
+                // refill outside their wider depot skirt: Orc 7 tanker 1532
+                // exhausts its one-byte NW buffer on fixtures 219 and 1029,
+                // then refills and commits NW on the residual-settle visits
+                // 251 and 1061. The one-stride tanker skirt is already owned
+                // by depotRingAction25 above and remains action 25.
                 worker.setRouteSpent(false);
                 worker.setWaitCycles(0);
             }
@@ -3919,6 +3974,49 @@ final class BattleNetMovementSystem {
             }
             if (!canTakeStep) {
                 Unit stageSixBlocker = world.unitAt(nextX, nextY);
+                boolean recurringRegroupWorkerRefusal =
+                        unit.order() == Unit.Order.MOVE
+                        && !unit.battleNetPlayerCommandMove()
+                        && unit.battleNetAiBehavior() == 1
+                        && unit.hasBattleNetAiHome()
+                        && unit.orderTargetX() == unit.battleNetAiHomeX()
+                        && unit.orderTargetY() == unit.battleNetAiHomeY()
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetCollisionCounter() == 0
+                        && stageSixBlocker != null
+                        && stageSixBlocker != unit
+                        && stageSixBlocker.isMoving()
+                        && stageSixBlocker.order() == Unit.Order.HARVEST
+                        && stageSixBlocker.type() != null
+                        && stageSixBlocker.type().moveType()
+                                == UnitType.Movement.LAND
+                        && world.isAllied(unit.player(),
+                                stageSixBlocker.player());
+                if (recurringRegroupWorkerRefusal) {
+                    // The recurring behaviour-one regroup writer plans through
+                    // a worker whose Move body is in flight, but the following
+                    // NextPathElement still tests the live occupied square.
+                    // That is a cooperative refusal, not an empty point route:
+                    // XHuman 12 axethrower 1359 writes N,NW,SE,E,E on fixture
+                    // 252, retains route index zero, raises unit+0x1d to 0x10,
+                    // and owns Move 830/15 while the north peon drains.  Java
+                    // used to harden the worker during planning, obtain an
+                    // empty route, and promote the regroup order to Still.
+                    unit.setBattleNetCollisionCounter(1);
+                    unit.setBattleNetRefusals(0);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(15);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
                 boolean paidRecoveryResidualTailPark =
                         unit.battleNetPaidRefusalRecoveryApproach()
                         && world.actionMoveWalked
@@ -4538,6 +4636,64 @@ final class BattleNetMovementSystem {
                     if (temporaryBody && unit.target() == null
                             && !unit.isMoving()
                             && unit.pathLength() > 0) {
+                        boolean loadedTankerReturn =
+                                unit.type().gathering().containsKey(
+                                        UnitType.Resource.OIL)
+                                && unit.returningToDepot()
+                                && unit.carried() > 0
+                                && unit.battleNetPathStepsTaken() == 0
+                                && blocker.isMoving()
+                                && blocker.returningToDepot()
+                                && blocker.carried() > 0;
+                        if (loadedTankerReturn) {
+                            // Action 24 does not use the ordinary fresh naval
+                            // refusal ladder. A laden tanker whose new doubled
+                            // route opens on another moving laden return raises
+                            // the packed collision generation and pays the
+                            // complete Move band immediately, retaining byte
+                            // zero until the convoy neighbour has had time to
+                            // sail away. Two sealed
+                            // witnesses carry the same construction: XOrc 7
+                            // slot 1587 writes collision 1 / timer 15 at
+                            // fixture 252, and Orc 10 slot 1533 does so at
+                            // fixture 253. Orc 10 slot 1541 is the clear-route
+                            // control: it commits N immediately at fixture
+                            // 222 and never enters this branch. Orc 8 slot
+                            // 1478 supplies the inert-body control: a freshly
+                            // surfaced Still tanker blocks N, so native parks
+                            // the cursor and climbs naked collision 1..7 before
+                            // paying its first full band at collision 8.
+                            int collision =
+                                    unit.battleNetCollisionCounter() + 1;
+                            unit.setBattleNetCollisionCounter(
+                                    collision > 14 ? 0 : collision);
+                            unit.setBattleNetRefusals(0);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(14);
+                            pickUpMoveAnimation(unit);
+                            if (world.battleNetSequence != null) {
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                }
+                                unit.setBattleNetAnimationTimer(15);
+                            }
+                            world.causalTrace.event(world.cycle,
+                                    "path.loaded-tanker-return-band",
+                                    unit.id(), "collision",
+                                    unit.battleNetCollisionCounter(),
+                                    "path_length", unit.pathLength(),
+                                    "heading", unit.peekHeading(),
+                                    "blocker", blocker.id(),
+                                    "blocker_order", blocker.order(),
+                                    "blocker_moving", blocker.isMoving(),
+                                    "blocker_returning",
+                                            blocker.returningToDepot(),
+                                    "blocker_carried", blocker.carried());
+                            return;
+                        }
                         // Cooperative naval refusals retain both the route and
                         // FUN_004379e0's sticky high nibble. A cached leftover
                         // heading (this route already spent a step) enters the
@@ -6199,6 +6355,15 @@ final class BattleNetMovementSystem {
                             }
                         }
                         if (!canTakeStep) {
+                            int woodOrderX = unit.battleNetWoodOrderX() >= 0
+                                    ? unit.battleNetWoodOrderX()
+                                    : unit.resourceTileX();
+                            int woodOrderY = unit.battleNetWoodOrderY() >= 0
+                                    ? unit.battleNetWoodOrderY()
+                                    : unit.resourceTileY();
+                            int woodOrderDistance = Math.max(
+                                    Math.abs(woodOrderX - unit.tileX()),
+                                    Math.abs(woodOrderY - unit.tileY()));
                             boolean saturatedWoodCornerLadder = unit
                                     .battleNetSaturatedWoodCornerLadder()
                                     && unit.pathLength() >= 4
@@ -6236,7 +6401,8 @@ final class BattleNetMovementSystem {
                                 return;
                             }
                             boolean parkedWoodCorner = unit.pathLength() == 1
-                                    && unit.battleNetCollisionCounter() == 0
+                                    && unit.battleNetCollisionCounter()
+                                            == unit.battleNetWoodCornerRefusalVisits()
                                     && unit.battleNetRefusals() > 0
                                     && Direction.isDiagonal(heading)
                                     && !walkedThisCycle;
@@ -6251,29 +6417,26 @@ final class BattleNetMovementSystem {
                                 parkedVisits++;
                                 unit.setBattleNetWoodCornerRefusalVisits(
                                         parkedVisits);
+                                int collision =
+                                        unit.battleNetCollisionCounter() + 1;
+                                unit.setBattleNetCollisionCounter(
+                                        collision > 14 ? 0 : collision);
                                 unit.setRouteSpent(false);
                                 unit.setWaitCycles(0);
                                 unit.setBattleNetOrderDelay(0);
                                 if (parkedVisits >= 3) {
                                     // Retail leaves the stale bytes behind its
                                     // route-index-20 cursor for three Move/1
-                                    // visits. The following resource callback
-                                    // redraws with this occupied face restored
-                                    // to the pathfinder and may first-step the
-                                    // replacement route immediately.
+                                    // visits while the packed collision nibble
+                                    // advances one, two, three. The following
+                                    // resource callback redraws with this
+                                    // occupied face restored to the pathfinder
+                                    // and may first-step the replacement route
+                                    // immediately.
                                     unit.clearPath();
                                 }
                                 return;
                             }
-                            int woodOrderX = unit.battleNetWoodOrderX() >= 0
-                                    ? unit.battleNetWoodOrderX()
-                                    : unit.resourceTileX();
-                            int woodOrderY = unit.battleNetWoodOrderY() >= 0
-                                    ? unit.battleNetWoodOrderY()
-                                    : unit.resourceTileY();
-                            int woodOrderDistance = Math.max(
-                                    Math.abs(woodOrderX - unit.tileX()),
-                                    Math.abs(woodOrderY - unit.tileY()));
                             boolean terminalWoodResidual =
                                     unit.pathLength() == 1
                                     && unit.battleNetCollisionCounter() > 0

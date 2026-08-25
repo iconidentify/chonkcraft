@@ -128,6 +128,65 @@ class Xhuman04OpeningCombatParityRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 4's committed grunt hold retargets on its timer-one OP0")
+    void xhuman4CommittedGruntHoldRetargetsOnItsTimerOneOp0() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1505 / Java 95 is the committed-hold
+        // witness. Its fixture-224 retarget opens Attack 2539/3,2,1 and then
+        // parks on the same quarry for 23..1. The spatial scan is not allowed
+        // to replace that live pointer during the hold: native keeps it at
+        // fixture 242/8 and 249/1, then retargets and calls FUN_004234b0 at
+        // fixture 250. The retail draw ledger seals caller 0x004234CD and the
+        // synchronized seed transition 9f1a7590 -> 4b761e89 on that visit.
+        Unit grunt = unitAt(world, "unit-grunt", 77, 61);
+        assertNotNull(grunt, "XHuman 4 has no native-slot-1505 grunt");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 224) {
+            mission.tick();
+        }
+        Unit heldTarget = grunt.target();
+        assertNotNull(heldTarget, "fixture 224 must install the committed quarry");
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+
+        while (world.cycle() - INITIALIZATION_TICKS < 242) {
+            mission.tick();
+        }
+        assertSame(heldTarget, grunt.target(),
+                "a committed melee OP0 hold cannot free-scan before timer one");
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(8, grunt.battleNetAnimationTimer(),
+                "native keeps draining the original 23-count hold");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 249) {
+            mission.tick();
+        }
+        assertSame(heldTarget, grunt.target());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(0x9f1a7590, world.randomSeed());
+
+        mission.tick();
+        assertTrue(grunt.target() != heldTarget,
+                "timer-one OP0 must install the better adjacent quarry");
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "the replacement opens fresh Attack construction");
+        assertEquals(0x4b761e89, world.randomSeed(),
+                "the due attack-loop draw belongs to the retarget visit");
+    }
+
+    @Test
     @DisplayName("xhuman 4 discards a dead helper offer before its next target scan")
     void xhuman4DiscardsADeadHelperOfferBeforeItsNextTargetScan() {
         AssetSource assets = AssetSource.fromEnvironment();
