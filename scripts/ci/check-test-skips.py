@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2751 tests,   26 skipped
-    no external input          2751 tests, 1153 skipped
+    authenticated inputs       2753 tests,   26 skipped
+    no external input          2753 tests, 1154 skipped
 
 Both can be green.
 
@@ -138,9 +138,14 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # New authenticated handoff referees cover crowded combat, resource,
         # tanker and naval-patrol boundaries. They run with the
         # pack and deliberately join this profile's skip inventory. The
+        # 25 August parity batch adds two engine referees: the claimed-wood
+        # re-aim runs data-free, while the terrain/wood-wall route referee is
+        # pack-backed and deliberately adds one data-free skip. Neither
+        # changes the authenticated profile's skip inventory.
+        #
         # production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1847, 831),
+        "engine": (1849, 832),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -187,7 +192,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1847, 7),
+        "engine": (1849, 7),
         "desktop": (345, 7),
         "matchmaker-server": (5, 1),
     },
