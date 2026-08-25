@@ -30,9 +30,12 @@ class Human13CatapultSplashTailSafetyRealDataTest {
         Unit northCatapult = unitById(world, 112);
         Unit southCatapult = unitById(world, 121);
         Unit crowdedKnight = unitById(world, 107);
+        Unit frontierCritter = unitById(world, 125);
         assertNotNull(northCatapult, "Human 13 has no native-slot-1488 catapult");
         assertNotNull(southCatapult, "Human 13 has no native-slot-1479 catapult");
         assertNotNull(crowdedKnight, "Human 13 has no western target knight");
+        assertNotNull(frontierCritter,
+                "Human 13 has no native-slot-1475 frontier critter");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -73,6 +76,20 @@ class Human13CatapultSplashTailSafetyRealDataTest {
         assertCatapult(southCatapult, Unit.Order.STILL, 413, 3);
         assertNull(southCatapult.target(),
                 "the live crowded replacement is refused again at its OP0");
+
+        while (fixtureCycle(world) < 216) {
+            mission.tick();
+        }
+        assertCatapult(southCatapult, Unit.Order.STILL, 413, 3);
+        assertEquals(0x7dfce682, world.battleNetRandomSeed(),
+                "the expired siege Attack must not steal the next land-idle draw");
+
+        mission.tick();
+        assertEquals(217, fixtureCycle(world));
+        assertEquals(Unit.Order.MOVE, frontierCritter.order(),
+                "native's next shared draw sends the frontier critter west");
+        assertEquals(108, frontierCritter.orderTargetX());
+        assertEquals(42, frontierCritter.orderTargetY());
     }
 
     private static int fixtureCycle(World world) {

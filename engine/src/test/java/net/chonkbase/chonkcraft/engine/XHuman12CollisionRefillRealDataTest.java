@@ -2,11 +2,13 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -237,6 +239,72 @@ class XHuman12CollisionRefillRealDataTest {
                 "the native cardinal tail remains live during the wait");
         assertEquals(Direction.fromDelta(0, -1), grunt.peekHeading());
         assertEquals(3, grunt.battleNetCollisionCounter());
+    }
+
+    @Test
+    @DisplayName("a saturated paid building refill retains its second wall byte")
+    void saturatedPaidBuildingRefillRetainsItsSecondWallByte() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 83);
+        Unit knight = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1517 grunt");
+        assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 210) {
+            mission.tick();
+        }
+        assertEquals(29, grunt.tileX());
+        assertEquals(36, grunt.tileY());
+        assertEquals(2, grunt.pathLength(),
+                "the paid RI-20 refill stores both south and southwest");
+        assertEquals(Direction.fromDelta(0, 1), grunt.peekHeading());
+        assertEquals(1, grunt.battleNetCollisionCounter(),
+                "the replacement retains native collision generation one");
+
+        mission.tick();
+        assertEquals(211, fixtureCycle(world));
+        assertEquals(29, grunt.tileX());
+        assertEquals(37, grunt.tileY(),
+                "the first replacement byte commits south");
+        assertEquals(1, grunt.pathLength(),
+                "southwest remains cached behind the committed south byte");
+        assertEquals(Direction.fromDelta(-1, 1), grunt.peekHeading());
+
+        while (fixtureCycle(world) < 226) {
+            mission.tick();
+        }
+        assertEquals(29, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(-2, grunt.offsetY(),
+                "fixture 226 still owes the final south residual pixels");
+        assertEquals(1, grunt.pathLength());
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(2, grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        assertTrue(grunt.battleNetAttackWrapDestArmPending());
+
+        mission.tick();
+        assertEquals(227, fixtureCycle(world));
+        assertEquals(knight, grunt.target(),
+                "the residual target scan upgrades the tower to the knight");
+        assertEquals(30, grunt.tileX(),
+                "the retained wall byte permits the immediate east retarget step");
+        assertEquals(37, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, 0), grunt.lastStepHeading());
+        assertEquals(4, grunt.pathLength(),
+                "the east step retains native's four-byte knight tail");
+        assertEquals(0, grunt.battleNetCollisionCounter());
     }
 
     @Test
@@ -630,6 +698,61 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a repeated retained-route refusal writes timer fifteen immediately")
+    void repeatedRetainedRouteRefusalWritesTimerFifteenImmediately() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Sealed native slot 1503 / Java 97 reaches the same blocked NE head
+        // twice. FUN_004379e0 increments the packed collision byte at
+        // 0x00437a0d and unconditionally writes Move timer 15 at 0x00437a25
+        // on both visits. The second visit is fixture 221: it must not expose
+        // a synthetic Move/1 callback before beginning the paid band.
+        Unit grunt = unitById(world, 97);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1503 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 221) {
+            mission.tick();
+        }
+
+        assertEquals(38, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(2, grunt.battleNetCollisionCounter(),
+                "the repeated handler visit advances collision one to two");
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer(),
+                "the native refusal handler writes fifteen on this visit");
+        assertEquals(14, grunt.battleNetOrderDelay(),
+                "fourteen remaining quiet visits mirror native timer 15..1");
+
+        while (fixtureCycle(world) < 235) {
+            mission.tick();
+        }
+        assertEquals(38, grunt.tileX(),
+                "timer one still owns the blocked square at fixture 235");
+        assertEquals(39, grunt.tileY());
+
+        mission.tick();
+        assertEquals(236, fixtureCycle(world));
+        assertEquals(39, grunt.tileX(),
+                "the paid retained route consumes north-east at fixture 236");
+        assertEquals(38, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
+    }
+
+    @Test
     @DisplayName("collision generation four refills on its residual-settle visit")
     void collisionGenerationFourRefillsOnItsResidualSettleVisit() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -671,6 +794,59 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
         assertEquals(19, grunt.pathLength(),
                 "one heading is spent from the full replacement buffer");
+    }
+
+    @Test
+    @DisplayName("a free-compass detour remains the head of its replacement buffer")
+    void freeCompassDetourRetainsItsReplacementBuffer() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Sealed native slot 1496 / Java 104 ends its old four-byte route on
+        // a blocked west head. Retail parks RI 20, draws a complete replacement
+        // buffer toward knight 1475, substitutes the first free compass byte E,
+        // and consumes it on fixture 221. The following NE byte and eighteen
+        // more headings remain cached. Treating E as a complete one-byte route
+        // falsely closes Move when the quarry changes on fixture 237 and makes
+        // Java pay an unrelated Attack 3,2,1 construction.
+        Unit grunt = unitById(world, 104);
+        Unit replacement = unitById(world, 123);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+        assertNotNull(replacement, "XHuman 12 has no native-slot-1478 footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 221) {
+            mission.tick();
+        }
+
+        assertEquals(35, grunt.tileX());
+        assertEquals(40, grunt.tileY(),
+                "the approved east detour commits on native's visit");
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength(),
+                "east is the head of a full replacement buffer, not a surrogate route");
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+
+        while (fixtureCycle(world) < 237) {
+            mission.tick();
+        }
+
+        assertEquals(replacement, grunt.target(),
+                "the residual-settle scan installs the better footman");
+        assertEquals(36, grunt.tileX(),
+                "the replacement route commits without false cold construction");
+        assertEquals(39, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
     }
 
     @Test

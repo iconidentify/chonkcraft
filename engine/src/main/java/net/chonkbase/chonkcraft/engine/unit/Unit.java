@@ -2320,6 +2320,7 @@ public final class Unit {
             battleNetStageSixCardinalProbePark = false;
             battleNetParkedRefusalHeading = -1;
             battleNetSaturatedCardinalRetryLoop = false;
+            battleNetRangedCloseHitHelpWallFace = false;
         }
         this.target = target;
         if (target == null) {
@@ -2471,7 +2472,8 @@ public final class Unit {
      * constructor, and the next Move visit is drawing the replacement. If
      * that replacement's first byte is cooperatively blocked, it begins a
      * fresh fifteen-count band rather than being mistaken for the second
-     * refusal of the discarded residual.
+     * refusal of the discarded residual. A saturated building replacement can
+     * retain this transaction through its bounded naked formation retries.
      */
     public boolean battleNetRetargetResidualParkRefill() {
         return battleNetRetargetResidualParkRefill;
@@ -2844,6 +2846,23 @@ public final class Unit {
     private boolean battleNetWoodRouteIndex20;
 
     /**
+     * A repeated cardinal wood residual retired stale refusal history and is
+     * paying the fresh blocked-diagonal collision ladder before its wall-face
+     * redraw. XHuman 12 peon 1376 parks south on fixture 215, counts the
+     * blocked south-west corner through collision five, then redraws south on
+     * fixture 220.
+     */
+    public boolean battleNetSaturatedWoodCornerLadder() {
+        return battleNetSaturatedWoodCornerLadder;
+    }
+
+    public void setBattleNetSaturatedWoodCornerLadder(boolean armed) {
+        battleNetSaturatedWoodCornerLadder = armed;
+    }
+
+    private boolean battleNetSaturatedWoodCornerLadder;
+
+    /**
      * Far multi-step residual refuse hold (Orc 12 peon 1521). Armed on the
      * residual-settle refuse onto a cooperative gold ally when a free closer
      * neighbour also exists; keeps FUN_004379e0 coll bands 1..7 (timer 1)
@@ -3057,6 +3076,22 @@ public final class Unit {
     }
 
     private boolean battleNetSpatialHitHelpHandoff;
+
+    /**
+     * A person's standing melee defender accepted close HitUnit help from a
+     * ranged aggressor. Retail keeps the first successful clockwise wall face
+     * for that first chase only (XHuman 12 footman 1477); ordinary spatial
+     * help and direct melee HitUnit offers use their existing handoffs.
+     */
+    public boolean battleNetRangedCloseHitHelpWallFace() {
+        return battleNetRangedCloseHitHelpWallFace;
+    }
+
+    public void setBattleNetRangedCloseHitHelpWallFace(boolean retain) {
+        battleNetRangedCloseHitHelpWallFace = retain;
+    }
+
+    private boolean battleNetRangedCloseHitHelpWallFace;
 
     /**
      * A sea patrol's queued position attack is paying Attack construction

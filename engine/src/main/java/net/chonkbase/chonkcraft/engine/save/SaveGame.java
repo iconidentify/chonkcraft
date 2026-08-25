@@ -765,6 +765,9 @@ public final class SaveGame {
                     .append(unit.battleNetRetargetResidualParkSteps())
                     .append(",");
         }
+        if (unit.battleNetSaturatedWoodCornerLadder()) {
+            state.append(" saturatedWoodCornerLadder = true,");
+        }
         if (unit.battleNetParkedRefusalHeading() >= 0) {
             state.append(" parkedRefusalHeading = ")
                     .append(unit.battleNetParkedRefusalHeading())
@@ -786,6 +789,9 @@ public final class SaveGame {
         }
         if (unit.battleNetSpatialHitHelpHandoff()) {
             state.append(" spatialHitHelpHandoff = true,");
+        }
+        if (unit.battleNetRangedCloseHitHelpWallFace()) {
+            state.append(" rangedCloseHitHelpWallFace = true,");
         }
         if (unit.battleNetLandPatrolAttackRoutePending()) {
             state.append(" landPatrolAttackRoutePending = true,");

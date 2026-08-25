@@ -115,7 +115,16 @@ final class BattleNetIdleSystem {
                 && unit.pathLength() == 1
                 && unit.battleNetCollisionCounter()
                         > World.ATTACK_SCAN_INTERVAL;
-        if (unit.attackScanSleep() > 0 && !exhaustedReachabilityProbe) {
+        // The six-visit cadence throttles reconsidering a live quarry.  It
+        // does not postpone replacing a weak goal which has entered Die:
+        // XHuman 4 footman 1518 finishes its swing against dying grunt 1489
+        // on fixture 234 and selects live grunt 1505 on that same callback.
+        // Sleeping here made EndActionAttack discard the order before the
+        // replacement scan could run.
+        boolean liveCadenceGoal = world.targets.validAttackTarget(
+                unit, unit.target());
+        if (unit.attackScanSleep() > 0 && !exhaustedReachabilityProbe
+                && liveCadenceGoal) {
             unit.setAttackScanSleep(unit.attackScanSleep() - 1);
             return true;
         }
@@ -1248,6 +1257,9 @@ final class BattleNetIdleSystem {
 
     /** The random-facing half of {@code FUN_0040ad30}, without Still's AI pass. */
     void advanceBattleNetActiveOrderIdleRandom(Unit unit) {
+        if (!battleNetUsesLandIdleRandom(unit)) {
+            return;
+        }
         int seedBefore = world.battleNetRandomSeed;
         if (unit.type().moveType() != UnitType.Movement.LAND) {
             int timer = unit.battleNetFlyingIdleTimer();
@@ -1276,6 +1288,20 @@ final class BattleNetIdleSystem {
                     Integer.toUnsignedString(seedBefore),
                     Integer.toUnsignedString(world.battleNetRandomSeed));
         }
+    }
+
+
+    /** Whether a land unit enters {@code FUN_0040ad50}'s random-facing arm. */
+    boolean battleNetUsesLandIdleRandom(Unit unit) {
+        if (unit == null || unit.type() == null) {
+            return false;
+        }
+        int type = PudUnitTypes.code(unit.type().ident());
+        // The authenticated type table sends ballistae and catapults through
+        // the siege Still arm. They may run ready/auto-attack, but never pay
+        // the common land-idle random choice -- including when an expired
+        // Attack installs Still during the same scheduler visit.
+        return type != 4 && type != 5;
     }
 
 

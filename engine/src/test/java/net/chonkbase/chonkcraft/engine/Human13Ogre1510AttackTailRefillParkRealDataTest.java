@@ -66,6 +66,31 @@ class Human13Ogre1510AttackTailRefillParkRealDataTest {
         assertEquals(31, ogre.tileY());
         assertEquals(589, ogre.battleNetSequenceOffset());
         assertEquals(1, ogre.battleNetAnimationTimer());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 223) {
+            mission.tick();
+        }
+        assertSame(knight, ogre.target());
+        assertEquals(true, knight.isDying());
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(124, ogre.tileX());
+        assertEquals(31, ogre.tileY());
+        assertEquals(-2, ogre.offsetX());
+        assertEquals(-2, ogre.offsetY());
+        assertEquals(4, ogre.pathLength());
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, ogre.order(),
+                "the dying quarry releases Attack as the residual settles");
+        assertEquals(124, ogre.tileX(),
+                "the cached SW tail must not commit after the quarry dies");
+        assertEquals(31, ogre.tileY());
+        assertEquals(0, ogre.offsetX());
+        assertEquals(0, ogre.offsetY());
+        assertEquals(4, ogre.pathLength(),
+                "EndActionAttack leaves PathFinderOutput on the unit");
+        assertEquals(581, ogre.battleNetSequenceOffset());
+        assertEquals(3, ogre.battleNetAnimationTimer());
     }
 
     private static Unit unitById(World world, int id) {

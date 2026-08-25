@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -141,8 +143,127 @@ class BattleNetInPlaceFirstTakeRealDataTest {
                 "the final Human 8 approach is horizontal");
     }
 
+    @Test
+    @DisplayName("a Human 8 residual destination arm keeps the full refusal band")
+    void aHuman8ResidualDestinationArmKeepsTheFullRefusalBand() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is not in the pack");
+        World world = mission.world();
+        Unit attacker = unitById(world, 74);
+        Unit quarry = unitById(world, 81);
+        assertNotNull(attacker, "Human 8 has no native-slot-1526 attack peasant");
+        assertNotNull(quarry, "Human 8 has no native-slot-1519 quarry peasant");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 236) {
+            mission.tick();
+        }
+
+        // Native retains route index one and its southeast byte while the
+        // moving quarry updates the order point from 79,62 to 80,62. The
+        // allied attack peasant still on 77,62 refuses that cached byte;
+        // FUN_004379e0 writes collision one and Move timer fifteen on this
+        // visit. A one-count redraw instead produces free east and steps on
+        // fixture 238, the fleet's first semantic divergence.
+        assertEquals(76, attacker.tileX());
+        assertEquals(61, attacker.tileY());
+        assertEquals(quarry, attacker.target());
+        assertEquals(80, quarry.tileX());
+        assertEquals(62, quarry.tileY());
+        assertEquals(1, attacker.pathLength(),
+                "the refused southeast tail remains cached");
+        assertEquals(Direction.fromDelta(1, 1), attacker.peekHeading(),
+                "timer=" + attacker.battleNetAnimationTimer()
+                        + " delay=" + attacker.battleNetOrderDelay()
+                        + " collision=" + attacker.battleNetCollisionCounter()
+                        + " refusals=" + attacker.battleNetRefusals()
+                        + " initial=" + attacker.battleNetPathInitialLength()
+                        + " steps=" + attacker.battleNetPathStepsTaken()
+                        + " offered=" + (attacker.offeredTarget() == null
+                                ? -1 : attacker.offeredTarget().id()));
+        assertEquals(1, attacker.battleNetCollisionCounter());
+        assertEquals(world.idle.battleNetSequenceStart(attacker,
+                        BattleNetSequence.MOVE_ANIMATION),
+                attacker.battleNetSequenceOffset());
+        assertEquals(15, attacker.battleNetAnimationTimer());
+        assertEquals(14, attacker.battleNetOrderDelay());
+
+        while (fixtureCycle(world) < 238) {
+            mission.tick();
+        }
+        assertEquals(76, attacker.tileX(),
+                "the retained route must not redraw east during Move fifteen");
+        assertEquals(61, attacker.tileY());
+        assertEquals(13, attacker.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("an Orc 4 critter keeps Move while its wander square is settling")
+    void anOrc4CritterKeepsMoveUntilTheWanderBlockerSettles() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level04o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 4 is not in the pack");
+        World world = mission.world();
+        Unit wanderer = unitById(world, 17);
+        Unit blocker = unitById(world, 19);
+        assertNotNull(wanderer, "Orc 4 has no native-slot-1583 critter");
+        assertNotNull(blocker, "Orc 4 has no native-slot-1581 critter");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 238) {
+            mission.tick();
+        }
+
+        assertEquals(36, wanderer.tileX());
+        assertEquals(9, wanderer.tileY());
+        assertEquals(36, wanderer.orderTargetX());
+        assertEquals(8, wanderer.orderTargetY());
+        assertEquals(Unit.Order.MOVE, wanderer.order(),
+                "the moving body on the north goal keeps native Move visible");
+        while (fixtureCycle(world) < 239) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, wanderer.order());
+        while (fixtureCycle(world) < 240) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, blocker.order(),
+                "the north-square blocker settles on the completion visit");
+        assertEquals(Unit.Order.STILL, wanderer.order(),
+                "the standing blocker completes the empty wander into Still");
+        while (fixtureCycle(world) < 241) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, wanderer.order(),
+                "the replacement Still lifecycle re-wanders on the next visit");
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
+                return unit;
+            }
+        }
+        return null;
     }
 
     private static Unit atTile(World world, int x, int y) {

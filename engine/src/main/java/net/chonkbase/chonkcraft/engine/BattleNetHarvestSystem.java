@@ -250,6 +250,7 @@ final class BattleNetHarvestSystem {
     boolean beginHarvest(Unit worker, ResourceInfo info, Unit building, int tileX, int tileY) {
         worker.setGatherClockStarted(false);
         worker.setBattleNetWoodReadyPathRequired(false);
+        worker.setBattleNetSaturatedWoodCornerLadder(false);
         // Default off; gold free-prefix forest re-aim and range-one leftover
         // routes arm the walk claim themselves. A plain adjacent wood order
         // only draws at work 2660 (standing start).
@@ -351,8 +352,9 @@ final class BattleNetHarvestSystem {
                 // then parks its stale route when this delay expires (1498
                 // below).
                 if (worker.returningToDepot() && worker.carried() > 0
-                        && worker.pathLength() > 0
                         && worker.battleNetCollisionCounter() > 0
+                        && (worker.pathLength() > 0
+                                || worker.battleNetRefusals() >= 8)
                         && world.battleNetSequence != null) {
                     int moveStart = world.idle.battleNetSequenceStart(
                             worker, BattleNetSequence.MOVE_ANIMATION);
@@ -489,6 +491,16 @@ final class BattleNetHarvestSystem {
                     // ever consults the replacement selected above.
                     worker.clearPath();
                     worker.setRouteSpent(false);
+                    if (depot != null) {
+                        // SpreadUnit's stored point belongs to that same weak
+                        // goal.  A doubled tanker otherwise mistakes the dead
+                        // refinery's point for an exceptional shoreline point
+                        // of the replacement and completes the resource order
+                        // at the ruins instead of routing to the live depot.
+                        int[] entry = world.battleNetDepotEntryPoint(
+                                worker, depot);
+                        worker.setOrderTarget(entry[0], entry[1]);
+                    }
                 }
                 if (worker.resourceDepot() == null) {
                     worker.setResourceDepot(depot);
@@ -1499,10 +1511,56 @@ final class BattleNetHarvestSystem {
         Unit home = bestDepotByTravel(worker, info.resource(), 1000);
         Unit rememberedDepot = worker.resourceDepot();
         Unit dropTowards = home;
-        int[] returnPoint = home != null && world.battleNetSequence != null
+        int returnGoalX = home == null ? -1 : home.tileX();
+        int returnGoalY = home == null ? -1 : home.tileY();
+        boolean verticalDoubledTankerSpread = false;
+        if (home != null && home.type() != null
+                && info.resource() == UnitType.Resource.OIL
+                && worker.type() != null && worker.type().seaUnit()
+                && world.battleNetMovementStride(worker) > 1
+                && worker.carried() > 0) {
+            // A doubled tanker feeds SpreadUnit the closest point of the
+            // depot rectangle, rather than its top-left anchor. The reverse
+            // ray may still store an occupied shoreline point beyond that
+            // face. Orc 10's south-east approach to the 3x3 shipyard thereby
+            // stores 11,23; tankers whose nearest refinery corner is already
+            // reachable retain that authenticated corner instead.
+            int depotRight = home.tileX()
+                    + Math.max(1, home.type().tileWidth()) - 1;
+            int depotBottom = home.tileY()
+                    + Math.max(1, home.type().tileHeight()) - 1;
+            returnGoalX = Math.max(home.tileX(),
+                    Math.min(worker.tileX(), depotRight));
+            returnGoalY = Math.max(home.tileY(),
+                    Math.min(worker.tileY(), depotBottom));
+            boolean verticalMajor = Math.abs(worker.tileY() - returnGoalY)
+                    > Math.abs(worker.tileX() - returnGoalX);
+            verticalDoubledTankerSpread = verticalMajor;
+            if (verticalMajor) {
+                returnGoalX = home.tileX()
+                        + Math.max(1, home.type().tileWidth()) / 2;
+            } else {
+                returnGoalY = home.tileY()
+                        + Math.max(1, home.type().tileHeight()) / 2;
+            }
+        }
+        boolean doubledTankerSpread = home != null
+                && info.resource() == UnitType.Resource.OIL
+                && worker.type() != null && worker.type().seaUnit()
+                && world.battleNetMovementStride(worker) > 1
+                && worker.carried() > 0;
+        int[] dropPoint = home != null && world.battleNetSequence != null
                 ? world.battleNetSpreadUnitGoal(
                         worker, home.tileX(), home.tileY())
                 : null;
+        int[] returnPoint = doubledTankerSpread
+                ? world.battleNetSpreadUnitGoal(worker,
+                        returnGoalX, returnGoalY,
+                        verticalDoubledTankerSpread ? 1
+                                : worker.type().tileWidth(),
+                        verticalDoubledTankerSpread
+                                ? worker.type().tileHeight() : 1)
+                : dropPoint;
         String resourceTrace = System.getenv("CHONKCRAFT_TRACE_RESOURCE");
         if (resourceTrace != null
                 && worker.id() == Integer.parseInt(resourceTrace)) {
@@ -1517,8 +1575,8 @@ final class BattleNetHarvestSystem {
                 && rememberedDepot.isAlive() && !rememberedDepot.isDying()) {
             dropTowards = rememberedDepot;
         }
-        boolean leftResource = returnPoint != null
-                ? leaveResource(worker, returnPoint[0], returnPoint[1])
+        boolean leftResource = dropPoint != null
+                ? leaveResource(worker, dropPoint[0], dropPoint[1])
                 : leaveResource(worker, dropTowards);
         if (!leftResource) {
             return;
@@ -1527,8 +1585,9 @@ final class BattleNetHarvestSystem {
         worker.setReturnDepotGoal(home);
         if (returnPoint != null) {
             // The native order constructor authors and spreads unit+0x84
-            // before 0x4519d0 reads it for dropout. Preserve that same point
-            // through the timed Still head and the eventual queue pop.
+            // before the timed Still head and eventual queue pop. Doubled
+            // tankers expose a distinct dropout face hint above, while this
+            // major-axis footprint point remains the queued return goal.
             worker.setOrderTarget(returnPoint[0], returnPoint[1]);
         }
 
@@ -1999,6 +2058,33 @@ final class BattleNetHarvestSystem {
                             return;
                         }
                     }
+                    int woodOrderX = worker.battleNetWoodOrderX() >= 0
+                            ? worker.battleNetWoodOrderX()
+                            : worker.resourceTileX();
+                    int woodOrderY = worker.battleNetWoodOrderY() >= 0
+                            ? worker.battleNetWoodOrderY()
+                            : worker.resourceTileY();
+                    int woodOrderDistance = Math.max(
+                            Math.abs(woodOrderX - worker.tileX()),
+                            Math.abs(woodOrderY - worker.tileY()));
+                    boolean saturatedRepeatedCardinalResidual = shortcut < 0
+                            && worker.pathLength() == 3
+                            && worker.battleNetPathInitialLength() == 4
+                            && worker.battleNetPathStepsTaken() == 1
+                            && worker.lastStepHeading() == heading
+                            && !Direction.isDiagonal(heading)
+                            && worker.battleNetCollisionCounter() == 2
+                            && worker.battleNetRefusals() == 2
+                            && woodOrderDistance >= 3;
+                    if (saturatedRepeatedCardinalResidual) {
+                        // The two refusals belong to the retired approach,
+                        // not the blocked corner which follows this residual.
+                        // Retail starts the new generation at collision one
+                        // when it parks route index twenty on fixture 215.
+                        worker.setBattleNetCollisionCounter(1);
+                        worker.setBattleNetRefusals(0);
+                        worker.setBattleNetSaturatedWoodCornerLadder(true);
+                    }
                     // A repeated diagonal has no two-heading shortcut. Native
                     // parks that stale tail at route index twenty on the
                     // residual-settle visit, so the next resource callback
@@ -2208,6 +2294,10 @@ final class BattleNetHarvestSystem {
                 MapField goalField = world.map.fieldOrNull(goalX, goalY);
                 boolean forestGoal = goalField != null
                         && goalField.isForest();
+                boolean boundaryForestOrderPoint =
+                        goalX <= 1 || goalY <= 1
+                                || goalX >= world.map.width() - 2
+                                || goalY >= world.map.height() - 2;
                 if (forestGoal) {
                     PathFinder.Path wall = world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker,
@@ -2227,7 +2317,11 @@ final class BattleNetHarvestSystem {
                 // endpoint pack so XHuman 2 path 707 is not shortened.
                 // Wall detours longer than their Chebyshev span skip tip
                 // upgrade so Human 8's east face is not rewritten to SE.
-                path = forestGoal
+                // A reverse-free order point beside the map boundary is
+                // static terrain rather than the tree itself, but it retains
+                // forest tip semantics. Human 12 peon 1571 therefore keeps
+                // the free interior face before trying the top-edge corner.
+                path = forestGoal || boundaryForestOrderPoint
                         ? world.battleNetForestDiagonalPrefer(
                                 worker, path, goalX, goalY)
                         : world.battleNetDiagonalPreferPath(
@@ -2235,6 +2329,7 @@ final class BattleNetHarvestSystem {
             }
             if (cornerRefusalReplan) {
                 worker.clearBattleNetWoodCornerRefusal();
+                worker.setBattleNetSaturatedWoodCornerLadder(false);
             }
             if (path.result() == PathFinder.Result.REACHED) {
                 // Already beside it; the chop notices for itself.

@@ -338,6 +338,57 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
+    @DisplayName("xorc 11's responding destroyer pays cold Attack construction after its final chase stride")
+    void xorc11sRespondingDestroyerPaysColdAttackConstructionAfterItsFinalChaseStride() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit responder = unitById(world, 79);
+        Unit quarry = unitById(world, 58);
+        assertNotNull(responder,
+                "XOrc 11 has no native-slot-1521 responding destroyer");
+        assertNotNull(quarry,
+                "XOrc 11 has no native-slot-1542 human destroyer");
+        assertEquals(79, responder.id());
+        assertEquals(58, quarry.id());
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 217) {
+            mission.tick();
+            int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+            if (fixture == 205) {
+                assertEquals(3261, responder.battleNetSequenceOffset(),
+                        "the final two pixels still belong to the Move body");
+                assertEquals(1, responder.battleNetAnimationTimer());
+            } else if (fixture >= 206 && fixture <= 208) {
+                assertEquals(3266, responder.battleNetSequenceOffset(),
+                        "the settled naval residual opens Attack start");
+                assertEquals(209 - fixture,
+                        responder.battleNetAnimationTimer(),
+                        "native naval Attack construction counts 3,2,1");
+            } else if (fixture >= 209) {
+                assertEquals(3266, responder.battleNetSequenceOffset(),
+                        "the broadside cadence remains parked at OP0");
+                assertEquals(327 - fixture,
+                        responder.battleNetAnimationTimer(),
+                        "the fresh 118-count broadside period drains in place");
+            }
+            if (fixture == 217) {
+                assertEquals(54, quarry.hitPoints(),
+                        "the retained HitUnit target must not take the phantom cannon splash");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("xorc 11's opening battleship is attacking on cycle 58")
     void xorc11sOpeningBattleshipIsAttackingOnCycle58() {
         AssetSource assets = AssetSource.fromEnvironment();

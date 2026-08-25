@@ -521,13 +521,41 @@ final class BattleNetConstructionSystem {
                         + Math.max(1, target.type().tileWidth()) - 1;
                 int targetBottom = targetTop
                         + Math.max(1, target.type().tileHeight()) - 1;
-                BattleNetPathFinder.Passability traversalPassability =
+                BattleNetPathFinder.Passability baseTraversalPassability =
                         world.battleNetTraversalPassability(worker,
                                 goldResource && goldFreePrefixReplan);
+                BattleNetPathFinder.Passability traversalPassability =
+                        new BattleNetPathFinder.Passability() {
+                            @Override
+                            public boolean canEnter(int x, int y) {
+                                return baseTraversalPassability.canEnter(x, y);
+                            }
+
+                            @Override
+                            public boolean canEnterIgnoringMobileOccupancy(
+                                    int x, int y) {
+                                return baseTraversalPassability
+                                        .canEnterIgnoringMobileOccupancy(x, y)
+                                        || battleNetMovingGoldSkirtSiblingYields(
+                                                worker, target,
+                                                targetLeft, targetTop,
+                                                targetRight, targetBottom,
+                                                x, y);
+                            }
+
+                            @Override
+                            public boolean isOutOfBounds(int x, int y) {
+                                return baseTraversalPassability
+                                        .isOutOfBounds(x, y);
+                            }
+                        };
                 BattleNetPathFinder.Passability optimizationPassability =
-                        (x, y) -> traversalPassability.canEnter(x, y)
+                        (x, y) -> (traversalPassability.canEnter(x, y)
                                 && !world.battleNetUnitOccupies(
-                                        softBlockers, x, y);
+                                        softBlockers, x, y))
+                                || battleNetMovingGoldSkirtSiblingYields(
+                                        worker, target, targetLeft, targetTop,
+                                        targetRight, targetBottom, x, y);
                 int stride = world.battleNetMovementStride(worker);
                 PathFinder.Path path = BattleNetPathFinder.find(
                         worker.tileX(), worker.tileY(), point[0], point[1],
@@ -567,7 +595,43 @@ final class BattleNetConstructionSystem {
         // GiveOrder-27 approach point and retains its captured legacy path.
         // Ships require the target router on their two-tile anchor grid even
         // when empty, so they keep the established stride guard as well.
-        if (world.battleNetMovementStride(worker) > 1
+        int stride = world.battleNetMovementStride(worker);
+        int targetLeft = target.tileX();
+        int targetTop = target.tileY();
+        int targetRight = targetLeft
+                + Math.max(1, target.type().tileWidth()) - 1;
+        int targetBottom = targetTop
+                + Math.max(1, target.type().tileHeight()) - 1;
+        boolean spreadPointOutsideTargetSkirt =
+                worker.orderTargetX() < targetLeft - stride
+                || worker.orderTargetX() > targetRight + stride
+                || worker.orderTargetY() < targetTop - stride
+                || worker.orderTargetY() > targetBottom + stride;
+        boolean loadedDoubledTankerReturn = stride > 1
+                && worker.returningToDepot() && worker.carried() > 0
+                && worker.carrying() == UnitType.Resource.OIL
+                && worker.type().seaUnit()
+                && target.type().storesResource(UnitType.Resource.OIL)
+                && worker.orderTargetX() >= 0 && worker.orderTargetY() >= 0
+                && spreadPointOutsideTargetSkirt;
+        if (loadedDoubledTankerReturn) {
+            // When SpreadUnit had to leave the depot's ordinary marked skirt
+            // to clear an obstructed shoreline, MoveToDepot preserves that
+            // point instead of replacing it with the nearest footprint cell.
+            // It normalizes x onto the hull's doubled lattice but leaves the
+            // odd y boundary intact. Orc 10 changes 11,23 to 12,23 and writes
+            // an N-led route; unobstructed tanker returns stay on the normal
+            // target router used throughout the rest of the fleet.
+            int correctedX = worker.orderTargetX();
+            while (Math.floorMod(correctedX - worker.tileX(), stride) != 0) {
+                correctedX += Integer.signum(worker.tileX() - correctedX);
+            }
+            int correctedY = worker.orderTargetY();
+            worker.setOrderTarget(correctedX, correctedY);
+            return world.findBattleNetPointPath(
+                    worker, correctedX, correctedY);
+        }
+        if (stride > 1
                 || (worker.type().landUnit()
                         && worker.returningToDepot() && worker.carried() > 0)) {
             return world.findBattleNetTargetPath(worker, target);
@@ -579,6 +643,81 @@ final class BattleNetConstructionSystem {
         } finally {
             world.setMovementFieldFlags(target, true);
         }
+    }
+
+
+    /**
+     * Whether the marked goal and optimizer may accept a mine-skirt shortcut
+     * through a collision-free sibling's just-committed terminal step.
+     *
+     * <p>Orc 11 peasant 1490 commits south-west onto (8,122) before peasant
+     * 1505 is routed in the same scheduler cycle. The residual corridor rule
+     * keeps that Move body hard to the wall writer, but native's optimizer
+     * still collapses S,SW to SW on its marked terminal square. Java applied
+     * the corridor's hard view to both phases and retained an extra south
+     * step. Only a moving outbound sibling for the same mine may yield;
+     * stationary, collided, returning, differently tasked, and multiply
+     * occupied cells stay hard.</p>
+     */
+    private boolean battleNetMovingGoldSkirtSiblingYields(
+            Unit worker, Unit target,
+            int targetLeft, int targetTop, int targetRight, int targetBottom,
+            int x, int y) {
+        if (target.type().givesResource() != UnitType.Resource.GOLD
+                || x < targetLeft - 1 || x > targetRight + 1
+                || y < targetTop - 1 || y > targetBottom + 1
+                // Immediate packed-queue routes retain the hard wall and
+                // collision band. Orc 12 peon 1521 and XHuman 11 peon 1486
+                // are both two tiles from the occupied skirt and must not
+                // turn that terminal yield into their opening stride.
+                || Math.max(Math.abs(x - worker.tileX()),
+                        Math.abs(y - worker.tileY())) <= 2) {
+            return false;
+        }
+        boolean found = false;
+        for (Unit candidate : world.units) {
+            if (candidate == worker || candidate.type() == null
+                    || !candidate.isOnMap() || candidate.isDying()
+                    || candidate.type().revealer()
+                    || candidate.type().vanishes()
+                    || candidate.type().nonSolid()) {
+                continue;
+            }
+            int width = Math.max(1, candidate.type().tileWidth());
+            int height = Math.max(1, candidate.type().tileHeight());
+            if (x < candidate.tileX() || x >= candidate.tileX() + width
+                    || y < candidate.tileY()
+                    || y >= candidate.tileY() + height) {
+                continue;
+            }
+            if (candidate.order() != Unit.Order.HARVEST
+                    || candidate.returningToDepot()
+                    || candidate.resourceUnit() != target
+                    || candidate.carrying() != UnitType.Resource.GOLD
+                    || !candidate.isMoving()
+                    || candidate.pathLength() != 0
+                    || !candidate.routeSpent()
+                    || candidate.battleNetCollisionCounter() != 0) {
+                return false;
+            }
+            found = true;
+        }
+        if (!found) {
+            return false;
+        }
+        long fixedBlocking = worker.blockingFlags()
+                & ~(TileFlag.LAND_UNIT | TileFlag.AIR_UNIT
+                        | TileFlag.SEA_UNIT);
+        boolean fixedFree = world.map().isFootprintFree(x, y, 1, 1,
+                worker.movementMask(), fixedBlocking);
+        String traced = System.getenv("CHONKCRAFT_TRACE_BNE_PATH");
+        if (fixedFree && traced != null && !traced.isBlank()
+                && worker.id() == Integer.parseInt(traced.trim())) {
+            System.err.printf("JBNEGOLDSKIRTYIELD cycle=%d unit=%d target=%d"
+                            + " at=%d,%d%n",
+                    world.cycle(), worker.id(), target.id(), x, y);
+        }
+        return fixedFree;
     }
 
 

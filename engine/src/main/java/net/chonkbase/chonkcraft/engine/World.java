@@ -4134,6 +4134,7 @@ public final class World {
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
         unit.setBattleNetSpatialHitHelpHandoff(false);
+        unit.setBattleNetRangedCloseHitHelpWallFace(false);
         unit.setBattleNetAttackRefusalRecoveryStage(0);
         unit.setBattleNetPaidRefusalRecoveryApproach(false);
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
@@ -5105,6 +5106,12 @@ public final class World {
      * (78,9).</p>
      */
     int[] battleNetSpreadUnitGoal(Unit unit, int goalX, int goalY) {
+        return battleNetSpreadUnitGoal(unit, goalX, goalY, 1, 1);
+    }
+
+    /** SpreadUnit variant whose free ray must admit the mover's footprint. */
+    int[] battleNetSpreadUnitGoal(Unit unit, int goalX, int goalY,
+            int footprintWidth, int footprintHeight) {
         if (unit == null || unit.type() == null
                 || !map.contains(unit.tileX(), unit.tileY())
                 || !map.contains(goalX, goalY)
@@ -5143,7 +5150,9 @@ public final class World {
             boolean sameComponent = !requiresComponent
                     || component[x + y * map.width()];
             boolean free = sameComponent
-                    && map.isFootprintFree(x, y, 1, 1,
+                    && map.isFootprintFree(x, y,
+                            Math.max(1, footprintWidth),
+                            Math.max(1, footprintHeight),
                             unit.movementMask(), unit.blockingFlags());
             if (free) {
                 return new int[] {x + lastStepX, y + lastStepY};
@@ -5768,10 +5777,104 @@ public final class World {
         }
         PathFinder.Path tipPath = battleNetDiagonalPreferPath(
                 worker, captured, goalX, goalY);
+        tipPath = battleNetForestBoundaryInteriorAxialTip(
+                worker, tipPath, goalX, goalY);
         if (pathDiagonalCount(tipPath) > pathDiagonalCount(endpointPack)) {
             return tipPath;
         }
         return endpointPack;
+    }
+
+    /**
+     * Keeps a forest approach on the interior face before using a map-edge
+     * diagonal corner.
+     *
+     * <p>Human 12 peon 1571 approaches tree 105,0 through blocked goal
+     * 104,1. The ordinary maximum-diagonal tip is the boundary corner 103,0,
+     * but native first seals {@code NE,NE,NE,NE,E} onto the free interior
+     * west face 103,1. When that face is occupied at fixture 228, the next
+     * search is allowed to fall back to the corner. Restricting the override
+     * to a boundary diagonal tip preserves ordinary interior forest and
+     * building-tip preferences.</p>
+     */
+    private PathFinder.Path battleNetForestBoundaryInteriorAxialTip(
+            Unit worker, PathFinder.Path selected, int goalX, int goalY) {
+        if (selected == null || selected.length() == 0) {
+            return selected;
+        }
+        int selectedX = worker.tileX();
+        int selectedY = worker.tileY();
+        for (int index = selected.length() - 1; index >= 0; index--) {
+            int heading = selected.headings()[index];
+            selectedX += Direction.deltaX(heading);
+            selectedY += Direction.deltaY(heading);
+        }
+        boolean boundary = selectedX == 0 || selectedY == 0
+                || selectedX == map.width() - 1
+                || selectedY == map.height() - 1;
+        if (!boundary
+                || Math.abs(selectedX - goalX) != 1
+                || Math.abs(selectedY - goalY) != 1) {
+            return selected;
+        }
+
+        int[][] axialTips = {
+            {goalX - 1, goalY}, {goalX + 1, goalY},
+            {goalX, goalY - 1}, {goalX, goalY + 1},
+        };
+        java.util.List<Integer> bestForward = null;
+        int bestDiagonals = -1;
+        int bestLength = Integer.MAX_VALUE;
+        for (int[] tip : axialTips) {
+            int endX = tip[0];
+            int endY = tip[1];
+            if (!map.contains(endX, endY)
+                    || endX == 0 || endY == 0
+                    || endX == map.width() - 1
+                    || endY == map.height() - 1
+                    || !battleNetDiagonalPackEnter(worker, endX, endY)) {
+                continue;
+            }
+            int x = worker.tileX();
+            int y = worker.tileY();
+            java.util.List<Integer> forward = new java.util.ArrayList<>();
+            int diagonals = 0;
+            boolean blocked = false;
+            while ((x != endX || y != endY) && forward.size() < 20) {
+                int dx = Integer.signum(endX - x);
+                int dy = Integer.signum(endY - y);
+                int nx = x + dx;
+                int ny = y + dy;
+                if (!battleNetDiagonalPackEnter(worker, nx, ny)) {
+                    blocked = true;
+                    break;
+                }
+                if (dx != 0 && dy != 0) {
+                    diagonals++;
+                }
+                forward.add(Direction.fromDelta(dx, dy));
+                x = nx;
+                y = ny;
+            }
+            if (blocked || forward.isEmpty() || x != endX || y != endY) {
+                continue;
+            }
+            if (diagonals > bestDiagonals
+                    || (diagonals == bestDiagonals
+                            && forward.size() < bestLength)) {
+                bestDiagonals = diagonals;
+                bestLength = forward.size();
+                bestForward = forward;
+            }
+        }
+        if (bestForward == null || bestForward.isEmpty()) {
+            return selected;
+        }
+        int[] reversed = new int[bestForward.size()];
+        for (int i = 0; i < bestForward.size(); i++) {
+            reversed[bestForward.size() - 1 - i] = bestForward.get(i);
+        }
+        return new PathFinder.Path(PathFinder.Result.FOUND, reversed);
     }
 
     /** How many diagonal headings a stack-stored route carries. */
@@ -5966,7 +6069,11 @@ public final class World {
                     && unit.resourceTileY() >= 0
                     && !unit.isMoving()
                     && unit.pathLength() == 0
-                    && unit.stepDrained();
+                    && unit.stepDrained()
+                    // Collision five has paid for a fresh wall generation.
+                    // XHuman 12 peon 1376 may therefore use the south square
+                    // its allied predecessor has just vacated on fixture 220.
+                    && !unit.battleNetSaturatedWoodCornerLadder();
             AiPlayer pointOrderAi = ais.get(unit.player());
             boolean preserveVacatedPatrolSquare =
                     unit.order() == Unit.Order.PATROL
@@ -6822,10 +6929,13 @@ public final class World {
                                     optimizationSoftBlockers, x, y);
             boolean saturatedResidualFace =
                     unit.battleNetSaturatedResidualFaceRetry();
+            boolean rangedCloseHitWallFace =
+                    unit.battleNetRangedCloseHitHelpWallFace();
             boolean sharedSaturatedWall = forceSharedWallBuffer
                     || (saturatedResidualFace
                             && unit.battleNetCollisionCounter() >= 5);
-            boolean reverseWallFace = saturatedResidualFace;
+            boolean reverseWallFace = saturatedResidualFace
+                    || rangedCloseHitWallFace;
             PathFinder.Path path = BattleNetPathFinder.find(
                     unit.tileX(), unit.tileY(), goalX, goalY,
                     battleNetMovementStride(unit), traversalPassability,
@@ -6853,7 +6963,7 @@ public final class World {
                                     || (y >= targetTop && y <= targetBottom)),
                     true, false, false, preferMarkedWallOnTie,
                     sharedSaturatedWall, reverseWallFace,
-                    retainPaidBandWallFace);
+                    retainPaidBandWallFace || rangedCloseHitWallFace);
             String tracedVariants = System.getenv(
                     "CHONKCRAFT_TRACE_BNE_PATH_VARIANTS");
             if (tracedVariants != null
@@ -10132,6 +10242,7 @@ public final class World {
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
         unit.setBattleNetSpatialHitHelpHandoff(false);
+        unit.setBattleNetRangedCloseHitHelpWallFace(false);
         unit.setBattleNetAttackRefusalRecoveryStage(0);
         unit.setBattleNetPaidRefusalRecoveryApproach(false);
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
@@ -10670,6 +10781,19 @@ public final class World {
                                     personLandDirectHitHelp);
                             unit.setBattleNetSpatialHitHelpHandoff(
                                     personNavalHelp || !isPerson(owner));
+                            // A close projectile offer is neither ordinary
+                            // person spatial help nor direct-body HitUnit.
+                            // Its first route keeps native's first successful
+                            // clockwise wall face (XHuman 12 footman 1477).
+                            boolean rangedCloseHitWallFace = personLandHelp
+                                    && closeHitHelp
+                                    && activeOrderStillBoundary
+                                    && unit.type() != null
+                                    && unit.type().maxAttackRange() <= 1
+                                    && helpTarget.type() != null
+                                    && helpTarget.type().maxAttackRange() > 1;
+                            unit.setBattleNetRangedCloseHitHelpWallFace(
+                                    rangedCloseHitWallFace);
                             unit.setBattleNetOrderDelay(3);
                             // First chase path after person help may prefer
                             // an equal-cost goal-axis diagonal onto a lead
@@ -11144,6 +11268,15 @@ public final class World {
 
     /** Ends a fight and restores the patrol or exploration it interrupted. */
     void finishAttackOrder(Unit unit) {
+        finishAttackOrder(unit, false);
+    }
+
+    /** Ends an attack while retaining PathFinderOutput on the unit. */
+    void finishAttackOrderPreservingPath(Unit unit) {
+        finishAttackOrder(unit, true);
+    }
+
+    private void finishAttackOrder(Unit unit, boolean preservePath) {
         // A presentation frame may have drawn a mobile weapon at the muzzle
         // before retail opcode ten constructs it. That placeholder belongs to
         // this attack order, not to the unit or the global missile list. When
@@ -11163,6 +11296,7 @@ public final class World {
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
         unit.setBattleNetSpatialHitHelpHandoff(false);
+        unit.setBattleNetRangedCloseHitHelpWallFace(false);
         unit.setBattleNetAttackRefusalRecoveryStage(0);
         unit.setBattleNetPaidRefusalRecoveryApproach(false);
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
@@ -11185,7 +11319,7 @@ public final class World {
         // temporary unit goal restores that same position without touching
         // its route. level11o carries the surviving tail from cycle 419 to
         // its turn at cycle 435.
-        if (unit.savedOrder() == null) {
+        if (!preservePath && unit.savedOrder() == null) {
             unit.clearPath();
         }
         unit.setTarget(null);
@@ -12200,7 +12334,16 @@ public final class World {
             // emptied the route at 130 and left the attacker parked until 145.
             if (liveOfferedRoute
                     && !unit.battleNetAttackWrapDestArmPending()
-                    && !unit.chasing() && path.length() > 2) {
+                    && !unit.chasing() && path.length() > 2
+                    && target.type() != null
+                    && !target.type().building()) {
+                // The two-byte dest-arm leftover is the mobile-quarry form.
+                // A standing offer aimed at a building retains the bounded
+                // footprint route written by the wall tracer: XHuman 2 ogre
+                // 1549 stores S,S,SW,W toward the guard tower on fixture 196
+                // and consumes the cached west tail on fixture 232. Truncating
+                // that buffer after two south bytes forced a fresh long route
+                // whose second step was south-west.
                 path = keepBattleNetDestArmLeftoverHeadings(path);
             }
         }
@@ -12209,6 +12352,10 @@ public final class World {
             // mid-Move brother (XHuman 10 knight 1493 SW onto 1489).
             path = preferBattleNetGoalAxisFirstHeading(unit, path, target);
             unit.setBattleNetPersonHelpFirstChase(false);
+        }
+        if (path.length() > 0
+                && unit.battleNetRangedCloseHitHelpWallFace()) {
+            unit.setBattleNetRangedCloseHitHelpWallFace(false);
         }
         unit.setPath(path);
         if (path.length() == 0) {
@@ -14087,6 +14234,39 @@ public final class World {
             restartBattleNetArmedPatrol(unit);
             return;
         }
+        // A recurring behaviour-four ray can spend a saturated cardinal
+        // prefix on the skirt of its literal point.  That is not the same
+        // completion as a one-byte collision detour: retail asks NewPath on
+        // the landing visit and commits the final free cardinal stride.
+        // XOrc 8 rider 1550 exhausts S,S,S on (2,16) for point (0,16), then
+        // draws and cold-commits W on fixture 230.  Treating every point
+        // within one doubled stride as complete left it Still on (2,16).
+        int flyerPointDx = Math.abs(
+                unit.tileX() - unit.orderTargetX());
+        int flyerPointDy = Math.abs(
+                unit.tileY() - unit.orderTargetY());
+        boolean saturatedCardinalFlyerSkirt = residualSettledThisVisit
+                && unit.order() == Unit.Order.PATROL
+                && battleNetArmedFlyerPatrol(unit)
+                && unit.battleNetScoutPatrol()
+                && unit.battleNetFlyerScoutExhausted()
+                && unit.battleNetAiBehavior() != 2
+                && unit.pathLength() == 0
+                && unit.battleNetPathStepsTaken() > 1
+                && (flyerPointDx == 0 || flyerPointDy == 0)
+                && Math.max(flyerPointDx, flyerPointDy)
+                        == battleNetMovementStride(unit)
+                && canEnter(unit,
+                        unit.orderTargetX(), unit.orderTargetY());
+        if (saturatedCardinalFlyerSkirt) {
+            unit.setRouteSpent(false);
+            unit.setWaitCycles(0);
+            unit.animation().clearCurrent();
+            movement.walkTowards(
+                    unit, unit.orderTargetX(), unit.orderTargetY());
+            armBattleNetPatrolMoveBody(unit);
+            return;
+        }
         // A behaviour-four aircraft's random point is a one-shot scout leg,
         // not the far end of an ordinary back-and-forth Patrol. Once its last
         // route byte and committed pixels are spent, native installs Still on
@@ -14370,7 +14550,7 @@ public final class World {
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(2);
-                restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
+                restartBattleNetPatrolAfterEndpointSwap(unit);
                 return;
             }
         }
@@ -14453,10 +14633,40 @@ public final class World {
                 && unit.type().moveType() == UnitType.Movement.LAND
                 && unit.isMoving() && unit.pathLength() == 0
                 && unit.routeSpent();
+        boolean paidSmallWarshipBlockedRouteWake = false;
+        if (battleNetArmedSmallWarshipPatrol(unit)
+                && !unit.isMoving() && unit.pathLength() > 0
+                && unit.battleNetOrderDelay() == 0
+                && unit.battleNetAnimationTimer() == 1
+                && unit.battleNetRefusals() >= 8) {
+            int heading = unit.peekHeading();
+            int stride = battleNetMovementStride(unit);
+            int nextX = unit.tileX()
+                    + Direction.deltaX(heading) * stride;
+            int nextY = unit.tileY()
+                    + Direction.deltaY(heading) * stride;
+            paidSmallWarshipBlockedRouteWake =
+                    !canEnter(unit, nextX, nextY);
+            if (paidSmallWarshipBlockedRouteWake) {
+                // A complete cooperative band reuses its cached head when the
+                // square has opened (XOrc 8 destroyer 164 at fixture 106).
+                // If that head is still occupied, however, the timer-one wake
+                // asks NewPath and replaces the route before moving. Native
+                // destroyer 1431 wakes on fixture 232 with NW still held by a
+                // sibling, writes N,NW and commits N; retrying stale NW opened
+                // a second fifteen-count band and left Java on 94,82.
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+            }
+        }
         // Through walkTowards, which is the only thing that may step a unit:
         // stepMove reads the order it is given, so a patrolling unit has to
         // borrow the move order for the duration of the step and give it back.
         movement.walkTowards(unit, unit.orderTargetX(), unit.orderTargetY());
+        if (paidSmallWarshipBlockedRouteWake && unit.isMoving()) {
+            armBattleNetPatrolMoveBody(unit);
+        }
         if (spentLandPatrolResidual
                 && unit.order() == Unit.Order.PATROL
                 && !unit.isMoving() && unit.pathLength() == 0
@@ -14497,7 +14707,7 @@ public final class World {
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(2);
-                restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
+                restartBattleNetPatrolAfterEndpointSwap(unit);
                 return;
             }
         }
@@ -14546,8 +14756,6 @@ public final class World {
         if (!unit.battleNetDoubleStep() || unit.type() == null
                 || !unit.type().seaUnit()
                 || !map.contains(unit.orderTargetX(), unit.orderTargetY())
-                || !battleNetNavalRewriteOpenWater(
-                        unit.orderTargetX(), unit.orderTargetY())
                 || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
                         Math.abs(unit.tileY() - unit.orderTargetY())) > 1) {
             return false;
@@ -14557,8 +14765,20 @@ public final class World {
         // coordinates never become equal. Native uses the point pathfinder's
         // REACHED result as Patrol arrival: XHuman 8 destroyer 1480 settles
         // on 40,84 for endpoint 41,85, exchanges endpoints on fixture 108,
-        // and takes the west leg on 111. Literal equality instead paid
-        // PF_WAIT 10 and retried the impossible odd-grid point forever.
+        // and takes the west leg on 111. The same answer applies to a naval
+        // ready point rewritten onto a shore-building footprint: XOrc 8
+        // destroyer 1435 spends seven route bytes, lands on 88,74 beside
+        // 88,73, and swaps to its 115,53 return point on fixture 231. Limiting
+        // the REACHED query to open-water goals misclassified that landing as
+        // an empty-route patrol failure and installed Still. The genuinely
+        // failed XOrc 11 shipyard case remains two tiles from its point and is
+        // rejected by the one-tile hull gate above.
+        if (!battleNetNavalRewriteOpenWater(
+                    unit.orderTargetX(), unit.orderTargetY())
+                && unit.routeSpent()
+                && unit.battleNetPathStepsTaken() > 0) {
+            return true;
+        }
         PathFinder.Path path = findBattleNetPointPath(unit,
                 unit.orderTargetX(), unit.orderTargetY());
         return path.result() == PathFinder.Result.REACHED;
@@ -16024,6 +16244,19 @@ public final class World {
             unit.setBattleNetSequenceOffset(still);
             unit.setBattleNetAnimationTimer(3);
         }
+    }
+
+    /** Restarts the binary constructor owned by a Patrol endpoint exchange. */
+    private void restartBattleNetPatrolAfterEndpointSwap(Unit unit) {
+        if (battleNetArmedSmallWarshipPatrol(unit)) {
+            // Small armed warships are not standing-capital cursors, but an
+            // endpoint exchange still constructs the next Patrol leg at the
+            // Still head. XOrc 8 destroyer 1435 swaps 88,73 for 115,53 on
+            // fixture 231 and exposes 3129/3 before writing its new route.
+            restartBattleNetArmedPatrol(unit);
+            return;
+        }
+        restartBattleNetCapitalPatrolAfterEndpointSwap(unit);
     }
 
     /**

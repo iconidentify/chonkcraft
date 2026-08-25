@@ -178,6 +178,31 @@ class BattleNetIdleAttackTest {
     }
 
     @Test
+    @DisplayName("siege active-order Still callbacks never draw idle random")
+    void siegeActiveOrderStillCallbacksNeverDrawIdleRandom() {
+        GameMap map = new GameMap(16, 16, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        Unit ballista = world.createUnit(fighter("unit-ballista", 50),
+                0, 4, 4);
+        Unit catapult = world.createUnit(fighter("unit-catapult", 50),
+                1, 8, 8);
+        assertNotNull(ballista);
+        assertNotNull(catapult);
+
+        int seedBefore = world.battleNetRandomSeed();
+        world.idle.advanceBattleNetActiveOrderIdleRandom(ballista);
+        world.idle.advanceBattleNetActiveOrderIdleRandom(catapult);
+
+        assertEquals(seedBefore, world.battleNetRandomSeed(),
+                "ballistae and catapults use the non-random siege Still arm");
+    }
+
+    @Test
     @DisplayName("BNE naval units acquire targets when their idle countdown fires")
     void navalUnitUsesTheNativeIdleTargetScan() {
         GameMap map = new GameMap(24, 24, new Tileset());

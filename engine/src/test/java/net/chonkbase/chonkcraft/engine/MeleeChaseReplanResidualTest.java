@@ -1101,8 +1101,9 @@ class MeleeChaseReplanResidualTest {
                 "residual-settled pathn1 free-compass must quiet one visit");
         assertEquals(20, chaser.tileY(),
                 "residual-settled pathn1 free-compass must quiet one visit");
-        assertEquals(1, chaser.pathLength(),
-                "must install free N leftover; pathn=" + chaser.pathLength());
+        assertTrue(chaser.pathLength() > 1,
+                "free N must head a retained replacement buffer; pathn="
+                        + chaser.pathLength());
         assertEquals(north, chaser.peekHeading(),
                 "free-compass first free neighbour is N; heading="
                         + chaser.peekHeading());

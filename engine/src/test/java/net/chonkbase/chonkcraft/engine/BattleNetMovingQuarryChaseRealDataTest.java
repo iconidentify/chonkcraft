@@ -397,6 +397,103 @@ class BattleNetMovingQuarryChaseRealDataTest {
                 "the already-paid construction hands directly to Move body");
     }
 
+    @Test
+    void adjacentExpiredQuarryHandoffsKeepTheirNativeSchedulerOrder() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit native1505 = unitById(world, 95);
+        Unit native1513 = unitById(world, 87);
+        assertNotNull(native1505);
+        assertNotNull(native1513);
+
+        while (fixtureCycle(world) < 223) {
+            mission.tick();
+        }
+        assertChaser(native1505, 76, 62, 0, 0, false);
+        assertEquals(2657, native1505.battleNetSequenceOffset());
+        assertEquals(3, native1505.battleNetAnimationTimer(),
+                "slot 1505's replacement quarry opens fresh construction");
+        assertChaser(native1513, 76, 63, 0, 0, false);
+        assertEquals(2657, native1513.battleNetSequenceOffset());
+        assertEquals(1, native1513.battleNetAnimationTimer());
+
+        mission.tick();
+        assertChaser(native1505, 76, 62, 0, 0, false);
+        assertEquals(2657, native1505.battleNetSequenceOffset());
+        assertEquals(2, native1505.battleNetAnimationTimer());
+        assertChaser(native1513, 77, 62, -32, 32, true);
+        assertEquals(2603, native1513.battleNetSequenceOffset());
+        assertEquals(1, native1513.battleNetAnimationTimer());
+        assertEquals(2, native1513.pathLength(),
+                "Java removes the committed NE head from native's NE,E,E buffer");
+    }
+
+    @Test
+    void aMovingQuarryResidualReopensAttackBeforeTheCachedEastStep() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        Unit attacker = unitById(mission.world(), 80);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1520");
+
+        while (fixtureCycle(mission.world()) < 229) {
+            mission.tick();
+        }
+        assertChaser(attacker, 75, 63, -2, 2, true);
+        assertEquals(3, attacker.pathLength());
+        assertEquals(2652, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(230, fixtureCycle(mission.world()));
+        assertChaser(attacker, 75, 63, 0, 0, false);
+        assertEquals(3, attacker.pathLength(),
+                "Attack construction retains the east-led quarry route");
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+
+        while (fixtureCycle(mission.world()) < 232) {
+            mission.tick();
+        }
+        assertChaser(attacker, 75, 63, 0, 0, false);
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertChaser(attacker, 76, 63, -32, 0, true);
+        assertEquals(2, attacker.pathLength());
+        assertEquals(2603, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
     private static Unit unitAt(World world, int player, String ident,
             int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {

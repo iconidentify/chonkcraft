@@ -860,6 +860,10 @@ public final class LoadGame {
             unit.setBattleNetSaturatedWallFacePairParked(
                     truthy(state.rawGet("saturatedWallFacePairParked")));
         }
+        if (state.rawGet("saturatedWoodCornerLadder") != null) {
+            unit.setBattleNetSaturatedWoodCornerLadder(
+                    truthy(state.rawGet("saturatedWoodCornerLadder")));
+        }
         if (state.rawGet("saturatedRetargetRouteBand") != null) {
             unit.setBattleNetSaturatedRetargetRouteBand(
                     truthy(state.rawGet("saturatedRetargetRouteBand")));
@@ -923,6 +927,10 @@ public final class LoadGame {
         if (state.rawGet("spatialHitHelpHandoff") != null) {
             unit.setBattleNetSpatialHitHelpHandoff(
                     truthy(state.rawGet("spatialHitHelpHandoff")));
+        }
+        if (state.rawGet("rangedCloseHitHelpWallFace") != null) {
+            unit.setBattleNetRangedCloseHitHelpWallFace(
+                    truthy(state.rawGet("rangedCloseHitHelpWallFace")));
         }
         if (state.rawGet("landPatrolAttackRoutePending") != null) {
             unit.setBattleNetLandPatrolAttackRoutePending(

@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -49,6 +50,39 @@ class Human13Ogre1501ParkedRefusalRealDataTest {
                 "the fresh native wall face starts east");
         assertEquals(4, ogre.pathLength(),
                 "east consumes one byte from the native five-heading refill");
+
+        for (int fixture = 179; fixture <= 225; fixture++) {
+            mission.tick();
+        }
+        assertSame(knight, ogre.target(),
+                "the mature paid tail still names knight 1493 at fixture 225");
+        assertEquals(true, knight.isDying(),
+                "knight 1493 is already dying before the residual settles");
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(123, ogre.tileX());
+        assertEquals(30, ogre.tileY());
+        assertEquals(2, ogre.offsetX());
+        assertEquals(-2, ogre.offsetY());
+        assertEquals(1, ogre.pathLength(),
+                "only the retained west byte remains after four paid headings");
+        assertEquals(4, ogre.battleNetPathStepsTaken());
+        assertEquals(3, ogre.battleNetCollisionCounter());
+        assertEquals(1, ogre.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, ogre.order(),
+                "the dying quarry releases Attack when the residual settles");
+        assertNull(ogre.target(),
+                "EndActionAttack clears the invalid CUnitPtr");
+        assertEquals(123, ogre.tileX(),
+                "fixture 226 must not replan north toward the dying knight");
+        assertEquals(30, ogre.tileY());
+        assertEquals(0, ogre.offsetX());
+        assertEquals(0, ogre.offsetY());
+        assertEquals(1, ogre.pathLength(),
+                "EndActionAttack preserves the remaining route byte");
+        assertEquals(581, ogre.battleNetSequenceOffset());
+        assertEquals(3, ogre.battleNetAnimationTimer());
     }
 
     private static Unit unitById(World world, int id) {

@@ -51,6 +51,38 @@ class Xhuman02OgreRouteRefillRealDataTest {
         assertEquals(62, northOgre.tileY());
     }
 
+    @Test
+    @DisplayName("xhuman 2's east ogre keeps the cached west chase tail at cycle 232")
+    void xhuman2EastOgreKeepsCachedWestChaseTailAtCycle232() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx02h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 2 is not in the pack");
+        World world = mission.world();
+        Unit ogre = unitById(world, 51);
+        assertNotNull(ogre, "XHuman 2 has no Java twin for native ogre 1549");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 231) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(66, ogre.tileX());
+        assertEquals(59, ogre.tileY());
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(65, ogre.tileX());
+        assertEquals(59, ogre.tileY(),
+                "native's fourth cached chase byte is west, not south-west");
+    }
+
     private static Unit unitById(World world, int id) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.id() == id) {

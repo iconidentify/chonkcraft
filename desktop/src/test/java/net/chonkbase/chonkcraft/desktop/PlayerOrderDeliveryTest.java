@@ -127,6 +127,12 @@ class PlayerOrderDeliveryTest {
         Unit site = make(scene, "unit-farm", 1, 16, 12);
         site.setOrder(Unit.Order.UNDER_CONSTRUCTION);
         site.setHitPoints(80);
+        // This is a command-delivery/combat fixture, not a construction-rate
+        // fixture. Keep its authored 80-HP frame from entering the ordinary
+        // construction completion path: a hand-made site has no progress
+        // goal, so its first Built callback would otherwise treat progress
+        // zero as complete and refill it to the farm's full 400 HP.
+        site.setBattleNetOrderDelay(10_000);
         Unit builder = make(scene, "unit-peon", 1, 15, 17);
         scene.world().restoreContained(builder, site, false, Unit.Order.STILL);
 
@@ -171,7 +177,13 @@ class PlayerOrderDeliveryTest {
                             && !event.named() && "dead".equals(event.event()));
             destroyed = !site.isAlive();
         }
-        assertTrue(destroyed, "a mixed BNE squad could not destroy the construction site");
+        assertTrue(destroyed, () -> "a mixed BNE squad could not destroy the "
+                + "construction site; hp=" + site.hitPoints() + " squad="
+                + squad.stream().map(unit -> unit.id() + ":"
+                        + unit.type().ident() + "@" + unit.tileX() + ","
+                        + unit.tileY() + "/" + unit.order() + "/target="
+                        + (unit.target() == null ? -1 : unit.target().id()))
+                        .toList());
         assertEquals(squad.size(), engaged.size(),
                 "one or more queued group members never entered Attack");
         assertTrue(siteDeathAnnounced,

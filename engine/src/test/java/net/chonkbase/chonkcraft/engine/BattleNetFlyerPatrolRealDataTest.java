@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -205,6 +206,23 @@ class BattleNetFlyerPatrolRealDataTest {
         assertEquals(1, rider.pathLength(),
                 "one final south byte remains in the three-byte wall route");
         assertEquals(4, rider.peekHeading());
+
+        tickThrough(mission, 230);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "the recurring scout must retain Patrol through its literal point");
+        assertEquals(0, rider.tileX(),
+                "the landing callback commits the final west doubled stride");
+        assertEquals(16, rider.tileY());
+        assertEquals(Direction.fromDelta(-1, 0), rider.lastStepHeading(),
+                "the replacement path commits west, not another south leg");
+        assertEquals(2259, rider.battleNetSequenceOffset());
+        assertEquals(1, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 231);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "the literal-point stride remains Patrol while its pixels drain");
+        assertEquals(0, rider.tileX());
+        assertEquals(16, rider.tileY());
     }
 
     @Test

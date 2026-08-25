@@ -134,6 +134,39 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 9 loaded peon pays the eighth direct-return refusal band")
+    void anXHuman9LoadedPeonPaysTheEighthDirectReturnRefusalBand() {
+        Mission mission = mission("campaigns/human-exp/levelx09h");
+        Unit peon = mission.world().unitsSnapshot().stream()
+                .filter(unit -> unit.id() == 4)
+                .findFirst().orElse(null);
+        assertNotNull(peon, "native slot 1596 must remain paired with Java peon 4");
+
+        for (int cycle = 1; cycle <= 229; cycle++) {
+            mission.tick();
+        }
+        assertEquals(61, peon.tileX());
+        assertEquals(3, peon.tileY());
+        assertEquals(100, peon.carried());
+        assertEquals(8, peon.battleNetRefusals(),
+                "the occupied south ray reaches refusal eight on fixture 229");
+        assertEquals(14, peon.battleNetOrderDelay());
+
+        for (int cycle = 230; cycle <= 243; cycle++) {
+            mission.tick();
+            assertEquals(61, peon.tileX(),
+                    "the complete Move band holds through fixture " + cycle);
+            assertEquals(3, peon.tileY());
+        }
+        mission.tick();
+        assertEquals(Unit.Order.HARVEST, peon.order(),
+                "Java's unified resource order retains the loaded return leg");
+        assertEquals(61, peon.tileX());
+        assertEquals(4, peon.tileY(),
+                "native releases the cached south ray on fixture 244");
+    }
+
+    @Test
     @DisplayName("an XHuman 8 hall exit queues and pays its BNE watch-tower job")
     void anXHuman8HallExitQueuesAndPaysItsWatchTowerJob() {
         Mission mission = mission("campaigns/human-exp/levelx08h");

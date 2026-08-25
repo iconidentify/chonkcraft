@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -19,6 +20,59 @@ import org.junit.jupiter.api.Test;
 class Xhuman04OpeningCombatParityRealDataTest {
 
     private static final int INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("xhuman 4's completed melee body retargets before releasing Attack")
+    void xhuman4CompletedMeleeBodyRetargetsBeforeReleasingAttack() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        Unit footman = unitAt(world, "unit-footman", 72, 60);
+        Unit stationaryPeer = unitAt(world, "unit-footman", 72, 61);
+        Unit replacement = unitAt(world, "unit-grunt", 77, 61);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1518 footman");
+        assertNotNull(stationaryPeer,
+                "XHuman 4 has no native-slot-1498 footman");
+        assertNotNull(replacement, "XHuman 4 has no native-slot-1505 grunt");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 233) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, footman.order());
+        assertEquals(1, footman.type().maxAttackRange());
+        assertFalse(footman.battleNetStationaryAttack(),
+                "native action 12 must remain chase-capable at this boundary");
+        assertNotNull(footman.target());
+        assertTrue(footman.target().isDying(),
+                "fixture 233 must retain the dying incumbent through the swing body");
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, footman.order(),
+                "EndActionAttack must scan before releasing the invalid incumbent");
+        assertSame(replacement, footman.target(),
+                "fixture 234 selects native grunt 1505 at the east face");
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(3, footman.battleNetAnimationTimer(),
+                "the replacement opens native Attack construction 3,2,1");
+        assertEquals(72, footman.tileX());
+        assertEquals(60, footman.tileY());
+
+        mission.tick();
+        mission.tick();
+        assertEquals(Unit.Order.STILL, stationaryPeer.order(),
+                "stationary action 16 releases its dead quarry on fixture 236");
+        assertEquals(2477, stationaryPeer.battleNetSequenceOffset());
+        assertEquals(3, stationaryPeer.battleNetAnimationTimer());
+    }
 
     @Test
     @DisplayName("xhuman 4's melee loop restores its banked retaliation target")

@@ -145,6 +145,58 @@ class BattleNetSmallWarshipPatrolRealDataTest {
                 "a successful step does not clear the native sticky nibble");
     }
 
+    @Test
+    @DisplayName("XOrc 8's landing destroyer promotes the cycle-230 naval pass")
+    void xOrc8LandingDestroyerPromotesCycle230NavalPass() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 165);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1435");
+
+        tickThrough(mission, 230);
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(88, destroyer.tileX());
+        assertEquals(74, destroyer.tileY());
+
+        tickThrough(mission, 231);
+        assertEquals(Unit.Order.PATROL, destroyer.order(),
+                "the landing callback promotes the newly queued naval pass");
+        assertEquals(115, destroyer.orderTargetX());
+        assertEquals(53, destroyer.orderTargetY());
+        assertEquals(3129, destroyer.battleNetSequenceOffset());
+        assertEquals(3, destroyer.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("XOrc 8's paid destroyer route releases north on cycle 232")
+    void xOrc8PaidDestroyerRouteReleasesNorthOnCycle232() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 169);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1431");
+
+        tickThrough(mission, 231);
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(94, destroyer.tileX());
+        assertEquals(82, destroyer.tileY());
+
+        tickThrough(mission, 232);
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(94, destroyer.tileX());
+        assertEquals(80, destroyer.tileY(),
+                "timer-one wakes and commits the cached north heading");
+        assertEquals(3137, destroyer.battleNetSequenceOffset());
+        assertEquals(1, destroyer.battleNetAnimationTimer());
+    }
+
     private static Mission mission(GameData data) {
         Mission mission = data.loadMission(MAP,
                 GameData.personIn(data.campaignMap(MAP)), 1);
@@ -168,6 +220,15 @@ class BattleNetSmallWarshipPatrolRealDataTest {
                     && unit.tileX() == x && unit.tileY() == y
                     && unit.type() != null
                     && ident.equals(unit.type().ident())) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }
