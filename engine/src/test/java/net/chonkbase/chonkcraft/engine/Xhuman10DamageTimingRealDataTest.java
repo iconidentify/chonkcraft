@@ -491,10 +491,10 @@ class Xhuman10DamageTimingRealDataTest {
         // fixture 324 and commits SW from (82,90) with collision nibble zero.
         // Slot 1493's path writer then sees that action-three body as soft,
         // stores SW,NW,N, and collision-waits at (82,88) under Move 1874/15.
-        // The dead-quarry handoff leaves Java's historical refusal proxy on
-        // 1485 for committed-swing timing, but that retired generation must
-        // not turn the accepted mover back into a wall and select the free
-        // east face.
+        // The dead-quarry handoff clears Java's historical refusal proxy on
+        // 1485: native keeps the route generation in its collision nibble,
+        // and the retired Java-only proxy must not turn the accepted mover
+        // back into a wall and select the free east face.
         Unit southernKnight = unitById(world, 115);
         Unit northernKnight = unitById(world, 107);
         Unit axethrower = unitById(world, 104);
@@ -514,8 +514,8 @@ class Xhuman10DamageTimingRealDataTest {
             assertEquals(1, knight.battleNetAnimationTimer());
             assertEquals(0, knight.battleNetCollisionCounter());
         }
-        assertEquals(1, southernKnight.battleNetRefusals(),
-                "the committed swing still owns Java's historical timing proxy");
+        assertEquals(0, southernKnight.battleNetRefusals(),
+                "the retired Java-only refusal proxy must be cleared");
 
         mission.tick();
         assertEquals(81, southernKnight.tileX());

@@ -634,6 +634,11 @@ final class BattleNetConstructionSystem {
         if (stride > 1
                 || (worker.type().landUnit()
                         && worker.returningToDepot() && worker.carried() > 0)) {
+            if (stride == 1 && worker.type().landUnit()
+                    && worker.returningToDepot() && worker.carried() > 0) {
+                int[] edge = world.battleNetDepotEntryPoint(worker, target);
+                worker.setOrderTarget(edge[0], edge[1]);
+            }
             return world.findBattleNetTargetPath(worker, target);
         }
         world.setMovementFieldFlags(target, false);

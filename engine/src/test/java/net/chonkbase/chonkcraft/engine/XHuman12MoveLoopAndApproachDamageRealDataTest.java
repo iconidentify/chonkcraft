@@ -423,11 +423,14 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         Unit recoveryGrunt = unitById(world, 96);
         Unit formationMate = unitById(world, 105);
         Unit knight = unitById(world, 125);
+        Unit returningPeon = unitById(world, 46);
         assertNotNull(recoveryGrunt,
                 "XHuman 12 has no native-slot-1504 recovery grunt");
         assertNotNull(formationMate,
                 "XHuman 12 has no native-slot-1495 formation mate");
         assertNotNull(knight, "XHuman 12 has no paired knight");
+        assertNotNull(returningPeon,
+                "XHuman 12 has no native-slot-1554 returning peon");
 
         // Native slot 1504 has just drained a north step away from its quarry
         // at fixture 194. The paid recovery returns to the full route writer
@@ -462,6 +465,104 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 "native consumes SE and retains only the SW tail");
         assertEquals(Direction.fromDelta(-1, 1),
                 recoveryGrunt.peekHeading());
+
+        // The same paid generation later finishes a north residual at fixture
+        // 245 with collision four and no hard-refusal history. Retail's shared
+        // wall writer keeps its counter-clockwise opening byte and commits NW
+        // on 246; choosing the opposite face moves east and is the first
+        // full-fleet semantic divergence.
+        while (fixtureCycle(world) < 245) {
+            mission.tick();
+        }
+        assertEquals(31, recoveryGrunt.tileX());
+        assertEquals(40, recoveryGrunt.tileY());
+        assertEquals(4, recoveryGrunt.battleNetCollisionCounter());
+        assertEquals(0, recoveryGrunt.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(246, fixtureCycle(world));
+        assertEquals(30, recoveryGrunt.tileX(),
+                "the paid cardinal residual keeps native's northwest wall face");
+        assertEquals(39, recoveryGrunt.tileY());
+        assertEquals(Direction.fromDelta(-1, -1),
+                recoveryGrunt.lastStepHeading());
+        assertEquals(Direction.fromDelta(1, -1),
+                recoveryGrunt.peekHeading(),
+                "the retained route turns northeast after its northwest opening");
+
+        // On the next visit, native action 24 finishes this peon's committed
+        // northeast pixels just as its closest great-hall entry changes from
+        // (6,23) to (8,23). The old route tail belongs to the former point:
+        // retail parks it at cursor twenty and raises collision one on 247,
+        // then redraws and commits north on 248. Consuming Java's cached north
+        // on the settle visit is one semantic cycle early.
+        assertEquals(7, returningPeon.tileX());
+        assertEquals(29, returningPeon.tileY());
+        assertEquals(2, returningPeon.pathLength());
+        assertEquals(0, returningPeon.battleNetCollisionCounter());
+        assertEquals(6, returningPeon.orderTargetX());
+        assertEquals(23, returningPeon.orderTargetY());
+
+        mission.tick();
+        assertEquals(247, fixtureCycle(world));
+        assertEquals(7, returningPeon.tileX());
+        assertEquals(29, returningPeon.tileY(),
+                "the changed depot entry parks the stale tail for one visit");
+        assertEquals(0, returningPeon.pathLength());
+        assertEquals(1, returningPeon.battleNetCollisionCounter());
+        assertEquals(8, returningPeon.orderTargetX());
+        assertEquals(23, returningPeon.orderTargetY());
+
+        mission.tick();
+        assertEquals(248, fixtureCycle(world));
+        assertEquals(7, returningPeon.tileX());
+        assertEquals(28, returningPeon.tileY());
+        assertEquals(Direction.fromDelta(0, -1),
+                returningPeon.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("terrain wood wall route retains its doubled northeast turn")
+    void terrainWoodWallRouteRetainsItsDoubledNortheastTurn() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit woodPeon = unitById(world, 240);
+        assertNotNull(woodPeon, "XHuman 12 has no native-slot-1360 wood peon");
+
+        // A queued patrol opens the blocked tree route on fixture 200. The
+        // authenticated native buffer is W,NW,NE,NE,E,SE. Its fourth byte is
+        // not consumed until fixture 248, so substituting E,NE stays invisible
+        // for forty-eight cycles and then parks against the peon on (12,88).
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 200) {
+            mission.tick();
+        }
+
+        assertEquals(11, woodPeon.tileX());
+        assertEquals(90, woodPeon.tileY());
+        assertEquals(Direction.fromDelta(-1, 0),
+                woodPeon.lastStepHeading());
+        assertEquals(5, woodPeon.pathLength());
+        assertEquals(Direction.fromDelta(-1, -1),
+                woodPeon.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, -1),
+                woodPeon.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(1, -1),
+                woodPeon.peekHeadingAtDepth(2),
+                "retail keeps the second northeast before turning east");
+        assertEquals(Direction.fromDelta(1, 0),
+                woodPeon.peekHeadingAtDepth(3));
+        assertEquals(Direction.fromDelta(1, 1),
+                woodPeon.peekHeadingAtDepth(4));
     }
 
     private static int fixtureCycle(World world) {

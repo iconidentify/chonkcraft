@@ -1388,14 +1388,15 @@ public final class GameData {
             }
             placed++;
 
-            applyPudPlacementMetadata(made, entry);
+            applyPudPlacementMetadata(world, made, entry);
         }
         return placed;
     }
 
     /** Applies the non-positional fields wartool emits after CreateUnit. */
     private static void applyPudPlacementMetadata(
-            net.chonkbase.chonkcraft.engine.unit.Unit unit, PudMap.PudUnit entry) {
+            World world, net.chonkbase.chonkcraft.engine.unit.Unit unit,
+            PudMap.PudUnit entry) {
         // BNE's PUD loader: non-zero UNIT.Data subtracts the unit from the
         // AI-accounted family census (FUN_004175e0) and sets unit+0x5f bit 2.
         // The ready-pass uses the same marker on movable units to keep map
@@ -1404,6 +1405,7 @@ public final class GameData {
         unit.setBattleNetPudData(entry.data());
         if (entry.data() != 0 && unit.canMove()) {
             unit.setBattleNetReadySuppressed(true);
+            world.initializeBattleNetMapGuardHome(unit);
         }
 
         // How much the map says this mine or patch holds. The engine keeps a

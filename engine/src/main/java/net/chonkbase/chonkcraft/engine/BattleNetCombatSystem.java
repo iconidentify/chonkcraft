@@ -4977,12 +4977,27 @@ final class BattleNetCombatSystem {
                     // E on fixture 55 with collision one and route index 20,
                     // then plans S,SW,SW,SE on 56. Combining both visits let
                     // Java route around the moving ally and step SE at 55.
+                    boolean paidCollisionFourDeferredRefill =
+                            unit.battleNetPaidLongResidualRefill()
+                            && !world.actionMoveWalked
+                            && unit.stepDrained() && !unit.isMoving()
+                            && unit.battleNetChaseEmptyRouteReplan()
+                            && unit.battleNetCollisionCounter() == 4
+                            && unit.battleNetRefusals() == 0
+                            && unit.target() != null
+                            && unit.target().isAlive()
+                            && unit.target().type() != null
+                            && !unit.target().type().building()
+                            && unit.type() != null
+                            && unit.type().maxAttackRange() <= 1
+                            && !World.battleNetRangedChaseUnit(unit);
                     boolean paidCollisionFourImmediateRefill =
-                            world.actionMoveWalked
+                            (world.actionMoveWalked
                             && unit.stepDrained() && !unit.isMoving()
                             && unit.routeSpent()
                             && unit.battleNetCollisionCounter() == 4
-                            && unit.battleNetRefusals() == 0;
+                            && unit.battleNetRefusals() == 0)
+                            || paidCollisionFourDeferredRefill;
                     if (world.actionMoveWalked
                             && unit.stepDrained()
                             && !unit.isMoving()
@@ -5098,11 +5113,16 @@ final class BattleNetCombatSystem {
                         // ordinary optimized wall route.
                     } else if (paidCollisionFourImmediateRefill) {
                         // Preserve the already-paid moving-ally view and the
-                        // first wall face written into BNE's route buffer.
+                        // first wall face written into BNE's route buffer. The
+                        // deferred form is the same boundary split over two
+                        // callbacks: XHuman 12 grunt 1504 parks its blocked
+                        // nineteen-byte residual on fixture 245, then runs this
+                        // paid writer and consumes NW on 246.
                         // This is the formation-wide collision-four boundary,
                         // not a unit- or map-specific path exception.
                         world.planTowardsAfterRefusalBand(
                                 unit, chased, true);
+                        unit.setBattleNetPaidLongResidualRefill(false);
                     } else if (unit.battleNetRetargetResidualParkRefill()
                             && unit.battleNetRetargetResidualParkSteps() == 1
                             && (unit.battleNetCollisionCounter() == 1
@@ -5765,6 +5785,53 @@ final class BattleNetCombatSystem {
                         // knight (native 1489 / Java 111) is the sealed witness.
                         world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
                     }
+                    return;
+                }
+                Unit settledRetarget = unit.target();
+                boolean boxedBuildingRetargetAfterResidual =
+                        world.actionMoveWalked
+                        && chaseTargetBeforeWalk != null
+                        && settledRetarget != null
+                        && settledRetarget != chaseTargetBeforeWalk
+                        && settledRetarget.isAlive()
+                        && settledRetarget.type() != null
+                        && settledRetarget.type().building()
+                        && unit.type() != null
+                        && unit.type().maxAttackRange() <= 1
+                        && unit.battleNetAiBehavior() == 1
+                        && !unit.isMoving() && unit.pathLength() == 0
+                        && unit.stepDrained()
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0
+                        && unit.battleNetChaseReplanResidualHold()
+                        && !world.targets.inAttackRange(
+                                unit, settledRetarget)
+                        && !world.movement
+                                .battleNetHasStrictlyCloserFreeNeighbour(
+                                        unit, settledRetarget);
+                if (boxedBuildingRetargetAfterResidual) {
+                    // The last pixels of a live mobile-quarry route can settle
+                    // on the same callback whose chase-boundary target scan
+                    // replaces it with a building footprint. If every free compass square
+                    // fails to close footprint distance, retail enters the
+                    // active-order land-idle callback immediately and opens a
+                    // cold Attack 3,2,1 constructor with RI20. XHuman 12 slot
+                    // 1513 is the sealed witness: its SE residual lands at
+                    // (40,39), footman 1477 becomes tower 1485, and fixtures
+                    // 240/243/246/249 each pay 0040AD58 and expose 2539/3.
+                    // Keeping Java's generic PF_REACHED Move-start/1 sleep
+                    // omitted two draws before the fixture-249 melee roll.
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    unit.setBattleNetChaseStepReady(false);
+                    unit.setBattleNetChaseEmptyRouteReplan(true);
+                    unit.setBattleNetChaseReplanResidualHold(false);
+                    unit.setBattleNetColdNoProgressRefusalLoop(true);
+                    unit.setPathGoal(
+                            settledRetarget.tileX(), settledRetarget.tileY());
+                    rearmBattleNetHardRefusalAttack(unit);
                     return;
                 }
                 if (World.TRACE_MOVING != null
@@ -10815,7 +10882,6 @@ final class BattleNetCombatSystem {
                     && unit.battleNetChaseEmptyRouteReplan()
                     && boxedTarget != null && boxedTarget.isAlive()
                     && boxedTarget.type() != null
-                    && !boxedTarget.type().building()
                     && !world.targets.inAttackRange(unit, boxedTarget)
                     && !World.battleNetRangedChaseUnit(unit)
                     && !world.movement

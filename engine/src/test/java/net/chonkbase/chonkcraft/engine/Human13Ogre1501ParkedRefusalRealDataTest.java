@@ -83,6 +83,31 @@ class Human13Ogre1501ParkedRefusalRealDataTest {
                 "EndActionAttack preserves the remaining route byte");
         assertEquals(581, ogre.battleNetSequenceOffset());
         assertEquals(3, ogre.battleNetAnimationTimer());
+
+        for (int fixture = 227; fixture <= 248; fixture++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, ogre.order(),
+                "the native ogre remains parked through fixture 248");
+        assertEquals(123, ogre.tileX());
+        assertEquals(30, ogre.tileY());
+        assertEquals(true, ogre.hasBattleNetAiHome());
+        assertEquals(115, ogre.battleNetAiHomeX());
+        assertEquals(25, ogre.battleNetAiHomeY());
+        assertEquals(true, ogre.battleNetReadySuppressed(),
+                "UNIT.Data marker two remains present at the recurring beat");
+
+        mission.tick();
+        assertEquals(Unit.Order.MOVE, ogre.order(),
+                "the recurring behavior-one pass sends marker-two ogre 1501 home");
+        assertNull(ogre.target());
+        assertEquals(115, ogre.orderTargetX());
+        assertEquals(25, ogre.orderTargetY());
+        assertEquals(123, ogre.tileX(),
+                "the fixture-249 action marker constructs Move before stepping");
+        assertEquals(30, ogre.tileY());
+        assertEquals(581, ogre.battleNetSequenceOffset());
+        assertEquals(3, ogre.battleNetAnimationTimer());
     }
 
     private static Unit unitById(World world, int id) {

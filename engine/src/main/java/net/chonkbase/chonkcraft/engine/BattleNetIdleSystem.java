@@ -618,7 +618,10 @@ final class BattleNetIdleSystem {
      * reaches its action marker on the same beat, the Move becomes current
      * immediately. XHuman 12 slot 1363 is the authenticated boundary: it is
      * Still at (12,88), home (26,87), through fixture 198 and exposes Move
-     * construction on the fixture-199 player beat.</p>
+     * construction on the fixture-199 player beat. UNIT.Data only suppresses
+     * the creation-time ready callback; a marked behavior-one guard which has
+     * since chased away is eligible here. Human 13 ogre 1501 seals that arm:
+     * Still through fixture 248, Move toward 115,25 at fixture 249.</p>
      */
     void fireBattleNetLandRegroupPass() {
         List<Unit> ready = world.unitsSnapshot();
@@ -630,7 +633,6 @@ final class BattleNetIdleSystem {
                     || unit.battleNetAiBehavior() != 1
                     || !unit.battleNetMapPlaced()
                     || !unit.hasBattleNetAiHome()
-                    || unit.battleNetReadySuppressed()
                     || unit.type().moveType() != UnitType.Movement.LAND
                     || unit.type().building() || !unit.type().canAttack()
                     || unit.type().canGather()) {

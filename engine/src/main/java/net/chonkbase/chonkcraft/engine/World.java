@@ -3467,6 +3467,29 @@ public final class World {
         unit.setBattleNetAiHome(home[0], home[1]);
     }
 
+    /** Applies the native behavior-one home after PUD UNIT.Data is known. */
+    void initializeBattleNetMapGuardHome(Unit unit) {
+        if (unit == null || unit.type() == null
+                || unit.type().moveType() != UnitType.Movement.LAND
+                || unit.type().building() || !unit.type().canAttack()
+                || unit.type().canGather()) {
+            return;
+        }
+        // UNIT.Data is written immediately after CreateUnit. Marked land
+        // fighters do not retain the provisional AI-hall rendezvous selected
+        // during construction: native normalizes their now-occupied authored
+        // square through the same fixed free-square spiral. Human 13's sealed
+        // cycle-one state records this for every marked guard; ogre 1501 is at
+        // 116,25 with behavior-one home 115,25.
+        int[] home = battleNetNormalizeLandHome(unit.tileX(), unit.tileY(),
+                battleNetConnectivityCell(unit));
+        if (home == null) {
+            home = new int[] {unit.tileX(), unit.tileY()};
+        }
+        unit.setBattleNetAiBehavior(1);
+        unit.setBattleNetAiHome(home[0], home[1]);
+    }
+
     /** Native {@code 0x427830}, evaluated against the partial creation list. */
     private boolean battleNetHostileExistsAtCreation(Unit unit) {
         for (Unit candidate : units) {
@@ -5978,6 +6001,7 @@ public final class World {
             boolean preserveEmptyFailure,
             boolean autoForestFreePrefix) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
+        java.util.List<Unit> optimizerBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         boolean restoreWoodCorner = unit.order() == Unit.Order.HARVEST
                 && !unit.returningToDepot()
@@ -5999,7 +6023,17 @@ public final class World {
                     || candidate.isDying()) {
                 continue;
             }
+            boolean queuedRegroupConstruction = false;
             if (isAllied(unit.player(), candidate.player())) {
+                queuedRegroupConstruction = !candidate.isMoving()
+                        && candidate.battleNetAiBehavior() == 1
+                        && candidate.hasBattleNetAiHome()
+                        && candidate.order() == Unit.Order.STILL
+                        && candidate.hasBattleNetPendingMove()
+                        && candidate.battleNetPendingMoveX()
+                                == candidate.battleNetAiHomeX()
+                        && candidate.battleNetPendingMoveY()
+                                == candidate.battleNetAiHomeY();
                 boolean pendingRegroupConstruction = !candidate.isMoving()
                         && candidate.battleNetAiBehavior() == 1
                         && candidate.hasBattleNetAiHome()
@@ -6010,12 +6044,7 @@ public final class World {
                                         == candidate.battleNetAiHomeX()
                                 && candidate.orderTargetY()
                                         == candidate.battleNetAiHomeY())
-                            || (candidate.order() == Unit.Order.STILL
-                                && candidate.hasBattleNetPendingMove()
-                                && candidate.battleNetPendingMoveX()
-                                        == candidate.battleNetAiHomeX()
-                                && candidate.battleNetPendingMoveY()
-                                        == candidate.battleNetAiHomeY()));
+                            || queuedRegroupConstruction);
                 // Native 0x4500f0 clears the occupancy bit for an allied unit
                 // whose current animation is Move. Attack-sequence allies keep
                 // hard occupancy even while residual/path leftover makes
@@ -6046,6 +6075,15 @@ public final class World {
             }
             setMovementFieldFlags(candidate, false);
             softBlockers.add(candidate);
+            // A queued behaviour-one regroup has already had its occupancy
+            // cleared for this player pass, so native's 0x450350 shortcut
+            // writer shares the wall follower's soft view for that body.
+            // Ordinary moving allies remain hard to the optimizer. XHuman 12
+            // fixture 200 then swaps E+NE through the queued regroup on
+            // (12,87), sealing W,NW,NE,NE,E,SE instead of W,NW,NE,E,NE,SE.
+            if (!queuedRegroupConstruction) {
+                optimizerBlockers.add(candidate);
+            }
         }
         setMovementFieldFlags(unit, false);
         try {
@@ -6123,7 +6161,8 @@ public final class World {
                     };
             BattleNetPathFinder.Passability optimizationPassability =
                     (x, y) -> traversalPassability.canEnter(x, y)
-                            && !battleNetUnitOccupies(softBlockers, x, y);
+                            && !battleNetUnitOccupies(
+                                    optimizerBlockers, x, y);
             // Critter one-tile wanders must not invent a fallbackEscape side
             // step when the goal is under a building: XOrc 2's 1580 aims at
             // 29,21 (hall), native keeps an all-0xff route and returns to
@@ -6892,6 +6931,18 @@ public final class World {
                     && unit.battleNetAttackWrapDestArmPending()
                     && unit.battleNetCollisionCounter() == 0
                     && unit.battleNetRefusals() == 0;
+            // A paid long-route refill runs later in the same object pass as
+            // allied movers with larger object ids.  Those allies may already
+            // have committed their next tile in Java, but native's path view
+            // still contains their beginning-of-visit square until the pass
+            // ends.  XHuman 12 grunt 1490/Java 110 commits SW from (32,39)
+            // immediately before grunt 1504/Java 96 redraws its collision-four
+            // wall at fixture 246.  Keeping the old square solid makes the
+            // existing counter-clockwise wall continuation write NW,NE,E...
+            // exactly as the sealed route does; releasing it lets the tracer
+            // close a four-step loop and fall back to the wrong NE head.
+            boolean preserveVisitStartAllySquare =
+                    unit.battleNetPaidLongResidualRefill();
             int destArmSkirtPadding = goalPaddingOverride >= 0
                     ? goalPaddingOverride : battleNetMovementStride(unit);
             BattleNetPathFinder.Passability traversalPassability =
@@ -6911,8 +6962,12 @@ public final class World {
                                             ? map.isFootprintFree(x, y, 1, 1,
                                                     unit.movementMask(),
                                                     targetSkirtFixedBlocking)
-                                            : (!battleNetReservedMoveDestinationOccupies(
-                                                    reservedMoveBodies, x, y)
+                                            : ((!preserveVisitStartAllySquare
+                                                    || !movement
+                                                            .battleNetAllyJustVacated(
+                                                                    unit, x, y))
+                                                    && !battleNetReservedMoveDestinationOccupies(
+                                                            reservedMoveBodies, x, y)
                                                     && base.canEnter(x, y)));
                         }
 
@@ -6987,6 +7042,24 @@ public final class World {
                     true, false, false, preferMarkedWallOnTie,
                     sharedSaturatedWall, reverseWallFace,
                     retainPaidBandWallFace || rangedCloseHitWallFace);
+            if (unit.battleNetPaidLongResidualRefill()
+                    && unit.battleNetParkedRefusalHeading() >= 0
+                    && unit.battleNetParkedRefusalHeading() < Direction.COUNT) {
+                PathFinder.Path continued = BattleNetPathFinder
+                        .continueWallFace(
+                                unit.tileX(), unit.tileY(), goalX, goalY,
+                                unit.battleNetParkedRefusalHeading(), -1,
+                                battleNetMovementStride(unit),
+                                traversalPassability, optimizationPassability,
+                                (x, y) -> x >= targetLeft - goalPadding
+                                        && x <= targetRight + goalPadding
+                                        && y >= targetTop - goalPadding
+                                        && y <= targetBottom + goalPadding);
+                if (continued.result() == PathFinder.Result.FOUND
+                        && continued.length() > 0) {
+                    path = continued;
+                }
+            }
             String tracedVariants = System.getenv(
                     "CHONKCRAFT_TRACE_BNE_PATH_VARIANTS");
             if (tracedVariants != null

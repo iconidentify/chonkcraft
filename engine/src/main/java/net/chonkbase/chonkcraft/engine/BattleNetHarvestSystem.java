@@ -1706,8 +1706,7 @@ final class BattleNetHarvestSystem {
                 // that result without starting a swing or drawing RNG.
                 // XHuman 2 slot 1589 is the cycle-19 witness: re-aim on
                 // c19, standing tail wait 3/2/1, first swing on c22.
-                int[] found = world.findTerrainType(worker,
-                        worker.tileX(), worker.tileY(), 15);
+                int[] found = findClaimedWoodReplacement(worker);
                 if (found != null) {
                     world.combat.aimAt(worker, found);
                     worker.setBattleNetOrderDelay(2);
@@ -2460,7 +2459,7 @@ final class BattleNetHarvestSystem {
      * goal marker can consume the diagonal ray.</p>
      */
     /**
-     * Nearest forest tile in the eight-neighbour ring, or null.
+     * Nearest unclaimed forest tile in the eight-neighbour ring, or null.
      *
      * <p>Used when a wood free-prefix ends already adjacent to the mass so
      * the harvest order can re-aim without a ranged search that may miss
@@ -2471,7 +2470,18 @@ final class BattleNetHarvestSystem {
             int nx = x + Direction.deltaX(heading);
             int ny = y + Direction.deltaY(heading);
             MapField field = world.map.fieldOrNull(nx, ny);
-            if (field != null && field.isForest()) {
+            int index = nx + ny * world.map.width();
+            Unit claimant = field == null ? null
+                    : world.battleNetClaimedWood.get(index);
+            if (claimant != null && !isActiveWoodClaim(claimant, nx, ny)) {
+                // Java keeps the terrain flag and the native -2 -> -4 claim
+                // projection separately. Mirror FUN_0044df10 here as well as
+                // at StartGathering so an abandoned reservation does not hide
+                // a valid adjacent tree forever.
+                world.battleNetClaimedWood.remove(index);
+                claimant = null;
+            }
+            if (field != null && field.isForest() && claimant == null) {
                 return new int[] {nx, ny};
             }
         }
@@ -2860,8 +2870,10 @@ final class BattleNetHarvestSystem {
         // now, and let assignHarvester re-arm it only for the adjacent-tree
         // branch that actually needs the native path gate.
         worker.setBattleNetWoodReadyPathRequired(false);
-        int[] ordinary = findAiWoodFromCenter(
-                worker, connected, worker.tileX(), worker.tileY());
+        int maximum = (world.map.width() * 3) >> 2;
+        int[] ordinary = findBattleNetWoodFromCenter(
+                worker, connected, worker.tileX(), worker.tileY(), maximum,
+                false);
         if (!failedGoldReady || ordinary == null
                 || Math.max(Math.abs(ordinary[0] - worker.tileX()),
                         Math.abs(ordinary[1] - worker.tileY())) > 1) {
@@ -2875,18 +2887,35 @@ final class BattleNetHarvestSystem {
         // chooses (104,46), not the adjacent southern tree (104,47). Distant
         // fallbacks such as XHuman 12 retain the ordinary anchor-centred
         // result and route.
-        int[] shifted = findAiWoodFromCenter(
-                worker, connected, worker.tileX(), worker.tileY() - 1);
+        int[] shifted = findBattleNetWoodFromCenter(
+                worker, connected, worker.tileX(), worker.tileY() - 1,
+                maximum, false);
         if (shifted == null) {
             shifted = ordinary;
         }
         return new int[] {shifted[0], shifted[1], 1};
     }
 
-    private int[] findAiWoodFromCenter(Unit worker, boolean[] connected,
-            int x, int y) {
+    /**
+     * Native {@code 0x44e230}: replacement search after StartGathering finds
+     * its terrain square already changed from -2 to -4 by another worker.
+     * The constructor passes the worker position and literal range 15 to the
+     * same {@code 0x443cd0}/{@code 0x44e150} clockwise ring used by AI wood.
+     */
+    private int[] findClaimedWoodReplacement(Unit worker) {
+        if (worker == null || !worker.isOnMap()) {
+            return null;
+        }
+        return findBattleNetWoodFromCenter(worker,
+                world.battleNetConnectivityCell(worker),
+                worker.tileX(), worker.tileY(), 15, true);
+    }
+
+
+    private int[] findBattleNetWoodFromCenter(Unit worker,
+            boolean[] connected, int x, int y, int maximum,
+            boolean skipClaimed) {
         int sideLength = 3;
-        int maximum = (world.map.width() * 3) >> 2;
         int[] dx = {1, 0, -1, 0};
         int[] dy = {0, 1, 0, -1};
         while (sideLength < maximum) {
@@ -2902,6 +2931,11 @@ final class BattleNetHarvestSystem {
                         if (connected[index]) {
                             ringTouchesComponent = true;
                         } else if (world.map.field(x, y).isForest()
+                                // Native changes a claimed forest component
+                                // from -2 to -4, which 0x44e150 rejects.
+                                && (!skipClaimed
+                                        || !world.battleNetClaimedWood
+                                                .containsKey(index))
                                 && battleNetWoodTouchesComponent(
                                         worker, x, y, connected)) {
                             return new int[] {x, y};

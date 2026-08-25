@@ -571,18 +571,31 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         // kept E,SE,SE,...; both engines consequently occupied the same tiles
         // through 238 and only exposed the stale third byte at fixture 239.
         Unit towerChaser = unitAt(world, "unit-grunt", 34, 38);
+        // Native slot 1513 / Java 87 finishes its southeast residual on
+        // fixture 240 while AutoSelectTarget replaces footman 1477 with guard
+        // tower 1485. Retail pays the active-order land-idle callback and
+        // immediately opens Attack 3,2,1; Java used to expose Move-start/1
+        // with a two-visit sleep, leaving the asynchronous stream two damage
+        // rolls behind by fixture 249.
+        Unit buildingRetargetChaser = unitAt(
+                world, "unit-grunt", 36, 37);
+        Unit defenderKnight = unitAt(world, "unit-knight", 30, 44);
         // Native slot 1453 / Java 147 is routeless when its knight quarry
         // enters Die on fixture 239. Retail installs the replacement footman
         // immediately but restarts cold Attack 3,2,1 before any new route.
         Unit dyingQuarryChaser = unitAt(world, "unit-grunt", 18, 57);
         assertNotNull(towerChaser, "XHuman 12 has no native-slot-1510 grunt");
+        assertNotNull(buildingRetargetChaser,
+                "XHuman 12 has no native-slot-1513 grunt");
+        assertNotNull(defenderKnight,
+                "XHuman 12 has no native-slot-1475 knight");
         assertNotNull(dyingQuarryChaser,
                 "XHuman 12 has no native-slot-1453 grunt");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        while (fixtureCycle(world) < 245) {
+        while (fixtureCycle(world) < 249) {
             mission.tick();
             int fixture = fixtureCycle(world);
             if (fixture == 206) {
@@ -600,7 +613,8 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                         towerChaser.peekHeadingAtDepth(1),
                         "the refill rewrites the stale duplicate diagonal");
             }
-            if (fixture == 239 || fixture == 242 || fixture == 245) {
+            if (fixture == 239 || fixture == 242 || fixture == 245
+                    || fixture == 248) {
                 assertEquals(23, dyingQuarryChaser.tileX(),
                         "a boxed retarget must not take a non-progressing detour at "
                                 + fixture);
@@ -616,6 +630,28 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                             "the initial three cold constructors pay land-idle");
                 }
             }
+            if (fixture == 240 || fixture == 243 || fixture == 246
+                    || fixture == 249) {
+                assertEquals(40, buildingRetargetChaser.tileX(),
+                        "the building retarget retains its settled square at "
+                                + fixture);
+                assertEquals(39, buildingRetargetChaser.tileY());
+                assertTargetAt(buildingRetargetChaser,
+                        "unit-human-guard-tower",
+                        39, 41,
+                        "the settled residual selects native tower 1485");
+                assertEquals(world.idle.battleNetSequenceStart(
+                                buildingRetargetChaser,
+                                net.chonkbase.chonkcraft.engine.animation
+                                        .BattleNetSequence.ATTACK_ANIMATION),
+                        buildingRetargetChaser.battleNetSequenceOffset(),
+                        "a no-progress building retarget remains in Attack");
+                assertEquals(3,
+                        buildingRetargetChaser.battleNetAnimationTimer(),
+                        "each native land-idle visit reopens Attack 3,2,1");
+                assertEquals(0, buildingRetargetChaser.pathLength(),
+                        "the blocked footprint keeps route index twenty");
+            }
         }
 
         assertEquals(42, towerChaser.tileX(),
@@ -630,12 +666,17 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                         net.chonkbase.chonkcraft.engine.animation
                                 .BattleNetSequence.ATTACK_ANIMATION),
                 dyingQuarryChaser.battleNetSequenceOffset());
-        assertEquals(3, dyingQuarryChaser.battleNetAnimationTimer(),
-                "the replacement reopens cold Attack construction");
+        assertEquals(2, dyingQuarryChaser.battleNetAnimationTimer(),
+                "fixture 249 drains the constructor reopened on 248");
         assertEquals(0, dyingQuarryChaser.pathLength(),
                 "construction precedes the replacement route writer");
         assertTrue(dyingQuarryChaser.battleNetColdNoProgressRefusalLoop(),
                 "the authenticated active-order retry remains the loop owner");
+        assertEquals(39, defenderKnight.hitPoints(),
+                "restored idle ownership gives the fixture-249 grunt blow "
+                        + "native damage five");
+        assertEquals(0x7aeac18f, world.battleNetRandomSeed(),
+                "the complete asynchronous ledger agrees through fixture 249");
     }
 
     private static int fixtureCycle(World world) {

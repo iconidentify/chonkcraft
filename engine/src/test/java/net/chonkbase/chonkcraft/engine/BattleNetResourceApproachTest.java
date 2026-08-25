@@ -773,6 +773,57 @@ class BattleNetResourceApproachTest {
     }
 
     @Test
+    @DisplayName("XHuman 11 claimed wood re-aim follows the native clockwise ring")
+    void xhumanElevenClaimedWoodReaimsEastBeforeWest() {
+        // Retail XHuman 11 slot 1588 settles at (21,17) beside slot 1586's
+        // claimed tree (20,18). Trees (19,18) and (23,18) are equally far.
+        // Native 0x44e230 feeds range 15 to the square-ring walker at 0x443cd0,
+        // whose E,S,W,N perimeter reaches the eastern tree first. Fixture 243
+        // stores order point (23,18), stages 2657/3,2,1, then steps east at 246.
+        GameMap map = new GameMap(32, 32, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        for (int x : new int[] {19, 20, 23}) {
+            map.field(x, 18).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+            map.field(x, 18).setValue(100);
+        }
+
+        World world = new World(map);
+        Unit claimant = world.createUnit(woodcutter(), 0, 20, 17);
+        Unit arriving = world.createUnit(woodcutter(), 0, 21, 17);
+        assertTrue(claimant != null && arriving != null, "both peons must place");
+
+        assertTrue(world.orderHarvest(claimant, 20, 18));
+        claimant.setGatherClockStarted(true);
+        world.battleNetClaimedWood.put(20 + 18 * map.width(), claimant);
+        assertTrue(world.orderHarvest(arriving, 20, 18));
+
+        world.tick();
+
+        assertEquals(23, arriving.resourceTileX(),
+                "native clockwise ring reaches the eastern equal-distance tree first");
+        assertEquals(18, arriving.resourceTileY());
+        assertEquals(2, arriving.battleNetOrderDelay(),
+                "the claimed-tree replacement keeps StartGathering's three-call staging");
+
+        // Timer 3 was served on the re-aim visit above; timer 2, timer 1 and
+        // the fresh path handoff occupy the next three visits. The already
+        // claimed western tree must not pull the order point back while the
+        // eastern route is being constructed.
+        world.tick();
+        world.tick();
+        world.tick();
+        assertEquals(22, arriving.tileX(),
+                "the fresh eastern route must commit on the timer-one handoff");
+        assertEquals(17, arriving.tileY());
+        assertEquals(23, arriving.resourceTileX(),
+                "the claimed adjacent tree must remain excluded during path construction");
+    }
+
+    @Test
     @DisplayName("a moved woodcutter releases its tree for the next peon")
     void replacingHarvestWithMoveReleasesTreeClaim() {
         GameMap map = new GameMap(12, 12, new Tileset());

@@ -101,6 +101,58 @@ public final class BattleNetPathFinder {
     private BattleNetPathFinder() {
     }
 
+    /**
+     * Continues one native wall face from a heading refused by the prior
+     * route-buffer visit.
+     *
+     * <p>{@code FUN_004379e0} can park route index twenty and return to
+     * NewPath with its rejected compass face still selected. That paid refill
+     * enters {@code 0x4500f0} at the old face rather than drawing another cold
+     * Bresenham prefix. The returned path is still optimized and capped by the
+     * ordinary twenty-byte route buffer.</p>
+     */
+    public static PathFinder.Path continueWallFace(int fromX, int fromY,
+            int toX, int toY, int blockedHeading, int turn, int stride,
+            Passability passability,
+            Passability optimizationPassability,
+            GoalMarker goalMarker) {
+        if (stride != 1 && stride != 2) {
+            throw new IllegalArgumentException(
+                    "BNE movement stride must be 1 or 2");
+        }
+        if (blockedHeading < 0 || blockedHeading >= Direction.COUNT
+                || (turn != -1 && turn != 1)) {
+            return new PathFinder.Path(PathFinder.Result.FOUND, new int[0]);
+        }
+        Map<Long, Integer> route = new HashMap<>();
+        Set<Long> laterLine = new HashSet<>();
+        Line line = new Line(fromX, fromY, toX, toY);
+        int lineX = fromX;
+        int lineY = fromY;
+        for (int step = 0; step < MAX_PATH
+                && (lineX != toX || lineY != toY); step++) {
+            int heading = line.next();
+            lineX += Direction.deltaX(heading) * stride;
+            lineY += Direction.deltaY(heading) * stride;
+            laterLine.add(point(lineX, lineY));
+        }
+        int[] join = traceWall(route, fromX, fromY, blockedHeading, turn,
+                toX, toY, stride, laterLine, passability, goalMarker);
+        if (join == null) {
+            return new PathFinder.Path(PathFinder.Result.FOUND, new int[0]);
+        }
+        int routeLength = optimize(route, fromX, fromY,
+                join[0], join[1], stride, optimizationPassability);
+        if (routeLength <= 0) {
+            return new PathFinder.Path(PathFinder.Result.FOUND, new int[0]);
+        }
+        List<Integer> steps = headings(route, fromX, fromY,
+                routeLength, stride);
+        return steps == null || steps.isEmpty()
+                ? new PathFinder.Path(PathFinder.Result.FOUND, new int[0])
+                : found(steps);
+    }
+
     /** Finds one native-sized route prefix to an exact BNE goal point. */
     public static PathFinder.Path find(int fromX, int fromY, int toX, int toY,
             Passability passability) {

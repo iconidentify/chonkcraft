@@ -2184,10 +2184,18 @@ final class BattleNetMovementSystem {
             // 1363 is at Move start 2477/timer 3 on fixture 199; retaining
             // the old Still cursor also kept its occupancy solid to the wood
             // planner that runs later in the same scheduler pass.
-            int moveStart = world.idle.battleNetSequenceStart(unit,
-                    BattleNetSequence.MOVE_ANIMATION);
-            if (moveStart >= 0) {
-                unit.setBattleNetSequenceOffset(moveStart);
+            // The ordinary ready-marker callback constructs Move animation
+            // here. A UNIT.Data guard reaches the recurring behavior-one
+            // callback through a different native arm: its Still action
+            // marker has already constructed the next Still body before Move
+            // becomes current. Human 13 ogre 1501 therefore exposes Move with
+            // Still 581/timer 3 at fixture 249, not Move 586.
+            int constructedStart = unit.battleNetReadySuppressed()
+                    ? world.idle.battleNetStillSequenceStart(unit)
+                    : world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+            if (constructedStart >= 0) {
+                unit.setBattleNetSequenceOffset(constructedStart);
                 unit.setBattleNetAnimationTimer(3);
             }
         }
@@ -2955,6 +2963,52 @@ final class BattleNetMovementSystem {
                 || (chaseMoveSequence
                         ? unit.battleNetChaseStepReady()
                         : !unit.walkHolding() && atMoveBoundary(unit));
+        if (mayDecide && walkedThisCycle && unit.stepDrained()
+                && !unit.isMoving()
+                && unit.battleNetBorrowedMoveForStep()
+                && unit.returningToDepot() && unit.carried() > 0
+                && unit.type() != null && unit.type().landUnit()
+                && world.battleNetMovementStride(unit) == 1
+                && unit.pathLength() > 0
+                && unit.returnDepotGoal() != null) {
+            int[] refreshedDepotEdge = world.battleNetDepotEntryPoint(
+                    unit, unit.returnDepotGoal());
+            boolean lateralTwoByteDepotReaim = unit.pathLength() == 2
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.lastStepHeading()
+                            == Direction.fromDelta(1, -1)
+                    && unit.peekHeading() == Direction.fromDelta(0, -1)
+                    && refreshedDepotEdge[1] == unit.orderTargetY()
+                    && Math.abs(refreshedDepotEdge[0]
+                            - unit.orderTargetX()) == 2;
+            if (lateralTwoByteDepotReaim) {
+                // This is the retained-tail footprint handoff proved by the
+                // sealed XHuman 12 route, not a rule for every nearest-edge
+                // change. The NE residual crosses a four-wide hall's lateral
+                // midpoint while two cached bytes remain; native publishes
+                // the opposite edge, parks the old N,NW tail at cursor twenty
+                // with collision one, and redraws on the following visit.
+                // Other gold carriers keep their cached route when their edge
+                // drifts by one cell or under a different residual shape.
+                unit.setOrderTarget(
+                        refreshedDepotEdge[0], refreshedDepotEdge[1]);
+                int collision = unit.battleNetCollisionCounter() + 1;
+                unit.setBattleNetCollisionCounter(
+                        collision > 14 ? 0 : collision);
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(0);
+                int moveStart = world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                    unit.setBattleNetChaseStepReady(false);
+                }
+                return;
+            }
+        }
         if (mayDecide && (walkedThisCycle || world.actionMoveWalked)
                 && unit.stepDrained()
                 && !unit.isMoving()
@@ -5988,6 +6042,18 @@ final class BattleNetMovementSystem {
                                 && unit.target().type() != null
                                 && !unit.target().type().building()
                                 && !World.battleNetRangedChaseUnit(unit);
+                        boolean paidLongResidualPark =
+                                unit.stepDrained() && !unit.isMoving()
+                                && unit.battleNetPathInitialLength()
+                                        == BattleNetPathFinder.MAX_PATH
+                                && unit.battleNetPathStepsTaken() == 1
+                                && unit.battleNetCollisionCounter() == 3
+                                && unit.battleNetRefusals() == 0
+                                && unit.target() != null
+                                && unit.target().isAlive()
+                                && unit.target().type() != null
+                                && !unit.target().type().building()
+                                && !World.battleNetRangedChaseUnit(unit);
                         if (unit.stepDrained() && !unit.isMoving()) {
                             int collision =
                                     unit.battleNetCollisionCounter() + 1;
@@ -6004,6 +6070,22 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetParkedRefusalHeading(heading);
                         }
                         int refusals = battleNetRefuse(unit);
+                        if (paidLongResidualPark) {
+                            // The fourth mobile-formation generation is stored
+                            // only in FUN_004379e0's high nibble. It is not the
+                            // first visit in a new hard-refusal band. XHuman 12
+                            // grunt 1504 drains N and refuses the next NE byte
+                            // on fixture 245: native writes 0x30 -> 0x40 and
+                            // parks RI20, then the paid wall writer opens NW on
+                            // 246. Keep Java's duplicate refusal projection out
+                            // of this boundary and mark the empty route for the
+                            // already-paid refill.
+                            unit.setBattleNetRefusals(0);
+                            unit.setBattleNetChaseEmptyRouteReplan(true);
+                            unit.setBattleNetPaidLongResidualRefill(true);
+                            unit.setBattleNetParkedRefusalHeading(heading);
+                            refusals = 0;
+                        }
                         if (saturatedLongResidualConstruction
                                 && refusals == 1) {
                             // A saturated twenty-byte chase which has already
@@ -6760,18 +6842,23 @@ final class BattleNetMovementSystem {
                                         && world.attackDistance(
                                                 unit, unit.target()) <= 1
                                         ? BNE_MELEE_REFUSAL_HOLD : 0);
-                        // RI20 parks add one more collision generation once
-                        // the native high nibble is saturated.  XHuman 12
-                        // grunt 1496 is 0x40 while draining its SE stride,
-                        // becomes 0x50 when the residual SW is parked on
-                        // fixture 106, and keeps 0x50 through the fresh NE
-                        // route.  Below that band this is the ordinary chase
-                        // park and NewPath clears the stale provenance.
+                        // RI20 parks advance the native collision generation
+                        // for every refused residual, not only after the high
+                        // nibble reaches four. XHuman 12 grunt 1504 is the
+                        // sealed low-band witness: its raw byte is 0x10 at the
+                        // fixture-194 park, then 0x20, 0x30 and 0x40 at the
+                        // corresponding parks on 211, 228 and 245. Erasing
+                        // generations one through three loses the wall face
+                        // which opens NW on fixture 246. Java's separate hard
+                        // refusal projection does not survive this cursor-park
+                        // callback; the raw native generation is represented
+                        // by the collision counter alone.
                         int parkedCollision =
                                 unit.battleNetCollisionCounter();
                         unit.setBattleNetCollisionCounter(
-                                parkedCollision >= 4
-                                        ? parkedCollision + 1 : 0);
+                                parkedCollision >= 14
+                                        ? 0 : parkedCollision + 1);
+                        unit.setBattleNetRefusals(0);
                         unit.setBattleNetChaseEmptyRouteReplan(true);
                         unit.setBattleNetOrderDelay(0);
                         return;
