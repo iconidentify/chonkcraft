@@ -1857,6 +1857,40 @@ final class BattleNetMovementSystem {
                 battleNetEmptyResourceRouteReady(worker, building);
                 return false;
             }
+            if (path.length() == 0
+                    && worker.order() == Unit.Order.HARVEST
+                    && worker.returningToDepot() && worker.carried() > 0
+                    && worker.type().landUnit()
+                    && world.battleNetMovementStride(worker) == 1
+                    && !worker.isMoving()
+                    && worker.distanceTo(building) > 1) {
+                // A laden hauler whose whole plan came back empty because an
+                // ally parks on the direct next square used to install that
+                // empty route and poll: it stepped onto the square the same
+                // cycle the ally left. Orc 8's queue outside the mine is the
+                // sealed witness -- native plans the refused face, counts a
+                // refusal generation each blocked retry (Move-start/timer one,
+                // route cursor parked at twenty), and from the eighth refusal
+                // serves the fourteen-visit cooperative band to expiry, so
+                // peasant 1504 takes the exit square its neighbour vacated at
+                // fixture 253 only on 255. Handing the attempt a one-heading
+                // route routes the outcome through that same ladder instead
+                // of bypassing it.
+                int faceX = Integer.signum(
+                        worker.orderTargetX() - worker.tileX());
+                int faceY = Integer.signum(
+                        worker.orderTargetY() - worker.tileY());
+                int heading = Direction.fromDelta(faceX, faceY);
+                Unit blocker = world.unitAt(
+                        worker.tileX() + Direction.deltaX(heading),
+                        worker.tileY() + Direction.deltaY(heading));
+                if (blocker != null && blocker.isOnMap()
+                        && !blocker.isDying() && blocker != building
+                        && world.isAllied(worker.player(), blocker.player())) {
+                    path = new PathFinder.Path(
+                            PathFinder.Result.FOUND, new int[] {heading});
+                }
+            }
             boolean preserveCardinalTailCollision =
                     worker.battleNetGoldCardinalTailRefusal();
             int cardinalTailCollision = worker.battleNetCollisionCounter();
