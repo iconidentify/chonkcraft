@@ -66,6 +66,21 @@ one visit early:
   membership relative to the planning hull. The sealed packets for both
   wakes are in this file; resolve the discriminator before touching the
   passability classification again.
+  Second candidate refuted, and it exposed the real mechanism. Re-applying
+  the same soften and tracing sibling 1501 (Java 99, pair confirmed by
+  cadence, aligned through 252 pre-change): its wake plan is NOT the
+  blocker question at all. At internal 254 the planner answers
+  `from=123,30 goal=115,25 FOUND [SW,NW,N]` -- yet native (and pre-change
+  Java) step NORTH at fixture 252, a heading that exists only in the STALE
+  LEFTOVER behind route index twenty from the earlier refusal. The wake
+  visit consumes the parked leftover FIRST; the fresh plan takes over only
+  after that consumption. The soften perturbed this visit's internal
+  ordering so the leftover-consume slipped one visit -- hence the late
+  step -- while its planning answer was almost incidental. THE FAMILY RULE:
+  at constructor end, consume the parked stale heading immediately (face
+  permitting); refuse-and-reband if blocked; only then replan. Any
+  passability change must be evaluated against that ordering, not against
+  planned-route content.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
