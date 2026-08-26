@@ -43,6 +43,14 @@ chain (XHuman 7 253->255, XHuman 5 256->288).
   by one: either the constructor timing differs or the parked-heading
   consume fires differently. This is the same depot-ring arrival pattern
   as existing `depotRingAction25` code; likely a narrow fix.
+  TRACED: Java drains residual one cycle LONGER than native. At internal
+  263 Java still shows `moving=1 spent=1 drained=0` while native's
+  constructor already started at f261. Java's wake lands at internal 266/267
+  with `path=0` then `path=1`, one visit late for the SW step onto (29,76).
+  The fix is in the residual-drain arithmetic on the final approach leg:
+  compare Java's offsetX/offsetY pixel series against native's pixel column
+  `(965,2395)->(962,2398)->(962,2398)` across f258..264; the drain rate or
+  step-prime amount differs by exactly one cycle's pixels.
 
 ### Next blockers at 255 (all one family)
 
