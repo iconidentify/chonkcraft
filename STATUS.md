@@ -11,19 +11,21 @@ media supplied by the player.
 The current release candidate has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 252.** The lowest common divergence is
-  cycle 253, so the shared proven frontier is cycle 252. The three maps at that
-  boundary are Orc 8, expansion Human 7, and expansion Orc 11.
+- **52/52 maps are exact through cycle 254.** The lowest common divergence is
+  cycle 255, so the shared proven frontier is cycle 254 -- the first advance
+  past the long-standing 252 boundary. The three maps at that boundary are
+  Human 8's blocked chase, XHuman 7's capital order remnant, and XHuman 12's
+  force-launch home.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,164 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,273 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  32,826; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  32,935; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- In the latest full-fleet pass, Orc 10 advanced from cycle 255 to 440 and
-  expansion Orc 7 from cycle 252 to 542. Both are now exact through the entire
-  400-cycle window; the other 50 maps retained their prior boundaries.
+- Fleet-verified session advances: Orc 8 to 289, XOrc 11 to 282, XHuman 5 to
+  288, Human 13 to 265, and XHuman 7 to 255; the other maps retained their
+  prior boundaries.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
