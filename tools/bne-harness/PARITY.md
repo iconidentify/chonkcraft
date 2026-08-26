@@ -51,6 +51,9 @@ chain (XHuman 7 253->255, XHuman 5 256->288).
   compare Java's offsetX/offsetY pixel series against native's pixel column
   `(965,2395)->(962,2398)->(962,2398)` across f258..264; the drain rate or
   step-prime amount differs by exactly one cycle's pixels.
+  Drain mechanism located: `walkPixels` (BattleNetMovementSystem:7855)
+  sets `setStepDrained(true)` when `reached || (rawX==0 && rawY==0 &&
+  !animation().unbreakable())`. The off-by-one is in this arithmetic.
 
 ### Next blockers at 255 (all one family)
 
