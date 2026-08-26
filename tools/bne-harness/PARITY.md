@@ -64,6 +64,14 @@ step. Port that protocol into the chase refill (the laden returner's
 band-consumption in `stepHarvest` is the in-tree pattern), gate each map
 against its sealed packet, and note h13 additionally needs land doubled-
 step route bytes decoded before its fresh-route step can match.
+Navigation for XHuman 12, proved by stack probe: the ogre's delay-two is
+armed through `dispatchBattleNetIdleMarker -> beginBattleNetPendingMove ->
+orderMove` (BattleNetIdleSystem 1461 -> BattleNetMovementSystem 2269/65/478)
+from inside `stepStill`, not from `stepPatrol` -- the unit shows PATROL in
+its order field while the idle marker dispatches the move that steps it.
+The stale leftover it consumes sits behind route index twenty from the
+earlier refusal; native discards that leftover at constructor end, replans,
+and arms seq 586/t15 instead.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
