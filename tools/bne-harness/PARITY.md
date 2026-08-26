@@ -81,6 +81,21 @@ one visit early:
   permitting); refuse-and-reband if blocked; only then replan. Any
   passability change must be evaluated against that ordering, not against
   planned-route content.
+  Third candidate refuted, and it pinned the true root. Preserving the
+  single-heading buffer across `orderMove`'s clearPath for AI-dispatched
+  promotions (beginBattleNetPendingMove) implemented the consume-on-wake --
+  and STILL slipped ogre 1501 one cycle, because the probe showed Java's
+  parked byte is WEST (6) where native's stored route at the same fixture
+  holds NORTH (`00` bytes, ri walking 4 -> 20 -> 1 across f246..252). The
+  wake-consume machinery is proven correct given right content: native
+  consumed its parked north on schedule, and a preserved-but-wrong heading
+  refused at walk time and re-banded. The divergence was therefore created
+  generations earlier, when the route was originally parked around ogre
+  1510's march settling at (123,30) on fixture 214: native parked an
+  all-north continuation, this implementation's planner parked a west.
+  Root cause: point-path planning content parity at the original parking
+  event (same optimizer-under-occupancy family as ogre 1510's wake), one
+  planning generation upstream of every symptom in this file.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
