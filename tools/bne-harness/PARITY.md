@@ -80,6 +80,20 @@ inside the attack handler, not another watchpoint.
   same endpoints) before writing any arm. After the swap the sealed hull
   doubles east onto (28,28) around fixture 256-258 with goal (39,33), which
   is the post-fix shape to match.
+  Narrowed further this session, all from sealed bytes plus one throwaway
+  probe: p6's oil tanker 1571 reaches the platform (39,33) and turns removed
+  at exactly fixture 199; Java's `battleNetNavalPatrolTarget` already
+  answers target=self, back=platform from fixture 199 onward and
+  target=shipyard before, so routing the recurring pass through the existing
+  chain reproduces the swap ANSWER but fires it at the 199 beat where native
+  decays. No unit-record byte and no world object distinguishes the 199 and
+  249 pre-beat states except animation phase -- the accepting gate is
+  therefore not in the sealed 152-byte records at all. It lives in native's
+  per-player AI state (the tanker-assignment registry or a reissue counter
+  beside it), and the next session should run one decision-plan contrast on
+  the writer of offset 0x58 at fixture 249 versus its silence at 199 --
+  `--native-unit 1562 --field x` style plans will not see it; the plan must
+  watch ai_home 0x58 directly.
 
 ## Prior release checkpoint — 2026-08-22
 
