@@ -15779,6 +15779,59 @@ public final class World {
     }
 
     /** Destination chosen by BNE naval behaviour six ({@code 0x427a10}). */
+    /**
+     * The far patrol endpoint the behaviour-six chain selects from near, or
+     * null when the chain would fall to its random jitter. Owned platforms
+     * first, then any oil patch, then any platform on any player.
+     *
+     * <p>Exposed so the fifty-cycle naval beat can keep its legacy single-
+     * point reissue on waters with no oil at all: routing that beat through
+     * {@link #battleNetNavalPatrolTarget} unconditionally would start paying
+     * the chain's two async draws on maps whose sealed runs never spent them.
+     */
+    Unit battleNetNavalFarEndpointOrNull(Unit ship, int targetX, int targetY) {
+        Unit far = null;
+        int farDistance = 0xffff;
+        for (Unit candidate : playerUnits(ship.player())) {
+            if (!candidate.isAlive() || !candidate.isOnMap()
+                    || !harvest.isBattleNetOilPlatform(candidate.type().ident())) {
+                continue;
+            }
+            int distance = candidate.distanceTo(targetX, targetY);
+            if (distance < farDistance) {
+                far = candidate;
+                farDistance = distance;
+            }
+        }
+        if (far == null) {
+            for (Unit candidate : units) {
+                if (!candidate.isAlive() || !candidate.isOnMap()
+                        || !"unit-oil-patch".equals(candidate.type().ident())) {
+                    continue;
+                }
+                int distance = candidate.distanceTo(targetX, targetY);
+                if (distance < farDistance) {
+                    far = candidate;
+                    farDistance = distance;
+                }
+            }
+        }
+        if (far == null) {
+            for (Unit candidate : units) {
+                if (!candidate.isAlive() || !candidate.isOnMap()
+                        || !harvest.isBattleNetOilPlatform(candidate.type().ident())) {
+                    continue;
+                }
+                int distance = candidate.distanceTo(targetX, targetY);
+                if (distance < farDistance) {
+                    far = candidate;
+                    farDistance = distance;
+                }
+            }
+        }
+        return far;
+    }
+
     BattleNetPatrolEndpoints battleNetNavalPatrolTarget(Unit ship) {
         boolean attackBehavior = ship.battleNetAiBehavior() == 2;
         // A queued attack group may have replaced native behaviour six before
@@ -15876,45 +15929,7 @@ public final class World {
         // diverged at fixture cycle 12; native route 02 03 02 lands on
         // 36,82 toward 41,85. XOrc 8 / XOrc 10 keep owned or sole
         // platforms as far when no closer owned platform or patch wins.
-        Unit far = null;
-        int farDistance = 0xffff;
-        for (Unit candidate : playerUnits(ship.player())) {
-            if (!candidate.isAlive() || !candidate.isOnMap()
-                    || !harvest.isBattleNetOilPlatform(candidate.type().ident())) {
-                continue;
-            }
-            int distance = candidate.distanceTo(targetX, targetY);
-            if (distance < farDistance) {
-                far = candidate;
-                farDistance = distance;
-            }
-        }
-        if (far == null) {
-            for (Unit candidate : units) {
-                if (!candidate.isAlive() || !candidate.isOnMap()
-                        || !"unit-oil-patch".equals(candidate.type().ident())) {
-                    continue;
-                }
-                int distance = candidate.distanceTo(targetX, targetY);
-                if (distance < farDistance) {
-                    far = candidate;
-                    farDistance = distance;
-                }
-            }
-        }
-        if (far == null) {
-            for (Unit candidate : units) {
-                if (!candidate.isAlive() || !candidate.isOnMap()
-                        || !harvest.isBattleNetOilPlatform(candidate.type().ident())) {
-                    continue;
-                }
-                int distance = candidate.distanceTo(targetX, targetY);
-                if (distance < farDistance) {
-                    far = candidate;
-                    farDistance = distance;
-                }
-            }
-        }
+        Unit far = battleNetNavalFarEndpointOrNull(ship, targetX, targetY);
         int backX;
         int backY;
         if (far != null) {

@@ -519,8 +519,43 @@ final class BattleNetIdleSystem {
             // made the doubled point pathfinder report arrival and stranded
             // the ship in Still forever.  Behaviour-two assault patrols use
             // their current tactical point and remain unchanged.
-            if (unit.battleNetAiBehavior() == 6
-                    && unit.hasBattleNetAiHome()) {
+            boolean capitalShip =
+                    World.isBattleNetCapitalShip(unit.type().ident());
+            if (unit.battleNetAiBehavior() == 6 && unit.hasBattleNetAiHome()
+                    && !capitalShip) {
+                // Retail reruns the whole behaviour-six constructor on every
+                // beat, so its endpoints track the tanker's career. XHuman 7's
+                // southern destroyer stands beside a stale rewrite through the
+                // beats at fixtures 99, 149 and 199, and on 249 -- one beat
+                // after p6's tanker settles into its platform -- native writes
+                // home to the hull's own square and reissues toward the
+                // platform instead, both destroyers together. Reissuing the
+                // stale single point here left that beat decaying back to
+                // Still while retail started a real leg. The chain already
+                // answers near=service-base/self and far=closest owned
+                // platform per beat; store the pair it returns. On waters
+                // with no oil at all the chain would fall to its random
+                // jitter, which this beat never spent on the sealed runs, so
+                // those keep the legacy single-point reissue.
+                if (world.battleNetNavalFarEndpointOrNull(unit,
+                        unit.battleNetAiHomeX(), unit.battleNetAiHomeY())
+                        != null) {
+                    World.BattleNetPatrolEndpoints endpoints =
+                            world.battleNetNavalPatrolTarget(unit);
+                    unit.setBattleNetAiHome(endpoints.targetX(),
+                            endpoints.targetY());
+                    unit.setBattleNetPendingPatrol(endpoints.targetX(),
+                            endpoints.targetY(), endpoints.backX(),
+                            endpoints.backY());
+                    if (World.BNE_IDLE_TRACE) {
+                        System.err.printf("JBNEPATROL unit=%d naval-beat=1"
+                                        + " target=%d,%d back=%d,%d%n",
+                                unit.id(), endpoints.targetX(),
+                                endpoints.targetY(), endpoints.backX(),
+                                endpoints.backY());
+                    }
+                    continue;
+                }
                 targetX = unit.battleNetAiHomeX();
                 targetY = unit.battleNetAiHomeY();
             }
