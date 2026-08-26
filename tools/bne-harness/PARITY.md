@@ -131,6 +131,20 @@ one visit early:
   calibration pair for that face order. The port needs this per-step
   selector for plain-Move wakes plus the through-mobile view together --
   either alone regresses one sibling while fixing the other.
+  Fifth candidate implemented (single-step selector: line face then a
+  blocked diagonal's cardinals in ascending order) and reverted -- it
+  fixed 1510, slipped 1501, and the slip finally named the true target:
+  native 1501 stepped NORTH away from its own home (115,25), toward the
+  force/enemy direction around (119,22). Both h13 ogres reissue toward the
+  assault direction while this implementation dispatches them toward their
+  stored aiHome. This is the same disease XHuman 12's launch-home trace
+  found -- the recurring behaviour-one beat reissues toward a target that
+  is not aiHome -- and it means face selection cannot be calibrated until
+  the dispatch target matches. THE UNIFIED ROOT for the whole 255 family:
+  read where native's behaviour-one beat reissue takes its target from
+  (AI.BIN attack waypoint versus stored home; XH12's launch home writer is
+  the same question one step earlier), fix that source, and the wake-face
+  selector calibrated on the two sealed wakes lands on top of it.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
