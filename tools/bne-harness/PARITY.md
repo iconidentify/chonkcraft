@@ -44,13 +44,18 @@ one visit early:
   band. Java's cursor instead parks at 2603/timer-one with collision one,
   and when its orderDelay hits zero it replans once and steps immediately
   (to 76,62, against the chase direction) at 255.
-- `retail-human-13-idle` @255: ogre 1510 (Java 90) promotes order 3 at 252,
-  constructor 581/3,2,1 across 252..254, steps NW onto (123,30) at 255 with
-  fresh route `07 00 07 00 07 00 07 07 00` (zero-interleaved headings --
-  doubled-step encoding on land, unported). Java misses the step cycle.
+- `retail-human-13-idle` @255: NOT a timing case -- a heading choice. Ogre
+  1510 (Java 90) promotes order 3 at 252, constructor 581/3,2,1 across
+  252..254 (Java's own trace matches this far), then steps NORTH-WEST onto
+  (123,30) at 255 on a fresh zero-interleaved route
+  `07 00 07 00 07 00 07 07 00` -- land doubled-step encoding, unported.
+  Java's planner instead picks pure north ((124,30) at the same visit), so
+  matching needs the detour-face rule behind that route, not band work.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
-  refuse marker ri=20, constructor 581/3,2,1 across 252..254, replans to
-  `[SW, NW]` with seq 586/t15 at 255. Java x off by one.
+  refuse marker ri=20 through fixtures 249..250 with no program, arms delay
+  2 at fixture 255 -- then Java steps west to (10,86) when the delay
+  expires at 256. Native instead replans to `[SW, NW]` with seq 586/t15 at
+  255 and stays put: the same expiry-visit protocol as Human 8.
 
 The systemic shape: the combat chase path consumes its order delay but does
 not run the refusal-generation protocol native uses on expiry -- attempt
