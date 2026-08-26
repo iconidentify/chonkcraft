@@ -72,6 +72,14 @@ its order field while the idle marker dispatches the move that steps it.
 The stale leftover it consumes sits behind route index twenty from the
 earlier refusal; native discards that leftover at constructor end, replans,
 and arms seq 586/t15 instead.
+One more layer down, also proved by trace: at delay expiry Java's planner
+is asked for a route to (13,86) -- a local waypoint -- and answers a single
+westward step, while native keeps the ogre's authored goal (13,66), replans
+`[SW, NW]`, and arms its band. So XHuman 12's fix is upstream of movement
+entirely: the idle-marker dispatch must target what the AI assignment says
+(13,66), not a local waypoint, after which the shared expiry protocol applies.
+Human 8's chase variant arms through the combat refill instead and still
+needs the protocol there.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
