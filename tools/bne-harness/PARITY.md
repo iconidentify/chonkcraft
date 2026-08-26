@@ -115,6 +115,22 @@ one visit early:
   fixture 204 while Human 13's ogre crosses standing brothers at 255 -- so
   the condition separating "transparent brother" from "wall brother" must
   be read before the passability classification is touched.
+  Fourth candidate implemented and reverted: a `planThroughAlliedMobiles`
+  view on findBattleNetPointPath (threaded to the plain-Move wake,
+  traversal and optimizer consistently, mobiles only) DID fix ogre 1510's
+  face -- north-west, matching retail -- but slipped sibling 1501 again,
+  and this time the trace exposed the last unknown precisely. With mobiles
+  transparent, 1501's line toward home (115,25) is west-major and opens
+  south-west onto (122,31) -- occupied by grunt 115. Retail stepped NORTH
+  instead: its per-step decision SKIPS an occupied preferred face and takes
+  the next free heading that still closes on the goal, rather than refusing
+  into a band. So the complete retail wake is: decide one step fresh with
+  all mobiles transparent, walking a face-preference order and skipping
+  occupied faces until one closes geographically; refuse only terrain.
+  Both sealed wakes (1510 free-face NW; 1501 blocked-SW skip-to-N) are the
+  calibration pair for that face order. The port needs this per-step
+  selector for plain-Move wakes plus the through-mobile view together --
+  either alone regresses one sibling while fixing the other.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
