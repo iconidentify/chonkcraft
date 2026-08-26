@@ -70,6 +70,16 @@ inside the attack handler, not another watchpoint.
   blanket switch to full-chain recomputation must be proven against both
   hulls; any fallback that can pay the chain's RNG draws when no far
   endpoint exists must stay gated until its native draw cadence is known.
+  Sharper still, measured from the sealed record: native leaves 1562 standing
+  through the cycle-99, 149 and 199 beats and accepts a reissue only at 249,
+  although the hull is Still beside the same rewritten home throughout -- so
+  an endpoint-swap arm gated only on "within one stride of the rewrite"
+  fires four beats early and moves this map backward. The missing gate is
+  whatever makes the beat accept THIS hull at 249; contrast native's
+  acceptance at 249 against its silence at 199 (same position, same order,
+  same endpoints) before writing any arm. After the swap the sealed hull
+  doubles east onto (28,28) around fixture 256-258 with goal (39,33), which
+  is the post-fix shape to match.
 
 ## Prior release checkpoint — 2026-08-22
 
