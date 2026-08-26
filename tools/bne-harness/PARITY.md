@@ -53,10 +53,19 @@ one visit early:
   five headings consumed `[N,N,NW,N,NW]`: the direct line was rewritten and
   shortened by the optimizer under the wake's soft-occupancy view (every
   neighbour except west reads soft-allied in `near=`), which flips the first
-  consumed face north where retail steps north-west. The fix lives in
-  BattleNetPathFinder's optimization passes preserving the unmodified line
-  when its squares are merely soft-occupied -- global blast radius, so gate
-  any candidate against the full survey, not just this case.
+  consumed face north where retail steps north-west.
+  First candidate refuted, do not retry as written: blanket-softening
+  standing behaviour-one members on recurring-regroup routes (planner ogre
+  1510 is ai=1 heading to its aiHome) fixed 1510's face but pushed SIBLING
+  ogre 1501 -- whose own constructor-wake at fixture 252 previously matched
+  -- one cycle late. Both wakes are the same family with opposite needs,
+  so the discriminator is per-blocker state not yet read: which standing
+  brother is transparent to a given wake (1510 crossed (122,28)/(122,27))
+  and which is a wall (1501's own replan). Candidates for that state:
+  the blocker's pending-move queue, its own band phase, or launch-group
+  membership relative to the planning hull. The sealed packets for both
+  wakes are in this file; resolve the discriminator before touching the
+  passability classification again.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
