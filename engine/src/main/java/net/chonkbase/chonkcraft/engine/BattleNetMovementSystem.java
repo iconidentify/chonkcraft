@@ -841,6 +841,41 @@ final class BattleNetMovementSystem {
                     }
                     unit.setPath(path);
                     unit.setPathGoal(toX, toY);
+                    // Retail's plain Move decides one step fresh toward the
+                    // goal and ignores every mobile occupant while deciding.
+                    // When the occupancy-aware planner's first consumed face
+                    // differs from the fresh line's own face but that face is
+                    // walkable right now, take the line face: Human 13 ogre
+                    // 1510's fixture-255 wake planned a north-first detour
+                    // around brothers parked on the line's fourth square,
+                    // while retail stepped the line's north-west straight
+                    // away. Sibling 1501 keeps its detour untouched -- its
+                    // line face south-west is itself occupied, which is what
+                    // makes this gate safe to leave open everywhere.
+                    // The gate carries refusal history: a fresh acquisition's
+                    // first plan is itself retail's answer (XHuman 4's
+                    // opening axethrowers wall correctly from cycle three),
+                    // while a wake that follows refusals and a constructor
+                    // band is where retail steps the line face across
+                    // standing brothers. Borrowed attack-chase moves keep
+                    // their own authenticated planning.
+                    if (unit.pathLength() > 0
+                            && !unit.battleNetBorrowedMoveForStep()
+                            && (unit.battleNetCollisionCounter() > 0
+                                    || unit.battleNetRefusals() > 0)) {
+                        int lineFirst = BattleNetPathFinder.firstLineHeading(
+                                unit.tileX(), unit.tileY(), toX, toY);
+                        int plannedFirst = unit.peekHeading();
+                        if (plannedFirst != lineFirst) {
+                            int faceX = unit.tileX()
+                                    + Direction.deltaX(lineFirst);
+                            int faceY = unit.tileY()
+                                    + Direction.deltaY(lineFirst);
+                            if (world.canEnter(unit, faceX, faceY)) {
+                                unit.replacePeekHeading(lineFirst);
+                            }
+                        }
+                    }
                 }
             }
         }

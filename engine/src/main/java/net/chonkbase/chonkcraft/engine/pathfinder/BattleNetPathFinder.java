@@ -1292,6 +1292,21 @@ public final class BattleNetPathFinder {
         return new int[] {toX, toY};
     }
 
+    /**
+     * The first heading a fresh line toward the goal would take.
+     *
+     * <p>Exposed for the plain-Move wake's face gate: when the
+     * occupancy-aware planner's first consumed face differs from the fresh
+     * line's own face but that face is walkable right now, retail's
+     * per-step decision takes the line face -- Human 13 ogre 1510 stepped
+     * north-west at its fixture-255 wake while the planned detour opened
+     * north.</p>
+     */
+    public static int firstLineHeading(int fromX, int fromY, int toX,
+            int toY) {
+        return new Line(fromX, fromY, toX, toY).next();
+    }
+
     /** Exact transcription of {@code 0x429f10}/{@code 0x429fa0}. */
     private static final class Line {
         private final int major;
