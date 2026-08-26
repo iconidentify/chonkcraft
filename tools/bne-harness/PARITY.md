@@ -29,6 +29,21 @@ Closed this stretch: Orc 8 mine-exit refusal hold (253->289), XOrc 11
 walled-quarry drop (253->282), naval beat reissue through the patrol target
 chain (XHuman 7 253->255, XHuman 5 256->288).
 
+### Next-ranked blockers beyond 255
+
+- `retail-xorc-08-idle` @261: submarine 1433 (unit-human-submarine) on
+  patrol order 5 with seven-NW route parked at ri=6. At fixture 260 native
+  arms seq 3469/t15 -- a fifteen-band -- and holds position through 261+.
+  Java moves instead. Same band-protocol family as Human 8; the naval
+  variant may need its own seq-station mapping.
+- `retail-xorc-12-idle` @264: peasant 1394 arriving at depot ring. Order
+  promotes 24->25 at f261 with seq 2600/t3 constructor and route parked at
+  ri=20 (`[SW,SW,S]` consumed two, one left). Native steps SW onto (29,76)
+  at f264 -- the parked heading consumed after constructor. Java x/y off
+  by one: either the constructor timing differs or the parked-heading
+  consume fires differently. This is the same depot-ring arrival pattern
+  as existing `depotRingAction25` code; likely a narrow fix.
+
 ### Next blockers at 255 (all one family)
 
 Native runs a Move-program band to expiry on a stalled chaser; Java steps
