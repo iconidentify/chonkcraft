@@ -96,6 +96,25 @@ one visit early:
   Root cause: point-path planning content parity at the original parking
   event (same optimizer-under-occupancy family as ogre 1510's wake), one
   planning generation upstream of every symptom in this file.
+  CORRECTION superseding the paragraph above -- the all-north parking does
+  not exist. A full-history dump of slot 1510 shows its route bytes
+  constant from cycle 1 (`00 x8` then pointer `38 81 06 05`); there is no
+  stored route at any fixture, the zeros were never headings, and offset
+  0x7e is a PER-ORDER STEP COUNTER: it increments on every tile step
+  (f6 -> 01, f18 -> 02, f108 -> 01 after a goal change) and resets to 20
+  on refusals and order-goal changes. Ogre 1510 walks entirely by fresh
+  per-step decisions -- roughly one step per eleven-to-thirteen cycle
+  Still-loop program -- refusing at walk time when a chosen square is
+  occupied. Consequences for the fix: (a) native's plain-move wake simply
+  decides ONE step fresh toward the goal and ignores every mobile occupant
+  while deciding -- Human 13's wake chose north-west across squares held by
+  standing brothers, discovering blocks later by refusal; (b) the port's
+  habit of pre-truncating or reordering the plan around hard-standing
+  allies is the entire visible delta; and (c) the open discriminator stands
+  unchanged -- XHuman 12's ogre 1356 provably walls a regrouping brother at
+  fixture 204 while Human 13's ogre crosses standing brothers at 255 -- so
+  the condition separating "transparent brother" from "wall brother" must
+  be read before the passability classification is touched.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
