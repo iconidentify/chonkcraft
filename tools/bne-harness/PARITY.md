@@ -44,18 +44,19 @@ one visit early:
   band. Java's cursor instead parks at 2603/timer-one with collision one,
   and when its orderDelay hits zero it replans once and steps immediately
   (to 76,62, against the chase direction) at 255.
-- `retail-human-13-idle` @255: SOLVED DOWN TO TIMING -- not a heading
-  choice and not an encoding. Native's fresh route
-  `07 00 07 00 07 00 07 07 00` is plain `[NW,N,NW,N,NW,N,NW,NW,N]`
-  (heading zero IS north), and hand-running this implementation's own
-  `Line.next()` over (124,31)->(119,22) reproduces that exact sequence --
-  the line walker needs no change. The defect is only WHEN the plan exists:
-  Java promotes the order with an EMPTY path (bna-seq 581/t3, delay 2,
-  path 0), then walks north off some later consult, while native keeps the
-  old route parked through the constructor and on the expiry visit plans
-  the nine-heading route and takes its first north-west step in the SAME
-  visit. Same expiry-visit family as Human 8: plan must happen at the
-  wake, not before it.
+- `retail-human-13-idle` @255: SOLVED DOWN TO THE OPTIMIZER -- not timing,
+  not encoding, not the line walker. Heading zero IS north; native's fresh
+  route decodes to plain `[NW,N,NW,N,NW,N,NW,NW,N]`, and hand-running this
+  implementation's own `Line.next()` over (124,31)->(119,22) reproduces
+  exactly that sequence. At the wake visit Java DOES plan -- the trace shows
+  `from=124,31 goal=119,22 FOUND` -- but the stored route comes back as
+  five headings consumed `[N,N,NW,N,NW]`: the direct line was rewritten and
+  shortened by the optimizer under the wake's soft-occupancy view (every
+  neighbour except west reads soft-allied in `near=`), which flips the first
+  consumed face north where retail steps north-west. The fix lives in
+  BattleNetPathFinder's optimization passes preserving the unmodified line
+  when its squares are merely soft-occupied -- global blast radius, so gate
+  any candidate against the full survey, not just this case.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
