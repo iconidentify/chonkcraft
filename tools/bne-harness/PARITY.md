@@ -34,23 +34,31 @@ chain (XHuman 7 253->255, XHuman 5 256->288).
 Native runs a Move-program band to expiry on a stalled chaser; Java steps
 one visit early:
 
-- `retail-human-08-idle` @255: attack-peasant 1513 (Java 87) chasing on
-  route `[NW consumed, E, E]`, ri=1, seq 2600 counting t9->t3 across
-  249..255 -- native still inside its quiet band; Java stepped at 255.
-  Cadence: aligned through 224, extra Java transition at 255.
+- `retail-human-08-idle` @255: attack-peasant 1513 (Java 87) finished its
+  diagonal march at (77,62) on f224, ran the ordinary 2657/3 constructor at
+  240..242, then -- its next heading refused -- armed the fifteen-count on
+  Move-start (seq 2600, t15 at 243) and served it to 257. On the expiry
+  visit 258 it replanned a fresh `[01,02,02]` route AND armed a second
+  fifteen rather than stepping: per expiry visit, attempt the stored
+  heading; free -> step, blocked -> next refusal generation, replan, next
+  band. Java's cursor instead parks at 2603/timer-one with collision one,
+  and when its orderDelay hits zero it replans once and steps immediately
+  (to 76,62, against the chase direction) at 255.
 - `retail-human-13-idle` @255: ogre 1510 (Java 90) promotes order 3 at 252,
   constructor 581/3,2,1 across 252..254, steps NW onto (123,30) at 255 with
-  fresh route `07 00 07 00 07 00 07 07 00`. Java misses the step cycle.
+  fresh route `07 00 07 00 07 00 07 07 00` (zero-interleaved headings --
+  doubled-step encoding on land, unported). Java misses the step cycle.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20, constructor 581/3,2,1 across 252..254, replans to
   `[SW, NW]` with seq 586/t15 at 255. Java x off by one.
 
-The systemic shape to port: the combat chase path consumes its order delay
-but does not serve the authenticated Move-program band the way the laden
-returner path now does (`stepHarvest` counts the Move program during
-`battleNetOrderDelay`; the chase equivalents step on expiry instead). Port
-that band-consumption into the chase refill and all three should move
-together; gate each against its sealed packet before writing code.
+The systemic shape: the combat chase path consumes its order delay but does
+not run the refusal-generation protocol native uses on expiry -- attempt
+stored heading, blocked means replan plus another band, never an immediate
+step. Port that protocol into the chase refill (the laden returner's
+band-consumption in `stepHarvest` is the in-tree pattern), gate each map
+against its sealed packet, and note h13 additionally needs land doubled-
+step route bytes decoded before its fresh-route step can match.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
