@@ -20,9 +20,37 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 Accepted pointer: run `609b4c53` (common clean 252, earliest divergence 253,
 gate PASS, engine content identical to commit `bfe8abdc`; the capsule's
 declared pathspecs match that tree exactly, only excluded `.md` files
-differ). Candidate on `master` after `5475597e`: Orc 8 exact through 288,
-52-map survey at cycle 400 keeps 27 clean / 25 divergent / 0 failed, capped
-sums move 18,164 -> 18,200 with no per-map regression.
+differ). Candidate on `master` after `86f1c618`: **shared horizon 254**
+(earliest divergence 255), survey through cycle 400 keeps 27 clean / 25
+divergent / 0 failed with zero regressions and capped sums moving
+18,164 -> 18,263. Engine failure identities unchanged (110=110).
+
+Closed this stretch: Orc 8 mine-exit refusal hold (253->289), XOrc 11
+walled-quarry drop (253->282), naval beat reissue through the patrol target
+chain (XHuman 7 253->255, XHuman 5 256->288).
+
+### Next blockers at 255 (all one family)
+
+Native runs a Move-program band to expiry on a stalled chaser; Java steps
+one visit early:
+
+- `retail-human-08-idle` @255: attack-peasant 1513 (Java 87) chasing on
+  route `[NW consumed, E, E]`, ri=1, seq 2600 counting t9->t3 across
+  249..255 -- native still inside its quiet band; Java stepped at 255.
+  Cadence: aligned through 224, extra Java transition at 255.
+- `retail-human-13-idle` @255: ogre 1510 (Java 90) promotes order 3 at 252,
+  constructor 581/3,2,1 across 252..254, steps NW onto (123,30) at 255 with
+  fresh route `07 00 07 00 07 00 07 07 00`. Java misses the step cycle.
+- `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
+  refuse marker ri=20, constructor 581/3,2,1 across 252..254, replans to
+  `[SW, NW]` with seq 586/t15 at 255. Java x off by one.
+
+The systemic shape to port: the combat chase path consumes its order delay
+but does not serve the authenticated Move-program band the way the laden
+returner path now does (`stepHarvest` counts the Move program during
+`battleNetOrderDelay`; the chase equivalents step on expiry instead). Port
+that band-consumption into the chase refill and all three should move
+together; gate each against its sealed packet before writing code.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
