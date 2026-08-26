@@ -15,7 +15,63 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-22
+## Current release checkpoint — 2026-08-26
+
+Accepted pointer: run `609b4c53` (common clean 252, earliest divergence 253,
+gate PASS, engine content identical to commit `bfe8abdc`; the capsule's
+declared pathspecs match that tree exactly, only excluded `.md` files
+differ). Candidate on `master` after `5475597e`: Orc 8 exact through 288,
+52-map survey at cycle 400 keeps 27 clean / 25 divergent / 0 failed, capped
+sums move 18,164 -> 18,200 with no per-map regression.
+
+### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
+
+Peasant 1504 stalls at (123,86) behind ally 1501 on the only south square.
+Native answers each blocked retry with a refusal generation -- Move-start
+timer one with route cursor parked at twenty for seven quiet visits
+(fixtures 233..239), then the fifteen-count cooperative band armed at 240,
+served to expiry even though the blocker steps away at 253; the hauler takes
+the square at 255. The port held nothing: the planner returned an empty
+route while the face was occupied, installed it silently, and stepped the
+same cycle the square opened. Fix in `walkTowards`: when a laden land
+returner's fresh plan is empty and the direct face is allied-occupied,
+install the one-heading face route so the authenticated refusal ladder owns
+the outcome. Regression: `Orc08MineExitRefuseHoldRealDataTest` (checked to
+fail without the fix).
+
+### Negative result (do not retry as written)
+
+An empty chase probe is NOT a safe drop condition for auto-acquired attacks.
+XHuman 4 axethrowers 1506/1516 park route index twenty through their opening
+windup exactly like XOrc 11's 1517, but retail keeps their order alive and
+hands them a real one-heading chase route at windup end (fixture 6); Java's
+planner answers empty on that visit and only succeeds two visits later, so
+the current promote-on-empty plus retry loop is what matches XHuman 4.
+Gating a Still drop on `pathLength() == 0` regressed XHuman 4 to cycle 3
+even with an order-delay guard. The true XOrc 11 discriminator is whatever
+makes retail's Attack handler call the GiveOrder(STILL) epilogue --
+writer proved by decision-miner bootstrap capture: instruction `0x00453097`
+`mov %bl,0x2e(%esi)` inside `0x452110`'s activation, preceded by
+`mov byte [esi+0x2f],0x3c`, and the STILL branch clears the target pointer
+at `+0x88`. Next step there is reading the caller chain of `0x00453050`
+inside the attack handler, not another watchpoint.
+
+### Open at the shared boundary
+
+- `retail-xorc-11-idle` @253: see above; witness plan and bootstrap capture
+  are durable under `.bne-decision-miner/plans/2da7f89d...` and
+  `.bne-decision-miner/remote/b2bc3ae8...`.
+- `retail-xhuman-07-idle` @253: destroyer 1562. Native's fifty-cycle naval
+  beat reissues Patrol and rewrites BOTH endpoint pairs ((26,28) self,
+  (39,33) closest owned oil platform) while reusing behavior six; Java's
+  `fireBattleNetNavalPatrolPass` requeues only the stale ai-home point
+  (22,27), whose promotion decays to Still. Regression trap: the northern
+  destroyer's fixture-106 home rewrite witness lives on this same map, so a
+  blanket switch to full-chain recomputation must be proven against both
+  hulls; any fallback that can pay the chain's RNG draws when no far
+  endpoint exists must stay gated until its native draw cadence is known.
+
+## Prior release checkpoint — 2026-08-22
 
 The authenticated semantic-v1 campaign gate currently reports:
 
