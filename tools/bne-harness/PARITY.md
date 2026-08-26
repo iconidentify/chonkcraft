@@ -80,6 +80,18 @@ entirely: the idle-marker dispatch must target what the AI assignment says
 (13,66), not a local waypoint, after which the shared expiry protocol applies.
 Human 8's chase variant arms through the combat refill instead and still
 needs the protocol there.
+Root cause found, one layer deeper still: ogre 1356 (Java 244) is behaviour
+two because `AiPlayer.battleNetFinishBootstrapForces` launched its ground
+force at fixture 49 -- exactly where native rewrites the sealed home from
+(26,87) to (13,66). Java writes the launch enemy's own tile: guard tower
+230 stands at (13,86) and that became the behaviour-two home. But (13,66)
+is no unit's tile anywhere in the sealed run -- native's launch home is an
+AI-script-derived point, not the quarry's square. The fix therefore belongs
+in behaviour-two home selection at force launch (enemy tile versus script
+point), which needs the native force-launch code read through a
+decision capture or the AI.BIN ledger before `battleNetForceEnemy`'s result
+can be replaced; everything downstream -- idle dispatch, band protocol,
+step choice -- already follows from whatever home is stored.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
