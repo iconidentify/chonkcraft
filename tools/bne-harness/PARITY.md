@@ -55,6 +55,20 @@ one visit early:
   planner), so the redraw returns retail's straight line and the existing
   band ladder frames it. Calibrate against the sealed ladder above; gate
   with the full survey -- chase redraws are everywhere in crowded maps.
+  Candidate refuted, do not retry as written: threading a
+  `battleNetColdParkRedraw` marker from the park site into
+  findBattleNetTargetPath fixed ogre 1513's fixture-258 redraw but broke
+  its OWN mid-march at fixture 189 -- earlier parks inside the formation's
+  diagonal march consume the same marker, and those redraws must keep
+  walls. So the discriminator is real and temporal: retail's per-step
+  walker treats standing brothers as transparent during the crowded
+  ladder but as walls during the open march, or equivalently the port
+  must abandon multi-heading plans for this walker entirely and mirror
+  retail's one-decision-per-band protocol literally (band -> band ->
+  constructor -> single fresh step). The literal-mirror approach is the
+  recommended next implementation: it sidesteps the discriminator by
+  never drawing multi-heading detours for this state at all, matching the
+  sealed record where no route bytes are ever stored.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
