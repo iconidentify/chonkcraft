@@ -101,12 +101,23 @@ inside the attack handler, not another watchpoint.
   chain reproduces the swap ANSWER but fires it at the 199 beat where native
   decays. No unit-record byte and no world object distinguishes the 199 and
   249 pre-beat states except animation phase -- the accepting gate is
-  therefore not in the sealed 152-byte records at all. It lives in native's
-  per-player AI state (the tanker-assignment registry or a reissue counter
-  beside it), and the next session should run one decision-plan contrast on
-  the writer of offset 0x58 at fixture 249 versus its silence at 199 --
-  `--native-unit 1562 --field x` style plans will not see it; the plan must
-  watch ai_home 0x58 directly.
+  therefore not in the sealed 152-byte records at all.
+  Decisive new fact: BOTH behavior-six destroyers swap at the same beat --
+  northern 1570 writes home:=self (24,24) at queue time 249 and starts its
+  real east leg onto goal (39,33) at fixture 255, exactly mirroring
+  southern 1562 -- so the accepting gate is player-level, not per-hull.
+  p6's banks stay zero throughout (no delivery trigger), and no unit or
+  world object changes in 200..248 beyond movers' positions. The gate is
+  therefore native per-player AI state -- most plausibly an oil-logistics
+  flag set when the tanker entered the platform, observed by the first beat
+  after some internal delay -- which lives beside the AI.BIN interpreter,
+  outside both the sealed unit records and the fixture player rows. Next
+  session: capture the writer of ai_home offset 0x58 at fixture 249 (plan
+  must watch 0x58 directly; `--field order` plans will not see it), or mine
+  the AI player state around the 199->249 window with the ai-decision-ledger
+  tooling, then port the same condition into
+  `fireBattleNetNavalPatrolPass`'s behavior-six arm using
+  `battleNetNavalPatrolTarget`, which already computes the right endpoints.
 
 ## Prior release checkpoint — 2026-08-22
 
