@@ -86,12 +86,21 @@ force at fixture 49 -- exactly where native rewrites the sealed home from
 (26,87) to (13,66). Java writes the launch enemy's own tile: guard tower
 230 stands at (13,86) and that became the behaviour-two home. But (13,66)
 is no unit's tile anywhere in the sealed run -- native's launch home is an
-AI-script-derived point, not the quarry's square. The fix therefore belongs
-in behaviour-two home selection at force launch (enemy tile versus script
-point), which needs the native force-launch code read through a
-decision capture or the AI.BIN ledger before `battleNetForceEnemy`'s result
-can be replaced; everything downstream -- idle dispatch, band protocol,
-step choice -- already follows from whatever home is stored.
+AI-script-derived point, not the quarry's square.
+The launch is a four-member group and the home is SHARED: at fixture 60 the
+sealed records hold home=(13,66) on slots 1356, 1434, 1435 and 1438, while
+1358/1359/1363 still carry the pre-launch (26,87). No member stood at
+(13,66) at launch (positions were (10,90)/(20,64)/(23,61)/(19,64)), no p6
+building sits near it (the base is the far south-west corner), and no enemy
+structure owns that tile either -- the closest enemies are guard tower
+171 at (15,67) and the targeted tower 230 twenty tiles south. So the point
+is computed by native's force-launch code from something none of these
+snapshots expose -- an AI.BIN script waypoint being the leading candidate.
+Resolving it requires capturing the writer of offsets 0x58/0x5a on slot
+1356 during fixture 49 (a plan watching ai_home directly; order/x/y field
+plans will not see it) or mining the AI player state across the window.
+Everything downstream -- idle dispatch, band protocol, step choice --
+already follows from whatever home is stored.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
