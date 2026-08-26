@@ -44,13 +44,18 @@ one visit early:
   band. Java's cursor instead parks at 2603/timer-one with collision one,
   and when its orderDelay hits zero it replans once and steps immediately
   (to 76,62, against the chase direction) at 255.
-- `retail-human-13-idle` @255: NOT a timing case -- a heading choice. Ogre
-  1510 (Java 90) promotes order 3 at 252, constructor 581/3,2,1 across
-  252..254 (Java's own trace matches this far), then steps NORTH-WEST onto
-  (123,30) at 255 on a fresh zero-interleaved route
-  `07 00 07 00 07 00 07 07 00` -- land doubled-step encoding, unported.
-  Java's planner instead picks pure north ((124,30) at the same visit), so
-  matching needs the detour-face rule behind that route, not band work.
+- `retail-human-13-idle` @255: SOLVED DOWN TO TIMING -- not a heading
+  choice and not an encoding. Native's fresh route
+  `07 00 07 00 07 00 07 07 00` is plain `[NW,N,NW,N,NW,N,NW,NW,N]`
+  (heading zero IS north), and hand-running this implementation's own
+  `Line.next()` over (124,31)->(119,22) reproduces that exact sequence --
+  the line walker needs no change. The defect is only WHEN the plan exists:
+  Java promotes the order with an EMPTY path (bna-seq 581/t3, delay 2,
+  path 0), then walks north off some later consult, while native keeps the
+  old route parked through the constructor and on the expiry visit plans
+  the nine-heading route and takes its first north-west step in the SAME
+  visit. Same expiry-visit family as Human 8: plan must happen at the
+  wake, not before it.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
