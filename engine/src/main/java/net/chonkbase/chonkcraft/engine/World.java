@@ -12183,6 +12183,63 @@ public final class World {
         return new PathFinder.Path(PathFinder.Result.FOUND, headings);
     }
 
+    /**
+     * Whether any square beside the target's footprint is reachable over
+     * terrain alone, every mobile occupant ignored.
+     *
+     * <p>The ordinary combat planner answers an occupied or transiently walled
+     * face with an empty route and relies on its callers retrying, so its
+     * empty answer cannot separate a quarry that will open up from one that
+     * never can. This question strips the mobile-occupancy tile flags and
+     * asks again: XHuman 4's packed axethrower row opens within three visits,
+     * while XOrc 11's axethrower 1517 acquires the archer row on 10,30 from a
+     * compound whose land gate no route crosses -- retail answers that shape
+     * by clearing the target and returning to Still at fixture 253, the
+     * GiveOrder epilogue at 0x00453097 proved by the sealed capture. Purely a
+     * function of terrain and footprints; draws nothing and moves nothing.
+     */
+    boolean battleNetTerrainReachable(Unit unit, Unit target) {
+        long mask = unit.movementMask();
+        long blocking = unit.blockingFlags()
+                & ~(TileFlag.LAND_UNIT | TileFlag.AIR_UNIT
+                        | TileFlag.SEA_UNIT);
+        int mapWidth = map.width();
+        int mapHeight = map.height();
+        BattleNetPathFinder.Passability terrainOnly =
+                new BattleNetPathFinder.Passability() {
+                    @Override
+                    public boolean canEnter(int x, int y) {
+                        return map.isFootprintFree(x, y, 1, 1, mask, blocking);
+                    }
+
+                    @Override
+                    public boolean canEnterIgnoringMobileOccupancy(int x,
+                            int y) {
+                        return canEnter(x, y);
+                    }
+
+                    @Override
+                    public boolean isOutOfBounds(int x, int y) {
+                        return x < 0 || y < 0 || x >= mapWidth || y >= mapHeight;
+                    }
+                };
+        int left = target.tileX();
+        int top = target.tileY();
+        int right = left + Math.max(1, target.type().tileWidth()) - 1;
+        int bottom = top + Math.max(1, target.type().tileHeight()) - 1;
+        PathFinder.Path path = BattleNetPathFinder.find(
+                unit.tileX(), unit.tileY(),
+                left + (right - left) / 2, top + (bottom - top) / 2,
+                battleNetMovementStride(unit),
+                terrainOnly, terrainOnly,
+                (x, y) -> x >= left - 1 && x <= right + 1
+                        && y >= top - 1 && y <= bottom + 1);
+        // This finder answers "no route" as FOUND with an empty buffer, so
+        // the verdict is the heading count and never the result code alone.
+        return path.result() == PathFinder.Result.FOUND
+                && path.length() > 0;
+    }
+
     private PathFinder.Result planTowards(Unit unit, Unit target,
             boolean settledResidualRetarget,
             boolean completedRefusalBand) {

@@ -58,22 +58,22 @@ inside the attack handler, not another watchpoint.
 
 ### Open at the shared boundary
 
-- `retail-xorc-11-idle` @253: see above; witness plan and bootstrap capture
-  are durable under `.bne-decision-miner/plans/2da7f89d...` and
-  `.bne-decision-miner/remote/b2bc3ae8...`. Second negative result saved:
-  the quarry is NOT terrain-unreachable. A terrain-only reachability ask
-  (mobile occupancy stripped, footprint-plus-skirt goal) answers FOUND for
-  (4,37) -> (10,30) at every probe visit, so a give-up gated on strong
-  unreachability never fires and cannot be the retail rule either. The two
-  surviving explanations are both measurable and should be priced before any
-  arm is written: native's pathfinder search budget answering failure on
-  this long detour while succeeding on XHuman 4's six-tile corridor, or an
-  attack-order retry counter in AI state giving up after N empty probes.
-  The sealed contrast to price them against: XHuman 4's first post-windup
-  probe succeeds at fixture 6 after three earlier empties, XOrc 11's never
-  succeeds, and both engines' planners answer empty at every one of these
-  visits -- so whichever mechanism native uses, it reads something Java's
-  planner does not currently expose.
+- `retail-xorc-11-idle` @253 -- CLOSED this pass, frontier 253 -> 282.
+  The give-up keys on terrain-only unreachability of the quarry. A
+  terrain-only reachability ask (mobile occupancy stripped, footprint-skirt
+  goal) fails for (4,37) -> (10,30) at every probe visit while XHuman 4's
+  packed row stays five steps over open ground, so the new arm in stepAttack
+  drops only when the post-delay chase probe answers empty AND that question
+  says no route exists over any terrain. One measurement lesson is worth
+  keeping: BattleNetPathFinder encodes "no route" as FOUND with an empty
+  buffer, so the first version of this verdict read `result() == FOUND` and
+  silently inverted -- reachability claims must check the heading count,
+  never the result code alone. The GiveOrder epilogue at 0x00453097 proved
+  by capture stands as the retail mechanism being reproduced. Regression:
+  `Xorc11UnreachableQuarryDropRealDataTest` (checked to fail without the
+  fix); witness plan and bootstrap capture remain durable under
+  `.bne-decision-miner/plans/2da7f89d...` and `.bne-decision-miner/remote/
+  b2bc3ae8...`.
 - `retail-xhuman-07-idle` @253: destroyer 1562. Native's fifty-cycle naval
   beat reissues Patrol and rewrites BOTH endpoint pairs ((26,28) self,
   (39,33) closest owned oil platform) while reusing behavior six; Java's

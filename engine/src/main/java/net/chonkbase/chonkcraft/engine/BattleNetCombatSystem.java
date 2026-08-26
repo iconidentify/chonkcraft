@@ -6059,6 +6059,25 @@ final class BattleNetCombatSystem {
                     world.finishAttackOrder(unit);
                     return;
                 }
+                if (unit.pathLength() == 0 && unit.type().landUnit()
+                        && !world.battleNetTerrainReachable(unit, target)) {
+                    // An empty answer whose quarry is unreachable over terrain
+                    // alone is retail's give-up, not a route to wait on. XOrc
+                    // 11's axethrower 1517 acquires the archer row on 10,30
+                    // from its walled shore pocket at fixture 248, winds
+                    // Attack 3,2,1 across 250..252, and on 253 clears the
+                    // target and returns to Still without a step -- the
+                    // GiveOrder epilogue at 0x00453097 proved by capture.
+                    // This used to promote the chase anyway and loop the
+                    // windup timer against the wall forever. Reachable
+                    // quarries keep today's compensated retry: XHuman 4's
+                    // packed axethrower row answers empty for three visits,
+                    // stays five steps over open ground, and then opens --
+                    // its opening chase is exact.
+                    unit.setChasing(false);
+                    world.finishAttackOrder(unit);
+                    return;
+                }
                 refilled = true;
                 // Bind the marker below, after the first movement consult has
                 // told us whether this is a borrowed leftover or a buffered
