@@ -34,138 +34,41 @@ chain (XHuman 7 253->255, XHuman 5 256->288).
 Native runs a Move-program band to expiry on a stalled chaser; Java steps
 one visit early:
 
-- `retail-human-08-idle` @255: attack-peasant 1513 (Java 87) finished its
-  diagonal march at (77,62) on f224, ran the ordinary 2657/3 constructor at
-  240..242, then -- its next heading refused -- armed the fifteen-count on
-  Move-start (seq 2600, t15 at 243) and served it to 257. On the expiry
-  visit 258 it replanned a fresh `[01,02,02]` route AND armed a second
-  fifteen rather than stepping: per expiry visit, attempt the stored
-  heading; free -> step, blocked -> next refusal generation, replan, next
-  band. Java's cursor instead parks at 2603/timer-one with collision one,
-  and when its orderDelay hits zero it replans once and steps immediately
-  (to 76,62, against the chase direction) at 255.
-- `retail-human-13-idle` @255: SOLVED DOWN TO THE OPTIMIZER -- not timing,
-  not encoding, not the line walker. Heading zero IS north; native's fresh
-  route decodes to plain `[NW,N,NW,N,NW,N,NW,NW,N]`, and hand-running this
-  implementation's own `Line.next()` over (124,31)->(119,22) reproduces
-  exactly that sequence. At the wake visit Java DOES plan -- the trace shows
-  `from=124,31 goal=119,22 FOUND` -- but the stored route comes back as
-  five headings consumed `[N,N,NW,N,NW]`: the direct line was rewritten and
-  shortened by the optimizer under the wake's soft-occupancy view (every
-  neighbour except west reads soft-allied in `near=`), which flips the first
-  consumed face north where retail steps north-west.
-  First candidate refuted, do not retry as written: blanket-softening
-  standing behaviour-one members on recurring-regroup routes (planner ogre
-  1510 is ai=1 heading to its aiHome) fixed 1510's face but pushed SIBLING
-  ogre 1501 -- whose own constructor-wake at fixture 252 previously matched
-  -- one cycle late. Both wakes are the same family with opposite needs,
-  so the discriminator is per-blocker state not yet read: which standing
-  brother is transparent to a given wake (1510 crossed (122,28)/(122,27))
-  and which is a wall (1501's own replan). Candidates for that state:
-  the blocker's pending-move queue, its own band phase, or launch-group
-  membership relative to the planning hull. The sealed packets for both
-  wakes are in this file; resolve the discriminator before touching the
-  passability classification again.
-  Second candidate refuted, and it exposed the real mechanism. Re-applying
-  the same soften and tracing sibling 1501 (Java 99, pair confirmed by
-  cadence, aligned through 252 pre-change): its wake plan is NOT the
-  blocker question at all. At internal 254 the planner answers
-  `from=123,30 goal=115,25 FOUND [SW,NW,N]` -- yet native (and pre-change
-  Java) step NORTH at fixture 252, a heading that exists only in the STALE
-  LEFTOVER behind route index twenty from the earlier refusal. The wake
-  visit consumes the parked leftover FIRST; the fresh plan takes over only
-  after that consumption. The soften perturbed this visit's internal
-  ordering so the leftover-consume slipped one visit -- hence the late
-  step -- while its planning answer was almost incidental. THE FAMILY RULE:
-  at constructor end, consume the parked stale heading immediately (face
-  permitting); refuse-and-reband if blocked; only then replan. Any
-  passability change must be evaluated against that ordering, not against
-  planned-route content.
-  Third candidate refuted, and it pinned the true root. Preserving the
-  single-heading buffer across `orderMove`'s clearPath for AI-dispatched
-  promotions (beginBattleNetPendingMove) implemented the consume-on-wake --
-  and STILL slipped ogre 1501 one cycle, because the probe showed Java's
-  parked byte is WEST (6) where native's stored route at the same fixture
-  holds NORTH (`00` bytes, ri walking 4 -> 20 -> 1 across f246..252). The
-  wake-consume machinery is proven correct given right content: native
-  consumed its parked north on schedule, and a preserved-but-wrong heading
-  refused at walk time and re-banded. The divergence was therefore created
-  generations earlier, when the route was originally parked around ogre
-  1510's march settling at (123,30) on fixture 214: native parked an
-  all-north continuation, this implementation's planner parked a west.
-  Root cause: point-path planning content parity at the original parking
-  event (same optimizer-under-occupancy family as ogre 1510's wake), one
-  planning generation upstream of every symptom in this file.
-  CORRECTION superseding the paragraph above -- the all-north parking does
-  not exist. A full-history dump of slot 1510 shows its route bytes
-  constant from cycle 1 (`00 x8` then pointer `38 81 06 05`); there is no
-  stored route at any fixture, the zeros were never headings, and offset
-  0x7e is a PER-ORDER STEP COUNTER: it increments on every tile step
-  (f6 -> 01, f18 -> 02, f108 -> 01 after a goal change) and resets to 20
-  on refusals and order-goal changes. Ogre 1510 walks entirely by fresh
-  per-step decisions -- roughly one step per eleven-to-thirteen cycle
-  Still-loop program -- refusing at walk time when a chosen square is
-  occupied. Consequences for the fix: (a) native's plain-move wake simply
-  decides ONE step fresh toward the goal and ignores every mobile occupant
-  while deciding -- Human 13's wake chose north-west across squares held by
-  standing brothers, discovering blocks later by refusal; (b) the port's
-  habit of pre-truncating or reordering the plan around hard-standing
-  allies is the entire visible delta; and (c) the open discriminator stands
-  unchanged -- XHuman 12's ogre 1356 provably walls a regrouping brother at
-  fixture 204 while Human 13's ogre crosses standing brothers at 255 -- so
-  the condition separating "transparent brother" from "wall brother" must
-  be read before the passability classification is touched.
-  Fourth candidate implemented and reverted: a `planThroughAlliedMobiles`
-  view on findBattleNetPointPath (threaded to the plain-Move wake,
-  traversal and optimizer consistently, mobiles only) DID fix ogre 1510's
-  face -- north-west, matching retail -- but slipped sibling 1501 again,
-  and this time the trace exposed the last unknown precisely. With mobiles
-  transparent, 1501's line toward home (115,25) is west-major and opens
-  south-west onto (122,31) -- occupied by grunt 115. Retail stepped NORTH
-  instead: its per-step decision SKIPS an occupied preferred face and takes
-  the next free heading that still closes on the goal, rather than refusing
-  into a band. So the complete retail wake is: decide one step fresh with
-  all mobiles transparent, walking a face-preference order and skipping
-  occupied faces until one closes geographically; refuse only terrain.
-  Both sealed wakes (1510 free-face NW; 1501 blocked-SW skip-to-N) are the
-  calibration pair for that face order. The port needs this per-step
-  selector for plain-Move wakes plus the through-mobile view together --
-  either alone regresses one sibling while fixing the other.
-  Fifth candidate implemented (single-step selector: line face then a
-  blocked diagonal's cardinals in ascending order) and reverted -- it
-  fixed 1510, slipped 1501, and the slip finally named the true target:
-  native 1501 stepped NORTH away from its own home (115,25), toward the
-  force/enemy direction around (119,22). Both h13 ogres reissue toward the
-  assault direction while this implementation dispatches them toward their
-  stored aiHome. This is the same disease XHuman 12's launch-home trace
-  found -- the recurring behaviour-one beat reissues toward a target that
-  is not aiHome -- and it means face selection cannot be calibrated until
-  the dispatch target matches. THE UNIFIED ROOT for the whole 255 family:
-  read where native's behaviour-one beat reissue takes its target from
-  (AI.BIN attack waypoint versus stored home; XH12's launch home writer is
-  the same question one step earlier), fix that source, and the wake-face
-  selector calibrated on the two sealed wakes lands on top of it.
+- `retail-human-13-idle` @255 -- CLOSED this session (line-face gate,
+  Human 13 now @265).
+- `retail-xhuman-12-idle` @255 -- force-launch home root cause recorded
+  below; needs AI.BIN capture.
+- `retail-human-08-idle` @255 -- DECODED, ready to implement. Attack-peasant
+  1513 (Java 87) chases east; its stored face refuses. Retail runs a
+  multi-band ladder on the Move-start station 2600: fifteen-count served
+  f243..257, then counter reset (ri 1->0) and ANOTHER fifteen f258..272,
+  then constructor 2657/3,2,1 f273..275, then the fresh per-step decision
+  steps EAST onto (78,62) at f276 -- straight through where brothers stand,
+  because the post-band redraw ignores every mobile occupant. A later
+  refusal at f295 runs constructor plus a twenty-three count. Java
+  instead parks once, redraws against current occupancy (brothers read as
+  walls), stores a westward detour segment, and steps west at its first
+  delay-expiry -- away from the goal entirely.
+  The fix: the post-park redraw for a cold-chase-refusal wake must use the
+  through-allied-mobiles passability (the `planThroughAlliedMobiles` flag
+  built for findBattleNetPointPath, threaded here into the unit-target
+  planner), so the redraw returns retail's straight line and the existing
+  band ladder frames it. Calibrate against the sealed ladder above; gate
+  with the full survey -- chase redraws are everywhere in crowded maps.
 - `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
   refuse marker ri=20 through fixtures 249..250 with no program, arms delay
   2 at fixture 255 -- then Java steps west to (10,86) when the delay
   expires at 256. Native instead replans to `[SW, NW]` with seq 586/t15 at
   255 and stays put: the same expiry-visit protocol as Human 8.
 
-The systemic shape: the combat chase path consumes its order delay but does
-not run the refusal-generation protocol native uses on expiry -- attempt
-stored heading, blocked means replan plus another band, never an immediate
-step. Port that protocol into the chase refill (the laden returner's
-band-consumption in `stepHarvest` is the in-tree pattern), gate each map
-against its sealed packet, and note h13 additionally needs land doubled-
-step route bytes decoded before its fresh-route step can match.
-Navigation for XHuman 12, proved by stack probe: the ogre's delay-two is
-armed through `dispatchBattleNetIdleMarker -> beginBattleNetPendingMove ->
-orderMove` (BattleNetIdleSystem 1461 -> BattleNetMovementSystem 2269/65/478)
-from inside `stepStill`, not from `stepPatrol` -- the unit shows PATROL in
-its order field while the idle marker dispatches the move that steps it.
-The stale leftover it consumes sits behind route index twenty from the
-earlier refusal; native discards that leftover at constructor end, replans,
-and arms seq 586/t15 instead.
+The systemic shape across the family: retail's plain-move and chase wakes
+decide ONE step fresh toward the goal with every mobile occupant invisible
+while deciding, refusing at walk time when the chosen square is truly
+blocked; this implementation's occupancy-aware planner instead pre-shapes
+multi-heading routes around hard-standing allies, which is where every
+symptom in this family enters. Two of the three 255 blockers are closed;
+Human 8's chase redraw and XHuman 12's dispatch target remain, each with
+its decoded protocol above.
 One more layer down, also proved by trace: at delay expiry Java's planner
 is asked for a route to (13,86) -- a local waypoint -- and answers a single
 westward step, while native keeps the ogre's authored goal (13,66), replans
