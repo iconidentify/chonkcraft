@@ -384,10 +384,12 @@ def _opcode3_predicates(ai_bin: bytes | None, incoming: bytes | None,
         outgoing: bytes, ai_base: int, ai_size: int) -> list[dict[str, Any]]:
     """Recover WAIT-UNTIL attempts that the boundary snapshots do not hook.
 
-    Opcode 3 at the incoming program counter is the pinned WAIT-UNTIL
-    predicate. A failed gate restores the same PC and writes wait=1. A
-    successful gate advances two bytes. This is transcribed from the
-    opcode, not inferred from a later visual.
+    A zero-wait tick walks the pinned bytecode through unconditional SET and
+    JUMP instructions until WAIT or WAIT-UNTIL yields.  A failed opcode-3 gate
+    restores the reached opcode address and writes wait=1; a successful gate
+    advances two bytes.  This is transcribed from ai.bin and the two committed
+    PCs, not inferred from a later visual.  An invalid path or an outgoing PC
+    other than either legal result fails closed with no invented event.
     """
     if ai_bin is None or incoming is None or _u32(incoming, 0) != 0:
         return []
@@ -396,9 +398,32 @@ def _opcode3_predicates(ai_bin: bytes | None, incoming: bytes | None,
         later = normalize_pointer(_u32(outgoing, PTR_PC), ai_base, ai_size)
     except ValueError:
         return []
-    if pc < 0 or pc + 1 >= len(ai_bin) or ai_bin[pc] != 3:
-        return []
-    return [{"id": ai_bin[pc + 1], "result": later != pc}]
+    visited: set[int] = set()
+    while 0 <= pc < len(ai_bin) and pc not in visited:
+        visited.add(pc)
+        opcode = ai_bin[pc]
+        if opcode == 0:  # SET offset, value
+            if pc + 2 >= len(ai_bin):
+                return []
+            pc += 3
+            continue
+        if opcode == 1:  # JUMP absolute file offset
+            if pc + 2 >= len(ai_bin):
+                return []
+            pc = int.from_bytes(ai_bin[pc + 1:pc + 3], "little")
+            continue
+        if opcode == 2:  # WAIT ends this bytecode tick before later bytes.
+            return []
+        if opcode != 3 or pc + 1 >= len(ai_bin):
+            return []
+        if later == pc:
+            result = False
+        elif later == pc + 2:
+            result = True
+        else:
+            return []
+        return [{"id": ai_bin[pc + 1], "result": result}]
+    return []
 
 
 def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,

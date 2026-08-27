@@ -46,8 +46,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,790 tests**. The canonical authenticated
-profile runs 2,764 and intentionally skips exactly 26, while keeping the exact
+The complete suite now contains **2,791 tests**. The canonical authenticated
+profile runs 2,765 and intentionally skips exactly 26, while keeping the exact
 expected 110-test specification-failure set. Hosted run `33121122477` passed
 both the data-free and authenticated jobs against revision
 `f4e7b95212b58183340bcd72526fccfc2082f423`.
@@ -71,12 +71,12 @@ being inferred from the playable campaign fleet:
 - Physical player transactions: **0/532** paired native/Java certifications.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
-- AI fleet: **45/52** current-head mission twins are materialized from
-  authenticated native captures; seven captures are missing. Committed state
-  is exact for **36/52** missions and **163,796/167,400** player-cycles. Full
-  causal telemetry is exact for **32/52** missions and **163,784/167,400**
-  player-cycles. Fleet certification remains incomplete until all 52 missions
-  are materialized and exact under one proof.
+- AI fleet: **52/52** current-head mission twins are materialized from
+  authenticated native captures. Committed state is exact for **42/52**
+  missions and **201,088/205,200** player-cycles. Full causal telemetry is
+  exact for **38/52** missions and **201,040/205,200** player-cycles. Fleet
+  certification remains incomplete until all 52 missions are exact under one
+  proof.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 

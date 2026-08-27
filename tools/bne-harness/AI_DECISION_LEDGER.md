@@ -109,7 +109,10 @@ The interpreter often runs after the committed `game-after` snapshot, so a
 same-cycle `game-before` dump already holds the new wait and hides the write.
 `from-trace` now seeds incoming state from the previous committed after-state
 (including the last warmup-after) and recovers opcode-3 WAIT-UNTIL attempts
-from authenticated `ai.bin` when the incoming wait is zero. The same Orc 1
+from authenticated `ai.bin` when the incoming wait is zero. Recovery walks
+the pinned unconditional SET/JUMP chain until the first WAIT or WAIT-UNTIL;
+the reached opcode and one of its two legal outgoing PCs determine the event,
+while malformed paths fail closed. The same Orc 1
 player-1 capture now compares `state_identical` and `telemetry_identical`
 through 12, 200, and 1,800 cycles: PC stays `0x1ba6`, wait oscillates 0/1,
 predicate 3 (worker count) fails every independent choice, and no launch is
@@ -118,16 +121,18 @@ consumed.
 Human 1 and Human 4 computers SET `+0x0c=0` during install. Native
 `0x428160` already reads that byte as the builder-scan latch and skips the
 map walk when it is zero. Java now arms the latch after install. The current
-head conductor store materializes all 14 classic Human missions plus Orc 1
-through 1,800 cycles under one proof: Human 1, 2, 3, 6, 9, 10 and Orc 1
-are state and telemetry exact; Human 7 and 12 are state exact with
-telemetry-only first misses. The ranked state frontier is Human 13 player 0
-at 466, then Human 4 player 0 at 1,414: both are opcode-3 predicate 3
-succeeding so the PC advances two bytes while native still fails the
-wait-until. That is extra completed family-word workers, not a second
-predicate rule -- do not invert pred 3. Human 8 player 0 at 149 already has
-the `3e1656` box rewrite while native still holds `3e164f`. Human 5 player 5
-is still telemetry-only at cycle 2.
+head conductor store materializes all 52 campaign missions through 1,800
+cycles under one proof: 42/52 missions and 201,088/205,200 player-cycles are
+committed-state exact; 38/52 missions and 201,040/205,200 player-cycles have
+full causal telemetry. Seven classic/expansion witnesses run SET/JUMP chains
+before WAIT-UNTIL; recovering those native predicate attempts makes Orc 5,
+expansion Orc 4 and expansion Orc 10 fully causal-exact without changing
+simulation. Periodic ground/naval/air launch-byte mutations now join the same
+net-write ledger as bytecode and build-box refresh. The remaining launch rows
+fail closed on native requested/assigned/target evidence rather than hiding
+that proof gap. The ranked committed-state frontiers are Orc 4 at cycle 970,
+expansion Human 2 at 972 and Human 4 at 1,444; those are behavior debt, not a
+reason to invert the already authenticated predicate rules.
 
 The 0x4273e0 pad after the land walk is 8-bit wrapping minus 5 / plus 8,
 then a signed clamp. A 128-tile computer whose signed min never moves

@@ -601,6 +601,7 @@ public final class AiPlayer {
         if (battleNetAiState == null || world == null) {
             return;
         }
+        byte[] before = packDecisionState();
         battleNetConsumeLaunch(world, "ground", 4,
                 BattleNetAiBytecode.OFF_LAUNCH_GROUND,
                 BattleNetAiBytecode.OFF_GROUND_FORCE_COUNT,
@@ -613,6 +614,7 @@ public final class AiPlayer {
                 BattleNetAiBytecode.OFF_LAUNCH_AIR,
                 BattleNetAiBytecode.OFF_AIR_FORCE_COUNT,
                 BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER);
+        recordDecisionWrites(before, packDecisionState());
     }
 
     /**

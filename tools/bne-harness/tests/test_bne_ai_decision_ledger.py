@@ -252,6 +252,75 @@ class AiDecisionLedgerTest(unittest.TestCase):
                          "opcode 3 at the incoming PC is WAIT-UNTIL; an "
                          "unchanged PC is a failed predicate")
 
+    def test_wait_until_after_sets_is_recovered_for_both_outcomes(self):
+        ai = bytearray(AI_SIZE)
+        # SET +0x13=9; SET +0x0d=1; WAIT-UNTIL 4.
+        ai[0x120:0x128] = bytes((0, 0x13, 9, 0, 0x0d, 1, 3, 4))
+        incoming = raw_state(wait=0, process_pc=True)
+        failed = raw_state(wait=1, pc=0x126, wanted_workers=9,
+                           process_pc=True)
+        succeeded = raw_state(wait=1, pc=0x128, wanted_workers=9,
+                              process_pc=True)
+
+        for result, after in ((False, failed), (True, succeeded)):
+            with self.subTest(result=result):
+                text = (
+                    tracer_dump(cycle=1, player=1, profile=0, raw=incoming)
+                    + tracer_dump(cycle=2, player=1, profile=0, raw=after,
+                                  phase="game-before")
+                    + tracer_dump(cycle=2, player=1, profile=0, raw=after)
+                )
+                built = ledger.ledger_from_native_trace(
+                    text, ai_base=AI_BASE, ai_size=AI_SIZE, ai_bin=bytes(ai))
+                self.assertEqual(
+                    [{"id": 4, "result": result}],
+                    built["rows"][1]["predicates"],
+                    "unconditional SETs before WAIT-UNTIL do not hide the "
+                    "predicate attempt",
+                )
+
+    def test_jump_chain_can_return_to_incoming_pc_after_wait_until(self):
+        ai = bytearray(AI_SIZE)
+        # SET; JUMP 0x11b; SET; WAIT-UNTIL 4. A successful predicate lands
+        # at 0x120, the same address the cycle entered at.
+        ai[0x11b:0x120] = bytes((0, 0x0d, 1, 3, 4))
+        ai[0x120:0x126] = bytes((0, 0x13, 9, 1, 0x1b, 0x01))
+        incoming = raw_state(wait=0, process_pc=True)
+        after = raw_state(wait=1, pc=0x120, wanted_workers=9,
+                          process_pc=True)
+        text = (
+            tracer_dump(cycle=1, player=1, profile=0, raw=incoming)
+            + tracer_dump(cycle=2, player=1, profile=0, raw=after,
+                          phase="game-before")
+            + tracer_dump(cycle=2, player=1, profile=0, raw=after)
+        )
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE, ai_bin=bytes(ai))
+        self.assertEqual([{"id": 4, "result": True}],
+                         built["rows"][1]["predicates"],
+                         "result is relative to the reached predicate, not "
+                         "the cycle's incoming PC")
+
+    def test_wait_instruction_stops_scan_before_later_wait_until(self):
+        ai = bytearray(AI_SIZE)
+        # SET; WAIT 25; unreachable-in-this-cycle WAIT-UNTIL 4.
+        ai[0x120:0x12b] = bytes((
+            0, 0x13, 9, 2, 25, 0, 0, 0, 3, 4, 0,
+        ))
+        incoming = raw_state(wait=0, process_pc=True)
+        after = raw_state(wait=25, pc=0x128, wanted_workers=9,
+                          process_pc=True)
+        text = (
+            tracer_dump(cycle=1, player=1, profile=0, raw=incoming)
+            + tracer_dump(cycle=2, player=1, profile=0, raw=after,
+                          phase="game-before")
+            + tracer_dump(cycle=2, player=1, profile=0, raw=after)
+        )
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE, ai_bin=bytes(ai))
+        self.assertEqual([], built["rows"][1]["predicates"],
+                         "a WAIT ends the bytecode tick before later bytes")
+
     def test_native_trace_pc_mutation_fails_at_that_cycle_and_field(self):
         text = tracer_dump(cycle=12, player=6, profile=29,
                            raw=raw_state(process_pc=True))

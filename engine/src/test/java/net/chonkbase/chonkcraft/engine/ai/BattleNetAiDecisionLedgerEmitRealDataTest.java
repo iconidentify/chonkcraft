@@ -162,6 +162,27 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("periodic launch-byte writes are recorded across force domains")
+    void periodicLaunchByteWritesAreRecordedAcrossForceDomains() {
+        assertWrite("campaigns/orc/level11o", 1, 49,
+                BattleNetAiBytecode.OFF_LAUNCH_GROUND, 1, 0);
+        assertWrite("campaigns/human-exp/levelx12h", 2, 49,
+                BattleNetAiBytecode.OFF_LAUNCH_GROUND, 1, 0);
+        assertWrite("campaigns/orc-exp/levelx11o", 6, 49,
+                BattleNetAiBytecode.OFF_LAUNCH_AIR, 1, 0);
+
+        List<AiDecisionLedger.Row> sameCycle = rowsFor(
+                emit("campaigns/orc-exp/levelx08o", 1499), 2);
+        assertTrue(sameCycle.size() >= 1499,
+                "XOrc 8 player 2 has no cycle-1499 AI row");
+        assertFalse(sameCycle.get(1498).writes().stream().anyMatch(
+                        write -> write.offset()
+                                == BattleNetAiBytecode.OFF_LAUNCH_NAVAL),
+                "arming and consuming one launch byte in the same cycle has "
+                        + "no committed net write");
+    }
+
+    @Test
     @DisplayName("a computer whose install stored zero still arms the builder-scan latch")
     void aComputerWhoseInstallStoredZeroStillArmsTheBuilderScanLatch() {
         // Human 1 profile 1 and Human 4 profile 3 both SET +0x0c=0. Native
