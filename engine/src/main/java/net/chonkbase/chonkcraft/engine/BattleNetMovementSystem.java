@@ -3865,6 +3865,15 @@ final class BattleNetMovementSystem {
                         && residualParkBlocker != unit
                         && world.isAllied(unit.player(),
                                 residualParkBlocker.player());
+                boolean consumedNearSaturatedRetargetFirstRefusal =
+                        !canTakeStep
+                        && unit.battleNetPathInitialLength()
+                                == BattleNetPathFinder.MAX_PATH - 1
+                        && unit.pathLength()
+                                == BattleNetPathFinder.MAX_PATH - 2
+                        && unit.battleNetPathStepsTaken() == 1
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0;
                 if (saturatedBuildingRetargetFirstRetry) {
                     // Attack construction has completed, but its first direct
                     // building-footprint byte still belongs to the saturated
@@ -3892,11 +3901,16 @@ final class BattleNetMovementSystem {
                 }
                 unit.setBattleNetRetargetResidualRoutePark(false);
                 if (!canTakeStep
-                        && unit.battleNetSaturatedRetargetRouteBand()) {
-                    // The collision-saturated retarget already paid for this
-                    // replacement buffer. Keep its approved tail through the
-                    // post-construction Move band instead of parking and cold-
-                    // replanning around the back of the formation.
+                        && (unit.battleNetSaturatedRetargetRouteBand()
+                                || consumedNearSaturatedRetargetFirstRefusal)) {
+                    // A collision-saturated retarget, or a nineteen-heading
+                    // retarget after its first committed step, already paid
+                    // for this replacement buffer. Keep its approved tail
+                    // through the post-construction Move band instead of
+                    // parking and cold-replanning around the formation.
+                    // XHuman 12 grunt 1496 keeps eighteen headings and arms
+                    // Move 15 at fixture 256; discarding them let Java step
+                    // southeast on 257 while retail remained on 36,39.
                     unit.setBattleNetSaturatedRetargetRouteBand(false);
                     int collision =
                             unit.battleNetCollisionCounter() + 1;

@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
@@ -224,6 +225,64 @@ class XHuman12Cycle166FormationHandoffRealDataTest {
                         arrivingGrunt.battleNetAnimationTimer()),
                 () -> assertEquals(0, arrivingGrunt.pathLength(),
                         "native parks the occupied quarry route at index twenty"));
+    }
+
+    @Test
+    @DisplayName("a consumed nineteen-heading retarget keeps its first refusal band")
+    void consumedNineteenHeadingRetargetKeepsItsFirstRefusalBand() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 104);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 255) {
+            mission.tick();
+        }
+
+        assertAll(
+                () -> assertPosition(grunt, 36, 39,
+                        "the northeast residual settles on retail's square"),
+                () -> assertEquals(18, grunt.pathLength(),
+                        "the consumed nineteen-heading route keeps eighteen bytes"),
+                () -> assertEquals(19, grunt.battleNetPathInitialLength()),
+                () -> assertEquals(1, grunt.battleNetPathStepsTaken()),
+                () -> assertEquals(0, grunt.battleNetCollisionCounter()),
+                () -> assertTrue(grunt.battleNetRetargetResidualRoutePark(),
+                        "Attack construction retains the route-park boundary"));
+
+        mission.tick();
+        assertEquals(256, fixtureCycle(world));
+        assertAll(
+                () -> assertPosition(grunt, 36, 39,
+                        "the blocked east heading must remain parked"),
+                () -> assertEquals(18, grunt.pathLength(),
+                        "retail keeps the cached route through the refusal"),
+                () -> assertEquals(1, grunt.battleNetCollisionCounter(),
+                        "the first blocked visit raises the collision nibble"),
+                () -> assertEquals(14, grunt.battleNetOrderDelay(),
+                        "Move timer fifteen leaves fourteen quiet visits"),
+                () -> assertEquals(15, grunt.battleNetAnimationTimer()),
+                () -> assertTrue(grunt.battleNetRefusalHold(),
+                        "the retained route owns the complete refusal band"));
+
+        mission.tick();
+        assertEquals(257, fixtureCycle(world));
+        assertAll(
+                () -> assertPosition(grunt, 36, 39,
+                        "retail still holds at the previous Java divergence"),
+                () -> assertEquals(18, grunt.pathLength()),
+                () -> assertEquals(13, grunt.battleNetOrderDelay()),
+                () -> assertEquals(14, grunt.battleNetAnimationTimer()));
     }
 
     @Test
