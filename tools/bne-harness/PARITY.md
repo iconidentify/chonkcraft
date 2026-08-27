@@ -17,13 +17,13 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-26
 
-Accepted pointer: run `609b4c53` (common clean 252, earliest divergence 253,
-gate PASS, engine content identical to commit `bfe8abdc`; the capsule's
-declared pathspecs match that tree exactly, only excluded `.md` files
-differ). Candidate on `master` after `86f1c618`: **shared horizon 254**
-(earliest divergence 255), survey through cycle 400 keeps 27 clean / 25
-divergent / 0 failed with zero regressions and capped sums moving
-18,164 -> 18,263. Engine failure identities unchanged (110=110).
+Accepted pointer: run `03d44b64` (common clean 254, earliest divergence 255,
+gate PASS, clean engine input `a40cd311` at commit `ee974f26`). The full
+cycle-1,800 fleet keeps 8 clean / 44 divergent / 0 failed with zero
+regressions against `master`. The cycle-400 view remains 27 clean / 25
+divergent / 0 failed. Human 8 advances 255 -> 328 and XHuman 12 advances
+255 -> 257; XHuman 7's juggernaught patrol handoff keeps the shared horizon
+at 254. Engine failure identities remain unchanged (110=110).
 
 Closed this stretch: Orc 8 mine-exit refusal hold (253->289), XOrc 11
 walled-quarry drop (253->282), naval beat reissue through the patrol target
@@ -55,89 +55,25 @@ chain (XHuman 7 253->255, XHuman 5 256->288).
   sets `setStepDrained(true)` when `reached || (rawX==0 && rawY==0 &&
   !animation().unbreakable())`. The off-by-one is in this arithmetic.
 
-### Next blockers at 255 (all one family)
+### Harvested cycle-255 work
 
-Native runs a Move-program band to expiry on a stalled chaser; Java steps
-one visit early:
+- `retail-human-08-idle` is closed from 255 through 327. Attack-peasant 1513
+  now follows the sealed two Move-15 bands, Attack-3 constructor, and one
+  fresh direct heading. The earlier broad cold-park marker remains rejected:
+  it regressed the same unit's fixture-188 residual march.
+- `retail-xhuman-12-idle` no longer fails on ogre 1356 at 255. Authenticated
+  capture proved selector zero chooses guard tower 1429 at (15,67), then the
+  native free-square writer normalizes the shared force home to (13,66).
+  The next failure is now grunt 1496's movement at 257.
+- `retail-xhuman-07-idle` remains the sole cycle-255 blocker: juggernaught
+  1573 is Still in Java when retail promotes it to Patrol.
 
-- `retail-human-13-idle` @255 -- CLOSED this session (line-face gate,
-  Human 13 now @265).
-- `retail-xhuman-12-idle` @255 -- force-launch home root cause recorded
-  below; needs AI.BIN capture.
-- `retail-human-08-idle` @255 -- DECODED, ready to implement. Attack-peasant
-  1513 (Java 87) chases east; its stored face refuses. Retail runs a
-  multi-band ladder on the Move-start station 2600: fifteen-count served
-  f243..257, then counter reset (ri 1->0) and ANOTHER fifteen f258..272,
-  then constructor 2657/3,2,1 f273..275, then the fresh per-step decision
-  steps EAST onto (78,62) at f276 -- straight through where brothers stand,
-  because the post-band redraw ignores every mobile occupant. A later
-  refusal at f295 runs constructor plus a twenty-three count. Java
-  instead parks once, redraws against current occupancy (brothers read as
-  walls), stores a westward detour segment, and steps west at its first
-  delay-expiry -- away from the goal entirely.
-  The fix: the post-park redraw for a cold-chase-refusal wake must use the
-  through-allied-mobiles passability (the `planThroughAlliedMobiles` flag
-  built for findBattleNetPointPath, threaded here into the unit-target
-  planner), so the redraw returns retail's straight line and the existing
-  band ladder frames it. Calibrate against the sealed ladder above; gate
-  with the full survey -- chase redraws are everywhere in crowded maps.
-  Candidate refuted, do not retry as written: threading a
-  `battleNetColdParkRedraw` marker from the park site into
-  findBattleNetTargetPath fixed ogre 1513's fixture-258 redraw but broke
-  its OWN mid-march at fixture 189 -- earlier parks inside the formation's
-  diagonal march consume the same marker, and those redraws must keep
-  walls. So the discriminator is real and temporal: retail's per-step
-  walker treats standing brothers as transparent during the crowded
-  ladder but as walls during the open march, or equivalently the port
-  must abandon multi-heading plans for this walker entirely and mirror
-  retail's one-decision-per-band protocol literally (band -> band ->
-  constructor -> single fresh step). The literal-mirror approach is the
-  recommended next implementation: it sidesteps the discriminator by
-  never drawing multi-heading detours for this state at all, matching the
-  sealed record where no route bytes are ever stored.
-- `retail-xhuman-12-idle` @255: ogre 1356 (Java 244) drains residual under
-  refuse marker ri=20 through fixtures 249..250 with no program, arms delay
-  2 at fixture 255 -- then Java steps west to (10,86) when the delay
-  expires at 256. Native instead replans to `[SW, NW]` with seq 586/t15 at
-  255 and stays put: the same expiry-visit protocol as Human 8.
-
-The systemic shape across the family: retail's plain-move and chase wakes
-decide ONE step fresh toward the goal with every mobile occupant invisible
-while deciding, refusing at walk time when the chosen square is truly
-blocked; this implementation's occupancy-aware planner instead pre-shapes
-multi-heading routes around hard-standing allies, which is where every
-symptom in this family enters. Two of the three 255 blockers are closed;
-Human 8's chase redraw and XHuman 12's dispatch target remain, each with
-its decoded protocol above.
-One more layer down, also proved by trace: at delay expiry Java's planner
-is asked for a route to (13,86) -- a local waypoint -- and answers a single
-westward step, while native keeps the ogre's authored goal (13,66), replans
-`[SW, NW]`, and arms its band. So XHuman 12's fix is upstream of movement
-entirely: the idle-marker dispatch must target what the AI assignment says
-(13,66), not a local waypoint, after which the shared expiry protocol applies.
-Human 8's chase variant arms through the combat refill instead and still
-needs the protocol there.
-Root cause found, one layer deeper still: ogre 1356 (Java 244) is behaviour
-two because `AiPlayer.battleNetFinishBootstrapForces` launched its ground
-force at fixture 49 -- exactly where native rewrites the sealed home from
-(26,87) to (13,66). Java writes the launch enemy's own tile: guard tower
-230 stands at (13,86) and that became the behaviour-two home. But (13,66)
-is no unit's tile anywhere in the sealed run -- native's launch home is an
-AI-script-derived point, not the quarry's square.
-The launch is a four-member group and the home is SHARED: at fixture 60 the
-sealed records hold home=(13,66) on slots 1356, 1434, 1435 and 1438, while
-1358/1359/1363 still carry the pre-launch (26,87). No member stood at
-(13,66) at launch (positions were (10,90)/(20,64)/(23,61)/(19,64)), no p6
-building sits near it (the base is the far south-west corner), and no enemy
-structure owns that tile either -- the closest enemies are guard tower
-171 at (15,67) and the targeted tower 230 twenty tiles south. So the point
-is computed by native's force-launch code from something none of these
-snapshots expose -- an AI.BIN script waypoint being the leading candidate.
-Resolving it requires capturing the writer of offsets 0x58/0x5a on slot
-1356 during fixture 49 (a plan watching ai_home directly; order/x/y field
-plans will not see it) or mining the AI player state across the window.
-Everything downstream -- idle dispatch, band protocol, step choice --
-already follows from whatever home is stored.
+The systemic movement rule retained here is one decision per completed band:
+mobile occupants are invisible while choosing the direct heading and become
+authoritative only when the physical step accepts or refuses it. The full
+fleet gate is required for every extension because the same cold-park shape
+also appears in ordinary residual marches where multi-heading wall planning
+is still correct.
 
 ### Closed this pass (Orc 8 mine-exit refusal hold, 253 -> 289)
 
