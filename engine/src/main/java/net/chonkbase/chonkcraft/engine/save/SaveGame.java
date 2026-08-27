@@ -736,6 +736,9 @@ public final class SaveGame {
         if (unit.battleNetMovingQuarryResidual()) {
             state.append(" movingQuarryResidual = true,");
         }
+        if (unit.battleNetRetainedRewriteOccupancy()) {
+            state.append(" retainedRewriteOccupancy = true,");
+        }
         if (unit.battleNetSaturatedResidualFaceRetry()) {
             state.append(" saturatedResidualFaceRetry = true,");
         }
@@ -783,6 +786,9 @@ public final class SaveGame {
         }
         if (unit.battleNetSaturatedRetargetRouteBand()) {
             state.append(" saturatedRetargetRouteBand = true,");
+        }
+        if (unit.battleNetBuildingRetargetReplay()) {
+            state.append(" buildingRetargetReplay = true,");
         }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");

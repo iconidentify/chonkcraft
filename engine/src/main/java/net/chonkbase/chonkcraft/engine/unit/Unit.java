@@ -2323,6 +2323,7 @@ public final class Unit {
             battleNetRangedCloseHitHelpWallFace = false;
             battleNetColdNoProgressRefusalLoop = false;
             battleNetPaidLongResidualRefill = false;
+            battleNetBuildingRetargetReplay = false;
         }
         this.target = target;
         if (target == null) {
@@ -2454,6 +2455,25 @@ public final class Unit {
     }
 
     private boolean battleNetSaturatedRetargetRouteBand;
+
+    /**
+     * A building retarget crossed native's retained-route replay boundary.
+     *
+     * <p>The old mobile route length is no longer recoverable after the
+     * replacement route commits its first stride. Native's cursor still
+     * distinguishes a fifteen-byte retained generation, which parks at RI20
+     * and redraws, from the fourteen-byte generation which consumes its live
+     * tail directly after Attack construction.</p>
+     */
+    public boolean battleNetBuildingRetargetReplay() {
+        return battleNetBuildingRetargetReplay;
+    }
+
+    public void setBattleNetBuildingRetargetReplay(boolean replay) {
+        battleNetBuildingRetargetReplay = replay;
+    }
+
+    private boolean battleNetBuildingRetargetReplay;
 
     /**
      * Whether a melee retarget route has paid its first residual Attack hold
@@ -2768,6 +2788,26 @@ public final class Unit {
     private boolean battleNetMoveFreeDetourPending;
 
     /**
+     * Occupancy ownership retained by a collision-one full route rewrite.
+     *
+     * <p>The native packed collision nibble remains one while the rewritten
+     * route is executing, so other movers treat this body as solid. Java must
+     * keep its ordinary collision counter clear because that counter also
+     * changes the rewriting unit's own later retarget path. This bit carries
+     * only the native occupancy consequence until another route replaces the
+     * rewritten buffer.</p>
+     */
+    public boolean battleNetRetainedRewriteOccupancy() {
+        return battleNetRetainedRewriteOccupancy;
+    }
+
+    public void setBattleNetRetainedRewriteOccupancy(boolean retained) {
+        battleNetRetainedRewriteOccupancy = retained;
+    }
+
+    private boolean battleNetRetainedRewriteOccupancy;
+
+    /**
      * Multi-step leftover residual opened Attack at post-OP0; the next melee
      * OP10 may land damage without a presentation pend (Human 13 ogre 1510).
      */
@@ -2948,8 +2988,14 @@ public final class Unit {
         // probe which either takes the newly-free heading or returns to
         // Attack construction.  SaveGame already persists this integer, so
         // keeping the phases here also prevents a mid-jam reload from
-        // turning a blocked combatant into a permanently frozen one.
-        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(6, stage));
+        // turning a blocked combatant into a permanently frozen one. Stages
+        // seven through twelve are the expired moving-quarry twins: first-band
+        // tail, optional second Move band, Attack construction, and the
+        // single-band entrance to and exit from the committed melee body hold,
+        // followed by its one fresh route constructor. Stage thirteen retains
+        // a just-surfaced laden quarry through its already-open Attack 3,2,1
+        // before the adjacent replacement scan starts a second constructor.
+        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(13, stage));
         if (battleNetAttackRefusalRecoveryStage != 6) {
             battleNetStageSixCardinalProbePark = false;
         }
@@ -4217,6 +4263,7 @@ public final class Unit {
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
+        this.battleNetRetainedRewriteOccupancy = false;
     }
 
     public void clearPath() {
@@ -4231,6 +4278,7 @@ public final class Unit {
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
+        this.battleNetRetainedRewriteOccupancy = false;
     }
 
     /**

@@ -348,8 +348,47 @@ final class BattleNetHarvestSystem {
                         && worker.resourceUnit() == null
                         && worker.pathLength() > 0
                         && worker.battleNetCollisionCounter() >= 4;
+                boolean parkPaidLongWoodPrefix =
+                        worker.battleNetRefusalHold()
+                        && info != null && info.terrainHarvester()
+                        && worker.resourceUnit() == null
+                        && worker.pathLength() >= 3
+                        && worker.battleNetCollisionCounter() == 3
+                        && worker.battleNetRefusals() == 1
+                        && worker.battleNetGoldFreePrefix()
+                        && worker.battleNetGoldFreePrefixLength() >= 3
+                        && worker.battleNetPathStepsTaken() > 0;
+                boolean parkTerminalFreePrefixRoute =
+                        worker.battleNetRefusalHold()
+                        && info != null && info.terrainHarvester()
+                        && worker.resourceUnit() == null
+                        && worker.pathLength() > 1
+                        && worker.battleNetCollisionCounter() == 1
+                        && worker.battleNetRefusals() == 0
+                        && worker.battleNetGoldFreePrefix()
+                        && worker.battleNetGoldFreePrefixLength() >= 3
+                        && worker.battleNetPathStepsTaken() > 0;
+                boolean parkReconstructedWoodPrefix =
+                        worker.battleNetRefusalHold()
+                        && info != null && info.terrainHarvester()
+                        && worker.resourceUnit() == null
+                        && worker.pathLength() == 0
+                        && worker.battleNetCollisionCounter() >= 8
+                        && worker.battleNetSaturatedWoodCornerLadder();
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
+                // A queued mine-exit Return Goods promotion starts action
+                // 24 on the worker's three-call Still body.  Java projects
+                // that action onto HARVEST after the promotion visit, but
+                // the native cursor keeps counting 3,2,1 while the order's
+                // two quiet constructor visits are served.  Human 8 peon
+                // 1536 is Still-sequence 2595/timers 3,2,1 on fixtures
+                // 280..282 before its first empty depot-route ask.
+                if (isBattleNetEmptyDepotRouteIdleCursor(worker)
+                        && worker.battleNetAnimationTimer() > 1) {
+                    worker.setBattleNetAnimationTimer(
+                            worker.battleNetAnimationTimer() - 1);
+                }
                 // A laden return counts the native Move program itself rather
                 // than sleeping through a generic Still animation. XHuman 10
                 // peon 1588 is 2600/15 on its fixture-270 cooperative refusal,
@@ -396,7 +435,10 @@ final class BattleNetHarvestSystem {
                 // consume SE on 250; leaving the cursor at fifteen made the
                 // semantic position right but the authenticated program state
                 // fourteen cycles wrong.
-                if (parkSaturatedWoodRoute
+                if ((parkSaturatedWoodRoute
+                            || parkPaidLongWoodPrefix
+                            || parkTerminalFreePrefixRoute
+                            || parkReconstructedWoodPrefix)
                         && world.battleNetSequence != null) {
                     int moveStart = world.idle.battleNetSequenceStart(
                             worker, BattleNetSequence.MOVE_ANIMATION);
@@ -439,6 +481,38 @@ final class BattleNetHarvestSystem {
                 }
                 return;
             }
+        }
+        boolean reconstructedWoodPrefixWake =
+                worker.battleNetSaturatedWoodCornerLadder()
+                && worker.battleNetRefusalHold()
+                && worker.battleNetCollisionCounter() >= 8
+                && worker.battleNetRefusals() == 0
+                && worker.resourceUnit() == null
+                && worker.pathLength() > 1
+                && worker.battleNetPathStepsTaken() == 0
+                && worker.stepDrained() && !worker.isMoving();
+        if (reconstructedWoodPrefixWake) {
+            // The timer-one visit above still exposes the parked route. Its
+            // following resource callback retires that generation and runs
+            // FindAnotherResource/NewPath exactly once against current
+            // occupancy. XHuman 12 slot 1385 drops N,NE,SE,SE after fixture
+            // 306, redraws NE,NE,SE,S, and commits NE on fixture 307.
+            worker.clearPath();
+            worker.setRouteSpent(false);
+            worker.setWaitCycles(0);
+            worker.setBattleNetRefusalHold(false);
+        }
+        // An empty action-24 depot route does not become a synthetic Still
+        // order and it does not poll the pathfinder every visit.  Its active
+        // resource order owns the rest of the same three-call Still body;
+        // only timer one asks for another route.  The restart and its one
+        // land-idle draw are installed by beginBattleNetEmptyDepotRouteIdleBand
+        // after the failed route construction below.
+        if (isBattleNetEmptyDepotRouteIdleCursor(worker)
+                && worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return;
         }
         if (info == null && worker.type().canTransport() && worker.target() != null) {
             // Retail's startup transport action is in the resource family,
@@ -1335,6 +1409,24 @@ final class BattleNetHarvestSystem {
 
         int goalX = worker.battleNetWoodOrderX();
         int goalY = worker.battleNetWoodOrderY();
+        BattleNetPathFinder.GoalMarker marker =
+                (x, y) -> Math.max(Math.abs(x - goalX),
+                        Math.abs(y - goalY)) <= 1;
+        PathFinder.Path replacement = world.findBattleNetPointPath(
+                worker, goalX, goalY, marker, true);
+        if (replacement.result() == PathFinder.Result.FOUND
+                && replacement.length() > 0) {
+            // The timer-one callback is NewPath plus the first Move probe,
+            // not merely a single compass rescue. The complete compact ray
+            // remains visible behind the consumed first byte: XHuman 12 slot
+            // 1364 writes SE,E on fixture 266 after its later terminal wall,
+            // while its earlier skirt at (13,90) naturally writes only SE.
+            worker.setBattleNetWoodTerminalRefusalHeading(-1);
+            worker.setBattleNetWoodReadyPathRequired(false);
+            worker.setPath(replacement);
+            worker.setPathGoal(-1, -1);
+            return false;
+        }
         int currentDistance = Math.max(
                 Math.abs(goalX - worker.tileX()),
                 Math.abs(goalY - worker.tileY()));
@@ -1363,6 +1455,20 @@ final class BattleNetHarvestSystem {
                 PathFinder.Result.FOUND, new int[] {admitted}));
         worker.setPathGoal(-1, -1);
         return false;
+    }
+
+
+    /** Recomputes the reachable forest skirt owned by a terminal wall face. */
+    void armBattleNetWoodTerminalRefusal(Unit worker, int refusedHeading) {
+        int[] skirt = battleNetWoodOrderPoint(worker,
+                worker.resourceTileX(), worker.resourceTileY());
+        int wallHeading = World.battleNetFirstBresenhamHeading(
+                worker.tileX(), worker.tileY(), skirt[0], skirt[1]);
+        if (wallHeading < 0 || wallHeading >= Direction.COUNT) {
+            wallHeading = refusedHeading;
+        }
+        worker.setBattleNetWoodTerminalRefusalHeading(wallHeading);
+        worker.setBattleNetWoodOrder(skirt[0], skirt[1]);
     }
 
 
@@ -2061,6 +2167,64 @@ final class BattleNetHarvestSystem {
                     return;
                 }
             }
+            if (worker.stepDrained() && worker.pathLength() > 1
+                    && worker.battleNetCollisionCounter() == 0
+                    && worker.battleNetRefusals() == 0
+                    && worker.battleNetGoldFreePrefix()
+                    && worker.battleNetGoldFreePrefixLength() >= 3
+                    && worker.battleNetPathStepsTaken() > 0) {
+                int heading = worker.peekHeading();
+                int nextX = worker.tileX() + Direction.deltaX(heading);
+                int nextY = worker.tileY() + Direction.deltaY(heading);
+                Unit blocker = world.blockerOnLayer(worker, nextX, nextY);
+                boolean alliedBlocker = blocker != null && blocker != worker
+                        && blocker.isOnMap() && !blocker.isDying()
+                        && world.isAllied(worker.player(), blocker.player());
+                int woodOrderX = worker.battleNetWoodOrderX() >= 0
+                        ? worker.battleNetWoodOrderX()
+                        : worker.resourceTileX();
+                int woodOrderY = worker.battleNetWoodOrderY() >= 0
+                        ? worker.battleNetWoodOrderY()
+                        : worker.resourceTileY();
+                int woodOrderDistance = Math.max(
+                        Math.abs(woodOrderX - worker.tileX()),
+                        Math.abs(woodOrderY - worker.tileY()));
+                int nextDistance = Math.max(
+                        Math.abs(woodOrderX - nextX),
+                        Math.abs(woodOrderY - nextY));
+                boolean terminalLateralFace = alliedBlocker
+                        && worker.pathLength() > 1
+                        && worker.battleNetPathStepsTaken()
+                                + worker.pathLength()
+                                == worker.battleNetGoldFreePrefixLength()
+                        && nextDistance >= woodOrderDistance
+                        && Direction.isDiagonal(worker.lastStepHeading())
+                        && !Direction.isDiagonal(heading);
+                if (terminalLateralFace) {
+                    // A free forest prefix can end with a lateral wall face
+                    // after its last diagonal has settled. The first occupied
+                    // probe retains both cached bytes and starts the ordinary
+                    // cooperative Move 15..1 band; it is not a cold resource
+                    // replan. XHuman 12 peon 1360 reaches (12,87) after four
+                    // bytes, retains E,SE toward (14,89), and waits behind the
+                    // allied peon on (13,87) from fixture 264.
+                    // The lateral face can occur earlier in the same complete
+                    // prefix: peon 1364 retains N,NE,E,NE,SE,S at distance
+                    // four behind the axethrower on (11,88) at fixture 317.
+                    worker.setBattleNetCollisionCounter(1);
+                    worker.setRouteSpent(false);
+                    worker.setWaitCycles(0);
+                    worker.setBattleNetOrderDelay(14);
+                    worker.setBattleNetRefusalHold(true);
+                    int moveStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        worker.setBattleNetSequenceOffset(moveStart);
+                        worker.setBattleNetAnimationTimer(15);
+                    }
+                    return;
+                }
+            }
             // A terrain worker's residual is drained in this outer harvest
             // action before stepMove sees the route. Preserve the fact that
             // this was the settle visit for a later-refusal leftover: native
@@ -2084,18 +2248,6 @@ final class BattleNetHarvestSystem {
                         && blocker.isOnMap() && !blocker.isDying()
                         && world.isAllied(worker.player(), blocker.player());
                 if (alliedBlocker) {
-                    int shortcut = BattleNetPathFinder.twoHeadingShortcut(
-                            worker.lastStepHeading(), heading);
-                    if (shortcut >= 0) {
-                        int shortcutX = worker.tileX()
-                                + Direction.deltaX(shortcut);
-                        int shortcutY = worker.tileY()
-                                + Direction.deltaY(shortcut);
-                        if (world.canEnter(worker, shortcutX, shortcutY)) {
-                            worker.setBattleNetWoodRouteIndex20(true);
-                            return;
-                        }
-                    }
                     int woodOrderX = worker.battleNetWoodOrderX() >= 0
                             ? worker.battleNetWoodOrderX()
                             : worker.resourceTileX();
@@ -2105,12 +2257,75 @@ final class BattleNetHarvestSystem {
                     int woodOrderDistance = Math.max(
                             Math.abs(woodOrderX - worker.tileX()),
                             Math.abs(woodOrderY - worker.tileY()));
-                    boolean saturatedWoodRouteHold =
+                    int shortcut = BattleNetPathFinder.twoHeadingShortcut(
+                            worker.lastStepHeading(), heading);
+                    if (shortcut >= 0) {
+                        int shortcutX = worker.tileX()
+                                + Direction.deltaX(shortcut);
+                        int shortcutY = worker.tileY()
+                                + Direction.deltaY(shortcut);
+                        if (world.canEnter(worker, shortcutX, shortcutY)) {
+                            int shortcutDistance = Math.max(
+                                    Math.abs(woodOrderX - shortcutX),
+                                    Math.abs(woodOrderY - shortcutY));
+                            boolean terminalFreePrefixShortcut =
+                                    worker.battleNetGoldFreePrefix()
+                                    && worker
+                                            .battleNetGoldFreePrefixLength()
+                                            >= 3
+                                    && worker.battleNetPathStepsTaken() > 0
+                                    && worker.pathLength() > 1
+                                    && worker.battleNetCollisionCounter() == 2
+                                    && shortcutDistance
+                                            >= woodOrderDistance;
+                            if (terminalFreePrefixShortcut) {
+                                // A free simplified byte which no longer
+                                // advances the terrain order is the terminal
+                                // wall face, not an admissible shortcut.
+                                // XHuman 12 slot 1364 combines NW,NE into N
+                                // on fixture 262, but N stays level with its
+                                // old (14,89) point. Retail parks RI20 at
+                                // collision three, selects skirt (13,89), and
+                                // enters action 23 construction next visit.
+                                worker.setBattleNetCollisionCounter(3);
+                                worker.clearPath();
+                                worker.setRouteSpent(false);
+                                worker.setWaitCycles(0);
+                                worker.setBattleNetOrderDelay(0);
+                                armBattleNetWoodTerminalRefusal(
+                                        worker, shortcut);
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(worker,
+                                                BattleNetSequence
+                                                        .MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    worker.setBattleNetSequenceOffset(
+                                            moveStart);
+                                    worker.setBattleNetAnimationTimer(1);
+                                }
+                                return;
+                            }
+                            worker.setBattleNetWoodRouteIndex20(true);
+                            return;
+                        }
+                    }
+                    boolean paidLongWallResidualHold =
+                            worker.pathLength() >= 3
+                            && worker.battleNetPathStepsTaken() > 0
+                            && worker.battleNetGoldFreePrefix()
+                            && worker.battleNetGoldFreePrefixLength() >= 3
+                            && worker.battleNetCollisionCounter() == 2
+                            && worker.battleNetRefusals() == 1
+                            && Direction.isDiagonal(worker.lastStepHeading())
+                            && !Direction.isDiagonal(heading)
+                            && woodOrderDistance >= 3;
+                    boolean saturatedWoodRouteHold = paidLongWallResidualHold
+                            || (
                             worker.pathLength() >= 2
                             && worker.battleNetCollisionCounter() >= 3
                             && !Direction.isDiagonal(worker.lastStepHeading())
                             && Direction.isDiagonal(heading)
-                            && woodOrderDistance >= 3;
+                            && woodOrderDistance >= 3);
                     if (saturatedWoodRouteHold) {
                         // A terrain wall which already paid three occupied
                         // probes keeps its residual bytes on the fourth.
@@ -2121,6 +2336,11 @@ final class BattleNetHarvestSystem {
                         // consume the cached diagonal after the allied peon
                         // vacates it. The lower-collision XHuman 11 terminal
                         // and corner-redraw families remain outside this band.
+                        // The same handler owns a long forest prefix after its
+                        // first paid refusal: XHuman 12 peon 1386 drains
+                        // SE at (10,88), retains its occupied east byte at
+                        // route index seven, and opens Move 15 on fixture 316
+                        // rather than throwing away the remaining nine bytes.
                         int collision =
                                 worker.battleNetCollisionCounter() + 1;
                         worker.setBattleNetCollisionCounter(
@@ -2196,22 +2416,89 @@ final class BattleNetHarvestSystem {
                 }
                 worker.setRouteSpent(false);
                 boolean shortFreePrefix = freeLen > 0 && freeLen < 3;
+                boolean collidedFullFreePrefix = freeLen >= 3
+                        && worker.battleNetCollisionCounter() > 0;
                 // Only the short free-tip family re-aims to a newly adjacent
                 // tree. A full direct prefix can finish beside intervening
                 // forest while still owning its original order point: Human
                 // 13 peon 1467 exhausts five headings at (50,48), retains the
                 // tree at (50,46), and immediately replans NE,N on fixture 85.
                 // Re-aiming that full prefix to (50,47) parked the peon in an
-                // invented action-23 delay and made it look frozen.
-                if (shortFreePrefix || freeLen == 0) {
-                    int[] localTree = findAdjacentForest(worker.tileX(),
-                            worker.tileY());
+                // invented action-23 delay and made it look frozen. A full
+                // prefix that still carries a collision generation is a
+                // different native exit: action 23 clears that completed
+                // generation and counts 3,2,1 before redrawing current
+                // occupancy. XHuman 12 slot 1385 settles its fourth byte on
+                // fixture 282, clears collision four, then writes the fresh
+                // blocked N,NE,SE,SE ray on fixture 285.
+                if (shortFreePrefix || freeLen == 0
+                        || collidedFullFreePrefix) {
+                    Unit activeClaimant = null;
+                    int claimedTreeX = worker.resourceTileX();
+                    int claimedTreeY = worker.resourceTileY();
+                    if (world.map.contains(claimedTreeX, claimedTreeY)) {
+                        int claimedIndex = claimedTreeX
+                                + claimedTreeY * world.map.width();
+                        activeClaimant = world.battleNetClaimedWood.get(
+                                claimedIndex);
+                        if (activeClaimant != null
+                                && !isActiveWoodClaim(activeClaimant,
+                                        claimedTreeX, claimedTreeY)) {
+                            world.battleNetClaimedWood.remove(claimedIndex);
+                            activeClaimant = null;
+                        }
+                    }
+                    boolean claimedReplacement = activeClaimant != null
+                            && activeClaimant != worker;
+                    int[] localTree = claimedReplacement
+                            ? findClaimedWoodReplacement(worker)
+                            : findAdjacentForest(worker.tileX(),
+                                    worker.tileY());
                     if (localTree == null) {
                         localTree = world.findTerrainType(worker,
                                 worker.tileX(), worker.tileY(), 1);
                     }
                     if (localTree != null) {
+                        // FindAnotherResource observes native forest claims,
+                        // not merely the still-present terrain flag. XHuman
+                        // 12 slot 1376 finishes its short free prefix after
+                        // slot 1365 has claimed (14,89); the clockwise
+                        // replacement ring therefore publishes (15,89) and
+                        // caches NE,E,SE,S. Re-selecting the claimed tree
+                        // produces the shorter NE,SE,SE path whose second
+                        // byte becomes visible at fixture 315.
                         worker.setResourceTile(localTree[0], localTree[1]);
+                        if (claimedReplacement) {
+                            // Native publishes the replacement forest square
+                            // as order X/Y on this action-23 callback. Keep
+                            // that direct resource goal across construction;
+                            // the later path visit must not replace it with a
+                            // reverse-free skirt point.
+                            worker.setBattleNetWoodOrder(
+                                    localTree[0], localTree[1]);
+                        }
+                    }
+                    if (collidedFullFreePrefix) {
+                        worker.setBattleNetCollisionCounter(0);
+                        worker.setBattleNetRefusals(0);
+                        // The completed collided prefix and the fresh route
+                        // written after action 23 are one saturated forest
+                        // recovery. Its first occupied byte climbs the native
+                        // collision ladder one timer-one visit at a time;
+                        // only generation eight owns a complete Move band.
+                        // XHuman 12 slot 1385 settles its four-byte prefix at
+                        // fixture 282, reconstructs on 282..284, then records
+                        // collision 1..8 on fixtures 285..292.
+                        worker.setBattleNetSaturatedWoodCornerLadder(true);
+                    }
+                    if (world.battleNetSequence != null) {
+                        int gatherStart = world.idle
+                                .battleNetSequenceStart(worker,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        if (gatherStart >= 0) {
+                            worker.setBattleNetSequenceOffset(gatherStart);
+                            worker.setBattleNetAnimationTimer(3);
+                        }
                     }
                     worker.setBattleNetOrderDelay(2);
                     return;
@@ -2278,6 +2565,9 @@ final class BattleNetHarvestSystem {
                     && !terminalBlocker.isDying()
                     && world.isAllied(worker.player(),
                             terminalBlocker.player());
+            boolean retainedDirectForestOrder =
+                    worker.battleNetWoodOrderX() == treeX
+                    && worker.battleNetWoodOrderY() == treeY;
             boolean aimAtResource =
                     world.battleNetRayReachesResource(worker, treeX, treeY)
                     // The blocked diagonal which ended the previous direct
@@ -2287,7 +2577,12 @@ final class BattleNetHarvestSystem {
                     // visit must still aim at tree 20,18, producing E,SE
                     // around the blocker; recomputing an intermediate order
                     // point chooses a one-byte south route instead.
-                    || diagonalTerminalRedraw;
+                    || diagonalTerminalRedraw
+                    // FindAnotherResource stores the claimed-aware forest
+                    // replacement itself in unit+0x84 before construction.
+                    // That stored direct order survives to NewPath even when
+                    // a free reverse-ray skirt exists.
+                    || retainedDirectForestOrder;
             int[] orderPoint = aimAtResource
                     ? new int[] {treeX, treeY}
                     : battleNetWoodOrderPoint(worker, treeX, treeY);
@@ -2299,7 +2594,8 @@ final class BattleNetHarvestSystem {
             path = aimAtResource
                     ? world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker,
-                            false, false, false)
+                            retainedDirectForestOrder, false, false,
+                            retainedDirectForestOrder)
                     : world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker, true);
             if (path.result() == PathFinder.Result.FOUND
@@ -2489,6 +2785,23 @@ final class BattleNetHarvestSystem {
         }
         if (worker.order() != Unit.Order.DYING) {
             worker.setOrder(saved);
+            if (worker.battleNetSaturatedWoodCornerLadder()
+                    && worker.battleNetCollisionCounter() > 0
+                    && worker.pathLength() == 0
+                    && !worker.isMoving()
+                    && world.battleNetSequence != null) {
+                // Restoring HARVEST after the borrowed movement probe clears
+                // Java's sequence cursor. The native resource order still
+                // exposes the Move program used by FUN_004379e0: timer one
+                // on naked generations and timer fifteen on generation eight.
+                int moveStart = world.idle.battleNetSequenceStart(
+                        worker, BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    worker.setBattleNetSequenceOffset(moveStart);
+                    worker.setBattleNetAnimationTimer(
+                            worker.battleNetOrderDelay() > 0 ? 15 : 1);
+                }
+            }
         }
     }
 
@@ -2802,10 +3115,14 @@ final class BattleNetHarvestSystem {
                 workerX, workerY, treeX, treeY);
         boolean freeDiagonal = freeStep[0] != workerX && freeStep[1] != workerY;
         boolean treeDiagonal = treeStep[0] != workerX && treeStep[1] != workerY;
-        // Reverse-free east (4,67→8,66) must not beat the tree's north-east
-        // (4,67→9,65). Reverse-free north-east (2,67→4,62) must keep winning
+        // A genuinely free reverse clip which cardinalizes the first step
+        // must not beat the tree's diagonal (4,67→8,66 versus 9,65). A
+        // blocked tip is native's stored wall objective, not that free clip:
+        // XHuman 12's peon at 11,88 retains blocked 13,88, writes one NE
+        // byte, and re-aims after it settles instead of caching the tree's
+        // NE,E,E,SE route. Reverse-free north-east (2,67→4,62) still wins
         // over the tree's pure north (2,67→4,61).
-        if (!freeDiagonal && treeDiagonal) {
+        if (!freeDiagonal && treeDiagonal && !sawBlocked) {
             return new int[] {treeX, treeY};
         }
         // Human 8 peasant 1499: tree 85,83 and reverse-free 86,82 both take a
@@ -4217,8 +4534,184 @@ final class BattleNetHarvestSystem {
         }
         unit.setResourceDepot(depot);
         unit.setReturnDepotGoal(depot);
+        int activeIdleSequence = unit.battleNetSequenceOffset();
+        int activeIdleTimer = unit.battleNetAnimationTimer();
         unit.setOrder(Unit.Order.HARVEST);
+        // RETURN_GOODS and HARVEST are two Java projections of the same
+        // native COrder_Resource.  Preserve action 24's active Still cursor
+        // across that projection change; Unit.setOrder deliberately clears
+        // animation cursors for unrelated order replacements.
+        int stillStart = world.idle.battleNetStillSequenceStart(unit);
+        if (activeIdleSequence == stillStart && activeIdleTimer > 0) {
+            unit.setBattleNetSequenceOffset(activeIdleSequence);
+            unit.setBattleNetAnimationTimer(activeIdleTimer);
+        }
         stepHarvest(unit);
+    }
+
+
+    /**
+     * Starts one native action-24 idle band after a depot route returned an
+     * empty FOUND prefix.
+     *
+     * <p>The order stays active and asks again every third visit.  Each
+     * restart runs the random-facing half of {@code FUN_0040ad30}, but not
+     * Still's autonomous-order dispatcher.  In Human 8, laden peon 1536 owns
+     * the missing draw at fixtures 283, 286 and 289; without it critter 1539
+     * consumes the peon's value and wanders on 283.</p>
+     */
+    boolean beginBattleNetEmptyDepotRouteIdleBand(Unit worker, Unit depot,
+            PathFinder.Path emptyPath) {
+        if (worker == null || depot == null || emptyPath == null
+                || emptyPath.result() != PathFinder.Result.FOUND
+                || emptyPath.length() != 0
+                || worker.order() != Unit.Order.HARVEST
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || !worker.type().landUnit()
+                || world.battleNetMovementStride(worker) != 1
+                || worker.isMoving() || worker.distanceTo(depot) <= 1
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart < 0) {
+            return false;
+        }
+        worker.setPath(emptyPath);
+        worker.setPathGoal(-1, -1);
+        worker.setBattleNetSequenceOffset(stillStart);
+        worker.setBattleNetAnimationTimer(3);
+        world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
+        beginBattleNetStrandedResourceHitFlee(worker);
+        return true;
+    }
+
+
+    /**
+     * Lets a stranded resource order answer the aggressor retained at +0x54.
+     *
+     * <p>The empty-route resource retry runs the common active-order idle
+     * callback. If a non-aggressive worker was struck since its preceding
+     * retry, retail's following {@code FUN_0040a5e0} visit reaches
+     * {@code FUN_0040a670}: it consumes two asynchronous draws, authors a
+     * short escape point from the aggressor's facing, and temporarily exposes
+     * action 3 over the resource order's three-call Still body. Human 8 peasant
+     * 1536 is the sealed witness. Ogre 1538 hits it on fixture 295; its next
+     * empty depot-route retry changes action 24 to action 3 at point (83,62)
+     * on fixture 298, then restores action 24 on fixture 301. Omitting the two
+     * point draws also hands critter 1539 the worker's values and makes it
+     * wander on fixture 298.</p>
+     */
+    private void beginBattleNetStrandedResourceHitFlee(Unit worker) {
+        Unit aggressor = worker == null ? null : worker.offeredTarget();
+        if (worker == null || aggressor == null
+                || !aggressor.isAlive() || aggressor.isDying()
+                || !aggressor.isOnMap() || worker.isAggressive()
+                || worker.savedOrder() != null
+                || world.battleNetSequence == null) {
+            return;
+        }
+        int face = aggressor.heading();
+        int x = worker.tileX() + Direction.deltaX(face) * 4
+                + (world.battleNetRand() & 7) - 2;
+        int y = worker.tileY() + Direction.deltaY(face) * 4
+                + (world.battleNetRand() & 7) - 2;
+        x = Math.max(0, Math.min(world.map.width() - 1, x));
+        y = Math.max(0, Math.min(world.map.height() - 1, y));
+        int authoredX = x;
+        int authoredY = y;
+        int[] normalized = world.battleNetSpreadUnitGoal(worker, x, y);
+        x = normalized[0];
+        y = normalized[1];
+
+        worker.setSavedOrder(Unit.Order.HARVEST);
+        worker.clearPath();
+        worker.setRouteSpent(false);
+        // The constructor band preserves the authored point here until its
+        // last call. Its difference from OrderX/Y is the semantic proof that
+        // SpreadUnit stored an occupied approach edge rather than accepting
+        // the free authored point. Both coordinates are already serialized.
+        worker.setPathGoal(authoredX, authoredY);
+        worker.setOrderTarget(x, y);
+        worker.setWaitCycles(0);
+        worker.setBattleNetOrderDelay(0);
+        worker.setOfferedTarget(null);
+        worker.setOrder(Unit.Order.MOVE);
+        worker.setBattleNetSequenceOffset(
+                world.idle.battleNetStillSequenceStart(worker));
+        worker.setBattleNetAnimationTimer(3);
+    }
+
+
+    /** Counts and either starts or restores the temporary resource-hit move. */
+    boolean stepBattleNetStrandedResourceHitFlee(Unit worker) {
+        if (worker == null || worker.order() != Unit.Order.MOVE
+                || worker.savedOrder() != Unit.Order.HARVEST
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || worker.isMoving() || worker.pathLength() != 0
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart < 0
+                || worker.battleNetSequenceOffset() != stillStart
+                || worker.battleNetAnimationTimer() <= 0) {
+            return false;
+        }
+        if (worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return true;
+        }
+
+        // SpreadUnit may retain an occupied edge point immediately beyond
+        // the first admissible square. That form proceeds through the normal
+        // Move handler when the three-call Still constructor expires: Human
+        // 8 peasant 1536 stores 79,59 and commits NE on fixture 325. A free
+        // authored point owns only the reaction body and then restores the
+        // resource action (peasants 1536 at fixture 301 and 1533 at 316).
+        boolean spreadApproachEdge = worker.pathGoalX()
+                != worker.orderTargetX()
+                || worker.pathGoalY() != worker.orderTargetY();
+        if (spreadApproachEdge) {
+            worker.setPathGoal(worker.orderTargetX(), worker.orderTargetY());
+            int moveStart = world.idle.battleNetSequenceStart(
+                    worker, BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                BattleNetSequence.Tick open =
+                        world.battleNetSequence.tick(moveStart, 1);
+                worker.setBattleNetSequenceOffset(
+                        open.valid() ? open.offset() : moveStart);
+                worker.setBattleNetAnimationTimer(
+                        open.valid() ? open.timer() : 1);
+            }
+            return false;
+        }
+
+        worker.takeSavedOrder();
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setOrderTarget(-1, -1);
+        worker.setPathGoal(-1, -1);
+        worker.setBattleNetSequenceOffset(stillStart);
+        worker.setBattleNetAnimationTimer(1);
+        stepHarvest(worker);
+        return true;
+    }
+
+
+    /** Whether this laden return is serving action 24's empty-route cursor. */
+    private boolean isBattleNetEmptyDepotRouteIdleCursor(Unit worker) {
+        if (worker == null || !worker.returningToDepot()
+                || worker.carried() <= 0 || !worker.type().landUnit()
+                || world.battleNetMovementStride(worker) != 1
+                || worker.pathLength() != 0 || worker.isMoving()
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        return stillStart >= 0
+                && worker.battleNetSequenceOffset() == stillStart
+                && worker.battleNetAnimationTimer() > 0;
     }
 
 

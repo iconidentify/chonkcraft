@@ -701,11 +701,14 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         assertTargetAt(longTailRetargetChaser,
                 "unit-human-guard-tower", 39, 41,
                 "the landing callback installs the native building target");
-        assertEquals(11, longTailRetargetChaser.pathLength(),
-                "the committed east byte leaves the native route tail");
+        assertEquals(12, longTailRetargetChaser.pathLength(),
+                "the committed east byte leaves the authenticated route tail");
         assertEquals(Direction.fromDelta(1, 1),
                 longTailRetargetChaser.peekHeading(),
                 "the replacement route next turns south-east");
+        assertEquals(Direction.fromDelta(1, 0),
+                longTailRetargetChaser.peekHeadingAtDepth(1),
+                "the newly visible third byte preserves the later east handoff");
         assertEquals(0, longTailRetargetChaser.battleNetCollisionCounter(),
                 "NewPath clears the obsolete collision generation");
         assertEquals(76, guardTower.hitPoints(),

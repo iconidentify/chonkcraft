@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -102,6 +103,107 @@ class XHuman12WoodSaturatedRouteHoldRealDataTest {
                 "the accepted saturated route keeps native collision ownership");
         assertTrue(peon.isMoving(),
                 "the accepted southeast step begins its pixel residual");
+    }
+
+    @Test
+    @DisplayName("a paid long wood wall retains its occupied cardinal tail")
+    void paidLongWoodWallRetainsItsOccupiedCardinalTail() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit peon = unitById(world, 214);
+        assertNotNull(peon,
+                "XHuman 12 has no Java unit 214 / native peon slot 1386");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        tickThrough(mission, world, 315);
+        assertPosition(peon, 10, 88);
+        assertEquals(9, peon.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), peon.peekHeading());
+        assertEquals(2, peon.battleNetCollisionCounter());
+        assertEquals(1, peon.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(316, fixtureCycle(world));
+        assertPosition(peon, 10, 88);
+        assertEquals(9, peon.pathLength(),
+                "native retains route index seven and its east-led tail");
+        assertEquals(Direction.fromDelta(1, 0), peon.peekHeading());
+        assertEquals(3, peon.battleNetCollisionCounter(),
+                "the occupied cached byte advances the paid generation");
+        assertEquals(14, peon.battleNetOrderDelay());
+        assertEquals(15, peon.battleNetAnimationTimer());
+        assertEquals(world.idle.battleNetSequenceStart(peon,
+                        BattleNetSequence.MOVE_ANIMATION),
+                peon.battleNetSequenceOffset());
+
+        mission.tick();
+        assertEquals(317, fixtureCycle(world));
+        assertPosition(peon, 10, 88);
+        assertEquals(9, peon.pathLength());
+        assertEquals(13, peon.battleNetOrderDelay());
+        assertEquals(14, peon.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("a complete forest prefix retains its occupied lateral byte")
+    void completeForestPrefixRetainsItsOccupiedLateralByte() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit peon = unitById(world, 236);
+        assertNotNull(peon,
+                "XHuman 12 has no Java unit 236 / native peon slot 1364");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        tickThrough(mission, world, 301);
+        assertPosition(peon, 11, 89);
+        assertEquals(Direction.fromDelta(-1, -1), peon.lastStepHeading());
+        assertEquals(7, peon.battleNetPathInitialLength());
+        assertEquals(1, peon.battleNetPathStepsTaken());
+        assertEquals(6, peon.pathLength());
+        assertEquals(Direction.fromDelta(0, -1), peon.peekHeading());
+        assertEquals(Direction.fromDelta(1, -1),
+                peon.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(1, 0),
+                peon.peekHeadingAtDepth(2));
+        assertEquals(Direction.fromDelta(1, -1),
+                peon.peekHeadingAtDepth(3));
+        assertEquals(Direction.fromDelta(1, 1),
+                peon.peekHeadingAtDepth(4));
+        assertEquals(Direction.fromDelta(0, 1),
+                peon.peekHeadingAtDepth(5));
+
+        tickThrough(mission, world, 317);
+        assertPosition(peon, 11, 89);
+        assertEquals(6, peon.pathLength(),
+                "the occupied north byte and its full tail stay cached");
+        assertEquals(1, peon.battleNetCollisionCounter());
+        assertEquals(14, peon.battleNetOrderDelay());
+        assertEquals(15, peon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(318, fixtureCycle(world));
+        assertPosition(peon, 11, 89);
+        assertEquals(6, peon.pathLength());
+        assertEquals(13, peon.battleNetOrderDelay());
+        assertEquals(14, peon.battleNetAnimationTimer());
     }
 
     private static void tickThrough(Mission mission, World world, int fixture) {

@@ -137,7 +137,8 @@ public final class BattleNetPathFinder {
             laterLine.add(point(lineX, lineY));
         }
         int[] join = traceWall(route, fromX, fromY, blockedHeading, turn,
-                toX, toY, stride, laterLine, passability, goalMarker);
+                toX, toY, stride, laterLine, passability, goalMarker,
+                false, false);
         if (join == null) {
             return new PathFinder.Path(PathFinder.Result.FOUND, new int[0]);
         }
@@ -326,6 +327,73 @@ public final class BattleNetPathFinder {
             boolean reverseWallFaceOrder,
             boolean retainFirstWallFace,
             boolean hardDirectRay) {
+        return findInternal(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, shareWallBufferBetweenFaces,
+                reverseWallFaceOrder, retainFirstWallFace, hardDirectRay,
+                false, false);
+    }
+
+    /**
+     * Claimed terrain-resource replacement route.
+     *
+     * <p>FindAnotherResource publishes a new forest square and keeps the raw
+     * wall writer's compass elements. It does not run the ordinary repeated
+     * two-heading simplifier over that new wall in the same callback.</p>
+     */
+    public static PathFinder.Path findPreservingWallSteps(
+            int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace,
+            boolean hardDirectRay) {
+        return findInternal(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, shareWallBufferBetweenFaces,
+                reverseWallFaceOrder, retainFirstWallFace, hardDirectRay,
+                true, true);
+    }
+
+    /** Claimed-resource raw route using the ordinary wall contact offset. */
+    public static PathFinder.Path findPreservingWallStepsWithOrdinaryContact(
+            int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace,
+            boolean hardDirectRay) {
+        return findInternal(fromX, fromY, toX, toY, stride, passability,
+                optimizationPassability, goalMarker, preserveEmptyFailure,
+                preserveBlockedGoalPrefix, preferPureMajorFreePrefix,
+                preferMarkedWallOnTie, shareWallBufferBetweenFaces,
+                reverseWallFaceOrder, retainFirstWallFace, hardDirectRay,
+                true, false);
+    }
+
+    private static PathFinder.Path findInternal(
+            int fromX, int fromY, int toX, int toY,
+            int stride, Passability passability,
+            Passability optimizationPassability, GoalMarker goalMarker,
+            boolean preserveEmptyFailure, boolean preserveBlockedGoalPrefix,
+            boolean preferPureMajorFreePrefix,
+            boolean preferMarkedWallOnTie,
+            boolean shareWallBufferBetweenFaces,
+            boolean reverseWallFaceOrder,
+            boolean retainFirstWallFace,
+            boolean hardDirectRay,
+            boolean preserveWallSteps,
+            boolean tightClaimedWallContact) {
         if (stride != 1 && stride != 2) {
             throw new IllegalArgumentException("BNE movement stride must be 1 or 2");
         }
@@ -426,7 +494,8 @@ public final class BattleNetPathFinder {
                             optimizationPassability, goalMarker,
                             scoreToX, scoreToY,
                             shareWallBufferBetweenFaces,
-                            reverseWallFaceOrder, retainFirstWallFace);
+                            reverseWallFaceOrder, retainFirstWallFace,
+                            preserveWallSteps, tightClaimedWallContact);
                     if (escaped.length() == 0) {
                         return prefix;
                     }
@@ -458,7 +527,8 @@ public final class BattleNetPathFinder {
                         optimizationPassability, goalMarker,
                         scoreToX, scoreToY,
                         shareWallBufferBetweenFaces,
-                        reverseWallFaceOrder, retainFirstWallFace);
+                        reverseWallFaceOrder, retainFirstWallFace,
+                        preserveWallSteps, tightClaimedWallContact);
                 // 0x4508f0 marks the target skirt and the target itself. When
                 // the ray is stopped by a marked square that is not the goal
                 // point, wall-follow can still invent a long detour whose first
@@ -591,7 +661,9 @@ public final class BattleNetPathFinder {
             int scoreToX, int scoreToY,
             boolean shareWallBufferBetweenFaces,
             boolean reverseWallFaceOrder,
-            boolean retainFirstWallFace) {
+            boolean retainFirstWallFace,
+            boolean preserveWallSteps,
+            boolean tightClaimedWallContact) {
         Map<Long, Integer> directRoute = routeFromPrefix(prefix, x, y, stride);
         Map<Long, Integer> sharedRoute = new HashMap<>(directRoute);
         List<Integer> failedSharedFace = null;
@@ -620,7 +692,8 @@ public final class BattleNetPathFinder {
                 route.putAll(directRoute);
             }
             int[] join = traceWall(route, x, y, blockedHeading, turn,
-                    toX, toY, stride, laterLine, passability, goalMarker);
+                    toX, toY, stride, laterLine, passability, goalMarker,
+                    preserveWallSteps, tightClaimedWallContact);
             if (join == null) {
                 if (shareWallBufferBetweenFaces) {
                     List<Integer> partial = partialHeadings(route,
@@ -641,13 +714,21 @@ public final class BattleNetPathFinder {
             }
             int remaining = progressFrom(join[0], join[1],
                     startX, startY, toX, toY, scoreToX, scoreToY);
-            int routeLength = optimize(route, startX, startY,
-                    join[0], join[1], stride, optimizationPassability);
-            if (routeLength <= 0) {
-                continue;
+            List<Integer> steps;
+            int routeLength;
+            if (preserveWallSteps) {
+                steps = partialHeadings(route, startX, startY, stride);
+                routeLength = steps.size();
+            } else {
+                routeLength = optimize(route, startX, startY,
+                        join[0], join[1], stride,
+                        optimizationPassability);
+                if (routeLength <= 0) {
+                    continue;
+                }
+                steps = headings(route, startX, startY,
+                        routeLength, stride);
             }
-            List<Integer> steps = headings(route, startX, startY,
-                    routeLength, stride);
             if (steps == null || steps.isEmpty()) {
                 continue;
             }
@@ -877,7 +958,9 @@ public final class BattleNetPathFinder {
     private static int[] traceWall(Map<Long, Integer> route,
             int anchorX, int anchorY, int blockedHeading, int turn,
             int toX, int toY, int stride, Set<Long> laterLine,
-            Passability passability, GoalMarker goalMarker) {
+            Passability passability, GoalMarker goalMarker,
+            boolean preserveWallSteps,
+            boolean tightClaimedWallContact) {
         String tracedWallStart = System.getenv(
                 "CHONKCRAFT_TRACE_BNE_WALL_STEPS");
         boolean traceSteps = tracedWallStart != null
@@ -892,6 +975,7 @@ public final class BattleNetPathFinder {
         for (int steps = 0; steps < 50; steps++) {
             int first = Math.floorMod(heading + turn, Direction.COUNT);
             int chosen = first;
+            int blockedRotations = 0;
             int nx;
             int ny;
             while (true) {
@@ -925,6 +1009,7 @@ public final class BattleNetPathFinder {
                 }
                 // Blocked terrain only: rotate until the first heading returns.
                 chosen = Math.floorMod(chosen + turn, Direction.COUNT);
+                blockedRotations++;
                 if (chosen == first) {
                     if (traceSteps) {
                         System.err.printf("JBNEWALLSTEP from=%d,%d turn=%d "
@@ -1000,7 +1085,21 @@ public final class BattleNetPathFinder {
                 }
                 return new int[] {x, y};
             }
-            heading = Math.floorMod(chosen - 3 * turn, Direction.COUNT);
+            // FindAnotherResource exposes the wall writer before the ordinary
+            // route callback has collapsed its wall contact. On that path the
+            // next probe begins one compass element tighter against the same
+            // obstacle: XHuman 12 peon 1376 keeps NE,E,SE,S around the claimed
+            // tree's worker instead of cutting NE,SE,SE. When two compass
+            // elements were rejected at one corner, the raw writer has
+            // rounded that corner and resumes the ordinary contact offset;
+            // peon 1364 thereby keeps ...E,NE,SE,S around two adjacent movers.
+            // Ordinary callers retain the independently authenticated
+            // post-callback convention.
+            int wallContact = preserveWallSteps && tightClaimedWallContact
+                    ? (blockedRotations >= 2 ? 3 : 2)
+                    : 3;
+            heading = Math.floorMod(
+                    chosen - wallContact * turn, Direction.COUNT);
             x = nx;
             y = ny;
         }

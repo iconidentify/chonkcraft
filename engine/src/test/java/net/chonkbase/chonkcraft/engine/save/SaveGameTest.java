@@ -854,6 +854,21 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a rewritten collision route keeps its occupancy ownership")
+    void retainedRewriteOccupancyRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 0, 10, 10);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setBattleNetRetainedRewriteOccupancy(true);
+
+        Unit loaded = find(reload(bench), "unit-grunt");
+
+        assertTrue(loaded.battleNetRetainedRewriteOccupancy(),
+                "reloading a live rewritten route must not make its body soft");
+    }
+
+    @Test
     @DisplayName("a hard attack refusal recovery keeps its native handoff stage")
     void attackRefusalRecoveryStageRoundTrips() throws IOException {
         Bench bench = bench();
@@ -875,6 +890,7 @@ class SaveGameTest {
         attacker.setBattleNetSaturatedWallFacePairHeading(5);
         attacker.setBattleNetSaturatedWallFacePairParked(true);
         attacker.setBattleNetSaturatedRetargetRouteBand(true);
+        attacker.setBattleNetBuildingRetargetReplay(true);
 
         Unit loaded = find(reload(bench), "unit-knight");
 
@@ -901,6 +917,31 @@ class SaveGameTest {
                 "the shared route buffer must survive a mid-jam save");
         assertTrue(loaded.battleNetSaturatedRetargetRouteBand(),
                 "the paid retarget buffer must survive a mid-jam save");
+        assertTrue(loaded.battleNetBuildingRetargetReplay(),
+                "the retained building cursor must survive Attack construction");
+    }
+
+    @Test
+    @DisplayName("an expired moving-quarry ladder keeps its final construction stage")
+    void expiredMovingQuarryLadderStageRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-knight"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 1, 12, 9);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setChasing(true);
+        attacker.setPathGoal(12, 9);
+        attacker.setBattleNetAttackRefusalRecoveryStage(13);
+
+        Unit loaded = find(reload(bench), "unit-knight");
+
+        assertNotNull(loaded.target());
+        assertEquals(13, loaded.battleNetAttackRefusalRecoveryStage(),
+                "reloading during Attack 3,2,1 must not release the retained quarry");
+        assertEquals(12, loaded.pathGoalX());
+        assertEquals(9, loaded.pathGoalY());
     }
 
     @Test

@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
@@ -97,6 +98,62 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a full collision rewrite remains solid to the next chase refill")
+    void fullCollisionRewriteRetainsOccupancyOwnership() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit rewrittenGrunt = unitById(world, 130);
+        Unit followingGrunt = unitById(world, 119);
+        assertNotNull(rewrittenGrunt,
+                "XHuman 12 has no native-slot-1470 grunt");
+        assertNotNull(followingGrunt,
+                "XHuman 12 has no native-slot-1481 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 243) {
+            mission.tick();
+        }
+        assertEquals(28, rewrittenGrunt.tileX());
+        assertEquals(38, rewrittenGrunt.tileY());
+        assertEquals(Direction.fromDelta(0, 1),
+                rewrittenGrunt.lastStepHeading());
+        assertTrue(rewrittenGrunt.battleNetRetainedRewriteOccupancy(),
+                "the native collision-one rewrite remains an occupied wall");
+
+        while (fixtureCycle(world) < 259) {
+            mission.tick();
+        }
+        assertEquals(29, rewrittenGrunt.tileX());
+        assertEquals(39, rewrittenGrunt.tileY());
+        assertEquals(Direction.fromDelta(1, 1),
+                rewrittenGrunt.lastStepHeading());
+        assertTrue(rewrittenGrunt.battleNetRetainedRewriteOccupancy());
+
+        while (fixtureCycle(world) < 267) {
+            mission.tick();
+        }
+        assertEquals(31, followingGrunt.tileX());
+        assertEquals(40, followingGrunt.tileY());
+
+        mission.tick();
+        assertEquals(268, fixtureCycle(world));
+        assertEquals(30, followingGrunt.tileX());
+        assertEquals(41, followingGrunt.tileY(),
+                "the collided moving body forces native's one-byte southwest refill");
+        assertEquals(Direction.fromDelta(-1, 1),
+                followingGrunt.lastStepHeading());
+    }
+
+    @Test
     @DisplayName("a saturated closing diagonal terminates before redraw")
     void saturatedClosingDiagonalTerminatesBeforeRedraw() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -162,6 +219,132 @@ class XHuman12CollisionRefillRealDataTest {
                 "the target swap must not reverse an approved east buffer");
         assertEquals(36, grunt.tileY());
         assertEquals(Direction.fromDelta(1, 0), grunt.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("an empty collided melee refill retries only its direct ray")
+    void emptyCollidedMeleeRefillRetriesOnlyItsDirectRay() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 110);
+        Unit knight = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1490 grunt");
+        assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 295) {
+            mission.tick();
+        }
+        int moveStart = world.idle.battleNetSequenceStart(grunt,
+                BattleNetSequence.MOVE_ANIMATION);
+        int attackStart = world.idle.battleNetSequenceStart(grunt,
+                BattleNetSequence.ATTACK_ANIMATION);
+        assertEquals(31, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(moveStart, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(2, grunt.battleNetCollisionCounter(),
+                "the empty replacement retains collided-route provenance");
+        assertEquals(0, grunt.battleNetRefusals());
+
+        for (int fixture = 296; fixture <= 298; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertEquals(31, grunt.tileX());
+            assertEquals(40, grunt.tileY());
+            assertEquals(attackStart, grunt.battleNetSequenceOffset());
+            assertEquals(299 - fixture,
+                    grunt.battleNetAnimationTimer(),
+                    "native exposes the first Attack constructor as 3,2,1");
+        }
+        assertEquals(16, knight.hitPoints(),
+                "the blocked direct wake has not reassigned the melee roll");
+
+        mission.tick();
+        assertEquals(299, fixtureCycle(world));
+        assertEquals(31, grunt.tileX(),
+                "a free closer side square must not bypass the blocked direct ray");
+        assertEquals(40, grunt.tileY());
+        assertEquals(attackStart, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "the blocked direct ray opens the next Attack constructor");
+        assertEquals(13, knight.hitPoints(),
+                "the constructor retry must retain native async consumer order");
+    }
+
+    @Test
+    @DisplayName("a non-empty collided refill keeps its full wall route")
+    void nonEmptyCollidedRefillDoesNotEnterTheDirectRayLoop() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 104);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 106) {
+            mission.tick();
+        }
+        assertEquals(31, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(0, grunt.pathLength());
+        assertEquals(5, grunt.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(107, fixtureCycle(world));
+        assertEquals(32, grunt.tileX(),
+                "the successful replacement route commits north-east");
+        assertEquals(39, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, -1),
+                grunt.lastStepHeading());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                grunt.pathLength(),
+                "the non-empty replacement retains its full route tail");
+
+        // The same unit later pays a nearly-full nineteen-byte wall route.
+        // Its accepted SE head must retain collision three; when the cached NE
+        // tail meets the still-occupied formation square, fixture 303 advances
+        // that generation to four and parks RI20. The paid writer keeps that
+        // refused square hard and commits a fresh north head on fixture 304.
+        while (fixtureCycle(world) < 303) {
+            mission.tick();
+        }
+        assertEquals(37, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(0, grunt.pathLength());
+        assertEquals(4, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(304, fixtureCycle(world));
+        assertEquals(37, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "the paid hard-square writer must commit north immediately");
+        assertEquals(Direction.fromDelta(0, -1), grunt.lastStepHeading());
+        assertEquals(4, grunt.battleNetCollisionCounter());
+        assertTrue(grunt.pathLength() > 0,
+                "the north commit retains the replacement wall tail");
     }
 
     @Test
@@ -850,6 +1033,121 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a capacity retarget tail keeps its paid cooperative Move band")
+    void capacityRetargetTailKeepsItsPaidCooperativeMoveBand() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Sealed native slot 1496 / Java 104 changes to footman 1477 while
+        // consuming the first NE byte of a capacity route. Once that leg
+        // settles, Attack construction counts 3,2,1 on fixtures 253..255.
+        // The retained east head is occupied by mid-stride allied slot 1494,
+        // so fixture 256 keeps all eighteen bytes and opens Move 15 instead
+        // of parking the cursor and taking a fresh south-east route on 257.
+        Unit grunt = unitById(world, 104);
+        Unit footman = unitById(world, 123);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+        assertNotNull(footman, "XHuman 12 has no native-slot-1477 footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 253) {
+            mission.tick();
+        }
+
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(footman, grunt.target());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2, grunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(254, fixtureCycle(world));
+        assertEquals(2, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(255, fixtureCycle(world));
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(256, fixtureCycle(world));
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2, grunt.pathLength(),
+                "the paid band retains the cached east-led tail");
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(257, fixtureCycle(world));
+        assertEquals(36, grunt.tileX(),
+                "the first paid quiet visit must not redraw south-east");
+        assertEquals(39, grunt.tileY());
+        assertEquals(14, grunt.battleNetAnimationTimer());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2, grunt.pathLength());
+
+        while (fixtureCycle(world) < 270) {
+            mission.tick();
+        }
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2, grunt.pathLength());
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(271, fixtureCycle(world));
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(0, grunt.pathLength(),
+                "the paid cursor parks at native route index twenty");
+        assertEquals(2, grunt.battleNetCollisionCounter());
+        assertTrue(grunt.battleNetRetargetResidualParkRefill());
+        assertEquals(1, grunt.battleNetRetargetResidualParkSteps());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(272, fixtureCycle(world));
+        assertEquals(36, grunt.tileX(),
+                "the replacement's occupied south-east head opens a paid band");
+        assertEquals(39, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+        assertEquals(3, grunt.battleNetCollisionCounter());
+        assertEquals(14, grunt.battleNetOrderDelay());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+        int[] replacement = {
+                3, 1, 1, 2, 3, 3, 3, 4, 4, 5,
+                5, 6, 6, 6, 7, 7, 7, 6, 6
+        };
+        for (int depth = 0; depth < replacement.length; depth++) {
+            assertEquals(replacement[depth],
+                    grunt.peekHeadingAtDepth(depth),
+                    "native retained-face route differs at depth " + depth);
+        }
+    }
+
+    @Test
     @DisplayName("paid melee recovery keeps both formation grunts engaged at cycle 140")
     void paidMeleeRecoveryKeepsFormationEngagedAtCycle140() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -885,6 +1183,591 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(41, directRefill.tileY(),
                 "the paid residual must consume BNE's direct south refill");
         assertEquals(Direction.fromDelta(0, 1), directRefill.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("a pressured capacity tail redraws before its immediate retarget step")
+    void pressuredCapacityTailRedrawsBeforeItsImmediateRetargetStep() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 99);
+        Unit footman = unitById(world, 123);
+        Unit knight = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1501 grunt");
+        assertNotNull(footman, "XHuman 12 has no native-slot-1477 footman");
+        assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
+
+        // Native slot 1501 finishes the pixels of its fifth east-led route
+        // byte with one collision/refusal generation attached. On fixture
+        // 258 AutoSelectTarget replaces knight 1475 with footman 1477, NewPath
+        // writes 00,01,03,01,02,02,03,03,03,04,05,05,06,06,06,07,07,06,06,06,
+        // and MoveToTarget consumes north in that same callback. Treating the
+        // old capacity tail as a newly completed refusal band softens the
+        // formation, draws an occupied east head, and parks the fighter.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 257) {
+            mission.tick();
+        }
+
+        assertEquals(knight, grunt.target());
+        assertEquals(35, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 5, grunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(5, grunt.battleNetPathStepsTaken());
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(1, grunt.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(258, fixtureCycle(world));
+        assertEquals(footman, grunt.target(),
+                "the settled scan must publish native's replacement quarry");
+        assertEquals(35, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "the replacement route must consume north immediately");
+        assertEquals(Direction.fromDelta(0, -1), grunt.lastStepHeading());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        int[] retained = {
+                1, 3, 1, 2, 2, 3, 3, 3, 4, 5,
+                5, 6, 6, 6, 7, 7, 6, 6, 6
+        };
+        for (int depth = 0; depth < retained.length; depth++) {
+            assertEquals(retained[depth], grunt.peekHeadingAtDepth(depth),
+                    "native replacement route differs at retained depth " + depth);
+        }
+        assertEquals(0, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION) + 3,
+                grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 273) {
+            mission.tick();
+        }
+        assertEquals(footman, grunt.target());
+        assertEquals(35, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+        assertEquals(0x6e32f013L, Integer.toUnsignedLong(world.randomSeed()),
+                "the settled north residual must not debit sync RNG");
+
+        mission.tick();
+        assertEquals(274, fixtureCycle(world));
+        assertEquals(footman, grunt.target());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength(),
+                "Attack construction retains the paid old route bytes");
+        assertEquals(0x6e32f013L, Integer.toUnsignedLong(world.randomSeed()),
+                "opening Attack construction owns no sync draw");
+
+        while (fixtureCycle(world) < 276) {
+            mission.tick();
+        }
+        assertEquals(footman, grunt.target());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(0xf2883250L, Integer.toUnsignedLong(world.randomSeed()));
+
+        mission.tick();
+        assertEquals(277, fixtureCycle(world));
+        assertEquals(knight, grunt.target(),
+                "timer one must publish the fresh native quarry");
+        assertEquals(36, grunt.tileX());
+        assertEquals(40, grunt.tileY(),
+                "the fresh route must consume southeast, not stale northeast");
+        assertEquals(Direction.fromDelta(1, 1), grunt.lastStepHeading());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        int[] returnedKnightTail = {
+                2, 1, 1, 1, 3, 3, 3, 4, 4, 4,
+                5, 5, 6, 6, 6, 7, 7, 6, 6
+        };
+        for (int depth = 0; depth < returnedKnightTail.length; depth++) {
+            assertEquals(returnedKnightTail[depth],
+                    grunt.peekHeadingAtDepth(depth),
+                    "native returned-knight route differs at retained depth "
+                            + depth);
+        }
+        assertEquals(0, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION) + 3,
+                grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(0xf2883250L, Integer.toUnsignedLong(world.randomSeed()),
+                "the replacement route/step boundary owns no sync draw");
+    }
+
+    @Test
+    @DisplayName("an unoffered four-byte melee ray parks before its compact wall pair")
+    void unofferedFourByteMeleeRayParksBeforeCompactWallPair() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 83);
+        Unit saturatedGrunt = unitById(world, 96);
+        Unit coldDiagonalGrunt = unitById(world, 119);
+        Unit knight = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1517 grunt");
+        assertNotNull(saturatedGrunt,
+                "XHuman 12 has no native-slot-1504 grunt");
+        assertNotNull(coldDiagonalGrunt,
+                "XHuman 12 has no native-slot-1481 grunt");
+        assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
+
+        // Native slot 1517 finishes Attack construction with a cached
+        // E,E,SE,S,SW tail and no live hit offer. Fixture 246 parks that old
+        // route at RI 20. Fixture 247 writes SE,SE,SW,W, refuses the first
+        // SE, and owns a complete Move 15..1 band. The timer-one wake on 262
+        // parks that same face again; 263 writes the compact SE,SW wall pair
+        // and commits its first byte immediately.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 245) {
+            mission.tick();
+        }
+
+        assertEquals(knight, grunt.target());
+        assertNull(grunt.offeredTarget());
+        assertEquals(30, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(4, grunt.pathLength());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(246, fixtureCycle(world));
+        assertEquals(0, grunt.pathLength(),
+                "the unoffered old buffer is parked before replacement planning");
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(2482, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(247, fixtureCycle(world));
+        assertEquals(4, grunt.pathLength());
+        assertEquals(4, grunt.battleNetPathInitialLength());
+        assertEquals(0, grunt.battleNetPathStepsTaken());
+        assertEquals(3, grunt.peekHeadingAtDepth(0));
+        assertEquals(3, grunt.peekHeadingAtDepth(1));
+        assertEquals(5, grunt.peekHeadingAtDepth(2));
+        assertEquals(6, grunt.peekHeadingAtDepth(3));
+        assertEquals(2, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertEquals(2482, grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 261) {
+            mission.tick();
+        }
+        assertEquals(30, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(4, grunt.pathLength());
+        assertEquals(4, grunt.battleNetPathInitialLength());
+        assertEquals(0, grunt.battleNetPathStepsTaken());
+        assertEquals(2, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertTrue(grunt.stepDrained());
+        assertEquals(2, grunt.lastStepHeading());
+        assertEquals(3, grunt.peekHeading());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(39, saturatedGrunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                saturatedGrunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                saturatedGrunt.battleNetPathInitialLength());
+        assertEquals(1, saturatedGrunt.battleNetPathStepsTaken());
+        assertEquals(4, saturatedGrunt.battleNetCollisionCounter());
+        assertEquals(0, saturatedGrunt.battleNetRefusals());
+        assertEquals(2534, saturatedGrunt.battleNetSequenceOffset());
+        assertEquals(1, saturatedGrunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(262, fixtureCycle(world));
+        assertEquals(0, grunt.pathLength());
+        assertEquals(3, grunt.battleNetCollisionCounter());
+        assertEquals(1, grunt.battleNetRefusals());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(39, saturatedGrunt.tileY());
+        assertEquals(0, saturatedGrunt.pathLength(),
+                "the saturated cached tail parks before its paid redraw");
+        assertEquals(5, saturatedGrunt.battleNetCollisionCounter());
+        assertEquals(0, saturatedGrunt.battleNetRefusals());
+        assertEquals(2482, saturatedGrunt.battleNetSequenceOffset());
+        assertEquals(1, saturatedGrunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(263, fixtureCycle(world));
+        assertEquals(31, grunt.tileX());
+        assertEquals(38, grunt.tileY(),
+                "the compact replacement pair commits southeast immediately");
+        assertEquals(Direction.fromDelta(1, 1), grunt.lastStepHeading());
+        assertEquals(1, grunt.pathLength());
+        assertEquals(Direction.fromDelta(-1, 1), grunt.peekHeading());
+        assertEquals(3, grunt.battleNetCollisionCounter());
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(40, saturatedGrunt.tileY(),
+                "the saturated replacement ray commits south immediately");
+        assertEquals(Direction.fromDelta(0, 1),
+                saturatedGrunt.lastStepHeading());
+        assertEquals(1, saturatedGrunt.pathLength());
+        assertEquals(Direction.fromDelta(0, 1),
+                saturatedGrunt.peekHeading());
+        assertEquals(5, saturatedGrunt.battleNetCollisionCounter());
+
+        // Slot 1504 drains the first south byte through fixture 279, where
+        // the second south is refused and the compact buffer is parked. The
+        // next visit clears collision six and enters a cold Attack constructor
+        // loop. A free south-east neighbour is deliberately not a route: the
+        // loop re-faces toward the moving knight but keeps RI 20 and spends no
+        // additional sync draw.
+        while (fixtureCycle(world) < 279) {
+            mission.tick();
+        }
+        assertEquals(knight, saturatedGrunt.target());
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(40, saturatedGrunt.tileY());
+        assertEquals(0, saturatedGrunt.pathLength());
+        assertEquals(6, saturatedGrunt.battleNetCollisionCounter());
+        assertEquals(0, saturatedGrunt.battleNetRefusals());
+        assertEquals(world.idle.battleNetSequenceStart(saturatedGrunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                saturatedGrunt.battleNetSequenceOffset());
+        assertEquals(1, saturatedGrunt.battleNetAnimationTimer());
+        assertEquals(0xfd31fc49L, Integer.toUnsignedLong(world.randomSeed()));
+
+        mission.tick();
+        assertEquals(280, fixtureCycle(world));
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(40, saturatedGrunt.tileY(),
+                "the saturated cardinal park must not invent a diagonal escape");
+        assertEquals(0, saturatedGrunt.pathLength());
+        assertEquals(0, saturatedGrunt.battleNetCollisionCounter());
+        assertEquals(world.idle.battleNetSequenceStart(saturatedGrunt,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                saturatedGrunt.battleNetSequenceOffset());
+        assertEquals(3, saturatedGrunt.battleNetAnimationTimer());
+        assertEquals(0x1046237cL, Integer.toUnsignedLong(world.randomSeed()),
+                "the wrapped cardinal constructor owns no sync draw");
+        assertEquals(0x0957ada5, world.battleNetRandomSeed(),
+                "fixture 280 owns native's active-order idle draw");
+
+        while (fixtureCycle(world) < 282) {
+            mission.tick();
+        }
+        assertEquals(1, saturatedGrunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(283, fixtureCycle(world));
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(40, saturatedGrunt.tileY());
+        assertEquals(3, saturatedGrunt.battleNetAnimationTimer(),
+                "a still-blocked direct face reopens Attack construction");
+        assertEquals(0x3a951405L, Integer.toUnsignedLong(world.randomSeed()),
+                "the recurring constructor also owns no sync draw");
+
+        mission.tick();
+        assertEquals(284, fixtureCycle(world));
+        assertEquals(knight, coldDiagonalGrunt.target());
+        assertEquals(30, coldDiagonalGrunt.tileX());
+        assertEquals(41, coldDiagonalGrunt.tileY());
+        assertEquals(0, coldDiagonalGrunt.pathLength());
+        assertEquals(world.idle.battleNetSequenceStart(coldDiagonalGrunt,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                coldDiagonalGrunt.battleNetSequenceOffset());
+        assertEquals(3, coldDiagonalGrunt.battleNetAnimationTimer(),
+                "the unqueued paid diagonal enters cold Attack construction");
+        assertTrue(coldDiagonalGrunt.battleNetColdNoProgressRefusalLoop());
+        assertEquals(0x179cfada, world.battleNetRandomSeed(),
+                "fixture 284 debits the diagonal Still promotion");
+
+        while (fixtureCycle(world) < 287) {
+            mission.tick();
+        }
+        assertEquals(3, coldDiagonalGrunt.battleNetAnimationTimer(),
+                "the boxed diagonal promotion repeats every three visits");
+        assertEquals(0xe39784ed, world.battleNetRandomSeed(),
+                "fixture 287 retains the authenticated async ledger");
+
+        while (fixtureCycle(world) < 290) {
+            mission.tick();
+        }
+        assertEquals(3, coldDiagonalGrunt.battleNetAnimationTimer());
+        assertEquals(0x5a765747, world.battleNetRandomSeed(),
+                "all cycle-290 melee rolls receive their native draw values");
+
+        while (fixtureCycle(world) < 300) {
+            mission.tick();
+        }
+        assertEquals(30, saturatedGrunt.tileX());
+        assertEquals(40, saturatedGrunt.tileY());
+        assertEquals(1, saturatedGrunt.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("cycle-264 paid retargets keep their authenticated formation routes")
+    void unofferedCollisionFourRetargetKeepsOuterFormationRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 106);
+        Unit buildingRetargetGrunt = unitById(world, 120);
+        Unit cleanBuildingRetargetGrunt = unitById(world, 121);
+        Unit knight = unitById(world, 125);
+        Unit footman = unitById(world, 123);
+        Unit guardTower = unitById(world, 117);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1494 grunt");
+        assertNotNull(buildingRetargetGrunt,
+                "XHuman 12 has no native-slot-1480 grunt");
+        assertNotNull(cleanBuildingRetargetGrunt,
+                "XHuman 12 has no native-slot-1479 grunt");
+        assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
+        assertNotNull(footman, "XHuman 12 has no native-slot-1477 footman");
+        assertNotNull(guardTower,
+                "XHuman 12 has no native-slot-1483 guard tower");
+
+        // Native slot 1494 settles the eleventh byte of its collision-four
+        // knight route on fixture 245. With no live hit offer, target scan
+        // selects footman 1477 and NewPath keeps unrefused collision-marked
+        // formation peers solid. The resulting outer route begins with three
+        // north-east bytes. One commits immediately, Attack construction owns
+        // fixtures 261..263, and the second commits on fixture 264. Repeating
+        // the last heading after construction can mimic the final coordinate,
+        // but loses the authenticated eighteen-byte route and is explicitly
+        // excluded by the retained-buffer assertions below.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 244) {
+            mission.tick();
+        }
+        assertEquals(knight, grunt.target());
+        assertEquals(36, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(4, grunt.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(245, fixtureCycle(world));
+        assertEquals(footman, grunt.target());
+        assertEquals(37, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
+        assertEquals(18, grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        int[] retained = {
+                1, 1, 3, 3, 2, 3, 4, 5, 4,
+                5, 6, 6, 6, 7, 7, 6, 6
+        };
+        assertEquals(retained.length, grunt.pathLength());
+        for (int depth = 0; depth < retained.length; depth++) {
+            assertEquals(retained[depth], grunt.peekHeadingAtDepth(depth),
+                    "native outer route differs at retained depth " + depth);
+        }
+        assertEquals(0, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+
+        while (fixtureCycle(world) < 261) {
+            mission.tick();
+        }
+        for (int fixture = 261; fixture <= 263; fixture++) {
+            assertEquals(world.idle.battleNetSequenceStart(grunt,
+                            BattleNetSequence.ATTACK_ANIMATION),
+                    grunt.battleNetSequenceOffset());
+            assertEquals(264 - fixture, grunt.battleNetAnimationTimer(),
+                    "native exposes the retained-route constructor as 3,2,1");
+            assertEquals(retained.length, grunt.pathLength(),
+                    "Attack construction must retain every cached heading");
+            if (fixture < 263) {
+                mission.tick();
+            }
+        }
+
+        // Native slot 1480 reaches the same fixture through a different paid
+        // seam: fourteen bytes of a collision-three knight route remain when
+        // target scan selects guard tower 1483. NewPath softens the collided
+        // formation rank, but keeps the long uncollided grunt which is moving
+        // on the direct south-west approach diagonal solid. That exact view
+        // writes SW,W,W,SW,S,S. Broadly softening the rank writes SW,S,SW,W;
+        // treating every mover as solid writes SW,W,W,SW,SE.
+        assertEquals(knight, buildingRetargetGrunt.target());
+        assertEquals(32, buildingRetargetGrunt.tileX());
+        assertEquals(36, buildingRetargetGrunt.tileY());
+        assertEquals(14, buildingRetargetGrunt.pathLength());
+        assertEquals(3,
+                buildingRetargetGrunt.battleNetCollisionCounter());
+        assertEquals(knight, cleanBuildingRetargetGrunt.target());
+        assertEquals(30, cleanBuildingRetargetGrunt.tileX());
+        assertEquals(36, cleanBuildingRetargetGrunt.tileY());
+        assertEquals(16, cleanBuildingRetargetGrunt.pathLength());
+        assertEquals(3,
+                cleanBuildingRetargetGrunt.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(264, fixtureCycle(world));
+        assertEquals(38, grunt.tileX());
+        assertEquals(38, grunt.tileY(),
+                "the constructor wake commits the cached north-east byte");
+        assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
+        assertEquals(retained.length - 1, grunt.pathLength());
+
+        assertEquals(guardTower, buildingRetargetGrunt.target(),
+                "the residual scan must publish native's building replacement");
+        assertEquals(31, buildingRetargetGrunt.tileX());
+        assertEquals(37, buildingRetargetGrunt.tileY(),
+                "the paid building route commits south-west immediately");
+        assertEquals(Direction.fromDelta(-1, 1),
+                buildingRetargetGrunt.lastStepHeading());
+        assertEquals(6,
+                buildingRetargetGrunt.battleNetPathInitialLength());
+        assertEquals(1,
+                buildingRetargetGrunt.battleNetPathStepsTaken());
+        int[] buildingRetained = {6, 6, 5, 4, 4};
+        assertEquals(buildingRetained.length,
+                buildingRetargetGrunt.pathLength());
+        for (int depth = 0; depth < buildingRetained.length; depth++) {
+            assertEquals(buildingRetained[depth],
+                    buildingRetargetGrunt.peekHeadingAtDepth(depth),
+                    "native building route differs at retained depth " + depth);
+        }
+        assertEquals(0,
+                buildingRetargetGrunt.battleNetCollisionCounter());
+        assertEquals(world.idle.battleNetSequenceStart(buildingRetargetGrunt,
+                        BattleNetSequence.MOVE_ANIMATION) + 3,
+                buildingRetargetGrunt.battleNetSequenceOffset());
+        assertEquals(1,
+                buildingRetargetGrunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(265, fixtureCycle(world));
+        assertEquals(guardTower, cleanBuildingRetargetGrunt.target(),
+                "the next paid residual publishes the same tower");
+        assertEquals(29, cleanBuildingRetargetGrunt.tileX());
+        assertEquals(37, cleanBuildingRetargetGrunt.tileY(),
+                "the one-square approach corridor keeps native's south-west head");
+        assertEquals(Direction.fromDelta(-1, 1),
+                cleanBuildingRetargetGrunt.lastStepHeading());
+        assertEquals(3,
+                cleanBuildingRetargetGrunt.battleNetPathInitialLength());
+        assertEquals(1,
+                cleanBuildingRetargetGrunt.battleNetPathStepsTaken());
+        assertEquals(2, cleanBuildingRetargetGrunt.pathLength());
+        assertEquals(Direction.fromDelta(-1, 1),
+                cleanBuildingRetargetGrunt.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(0, 1),
+                cleanBuildingRetargetGrunt.peekHeadingAtDepth(1));
+        assertEquals(0,
+                cleanBuildingRetargetGrunt.battleNetCollisionCounter());
+        assertEquals(world.idle.battleNetSequenceStart(
+                        cleanBuildingRetargetGrunt,
+                        BattleNetSequence.MOVE_ANIMATION) + 3,
+                cleanBuildingRetargetGrunt.battleNetSequenceOffset());
+        assertEquals(1,
+                cleanBuildingRetargetGrunt.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("an unspent paid formation route executes its opened head after construction")
+    void unspentPaidFormationRouteExecutesItsOpenedHeadAfterConstruction() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit grunt = unitById(world, 99);
+        Unit footman = unitById(world, 123);
+        assertNotNull(grunt,
+                "XHuman 12 has no native-slot-1501 grunt");
+        assertNotNull(footman,
+                "XHuman 12 has no native-slot-1477 footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 296) {
+            mission.tick();
+        }
+
+        // Native changes quarry, writes a full N-led formation route, and
+        // pays Move 15 while the north square is occupied. No heading has
+        // been consumed from this route yet.
+        assertEquals(footman, grunt.target());
+        assertEquals(36, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(0, grunt.battleNetPathStepsTaken());
+        assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength());
+        assertEquals(Direction.fromDelta(0, -1), grunt.peekHeading());
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer());
+        assertEquals(0xba394867, world.randomSeed());
+
+        while (fixtureCycle(world) < 311) {
+            mission.tick();
+        }
+        for (int fixture = 311; fixture <= 313; fixture++) {
+            assertEquals(world.idle.battleNetSequenceStart(grunt,
+                            BattleNetSequence.ATTACK_ANIMATION),
+                    grunt.battleNetSequenceOffset());
+            assertEquals(314 - fixture, grunt.battleNetAnimationTimer(),
+                    "native exposes the paid constructor as 3,2,1");
+            assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength(),
+                    "construction must retain the unspent route");
+            if (fixture < 313) {
+                mission.tick();
+            }
+        }
+
+        mission.tick();
+        assertEquals(314, fixtureCycle(world));
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "the opened north head must execute instead of parking again");
+        assertEquals(Direction.fromDelta(0, -1), grunt.lastStepHeading());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+        assertEquals(Direction.fromDelta(1, -1), grunt.peekHeading(),
+                "the authenticated north-east tail must remain cached");
+        assertEquals(0x7e7cdd5f, world.randomSeed(),
+                "the constructor wake owns no sync draw");
     }
 
     private static int fixtureCycle(World world) {

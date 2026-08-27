@@ -17,13 +17,13 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-26
 
-Accepted pointer: run `609b4c53` (common clean 252, earliest divergence 253,
-gate PASS, engine content identical to commit `bfe8abdc`; the capsule's
-declared pathspecs match that tree exactly, only excluded `.md` files
-differ). Candidate on `master` after `86f1c618`: **shared horizon 254**
-(earliest divergence 255), survey through cycle 400 keeps 27 clean / 25
-divergent / 0 failed with zero regressions and capped sums moving
-18,164 -> 18,263. Engine failure identities unchanged (110=110).
+Accepted pointer: run `34810078` (common clean 254, earliest divergence 255,
+gate PASS, engine input `2d8f22d8` at commit `4e2e7e74`, with a verified clean
+source capsule). The current `master` survey through cycle 400 keeps 27 clean /
+25 divergent / 0 failed with zero regressions and capped sums moving
+18,164 -> 18,273. The sealed cycle-1,800 fleet keeps 8 clean / 44 divergent /
+0 failed with a frontier sum of 32,935. Engine failure identities remain
+unchanged (110=110).
 
 Closed this stretch: Orc 8 mine-exit refusal hold (253->289), XOrc 11
 walled-quarry drop (253->282), naval beat reissue through the patrol target

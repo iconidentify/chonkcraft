@@ -235,6 +235,56 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an Human 8 empty depot route owns its active idle draw")
+    void anHuman8EmptyDepotRouteOwnsItsActiveIdleDraw() {
+        Mission mission = mission("campaigns/human/level08h");
+        World world = mission.world();
+        Unit peasant = byId(world, 64);
+        Unit critter = byId(world, 61);
+        assertNotNull(peasant,
+                "native slot 1536 must remain paired with Java peasant 64");
+        assertNotNull(critter,
+                "native slot 1539 must remain paired with Java critter 61");
+
+        while (fixtureCycle(world) < 280) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.RETURN_GOODS, peasant.order());
+        assertEquals(2595, peasant.battleNetSequenceOffset(),
+                "action 24 promotes on the worker's Still body");
+        assertEquals(3, peasant.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(281, fixtureCycle(world));
+        assertEquals(Unit.Order.HARVEST, peasant.order(),
+                "Java's unified resource projection keeps native action 24 active");
+        assertEquals(2595, peasant.battleNetSequenceOffset());
+        assertEquals(2, peasant.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(2595, peasant.battleNetSequenceOffset());
+        assertEquals(1, peasant.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(283, fixtureCycle(world));
+        assertEquals(2595, peasant.battleNetSequenceOffset());
+        assertEquals(3, peasant.battleNetAnimationTimer(),
+                "the empty depot route restarts the three-call active idle band");
+        assertEquals(Unit.Order.STILL, critter.order(),
+                "the next critter must consume its own choice instead of the peasant's");
+
+        mission.tick();
+        assertEquals(2, peasant.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(1, peasant.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(286, fixtureCycle(world));
+        assertEquals(2595, peasant.battleNetSequenceOffset());
+        assertEquals(3, peasant.battleNetAnimationTimer(),
+                "an unchanged empty route repeats the active-order band every three visits");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");
@@ -335,6 +385,19 @@ class BattleNetAiMineExitReadyRealDataTest {
             mission.tick();
         }
         return mission;
+    }
+
+    private static int fixtureCycle(World world) {
+        return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
+    }
+
+    private static Unit byId(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
+                return unit;
+            }
+        }
+        return null;
     }
 
     private static Unit at(World world, String ident, int x, int y) {

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.animation.BattleNetSequence;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -31,7 +32,10 @@ class Xhuman12WoodCollisionLadderRealDataTest {
         Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
         World world = mission.world();
         Unit peon = unitById(world, 224);
+        Unit sibling = unitById(world, 215);
         assertNotNull(peon, "XHuman 12 has no Java unit 224 / native peon 1376");
+        assertNotNull(sibling,
+                "XHuman 12 has no Java unit 215 / native peon 1385");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -140,6 +144,141 @@ class Xhuman12WoodCollisionLadderRealDataTest {
                 "the east tail remains after the accepted southeast step");
         assertEquals(6, peon.battleNetCollisionCounter(),
                 "the accepted saturated route keeps native collision six");
+
+        while (fixtureCycle(world) < 280) {
+            mission.tick();
+        }
+        assertEquals(12, peon.tileX());
+        assertEquals(87, peon.tileY());
+        assertTrue(peon.isMoving(),
+                "fixture 280 consumes the complete one-byte north-east tip");
+        assertEquals(Direction.fromDelta(1, -1), peon.lastStepHeading());
+        assertEquals(0, peon.pathLength(),
+                "the blocked forest tip contributes no speculative tail");
+        assertEquals(1, peon.battleNetPathInitialLength());
+        assertEquals(1, peon.battleNetPathStepsTaken());
+        assertEquals(13, peon.battleNetWoodOrderX());
+        assertEquals(88, peon.battleNetWoodOrderY());
+
+        while (fixtureCycle(world) < 282) {
+            mission.tick();
+        }
+        assertEquals(12, sibling.tileX());
+        assertEquals(88, sibling.tileY());
+        assertFalse(sibling.isMoving());
+        assertEquals(0, sibling.pathLength(),
+                "the collided four-byte prefix settles before reconstruction");
+        assertEquals(0, sibling.battleNetCollisionCounter(),
+                "action 23 retires the completed collision generation");
+        assertEquals(2657, sibling.battleNetSequenceOffset());
+        assertEquals(3, sibling.battleNetAnimationTimer());
+
+        for (int fixture = 283; fixture <= 284; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertEquals(2657, sibling.battleNetSequenceOffset());
+            assertEquals(285 - fixture,
+                    sibling.battleNetAnimationTimer());
+        }
+
+        mission.tick();
+        assertEquals(285, fixtureCycle(world));
+        assertEquals(12, sibling.tileX());
+        assertEquals(88, sibling.tileY());
+        assertEquals(0, sibling.pathLength(),
+                "the occupied fresh byte is parked at native route index twenty");
+        assertEquals(1, sibling.battleNetCollisionCounter());
+        assertEquals(0, sibling.battleNetOrderDelay());
+        assertEquals(1, sibling.battleNetAnimationTimer());
+
+        for (int fixture = 286; fixture <= 291; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertEquals(fixture - 284,
+                    sibling.battleNetCollisionCounter(),
+                    "each timer-one visit advances the naked refusal ladder");
+            assertEquals(1, sibling.battleNetAnimationTimer());
+        }
+
+        mission.tick();
+        assertEquals(292, fixtureCycle(world));
+        assertEquals(8, sibling.battleNetCollisionCounter());
+        assertEquals(14, sibling.battleNetOrderDelay());
+        assertEquals(world.idle.battleNetSequenceStart(sibling,
+                        BattleNetSequence.MOVE_ANIMATION),
+                sibling.battleNetSequenceOffset());
+        assertEquals(15, sibling.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 296) {
+            mission.tick();
+        }
+        assertEquals(12, peon.tileX());
+        assertEquals(87, peon.tileY());
+        assertFalse(peon.isMoving());
+        assertEquals(0, peon.pathLength());
+        assertEquals(6, peon.battleNetCollisionCounter(),
+                "the one-byte saturated tip retains its paid generation");
+        assertEquals(2657, peon.battleNetSequenceOffset());
+        assertEquals(3, peon.battleNetAnimationTimer(),
+                "the short collided prefix pays action 23 on its settle visit");
+        mission.tick();
+        assertEquals(297, fixtureCycle(world));
+        assertEquals(2, peon.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(298, fixtureCycle(world));
+        assertEquals(1, peon.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(299, fixtureCycle(world));
+        assertEquals(13, peon.tileX());
+        assertEquals(86, peon.tileY());
+        assertTrue(peon.isMoving());
+        assertEquals(Direction.fromDelta(1, -1), peon.lastStepHeading());
+        assertEquals(15, peon.resourceTileX(),
+                "the claimed tree must advance to native's next forest tile");
+        assertEquals(89, peon.resourceTileY());
+        assertEquals(4, peon.battleNetPathInitialLength());
+        assertEquals(1, peon.battleNetPathStepsTaken());
+        assertEquals(3, peon.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), peon.peekHeading());
+        assertEquals(Direction.fromDelta(1, 1),
+                peon.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(0, 1),
+                peon.peekHeadingAtDepth(2));
+
+        while (fixtureCycle(world) < 306) {
+            mission.tick();
+        }
+        assertEquals(12, sibling.tileX());
+        assertEquals(88, sibling.tileY());
+        assertEquals(0, sibling.pathLength());
+        assertEquals(1, sibling.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(307, fixtureCycle(world));
+        assertEquals(13, sibling.tileX());
+        assertEquals(87, sibling.tileY());
+        assertEquals(Direction.fromDelta(1, -1), sibling.lastStepHeading());
+        assertTrue(sibling.pathLength() > 0);
+
+        while (fixtureCycle(world) < 314) {
+            mission.tick();
+        }
+        assertEquals(13, peon.tileX());
+        assertEquals(86, peon.tileY());
+        assertEquals(3, peon.pathLength(),
+                "the full claimed-aware tail remains cached while NE settles");
+
+        mission.tick();
+        assertEquals(315, fixtureCycle(world));
+        assertEquals(14, peon.tileX());
+        assertEquals(86, peon.tileY(),
+                "the second claimed-aware route byte is cardinal east");
+        assertEquals(Direction.fromDelta(1, 0), peon.lastStepHeading());
+        assertEquals(2, peon.pathLength());
+        assertEquals(Direction.fromDelta(1, 1), peon.peekHeading());
+        assertEquals(Direction.fromDelta(0, 1), peon.peekHeadingAtDepth(1));
+        assertEquals(0xe65c0875, world.randomSeed(),
+                "the claimed-tree replacement owns no extra sync draw");
     }
 
     private static int fixtureCycle(World world) {

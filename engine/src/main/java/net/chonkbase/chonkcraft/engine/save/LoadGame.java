@@ -824,6 +824,10 @@ public final class LoadGame {
             unit.setBattleNetStopAfterLeftover(
                     truthy(state.rawGet("stopAfterLeftover")));
         }
+        if (state.rawGet("retainedRewriteOccupancy") != null) {
+            unit.setBattleNetRetainedRewriteOccupancy(
+                    truthy(state.rawGet("retainedRewriteOccupancy")));
+        }
         if (state.rawGet("saturatedResidualFaceRetry") != null) {
             unit.setBattleNetSaturatedResidualFaceRetry(
                     truthy(state.rawGet("saturatedResidualFaceRetry")));
@@ -919,6 +923,10 @@ public final class LoadGame {
         if (state.rawGet("movingQuarryResidual") != null) {
             unit.setBattleNetMovingQuarryResidual(
                     truthy(state.rawGet("movingQuarryResidual")));
+        }
+        if (state.rawGet("buildingRetargetReplay") != null) {
+            unit.setBattleNetBuildingRetargetReplay(
+                    truthy(state.rawGet("buildingRetargetReplay")));
         }
         if (state.rawGet("attackWrapDestArmPending") != null) {
             unit.setBattleNetAttackWrapDestArmPending(
