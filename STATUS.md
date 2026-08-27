@@ -14,24 +14,23 @@ after play.
 
 ## Measured Battle.net Edition parity
 
-The current release candidate has been compared with Warcraft II: Battle.net
+The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 254.** The lowest common divergence is
-  cycle 255, so the shared proven frontier is cycle 254 -- the first advance
-  past the long-standing 252 boundary. Expansion Human 7's capital patrol
-  handoff is now the sole map at that boundary.
+- **52/52 maps are exact through cycle 260.** The lowest common divergence is
+  cycle 261, so the shared proven frontier is cycle 260. Expansion Orc 8 is
+  the sole map at that boundary; every other mission reaches at least cycle
+  263.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,273 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,366 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  32,935; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,121; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- Fleet-verified session advances: Orc 8 to 289, XOrc 11 to 282, XHuman 5 to
-  288, Human 13 to 265, Human 8 to 328, and XHuman 12 to 257; XHuman 7
-  retains the boundary at 255 and the other maps retained their prior
-  frontiers.
+- The current AI-ledger milestone changes causal evidence, not simulation
+  behavior: the cycle-400 and cycle-1,800 fleets retained these exact counts
+  and the h260 regression gate with zero failed cases.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
@@ -47,19 +46,20 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,777 tests**. The canonical authenticated
-profile runs 2,751 and intentionally skips exactly 26, while keeping the exact
-expected 110-test specification-failure set. Three optional private
-playtest-save checks also ran and passed on the development workstation before
-the CI-equivalent skip receipt was produced.
+The complete suite now contains **2,790 tests**. The canonical authenticated
+profile runs 2,764 and intentionally skips exactly 26, while keeping the exact
+expected 110-test specification-failure set. Hosted run `33121122477` passed
+both the data-free and authenticated jobs against revision
+`f4e7b95212b58183340bcd72526fccfc2082f423`.
 
-The next-level readiness gate also passes its present fail-closed contract.
-Signed engine OTA `2026.0825.68` remains the public release, published from
-revision `979c4a21613b40405fad03a0158b1c80d0a31e84`; its workflow proved both
-local installation and a fresh launcher install from the public endpoint. The
-cycle-254 candidate is fleet-verified but not yet published. It changes
-only engine behavior and authenticated referees: no matchmaking protocol,
-service, or infrastructure path changed, so a server rollout is not required.
+The next-level readiness inventory passes its present fail-closed executable
+checks while correctly remaining open for the incomplete proof lanes below.
+Signed engine OTA `2026.0827.86` is the public release, published from revision
+`f4e7b95212b58183340bcd72526fccfc2082f423` with game JAR SHA-256
+`9b6d1cfc033f10325a2d47b521dd376dfeb82192b4b15d881c07d5b9756036f5`.
+Its workflow proved both local installation and a fresh launcher install from
+the public endpoint. No matchmaking protocol, service, or infrastructure path
+changed, so a server rollout was not required.
 
 ## Broader fidelity frontier
 
@@ -71,9 +71,12 @@ being inferred from the playable campaign fleet:
 - Physical player transactions: **0/532** paired native/Java certifications.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
-- AI fleet: **0/52** current-head mission twins. Forty-five authenticated
-  native captures are discoverable, seven are missing, and none has yet been
-  materialized into a complete current-head conductor receipt.
+- AI fleet: **45/52** current-head mission twins are materialized from
+  authenticated native captures; seven captures are missing. Committed state
+  is exact for **36/52** missions and **163,796/167,400** player-cycles. Full
+  causal telemetry is exact for **32/52** missions and **163,784/167,400**
+  player-cycles. Fleet certification remains incomplete until all 52 missions
+  are materialized and exact under one proof.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 
