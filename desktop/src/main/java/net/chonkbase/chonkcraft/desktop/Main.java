@@ -810,8 +810,10 @@ public final class Main {
     private static void startMultiplayer(GameData data, AssetSource assets,
             Java2DPipeline.Choice pipeline, LobbySetup lobby) {
         PudMap source;
+        byte[] synchronizedMap;
         try {
-            source = PudReader.read(lobby.mapBytes(assets));
+            synchronizedMap = lobby.mapBytes(assets);
+            source = PudReader.read(synchronizedMap);
         } catch (java.io.IOException e) {
             System.err.println("Cannot read " + lobby.map() + ": " + e.getMessage());
             return;
@@ -834,7 +836,7 @@ public final class Main {
                 lobby.localPlayer(), lobby.map().getFileName());
 
         start(data, assets, pipeline, null, lobby.map(), null, 0,
-                started.game(), world, lobby.localPlayer());
+                started.game(), world, lobby.localPlayer(), synchronizedMap);
     }
 
     /**
@@ -1469,7 +1471,7 @@ public final class Main {
             String campaignName, int missionNumber,
             net.chonkbase.chonkcraft.engine.network.NetworkGame network) {
         start(data, assets, pipeline, mission, mapFileOrNull, campaignName,
-                missionNumber, network, null, -1);
+                missionNumber, network, null, -1, null);
     }
 
     /**
@@ -1485,7 +1487,8 @@ public final class Main {
             Java2DPipeline.Choice pipeline, Mission mission, Path mapFileOrNull,
             String campaignName, int missionNumber,
             net.chonkbase.chonkcraft.engine.network.NetworkGame network,
-            World preparedNetworkWorld, int preparedLocalPlayer) {
+            World preparedNetworkWorld, int preparedLocalPlayer,
+            byte[] synchronizedMapBytes) {
         closeFrontEndAudio();
         Path mapFile = mapFileOrNull;
         PudMap source;
@@ -1698,6 +1701,21 @@ public final class Main {
             savePath = name != null ? name : mapFile.toAbsolutePath().toString();
         } else {
             savePath = null;
+        }
+        if (network != null && synchronizedMapBytes != null && savePath != null) {
+            try {
+                PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
+                        world, savePath, synchronizedMapBytes, localPlayer,
+                        network.scheduler().cyclesPerUpdate(), network.scheduler().lag(),
+                        MatchmakingProtocol.gameBuild());
+                network.setCycleSink(recorder);
+                System.out.println("Multiplayer recording: " + recorder.directory());
+            } catch (java.io.IOException | RuntimeException failed) {
+                // Recording is a safety net, not a condition of playing. A
+                // read-only or full home directory must not send everybody
+                // back to the lobby after they have assembled a match.
+                System.err.println("Could not start multiplayer recording: " + failed);
+            }
         }
         BattleShowcase.Result openingShowcase = showcase;
         SwingUtilities.invokeLater(() -> show(

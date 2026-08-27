@@ -44,7 +44,7 @@ Developer tools may use these external inputs (the property wins):
 
 Tests needing retail assets call `Assumptions.assumeTrue(...)` and skip; Maven
 reports `BUILD SUCCESS` either way. The exit code alone certifies nothing.
-The 17-lane playability gate fails if any selected referee skips and runs with
+The 18-lane playability gate fails if any selected referee skips and runs with
 no external source-tree input. Never report a passing run
 without saying which pack and gate were used.
 

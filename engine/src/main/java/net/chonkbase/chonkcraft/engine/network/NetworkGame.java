@@ -25,6 +25,28 @@ import net.chonkbase.chonkcraft.engine.World;
  */
 public final class NetworkGame implements AutoCloseable {
 
+    /**
+     * A read-only copy of each command batch after lockstep releases it.
+     *
+     * <p>The sink runs after the commands have been applied and the resulting
+     * world hash has been computed. It cannot admit a command, change its
+     * order, or hold the simulation up waiting for another machine. Desktop
+     * clients use this seam for a local flight recorder; headless peers and
+     * tests pay nothing unless they install one.
+     */
+    public interface CycleSink {
+        /** Records one completed lockstep boundary. */
+        void released(long netCycle, long worldCycle, List<GameCommand> commands,
+                long syncHash);
+
+        /** Records the last state visible when this machine leaves the game. */
+        default void finished(long netCycle, long worldCycle, long syncHash) {
+        }
+    }
+
+    private static final CycleSink NO_CYCLE_SINK =
+            (netCycle, worldCycle, commands, syncHash) -> { };
+
     /** What a call to {@link #update} did. */
     public enum Step {
         /** The world advanced a cycle. */
@@ -54,6 +76,7 @@ public final class NetworkGame implements AutoCloseable {
     private final LockstepScheduler scheduler;
     private final CommandApplier applier;
     private final int localPlayer;
+    private CycleSink cycleSink = NO_CYCLE_SINK;
 
     /** Commands the local player has issued but not yet sent. */
     private final List<GameCommand> outgoing = new ArrayList<>();
@@ -178,6 +201,11 @@ public final class NetworkGame implements AutoCloseable {
     /** Configures the one machine allowed to adjudicate peer timeouts. */
     public void setHostPlayer(int hostPlayer) {
         this.hostPlayer = hostPlayer;
+    }
+
+    /** Installs a passive observer of completed lockstep cycles. */
+    public void setCycleSink(CycleSink cycleSink) {
+        this.cycleSink = java.util.Objects.requireNonNull(cycleSink, "cycleSink");
     }
 
     /** Names captured from the settled lobby, used only in notifications. */
@@ -374,6 +402,16 @@ public final class NetworkGame implements AutoCloseable {
         ownHashes.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
         reportedHashes.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
         checkHashes(netCycle, hash);
+        try {
+            cycleSink.released(netCycle, world.cycle(), released, hash);
+        } catch (RuntimeException failed) {
+            // A recorder is evidence about a match, never part of the match.
+            // Letting one failed disk write escape here used to be the exact
+            // shape of the network freeze this observer is meant to diagnose:
+            // the simulation callback died and the window stopped moving.
+            System.err.println("multiplayer cycle recorder stopped: " + failed);
+            cycleSink = NO_CYCLE_SINK;
+        }
         return desyncCycle >= 0 ? Step.DESYNC : Step.ADVANCED;
     }
 
@@ -717,5 +755,12 @@ public final class NetworkGame implements AutoCloseable {
     public void close() {
         leave();
         session.close();
+        try {
+            cycleSink.finished(lastCompletedCycle(), world.cycle(), SyncHash.of(world));
+        } catch (RuntimeException failed) {
+            System.err.println("multiplayer cycle recorder could not finish: " + failed);
+        } finally {
+            cycleSink = NO_CYCLE_SINK;
+        }
     }
 }

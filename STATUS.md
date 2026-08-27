@@ -6,6 +6,12 @@ save and load, and lockstep multiplayer are implemented. All 52 campaign
 missions load and run from an authenticated ChonkPack built from original game
 media supplied by the player.
 
+Every multiplayer client passively keeps a bounded local flight record under
+`~/.chonkcraft/recordings`: the exact lobby map, cycle-zero save, accepted
+command stream, and sync hashes. It records no chat, uploads nothing, and adds
+no replay viewer; the bundle exists only to harvest a troublesome real match
+after play.
+
 ## Measured Battle.net Edition parity
 
 The current release candidate has been compared with Warcraft II: Battle.net
@@ -41,8 +47,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,773 tests**. The canonical authenticated
-profile runs 2,747 and intentionally skips exactly 26, while keeping the exact
+The complete suite now contains **2,777 tests**. The canonical authenticated
+profile runs 2,751 and intentionally skips exactly 26, while keeping the exact
 expected 110-test specification-failure set. Three optional private
 playtest-save checks also ran and passed on the development workstation before
 the CI-equivalent skip receipt was produced.

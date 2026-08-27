@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 1,173 of 2,773 tests skip and
+either way. With nothing configured, 1,173 of 2,777 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,7 +57,7 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **26 skips of 2,773**, re-measured after the BNE
+Asserts the `full` profile: **26 skips of 2,777**, re-measured after the BNE
 parity, explicit-team, multiplayer-wall, allied-vision, wood-command, team-outcome,
 mine-collapse-audio, and gryphon order-handoff coverage additions against the runner's
 authenticated retail installation. One of the twenty-six depends on which release
