@@ -13,9 +13,8 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
 - **52/52 maps are exact through cycle 254.** The lowest common divergence is
   cycle 255, so the shared proven frontier is cycle 254 -- the first advance
-  past the long-standing 252 boundary. The three maps at that boundary are
-  Human 8's blocked chase, XHuman 7's capital order remnant, and XHuman 12's
-  force-launch home.
+  past the long-standing 252 boundary. Expansion Human 7's capital patrol
+  handoff is now the sole map at that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
   frontiers, capped at 400, is 18,273 cycles; no map moved backward.
@@ -24,8 +23,9 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   32,935; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
 - Fleet-verified session advances: Orc 8 to 289, XOrc 11 to 282, XHuman 5 to
-  288, Human 13 to 265, and XHuman 7 to 255; the other maps retained their
-  prior boundaries.
+  288, Human 13 to 265, Human 8 to 328, and XHuman 12 to 257; XHuman 7
+  retains the boundary at 255 and the other maps retained their prior
+  frontiers.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
@@ -33,17 +33,16 @@ always one cycle before the earliest authenticated mismatch across the fleet.
 
 ## Playability and release gates
 
-The last completed player-contract receipt certifies **17/17 playability
-lanes** with zero failures, skips, blocks, or timeouts. The cycle-252 candidate
-re-ran 13 lanes successfully with no failures before the checkpoint was
-stopped; its remaining four-lane receipt is intentionally pending. The gate
+The current player-contract receipt certifies **18/18 playability lanes** with
+zero failures, skips, blocks, or timeouts, including the read-only end-to-end
+control-liveness referee. The gate
 covers authenticated boot and assets, deterministic scheduling, movement,
 orders, economy, construction, combat, projectiles, naval oil, spells, retail
-AI, campaign triggers, save/load, rendering and input, sound, and clean/adverse
-network lockstep.
+AI, campaign triggers, save/load, rendering and input, sound, control liveness,
+and clean/adverse network lockstep.
 
-The complete suite now contains **2,760 tests**. The canonical authenticated
-profile ran 2,734 and intentionally skipped exactly 26, while keeping the exact
+The complete suite now contains **2,773 tests**. The canonical authenticated
+profile runs 2,747 and intentionally skips exactly 26, while keeping the exact
 expected 110-test specification-failure set. Three optional private
 playtest-save checks also ran and passed on the development workstation before
 the CI-equivalent skip receipt was produced.
@@ -52,7 +51,7 @@ The next-level readiness gate also passes its present fail-closed contract.
 Signed engine OTA `2026.0825.68` remains the public release, published from
 revision `979c4a21613b40405fad03a0158b1c80d0a31e84`; its workflow proved both
 local installation and a fresh launcher install from the public endpoint. The
-cycle-252 candidate is fleet-verified but not yet published. It changes
+cycle-254 candidate is fleet-verified but not yet published. It changes
 only engine behavior and authenticated referees: no matchmaking protocol,
 service, or infrastructure path changed, so a server rollout is not required.
 
@@ -79,6 +78,6 @@ engine and program identity, and it fails closed rather than carrying forward
 partial, detached, legacy, or stale receipts.
 
 The source of truth is executable evidence: the enforced test profiles, the
-17-lane playability receipt, the authenticated retail comparison harness under
+18-lane playability receipt, the authenticated retail comparison harness under
 `tools/bne-harness/`, packaged-launcher checks, and focused regression tests
 beside the behavior they protect.

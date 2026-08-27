@@ -28,6 +28,7 @@ REQUIRED_SYSTEMS = {
     "save-load",
     "rendering-ui-input",
     "sound",
+    "control-liveness",
     "network-lockstep",
 }
 

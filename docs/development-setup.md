@@ -330,7 +330,7 @@ scripts/run-tests.sh
 ```
 
 Raw `WC2_INSTALL_DIR` remains an extractor/development input, not a shipped-game
-input. The game and 17-lane playability certification never read a ChonkCraft
+input. The game and 18-lane playability certification never read a ChonkCraft
 source directory.
 
 `-Djava.awt.headless=true` is often written out in commands and audit notes. It
@@ -341,7 +341,7 @@ it does no harm and makes the intent visible.
 
 Tests needing retail assets still use JUnit assumptions, so an ordinary Maven
 run can be green with those tests skipped. Inspect the Surefire summaries. For
-the player contract, run `scripts/run-bne-playability-gate.py`: all 17 selected
+the player contract, run `scripts/run-bne-playability-gate.py`: all 18 selected
 player/referee lanes must pass, any skip makes the receipt fail, and the runner
 forces the retired ChonkCraft source property to a nonexistent path.
 
@@ -485,9 +485,9 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 1,154 skips, so 1,599 tests actually run without exposing licensed
+It asserts 1,173 skips, so 1,600 tests actually run without exposing licensed
 media to public pull-request code. The authenticated lane asserts 26 skips out
-of 2,753 tests. Tests backed by retail sequences deliberately join the hosted
+of 2,773 tests. Tests backed by retail sequences deliberately join the hosted
 lane's skip inventory while running on the private authenticated runner.
 
 ## Packaging

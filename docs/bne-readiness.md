@@ -21,7 +21,7 @@ The exact-fidelity frontier remains a separate, stricter proof.
 
 | Grade | Systems | Meaning |
 |---|---:|---|
-| Green | 17 | Retail behavior understood and the differential proof passes. |
+| Green | 18 | Retail behavior understood and the differential proof passes. |
 | Yellow | 0 | Mapped and exercised, with known discrepancies or missing proof. |
 | Orange | 0 | Implemented primarily from LegacyEngine and not established against retail. |
 | Red | 0 | Disabled, absent, or unable to certify a playable loop. |
@@ -46,6 +46,7 @@ The exact-fidelity frontier remains a separate, stricter proof.
 | Save, load and terrain persistence | GREEN | The harness changes terrain and live state, saves, reloads and resumes the same simulation. | No blocking fact recorded. |
 | Rendering, UI and player input | GREEN | The desktop test driver issues real command-panel and map interactions, renders deterministic frames and activates the one-action playtest evidence shortcut. | No blocking fact recorded. |
 | Sound bindings and playback policy | GREEN | A worker completes a player-issued build order while the referee follows its sound event through the script-free retail bindings and real mixer. | No blocking fact recorded. |
+| End-to-end player control liveness | GREEN | A read-only outcome referee drives authenticated units through one-, three- and nine-unit controls locally and across two real UDP peers. | No blocking fact recorded. |
 | Multiplayer lockstep | GREEN | Independent UDP peers play a long match over both a clean link and a deterministic adverse link. | No blocking fact recorded. |
 
 ## Boot, retail data and assets
@@ -726,6 +727,46 @@ Recheck command:
 
 ```text
 scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+## End-to-end player control liveness
+
+Grade: **GREEN**.
+
+Automated driver: A read-only outcome referee drives authenticated units through one-, three- and nine-unit controls locally and across two real UDP peers.
+
+Success means: Every accepted command progresses or reaches an honest terminal state within 600 cycles, no control remains unresolved, and both multiplayer worlds finish 1,200 cycles with one hash.
+
+Implementation:
+
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournal.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/CommandSink.java`
+- `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/CommandApplier.java`
+- `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/NetworkGame.java`
+
+Automated checks:
+
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/ControlLivenessPlayabilityTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournalTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java`
+- `scripts/check-bne-control-liveness-gate.sh`
+
+Retail evidence:
+
+- The desktop flight recorder retains the physical gesture, ordered one-to-many command fan-out, authoritative acceptance result, first visible progress and a bounded terminal classification without changing the simulation.
+- The 600-cycle watchdog distinguishes explicit rejection, supersession, successful settlement, unit loss and target loss from the player-breaking case: an accepted command which never produces physical or order-state progress.
+- Authenticated retail footmen and grunts receive one-, three- and nine-unit moves, mid-stride redirects, Stop/resume and congested live-target attacks through the same CommandApplier seam used by the desktop.
+- Two independent worlds exchange those controls through real loopback UDP and the production lockstep scheduler for 1,200 cycles; both player journals remain live and the complete synchronized world hashes agree at the end.
+- The referee never retries, redirects or repairs an order. A liveness failure stays diagnostic evidence for the precision-owned movement or combat system instead of silently introducing non-retail recovery behavior.
+
+Known blockers:
+
+- None recorded.
+
+Recheck command:
+
+```text
+scripts/check-bne-control-liveness-gate.sh
 ```
 
 ## Multiplayer lockstep

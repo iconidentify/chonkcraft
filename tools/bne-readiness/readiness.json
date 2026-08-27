@@ -551,6 +551,37 @@
       }
     },
     {
+      "id": "control-liveness",
+      "name": "End-to-end player control liveness",
+      "grade": "green",
+      "implementation": [
+        "desktop/src/main/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournal.java",
+        "desktop/src/main/java/net/chonkbase/chonkcraft/desktop/CommandSink.java",
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/network/CommandApplier.java",
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/network/NetworkGame.java"
+      ],
+      "checks": [
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/ControlLivenessPlayabilityTest.java",
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournalTest.java",
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java",
+        "scripts/check-bne-control-liveness-gate.sh"
+      ],
+      "retail_evidence": [
+        "The desktop flight recorder retains the physical gesture, ordered one-to-many command fan-out, authoritative acceptance result, first visible progress and a bounded terminal classification without changing the simulation.",
+        "The 600-cycle watchdog distinguishes explicit rejection, supersession, successful settlement, unit loss and target loss from the player-breaking case: an accepted command which never produces physical or order-state progress.",
+        "Authenticated retail footmen and grunts receive one-, three- and nine-unit moves, mid-stride redirects, Stop/resume and congested live-target attacks through the same CommandApplier seam used by the desktop.",
+        "Two independent worlds exchange those controls through real loopback UDP and the production lockstep scheduler for 1,200 cycles; both player journals remain live and the complete synchronized world hashes agree at the end.",
+        "The referee never retries, redirects or repairs an order. A liveness failure stays diagnostic evidence for the precision-owned movement or combat system instead of silently introducing non-retail recovery behavior."
+      ],
+      "blockers": [],
+      "gate": {
+        "driver": "A read-only outcome referee drives authenticated units through one-, three- and nine-unit controls locally and across two real UDP peers.",
+        "success": "Every accepted command progresses or reaches an honest terminal state within 600 cycles, no control remains unresolved, and both multiplayer worlds finish 1,200 cycles with one hash.",
+        "required_inputs": ["asset_pack"],
+        "command": ["scripts/check-bne-control-liveness-gate.sh"]
+      }
+    },
+    {
       "id": "network-lockstep",
       "name": "Multiplayer lockstep",
       "grade": "green",

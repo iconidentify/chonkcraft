@@ -301,7 +301,7 @@ not map exceptions:
 - the full-media pack contains all 20 logical Opus music tracks and boots with
   the game JAR as the only other runtime file.
 
-The complete 17-lane playability receipt is certified with zero skips. The
+The complete 18-lane playability receipt is certified with zero skips. The
 52-case candidate survey passes the retained acceptance floor with 13 clean,
 39 later-divergent, zero failed, and common clean h40. That is a regression
 floor, not completion of the separate exact-fidelity track. The central parity

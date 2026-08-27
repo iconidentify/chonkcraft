@@ -114,7 +114,7 @@ architecture, and Windows x64, downloading and checksum-verifying it once into
 **A green test run may have tested almost nothing.** Tests that need retail
 assets use JUnit `Assumptions` and *skip* when no pack is configured; the build
 still reports `BUILD SUCCESS`. Run `scripts/check-setup.sh` first and inspect
-the skip count. The 17-lane BNE playability gate fails if any selected referee
+the skip count. The 18-lane BNE playability gate fails if any selected referee
 skips, and deliberately runs without any retired source-tree dependency.
 See [docs/development-setup.md](docs/development-setup.md#reading-a-test-run-skips-are-not-passes).
 

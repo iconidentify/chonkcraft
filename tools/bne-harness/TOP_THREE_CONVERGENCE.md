@@ -97,7 +97,7 @@ The next independent AI item is now XHuman 6's extra building at cycle 311.
 - The 52-case cycle-80 candidate has **zero regressions** against both released
   master `cb51738d` and the authenticated pre-command convergence survey. The
   regression receipt passes across all 52 cases.
-- The 17-lane playability gate's stale-report, test-count, signed-catalog, and
+- The 18-lane playability gate's stale-report, test-count, signed-catalog, and
   environment-path issues were corrected or supplied during this checkpoint;
   every individual lane passes with its authenticated inputs.
 - Player-command ownership, both queue clocks, and the interrupted current
