@@ -145,7 +145,7 @@ public final class AiPlayer {
     /** One opcode-3 question asked during the most recent AI tick. */
     public record DecisionPredicate(int id, boolean result) {}
 
-    /** One changed byte in the 48-byte AIPlayerState. */
+    /** One changed byte in the compared state, with pointers as file offsets. */
     public record DecisionWrite(int offset, int before, int after) {}
 
     /** One periodic force-launch request and what it actually assigned. */
@@ -388,7 +388,7 @@ public final class AiPlayer {
             battleNetLastTickIndependent = false;
             return;
         }
-        byte[] before = battleNetAiState.clone();
+        byte[] before = packDecisionState();
         battleNetLastTickIndependent =
                 BattleNetAiBytecode.waitCounter(battleNetAiState) == 0;
         battleNetAiPc = BattleNetAiBytecode.tick(
@@ -399,14 +399,7 @@ public final class AiPlayer {
                             new DecisionPredicate(predicate, result));
                     return result;
                 });
-        for (int offset = 0; offset < battleNetAiState.length; offset++) {
-            int oldValue = before[offset] & 0xff;
-            int newValue = battleNetAiState[offset] & 0xff;
-            if (oldValue != newValue) {
-                battleNetDecisionWrites.add(
-                        new DecisionWrite(offset, oldValue, newValue));
-            }
-        }
+        recordDecisionWrites(before, packDecisionState());
         syncBattleNetWantsFromState();
         int bound = battleNetAiState[BattleNetAiBytecode.OFF_LIST_BOUND] & 0xff;
         if (bound != 0xff) {
@@ -453,7 +446,43 @@ public final class AiPlayer {
      * Human 5 stayed {@code 7b3675} through 1649.
      */
     public void battleNetRefreshBuildBounds(World world) {
+        byte[] before = packDecisionState();
         writeBuildBounds(world);
+        recordDecisionWrites(before, packDecisionState());
+    }
+
+    /** Records the net packed-state mutations for the current decision cycle. */
+    private void recordDecisionWrites(byte[] before, byte[] after) {
+        if (before == null || after == null || before.length != after.length) {
+            return;
+        }
+        for (int offset = 0; offset < before.length; offset++) {
+            int oldValue = before[offset] & 0xff;
+            int newValue = after[offset] & 0xff;
+            if (oldValue == newValue) {
+                continue;
+            }
+            int existingIndex = -1;
+            for (int index = 0; index < battleNetDecisionWrites.size(); index++) {
+                if (battleNetDecisionWrites.get(index).offset() == offset) {
+                    existingIndex = index;
+                    break;
+                }
+            }
+            if (existingIndex < 0) {
+                battleNetDecisionWrites.add(
+                        new DecisionWrite(offset, oldValue, newValue));
+                continue;
+            }
+            DecisionWrite existing = battleNetDecisionWrites.get(existingIndex);
+            if (existing.before() == newValue) {
+                battleNetDecisionWrites.remove(existingIndex);
+            } else {
+                battleNetDecisionWrites.set(existingIndex,
+                        new DecisionWrite(offset, existing.before(), newValue));
+            }
+        }
+        battleNetDecisionWrites.sort(Comparator.comparingInt(DecisionWrite::offset));
     }
 
     private void writeBuildBounds(World world) {

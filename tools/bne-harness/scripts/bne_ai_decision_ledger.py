@@ -86,6 +86,18 @@ def normalize_state(raw: bytes, ai_base: int, ai_size: int) -> dict[str, Any]:
     }
 
 
+def normalized_state_bytes(raw: bytes, ai_base: int, ai_size: int) -> bytes:
+    """Return the compared 48-byte state with all pointers as file offsets."""
+    if len(raw) != STATE_BYTES:
+        raise ValueError(f"AIPlayerState is {len(raw)} bytes, not {STATE_BYTES}")
+    normalized = bytearray(raw)
+    for offset in POINTER_OFFSETS:
+        value = normalize_pointer(_u32(raw, offset), ai_base, ai_size)
+        normalized[offset:offset + PTR_WIDTH] = value.to_bytes(
+            PTR_WIDTH, "little")
+    return bytes(normalized)
+
+
 def row(*, cycle: int, player: int, profile: int, raw_state: bytes,
         ai_base: int, ai_size: int,
         predicates: list[dict[str, Any]] | None = None,
@@ -429,9 +441,15 @@ def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
         raw = parse_state_hex(fields["state"])
         player = int(fields["player"])
         incoming = committed.get(player, tick_before.get(player))
+        normalized_raw = normalized_state_bytes(raw, ai_base, ai_size)
+        normalized_incoming = (normalized_state_bytes(
+            incoming, ai_base, ai_size) if incoming is not None else None)
+        before_tick = tick_before.get(player)
+        normalized_before_tick = (normalized_state_bytes(
+            before_tick, ai_base, ai_size) if before_tick is not None else None)
         writes = _merge_writes(
-            _state_writes(incoming, raw),
-            _state_writes(tick_before.get(player), raw),
+            _state_writes(normalized_incoming, normalized_raw),
+            _state_writes(normalized_before_tick, normalized_raw),
         )
         classification = ("independent-choice"
                           if incoming is not None and _u32(incoming, 0) == 0

@@ -154,6 +154,14 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
     }
 
     @Test
+    @DisplayName("program-counter writes are recorded across three campaign profiles")
+    void programCounterWritesAreRecordedAcrossThreeCampaignProfiles() {
+        assertWrite("campaigns/orc/level05o", 0, 2, 0x04, 0xf3, 0x01);
+        assertWrite("campaigns/orc/level07o", 0, 2, 0x04, 0xf8, 0xfd);
+        assertWrite("campaigns/orc/level10o", 1, 2, 0x04, 0x2e, 0x45);
+    }
+
+    @Test
     @DisplayName("a computer whose install stored zero still arms the builder-scan latch")
     void aComputerWhoseInstallStoredZeroStillArmsTheBuilderScanLatch() {
         // Human 1 profile 1 and Human 4 profile 3 both SET +0x0c=0. Native
@@ -205,6 +213,18 @@ class BattleNetAiDecisionLedgerEmitRealDataTest {
         }
         throw new AssertionError(map + " player " + player
                 + " has no cycle-1 AI row");
+    }
+
+    private static void assertWrite(String map, int player, int cycle,
+            int offset, int before, int after) {
+        List<AiDecisionLedger.Row> playerRows = rowsFor(emit(map, cycle), player);
+        assertTrue(playerRows.size() >= cycle,
+                map + " player " + player + " has no cycle-" + cycle + " AI row");
+        assertTrue(playerRows.get(cycle - 1).writes().contains(
+                        new AiPlayer.DecisionWrite(offset, before, after)),
+                map + " player " + player + " cycle " + cycle
+                        + " must record the authenticated packed-state write at +0x"
+                        + Integer.toHexString(offset));
     }
 
     private static List<AiDecisionLedger.Row> emit(String map, int last) {

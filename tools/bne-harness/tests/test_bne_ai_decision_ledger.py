@@ -188,6 +188,25 @@ class AiDecisionLedgerTest(unittest.TestCase):
         self.assertEqual([{"offset": 0x13, "before": 5, "after": 9}],
                          item["writes"])
 
+    def test_native_pointer_writes_use_ai_bin_offsets(self):
+        native_base = AI_BASE + 0xb0
+        before = bytearray(raw_state(pc=0x12f))
+        before[0x04:0x08] = (native_base + 0x12f).to_bytes(4, "little")
+        before[0x23:0x27] = (native_base + 0x40).to_bytes(4, "little")
+        before[0x27:0x2b] = (native_base + 0x80).to_bytes(4, "little")
+        after = bytearray(before)
+        after[0x04:0x08] = (native_base + 0x135).to_bytes(4, "little")
+        text = tracer_dump(cycle=12, player=6, profile=29, raw=bytes(before),
+                           phase="game-before") + tracer_dump(
+            cycle=12, player=6, profile=29, raw=bytes(after))
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=native_base, ai_size=AI_SIZE)
+        self.assertEqual(
+            [{"offset": 0x04, "before": 0x2f, "after": 0x35}],
+            built["rows"][0]["writes"],
+            "pointer telemetry must use the same ai.bin offsets as committed state",
+        )
+
     def test_a_same_cycle_game_before_does_not_hide_the_previous_wait_write(self):
         # Native AI often thinks after game-after. Cycle N+1's game-before
         # already holds the new wait, so a same-cycle diff is empty. The

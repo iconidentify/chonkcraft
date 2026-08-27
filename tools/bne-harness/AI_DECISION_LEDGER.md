@@ -20,6 +20,13 @@ offsets. A raw process address, an out-of-range pointer, a missing
 active-player cycle, or two different rows for the same cycle and player
 fails closed.
 
+Write telemetry uses that same normalized state. Native process-pointer
+bytes are converted to `ai.bin` offsets before cycle differences are
+derived, so ASLR cannot make an otherwise identical Java write compare
+different. Java also merges the periodic build-box refresh into the
+current cycle's sorted net writes; these annotations explain already
+committed state and do not alter simulation behavior.
+
 The complete 12-cycle Orc 1 smoke capture is one command. It captures retail
 on `i9beef`, returns the sealed evidence to the local machine, derives the
 ASLR heap base from authenticated `ai.bin`, builds the current Java app, emits

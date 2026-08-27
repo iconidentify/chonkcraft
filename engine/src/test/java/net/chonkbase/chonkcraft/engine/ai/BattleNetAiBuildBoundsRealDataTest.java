@@ -163,6 +163,17 @@ class BattleNetAiBuildBoundsRealDataTest {
     }
 
     @Test
+    @DisplayName("periodic build-box writes are recorded across three campaigns")
+    void periodicBuildBoxWritesAreRecordedAcrossThreeCampaigns() {
+        assertDecisionWrite("campaigns/human/level08h", 0, 199,
+                BattleNetAiBytecode.OFF_BOUND_MAX_Y, 0x4f, 0x56);
+        assertDecisionWrite("campaigns/human/level12h", 0, 499,
+                BattleNetAiBytecode.OFF_BOUND_MAX_Y, 0xff, 0x6f);
+        assertDecisionWrite("campaigns/human-exp/levelx06h", 5, 349,
+                BattleNetAiBytecode.OFF_BOUND_MAX_Y, 0xff, 0x86);
+    }
+
+    @Test
     @DisplayName("an expansion computer keeps the land box while its newest tanker is inside a platform")
     void anExpansionComputerKeepsTheLandBoxWhileItsNewestTankerIsInsideAPlatform() {
         assertBuildBox("campaigns/human-exp/levelx03h", 3, 699,
@@ -249,5 +260,29 @@ class BattleNetAiBuildBoundsRealDataTest {
                 map + " retail max-Y is " + maxY + " after the land-building walk");
         assertEquals(minX, packed[BattleNetAiBytecode.OFF_BOUND_MIN_X] & 0xff,
                 map + " retail min-X is " + minX + " after the land-building walk");
+    }
+
+    private static void assertDecisionWrite(String map, int player, int fixtureCycle,
+            int offset, int before, int after) {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(map, 0, 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        World world = mission.world();
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int cycle = 1; cycle <= fixtureCycle; cycle++) {
+            mission.tick();
+        }
+        AiPlayer ai = world.ais().get(player);
+        assertTrue(ai != null, map + " has no computer player " + player);
+        assertTrue(ai.battleNetDecisionWrites().contains(
+                        new AiPlayer.DecisionWrite(offset, before, after)),
+                map + " player " + player + " cycle " + fixtureCycle
+                        + " must record the authenticated build-box write at +0x"
+                        + Integer.toHexString(offset));
     }
 }
