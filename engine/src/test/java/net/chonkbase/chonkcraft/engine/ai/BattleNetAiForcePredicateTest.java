@@ -159,7 +159,8 @@ class BattleNetAiForcePredicateTest {
         java.util.stream.Stream.of(first, second, spare)
                 .filter(unit -> unit.battleNetAiBehavior() == 2)
                 .forEach(unit -> {
-                    assertEquals(12, unit.battleNetAiHomeX());
+                    assertEquals(11, unit.battleNetAiHomeX(),
+                            "the occupied hall is normalized to its free west face");
                     assertEquals(12, unit.battleNetAiHomeY());
                 });
 
@@ -218,7 +219,8 @@ class BattleNetAiForcePredicateTest {
                 "the launch parks the old route immediately");
         assertTrue(mover.hasBattleNetPendingPatrol(),
                 "Patrol survives as the native next order");
-        assertEquals(12, mover.battleNetPendingPatrolX());
+        assertEquals(11, mover.battleNetPendingPatrolX(),
+                "the occupied hall is normalized to its free west face");
         assertEquals(12, mover.battleNetPendingPatrolY());
     }
 }
