@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2787 tests,   26 skipped
-    no external input          2787 tests, 1180 skipped
+    authenticated inputs       2788 tests,   26 skipped
+    no external input          2788 tests, 1180 skipped
 
 Both can be green.
 

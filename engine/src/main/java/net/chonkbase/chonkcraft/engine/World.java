@@ -8537,6 +8537,17 @@ public final class World {
     static final int BATTLE_NET_TRAIN_TICKS_PER_TIME = 2;
 
     /**
+     * Paid train construction plus the first action-37 animation yield.
+     *
+     * <p>The repeating Train body contributes {@code TIME * 2} yields at five
+     * cycles each, but retail does not enter that loop on the debit cycle. A
+     * TIME-45 worker therefore exits 468 cycles after payment, not 450. The
+     * same eighteen-cycle lead was independently visible in sealed Human 4,
+     * Orc 4, and XOrc 4 campaign recordings.</p>
+     */
+    static final int BATTLE_NET_TRAIN_STARTUP_CYCLES = 18;
+
+    /**
      * Selects BNE's fixed path goal on one axis of a target footprint.
      *
      * <p>This is the coordinate rule in native {@code 0x41f430}. A mover on
@@ -9085,6 +9096,7 @@ public final class World {
     private void startTraining(Unit building, UnitType what) {
         building.setProducing(what);
         building.setProgress(0);
+        building.setBattleNetOrderDelay(BATTLE_NET_TRAIN_STARTUP_CYCLES);
         building.setProgressGoal(
                 Math.max(1, unitCosts(what).getOrDefault(UnitType.Resource.TIME, 1))
                         * BATTLE_NET_TRAIN_TICKS_PER_TIME);
@@ -9197,6 +9209,19 @@ public final class World {
         if (building.producing() == null) {
             return false;
         }
+        if (building.battleNetOrderDelay() > 0) {
+            // The paid order is already visibly training during construction;
+            // only its progress counter is held. Action 37 then selects its
+            // own Train body, so restart that cursor when the construction
+            // prelude expires instead of carrying the prelude's phase into the
+            // TIME*2 yield loop.
+            stepWorkAnimation(building, AnimationSet.State.TRAIN);
+            building.setBattleNetOrderDelay(building.battleNetOrderDelay() - 1);
+            if (building.battleNetOrderDelay() == 0) {
+                building.animation().clearCurrent();
+            }
+            return true;
+        }
         boolean yielded = stepWorkAnimation(building, AnimationSet.State.TRAIN);
         // Native 0x40e1e0 runs only when 0x402440 returns 1 (the wait-1
         // yield). A Still drip of 100/cycle used to walk a TIME-45 peon out
@@ -9224,6 +9249,14 @@ public final class World {
             UnitType next = building.pollTraining();
             if (next != null) {
                 startTraining(building, next);
+            } else if (battleNetBuildingCanAction33Train(building)) {
+                // Returning from native action 37 constructs a fresh action-33
+                // Still body with its adjacent constructor markers. Carrying
+                // the pre-train phase/timer instead made every hall wait the
+                // full ordinary loop and put the next worker debit twelve
+                // cycles late in Human 4, Orc 4, and XOrc 4.
+                building.setBattleNetIdlePhase(0);
+                building.setBattleNetAnimationTimer(1);
             }
             return true;
         }

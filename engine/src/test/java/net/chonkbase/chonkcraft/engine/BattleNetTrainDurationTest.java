@@ -1,5 +1,6 @@
 package net.chonkbase.chonkcraft.engine;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,6 +29,30 @@ import org.junit.jupiter.api.Test;
  * peon around 265 cycles.
  */
 class BattleNetTrainDurationTest {
+
+    @Test
+    @DisplayName("a forty-five-time worker exits 468 cycles after payment")
+    void aFortyFiveTimeWorkerUsesTheNativePaymentToDropoutClock() {
+        World world = new World(grass(24));
+        UnitType hallType = hall("unit-great-hall");
+        UnitType peonType = worker("unit-peon", 45);
+        world.setTrainers(Map.of("unit-peon", Set.of("unit-great-hall")));
+        Unit hall = world.createUnit(hallType, 0, 4, 4);
+        world.player(0).set(UnitType.Resource.GOLD, 1000);
+        assertTrue(world.orderTrain(hall, peonType),
+                "the hall refused a paid peon");
+
+        int cycles = 0;
+        while (!hasLiveWorkerBesidesHall(world, hall) && cycles < 600) {
+            world.tick();
+            cycles++;
+        }
+
+        assertEquals(468, cycles,
+                "sealed Human 4, Orc 4, and XOrc 4 recordings all keep the "
+                        + "paid worker inside for eighteen cycles longer than "
+                        + "the old 450-cycle animation loop");
+    }
 
     @Test
     @DisplayName("a forty-five-time peon is still in the hall after three hundred cycles")
