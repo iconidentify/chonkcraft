@@ -875,8 +875,16 @@ class SaveGameTest {
         attacker.setBattleNetSaturatedWallFacePairHeading(5);
         attacker.setBattleNetSaturatedWallFacePairParked(true);
         attacker.setBattleNetSaturatedRetargetRouteBand(true);
+        attacker.setBattleNetLongPaidWrapTimerOneSeen(true);
+        attacker.setBattleNetLongPaidWrapParkedTail(
+                new int[] {3, 5, 6});
+        Unit redraw = bench.world().createUnit(
+                bench.types().get("unit-ogre"), 0, 12, 10);
+        redraw.markBattleNetLongPaidWrapParkedRoute();
 
-        Unit loaded = find(reload(bench), "unit-knight");
+        World reloaded = reload(bench);
+        Unit loaded = find(reloaded, "unit-knight");
+        Unit loadedRedraw = find(reloaded, "unit-ogre");
 
         assertNotNull(loaded.target());
         assertEquals(6, loaded.battleNetAttackRefusalRecoveryStage(),
@@ -901,6 +909,15 @@ class SaveGameTest {
                 "the shared route buffer must survive a mid-jam save");
         assertTrue(loaded.battleNetSaturatedRetargetRouteBand(),
                 "the paid retarget buffer must survive a mid-jam save");
+        assertTrue(loaded.battleNetLongPaidWrapTimerOneSeen());
+        assertTrue(loaded.hasBattleNetLongPaidWrapParkedRoute());
+        assertEquals(3, loaded.battleNetLongPaidWrapParkedTailLength());
+        assertEquals(3, loaded.battleNetLongPaidWrapParkedTailHeading(0));
+        assertEquals(5, loaded.battleNetLongPaidWrapParkedTailHeading(1));
+        assertEquals(6, loaded.battleNetLongPaidWrapParkedTailHeading(2));
+        assertTrue(loadedRedraw.hasBattleNetLongPaidWrapParkedRoute(),
+                "an empty paid redraw marker must survive a save");
+        assertEquals(0, loadedRedraw.battleNetLongPaidWrapParkedTailLength());
     }
 
     @Test

@@ -1359,6 +1359,28 @@ final class BattleNetHarvestSystem {
 
         int goalX = worker.battleNetWoodOrderX();
         int goalY = worker.battleNetWoodOrderY();
+        int constructionDistance = Math.max(
+                Math.abs(goalX - worker.tileX()),
+                Math.abs(goalY - worker.tileY()));
+        if (constructionDistance >= 3) {
+            BattleNetPathFinder.GoalMarker constructionMarker =
+                    (x, y) -> Math.max(Math.abs(x - goalX),
+                            Math.abs(y - goalY)) <= 1;
+            PathFinder.Path construction = world.findBattleNetPointPath(
+                    worker, goalX, goalY, constructionMarker, true);
+            if (construction.result() == PathFinder.Result.FOUND
+                    && construction.length() > 0) {
+                // A full forest-prefix construction redraws a real wall route,
+                // rather than synthesising only its first free compass byte.
+                // XHuman 12 slot 1364 gets SE,E here and consumes SE in this
+                // same fixture, retaining E behind route index one.
+                worker.setBattleNetWoodTerminalRefusalHeading(-1);
+                worker.setBattleNetWoodReadyPathRequired(false);
+                worker.setPath(construction);
+                worker.setPathGoal(-1, -1);
+                return false;
+            }
+        }
         int currentDistance = Math.max(
                 Math.abs(goalX - worker.tileX()),
                 Math.abs(goalY - worker.tileY()));
@@ -2513,6 +2535,28 @@ final class BattleNetHarvestSystem {
         }
         if (worker.order() != Unit.Order.DYING) {
             worker.setOrder(saved);
+        }
+        if (worker.battleNetWoodTerminalRefusalHeading() >= 0
+                && worker.battleNetCollisionCounter() == 0
+                && worker.pathLength() == 0) {
+            // stepMove runs under the borrowed MOVE projection. Finish the
+            // terminal forest transition only after restoring HARVEST, so the
+            // native sequence selector exposes action 23's 2657 start on the
+            // same scheduler visit.
+            int gatherStart = world.idle.battleNetSequenceStart(
+                    worker, BattleNetSequence.ATTACK_ANIMATION);
+            if (gatherStart >= 0) {
+                AnimationSet set = worker.type().animationSet();
+                Animation attack = set == null ? null
+                        : set.get(AnimationSet.State.ATTACK);
+                if (attack != null
+                        && worker.animation().current() != attack) {
+                    worker.animation().switchTo(attack);
+                }
+                // Animation.switchTo clears the raw sequence projection.
+                worker.setBattleNetSequenceOffset(gatherStart);
+                worker.setBattleNetAnimationTimer(3);
+            }
         }
     }
 

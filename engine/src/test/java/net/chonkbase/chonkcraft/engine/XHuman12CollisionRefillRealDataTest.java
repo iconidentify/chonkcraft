@@ -254,8 +254,23 @@ class XHuman12CollisionRefillRealDataTest {
         Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
         World world = mission.world();
         Unit grunt = unitById(world, 83);
+        Unit formationMate = unitById(world, 110);
+        Unit formationPressure = unitById(world, 96);
+        Unit paidTailRetarget = unitById(world, 120);
+        Unit saturatedMobileRetarget = unitById(world, 106);
+        Unit woodcutter = unitById(world, 236);
         Unit knight = unitById(world, 125);
         assertNotNull(grunt, "XHuman 12 has no native-slot-1517 grunt");
+        assertNotNull(formationMate,
+                "XHuman 12 has no native-slot-1490 grunt");
+        assertNotNull(formationPressure,
+                "XHuman 12 has no native-slot-1504 grunt");
+        assertNotNull(paidTailRetarget,
+                "XHuman 12 has no native-slot-1480 grunt");
+        assertNotNull(saturatedMobileRetarget,
+                "XHuman 12 has no native-slot-1494 grunt");
+        assertNotNull(woodcutter,
+                "XHuman 12 has no native-slot-1364 peon");
         assertNotNull(knight, "XHuman 12 has no native-slot-1475 knight");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
@@ -305,6 +320,96 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(4, grunt.pathLength(),
                 "the east step retains native's four-byte knight tail");
         assertEquals(0, grunt.battleNetCollisionCounter());
+
+        while (fixtureCycle(world) < 261) {
+            mission.tick();
+        }
+        assertEquals(30, grunt.tileX(),
+                "Move timer one must not spend the stale east tail");
+        assertEquals(37, grunt.tileY());
+        assertEquals(2482, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "retail retains Move timer one before parking the tail");
+        assertEquals(31, formationMate.tileX());
+        assertEquals(38, formationMate.tileY());
+        assertEquals(30, formationPressure.tileX());
+        assertEquals(39, formationPressure.tileY());
+        assertEquals(10, woodcutter.tileX());
+        assertEquals(89, woodcutter.tileY());
+
+        mission.tick();
+        assertEquals(262, fixtureCycle(world));
+        assertEquals(30, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(0, grunt.pathLength(),
+                "the completed paid band parks its old route at RI 20");
+        assertEquals(31, formationMate.tileX());
+        assertEquals(38, formationMate.tileY(),
+                "the earlier pool slot parks its paid cursor too");
+        assertEquals(30, formationPressure.tileX());
+        assertEquals(39, formationPressure.tileY(),
+                "the collision-four route parks at RI 20 for one visit");
+        assertEquals(10, woodcutter.tileX());
+        assertEquals(89, woodcutter.tileY(),
+                "the forest residual finishes without spending its blocked head");
+
+        mission.tick();
+        assertEquals(263, fixtureCycle(world));
+        assertEquals(31, grunt.tileX());
+        assertEquals(38, grunt.tileY(),
+                "the following NewPath visit must redraw and spend southeast");
+        assertEquals(Direction.fromDelta(1, 1), grunt.lastStepHeading());
+        assertEquals(2, grunt.pathLength(),
+                "the redrawn southeast route retains its two-byte tail");
+        assertEquals(32, formationMate.tileX());
+        assertEquals(39, formationMate.tileY(),
+                "the earlier pool slot must vacate before slot 1517 enters");
+        assertEquals(Direction.fromDelta(1, 1),
+                formationMate.lastStepHeading());
+        assertEquals(2, formationMate.pathLength());
+        assertEquals(30, formationPressure.tileX());
+        assertEquals(40, formationPressure.tileY(),
+                "the next paid generation must redraw and spend south");
+        assertEquals(Direction.fromDelta(0, 1),
+                formationPressure.lastStepHeading());
+        assertEquals(1, formationPressure.pathLength());
+        assertEquals(32, paidTailRetarget.tileX());
+        assertEquals(36, paidTailRetarget.tileY());
+        assertEquals(37, saturatedMobileRetarget.tileX());
+        assertEquals(39, saturatedMobileRetarget.tileY());
+        assertEquals(10, woodcutter.tileX());
+        assertEquals(89, woodcutter.tileY(),
+                "the full free-prefix shortcut enters wood construction instead of moving north");
+        assertEquals(13, woodcutter.battleNetWoodOrderX(),
+                "the reverse resource ray stores the intervening forest wall");
+        assertEquals(89, woodcutter.battleNetWoodOrderY());
+        assertEquals(world.idle.battleNetSequenceStart(woodcutter,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                woodcutter.battleNetSequenceOffset());
+        assertEquals(3, woodcutter.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(264, fixtureCycle(world));
+        assertEquals(31, paidTailRetarget.tileX());
+        assertEquals(37, paidTailRetarget.tileY(),
+                "the long paid tail retarget must redraw and spend southwest without construction");
+        assertEquals(Direction.fromDelta(-1, 1),
+                paidTailRetarget.lastStepHeading());
+        assertEquals(3, paidTailRetarget.pathLength());
+        assertEquals(2, woodcutter.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(265, fixtureCycle(world));
+        assertEquals(1, woodcutter.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(266, fixtureCycle(world));
+        assertEquals(11, woodcutter.tileX());
+        assertEquals(90, woodcutter.tileY(),
+                "the completed construction redraws and spends southeast");
+        assertEquals(Direction.fromDelta(1, 1),
+                woodcutter.lastStepHeading());
+        assertEquals(1, woodcutter.pathLength(),
+                "east remains cached behind the committed southeast byte");
+        assertEquals(Direction.fromDelta(1, 0), woodcutter.peekHeading());
     }
 
     @Test

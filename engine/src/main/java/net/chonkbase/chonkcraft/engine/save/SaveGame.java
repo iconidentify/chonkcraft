@@ -765,6 +765,22 @@ public final class SaveGame {
                     .append(unit.battleNetRetargetResidualParkSteps())
                     .append(",");
         }
+        if (unit.battleNetLongPaidWrapTimerOneSeen()) {
+            state.append(" longPaidWrapTimerOneSeen = true,");
+        }
+        int paidWrapTailLength =
+                unit.battleNetLongPaidWrapParkedTailLength();
+        if (unit.hasBattleNetLongPaidWrapParkedRoute()) {
+            state.append(" longPaidWrapParkedTailLength = ")
+                    .append(paidWrapTailLength).append(",");
+            for (int depth = 0; depth < paidWrapTailLength; depth++) {
+                state.append(" longPaidWrapParkedTail")
+                        .append(depth).append(" = ")
+                        .append(unit.battleNetLongPaidWrapParkedTailHeading(
+                                depth))
+                        .append(",");
+            }
+        }
         if (unit.battleNetSaturatedWoodCornerLadder()) {
             state.append(" saturatedWoodCornerLadder = true,");
         }

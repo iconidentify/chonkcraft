@@ -2465,9 +2465,91 @@ public final class Unit {
 
     public void setBattleNetRetargetResidualRoutePark(boolean park) {
         battleNetRetargetResidualRoutePark = park;
+        if (!park) {
+            battleNetLongPaidWrapTimerOneSeen = false;
+        }
     }
 
     private boolean battleNetRetargetResidualRoutePark;
+
+    /**
+     * A retained four-byte attack-wrap tail has exposed Move timer one once
+     * and owes its route-index-twenty park on the following callback.
+     */
+    public boolean battleNetLongPaidWrapTimerOneSeen() {
+        return battleNetLongPaidWrapTimerOneSeen;
+    }
+
+    public void setBattleNetLongPaidWrapTimerOneSeen(boolean seen) {
+        battleNetLongPaidWrapTimerOneSeen = seen;
+    }
+
+    private boolean battleNetLongPaidWrapTimerOneSeen;
+
+    /**
+     * Raw headings retained behind a paid wrap's parked route cursor, in
+     * next-to-last consumption order.
+     */
+    public void parkBattleNetLongPaidWrapTail() {
+        int retained = Math.max(0, pathLength - 1);
+        battleNetLongPaidWrapParkedTail = new int[retained];
+        for (int depth = 0; depth < retained; depth++) {
+            battleNetLongPaidWrapParkedTail[depth] =
+                    peekHeadingAtDepth(depth + 1);
+        }
+    }
+
+    public int battleNetLongPaidWrapParkedTailLength() {
+        return battleNetLongPaidWrapParkedTail == null
+                ? 0 : battleNetLongPaidWrapParkedTail.length;
+    }
+
+    /** Whether native route bytes are still owned by a parked paid cursor. */
+    public boolean hasBattleNetLongPaidWrapParkedRoute() {
+        return battleNetLongPaidWrapParkedTail != null;
+    }
+
+    /** Marks a paid cursor whose following visit must redraw, not continue. */
+    public void markBattleNetLongPaidWrapParkedRoute() {
+        battleNetLongPaidWrapParkedTail = new int[0];
+    }
+
+    public void clearBattleNetLongPaidWrapParkedRoute() {
+        battleNetLongPaidWrapParkedTail = null;
+    }
+
+    public int battleNetLongPaidWrapParkedTailHeading(int depth) {
+        if (battleNetLongPaidWrapParkedTail == null
+                || depth < 0
+                || depth >= battleNetLongPaidWrapParkedTail.length) {
+            return -1;
+        }
+        return battleNetLongPaidWrapParkedTail[depth];
+    }
+
+    public void setBattleNetLongPaidWrapParkedTail(int[] headings) {
+        battleNetLongPaidWrapParkedTail = headings == null
+                ? null : headings.clone();
+    }
+
+    public PathFinder.Path takeBattleNetLongPaidWrapParkedTail() {
+        if (battleNetLongPaidWrapParkedTail == null
+                || battleNetLongPaidWrapParkedTail.length == 0) {
+            return null;
+        }
+        int[] stack = new int[battleNetLongPaidWrapParkedTail.length];
+        for (int depth = 0; depth < stack.length; depth++) {
+            stack[stack.length - 1 - depth] =
+                    battleNetLongPaidWrapParkedTail[depth];
+        }
+        // Keep an empty marker through the first movement probe. It is also
+        // the scheduler-visible proof that a later native pool slot will
+        // vacate its current cell on this same simulation cycle.
+        battleNetLongPaidWrapParkedTail = new int[0];
+        return new PathFinder.Path(PathFinder.Result.FOUND, stack);
+    }
+
+    private int[] battleNetLongPaidWrapParkedTail;
 
     /**
      * The stale route behind a melee retarget was parked after its Attack

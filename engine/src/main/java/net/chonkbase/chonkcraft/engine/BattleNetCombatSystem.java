@@ -4044,12 +4044,26 @@ final class BattleNetCombatSystem {
                                     && candidate.type() != null
                                     && candidate.type().building()
                                     && settledResidualHeadFree));
+                    boolean longPaidTailRetargetRemainsLive =
+                            settledMeleeResidualRetarget
+                            && unit.battleNetPathInitialLength()
+                                    == BattleNetPathFinder.MAX_PATH
+                            && keepPathn == 14
+                            && unit.battleNetPathStepsTaken() == 6
+                            && unit.battleNetCollisionCounter() == 3
+                            && unit.battleNetRefusals() == 1
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.type() != null
+                            && candidate.type().building()
+                            && settledResidualHeadFree;
                     boolean pressuredResidualRetargetConstruction =
                             (spentOneStepRetargetConstruction
                                 || behaviorOneStrictMobileUpgradeConstruction
                                 || (settledMeleeResidualRetarget
                                     && keepPathn > 1
-                                    && collisionOwnsRetargetConstruction))
+                                    && collisionOwnsRetargetConstruction
+                                    && !longPaidTailRetargetRemainsLive))
                             && world.battleNetSequence != null;
                     int oldReplacementHeading = keepPathn > 0
                             ? unit.peekHeading() : -1;
@@ -4789,6 +4803,10 @@ final class BattleNetCombatSystem {
                 } else if (unit.pathLength() == 0) {
                     int parkedRefusalHeading =
                             unit.battleNetParkedRefusalHeading();
+                    boolean paidWrapRouteParked =
+                            unit.hasBattleNetLongPaidWrapParkedRoute();
+                    boolean paidWrapRouteRedraw = paidWrapRouteParked
+                            && unit.battleNetLongPaidWrapParkedTailLength() == 0;
                     int saturatedWallFacePairHeading =
                             unit.battleNetSaturatedWallFacePairHeading();
                     boolean saturatedWallFacePairParked =
@@ -5327,7 +5345,17 @@ final class BattleNetCombatSystem {
                         // its direct footprint face is occupied; each naked
                         // retry must redraw that retained face instead of
                         // falling back to the ordinary free west wall.
-                        world.planTowardsAfterRetargetPark(unit, chased);
+                        PathFinder.Path retainedPaidWrapTail = unit
+                                .takeBattleNetLongPaidWrapParkedTail();
+                        if (retainedPaidWrapTail != null) {
+                            // Native parks the cursor, not the route bytes.
+                            // The following NewPath visit resumes behind the
+                            // discarded stale head: XHuman 12 slot 1517 keeps
+                            // SE,SE,SW after parking E at fixture 262.
+                            unit.setPath(retainedPaidWrapTail);
+                        } else {
+                            world.planTowardsAfterRetargetPark(unit, chased);
+                        }
                         if (chased.type().building()
                                 && unit.pathLength() > 0) {
                             int nearX = World.battleNetNearFootprintCoordinate(
@@ -5436,9 +5464,53 @@ final class BattleNetCombatSystem {
                         world.planTowards(unit, chased,
                                 collidedResidualRefill);
                     }
+                    if (paidWrapRouteRedraw
+                            && unit.battleNetAttackWrapDestArmPending()
+                            && chased.type() != null
+                            && !chased.type().building()
+                            && unit.type() != null
+                            && (unit.tileX() == chased.tileX()
+                                    || unit.tileY() == chased.tileY())) {
+                        // A saturated Attack-tail cursor redraws the direct
+                        // axis through its first blocked square. This is a
+                        // bounded route buffer, not permission to enter that
+                        // square: XHuman 12 slot 1504 writes S,S at fixture
+                        // 263, consumes the free first S, and retains the
+                        // occupied second S behind route index one.
+                        int direct = World.battleNetFirstBresenhamHeading(
+                                unit.tileX(), unit.tileY(),
+                                chased.tileX(), chased.tileY());
+                        int distance = Math.max(
+                                Math.abs(chased.tileX() - unit.tileX()),
+                                Math.abs(chased.tileY() - unit.tileY()));
+                        int count = Math.max(0, Math.min(2,
+                                distance - Math.max(1,
+                                        unit.type().maxAttackRange())));
+                        int stride = world.battleNetMovementStride(unit);
+                        int scanX = unit.tileX();
+                        int scanY = unit.tileY();
+                        int retained = 0;
+                        for (int step = 0; step < count; step++) {
+                            scanX += Direction.deltaX(direct) * stride;
+                            scanY += Direction.deltaY(direct) * stride;
+                            retained++;
+                            if (!world.canEnter(unit, scanX, scanY)) {
+                                break;
+                            }
+                        }
+                        if (retained > 0) {
+                            int[] headings = new int[retained];
+                            java.util.Arrays.fill(headings, direct);
+                            unit.setPath(new PathFinder.Path(
+                                    PathFinder.Result.FOUND, headings));
+                            unit.setPathGoal(
+                                    chased.tileX(), chased.tileY());
+                        }
+                    }
                     if (parkedRefusalHeading >= 0
                             && parkedRefusalHeading < Direction.COUNT
-                            && !unit.battleNetAttackWrapDestArmPending()) {
+                            && !unit.battleNetAttackWrapDestArmPending()
+                            && !paidWrapRouteParked) {
                         // A cold paid refill continues the retained wall face.
                         // An Attack-tail wrap instead owns the fresh route
                         // writer: Human 13 ogre 1501 parks blocked SE at
@@ -5751,6 +5823,23 @@ final class BattleNetCombatSystem {
             int tileYBeforeChaseWalk = unit.tileY();
             boolean underWay = stepMoveTowardsTarget(
                     unit, deferSettledRetargetSync, chaseTargetBeforeWalk);
+            if (unit.battleNetLongPaidWrapTimerOneSeen()
+                    && unit.pathLength() == 4
+                    && !unit.isMoving()) {
+                // The first callback after this retained Move band only
+                // exposes timer one. DoActionMove's ordinary empty action
+                // advances the visible cursor past Move start even though
+                // retail pins it there until the next callback parks RI 20.
+                int moveStart = world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                }
+                unit.setBattleNetChaseStepReady(false);
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return;
+            }
             if (openBattleNetSaturatedCardinalRouteTerminator(unit, true)) {
                 return;
             }

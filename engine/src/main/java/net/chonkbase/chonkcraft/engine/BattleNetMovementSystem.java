@@ -1372,6 +1372,44 @@ final class BattleNetMovementSystem {
                 && offset >= move && (attack < 0 || offset < attack);
     }
 
+    /**
+     * Whether a later native pool slot owns a paid redraw which will vacate
+     * its current cell on this scheduler cycle.
+     */
+    private boolean battleNetPaidParkedRouteWillVacate(
+            Unit mover, Unit candidate) {
+        if (mover == null || candidate == null || candidate == mover
+                || !candidate.hasBattleNetLongPaidWrapParkedRoute()
+                || candidate.pathLength() != 0
+                || !candidate.stepDrained() || candidate.isMoving()
+                || candidate.target() == null
+                || candidate.target() != mover.target()
+                || candidate.type() == null
+                || candidate.type().maxAttackRange() > 1
+                || !world.isAllied(mover.player(), candidate.player())) {
+            return false;
+        }
+        Unit target = candidate.target();
+        int currentDistance = Math.max(
+                Math.abs(target.tileX() - candidate.tileX()),
+                Math.abs(target.tileY() - candidate.tileY()));
+        int stride = world.battleNetMovementStride(candidate);
+        for (int heading = 0; heading < Direction.COUNT; heading++) {
+            int nextX = candidate.tileX()
+                    + Direction.deltaX(heading) * stride;
+            int nextY = candidate.tileY()
+                    + Direction.deltaY(heading) * stride;
+            int nextDistance = Math.max(
+                    Math.abs(target.tileX() - nextX),
+                    Math.abs(target.tileY() - nextY));
+            if (nextDistance < currentDistance
+                    && world.canEnter(candidate, nextX, nextY)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     /**
      * One cycle of walking towards a tile, under some other order.
@@ -3766,6 +3804,27 @@ final class BattleNetMovementSystem {
                                     ? world.canEnterBattleNetTransportAnchor(
                                             unit, nextX, nextY)
                             : world.canEnter(unit, nextX, nextY);
+            boolean paidParkedRouteReplay =
+                    unit.hasBattleNetLongPaidWrapParkedRoute()
+                    && unit.pathLength() > 0
+                    && unit.stepDrained() && !unit.isMoving()
+                    && unit.target() != null
+                    && !World.battleNetRangedChaseUnit(unit);
+            if (!canTakeStep && paidParkedRouteReplay) {
+                Unit paidReplayBlocker = world.unitAt(nextX, nextY);
+                if (battleNetPaidParkedRouteWillVacate(
+                        unit, paidReplayBlocker)) {
+                    // Native visits the blocker's lower pool slot first. Its
+                    // paid redraw vacates the cell before this retained route
+                    // spends its first byte. Java's id order is the reverse,
+                    // so permit the brief cache overlap which that later visit
+                    // removes (XHuman 12 slots 1490 then 1517, fixture 263).
+                    canTakeStep = true;
+                }
+            }
+            if (paidParkedRouteReplay) {
+                unit.clearBattleNetLongPaidWrapParkedRoute();
+            }
             if (!canTakeStep
                     && unit.battleNetNavalPatrolAttackConstruction()
                     && unit.battleNetNavalPatrolAttackTimerOneReady()) {
@@ -3850,6 +3909,15 @@ final class BattleNetMovementSystem {
                         && !unit.battleNetAttackWrapDestArmPending()
                         && (unit.battleNetRefusalHold()
                                 || unit.battleNetCollisionCounter() > 0);
+                boolean completedLongPaidWrapRouteBand = canTakeStep
+                        && (unit.battleNetAttackRefusalRecoveryStage() == 3
+                                || unit.battleNetLongPaidWrapTimerOneSeen())
+                        && unit.battleNetAttackWrapDestArmPending()
+                        && unit.battleNetPathInitialLength() == 5
+                        && unit.pathLength() == 4
+                        && unit.battleNetPathStepsTaken() == 1
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0;
                 boolean saturatedBuildingRetargetFirstRetry =
                         !canTakeStep
                         && unit.battleNetRetargetResidualParkRefill()
@@ -3899,6 +3967,15 @@ final class BattleNetMovementSystem {
                     }
                     return;
                 }
+                if (completedLongPaidWrapRouteBand
+                        && !unit.battleNetLongPaidWrapTimerOneSeen()) {
+                    // Timer one exposes Move's action marker but does not run
+                    // NewPath on that same visit. Preserve the route for this
+                    // callback; the marker distinguishes the following RI-20
+                    // park from the just-completed fifteen-count band.
+                    unit.setBattleNetLongPaidWrapTimerOneSeen(true);
+                    return;
+                }
                 unit.setBattleNetRetargetResidualRoutePark(false);
                 if (!canTakeStep
                         && (unit.battleNetSaturatedRetargetRouteBand()
@@ -3929,7 +4006,9 @@ final class BattleNetMovementSystem {
                     return;
                 }
                 unit.setBattleNetSaturatedRetargetRouteBand(false);
-                if ((saturatedPaidRoutePark || !canTakeStep)
+                if ((saturatedPaidRoutePark
+                                || completedLongPaidWrapRouteBand
+                                || !canTakeStep)
                         && !paidConstructionCooperativeBlocker) {
                     // A saturated route is parked by the completed Attack
                     // constructor even when its next square has opened. The
@@ -3938,10 +4017,19 @@ final class BattleNetMovementSystem {
                     // 166. Retail advances their collision bytes 0->1 and
                     // 1->2, parks route index 1/0 at 20, and only lets the
                     // following NewPath visit spend a replacement heading.
+                    // The same route-cursor transaction follows a retained
+                    // four-byte wrap tail after its complete paid Move band:
+                    // XHuman 12 grunt 1517 keeps timer one on fixture 261,
+                    // parks E,SE,SE,SW at RI 20 on 262, then redraws and
+                    // spends SE on 263. Spending the free stale E here moves
+                    // it a full tile before retail.
                     int parkedSteps = unit.battleNetPathStepsTaken();
                     int collision = unit.battleNetCollisionCounter() + 1;
                     unit.setBattleNetCollisionCounter(
                             collision > 14 ? 0 : collision);
+                    if (completedLongPaidWrapRouteBand) {
+                        unit.parkBattleNetLongPaidWrapTail();
+                    }
                     unit.clearPath();
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
@@ -4561,7 +4649,8 @@ final class BattleNetMovementSystem {
                                                 - formationTarget.tileX()),
                                         Math.abs(nextY
                                                 - formationTarget.tileY()));
-                        if (nextDistance < currentDistance) {
+                        if (nextDistance < currentDistance
+                                || unit.battleNetAttackWrapDestArmPending()) {
                             // A saturated cached diagonal which still closes
                             // on the quarry terminates the old route instead
                             // of charging another cooperative wait. Native
@@ -4570,6 +4659,10 @@ final class BattleNetMovementSystem {
                             // following callback. Rear formation members can
                             // therefore keep advancing rather than freezing
                             // behind a route which has already done its job.
+                            // A completed Attack-tail wrap owns the same park
+                            // even when its stale diagonal points away from the
+                            // quarry: XHuman 12 slot 1504 parks NE/collision
+                            // four on fixture 262, then redraws S,S on 263.
                             int collision = previousCollision + 1;
                             unit.setBattleNetCollisionCounter(
                                     collision > 14 ? 0 : collision);
@@ -4579,6 +4672,13 @@ final class BattleNetMovementSystem {
                             unit.setWaitCycles(0);
                             unit.setBattleNetOrderDelay(0);
                             unit.setBattleNetChaseEmptyRouteReplan(true);
+                            if (unit.battleNetAttackWrapDestArmPending()) {
+                                // Preserve that this empty RI-20 buffer came
+                                // from a completed Attack-tail wrap. Its next
+                                // writer is the short direct blocked prefix,
+                                // not the ordinary long wall optimizer.
+                                unit.markBattleNetLongPaidWrapParkedRoute();
+                            }
                             int moveStart = world.idle
                                     .battleNetSequenceStart(unit,
                                             BattleNetSequence.MOVE_ANIMATION);
@@ -6361,6 +6461,19 @@ final class BattleNetMovementSystem {
                                 && unit.target().type() != null
                                 && !unit.target().type().building()
                                 && !World.battleNetRangedChaseUnit(unit);
+                        boolean paidFourByteParkRedraw =
+                                postRetargetParkRefill
+                                && unit.stepDrained() && !unit.isMoving()
+                                && unit.battleNetPathInitialLength() == 4
+                                && unit.pathLength() == 3
+                                && unit.battleNetPathStepsTaken() == 1
+                                && unit.battleNetCollisionCounter() == 0
+                                && unit.battleNetRefusals() == 0
+                                && unit.target() != null
+                                && unit.target().isAlive()
+                                && unit.target().type() != null
+                                && !unit.target().type().building()
+                                && !World.battleNetRangedChaseUnit(unit);
                         if (unit.stepDrained() && !unit.isMoving()) {
                             int collision =
                                     unit.battleNetCollisionCounter() + 1;
@@ -6377,6 +6490,14 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetParkedRefusalHeading(heading);
                         }
                         int refusals = battleNetRefuse(unit);
+                        if (paidFourByteParkRedraw) {
+                            // The one-step paid route is parked with its raw
+                            // bytes intact, but NewPath owns a fresh buffer on
+                            // the next visit. Do not carry Java's rejected head
+                            // clockwise into that buffer. Slot 1490 redraws
+                            // SE,SW,W and vacates (31,38) on fixture 263.
+                            unit.markBattleNetLongPaidWrapParkedRoute();
+                        }
                         if (paidLongResidualPark) {
                             // The fourth mobile-formation generation is stored
                             // only in FUN_004379e0's high nibble. It is not the
@@ -6490,6 +6611,45 @@ final class BattleNetMovementSystem {
                         }
                         int shortcut = BattleNetPathFinder.twoHeadingShortcut(
                                 unit.lastStepHeading(), heading);
+                        boolean fullFreePrefixConstruction =
+                                unit.battleNetGoldFreePrefix()
+                                && unit.battleNetGoldFreePrefixLength() == 6
+                                && unit.pathLength() == 4
+                                && unit.battleNetCollisionCounter() == 2
+                                && shortcut >= 0
+                                && !Direction.isDiagonal(shortcut);
+                        if (fullFreePrefixConstruction) {
+                            int[] redrawnOrder = world.harvest
+                                    .battleNetWoodOrderPoint(unit,
+                                            unit.resourceTileX(),
+                                            unit.resourceTileY());
+                            boolean orderChanged = redrawnOrder[0]
+                                    != unit.battleNetWoodOrderX()
+                                    || redrawnOrder[1]
+                                            != unit.battleNetWoodOrderY();
+                            if (orderChanged) {
+                                // The six-byte forest ray has reached its
+                                // occupied skirt, but its two-heading shortcut
+                                // is not another movement byte. Retail retires
+                                // the route, recomputes unit+0x84 from the
+                                // reverse resource ray and enters action 23's
+                                // 2657/3,2,1 constructor on this visit. XHuman
+                                // 12 slot 1364 therefore stays at (10,89) on
+                                // fixture 263, rewrites (14,89) to the wall at
+                                // (13,89), then redraws SE,E on fixture 266.
+                                unit.clearPath();
+                                unit.setRouteSpent(false);
+                                unit.setBattleNetWoodTerminalRefusalHeading(
+                                        heading);
+                                unit.setBattleNetWoodOrder(
+                                        redrawnOrder[0], redrawnOrder[1]);
+                                unit.setBattleNetCollisionCounter(0);
+                                unit.setBattleNetRefusals(0);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(0);
+                                return;
+                            }
+                        }
                         if (shortcut >= 0) {
                             int shortX = unit.tileX()
                                     + Direction.deltaX(shortcut)

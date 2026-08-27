@@ -852,6 +852,21 @@ public final class LoadGame {
                         integer(state.rawGet("retargetResidualParkSteps")));
             }
         }
+        if (state.rawGet("longPaidWrapTimerOneSeen") != null) {
+            unit.setBattleNetLongPaidWrapTimerOneSeen(
+                    truthy(state.rawGet("longPaidWrapTimerOneSeen")));
+        }
+        if (state.rawGet("longPaidWrapParkedTailLength") != null) {
+            int length = Math.max(0,
+                    integer(state.rawGet("longPaidWrapParkedTailLength")));
+            int[] headings = new int[length];
+            for (int depth = 0; depth < length; depth++) {
+                Object heading = state.rawGet(
+                        "longPaidWrapParkedTail" + depth);
+                headings[depth] = heading == null ? -1 : integer(heading);
+            }
+            unit.setBattleNetLongPaidWrapParkedTail(headings);
+        }
         if (state.rawGet("saturatedWallFacePairHeading") != null) {
             unit.setBattleNetSaturatedWallFacePairHeading(
                     integer(state.rawGet("saturatedWallFacePairHeading")));
