@@ -158,6 +158,7 @@ public final class NetworkPeer {
         World world = new World(map, lobbySetup == null
                 ? directPlayers(source, directPeers)
                 : lobbySetup.players(source));
+        world.setPlayerSiegeBuildingTargetLockEnabled(true);
         data.configureWorld(world, source);
         data.populate(world, source);
         if (lobbySetup != null) {

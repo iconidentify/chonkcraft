@@ -653,6 +653,14 @@ final class BattleNetTargetSelection {
      * row-major map scan.</p>
      */
     Unit findBattleNetHostile(Unit attacker, int range, Unit incumbent) {
+        Unit locked = world.playerSiegeBuildingTargetLock(attacker);
+        if (locked != null) {
+            // Playable desktop games keep ownership of a direct building
+            // click.  BNE 2.02 instead reaches 0x409ff0 from the moving siege
+            // callback and may publish a nearby mobile target at 0x437920.
+            // The world option is deliberately off in parity fixtures.
+            return locked;
+        }
         // 0x40a19f returns empty-handed before the incumbent is ever priced,
         // so a band that holds nothing beats a target already in hand.
         int[] band = battleNetBandWindow(attacker, range);

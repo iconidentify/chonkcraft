@@ -53,7 +53,7 @@ SCRIPT_COMMAND_SELECT = re.compile(
     r"^cycle ([1-9]\d*) select unit (\d+)$"
 )
 SCRIPT_COMMAND_UI_RIGHT_CLICK = re.compile(
-    r"^cycle ([1-9]\d*) ui-right-click x (\d+) y (\d+)$"
+    r"^cycle ([1-9]\d*) ui-right-click x (\d+) y (\d+)(?: target (\d+))?$"
 )
 GAME_RULE_REJECT_REASONS = {
     "unit-not-local",
@@ -147,6 +147,8 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                 slot = 0
                 x = int(ui_click.group(2))
                 y = int(ui_click.group(3))
+                if ui_click.group(4) is not None:
+                    target = int(ui_click.group(4))
             else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
@@ -155,7 +157,7 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
                     "'cycle N train unit SLOT type T', "
                     "'cycle N attack|harvest|repair unit SLOT target T', "
                     "'cycle N select unit SLOT', or "
-                    "'cycle N ui-right-click x X y Y'"
+                    "'cycle N ui-right-click x X y Y [target T]'"
                 )
             if cycle < previous_cycle:
                 raise ValueError(f"commands are not cycle-sorted at {path}:{line_number}")

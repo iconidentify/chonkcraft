@@ -547,6 +547,36 @@ scan. The two rules together are what fix the cycle: 24 and 29 are scan cycles
 where the band hides the knight, 30 to 33 are not scan cycles, and 34 is the
 first scan cycle where the band shows it.
 
+## Moving siege can surrender a player-clicked building to the free scan
+
+Authenticated UI captures close the player-control question for both siege
+types.  Fixture
+`afb1f39311ef857ec3275ae79e07bf06aa6492d44b978ee07de964f869ce0600`
+selects Human ballista slot 1488 and right-clicks great hall slot 1436 at cycle
+5.  The UI fanout writes Attack (`order=2`, `next_order=9`) and retains the hall
+while moving for 228 cycles.  At cycle 233, with the hall still alive, the
+moving attack callback replaces it with nearby enemy grunt slot 1505.
+
+The static path is shared combat code, not a ballista special case:
+
+```text
+0x004376c0    moving attack callback
+0x00437901    call 0x00409ff0              ; ordinary free target scan
+0x00437920    call 0x004513d0              ; publish replacement target
+0x00437925    or byte [unit + 0x1f], 2     ; mark automatic ownership
+```
+
+Orc fixture
+`5f9d92f5f3c700ab8818af0cf857908613cbbe92cc4d9d5806f01d76d18d9d3d`
+independently selects catapult slot 1599 through the retail UI and right-clicks
+building slot 1538.  Retail accepts the same Attack transaction and the
+catapult moves while retaining the building target.  The per-type table gives
+ballista type 4 and catapult type 5 the identical `00084004` word, and both
+dispatch through the callback above.  There is no native branch that preserves
+an explicit building click: the reaction scan may steal it from either siege
+engine.  ChonkCraft's live-game target guard is therefore a deliberate control
+overlay; parity fixtures must leave that overlay disabled.
+
 ## A Still unit spends two asynchronous draws on a nearby random point
 
 Read statically from SHA-256

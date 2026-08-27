@@ -90,7 +90,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,173 |
+| `data-free` | none | 1,176 |
 | `full` | installation, pack, Opus vectors | 26 |
 
 The twenty-six that skip even in `full` want nothing anyone should have to

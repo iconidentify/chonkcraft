@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,6 +49,42 @@ class TankerRoundTripTest {
             }
         }
         return map;
+    }
+
+    @Test
+    @DisplayName("a tanker can leave an oppositely aligned three-tile depot")
+    void aTankerLeavesAnEvenAnchorShipyardAfterBankingOil() {
+        World world = new World(sea());
+        // A minimally usable script.bin switches the resource dropout onto
+        // the authenticated BNE placement path without making this synthetic
+        // geometry test depend on an installed asset pack.
+        byte[] script = new byte[9];
+        script[0] = 2;
+        script[6] = 8;
+        world.setBattleNetSequenceData(script);
+        Unit depot = world.createUnit(refinery(), 0, 10, 10);
+        Unit rig = world.createUnit(platform(), 15, 18, 4);
+        Unit boat = world.createUnit(tanker(), 0, 4, 10);
+        assertNotNull(depot);
+        assertNotNull(rig);
+        assertNotNull(boat);
+        rig.setResourcesHeld(25_000);
+        world.restoreContained(boat, depot, false, Unit.Order.HARVEST);
+        world.restoreHarvestState(boat, rig, rig.tileX(), rig.tileY(), true, 0);
+        boat.setCarrying(UnitType.Resource.OIL);
+        boat.setBattleNetOilAction(Unit.BattleNetOilAction.TO_DEPOT);
+
+        world.harvest.leaveDepot(boat,
+                boat.type().gathering().get(UnitType.Resource.OIL));
+
+        assertTrue(boat.isOnMap(),
+                "the free tanker remained invisibly contained in the depot");
+        assertEquals(0, boat.tileX() & 1,
+                "the fallback must preserve the native absolute-even ship grid");
+        assertEquals(0, boat.tileY() & 1,
+                "the fallback must preserve the native absolute-even ship grid");
+        assertTrue(boat.battleNetDoubleStep(),
+                "an aligned fallback should keep normal doubled ship movement");
     }
 
     @Test

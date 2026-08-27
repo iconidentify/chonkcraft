@@ -922,6 +922,16 @@ static BOOL read_command_file(void) {
         } else {
         extra = '\0';
         fields = sscanf(cursor,
+                "cycle %lu ui-right-click x %lu y %lu target %lu %c",
+                &cycle, &x, &y, &target, &extra);
+        if (fields == 4) {
+            /* DoRightButton's third argument is the unit beneath the field
+             * cursor. This exercises the actual UI target transaction. */
+            action = SCRIPT_COMMAND_UI_RIGHT_CLICK;
+            slot = 0;
+        } else {
+        extra = '\0';
+        fields = sscanf(cursor,
                 "cycle %lu ui-right-click x %lu y %lu %c",
                 &cycle, &x, &y, &extra);
         if (fields == 3) {
@@ -1039,6 +1049,7 @@ static BOOL read_command_file(void) {
             }
             }
             }
+        }
         }
         }
         }
@@ -2148,6 +2159,7 @@ static void apply_ui_right_click(const script_command *command,
         0x83, 0xec, 0x08, 0x55, 0x8b, 0x6c, 0x24, 0x10
     };
     BYTE **selected = ui_selected_units();
+    BYTE *target = NULL;
     char selected_list[128];
     DWORD written = 0;
     DWORD index;
@@ -2157,6 +2169,17 @@ static void apply_ui_right_click(const script_command *command,
                 sizeof(expected_do_right_button)) != 0) {
         reject_command(command, "do-right-button-signature");
         return;
+    }
+    if (command->target_slot != SCRIPT_NO_TARGET) {
+        if (pool == NULL || command->target_slot >= pool_count) {
+            reject_command(command, "target-slot-out-of-range");
+            return;
+        }
+        target = pool + command->target_slot * BNE_UNIT_BYTES;
+        if ((target[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
+            reject_command(command, "target-not-live");
+            return;
+        }
     }
     selected_list[0] = '\0';
     for (index = 0; index < BNE_SELECTION_LIMIT; index++) {
@@ -2177,14 +2200,15 @@ static void apply_ui_right_click(const script_command *command,
         }
     }
     trace_write("# bne-trace event=ui-right-click cycle=%ld x=%u y=%u "
-            "ui-player=%u selected=%s",
+            "target=%lu ui-player=%u selected=%s",
             command->cycle, (unsigned int) command->x,
             (unsigned int) command->y,
+            (unsigned long) command->target_slot,
             (unsigned int) *BNE_202_UI_PLAYER, selected_list);
     player_tx_begin();
     player_tx_capturing = TRUE;
     ((do_right_button_function) (void *) BNE_202_DO_RIGHT_BUTTON)(
-            (int) command->x, (int) command->y, NULL, 0, 0);
+            (int) command->x, (int) command->y, target, 0, 0);
     player_tx_capturing = FALSE;
     player_tx_emit_dispatch(command, pool, pool_count, selected_list);
     for (index = 0; index < BNE_SELECTION_LIMIT; index++) {

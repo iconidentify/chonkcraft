@@ -1174,6 +1174,17 @@ public final class World {
     /** Whether buildings may accept another training job while busy. */
     private boolean trainingQueueEnabled;
 
+    /**
+     * Live-game control guard for a player-commanded ballista or catapult.
+     *
+     * <p>BNE 2.02 runs its ordinary free reaction scan while siege is chasing
+     * a clicked building.  That scan may replace the building with a nearby
+     * mobile hostile, even though the player never changed the order.  The
+     * desktop enables this guard for playable games; parity worlds leave it
+     * disabled and therefore retain the authenticated retail behavior.</p>
+     */
+    private boolean playerSiegeBuildingTargetLockEnabled;
+
     /** Tells the world what the scripts say a projectile does. */
     public void setMissileTypes(java.util.Map<String, MissileType> missileTypes) {
         this.missileTypes = missileTypes;
@@ -1191,6 +1202,33 @@ public final class World {
 
     public void setTrainingQueueEnabled(boolean enabled) {
         trainingQueueEnabled = enabled;
+    }
+
+    /** Enables the live-game siege target guard; disabled by default for parity. */
+    public void setPlayerSiegeBuildingTargetLockEnabled(boolean enabled) {
+        playerSiegeBuildingTargetLockEnabled = enabled;
+    }
+
+    /**
+     * Returns a player-owned building target that reaction scans must not
+     * replace, or {@code null} when retail target selection should run.
+     */
+    Unit playerSiegeBuildingTargetLock(Unit attacker) {
+        if (!playerSiegeBuildingTargetLockEnabled
+                || attacker == null || attacker.type() == null
+                || !isPerson(attacker.player())
+                || attacker.autoTargeting()) {
+            return null;
+        }
+        int type = PudUnitTypes.code(attacker.type().ident());
+        if (type != 4 && type != 5) {
+            return null;
+        }
+        Unit target = attacker.target();
+        return target != null && target.type() != null
+                && target.type().building()
+                && targets.validAttackTarget(attacker, target)
+                        ? target : null;
     }
 
     /** A table of its own, overriding what the scripts declared. */
@@ -3396,10 +3434,7 @@ public final class World {
         // 1x1; large ground/sea footprints carry it as well. Deriving the bit
         // from footprint alone made commanded daemons half-step while retail
         // commits directly to the next even-grid anchor.
-        unit.setBattleNetDoubleStep(unit.canMove()
-                && (unit.type().airUnit()
-                    || unit.type().tileWidth() > 1
-                    || unit.type().tileHeight() > 1));
+        unit.setBattleNetDoubleStep(battleNetTypeUsesDoubleStep(unit.type()));
         // Dead-vision and spell revealers are implementation-side sight
         // carriers, not retail unit constructions.  Native can leave the
         // fallen unit's sight behind without running FUN_00451b50 again;
@@ -4167,8 +4202,10 @@ public final class World {
         unit.setBattleNetLandPatrolAttackRoutePending(false);
         unit.setBattleNetResidualEmptyApproachIdlePending(false);
         unit.setBattleNetRetargetResidualParkRefill(false);
-        // A commanded target: the unit does not go looking for a better one.
-        // autoAttack and attackBack say otherwise for the ones they pick.
+        // The target begins under commanded ownership. Retail's moving-attack
+        // callback may later surrender it to a free reaction scan; playable
+        // desktop worlds suppress that scan only for siege-on-building clicks.
+        // autoAttack and attackBack say otherwise for the targets they pick.
         unit.setAutoTargeting(false);
         // Commanded attacks are action 12 (chase). Stationary action-16 is
         // set only by battleNetAutoAttack after this returns.
@@ -8210,14 +8247,51 @@ public final class World {
             return dropOutOnSide(unit.type(), LOOKING_WEST, container,
                     unit.tileX(), unit.tileY());
         }
-        return dropOutResourceNearest(unit, towards.tileX(), towards.tileY(),
-                container);
+        return placeResourceBesidePoint(unit, container,
+                towards.tileX(), towards.tileY());
     }
 
     /** Resource emergence toward an exact native order point. */
     int[] placeResourceBesidePoint(Unit unit, Unit container,
             int goalX, int goalY) {
-        return dropOutResourceNearest(unit, goalX, goalY, container);
+        int[] spot = dropOutResourceNearest(unit, goalX, goalY, container);
+        if (spot != null || !resourcePerimeterMissesMovementGrid(unit, container)) {
+            return spot;
+        }
+
+        // The exact native perimeter grows by two, preserving its starting
+        // parity. An odd-sized depot placed on the opposite lattice can
+        // therefore offer many free water squares while every candidate is
+        // rejected by 0x4512c0's doubled-grid test. This is impossible for a
+        // normally placed retail depot but legal in old/custom PUDs. Search
+        // the next parity-changing side ring as a fail-safe; the ordinary
+        // authenticated path above is unchanged whenever it has an answer.
+        int dx = Integer.compare(goalX,
+                container.tileX() + Math.max(1, container.type().tileWidth()) / 2);
+        int dy = Integer.compare(goalY,
+                container.tileY() + Math.max(1, container.type().tileHeight()) / 2);
+        int heading = dx == 0 && dy == 0
+                ? LOOKING_WEST : Direction.fromDelta(dx, dy);
+        return dropOutOnSide(unit.type(), heading, container,
+                unit.tileX(), unit.tileY(), maxRings(), battleNetMovementStride(unit));
+    }
+
+    /** Whether native's stride-preserving resource spiral can never hit the grid. */
+    private boolean resourcePerimeterMissesMovementGrid(Unit unit, Unit container) {
+        if (unit == null || container == null) {
+            return false;
+        }
+        int stride = battleNetMovementStride(unit);
+        if (stride <= 1) {
+            return false;
+        }
+        int width = Math.max(1, container.type().tileWidth());
+        int height = Math.max(1, container.type().tileHeight());
+        boolean bothVerticalFacesMiss = Math.floorMod(container.tileX() - 1, stride) != 0
+                && Math.floorMod(container.tileX() + width, stride) != 0;
+        boolean bothHorizontalFacesMiss = Math.floorMod(container.tileY() - 1, stride) != 0
+                && Math.floorMod(container.tileY() + height, stride) != 0;
+        return bothVerticalFacesMiss && bothHorizontalFacesMiss;
     }
 
     /**
@@ -9134,9 +9208,7 @@ public final class World {
             }
             return true;
         }
-        // The game a trained unit comes out of the west face.
-        int[] spot = dropOutOnSide(what, LOOKING_WEST, building,
-                building.tileX(), building.tileY());
+        int[] spot = trainedUnitDropout(what, building);
         if (spot == null) {
             // Nowhere to put it; hold at full progress and try again next
             // cycle, which is what the game does when a base is walled in.
@@ -9167,6 +9239,29 @@ public final class World {
             fireOnReady(trained);
         }
         return true;
+    }
+
+    /** Selects the west-side birth square for a unit whose training completed. */
+    int[] trainedUnitDropout(UnitType what, Unit building) {
+        // The game a trained unit comes out of the west face.
+        int[] spot = dropOutOnSide(what, LOOKING_WEST, building,
+                building.tileX(), building.tileY());
+        // Native's placement callback at 0x4512a0 rejects an odd x or y
+        // anchor when the unit type carries the doubled-movement bit. Most
+        // retail maps align their odd-sized shipyards so the ordinary west
+        // walk answers on that grid. A custom map can pre-place a 3x3 yard
+        // on the opposite parity, though; accepting its first free odd
+        // square creates a destroyer which can never reach the absolute-even
+        // goals used by the BNE pathfinder and appears to patrol forever.
+        // Keep the ordinary answer whenever it is native-legal, otherwise
+        // continue the same side walk until an aligned anchor is free.
+        int stride = battleNetTypeUsesDoubleStep(what) ? 2 : 1;
+        if (spot != null && stride > 1
+                && !onMovementGrid(spot[0], spot[1], stride)) {
+            spot = dropOutOnSide(what, LOOKING_WEST, building,
+                    building.tileX(), building.tileY(), maxRings(), stride);
+        }
+        return spot;
     }
 
     /** Counts a building towards becoming what it is turning into. */
@@ -9260,6 +9355,11 @@ public final class World {
 
     int[] dropOutOnSide(UnitType type, int heading, Unit container,
             int startX, int startY, int rings) {
+        return dropOutOnSide(type, heading, container, startX, startY, rings, 1);
+    }
+
+    private int[] dropOutOnSide(UnitType type, int heading, Unit container,
+            int startX, int startY, int rings, int stride) {
         long mask = Unit.movementMaskFor(type);
         long blocking = Unit.blockingFlagsFor(type);
         int width = Math.max(1, type.tileWidth());
@@ -9319,7 +9419,9 @@ public final class World {
             switch (leg) {
                 case LEG_WEST -> {
                     for (int i = addy; i-- > 0; y++) {
-                        if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                        if (onMovementGrid(x, y, stride)
+                                && map.isFootprintFree(
+                                        x, y, width, height, mask, blocking)) {
                             return new int[] {x, y};
                         }
                     }
@@ -9327,7 +9429,9 @@ public final class World {
                 }
                 case LEG_SOUTH -> {
                     for (int i = addx; i-- > 0; x++) {
-                        if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                        if (onMovementGrid(x, y, stride)
+                                && map.isFootprintFree(
+                                        x, y, width, height, mask, blocking)) {
                             return new int[] {x, y};
                         }
                     }
@@ -9335,7 +9439,9 @@ public final class World {
                 }
                 case LEG_EAST -> {
                     for (int i = addy; i-- > 0; y--) {
-                        if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                        if (onMovementGrid(x, y, stride)
+                                && map.isFootprintFree(
+                                        x, y, width, height, mask, blocking)) {
                             return new int[] {x, y};
                         }
                     }
@@ -9343,7 +9449,9 @@ public final class World {
                 }
                 default -> {
                     for (int i = addx; i-- > 0; x--) {
-                        if (map.isFootprintFree(x, y, width, height, mask, blocking)) {
+                        if (onMovementGrid(x, y, stride)
+                                && map.isFootprintFree(
+                                        x, y, width, height, mask, blocking)) {
                             return new int[] {x, y};
                         }
                     }
@@ -9353,6 +9461,16 @@ public final class World {
             leg = (leg + 1) & 3;
         }
         return null;
+    }
+
+    private static boolean onMovementGrid(int x, int y, int stride) {
+        return stride <= 1 || (Math.floorMod(x, stride) == 0
+                && Math.floorMod(y, stride) == 0);
+    }
+
+    private static boolean battleNetTypeUsesDoubleStep(UnitType type) {
+        return type != null && !type.building() && type.speed() > 0
+                && (type.airUnit() || type.tileWidth() > 1 || type.tileHeight() > 1);
     }
 
     /**

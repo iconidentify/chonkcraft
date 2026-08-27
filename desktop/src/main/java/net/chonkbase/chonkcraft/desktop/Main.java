@@ -1546,6 +1546,12 @@ public final class Main {
             placed = showcase.deployed();
         }
 
+        // A real player expects a direct siege-on-building command to remain
+        // theirs until the building is gone or no longer a valid target.
+        // Engine/oracle worlds do not enable this and stay byte-authentic to
+        // BNE's surprising moving-siege reaction retarget.
+        world.setPlayerSiegeBuildingTargetLockEnabled(true);
+
         GameData.LoadedTileset tileset = data.loadTileset(source.tileset());
         GameMap map = world.map();
 

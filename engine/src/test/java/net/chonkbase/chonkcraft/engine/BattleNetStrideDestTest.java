@@ -121,6 +121,32 @@ class BattleNetStrideDestTest {
                 "an even dest is the even lattice point itself");
     }
 
+    @Test
+    @DisplayName("a destroyer surfaced off-grid obeys its next player move")
+    void anOffGridDestroyerUsesASingleLatticeRecoveryMove() {
+        World world = openWater();
+        Unit ship = world.createUnit(destroyerType(), 0, 15, 12);
+        assertTrue(ship.battleNetDoubleStep(),
+                "the 2x2 destroyer initially carries the native doubled bit");
+        CommandApplier applier = new CommandApplier(world, List.of(ship.type()));
+
+        assertTrue(applier.apply(GameCommand.move(0, ship.id(), 9, 12)),
+                "the west click must be accepted");
+        for (int i = 0; i < 30 && world.battleNetMovementStride(ship) > 1; i++) {
+            world.tick();
+        }
+        assertEquals(1, world.battleNetMovementStride(ship),
+                "an odd anchor cannot recover while every step preserves two-tile parity");
+        for (int i = 0; i < 400 && ship.order() != Unit.Order.STILL; i++) {
+            world.tick();
+        }
+
+        assertEquals(Unit.Order.STILL, ship.order(),
+                "the destroyer crossed its goal forever as if it were patrolling");
+        assertEquals(9, ship.tileX());
+        assertEquals(12, ship.tileY());
+    }
+
     private static World openWater() {
         GameMap map = new GameMap(24, 24, new Tileset());
         for (int y = 0; y < map.height(); y++) {

@@ -61,6 +61,7 @@ measures entry and exit cycles rather than merely waiting for eventual oil.
 | Congested | tanker 1576 stationary at 120,4 while 1566 plans | the stationary hull remains solid and causes the `NE, NE, SE` wall-follow |
 | Multiple tankers | the two Orc 14 platform lanes and `OilLifecycleGateTest` | no starvation; each tanker can board and bank a load |
 | Blocked boarding seat | `OilLifecycleGateTest.twoTankersSurviveOnePlatformLane` | the following tanker waits/reroutes and eventually boards rather than ending its order |
+| Opposite-parity 3x3 depot | `TankerRoundTripTest.aTankerLeavesAnEvenAnchorShipyardAfterBankingOil` | a contained tanker uses a fail-safe aligned exit instead of disappearing permanently |
 
 The route explanation is important. Native `0x00450690` draws the ordinary
 doubled-delta line with `0x00429f10`/`0x00429fa0`; it does not use a special
@@ -114,6 +115,13 @@ order interprets a cached next anchor that enters the depot footprint as
 large ships still use BNE's doubled even-anchor lattice. Only a command which
 starts from an invalid legacy odd anchor uses a single-lattice recovery route,
 so the compatibility repair does not alter authenticated normal routes.
+The inverse custom-map case is a 3x3 shipyard whose anchor gives every native
+resource-exit face the wrong parity. The pinned executable's placement
+callback at `0x004512a0` tests the doubled-movement flag at `0x004512bb`, then
+`0x004512c0`--`0x004512ca` rejects a candidate if either coordinate is odd.
+Java therefore keeps the native absolute-even test and face-first search. Only
+after the face geometry proves that search can never intersect the required
+grid does it walk a parity-changing side ring for an aligned free square.
 The captured player save adds the interrupted-command boundary: its tanker is
 at `(53,18)` with `IX=-36`, a Move goal of `(53,18)`, cargo 100 and action 24.
 Without another command it now finishes the owed pixels, centres on that tile

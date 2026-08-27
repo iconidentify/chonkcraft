@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.StringWriter;
@@ -242,5 +243,74 @@ class BattleNetSiegeCadenceTest {
         assertEquals(shotCycles(fixture.world(), "missile-catapult-rock", 180),
                 shotCycles(loaded, "missile-catapult-rock", 180),
                 "reload resumed on a different shot cycle after loading");
+    }
+
+    @Test
+    @DisplayName("retail parity still permits the authenticated moving-siege reaction retarget")
+    void parityWorldRetainsRetailSiegeReactionRetarget() {
+        for (String ident : List.of("unit-ballista", "unit-catapult")) {
+            Fixture fixture = fixture();
+            Unit siege = place(fixture, ident, 0, 10, 10);
+            Unit building = place(fixture, "unit-orc-barracks", 1, 23, 10);
+            Unit distractor = place(fixture, "unit-footman", 1, 16, 16);
+
+            assertTrue(fixture.world().orderAttack(siege, building, true));
+            boolean changed = false;
+            for (int cycle = 0; cycle < 500 && siege.isAlive(); cycle++) {
+                fixture.world().tick();
+                if (siege.target() == distractor) {
+                    changed = true;
+                    break;
+                }
+            }
+            assertTrue(changed, ident + " no longer reproduces BNE's free reaction scan");
+        }
+    }
+
+    @Test
+    @DisplayName("live play keeps a direct ballista or catapult building target")
+    void livePlaySiegeBuildingClickCannotBeStolenByReactionScan() {
+        for (String ident : List.of("unit-ballista", "unit-catapult")) {
+            Fixture fixture = fixture();
+            fixture.world().setPlayerSiegeBuildingTargetLockEnabled(true);
+            Unit siege = place(fixture, ident, 0, 10, 10);
+            Unit building = place(fixture, "unit-orc-barracks", 1, 23, 10);
+            place(fixture, "unit-footman", 1, 16, 16);
+            int hitPoints = building.hitPoints();
+
+            assertTrue(fixture.world().orderAttack(siege, building, true));
+            boolean acquired = false;
+            for (int cycle = 0; cycle < 1_000
+                    && siege.isAlive() && building.hitPoints() == hitPoints; cycle++) {
+                fixture.world().tick();
+                if (siege.target() == building) {
+                    acquired = true;
+                }
+                if (acquired) {
+                    assertSame(building, siege.target(),
+                            ident + " surrendered the player's live building click");
+                }
+            }
+            assertTrue(acquired, ident + " never promoted the player's queued click");
+            assertTrue(building.hitPoints() < hitPoints,
+                    ident + " held the target but never delivered its shot");
+        }
+    }
+
+    @Test
+    @DisplayName("the live siege guard does not freeze automatically owned combat")
+    void livePlayGuardLeavesAutomaticSiegeSelectionAlone() {
+        Fixture fixture = fixture();
+        fixture.world().setPlayerSiegeBuildingTargetLockEnabled(true);
+        Unit ballista = place(fixture, "unit-ballista", 0, 10, 10);
+        Unit building = place(fixture, "unit-orc-barracks", 1, 23, 10);
+        Unit distractor = place(fixture, "unit-footman", 1, 16, 16);
+
+        assertTrue(fixture.world().orderAttack(ballista, building));
+        ballista.setAutoTargeting(true);
+
+        assertSame(distractor, fixture.world().targets.findBattleNetHostile(
+                ballista, ballista.type().reactRange(true), null),
+                "the playability guard leaked into an automatic/attack-move scan");
     }
 }

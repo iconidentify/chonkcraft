@@ -450,16 +450,24 @@ final class BattleNetMovementSystem {
         // so the pre-retail placeholder must go with it instead of remaining
         // at the old muzzle and waking up beside a later shot.
         world.projectiles.interruptPendingAttack(unit);
-        // Retail tankers select the absolute even-anchor route. A legacy save
-        // can contain a 2x2 tanker on an odd anchor, where a doubled step can
-        // never repair parity and crosses an odd order point forever. Keep
-        // BNE's doubled rule on its valid lattice, but make this one command a
-        // single-lattice recovery. A later command from an even anchor
-        // restores the tanker bit. Do not rewrite other large-mover flags:
-        // transports have their own shore-approach predicate.
+        // Retail doubled movers select the absolute even-anchor route. A
+        // legacy save or a custom map with an oppositely aligned 3x3 shipyard
+        // can surface a 2x2 hull on an odd anchor, where a doubled step can
+        // never repair parity. The reported destroyer stayed on the odd/even
+        // lattice, repeatedly crossed its rounded Move point, and looked like
+        // Patrol until Stop drained the current stride. Keep BNE's doubled
+        // rule on every valid anchor, but make a player command from an
+        // already-invalid anchor a single-lattice recovery when its requested
+        // water anchor is genuinely enterable. Keep the doubled shoreline
+        // refusal path for an impassable click, and do not touch transports:
+        // both have separately authenticated movement rules. Tankers retain
+        // their existing ability to re-arm the native bit after they return
+        // to a valid anchor.
         if (unit.type().gathering().containsKey(UnitType.Resource.OIL)) {
             unit.setBattleNetDoubleStep(
                     ((unit.tileX() | unit.tileY()) & 1) == 0);
+        } else if (usesOffGridShipRecovery(unit, toX, toY)) {
+            unit.setBattleNetDoubleStep(false);
         }
         unit.setPathGoal(toX, toY);
         unit.setOrderTarget(toX, toY);
@@ -477,6 +485,17 @@ final class BattleNetMovementSystem {
         // made external commands walk a cycle early.
         unit.setBattleNetOrderDelay(initialDelay);
         return true;
+    }
+
+    /** Narrow custom-map recovery for a doubled combat ship born off-grid. */
+    private boolean usesOffGridShipRecovery(Unit unit, int goalX, int goalY) {
+        return unit != null && unit.type() != null
+                && unit.battleNetDoubleStep()
+                && unit.type().seaUnit()
+                && !unit.type().canTransport()
+                && ((unit.tileX() | unit.tileY()) & 1) != 0
+                && world.map.contains(goalX, goalY)
+                && world.battleNetTerrainPassable(unit, goalX, goalY);
     }
 
 
@@ -551,10 +570,14 @@ final class BattleNetMovementSystem {
         // Once its owed pixels settle, a doubled path query snaps the odd
         // self-goal onto the neighbouring even anchor and sends the tanker
         // straight back across it forever. Recover the same single-lattice
-        // command that orderMove now chooses. This is deliberately limited
-        // to the oil tanker; other 2x2 movers keep their retail stride.
+        // command that orderMove now chooses. A custom-map shipyard can put
+        // a combat ship on the same invalid anchor, so repair that saved Move
+        // as well—but only toward enterable sea. Coastline refusal and
+        // transports keep their authenticated doubled rules.
         if (unit.battleNetDoubleStep()
-                && unit.type().gathering().containsKey(UnitType.Resource.OIL)
+                && (unit.type().gathering().containsKey(UnitType.Resource.OIL)
+                    || usesOffGridShipRecovery(unit,
+                            unit.orderTargetX(), unit.orderTargetY()))
                 && ((unit.tileX() | unit.tileY()) & 1) != 0) {
             unit.setBattleNetDoubleStep(false);
         }

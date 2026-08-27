@@ -126,15 +126,19 @@ class OracleIdentityTest(unittest.TestCase):
             path.write_text(
                 "cycle 5 select unit 1598\n"
                 "cycle 5 select unit 1597\n"
-                "cycle 5 ui-right-click x 25 y 28\n",
+                "cycle 5 ui-right-click x 25 y 28\n"
+                "cycle 6 ui-right-click x 31 y 30 target 1588\n",
                 encoding="ascii",
             )
             commands = bne_oracle.parse_command_script(path)
-        self.assertEqual(["select", "select", "ui-right-click"],
+        self.assertEqual(["select", "select", "ui-right-click",
+                          "ui-right-click"],
                          [command["action"] for command in commands])
-        self.assertEqual([1598, 1597, 0],
+        self.assertEqual([1598, 1597, 0, 0],
                          [command["unit"] for command in commands])
         self.assertEqual((25, 28), (commands[2]["x"], commands[2]["y"]))
+        self.assertNotIn("target", commands[2])
+        self.assertEqual(1588, commands[3]["target"])
 
     def test_rejects_an_unsorted_command_script(self):
         with tempfile.TemporaryDirectory() as directory:

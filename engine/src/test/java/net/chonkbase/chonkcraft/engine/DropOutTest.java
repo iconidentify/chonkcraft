@@ -49,6 +49,16 @@ class DropOutTest {
         return map;
     }
 
+    private static GameMap sea(int size) {
+        GameMap map = new GameMap(size, size, new Tileset());
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                map.field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+        }
+        return map;
+    }
+
     private static AnimationSet walker() {
         AnimationSet set = new AnimationSet("walker");
         set.put(AnimationSet.State.STILL, Animation.parse("still", List.of("frame 0", "wait 1")));
@@ -88,6 +98,24 @@ class DropOutTest {
         type.setTileSize(3, 3);
         type.setHitPoints(800);
         type.setBuilding(true);
+        return type;
+    }
+
+    private static UnitType shipyard() {
+        UnitType type = new UnitType("unit-human-shipyard");
+        type.setTileSize(3, 3);
+        type.setHitPoints(1100);
+        type.setBuilding(true);
+        return type;
+    }
+
+    private static UnitType destroyer() {
+        UnitType type = new UnitType("unit-human-destroyer");
+        type.setTileSize(2, 2);
+        type.setHitPoints(100);
+        type.setSpeed(32);
+        type.setSeaUnit(true);
+        type.setAnimationSet(walker());
         return type;
     }
 
@@ -170,6 +198,25 @@ class DropOutTest {
         // South row, walked west to east: the first free square is (10,13).
         assertEquals(10, trained.tileX());
         assertEquals(13, trained.tileY());
+    }
+
+    @Test
+    void aLargeShipTrainedFromAnEvenAnchorShipyardSurfacesOnItsMovementGrid() {
+        World world = new World(sea(30));
+        UnitType yardType = shipyard();
+        UnitType shipType = destroyer();
+        Unit yard = world.createUnit(yardType, 0, 10, 10);
+        int[] spot = world.trainedUnitDropout(shipType, yard);
+        Unit trained = spot == null ? null
+                : world.createUnit(shipType, 0, spot[0], spot[1]);
+
+        assertNotNull(trained, "the aligned search never surfaced the destroyer");
+        assertEquals(0, trained.tileX() & 1,
+                "native doubled ships require an absolute-even x anchor");
+        assertEquals(0, trained.tileY() & 1,
+                "native doubled ships require an absolute-even y anchor");
+        assertTrue(trained.battleNetDoubleStep(),
+                "the aligned trained ship should retain normal doubled movement");
     }
 
     // ------------------------------------------------------- DropOutNearest
