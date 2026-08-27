@@ -148,6 +148,51 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 7 juggernaught follows its tanker into the completed platform")
+    void anXHuman7JuggernaughtFollowsItsTankerIntoTheCompletedPlatform() {
+        Mission mission = mission("campaigns/human-exp/levelx07h");
+        Unit juggernaught = at(mission.world(),
+                "unit-ogre-juggernaught", 24, 24);
+        assertNotNull(juggernaught,
+                "XHuman 7 has no startup juggernaught at 24,24");
+
+        for (int cycle = 1; cycle <= 248; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, juggernaught.order());
+        assertEquals(22, juggernaught.battleNetAiHomeX());
+        assertEquals(27, juggernaught.battleNetAiHomeY(),
+                "the old shipyard home survives until the tanker's platform is ready");
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, juggernaught.order());
+        assertEquals(24, juggernaught.battleNetAiHomeX(),
+                "the fixture-249 naval beat resets home to the parked hull");
+        assertEquals(26, juggernaught.battleNetAiHomeY());
+        assertEquals(24, juggernaught.battleNetPendingPatrolX());
+        assertEquals(26, juggernaught.battleNetPendingPatrolY());
+        assertEquals(39, juggernaught.battleNetPendingPatrolBackX());
+        assertEquals(33, juggernaught.battleNetPendingPatrolBackY(),
+                "the completed platform becomes the far patrol endpoint");
+
+        for (int cycle = 250; cycle <= 252; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, juggernaught.order());
+        assertEquals(24, juggernaught.orderTargetX());
+        assertEquals(26, juggernaught.orderTargetY(),
+                "the queued patrol promotes at the native fixture-252 marker");
+
+        for (int cycle = 253; cycle <= 255; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, juggernaught.order());
+        assertEquals(39, juggernaught.orderTargetX());
+        assertEquals(33, juggernaught.orderTargetY(),
+                "the fixture-255 endpoint exchange opens the platform leg");
+    }
+
+    @Test
     @DisplayName("an XOrc 11 battleship takes its opening west patrol stride on fixture cycle five")
     void anXOrc11BattleshipTakesItsOpeningWestPatrolStrideOnFixtureCycleFive() {
         Mission mission = mission("campaigns/orc-exp/levelx11o");

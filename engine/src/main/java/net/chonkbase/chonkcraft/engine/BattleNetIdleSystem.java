@@ -519,21 +519,21 @@ final class BattleNetIdleSystem {
             // made the doubled point pathfinder report arrival and stranded
             // the ship in Still forever.  Behaviour-two assault patrols use
             // their current tactical point and remain unchanged.
-            boolean capitalShip =
-                    World.isBattleNetCapitalShip(unit.type().ident());
-            if (unit.battleNetAiBehavior() == 6 && unit.hasBattleNetAiHome()
-                    && !capitalShip) {
+            if (unit.battleNetAiBehavior() == 6 && unit.hasBattleNetAiHome()) {
                 // Retail reruns the whole behaviour-six constructor on every
                 // beat, so its endpoints track the tanker's career. XHuman 7's
                 // southern destroyer stands beside a stale rewrite through the
                 // beats at fixtures 99, 149 and 199, and on 249 -- one beat
                 // after p6's tanker settles into its platform -- native writes
                 // home to the hull's own square and reissues toward the
-                // platform instead, both destroyers together. Reissuing the
-                // stale single point here left that beat decaying back to
-                // Still while retail started a real leg. The chain already
-                // answers near=service-base/self and far=closest owned
-                // platform per beat; store the pair it returns. On waters
+                // platform instead, all three warships together. The capital
+                // ship proves the complete queued transition: home becomes
+                // its parked square at 249, Patrol promotes at 252, and the
+                // endpoint exchange exposes the platform goal at 255.
+                // Reissuing the stale single point here left that beat
+                // decaying back to Still while retail started a real leg. The
+                // chain already answers near=service-base/self and far=closest
+                // owned platform per beat; store the pair it returns. On waters
                 // with no oil at all the chain would fall to its random
                 // jitter, which this beat never spent on the sealed runs, so
                 // those keep the legacy single-point reissue.
