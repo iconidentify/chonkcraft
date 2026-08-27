@@ -230,6 +230,25 @@ class PlayerOrderDeliveryTest {
     }
 
     @Test
+    @DisplayName("a field right-click does not promise that a cannon tower will move")
+    void aFieldRightClickDoesNotMoveAnImmobileBuilding() {
+        Scene scene = scene();
+        Unit tower = make(scene, "unit-human-cannon-tower", 0, 5, 5);
+        scene.screen().selectForTest(List.of(tower));
+
+        scene.screen().fieldRightClickForTest(12, 8, null);
+
+        assertTrue(scene.screen().intentEntriesForTest().stream()
+                        .noneMatch(entry -> entry.command() != null),
+                "an immobile building must not emit a Move packet");
+        assertTrue(scene.screen().intentFeedbackForTest().isEmpty(),
+                "the tower must not acknowledge an impossible order");
+        assertTrue(scene.screen().intentDecisionsForTest().isEmpty(),
+                "an ignored building click is not an accepted command");
+        assertEquals(Unit.Order.STILL, tower.order());
+    }
+
+    @Test
     @DisplayName("retail's ordered nine-unit selection is the command fan-out order")
     void orderedSelectionIsBoundedAndDrivesEveryRecipient() {
         Scene scene = scene();

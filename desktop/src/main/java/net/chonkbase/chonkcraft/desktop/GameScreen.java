@@ -2121,13 +2121,11 @@ final class GameScreen extends JPanel {
      * every player from the event thread. This walks the published snapshot
      * and adds up exactly what {@code recalculateSupply} adds up.
      *
-     * <p>Departs from {@code World.orderTrain} by the optional training queue.
-     * This preflight follows retail and reads only live demand; the world also
-     * reserves every job in ChonkCraft's paid queue so the extension cannot
-     * overbook food. A local rejection is reported immediately. A network
-     * sink can only confirm that the command entered lockstep, so this screen
-     * stays silent rather than claiming the unit began training before the shared
-     * simulation applies it.
+     * <p>ChonkCraft's optional paid training queue extends retail's single-job
+     * rule, so its promised units must be included here too. The simulation
+     * reserves that food before accepting another job. Applying the same
+     * read-only check at the screen keeps a network sink from acknowledging a
+     * command that lockstep will deterministically refuse later.
      */
     private String noRoom(UnitType what) {
         if (what == null || what.demand() <= 0) {
@@ -2142,6 +2140,14 @@ final class GameScreen extends JPanel {
             }
             supply += unit.type().supply();
             demand += unit.type().demand();
+            if (world.trainingQueueEnabled()) {
+                if (unit.producing() != null) {
+                    demand += unit.producing().demand();
+                }
+                for (UnitType queued : unit.trainingQueue()) {
+                    demand += queued.demand();
+                }
+            }
         }
         return demand + what.demand() <= supply
                 ? null : bne(BattleNetMessages.Key.NOT_ENOUGH_FOOD);
@@ -3378,8 +3384,11 @@ final class GameScreen extends JPanel {
             case "attack", "spell-cast" ->
                     asFighter(unit, tileX, tileY, under, queued, keys.control());
             case "move", "sail" -> asMover(unit, tileX, tileY, under, queued);
-            // Sheep and seals. A right click on one is not an order.
-            case "none" -> null;
+            // Sheep, seals, and non-producing buildings. A right click on one
+            // is not an order. Producers were already handled as rally points
+            // above; falling through here sent towers an impossible Move and
+            // let a network sink acknowledge work the simulation would drop.
+            case "", "none" -> null;
             default -> asMover(unit, tileX, tileY, under, queued);
         };
     }

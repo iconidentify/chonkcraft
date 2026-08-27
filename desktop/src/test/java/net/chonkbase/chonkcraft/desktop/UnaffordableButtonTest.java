@@ -280,6 +280,30 @@ class UnaffordableButtonTest {
     }
 
     @Test
+    @DisplayName("already-paid training jobs reserve food before another network order")
+    void queuedTrainingFoodIsRefusedBeforeTheCommandSink() {
+        Scene scene = scene();
+        Unit hall = find(scene, "unit-town-hall");
+        UnitType peasant = scene.data().unitTypes().types().get("unit-peasant");
+        scene.world().recalculateSupply();
+        assertTrue(scene.world().player(ME).hasSupplyRoom(peasant.demand()),
+                "the fixture needs the live food room consumed below");
+        assertTrue(scene.world().orderTrain(hall, peasant),
+                "the first paid peasant must reserve the last food slot");
+        int jobs = hall.trainingJobCount();
+
+        scene.screen().selectForTest(hall);
+        press(scene, hall, "train-unit", "unit-peasant");
+
+        assertEquals(recovered(scene, NOT_ENOUGH_FOOD), scene.screen().status(),
+                "the preflight ignored food promised to the paid queue");
+        assertEquals(jobs, hall.trainingJobCount(),
+                "the refused click changed the paid training queue");
+        assertTrue(scene.screen().intentOutcomesForTest().isEmpty(),
+                "a pre-wire food refusal must not become a silent command outcome");
+    }
+
+    @Test
     @DisplayName("a command hotkey begins one player transaction")
     void aCommandHotkeyBeginsOnePlayerTransaction() {
         Scene scene = scene();
