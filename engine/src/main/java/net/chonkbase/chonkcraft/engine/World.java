@@ -12041,6 +12041,13 @@ public final class World {
         return planTowards(unit, target, true, true, retainFirstWallFace);
     }
 
+    /** A completed-band target replacement re-hardens its chosen moving head. */
+    PathFinder.Result planTowardsAfterCompletedRefusalBandRetarget(
+            Unit unit, Unit target, boolean retainFirstWallFace) {
+        return planTowards(unit, target, true, true, retainFirstWallFace,
+                false, true);
+    }
+
     /** Paid hit-help redraw retaining saturated formation ranks as walls. */
     PathFinder.Result planTowardsAfterPersonHelpHandoff(
             Unit unit, Unit target) {
@@ -12468,14 +12475,24 @@ public final class World {
                     unit.tileY() + Direction.deltaY(heading) * stride);
             if (routeHead != null && routeHead != unit
                     && routeHead.isMoving()
-                    && routeHead.battleNetAttackWrapDestArmPending()
+                    && (!completedRefusalBand
+                            || !unit.battleNetRetargetResidualParkRefill())
+                    && (completedRefusalBand
+                            || routeHead.battleNetAttackWrapDestArmPending())
                     && isAllied(unit.player(), routeHead.player())
-                    && movement.battleNetSoftClearMoveAlly(routeHead)) {
+                    && (movement.battleNetSoftClearMoveAlly(routeHead)
+                            || (completedRefusalBand
+                                    && movement
+                                            .battleNetRefusalBandSoftClearMoveAlly(
+                                                    routeHead)))) {
                 // The cooperative optimizer may choose a square occupied by
                 // a formation mate whose Move body is already in flight. On
-                // the first redraw after a paid park, retail makes that
-                // chosen head solid and redraws the wall face around it;
-                // unrelated moving allies remain soft.
+                // the first redraw after a paid park or a directly owned
+                // completed refusal band, retail makes that chosen head solid
+                // and redraws the wall face around it; unrelated moving allies
+                // remain soft. A completed band inherited from an older
+                // post-park refill keeps its cooperative head (XHuman 12 slot
+                // 1512), so RetargetResidualParkRefill excludes that form.
                 movingRouteHeadWall = routeHead;
                 path = findBattleNetTargetPath(
                         unit, target, settledResidualRetarget,

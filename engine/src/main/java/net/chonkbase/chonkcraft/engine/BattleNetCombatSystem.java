@@ -4484,8 +4484,13 @@ final class BattleNetCombatSystem {
                                     unit.battleNetRefusals() > 0
                                     && chased.type() != null
                                     && !chased.type().building();
-                            world.planTowardsAfterRefusalBand(
-                                    unit, chased, retainPaidMobileWallFace);
+                            if (retainPaidMobileWallFace) {
+                                world.planTowardsAfterCompletedRefusalBandRetarget(
+                                        unit, chased, true);
+                            } else {
+                                world.planTowardsAfterRefusalBand(
+                                        unit, chased, false);
+                            }
                             if (world.actionMoveWalked
                                     && settledResidualHeadFree
                                     && oldReplacementHeading >= 0

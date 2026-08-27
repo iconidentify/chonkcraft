@@ -240,7 +240,10 @@ class XHuman12Cycle166FormationHandoffRealDataTest {
         Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
         World world = mission.world();
         Unit grunt = unitById(world, 104);
+        Unit paidRetarget = unitById(world, 99);
         assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+        assertNotNull(paidRetarget,
+                "XHuman 12 has no native-slot-1501 paid-retarget grunt");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -282,7 +285,30 @@ class XHuman12Cycle166FormationHandoffRealDataTest {
                         "retail still holds at the previous Java divergence"),
                 () -> assertEquals(18, grunt.pathLength()),
                 () -> assertEquals(13, grunt.battleNetOrderDelay()),
-                () -> assertEquals(14, grunt.battleNetAnimationTimer()));
+                () -> assertEquals(14, grunt.battleNetAnimationTimer()),
+                () -> assertPosition(paidRetarget, 35, 40,
+                        "the paid retarget starts from its native square"),
+                () -> assertEquals(15, paidRetarget.pathLength()),
+                () -> assertEquals(20,
+                        paidRetarget.battleNetPathInitialLength()),
+                () -> assertEquals(5,
+                        paidRetarget.battleNetPathStepsTaken()),
+                () -> assertEquals(1,
+                        paidRetarget.battleNetCollisionCounter()),
+                () -> assertEquals(1, paidRetarget.battleNetRefusals()));
+
+        mission.tick();
+        assertEquals(258, fixtureCycle(world));
+        assertNotNull(paidRetarget.target());
+        assertAll(
+                () -> assertPosition(paidRetarget, 35, 39,
+                        "the paid retarget must take native's north wall face"),
+                () -> assertEquals(123, paidRetarget.target().id()),
+                () -> assertEquals(32, paidRetarget.pathGoalX()),
+                () -> assertEquals(43, paidRetarget.pathGoalY()),
+                () -> assertEquals(19, paidRetarget.pathLength()));
+        assertEquals(1, paidRetarget.peekHeading(),
+                "north-east remains next in native's route buffer");
     }
 
     @Test
