@@ -4087,6 +4087,44 @@ final class BattleNetMovementSystem {
             }
             if (!canTakeStep) {
                 Unit stageSixBlocker = world.unitAt(nextX, nextY);
+                boolean behaviorSixCapitalPatrolMovingHullRefusal =
+                        unit.battleNetBorrowedMoveForStep()
+                        && unit.battleNetAiBehavior() == 6
+                        && unit.patrolX() >= 0
+                        && unit.type() != null
+                        && World.isBattleNetCapitalShip(unit.type().ident())
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0
+                        && stageSixBlocker != null
+                        && stageSixBlocker != unit
+                        && stageSixBlocker.isMoving()
+                        && stageSixBlocker.type() != null
+                        && stageSixBlocker.type().seaUnit()
+                        && world.isAllied(unit.player(),
+                                stageSixBlocker.player());
+                if (behaviorSixCapitalPatrolMovingHullRefusal) {
+                    // The point writer has already drawn through the moving
+                    // hull, but Move consumes that route under restored live
+                    // occupancy. Retail retains the complete buffer and pays
+                    // FUN_004379e0's first collision generation. XHuman 7
+                    // slot 1573 therefore keeps seven headings toward the
+                    // completed platform at fixture 258 instead of clearing
+                    // them and drawing a northeast bypass on the next visit.
+                    unit.setBattleNetCollisionCounter(1);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    unit.setBattleNetRefusalHold(true);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(15);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
                 boolean recurringRegroupWorkerRefusal =
                         unit.order() == Unit.Order.MOVE
                         && !unit.battleNetPlayerCommandMove()

@@ -6069,6 +6069,7 @@ public final class World {
                 continue;
             }
             boolean queuedRegroupConstruction = false;
+            boolean behaviorSixCapitalPatrolThroughMovingHull = false;
             if (isAllied(unit.player(), candidate.player())) {
                 queuedRegroupConstruction = !candidate.isMoving()
                         && candidate.battleNetAiBehavior() == 1
@@ -6109,6 +6110,14 @@ public final class World {
                                 == UnitType.Movement.LAND
                         && Math.max(Math.abs(candidate.offsetX()),
                                 Math.abs(candidate.offsetY())) < 32;
+                behaviorSixCapitalPatrolThroughMovingHull =
+                        unit.order() == Unit.Order.PATROL
+                        && unit.battleNetAiBehavior() == 6
+                        && unit.type() != null
+                        && isBattleNetCapitalShip(unit.type().ident())
+                        && candidate.type() != null
+                        && candidate.type().seaUnit()
+                        && candidate.isMoving();
                 // The recurring behavior-one regroup planner draws through a
                 // moving worker even when that worker still owns a collision
                 // nibble. Execution remains hard: XHuman 12 axethrower 1359
@@ -6129,6 +6138,7 @@ public final class World {
                                 && pendingRegroupConstruction)
                         || (!regroupThroughMovingWorker
                                 && !assaultPatrolThroughMidstrideWorker
+                                && !behaviorSixCapitalPatrolThroughMovingHull
                                 && !movement.battleNetSoftClearMoveAlly(candidate)
                         && !movement.battleNetPendingLandAssaultYieldsToWood(
                                 unit, candidate))) {
@@ -6152,7 +6162,16 @@ public final class World {
             // Ordinary moving allies remain hard to the optimizer. XHuman 12
             // fixture 200 then swaps E+NE through the queued regroup on
             // (12,87), sealing W,NW,NE,NE,E,SE instead of W,NW,NE,E,NE,SE.
-            if (!queuedRegroupConstruction) {
+            // An ordinary capital-ship patrol's shortcut ray is drawn with a
+            // departing allied hull absent from both occupancy views. Move
+            // restores the real field before consuming the byte and owns the
+            // refusal if the ally has not vacated yet. XHuman 7 slot 1573
+            // therefore writes E,SE,E,SE,E,SE,E toward the completed oil
+            // platform at fixture 258, then keeps its occupied east head
+            // behind collision one and Move 15. Treating destroyer 1570 as
+            // an optimizer wall chooses the free northeast bypass instead.
+            if (!queuedRegroupConstruction
+                    && !behaviorSixCapitalPatrolThroughMovingHull) {
                 optimizerBlockers.add(candidate);
             }
         }
@@ -15076,9 +15095,18 @@ public final class World {
             // suppresses PF_WAIT for XHuman 7's one-byte stand-down and keeps
             // XOrc 11's combat patrols on their proved acquire cadence.
             armBattleNetPatrolMoveBody(unit);
-            if (unit.battleNetAiBehavior() == 2
-                    || unit.pathLength() == 0
-                    || unit.battleNetPathInitialLength() < 20) {
+            boolean retainedCapitalPatrolRefusalBuffer =
+                    unit.battleNetAiBehavior() == 6
+                    && unit.type() != null
+                    && isBattleNetCapitalShip(unit.type().ident())
+                    && unit.battleNetRefusalHold()
+                    && unit.battleNetCollisionCounter() == 1
+                    && unit.battleNetOrderDelay() == 14
+                    && unit.pathLength() > 0;
+            if (!retainedCapitalPatrolRefusalBuffer
+                    && (unit.battleNetAiBehavior() == 2
+                            || unit.pathLength() == 0
+                            || unit.battleNetPathInitialLength() < 20)) {
                 unit.clearPath();
             }
         }

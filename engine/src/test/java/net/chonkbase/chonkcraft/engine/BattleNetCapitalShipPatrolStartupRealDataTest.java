@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -190,6 +191,40 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
         assertEquals(39, juggernaught.orderTargetX());
         assertEquals(33, juggernaught.orderTargetY(),
                 "the fixture-255 endpoint exchange opens the platform leg");
+
+        mission.tick();
+        mission.tick();
+        assertEquals(24, juggernaught.tileX());
+        assertEquals(26, juggernaught.tileY(),
+                "the reconstructed Patrol holds through fixture 257");
+        assertEquals(0, juggernaught.battleNetCollisionCounter());
+        assertEquals(0, juggernaught.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(24, juggernaught.tileX(),
+                "native refuses its occupied direct east heading on fixture 258");
+        assertEquals(26, juggernaught.tileY());
+        assertEquals(7, juggernaught.pathLength(),
+                "the complete direct platform route remains behind the refusal");
+        int[] directPlatformRoute = {
+            Direction.fromDelta(1, 0),
+            Direction.fromDelta(1, 1),
+            Direction.fromDelta(1, 0),
+            Direction.fromDelta(1, 1),
+            Direction.fromDelta(1, 0),
+            Direction.fromDelta(1, 1),
+            Direction.fromDelta(1, 0)
+        };
+        for (int depth = 0; depth < directPlatformRoute.length; depth++) {
+            assertEquals(directPlatformRoute[depth],
+                    juggernaught.peekHeadingAtDepth(depth),
+                    "native direct platform route heading at depth " + depth);
+        }
+        assertEquals(1, juggernaught.battleNetCollisionCounter());
+        assertEquals(14, juggernaught.battleNetOrderDelay());
+        assertEquals(15, juggernaught.battleNetAnimationTimer());
+        assertEquals(true, juggernaught.battleNetRefusalHold(),
+                "the first occupied route byte owns a complete Move refusal band");
     }
 
     @Test
