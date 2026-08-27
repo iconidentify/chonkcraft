@@ -48,15 +48,15 @@ and clean/adverse network lockstep.
 
 The complete suite now contains **2,791 tests**. The canonical authenticated
 profile runs 2,765 and intentionally skips exactly 26, while keeping the exact
-expected 110-test specification-failure set. Hosted run `33121122477` passed
+expected 110-test specification-failure set. Hosted run `33127013655` passed
 both the data-free and authenticated jobs against revision
-`f4e7b95212b58183340bcd72526fccfc2082f423`.
+`53b6e96748dce391d001b9032fc0633e8208209b`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0827.86` is the public release, published from revision
-`f4e7b95212b58183340bcd72526fccfc2082f423` with game JAR SHA-256
-`9b6d1cfc033f10325a2d47b521dd376dfeb82192b4b15d881c07d5b9756036f5`.
+Signed engine OTA `2026.0827.87` is the public release, published from revision
+`53b6e96748dce391d001b9032fc0633e8208209b` with game JAR SHA-256
+`469d324b5616efefb177b3e02871fa1fba8e2a2bd9f13d0c9b2970c8fb356813`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
