@@ -3482,7 +3482,7 @@ public final class World {
         // cycle-one state records this for every marked guard; ogre 1501 is at
         // 116,25 with behavior-one home 115,25.
         int[] home = battleNetNormalizeLandHome(unit.tileX(), unit.tileY(),
-                battleNetConnectivityCell(unit));
+                battleNetConnectivityCell(unit), 24);
         if (home == null) {
             home = new int[] {unit.tileX(), unit.tileY()};
         }
@@ -5123,8 +5123,9 @@ public final class World {
      *
      * <p>This is observable before a contained miner even starts walking.
      * Human 13's peon inside the mine at (75,9) is assigned the fortress at
-     * (81,2). Friendly traffic blocks the reverse ray through (77,6), so
-     * native stores (77,6) and DropOutNearest surfaces the peon north at
+     * (81,2). The reverse ray reaches its first admissible component square
+     * at (76,7), so native keeps the preceding (77,6) and DropOutNearest
+     * surfaces the peon north at
      * (75,8). Using the fortress corner directly surfaces it east at
      * (78,9).</p>
      */
@@ -5176,7 +5177,8 @@ public final class World {
                     && map.isFootprintFree(x, y,
                             Math.max(1, footprintWidth),
                             Math.max(1, footprintHeight),
-                            unit.movementMask(), unit.blockingFlags());
+                            unit.movementMask(), unit.blockingFlags()
+                                    & ~TileFlag.LAND_UNIT);
             if (free) {
                 return new int[] {x + lastStepX, y + lastStepY};
             }
@@ -6058,6 +6060,18 @@ public final class World {
                         && candidate.type() != null
                         && candidate.type().moveType()
                                 == UnitType.Movement.LAND;
+                boolean assaultPatrolThroughMidstrideWorker =
+                        unit.order() == Unit.Order.PATROL
+                        && unit.battleNetAiBehavior() == 2
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.LAND
+                        && candidate.isMoving()
+                        && candidate.order() == Unit.Order.HARVEST
+                        && candidate.type() != null
+                        && candidate.type().moveType()
+                                == UnitType.Movement.LAND
+                        && Math.max(Math.abs(candidate.offsetX()),
+                                Math.abs(candidate.offsetY())) < 32;
                 // The recurring behavior-one regroup planner draws through a
                 // moving worker even when that worker still owns a collision
                 // nibble. Execution remains hard: XHuman 12 axethrower 1359
@@ -6077,6 +6091,7 @@ public final class World {
                         || (unit.order() != Unit.Order.HARVEST
                                 && pendingRegroupConstruction)
                         || (!regroupThroughMovingWorker
+                                && !assaultPatrolThroughMidstrideWorker
                                 && !movement.battleNetSoftClearMoveAlly(candidate)
                         && !movement.battleNetPendingLandAssaultYieldsToWood(
                                 unit, candidate))) {
@@ -6141,7 +6156,13 @@ public final class World {
                     && pointOrderAi.battleNetBuildProfileId() == 0
                     && !unit.isMoving()
                     && unit.pathLength() == 0
-                    && unit.stepDrained();
+                    && unit.stepDrained()
+                    && softBlockers.stream().noneMatch(candidate ->
+                            candidate.order() == Unit.Order.HARVEST
+                                    && candidate.isMoving()
+                                    && Math.max(Math.abs(candidate.offsetX()),
+                                            Math.abs(candidate.offsetY()))
+                                            < 32);
             BattleNetPathFinder.Passability traversalPassability =
                     new BattleNetPathFinder.Passability() {
                         @Override
@@ -14202,6 +14223,25 @@ public final class World {
                 unit.setBattleNetAnimationTimer(
                         unit.battleNetAnimationTimer() - 1);
             }
+            int stillStart = unit.type() == null
+                    ? -1 : idle.battleNetStillSequenceStart(unit);
+            boolean landAssaultPatrolConstructor =
+                    unit.type() != null
+                    && unit.type().moveType() == UnitType.Movement.LAND
+                    && unit.battleNetAiBehavior() == 2
+                    && !unit.isMoving() && unit.pathLength() == 0
+                    && unit.battleNetOrderDelay() <= 1
+                    && stillStart >= 0
+                    && unit.battleNetSequenceOffset() == stillStart
+                    && unit.battleNetAnimationTimer() > 1;
+            if (landAssaultPatrolConstructor) {
+                // The point-order delay and the raw Still constructor are the
+                // same two native visits. XHuman 12 ogre 1356 promotes its
+                // recurring assault Patrol as Still 581/3, then counts 2,1
+                // before the west-led route is written on the next visit.
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+            }
         }
         // Capital-ship Patrol keeps the Still/Move cursor and only scans on
         // opcode zero. The 15-cycle autoAttack used to fire once the first
@@ -15619,7 +15659,7 @@ public final class World {
         }
         boolean[] component = battleNetConnectivityCell(seed);
         int[] home = battleNetNormalizeLandHome(objective.tileX(),
-                objective.tileY(), component);
+                objective.tileY(), component, 24);
         return home != null ? home
                 : new int[] {objective.tileX(), objective.tileY()};
     }
@@ -15724,12 +15764,34 @@ public final class World {
         if (hall == null) {
             return null;
         }
-        return battleNetNormalizeLandHome(hall.tileX(), hall.tileY(), component);
+        return battleNetNormalizeLandHome(hall.tileX(), hall.tileY(), component,
+                24);
     }
 
-    /** Ports the 1x1, radius-24 invocation of native {@code 0x443a40}. */
+    /**
+     * Applies retail's free-square correction to a force-launch land home.
+     *
+     * <p>The common native order writer keeps a generated point when it is
+     * already free. If it is blocked, {@code 0x416a00/0x443a40} walks the
+     * fixed square spiral inside the moving unit's terrain component and
+     * substitutes the first free square. {@code FUN_004275b0} uses radius
+     * sixteen when assigning behavior two. A failed search leaves the
+     * authored point unchanged.</p>
+     */
+    public int[] battleNetNormalizeLandForceHome(Unit unit, int targetX,
+            int targetY) {
+        if (unit == null || unit.type() == null
+                || unit.type().moveType() != UnitType.Movement.LAND) {
+            return new int[] {targetX, targetY};
+        }
+        int[] normalized = battleNetNormalizeLandHome(targetX, targetY,
+                battleNetConnectivityCell(unit), 16);
+        return normalized != null ? normalized : new int[] {targetX, targetY};
+    }
+
+    /** Ports the 1x1 invocation of native {@code 0x443a40}. */
     private int[] battleNetNormalizeLandHome(int targetX, int targetY,
-            boolean[] component) {
+            boolean[] component, int radius) {
         if (battleNetLandHomeSquare(targetX, targetY, component)) {
             return new int[] {targetX, targetY};
         }
@@ -15740,7 +15802,7 @@ public final class World {
         int direction = 1;
         int horizontal = 1;
         int vertical = 1;
-        while (horizontal < 24) {
+        while (horizontal < Math.max(0, radius)) {
             int longLeg = vertical + 2;
             int shortLeg = horizontal + 1;
             for (int leg = 0; leg < 4; leg++) {
@@ -16139,14 +16201,15 @@ public final class World {
                 && unit.battleNetFlyerScoutExhausted();
         boolean assaultWarship = battleNetArmedSmallWarshipPatrol(unit)
                 && unit.battleNetAiBehavior() == 2;
-        boolean settledLandLaunch = before == Unit.Order.MOVE
-                && unit.type().moveType() == UnitType.Movement.LAND
+        boolean landAssaultPatrol =
+                unit.type().moveType() == UnitType.Movement.LAND
                 && unit.battleNetAiBehavior() == 2;
         if (!capitalShip && !exhaustedFlyer && !assaultWarship
-                && !settledLandLaunch) {
+                && !landAssaultPatrol) {
             return;
         }
-        if (before == Unit.Order.STILL || settledLandLaunch) {
+        if (before == Unit.Order.STILL
+                || (before == Unit.Order.MOVE && landAssaultPatrol)) {
             // The ready callback is reached through Still's opcode zero. Its
             // tick leaves the Java cursor just after that marker (4983 for a
             // battleship), but native's Patrol constructor rewinds to the
@@ -16158,7 +16221,7 @@ public final class World {
             if (still >= 0) {
                 unit.setBattleNetSequenceOffset(still);
                 unit.setBattleNetAnimationTimer(3);
-                if (settledLandLaunch) {
+                if (before == Unit.Order.MOVE && landAssaultPatrol) {
                     AnimationSet set = unit.type().animationSet();
                     if (set != null) {
                         unit.animation().switchTo(
@@ -16362,7 +16425,7 @@ public final class World {
         int stillStart = idle.battleNetStillSequenceStart(unit);
         return stillStart >= 0
                 && unit.battleNetSequenceOffset() == stillStart
-                && unit.battleNetAnimationTimer() == 3;
+                && unit.battleNetAnimationTimer() == 1;
     }
 
     /** Direct Attack queued behind a behavior-two land Patrol stride. */
@@ -16636,8 +16699,27 @@ public final class World {
             return true;
         }
         unit.clearPath();
+        // NewActionReturnGoods installs a fresh COrder_Resource and retires
+        // an aggressor offered to the preceding order. Human 8 peasant 1533
+        // is struck while its mine-exit Still head is waiting, then promotes
+        // the queued return at fixture 298. Native owns only its ordinary
+        // action-24 idle draw at fixture 301; carrying +0x54 across the pop
+        // would also enter FUN_0040a670, spend two escape-point draws, and
+        // steal peasant 1536's authenticated value.
+        unit.setOfferedTarget(null);
         unit.setOrder(Unit.Order.RETURN_GOODS);
         unit.setReturnDepotGoal(depot);
+        if (!fromPlayer && before == Unit.Order.STILL
+                && battleNetSequence != null) {
+            // A queued Return Goods promotion is native action 24 on the
+            // worker's Still body.  Keep that raw 3,2,1 constructor even
+            // though Java projects the following visits onto HARVEST.
+            int stillStart = idle.battleNetStillSequenceStart(unit);
+            if (stillStart >= 0) {
+                unit.setBattleNetSequenceOffset(stillStart);
+                unit.setBattleNetAnimationTimer(3);
+            }
+        }
         // Native pops 24 at fixture 9 with timer 3, dest-arms at 12.
         // The pop visit already spent one beat, so delay 2 dest-arms at 12.
         if (!fromPlayer && before == Unit.Order.STILL && !unit.type().canGather()) {

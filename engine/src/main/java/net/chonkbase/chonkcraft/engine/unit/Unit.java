@@ -2948,8 +2948,14 @@ public final class Unit {
         // probe which either takes the newly-free heading or returns to
         // Attack construction.  SaveGame already persists this integer, so
         // keeping the phases here also prevents a mid-jam reload from
-        // turning a blocked combatant into a permanently frozen one.
-        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(6, stage));
+        // turning a blocked combatant into a permanently frozen one. Stages
+        // seven through twelve are the expired moving-quarry twins: first-band
+        // tail, optional second Move band, Attack construction, and the
+        // single-band entrance to and exit from the committed melee body hold,
+        // followed by its one fresh route constructor. Stage thirteen retains
+        // a just-surfaced laden quarry through its already-open Attack 3,2,1
+        // before the adjacent replacement scan starts a second constructor.
+        battleNetAttackRefusalRecoveryStage = Math.max(0, Math.min(13, stage));
         if (battleNetAttackRefusalRecoveryStage != 6) {
             battleNetStageSixCardinalProbePark = false;
         }

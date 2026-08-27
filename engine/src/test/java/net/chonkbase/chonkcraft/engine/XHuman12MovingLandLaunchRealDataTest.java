@@ -5,7 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.engine.ai.AiPlayer;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -31,6 +33,9 @@ class XHuman12MovingLandLaunchRealDataTest {
 
         Unit ogre = unitAt(world, "unit-ogre", 6, 91);
         assertNotNull(ogre, "XHuman 12 has no native-slot-1356 ogre");
+        Unit guardTower = unitAt(world, "unit-human-guard-tower", 15, 67);
+        assertNotNull(guardTower,
+                "XHuman 12 has no native-slot-1429 hostile objective");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -45,12 +50,22 @@ class XHuman12MovingLandLaunchRealDataTest {
                         "committed pixels keep the old Move current");
                 assertEquals(0, ogre.pathLength(),
                         "native parks route index 20 on the launch visit");
+                assertEquals(13, ogre.battleNetAiHomeX());
+                assertEquals(66, ogre.battleNetAiHomeY(),
+                        "the hostile tower point is normalized before launch");
                 assertTrue(ogre.hasBattleNetPendingPatrol(),
                         "Patrol must survive as the next order");
                 assertEquals(ogre.battleNetAiHomeX(),
                         ogre.battleNetPendingPatrolX());
                 assertEquals(ogre.battleNetAiHomeY(),
                         ogre.battleNetPendingPatrolY());
+                AiPlayer ai = world.enableAi(ogre.player());
+                AiPlayer.DecisionLaunch launch = ai.battleNetDecisionLaunches()
+                        .stream()
+                        .filter(candidate -> "ground".equals(candidate.domain()))
+                        .findFirst().orElseThrow();
+                assertEquals(guardTower.id(), launch.targetId(),
+                        "selector zero chooses native guard-tower slot 1429");
             }
             if (fixture == 57) {
                 assertEquals(10, ogre.tileX(),
@@ -79,6 +94,41 @@ class XHuman12MovingLandLaunchRealDataTest {
 
         while (fixtureCycle(world) < 215) {
             mission.tick();
+            int fixture = fixtureCycle(world);
+            if (fixture == 199) {
+                assertEquals(Unit.Order.STILL, ogre.order());
+                assertTrue(ogre.hasBattleNetPendingPatrol());
+                assertEquals(4985, ogre.battleNetSequenceOffset());
+                assertEquals(2, ogre.battleNetAnimationTimer());
+            }
+            if (fixture == 200) {
+                assertEquals(Unit.Order.STILL, ogre.order());
+                assertTrue(ogre.hasBattleNetPendingPatrol());
+                assertEquals(4985, ogre.battleNetSequenceOffset());
+                assertEquals(1, ogre.battleNetAnimationTimer());
+            }
+            if (fixture >= 201 && fixture <= 203) {
+                assertEquals(Unit.Order.PATROL, ogre.order());
+                assertEquals(581, ogre.battleNetSequenceOffset());
+                assertEquals(204 - fixture,
+                        ogre.battleNetAnimationTimer());
+                assertEquals(0, ogre.pathLength(),
+                        "the Patrol constructor must not plan before timer one");
+            }
+            if (fixture == 204) {
+                assertEquals(Unit.Order.PATROL, ogre.order());
+                assertEquals(10, ogre.tileX());
+                assertEquals(88, ogre.tileY(),
+                        "the normalized assault goal routes west, not southwest");
+                assertEquals(3, ogre.pathLength(),
+                        "committing west retains NW,NE,E in the route buffer");
+                assertEquals(Direction.fromDelta(-1, -1),
+                        ogre.peekHeading());
+                assertEquals(Direction.fromDelta(1, -1),
+                        ogre.peekHeadingAtDepth(1));
+                assertEquals(Direction.fromDelta(1, 0),
+                        ogre.peekHeadingAtDepth(2));
+            }
         }
         assertEquals(Unit.Order.PATROL, ogre.order());
         assertEquals(10, ogre.tileX());

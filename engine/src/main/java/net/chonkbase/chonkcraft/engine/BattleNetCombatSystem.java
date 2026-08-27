@@ -32,6 +32,14 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
  */
 final class BattleNetCombatSystem {
 
+    private static final int EXPIRED_QUARRY_FIRST_BAND_TAIL = 7;
+    private static final int EXPIRED_QUARRY_SECOND_BAND = 8;
+    private static final int EXPIRED_QUARRY_ATTACK_CONSTRUCTION = 9;
+    private static final int EXPIRED_QUARRY_SINGLE_BAND_TAIL = 10;
+    private static final int EXPIRED_QUARRY_REPLACEMENT_BODY_HOLD = 11;
+    private static final int EXPIRED_QUARRY_FRESH_ROUTE_CONSTRUCTION = 12;
+    private static final int SURFACED_QUARRY_RETARGET_CONSTRUCTION = 13;
+
     private final World world;
 
     BattleNetCombatSystem(World world) {
@@ -470,6 +478,54 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetAnimationTimer(
                         unit.battleNetAnimationTimer() - 1);
                 return;
+            }
+            Unit completedQuarryLeg = unit.target();
+            boolean recurringMovingQuarryRetarget =
+                    unit.battleNetRetargetResidualRoutePark()
+                    && unit.battleNetAttackWrapDestArmPending()
+                    && unit.pathLength() == 1
+                    && unit.battleNetPathInitialLength() > 1
+                    && unit.battleNetPathStepsTaken() == 1
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetRefusals() == 0
+                    && completedQuarryLeg != null
+                    && completedQuarryLeg.isAlive()
+                    && completedQuarryLeg.type() != null
+                    && !completedQuarryLeg.type().building()
+                    && completedQuarryLeg.order() == Unit.Order.HARVEST;
+            if (recurringMovingQuarryRetarget) {
+                int reactRange = Math.max(
+                        unit.type().reactRange(world.isPerson(unit.player())),
+                        Math.max(1, unit.type().maxAttackRange()));
+                Unit replacement = world.targets.findBattleNetHostile(
+                        unit, reactRange, null);
+                if (replacement != null && replacement != completedQuarryLeg
+                        && replacement.isAlive() && !replacement.isDying()
+                        && !world.targets.inAttackRange(unit, replacement)) {
+                    // The retained last byte belongs to the quarry which has
+                    // moved again during construction. Timer one therefore
+                    // enters active-order Still, free-scans a replacement,
+                    // parks the old route at twenty and immediately reopens
+                    // Attack 3,2,1. Human 8 slot 1520 names slot 1536 and
+                    // owns 0040AD58 on fixture 307; releasing the retained
+                    // south-east byte instead delays that draw and hands its
+                    // value to critter 1496 three fixtures later.
+                    unit.setBattleNetBlockedChaseAttackConstruction(false);
+                    unit.setBattleNetChaseReplanResidualHold(false);
+                    unit.setBattleNetRetargetResidualRoutePark(false);
+                    unit.setBattleNetAttackWrapDestArmPending(false);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setBattleNetChaseStepReady(false);
+                    unit.setBattleNetChaseEmptyRouteReplan(true);
+                    setAutoTarget(unit, replacement);
+                    unit.setPathGoal(
+                            replacement.tileX(), replacement.tileY());
+                    unit.setChasing(true);
+                    unit.setFighting(false);
+                    rearmBattleNetHardRefusalAttack(unit);
+                    return;
+                }
             }
             unit.setBattleNetBlockedChaseAttackConstruction(false);
             unit.setBattleNetSaturatedCardinalRetryLoop(false);
@@ -1335,6 +1391,9 @@ final class BattleNetCombatSystem {
                 // formation provenance.
             }
         }
+        if (armBattleNetExpiredHarvestQuarryLadder(unit)) {
+            return;
+        }
         Unit residualConstructionGoal = unit.target();
         int residualAttackStart = world.battleNetSequence == null ? -1
                 : world.idle.battleNetSequenceStart(unit,
@@ -1974,6 +2033,19 @@ final class BattleNetCombatSystem {
                     && unit.pathLength() == 3
                     && unit.battleNetCollisionCounter() == 1
                     && world.battleNetSequence != null;
+            boolean expiredHarvestReplacementConstruction =
+                    replanResidualHold
+                    && unit.battleNetAttackWrapDestArmPending()
+                    && unit.battleNetPathStepsTaken() == 1
+                    && unit.pathLength() == 1
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetRefusals() == 0
+                    && unit.type() != null
+                    && unit.type().maxAttackRange() <= 1
+                    && unit.target() != null
+                    && unit.target().type() != null
+                    && unit.target().type().building()
+                    && world.battleNetSequence != null;
             boolean navalReplanConstruction = replanResidualHold
                     && unit.type() != null
                     && unit.type().moveType() == UnitType.Movement.NAVAL;
@@ -2003,7 +2075,10 @@ final class BattleNetCombatSystem {
                     && unit.pathLength() > 0
                     && unit.battleNetPathInitialLength() > 1
                     && unit.battleNetPathStepsTaken() == 1
-                    && unit.battleNetCollisionCounter() == 1
+                    && (unit.battleNetCollisionCounter() == 1
+                            || (replanResidualHold
+                                    && unit
+                                            .battleNetAttackWrapDestArmPending()))
                     && unit.battleNetRefusals() == 0
                     && unit.type() != null
                     && unit.type().maxAttackRange() <= 1
@@ -2097,9 +2172,12 @@ final class BattleNetCombatSystem {
                         // quarry returns through Attack construction before the
                         // cached tail may advance. The constructor is periodic,
                         // not only provenance from the target switch which laid
-                        // the route. Human 8 attack-peasant 1520 takes NE on
-                        // fixture 214, settles it on 230, retains E,E,NE, and
-                        // exposes Attack 2657/3,2,1 before E on fixture 233.
+                        // the route, and it outlives the collision generation:
+                        // Human 8 attack-peasant 1520 takes NE on fixture 214,
+                        // settles it on 230, retains E,E,NE, and exposes Attack
+                        // 2657/3,2,1 before E on 233. Its later uncollided
+                        // south-east leg settles on 304 and owns the same
+                        // constructor before the fixture-307 replacement scan.
                         world.causalTrace.event(world.cycle,
                                 "attack.moving-quarry-route-leg-construction",
                                 unit.id(), "target", quarry.id(),
@@ -2119,12 +2197,12 @@ final class BattleNetCombatSystem {
                     // lines look frozen on their residual boundary.
                     world.armBattleNetAttackStart(unit);
                     if (movingQuarryFirstRouteResidualConstruction
-                            && !replanResidualHold
                             && !freeDetourResidualHold) {
                         // Unlike a paid route-wrap constructor, this recurring
-                        // quarry leg owns the complete two quiet callbacks. Do
-                        // not let an unrelated retained-tail marker turn timer
-                        // three into a same-visit Move probe.
+                        // quarry leg owns the complete two quiet callbacks,
+                        // including when the prior target switch also left the
+                        // Java replan marker set. Do not let that retained-tail
+                        // marker freeze timer three behind an order delay.
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetBlockedChaseAttackConstruction(true);
                         unit.setBattleNetAttackRefusalRecoveryStage(0);
@@ -2149,6 +2227,16 @@ final class BattleNetCombatSystem {
                             // handoff and draws the direct replacement ray.
                             unit.setBattleNetRefusalHold(true);
                         }
+                    } else if (expiredHarvestReplacementConstruction) {
+                        // This is the same recurring leg constructor as a
+                        // still-moving harvesting quarry, reached through the
+                        // expired pointer's replacement route. Its timer-one
+                        // callback selects and spends the next route in one
+                        // visit; stage two would split planning from Execute
+                        // and move one fixture late.
+                        unit.setBattleNetOrderDelay(0);
+                        unit.setBattleNetBlockedChaseAttackConstruction(true);
+                        unit.setBattleNetAttackRefusalRecoveryStage(0);
                     } else if (spentSingleReplanConstruction
                             || paidTailWrapConstruction
                             || navalReplanConstruction) {
@@ -2432,6 +2520,7 @@ final class BattleNetCombatSystem {
             }
             Unit chased = unit.target();
             boolean clearCollisionAfterSettledRetargetStep = false;
+            boolean clearRefusalsAfterSettledRetargetStep = false;
             boolean goalMoved = chased != null
                     && (unit.pathGoalX() != chased.tileX()
                         || unit.pathGoalY() != chased.tileY());
@@ -2540,6 +2629,12 @@ final class BattleNetCombatSystem {
                             Math.max(1, unit.type().maxAttackRange()));
                     Unit replacement = world.targets.findBattleNetHostile(
                             unit, deadReactRange, null);
+                    boolean replacementInRange = replacement != null
+                            && replacement != chased
+                            && replacement.isAlive()
+                            && !replacement.isDying()
+                            && world.targets.inAttackRange(
+                                    unit, replacement);
                     boolean replacementOutOfRange = replacement != null
                             && replacement != chased
                             && replacement.isAlive()
@@ -2564,6 +2659,34 @@ final class BattleNetCombatSystem {
                                     world.idle.battleNetStillSequenceStart(unit));
                             unit.setBattleNetAnimationTimer(3);
                         }
+                        return;
+                    }
+                    if (replacementInRange) {
+                        // The final paid pixels can settle after their weak
+                        // quarry has left Alive. CheckForTargetInRange still
+                        // null-scans before it assigns the inherited OP0; an
+                        // adjacent successor owns a fresh Attack constructor,
+                        // not the dead quarry's already-open body. Human 8
+                        // ogre 1538 seals the distinction: peasant 1519 is
+                        // retained through fixture 258, then peasant 1536 is
+                        // installed at Attack 2657/3 on fixture 259 and the
+                        // constructor enters its committed 23-count hold.
+                        // The synchronized melee draw remains pending until
+                        // the next live in-range callback (fixture 260).
+                        int replacementAttackStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        setAutoTarget(unit, replacement);
+                        unit.setRouteSpent(false);
+                        unit.setChasing(false);
+                        unit.setFighting(true);
+                        if (replacementAttackStart >= 0) {
+                            unit.setBattleNetSequenceOffset(
+                                    replacementAttackStart);
+                            unit.setBattleNetAnimationTimer(3);
+                        }
+                        finishBattleNetPaidWrapRetargetArrival(unit);
+                        world.turnToTarget(unit, replacement, 0, 0);
                         return;
                     }
                     if (replacementOutOfRange) {
@@ -2713,6 +2836,7 @@ final class BattleNetCombatSystem {
                             && unit.type() != null
                             && unit.type().maxAttackRange() <= 1
                             && (unit.battleNetAttackWaitRefillResidual()
+                                    || unit.battleNetAttackWrapDestArmPending()
                                     || unit.battleNetMovingQuarryResidual()
                                     || (unit.pathLength() >= 2
                                     && (onBattleNetChaseMoveBody(unit)
@@ -3161,6 +3285,24 @@ final class BattleNetCombatSystem {
                             unit.setBattleNetOrderDelay(14);
                             unit.setBattleNetRefusalHold(true);
                             unit.setBattleNetChaseStepReady(false);
+                            boolean movingHarvestQuarryEntrance =
+                                    pathn1Quarry.order()
+                                            == Unit.Order.HARVEST
+                                    && pathn1Quarry.isOnMap()
+                                    && world.targets.validAttackTarget(
+                                            unit, pathn1Quarry)
+                                    && unit.offeredTarget() == pathn1Quarry;
+                            if (movingHarvestQuarryEntrance) {
+                                // The quarry is still a valid mobile target
+                                // when this band is purchased. Human 8
+                                // attack-peasant 1526 then watches it enter
+                                // the mine during Move 15..1. Preserve the
+                                // paid band now so its timer-one wake, rather
+                                // than an ordinary empty-route chase visit,
+                                // owns the adjacent replacement scan.
+                                unit.setBattleNetAttackRefusalRecoveryStage(
+                                        EXPIRED_QUARRY_SINGLE_BAND_TAIL);
+                            }
                             int moveStart = world.idle
                                     .battleNetSequenceStart(unit,
                                             BattleNetSequence.MOVE_ANIMATION);
@@ -3743,6 +3885,23 @@ final class BattleNetCombatSystem {
                             && unit.battleNetCollisionCounter() == 1
                             && unit.battleNetRefusals() == 0
                             && !world.targets.inAttackRange(unit, candidate);
+                    int expiredParkMoveStart = world.battleNetSequence == null
+                            ? -1 : world.idle.battleNetSequenceStart(
+                                    unit, BattleNetSequence.MOVE_ANIMATION);
+                    boolean expiredHarvestParkRetarget =
+                            !World.battleNetRangedChaseUnit(unit)
+                            && unit.stepDrained() && !unit.isMoving()
+                            && keepPathn == 0
+                            && unit.battleNetCollisionCounter() == 1
+                            && unit.battleNetRefusals() <= 1
+                            && previous.order() == Unit.Order.HARVEST
+                            && !world.targets.validAttackTarget(unit, previous)
+                            && !previous.isOnMap()
+                            && !world.targets.inAttackRange(unit, candidate)
+                            && expiredParkMoveStart >= 0
+                            && unit.battleNetSequenceOffset()
+                                    == expiredParkMoveStart
+                            && unit.battleNetAnimationTimer() == 1;
                     boolean saturatedFirstStepBuildingRetargetPark =
                             settledMeleeResidualRetarget
                             && keepPathn
@@ -3758,11 +3917,14 @@ final class BattleNetCombatSystem {
                             && candidate.type().building();
                     clearCollisionAfterSettledRetargetStep =
                             spentSingleCollisionResidualRetarget
+                            || expiredHarvestParkRetarget
                             || (settledMeleeResidualRetarget
                                 && unit.battleNetCollisionCounter() > 0
                                 && unit.battleNetRefusals() == 0
                                 && (unit.battleNetPathStepsTaken() == 1
                                         || saturatedSettledResidualRetarget));
+                    clearRefusalsAfterSettledRetargetStep =
+                            expiredHarvestParkRetarget;
                     boolean settledResidualHeadFree = keepPathn > 0
                             && world.canEnter(unit,
                                     unit.tileX() + Direction.deltaX(
@@ -4215,7 +4377,8 @@ final class BattleNetCombatSystem {
                         if ((keepPathn > 0
                                 || completedPersonHelpRetargetHandoff
                                 || unit.battleNetRetargetResidualRoutePark()
-                                || navalResidualRetarget)
+                                || navalResidualRetarget
+                                || expiredHarvestParkRetarget)
                                 && !World.battleNetRangedChaseUnit(unit)) {
                             // A completed queued-Attack handoff may have
                             // exhausted its retained route before this new
@@ -4233,6 +4396,15 @@ final class BattleNetCombatSystem {
                             // 3266/3,2,1 before spending the retained west
                             // heading on fixture 162.
                             unit.setBattleNetChaseReplanResidualHold(true);
+                            if (expiredHarvestParkRetarget) {
+                                // The expired CUnitPtr's replacement route is
+                                // followed by a queued Attack promotion. This
+                                // is native next_order=Attack while the farm
+                                // route drains; its first residual therefore
+                                // counts Attack 3,2,1 directly before the next
+                                // target/route decision.
+                                unit.setBattleNetAttackWrapDestArmPending(true);
+                            }
                             unit.setBattleNetSaturatedRetargetRouteBand(
                                     saturatedSettledResidualRetarget);
                         } else {
@@ -5594,6 +5766,9 @@ final class BattleNetCombatSystem {
                 // step onward. Keeping those generations contaminated the
                 // next crowded retarget nineteen cycles later.
                 unit.setBattleNetCollisionCounter(0);
+                if (clearRefusalsAfterSettledRetargetStep) {
+                    unit.setBattleNetRefusals(0);
+                }
             }
             if (paidConstructionMoveProbe) {
                 if (underWay && unit.isMoving()) {
@@ -6568,6 +6743,17 @@ final class BattleNetCombatSystem {
     private boolean stepMoveTowardsTarget(
             Unit unit, boolean deferSettledRetargetSync,
             Unit targetBeforeStep) {
+        int tileXBeforeStep = unit.tileX();
+        int tileYBeforeStep = unit.tileY();
+        Unit paidQuarry = unit.target();
+        boolean clearPaidMovingQuarryCollision =
+                unit.battleNetRetargetResidualRoutePark()
+                && unit.battleNetCollisionCounter() == 1
+                && unit.battleNetRefusals() == 0
+                && unit.battleNetPathStepsTaken() == 1
+                && unit.pathLength() > 1
+                && paidQuarry != null
+                && paidQuarry.order() == Unit.Order.HARVEST;
         Unit.Order saved = unit.order();
         // setOrder(MOVE/ATTACK) clears battleNetSequenceOffset so Still
         // cursors cannot fire mid-walk. Chase Move OP0 cadence needs that
@@ -6610,6 +6796,17 @@ final class BattleNetCombatSystem {
         unit.setBattleNetSequenceOffset(offsetAfter);
         unit.setBattleNetAnimationTimer(timerAfter);
         unit.setBattleNetChaseStepReady(readyAfter);
+        if (clearPaidMovingQuarryCollision && unit.isMoving()
+                && (unit.tileX() != tileXBeforeStep
+                        || unit.tileY() != tileYBeforeStep)) {
+            // Attack construction owns the boundary between successive legs
+            // of this cached quarry route. Once the next retained byte is
+            // physically accepted, native clears the collision generation:
+            // Human 8 slot 1520 exposes collision one through fixture 232,
+            // commits east on 233, and carries zero into the later refusal.
+            unit.setBattleNetCollisionCounter(0);
+            unit.setBattleNetRefusals(0);
+        }
         // Approach residual settled in weapon range under Attack with unpaid
         // order-time pending: pay FUN_004234b0 on this visit. XHuman 12 grunt
         // 225 (native 1375) lands on 12,86 next to tower 13,86 at fixture 40;
@@ -9790,6 +9987,32 @@ final class BattleNetCombatSystem {
                     && candidate != sequenceTarget
                     && candidate.isAlive()
                     && world.targets.inAttackRange(unit, candidate);
+            boolean surfacedLadenQuarryConstructor = candidateInRange
+                    && !rangedOp0
+                    && unit.battleNetAnimationTimer() == 1
+                    && unit.chasing() && !unit.isMoving()
+                    && unit.pathLength() == 1 && unit.stepDrained()
+                    && unit.type().maxAttackRange() <= 1
+                    && sequenceTarget.carried() > 0
+                    && sequenceTarget.order() == Unit.Order.STILL
+                    && sequenceTarget.hasQueuedOrders()
+                    && sequenceTarget.queuedOrders().getFirst().kind()
+                            == Unit.QueuedOrderKind.RETURN_GOODS
+                    && unit.offeredTarget() != sequenceTarget;
+            if (surfacedLadenQuarryConstructor) {
+                // The last quarry stride settled on this visit and opened
+                // Attack construction. AutoSelectTarget can already see an
+                // equal adjacent unit, but native retains the surfaced quarry
+                // for 3,2,1 and makes that scan only on the following OP0.
+                // Keep this phase semantic: it follows any laden quarry which
+                // surfaced while the pursuer's committed pixels drained.
+                unit.setBattleNetAttackRefusalRecoveryStage(
+                        SURFACED_QUARRY_RETARGET_CONSTRUCTION);
+                unit.setBattleNetSequenceOffset(attackStart);
+                unit.setBattleNetAnimationTimer(3);
+                unit.setBattleNetChaseStepReady(false);
+                return true;
+            }
             boolean candidateOutOfRange = candidate != null
                     && candidate != sequenceTarget
                     && candidate.isAlive()
@@ -10812,6 +11035,446 @@ final class BattleNetCombatSystem {
         return true;
     }
 
+    /**
+     * Opens retail's literal two-band handoff after a harvesting quarry leaves.
+     *
+     * <p>The first committed stride of a three-byte moving-quarry route can
+     * settle while its quarry is removed from the map. The remaining bytes are
+     * not a route to redraw around the current formation. Native leaves the
+     * cursor parked, finishes the current Move band, pays one complete new Move
+     * band, counts Attack construction 3,2,1, and only then makes one fresh
+     * compass decision toward the retained point. Human 8 attack-peasant 1513
+     * is the authenticated witness: it holds (77,62) through fixture 275 and
+     * takes one east step on 276.</p>
+     */
+    private boolean armBattleNetExpiredHarvestQuarryLadder(Unit unit) {
+        Unit quarry = unit.target();
+        int moveStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
+        boolean twoBandResidual = unit.pathLength() == 2
+                && unit.battleNetPathInitialLength() == 3
+                && unit.battleNetPathStepsTaken() == 1
+                && unit.offeredTarget() == null;
+        boolean expiredHarvestQuarryFirstResidual =
+                unit.battleNetAttackRefusalRecoveryStage() == 0
+                && unit.battleNetOrderDelay() == 0
+                && unit.chasing() && unit.stepDrained() && !unit.isMoving()
+                && twoBandResidual
+                && unit.battleNetCollisionCounter() == 1
+                && unit.battleNetRefusals() == 0
+                && unit.type() != null
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.type().maxAttackRange() <= 1
+                && !World.battleNetRangedChaseUnit(unit)
+                && quarry != null && quarry.type() != null
+                && !quarry.type().building()
+                && quarry.order() == Unit.Order.HARVEST
+                && !world.targets.validAttackTarget(unit, quarry)
+                && !quarry.isOnMap()
+                && moveStart >= 0
+                && onBattleNetChaseMoveBody(unit)
+                && unit.battleNetAnimationTimer() == 1;
+        if (!expiredHarvestQuarryFirstResidual) {
+            return false;
+        }
+        unit.clearPath();
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(2);
+        unit.setBattleNetSequenceOffset(moveStart);
+        unit.setBattleNetAnimationTimer(3);
+        int firstTailStage = EXPIRED_QUARRY_FIRST_BAND_TAIL;
+        unit.setBattleNetAttackRefusalRecoveryStage(firstTailStage);
+        unit.setBattleNetChaseStepReady(false);
+        world.causalTrace.event(world.cycle,
+                "combat.expired-harvest-quarry-ladder", unit.id(),
+                "target", quarry.id(),
+                "goal_x", unit.pathGoalX(), "goal_y", unit.pathGoalY(),
+                "stage", firstTailStage);
+        return true;
+    }
+
+    /** Serves the two Move bands, Attack constructor, and one fresh decision. */
+    private boolean stepBattleNetExpiredHarvestQuarryLadder(
+            Unit unit, int stage) {
+        if (stage == SURFACED_QUARRY_RETARGET_CONSTRUCTION) {
+            return stepBattleNetSurfacedQuarryRetargetConstruction(unit);
+        }
+        if (stage == EXPIRED_QUARRY_REPLACEMENT_BODY_HOLD) {
+            return stepBattleNetExpiredHarvestReplacementBodyHold(unit);
+        }
+        if (stage == EXPIRED_QUARRY_FRESH_ROUTE_CONSTRUCTION) {
+            return stepBattleNetExpiredHarvestFreshRoute(unit);
+        }
+        if (!unit.chasing()
+                || !(unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE)) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        if (stage == EXPIRED_QUARRY_SINGLE_BAND_TAIL) {
+            if (unit.battleNetOrderDelay() > 0) {
+                return false;
+            }
+            int reactRange = Math.max(
+                    unit.type().reactRange(world.isPerson(unit.player())),
+                    Math.max(1, unit.type().maxAttackRange()));
+            Unit replacement = world.targets.findBattleNetHostile(
+                    unit, reactRange, null);
+            int attackStart = world.idle.battleNetSequenceStart(
+                    unit, BattleNetSequence.ATTACK_ANIMATION);
+            if (replacement == null || attackStart < 0
+                    || !world.targets.inAttackRange(unit, replacement)) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            setAutoTarget(unit, replacement);
+            unit.clearPath();
+            unit.setRouteSpent(false);
+            unit.setWaitCycles(0);
+            int targetWidth = replacement.type() != null
+                    && replacement.type().building()
+                            ? Math.max(1, replacement.type().tileWidth()) : 1;
+            int targetHeight = replacement.type() != null
+                    && replacement.type().building()
+                            ? Math.max(1, replacement.type().tileHeight()) : 1;
+            unit.setPathGoal(
+                    World.battleNetNearFootprintCoordinate(
+                            unit.tileX(), replacement.tileX(), targetWidth),
+                    World.battleNetNearFootprintCoordinate(
+                            unit.tileY(), replacement.tileY(), targetHeight));
+            unit.setBattleNetCollisionCounter(0);
+            unit.setBattleNetRefusals(0);
+            unit.setBattleNetRefusalHold(false);
+            unit.setBattleNetChaseStepReady(false);
+            unit.setChasing(false);
+            unit.setFighting(true);
+            unit.setBattleNetAttackResumeFromMove(true);
+            unit.setBattleNetAttackOp0OutOfRange(true);
+            unit.setBattleNetSequenceOffset(attackStart);
+            unit.setBattleNetAnimationTimer(3);
+            unit.setBattleNetAttackRefusalRecoveryStage(
+                    EXPIRED_QUARRY_REPLACEMENT_BODY_HOLD);
+            AnimationSet set = unit.type() == null
+                    ? null : unit.type().animationSet();
+            Animation attack = set == null ? null
+                    : set.get(AnimationSet.State.ATTACK);
+            if (attack != null && unit.animation().current() != attack) {
+                unit.animation().switchTo(attack);
+            }
+            world.turnToTarget(unit, replacement, 0, 0);
+            return true;
+        }
+        if (stage == EXPIRED_QUARRY_FIRST_BAND_TAIL) {
+            if (unit.battleNetOrderDelay() > 0) {
+                return false;
+            }
+            int moveStart = world.idle.battleNetSequenceStart(
+                    unit, BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            int reactRange = Math.max(
+                    unit.type().reactRange(world.isPerson(unit.player())),
+                    Math.max(1, unit.type().maxAttackRange()));
+            Unit replacement = world.targets.findBattleNetHostile(
+                    unit, reactRange, null);
+            if (replacement != null) {
+                setAutoTarget(unit, replacement);
+                unit.setPathGoal(
+                        replacement.tileX(), replacement.tileY());
+                unit.setChasing(true);
+            }
+            unit.setBattleNetOrderDelay(14);
+            unit.setBattleNetSequenceOffset(moveStart);
+            unit.setBattleNetAnimationTimer(15);
+            unit.setBattleNetAttackRefusalRecoveryStage(
+                    EXPIRED_QUARRY_SECOND_BAND);
+            return true;
+        }
+        if (stage == EXPIRED_QUARRY_SECOND_BAND) {
+            if (unit.battleNetOrderDelay() > 0) {
+                return false;
+            }
+            int attackStart = world.idle.battleNetSequenceStart(
+                    unit, BattleNetSequence.ATTACK_ANIMATION);
+            if (attackStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                return false;
+            }
+            unit.setBattleNetSequenceOffset(attackStart);
+            unit.setBattleNetAnimationTimer(3);
+            unit.setBattleNetAttackRefusalRecoveryStage(
+                    EXPIRED_QUARRY_ATTACK_CONSTRUCTION);
+            AnimationSet set = unit.type() == null
+                    ? null : unit.type().animationSet();
+            Animation attack = set == null ? null
+                    : set.get(AnimationSet.State.ATTACK);
+            if (attack != null && unit.animation().current() != attack) {
+                unit.animation().switchTo(attack);
+            }
+            return true;
+        }
+        if (stage != EXPIRED_QUARRY_ATTACK_CONSTRUCTION) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(
+                unit, BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0
+                || unit.battleNetSequenceOffset() != attackStart) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        if (unit.battleNetAnimationTimer() > 1) {
+            unit.setBattleNetAnimationTimer(
+                    unit.battleNetAnimationTimer() - 1);
+            return true;
+        }
+        int reactRange = Math.max(
+                unit.type().reactRange(world.isPerson(unit.player())),
+                Math.max(1, unit.type().maxAttackRange()));
+        Unit replacement = world.targets.findBattleNetHostile(
+                unit, reactRange, null);
+        if (replacement != null && replacement != unit.target()) {
+            setAutoTarget(unit, replacement);
+        }
+        Unit freshTarget = unit.target();
+        if (freshTarget == null
+                || !world.targets.validAttackTarget(unit, freshTarget)) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        unit.clearPath();
+        PathFinder.Result planned = world.planTowardsAfterRefusalBand(
+                unit, freshTarget);
+        if (planned != PathFinder.Result.FOUND || unit.pathLength() == 0) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        int heading = unit.peekHeading();
+        int moveStart = world.idle.battleNetSequenceStart(
+                unit, BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart < 0) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        int goalX = freshTarget.tileX();
+        int goalY = freshTarget.tileY();
+        unit.setPathGoal(goalX, goalY);
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(0);
+        unit.setBattleNetSequenceOffset(moveStart);
+        unit.setBattleNetAnimationTimer(1);
+        unit.setBattleNetChaseStepReady(true);
+        AnimationSet set = unit.type() == null
+                ? null : unit.type().animationSet();
+        Animation move = set == null ? null : set.get(AnimationSet.State.MOVE);
+        if (move != null && unit.animation().current() != move) {
+            unit.animation().switchTo(move);
+        }
+        world.causalTrace.event(world.cycle,
+                "path.expired-harvest-quarry-fresh-step", unit.id(),
+                "target", freshTarget.id(), "heading", heading,
+                "goal_x", goalX, "goal_y", goalY);
+        stepMoveTowardsTarget(unit);
+        unit.setBattleNetAttackRefusalRecoveryStage(0);
+        unit.setBattleNetChaseStepReady(false);
+        return true;
+    }
+
+    /**
+     * Releases the temporary building target when its committed body hold ends.
+     *
+     * <p>The farm selected when a moving harvesting quarry enters its mine
+     * owns the already-paid melee OP0 hold even though no blow is delivered.
+     * At timer one retail performs a fresh spatial decision and accepts the
+     * best mobile quarry even when it is outside melee range. Human 8
+     * attack-peasant 1526 changes from farm 1540 to peasant 1533 on fixture
+     * 277, opens Attack construction 3,2,1, then takes the new route's first
+     * south-east heading on fixture 280.</p>
+     */
+    private boolean stepBattleNetExpiredHarvestReplacementBodyHold(Unit unit) {
+        int attackStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.ATTACK_ANIMATION);
+        boolean completedBodyHold = unit.order() == Unit.Order.ATTACK
+                && attackStart >= 0
+                && unit.battleNetSequenceOffset() == attackStart
+                && unit.battleNetAnimationTimer() == 1
+                && unit.battleNetAttackResumeHoldActive()
+                && unit.target() != null
+                && unit.target().type() != null
+                && unit.target().type().building();
+        if (!completedBodyHold) {
+            if (unit.order() != Unit.Order.ATTACK
+                    || unit.target() == null
+                    || attackStart < 0) {
+                unit.setBattleNetAttackRefusalRecoveryStage(0);
+            }
+            return false;
+        }
+        int reactRange = Math.max(
+                unit.type().reactRange(world.isPerson(unit.player())),
+                Math.max(1, unit.type().maxAttackRange()));
+        Unit replacement = world.targets.findBattleNetHostile(
+                unit, reactRange, null);
+        if (replacement == null || replacement == unit.target()
+                || !replacement.isAlive()) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        Unit previous = unit.target();
+        setAutoTarget(unit, replacement);
+        unit.setPathGoal(replacement.tileX(), replacement.tileY());
+        unit.setBattleNetAttackResumeHoldActive(false);
+        unit.setBattleNetStationaryRecoveryHeld(false);
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        unit.setBattleNetSequenceMeleeLanded(false);
+        unit.setOfferedTarget(replacement);
+        unit.setFighting(false);
+        unit.setChasing(false);
+        unit.setBattleNetAttackWrapDestArmPending(false);
+        unit.setBattleNetAttackRefusalRecoveryStage(
+                EXPIRED_QUARRY_FRESH_ROUTE_CONSTRUCTION);
+        world.turnToTarget(unit, replacement, 0, 0);
+        world.causalTrace.event(world.cycle,
+                "combat.expired-harvest-body-hold-retarget", unit.id(),
+                "from", previous.id(), "to", replacement.id());
+        return true;
+    }
+
+    /** Spends the one fresh route decision after the replacement constructor. */
+    private boolean stepBattleNetExpiredHarvestFreshRoute(Unit unit) {
+        int attackStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.ATTACK_ANIMATION);
+        if (unit.order() != Unit.Order.ATTACK || unit.target() == null
+                || attackStart < 0) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        if (unit.battleNetSequenceOffset() != attackStart) {
+            return false;
+        }
+        if (unit.battleNetAnimationTimer() > 1) {
+            unit.setBattleNetAnimationTimer(
+                    unit.battleNetAnimationTimer() - 1);
+            return true;
+        }
+        Unit target = unit.target();
+        unit.clearPath();
+        int face = unit.heading();
+        if (face < 0 || face >= Direction.COUNT) {
+            face = Direction.fromDelta(
+                    Integer.signum(target.tileX() - unit.tileX()),
+                    Integer.signum(target.tileY() - unit.tileY()));
+        }
+        int clockwise = Math.floorMod(face + 1, Direction.COUNT);
+        int counterclockwise = Math.floorMod(face - 1, Direction.COUNT);
+        // Both native wall probes write into one route buffer at this
+        // post-hold decision. Their opening faces remain on either side of
+        // the target-facing compass byte: the stack is read backwards, so
+        // this stores clockwise, face, counterclockwise in walking order.
+        unit.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                new int[] {counterclockwise, face, clockwise}));
+        unit.setPathGoal(target.tileX(), target.tileY());
+        int moveStart = world.idle.battleNetSequenceStart(
+                unit, BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart < 0) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        int heading = unit.peekHeading();
+        unit.setChasing(true);
+        unit.setFighting(false);
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(0);
+        unit.setBattleNetSequenceOffset(moveStart);
+        unit.setBattleNetAnimationTimer(1);
+        unit.setBattleNetChaseStepReady(true);
+        AnimationSet set = unit.type() == null
+                ? null : unit.type().animationSet();
+        Animation move = set == null ? null : set.get(AnimationSet.State.MOVE);
+        if (move != null && unit.animation().current() != move) {
+            unit.animation().switchTo(move);
+        }
+        world.causalTrace.event(world.cycle,
+                "path.expired-harvest-replacement-fresh-step", unit.id(),
+                "target", target.id(), "heading", heading,
+                "path_length", unit.pathLength());
+        stepMoveTowardsTarget(unit);
+        unit.setBattleNetAttackRefusalRecoveryStage(0);
+        unit.setBattleNetChaseStepReady(false);
+        return true;
+    }
+
+    /**
+     * Finishes construction against a just-surfaced laden quarry before the
+     * in-range replacement scan owns a new construction body.
+     *
+     * <p>The quarry can stop being a moving HARVEST unit while the pursuer's
+     * final pixels are still draining. Its CUnit pointer nevertheless owns
+     * the complete Attack 3,2,1 constructor. Only the following OP0 scans
+     * the adjacent formation and installs a replacement. Human 8 slot 1505
+     * keeps slot 1536 through fixtures 274..276, names slot 1533 on 277, pays
+     * another 3,2,1, and reaches the committed body hold on 280.</p>
+     */
+    private boolean stepBattleNetSurfacedQuarryRetargetConstruction(
+            Unit unit) {
+        int attackStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.ATTACK_ANIMATION);
+        Unit surfaced = unit.target();
+        if (unit.order() != Unit.Order.ATTACK || attackStart < 0
+                || unit.battleNetSequenceOffset() != attackStart
+                || surfaced == null || !surfaced.isAlive()) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        if (unit.battleNetAnimationTimer() > 1) {
+            unit.setBattleNetAnimationTimer(
+                    unit.battleNetAnimationTimer() - 1);
+            return true;
+        }
+        int reactRange = Math.max(
+                unit.type().reactRange(world.isPerson(unit.player())),
+                Math.max(1, unit.type().maxAttackRange()));
+        Unit replacement = world.targets.findBattleNetHostile(
+                unit, reactRange, null);
+        if (replacement == null || replacement == surfaced
+                || !replacement.isAlive()
+                || !world.targets.inAttackRange(unit, replacement)) {
+            unit.setBattleNetAttackRefusalRecoveryStage(0);
+            return false;
+        }
+        setAutoTarget(unit, replacement);
+        unit.clearPath();
+        unit.setRouteSpent(false);
+        unit.setChasing(false);
+        unit.setFighting(true);
+        unit.setBattleNetSequenceOffset(attackStart);
+        unit.setBattleNetAnimationTimer(3);
+        unit.setBattleNetSequenceMeleeLanded(false);
+        // This second constructor is the replacement half of a paid chase
+        // arrival. Its OP0 enters the normal melee bodyWaitSum-1 hold rather
+        // than walking directly into wind-up.
+        unit.setBattleNetAttackResumeFromMove(true);
+        unit.setBattleNetAttackOp0OutOfRange(true);
+        unit.setBattleNetAttackRefusalRecoveryStage(0);
+        world.turnToTarget(unit, replacement, 0, 0);
+        world.causalTrace.event(world.cycle,
+                "combat.surfaced-quarry-retarget", unit.id(),
+                "from", surfaced.id(), "to", replacement.id());
+        return true;
+    }
+
+
     private boolean stepBattleNetAttackRefusalRecovery(Unit unit) {
         int stage = unit.battleNetAttackRefusalRecoveryStage();
         if (stage == 0 || world.battleNetSequence == null) {
@@ -10824,6 +11487,9 @@ final class BattleNetCombatSystem {
                     unit.battleNetOrderDelay(),
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer(), unit.chasing() ? 1 : 0);
+        }
+        if (stage >= EXPIRED_QUARRY_FIRST_BAND_TAIL) {
+            return stepBattleNetExpiredHarvestQuarryLadder(unit, stage);
         }
         if (!unit.chasing() || unit.target() == null
                 || !(unit.order() == Unit.Order.ATTACK
@@ -10906,7 +11572,9 @@ final class BattleNetCombatSystem {
             }
             Unit boxedTarget = unit.target();
             boolean boxedRoutelessMeleeProbe =
-                    unit.battleNetColdNoProgressRefusalLoop()
+                    (unit.battleNetColdNoProgressRefusalLoop()
+                            || (unit.battleNetAiBehavior() == 0
+                                    && unit.offeredTarget() == boxedTarget))
                     && !unit.isMoving()
                     && unit.pathLength() == 0
                     && unit.battleNetChaseEmptyRouteReplan()
@@ -10918,16 +11586,17 @@ final class BattleNetCombatSystem {
                             .battleNetHasStrictlyCloserFreeNeighbour(
                                     unit, boxedTarget);
             if (boxedRoutelessMeleeProbe) {
-                // A cold Attack constructor does not grant its final Move
-                // probe to an arbitrary free compass cell when every such
-                // cell fails to close weapon distance. Retail falls through
-                // active-order Still instead, pays its idle draw and reopens
-                // Attack 3,2,1 with the route cursor still at twenty. XHuman
-                // 12 slots 1453, 1456 and 1457 repeat that exact transaction
-                // on fixtures 242 and 245 while their east/north-east faces
-                // remain occupied. Java's empty-route scan accepted free N,
-                // which kept Chebyshev distance three and broke both position
-                // and the asynchronous damage stream.
+                // A cold Attack constructor does not grant its final
+                // Move probe to an arbitrary free compass cell when every
+                // such cell fails to close weapon distance. This remains true
+                // XHuman 12 slots 1453, 1456 and 1457 are the authenticated
+                // cold-construction witnesses at fixtures 242/245. A matching
+                // standing offer is the same native cold-order provenance
+                // after target publication has cleared the Java latch: Human
+                // 8 slot 1526 keeps its offered harvesting quarry and pays
+                // the next Attack constructor on fixture 300. Java's empty-
+                // route scan accepted a non-progressing free square, breaking
+                // both position and the asynchronous stream.
                 return rearmBattleNetHardRefusalAttack(unit);
             }
             unit.setBattleNetColdNoProgressRefusalLoop(false);

@@ -904,6 +904,29 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("an expired moving-quarry ladder keeps its final construction stage")
+    void expiredMovingQuarryLadderStageRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-knight"), 0, 10, 10);
+        Unit target = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 1, 12, 9);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setTarget(target);
+        attacker.setChasing(true);
+        attacker.setPathGoal(12, 9);
+        attacker.setBattleNetAttackRefusalRecoveryStage(13);
+
+        Unit loaded = find(reload(bench), "unit-knight");
+
+        assertNotNull(loaded.target());
+        assertEquals(13, loaded.battleNetAttackRefusalRecoveryStage(),
+                "reloading during Attack 3,2,1 must not release the retained quarry");
+        assertEquals(12, loaded.pathGoalX());
+        assertEquals(9, loaded.pathGoalY());
+    }
+
+    @Test
     @DisplayName("an attack-loop retarget keeps its pending dest-arm across a save")
     void attackWrapDestArmPendingRoundTrips() throws IOException {
         Bench bench = bench();

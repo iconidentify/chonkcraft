@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.map.PudUnitTypes;
 import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
@@ -638,9 +639,15 @@ public final class AiPlayer {
             if (targetId == null) {
                 targetId = enemy.id();
             }
-            int goalX = enemy.tileX();
-            int goalY = enemy.tileY();
             for (Unit member : members) {
+                int goalX = enemy.tileX();
+                int goalY = enemy.tileY();
+                if (predicate == 4) {
+                    int[] normalized = world.battleNetNormalizeLandForceHome(
+                            member, goalX, goalY);
+                    goalX = normalized[0];
+                    goalY = normalized[1];
+                }
                 world.markBattleNetForceLaunchThisCycle(member);
                 member.setBattleNetAiBehavior(2);
                 member.setBattleNetAiHome(goalX, goalY);
@@ -669,6 +676,9 @@ public final class AiPlayer {
     }
 
     private Unit battleNetForceEnemy(World world, Unit leader, int predicate) {
+        if (predicate == 4) {
+            return battleNetLandForceObjective(world);
+        }
         if (predicate != 6) {
             Unit enemy = world.findEnemyByFlood(leader, predicate == 4);
             if (enemy == null && predicate == 4) {
@@ -688,6 +698,241 @@ public final class AiPlayer {
             if (candidateDistance < distance) {
                 distance = candidateDistance;
                 best = candidate;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Selects selector-zero's hostile land objective for a periodic launch.
+     *
+     * <p>Native {@code 0x426ad0} does not path from the force leader to the
+     * closest roof. It chooses the most populous person slot, rebuilds an
+     * eight-by-eight influence grid, and asks {@code 0x4266c0} for the land
+     * cell owned by that person which is farthest from the person's depot
+     * anchor. {@code 0x4278e0} then returns the closest eligible unit to the
+     * selected cell centre. This is why XHuman 12's first recurring launch
+     * chooses guard tower 1429 at 15,67 rather than the closer southern tower
+     * at 13,86.</p>
+     */
+    private Unit battleNetLandForceObjective(World world) {
+        int targetPlayer = battleNetMostPopulousPerson(world);
+        if (targetPlayer < 0) {
+            return null;
+        }
+        Unit anchor = battleNetLandInfluenceAnchor(world, targetPlayer);
+        if (anchor == null) {
+            return null;
+        }
+
+        int width = world.map().width() >> 3;
+        int height = world.map().height() >> 3;
+        int selectedX = anchor.tileX() >> 3;
+        int selectedY = anchor.tileY() >> 3;
+        int farthest = 0;
+        // The retail table is walked by row and then column. Its comparison
+        // point is assembled in that storage order (y, x), while the winning
+        // indices are written back to an ordinary (x, y) point before the
+        // nearest-unit lookup. Preserve that transposed distance quirk: it is
+        // what makes two otherwise tied hostile regions resolve the same way
+        // as selector zero.
+        for (int coarseY = 0; coarseY < height; coarseY++) {
+            int centerY = coarseY * 8 + 4;
+            for (int coarseX = 0; coarseX < width; coarseX++) {
+                if (!battleNetLandInfluenceCell(world, coarseX, coarseY)) {
+                    continue;
+                }
+                int dominant = battleNetDominantInfluencePlayer(
+                        world, coarseX, coarseY);
+                if (dominant != targetPlayer) {
+                    continue;
+                }
+                int centerX = coarseX * 8 + 4;
+                int distance = battleNetMapDistance(anchor, centerY, centerX);
+                if (distance > farthest) {
+                    farthest = distance;
+                    selectedX = coarseX;
+                    selectedY = coarseY;
+                }
+            }
+        }
+        int objectiveX = selectedX * 8 + 4;
+        int objectiveY = selectedY * 8 + 4;
+        return battleNetNearestLandObjective(
+                world, targetPlayer, objectiveX, objectiveY);
+    }
+
+    /** Native's largest live CPlayer::TotalNumUnits among person slots 0..7. */
+    private int battleNetMostPopulousPerson(World world) {
+        int targetPlayer = -1;
+        int greatest = 0;
+        for (int player = 0; player < 8; player++) {
+            Player candidate = world.player(player);
+            if (candidate == null || candidate.type() != PudMap.PlayerType.PERSON) {
+                continue;
+            }
+            int count = 0;
+            for (Unit unit : world.playerUnits(player)) {
+                if (unit != null && unit.type() != null && !unit.destroyed()
+                        && unit.order() != Unit.Order.DYING
+                        && !unit.type().vanishes() && !unit.type().revealer()) {
+                    count++;
+                }
+            }
+            if (count > greatest) {
+                greatest = count;
+                targetPlayer = player;
+            }
+        }
+        return targetPlayer;
+    }
+
+    /**
+     * Native {@code 0x439ce0}: nearest gold depot to the player-list head,
+     * then the first building in that chain, then the head itself.
+     */
+    private Unit battleNetLandInfluenceAnchor(World world, int targetPlayer) {
+        List<Unit> roster = world.playerUnits(targetPlayer);
+        Unit head = null;
+        for (int index = roster.size() - 1; index >= 0; index--) {
+            Unit unit = roster.get(index);
+            if (unit != null && unit.type() != null && !unit.destroyed()
+                    && unit.order() != Unit.Order.DYING
+                    && !unit.type().vanishes() && !unit.type().revealer()) {
+                head = unit;
+                break;
+            }
+        }
+        if (head == null) {
+            return null;
+        }
+        boolean skipComponent = head.type().seaUnit() || head.type().airUnit();
+        Unit depot = null;
+        int depotDistance = Integer.MAX_VALUE;
+        Unit firstBuilding = null;
+        for (int index = roster.size() - 1; index >= 0; index--) {
+            Unit unit = roster.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || !unit.isOnMap()) {
+                continue;
+            }
+            if (firstBuilding == null && unit.type().building()) {
+                firstBuilding = unit;
+            }
+            if (!isGoldDepot(unit.type())
+                    || !skipComponent
+                            && !world.battleNetSameMapComponent(head, unit)) {
+                continue;
+            }
+            int distance = battleNetMapDistance(
+                    head, unit.tileX(), unit.tileY());
+            if (distance < depotDistance) {
+                depotDistance = distance;
+                depot = unit;
+            }
+        }
+        return depot != null ? depot
+                : firstBuilding != null ? firstBuilding : head;
+    }
+
+    /** Land wins only when its tile count strictly exceeds water's. */
+    private boolean battleNetLandInfluenceCell(
+            World world, int coarseX, int coarseY) {
+        int land = 0;
+        int water = 0;
+        int startX = coarseX * 8;
+        int startY = coarseY * 8;
+        for (int y = startY; y < startY + 8; y++) {
+            for (int x = startX; x < startX + 8; x++) {
+                long flags = world.map().field(x, y).flags();
+                if ((flags & TileFlag.WATER_ALLOWED) != 0) {
+                    water++;
+                } else if ((flags & TileFlag.LAND_ALLOWED) != 0) {
+                    land++;
+                }
+            }
+        }
+        return land > water;
+    }
+
+    /** The first-score half of native influence record 0x4af438. */
+    private int battleNetDominantInfluencePlayer(
+            World world, int coarseX, int coarseY) {
+        int[] scores = new int[8];
+        int startX = coarseX * 8;
+        int startY = coarseY * 8;
+        for (int y = startY; y < startY + 8; y++) {
+            for (int x = startX; x < startX + 8; x++) {
+                Unit unit = world.unitAt(x, y);
+                if (unit == null || unit.player() < 0 || unit.player() >= 8) {
+                    continue;
+                }
+                scores[unit.player()] += battleNetLandInfluenceScore(unit);
+            }
+        }
+        int dominant = -1;
+        int best = -100;
+        for (int player = 0; player < scores.length; player++) {
+            int score = scores[player];
+            if (score != 0 && score > best) {
+                best = score;
+                dominant = player;
+            }
+        }
+        return dominant;
+    }
+
+    /** Health-scaled type points, with native's non-combat fixed weights. */
+    private int battleNetLandInfluenceScore(Unit unit) {
+        if (unit == null || unit.type() == null || !unit.isAlive()) {
+            return 0;
+        }
+        UnitType type = unit.type();
+        if (isGoldDepot(type) || type.building() && !type.canAttack()) {
+            return -1;
+        }
+        if (type.canGather()) {
+            return -5;
+        }
+        if (type.seaUnit() || type.airUnit()) {
+            return -2;
+        }
+        if (!type.canTargetLand()) {
+            return 0;
+        }
+        int maximum = Math.max(1, type.hitPoints());
+        return Math.max(0, unit.hitPoints()) * type.points() / maximum;
+    }
+
+    /** Native 0x416b10's Chebyshev distance from a unit footprint to a point. */
+    private int battleNetMapDistance(Unit unit, int x, int y) {
+        int right = unit.tileX() + Math.max(1, unit.type().tileWidth()) - 1;
+        int bottom = unit.tileY() + Math.max(1, unit.type().tileHeight()) - 1;
+        int dx = x < unit.tileX() ? unit.tileX() - x
+                : x > right ? x - right : 0;
+        int dy = y < unit.tileY() ? unit.tileY() - y
+                : y > bottom ? y - bottom : 0;
+        return Math.max(dx, dy);
+    }
+
+    /** Native 0x4278e0's nearest eligible target-player unit. */
+    private Unit battleNetNearestLandObjective(World world, int targetPlayer,
+            int x, int y) {
+        List<Unit> roster = world.playerUnits(targetPlayer);
+        Unit best = null;
+        int bestDistance = 0xffff;
+        for (int index = roster.size() - 1; index >= 0; index--) {
+            Unit unit = roster.get(index);
+            if (unit == null || unit.type() == null || !unit.isAlive()
+                    || !unit.isOnMap() || unit.type().vanishes()
+                    || unit.type().revealer() || unit.type().shoreBuilding()
+                    || unit.type().seaUnit() || unit.type().airUnit()) {
+                continue;
+            }
+            int distance = battleNetMapDistance(unit, x, y);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                best = unit;
             }
         }
         return best;

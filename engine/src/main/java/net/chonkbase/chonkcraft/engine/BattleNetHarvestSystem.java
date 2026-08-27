@@ -350,6 +350,18 @@ final class BattleNetHarvestSystem {
                         && worker.battleNetCollisionCounter() >= 4;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
+                // A queued mine-exit Return Goods promotion starts action
+                // 24 on the worker's three-call Still body.  Java projects
+                // that action onto HARVEST after the promotion visit, but
+                // the native cursor keeps counting 3,2,1 while the order's
+                // two quiet constructor visits are served.  Human 8 peon
+                // 1536 is Still-sequence 2595/timers 3,2,1 on fixtures
+                // 280..282 before its first empty depot-route ask.
+                if (isBattleNetEmptyDepotRouteIdleCursor(worker)
+                        && worker.battleNetAnimationTimer() > 1) {
+                    worker.setBattleNetAnimationTimer(
+                            worker.battleNetAnimationTimer() - 1);
+                }
                 // A laden return counts the native Move program itself rather
                 // than sleeping through a generic Still animation. XHuman 10
                 // peon 1588 is 2600/15 on its fixture-270 cooperative refusal,
@@ -439,6 +451,18 @@ final class BattleNetHarvestSystem {
                 }
                 return;
             }
+        }
+        // An empty action-24 depot route does not become a synthetic Still
+        // order and it does not poll the pathfinder every visit.  Its active
+        // resource order owns the rest of the same three-call Still body;
+        // only timer one asks for another route.  The restart and its one
+        // land-idle draw are installed by beginBattleNetEmptyDepotRouteIdleBand
+        // after the failed route construction below.
+        if (isBattleNetEmptyDepotRouteIdleCursor(worker)
+                && worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return;
         }
         if (info == null && worker.type().canTransport() && worker.target() != null) {
             // Retail's startup transport action is in the resource family,
@@ -4217,8 +4241,184 @@ final class BattleNetHarvestSystem {
         }
         unit.setResourceDepot(depot);
         unit.setReturnDepotGoal(depot);
+        int activeIdleSequence = unit.battleNetSequenceOffset();
+        int activeIdleTimer = unit.battleNetAnimationTimer();
         unit.setOrder(Unit.Order.HARVEST);
+        // RETURN_GOODS and HARVEST are two Java projections of the same
+        // native COrder_Resource.  Preserve action 24's active Still cursor
+        // across that projection change; Unit.setOrder deliberately clears
+        // animation cursors for unrelated order replacements.
+        int stillStart = world.idle.battleNetStillSequenceStart(unit);
+        if (activeIdleSequence == stillStart && activeIdleTimer > 0) {
+            unit.setBattleNetSequenceOffset(activeIdleSequence);
+            unit.setBattleNetAnimationTimer(activeIdleTimer);
+        }
         stepHarvest(unit);
+    }
+
+
+    /**
+     * Starts one native action-24 idle band after a depot route returned an
+     * empty FOUND prefix.
+     *
+     * <p>The order stays active and asks again every third visit.  Each
+     * restart runs the random-facing half of {@code FUN_0040ad30}, but not
+     * Still's autonomous-order dispatcher.  In Human 8, laden peon 1536 owns
+     * the missing draw at fixtures 283, 286 and 289; without it critter 1539
+     * consumes the peon's value and wanders on 283.</p>
+     */
+    boolean beginBattleNetEmptyDepotRouteIdleBand(Unit worker, Unit depot,
+            PathFinder.Path emptyPath) {
+        if (worker == null || depot == null || emptyPath == null
+                || emptyPath.result() != PathFinder.Result.FOUND
+                || emptyPath.length() != 0
+                || worker.order() != Unit.Order.HARVEST
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || !worker.type().landUnit()
+                || world.battleNetMovementStride(worker) != 1
+                || worker.isMoving() || worker.distanceTo(depot) <= 1
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart < 0) {
+            return false;
+        }
+        worker.setPath(emptyPath);
+        worker.setPathGoal(-1, -1);
+        worker.setBattleNetSequenceOffset(stillStart);
+        worker.setBattleNetAnimationTimer(3);
+        world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
+        beginBattleNetStrandedResourceHitFlee(worker);
+        return true;
+    }
+
+
+    /**
+     * Lets a stranded resource order answer the aggressor retained at +0x54.
+     *
+     * <p>The empty-route resource retry runs the common active-order idle
+     * callback. If a non-aggressive worker was struck since its preceding
+     * retry, retail's following {@code FUN_0040a5e0} visit reaches
+     * {@code FUN_0040a670}: it consumes two asynchronous draws, authors a
+     * short escape point from the aggressor's facing, and temporarily exposes
+     * action 3 over the resource order's three-call Still body. Human 8 peasant
+     * 1536 is the sealed witness. Ogre 1538 hits it on fixture 295; its next
+     * empty depot-route retry changes action 24 to action 3 at point (83,62)
+     * on fixture 298, then restores action 24 on fixture 301. Omitting the two
+     * point draws also hands critter 1539 the worker's values and makes it
+     * wander on fixture 298.</p>
+     */
+    private void beginBattleNetStrandedResourceHitFlee(Unit worker) {
+        Unit aggressor = worker == null ? null : worker.offeredTarget();
+        if (worker == null || aggressor == null
+                || !aggressor.isAlive() || aggressor.isDying()
+                || !aggressor.isOnMap() || worker.isAggressive()
+                || worker.savedOrder() != null
+                || world.battleNetSequence == null) {
+            return;
+        }
+        int face = aggressor.heading();
+        int x = worker.tileX() + Direction.deltaX(face) * 4
+                + (world.battleNetRand() & 7) - 2;
+        int y = worker.tileY() + Direction.deltaY(face) * 4
+                + (world.battleNetRand() & 7) - 2;
+        x = Math.max(0, Math.min(world.map.width() - 1, x));
+        y = Math.max(0, Math.min(world.map.height() - 1, y));
+        int authoredX = x;
+        int authoredY = y;
+        int[] normalized = world.battleNetSpreadUnitGoal(worker, x, y);
+        x = normalized[0];
+        y = normalized[1];
+
+        worker.setSavedOrder(Unit.Order.HARVEST);
+        worker.clearPath();
+        worker.setRouteSpent(false);
+        // The constructor band preserves the authored point here until its
+        // last call. Its difference from OrderX/Y is the semantic proof that
+        // SpreadUnit stored an occupied approach edge rather than accepting
+        // the free authored point. Both coordinates are already serialized.
+        worker.setPathGoal(authoredX, authoredY);
+        worker.setOrderTarget(x, y);
+        worker.setWaitCycles(0);
+        worker.setBattleNetOrderDelay(0);
+        worker.setOfferedTarget(null);
+        worker.setOrder(Unit.Order.MOVE);
+        worker.setBattleNetSequenceOffset(
+                world.idle.battleNetStillSequenceStart(worker));
+        worker.setBattleNetAnimationTimer(3);
+    }
+
+
+    /** Counts and either starts or restores the temporary resource-hit move. */
+    boolean stepBattleNetStrandedResourceHitFlee(Unit worker) {
+        if (worker == null || worker.order() != Unit.Order.MOVE
+                || worker.savedOrder() != Unit.Order.HARVEST
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || worker.isMoving() || worker.pathLength() != 0
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart < 0
+                || worker.battleNetSequenceOffset() != stillStart
+                || worker.battleNetAnimationTimer() <= 0) {
+            return false;
+        }
+        if (worker.battleNetAnimationTimer() > 1) {
+            worker.setBattleNetAnimationTimer(
+                    worker.battleNetAnimationTimer() - 1);
+            return true;
+        }
+
+        // SpreadUnit may retain an occupied edge point immediately beyond
+        // the first admissible square. That form proceeds through the normal
+        // Move handler when the three-call Still constructor expires: Human
+        // 8 peasant 1536 stores 79,59 and commits NE on fixture 325. A free
+        // authored point owns only the reaction body and then restores the
+        // resource action (peasants 1536 at fixture 301 and 1533 at 316).
+        boolean spreadApproachEdge = worker.pathGoalX()
+                != worker.orderTargetX()
+                || worker.pathGoalY() != worker.orderTargetY();
+        if (spreadApproachEdge) {
+            worker.setPathGoal(worker.orderTargetX(), worker.orderTargetY());
+            int moveStart = world.idle.battleNetSequenceStart(
+                    worker, BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                BattleNetSequence.Tick open =
+                        world.battleNetSequence.tick(moveStart, 1);
+                worker.setBattleNetSequenceOffset(
+                        open.valid() ? open.offset() : moveStart);
+                worker.setBattleNetAnimationTimer(
+                        open.valid() ? open.timer() : 1);
+            }
+            return false;
+        }
+
+        worker.takeSavedOrder();
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setOrderTarget(-1, -1);
+        worker.setPathGoal(-1, -1);
+        worker.setBattleNetSequenceOffset(stillStart);
+        worker.setBattleNetAnimationTimer(1);
+        stepHarvest(worker);
+        return true;
+    }
+
+
+    /** Whether this laden return is serving action 24's empty-route cursor. */
+    private boolean isBattleNetEmptyDepotRouteIdleCursor(Unit worker) {
+        if (worker == null || !worker.returningToDepot()
+                || worker.carried() <= 0 || !worker.type().landUnit()
+                || world.battleNetMovementStride(worker) != 1
+                || worker.pathLength() != 0 || worker.isMoving()
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        return stillStart >= 0
+                && worker.battleNetSequenceOffset() == stillStart
+                && worker.battleNetAnimationTimer() > 0;
     }
 
 

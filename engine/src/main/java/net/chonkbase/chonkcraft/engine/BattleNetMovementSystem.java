@@ -1024,6 +1024,9 @@ final class BattleNetMovementSystem {
      * draw and hands slot 1585 the wrong wander choice on cycle five.</p>
      */
     void stepMoveOrderWithBattleNetCritter(Unit unit) {
+        if (world.harvest.stepBattleNetStrandedResourceHitFlee(unit)) {
+            return;
+        }
         boolean critterMove = "unit-critter".equals(unit.type().ident());
         boolean resumeConstructor = critterMove
                 && unit.battleNetConstructorBurnAfterCycle() > 0
@@ -1925,6 +1928,10 @@ final class BattleNetMovementSystem {
                     path = new PathFinder.Path(
                             PathFinder.Result.FOUND, new int[] {heading});
                 }
+            }
+            if (world.harvest.beginBattleNetEmptyDepotRouteIdleBand(
+                    worker, building, path)) {
+                return true;
             }
             boolean preserveCardinalTailCollision =
                     worker.battleNetGoldCardinalTailRefusal();
