@@ -39,11 +39,12 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   frontiers, capped at 400, is 18,366 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,121; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,413; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- The current AI-ledger milestone changes causal evidence, not simulation
-  behavior: the cycle-400 and cycle-1,800 fleets retained these exact counts
-  and the h260 regression gate with zero failed cases.
+- The current production-cadence milestone moved three independent campaign
+  frontiers: Human 4 from 493 to 545, Orc 4 from 499 to 584, and expansion Orc
+  4 from 493 to 648. The cycle-400 and cycle-1,800 fleets retained their exact
+  map counts and the h260 regression gate with zero failed cases.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
@@ -64,16 +65,18 @@ profile runs 2,772 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
-opens. The synchronization hash now covers that completion latch under schema
-2, so peers report the disagreement before a duplicate can appear. Hosted run
-`33147089166` passed both the data-free and authenticated jobs against revision
-`58a596feebfa734143a1d2bd4f2de032a99acd45`.
+opens. New training completions now retire atomically in the trainee's birth
+cycle while schema-2 loading remains compatible with older saved completion
+latches. The synchronization hash covers that latch, so peers report any old
+boundary disagreement before a duplicate can appear. Hosted run `33151916840`
+passed both the data-free and authenticated jobs against revision
+`379fd6bffef957a940a883299fce86014d58d37b`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.89` is the public release, published from revision
-`58a596feebfa734143a1d2bd4f2de032a99acd45` with game JAR SHA-256
-`bf6ace3af7ff2d50a461d8213ac4fd38d496d38893d0e1856f48ed7eb5535c8d`.
+Signed engine OTA `2026.0828.90` is the public release, published from revision
+`379fd6bffef957a940a883299fce86014d58d37b` with game JAR SHA-256
+`fb3831f7868091f37369ec0cddd235b74daf241e5db793259df6de1fe7d6362b`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
@@ -109,9 +112,9 @@ being inferred from the playable campaign fleet:
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
 - AI fleet: **52/52** current-head mission twins are materialized from
-  authenticated native captures. Committed state is exact for **42/52**
-  missions and **201,088/205,200** player-cycles. Full causal telemetry is
-  exact for **38/52** missions and **201,040/205,200** player-cycles. Fleet
+  authenticated native captures. Committed state is exact for **45/52**
+  missions and **202,290/205,200** player-cycles. Full causal telemetry is
+  exact for **40/52** missions and **202,244/205,200** player-cycles. Fleet
   certification remains incomplete until all 52 missions are exact under one
   proof.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
