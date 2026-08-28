@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine.save;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -1347,6 +1348,110 @@ class SaveGameTest {
         assertEquals("upgrade-sword1", loaded.researching(),
                 "the research and the gold spent on it were both lost");
         assertEquals(smith.progress(), loaded.progress());
+    }
+
+    @Test
+    @DisplayName("completed research retires once across save and resume")
+    void completedResearchRetiresOnceAcrossSaveAndResume() throws IOException {
+        Bench bench = bench();
+        World world = bench.world();
+        world.player(0).set(UnitType.Resource.GOLD, 50_000);
+        world.player(0).set(UnitType.Resource.WOOD, 50_000);
+        Unit smith = world.createUnit(
+                bench.types().get("unit-human-blacksmith"), 0, 10, 10);
+        assertTrue(world.orderResearch(smith, "upgrade-sword1"),
+                "the fixture could not start sword research");
+
+        for (int guard = 0; guard < 20_000 && !smith.orderFinished(); guard++) {
+            world.tick();
+        }
+        assertTrue(smith.orderFinished(),
+                "research never reached its committed completion boundary");
+        assertEquals("upgrade-sword1", smith.researching(),
+                "the completed research marker retired too early");
+        assertTrue(world.upgrades(0).has("upgrade-sword1"),
+                "the completion boundary did not grant the upgrade");
+        int smithId = smith.id();
+        int goldAfterCompletion = world.player(0).get(UnitType.Resource.GOLD);
+
+        World reloaded = reload(bench);
+        Unit loadedSmith = find(reloaded, "unit-human-blacksmith");
+        assertEquals(smithId, loadedSmith.id(),
+                "the researching building lost its saved identity");
+        assertTrue(loadedSmith.orderFinished(),
+                "the completed research latch was lost on load");
+        assertEquals("upgrade-sword1", loadedSmith.researching());
+        assertTrue(reloaded.upgrades(0).has("upgrade-sword1"));
+        assertEquals(goldAfterCompletion,
+                reloaded.player(0).get(UnitType.Resource.GOLD),
+                "loading charged for completed research again");
+
+        reloaded.tick();
+        assertFalse(loadedSmith.orderFinished(),
+                "the completed research latch was not consumed");
+        assertNull(loadedSmith.researching(),
+                "the completed research marker did not retire");
+        for (int guard = 0; guard < 20; guard++) {
+            reloaded.tick();
+            assertTrue(reloaded.upgrades(0).has("upgrade-sword1"),
+                    "retiring completed research revoked the upgrade");
+        }
+        assertEquals(goldAfterCompletion,
+                reloaded.player(0).get(UnitType.Resource.GOLD),
+                "retiring completed research charged for it again");
+    }
+
+    @Test
+    @DisplayName("a completed building upgrade retires once across save and resume")
+    void completedBuildingUpgradeRetiresOnceAcrossSaveAndResume() throws IOException {
+        Bench bench = bench();
+        World world = bench.world();
+        world.player(0).set(UnitType.Resource.GOLD, 50_000);
+        world.player(0).set(UnitType.Resource.WOOD, 50_000);
+        world.player(0).set(UnitType.Resource.OIL, 50_000);
+        Unit hall = world.createUnit(bench.types().get("unit-town-hall"), 0, 10, 10);
+        UnitType keep = bench.types().get("unit-keep");
+        assertTrue(world.orderUpgradeTo(hall, keep),
+                "the fixture could not start the hall upgrade");
+
+        for (int guard = 0; guard < 20_000 && !hall.orderFinished(); guard++) {
+            world.tick();
+        }
+        assertTrue(hall.orderFinished(),
+                "the hall never reached its committed upgrade boundary");
+        assertEquals(keep, hall.type(), "the hall did not transform into a keep");
+        assertEquals(keep, hall.upgradingTo(),
+                "the completed upgrade marker retired too early");
+        int buildingId = hall.id();
+        int tileX = hall.tileX();
+        int tileY = hall.tileY();
+
+        World reloaded = reload(bench);
+        Unit loadedKeep = find(reloaded, "unit-keep");
+        assertEquals(buildingId, loadedKeep.id(),
+                "the transformed building lost its saved identity");
+        assertEquals(tileX, loadedKeep.tileX(), "the transformed building moved on load");
+        assertEquals(tileY, loadedKeep.tileY(), "the transformed building moved on load");
+        assertTrue(loadedKeep.orderFinished(),
+                "the completed building-upgrade latch was lost on load");
+        assertEquals(keep, loadedKeep.upgradingTo());
+        assertEquals(1, aliveUnits(reloaded, "unit-keep").size(),
+                "loading duplicated the transformed building");
+        assertEquals(0, aliveUnits(reloaded, "unit-town-hall").size(),
+                "loading resurrected the pre-upgrade hall");
+
+        reloaded.tick();
+        assertFalse(loadedKeep.orderFinished(),
+                "the completed building-upgrade latch was not consumed");
+        assertNull(loadedKeep.upgradingTo(),
+                "the completed building-upgrade marker did not retire");
+        for (int guard = 0; guard < 20; guard++) {
+            reloaded.tick();
+        }
+        assertEquals(1, aliveUnits(reloaded, "unit-keep").size(),
+                "retiring the upgrade duplicated the transformed building");
+        assertEquals(0, aliveUnits(reloaded, "unit-town-hall").size(),
+                "retiring the upgrade restored the old building");
     }
 
     @Test
