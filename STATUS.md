@@ -32,19 +32,24 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
 - **52/52 maps are exact through cycle 263.** The lowest common divergence is
   cycle 264, so the shared proven frontier is cycle 263. Expansion Human 12
-  and expansion Orc 8 and 12 share that boundary.
+  is now the only map at that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,378 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,382 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,698; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,702; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- The current naval-patrol milestone moves expansion Orc 8 from cycle 261 to
-  264 by retaining a consumed small-warship route behind a moving allied hull.
-  Expansion Human 7 remains at 266 and expansion Orc 11 at 282, and all other
-  51 maps are unchanged across both complete fleets. The cycle-400 and
-  cycle-1,800 map counts remain 27 and 8 with zero failed cases.
+- The terminal-route naval milestone moves expansion Orc 8 from cycle 264 to
+  268. A paid small-warship congestion wake may replace a blocked route while
+  several headings remain, but retains its final consumed heading for the
+  ordinary cooperative hold. Two native-backed final-tail cases and held-out
+  fresh-route, coast, attack and multi-heading controls protect the systemic
+  distinction. All other 51 maps are unchanged across both complete fleets;
+  the cycle-400 and cycle-1,800 counts remain 27 and 8 with zero failed cases.
+  Clean accepted receipt `1c162ee068cd64ef21279aa7e2dcda729470fd979b4668a7a8f48aa9ccf37bf0`
+  binds source `7ae3de6f1826fe928bf2dd9faaa8961dc2c57002` to engine-input identity
+  `0ec4cb11a50eae80dfa0c981f7fc9538f6a5f80ad340fd0bdc929333c3c20a71`.
 - The crowded-depot milestone moves expansion Orc 12 from cycle 264 to 273 by
   letting a staged laden worker commit its final entry behind an allied worker
   whose own entry pixels are still draining. Expansion Human 7 independently
@@ -77,15 +82,17 @@ born twice, while a fully blocked trainee remains unborn until a legal exit
 opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
-boundary disagreement before a duplicate can appear. Hosted run `33175315548`
+boundary disagreement before a duplicate can appear. The new authenticated
+naval regression runs in this profile and deliberately adds one data-free skip.
+Hosted run `33181294334`
 passed both the data-free and authenticated jobs against revision
-`2dae1da996bfe5c480363a4e31881b61e25af463`.
+`7ae3de6f1826fe928bf2dd9faaa8961dc2c57002`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.94` is the public release, published from revision
-`2dae1da996bfe5c480363a4e31881b61e25af463` with game JAR SHA-256
-`962ca76f6f20618ad81b48fbb51a1a70d5d221de71a512a5498777f50a5fde21`.
+Signed engine OTA `2026.0828.95` is the public release, published from revision
+`7ae3de6f1826fe928bf2dd9faaa8961dc2c57002` with game JAR SHA-256
+`f91829ab394785ea17e8c3da7142d25942535b29f06873c0fc76817edf4f76f2`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
@@ -110,26 +117,19 @@ being inferred from the playable campaign fleet:
   regenerates all 240 cells from three hash-pinned Human, Orc, and expansion
   seeds, then reopens the inventory and execution ledger before accepting a
   numerator.
-- Physical player transactions: **1/532**. One cell has an exact current-source
-  native/Java semantic pair, proven by two independent sealed scenarios. The
-  two-unit held-out cell remains red on a real two-cycle terminal difference;
-  one retained store now reopens five native capture closures across the Human
-  and Orc campaigns and reruns their packaged Java twins with producer evidence
-  verified. Three reach a real terminal; the Human three-wide and Orc two-wide
-  40-cycle observations remain terminal-incomplete. The other 531 cells remain
-  open; detached receipts still cannot certify themselves.
+- Physical player transactions: **0/532** current-source paired certifications.
+  A retained store reopens five native capture closures across the Human and
+  Orc campaigns and reruns their packaged Java twins with producer evidence
+  verified, but none currently carries the complete identity-bound physical
+  transaction receipt this denominator requires. Detached or older exact cells
+  remain diagnostics and cannot certify themselves.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
-- AI fleet: **52/52** current-head mission twins are materialized from
-  authenticated native captures. Committed state is exact for **45/52**
-  missions and **202,290/205,200** player-cycles. Full causal telemetry is
-  exact for **45/52** missions and **202,285/205,200** player-cycles. The
-  schema-2 ledger derives requested/assigned launch receipts and effective
-  behavior-two target coordinates from authenticated native state. Native
-  air and naval target selection makes expansion Orc 11 and expansion Orc 8
-  fully causal-exact; the one remaining launch mismatch is downstream
-  expansion Human 12 fallout. Fleet certification remains incomplete until
-  all 52 missions are exact under one proof.
+- AI fleet: **0/52** current-head mission twins are materialized under one
+  conductor report. All 52 authenticated native captures are discoverable,
+  and older ledgers remain useful diagnostics, but their partial numerators do
+  not carry across source identities. Fleet certification remains incomplete
+  until one current report materializes and proves all 52 missions.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 
