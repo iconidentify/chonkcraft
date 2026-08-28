@@ -648,6 +648,15 @@ public final class SaveGame {
         state.append(" progress = ").append(unit.progress()).append(",");
         state.append(" progressGoal = ").append(unit.progressGoal()).append(",");
         state.append(" wait = ").append(unit.waitCycles()).append(",");
+        // Training, research, upgrades, construction and several movement
+        // orders keep their work marker for one cycle after committing the
+        // result.  The live unit's Finished latch is what makes that following
+        // cycle retire the marker instead of applying the result a second
+        // time.  A save at that boundary must carry the latch along with the
+        // newborn unit, completed upgrade, or finished construction state.
+        if (unit.orderFinished()) {
+            state.append(" orderFinished = true,");
+        }
         // Human 2's delayed victory is RESCUED_NEAR. Reloading an elf as
         // just another person-owned archer used to restart the 120-cycle
         // wait, because the trigger no longer saw a rescued unit.

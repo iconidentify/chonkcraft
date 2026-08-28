@@ -59,17 +59,19 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,796 tests**. The canonical authenticated
-profile runs 2,769 and intentionally skips exactly 27, while keeping the exact
-expected 110-test specification-failure set. Hosted run `33138979370` passed
-both the data-free and authenticated jobs against revision
-`4294dcea8b284c4253ce2aac737636b66e43d2a0`.
+The complete suite now contains **2,799 tests**. The canonical authenticated
+profile runs 2,772 and intentionally skips exactly 27, while keeping the exact
+expected 110-test specification-failure set. The added boundary matrix proves
+that completed land, naval and air trainees survive save/resume without being
+born twice, while a fully blocked trainee remains unborn until a legal exit
+opens. The synchronization hash now covers that completion latch under schema
+2, so peers report the disagreement before a duplicate can appear.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0827.87` is the public release, published from revision
-`53b6e96748dce391d001b9032fc0633e8208209b` with game JAR SHA-256
-`469d324b5616efefb177b3e02871fa1fba8e2a2bd9f13d0c9b2970c8fb356813`.
+Signed engine OTA `2026.0828.88` is the public release, published from revision
+`93ae15a421a264f19d7246fb1aa6768a53e80e1b` with game JAR SHA-256
+`a7a8cdc11cd1a160ca0bf0f8ba120d1026f06bf48749f1959ac59ec72ea1456f`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.

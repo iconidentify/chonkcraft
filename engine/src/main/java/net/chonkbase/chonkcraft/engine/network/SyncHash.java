@@ -30,7 +30,7 @@ public final class SyncHash {
      * operation changes. Persisted hashes without this identity are useful for
      * diagnostics, but cannot prove an exact replay under a later engine.
      */
-    public static final int SCHEMA = 1;
+    public static final int SCHEMA = 2;
 
     private SyncHash() {
     }
@@ -73,6 +73,7 @@ public final class SyncHash {
             hash = mix(hash, unit.hitPoints());
             hash = mix(hash, unit.order().ordinal());
             hash = mix(hash, unit.currentAction().ordinal());
+            hash = mix(hash, unit.orderFinished() ? 1 : 0);
             hash = mix(hash, unit.battleNetOrderDelay());
             hash = mix(hash, unit.actionBeforeQueuedReleaseDelay());
             hash = mix(hash, unit.battleNetPlayerCommandMove() ? 1 : 0);

@@ -757,6 +757,9 @@ public final class LoadGame {
         if (state.rawGet("wait") != null) {
             unit.setWaitCycles(integer(state.rawGet("wait")));
         }
+        if (state.rawGet("orderFinished") != null) {
+            unit.setOrderFinished(truthy(state.rawGet("orderFinished")));
+        }
         if (state.rawGet("rescuedFrom") != null) {
             unit.setRescuedFrom(integer(state.rawGet("rescuedFrom")));
         }

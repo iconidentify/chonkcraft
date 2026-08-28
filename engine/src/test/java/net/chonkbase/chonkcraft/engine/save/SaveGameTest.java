@@ -696,14 +696,21 @@ class SaveGameTest {
      * points are the game's.
      */
     private record Bench(World world, java.util.Map<String, UnitType> types,
-            java.util.Map<String, MissileType> missileTypes) {}
+            java.util.Map<String, MissileType> missileTypes, long terrainFlags) {}
+
+    private record TrainingBoundary(String label, String producer, String trainee,
+            long terrainFlags, int movementStride) {}
 
     private static Bench bench() {
+        return bench(TileFlag.LAND_ALLOWED);
+    }
+
+    private static Bench bench(long terrainFlags) {
         Fixture fixture = load();
         GameMap map = new GameMap(48, 48, new Tileset());
         for (int y = 0; y < map.height(); y++) {
             for (int x = 0; x < map.width(); x++) {
-                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+                map.field(x, y).setFlags(terrainFlags);
             }
         }
         map.recordLoadedTerrain();
@@ -712,7 +719,7 @@ class SaveGameTest {
         world.setUnitTypes(fixture.data().unitTypes().types());
         world.setMissileTypes(fixture.data().missiles().types());
         return new Bench(world, fixture.data().unitTypes().types(),
-                fixture.data().missiles().types());
+                fixture.data().missiles().types(), terrainFlags);
     }
 
     private static World reload(Bench bench) throws IOException {
@@ -726,7 +733,7 @@ class SaveGameTest {
                 new Tileset());
         for (int y = 0; y < map.height(); y++) {
             for (int x = 0; x < map.width(); x++) {
-                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+                map.field(x, y).setFlags(bench.terrainFlags());
             }
         }
         map.recordLoadedTerrain();
@@ -1100,6 +1107,125 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a completed trainee is not born twice across save and resume")
+    void aCompletedTraineeIsNotBornTwiceAcrossSaveAndResume() throws IOException {
+        List<TrainingBoundary> boundaries = List.of(
+                new TrainingBoundary("land infantry", "unit-human-barracks",
+                        "unit-footman", TileFlag.LAND_ALLOWED, 1),
+                new TrainingBoundary("naval destroyer", "unit-human-shipyard",
+                        "unit-human-destroyer", TileFlag.WATER_ALLOWED, 2),
+                new TrainingBoundary("air flyer", "unit-gryphon-aviary",
+                        "unit-gryphon-rider", TileFlag.LAND_ALLOWED, 2));
+
+        for (TrainingBoundary boundary : boundaries) {
+            Bench bench = bench(boundary.terrainFlags());
+            World world = bench.world();
+            world.player(0).set(UnitType.Resource.GOLD, 50_000);
+            world.player(0).set(UnitType.Resource.WOOD, 50_000);
+            world.player(0).set(UnitType.Resource.OIL, 50_000);
+            world.createUnit(bench.types().get("unit-farm"), 0, 2, 2);
+            Unit producer = world.createUnit(
+                    bench.types().get(boundary.producer()), 0, 20, 20);
+            UnitType trainee = bench.types().get(boundary.trainee());
+            assertTrue(world.orderTrain(producer, trainee),
+                    boundary.label() + " could not start training");
+
+            for (int guard = 0; guard < 20_000 && !producer.orderFinished(); guard++) {
+                world.tick();
+            }
+            assertTrue(producer.orderFinished(),
+                    boundary.label() + " never reached the completion boundary");
+            assertNotNull(producer.producing(),
+                    boundary.label() + " did not retain its one-cycle job marker");
+            List<Unit> born = aliveUnits(world, boundary.trainee());
+            assertEquals(1, born.size(), boundary.label() + " was not born exactly once");
+            Unit original = born.get(0);
+            int originalDemand = world.player(0).demand();
+
+            World reloaded = reload(bench);
+            Unit loadedProducer = find(reloaded, boundary.producer());
+            Unit loadedTrainee = find(reloaded, boundary.trainee());
+            assertEquals(original.id(), loadedTrainee.id(),
+                    boundary.label() + " lost its saved identity");
+            assertTrue(loadedProducer.orderFinished(),
+                    boundary.label() + " lost the completed-job latch");
+
+            for (int guard = 0; guard < 100 && loadedProducer.producing() != null; guard++) {
+                reloaded.tick();
+                assertEquals(1, aliveUnits(reloaded, boundary.trainee()).size(),
+                        boundary.label() + " was duplicated while retiring the saved job");
+            }
+            assertEquals(1, aliveUnits(reloaded, boundary.trainee()).size(),
+                    boundary.label() + " was duplicated after resume");
+            assertFalse(loadedProducer.orderFinished(),
+                    boundary.label() + " did not consume the completion latch");
+            assertTrue(loadedProducer.producing() == null,
+                    boundary.label() + " did not clear the completed job");
+            assertEquals(originalDemand, reloaded.player(0).demand(),
+                    boundary.label() + " debited demand more than once");
+            assertEquals(0, loadedTrainee.tileX() % boundary.movementStride(),
+                    boundary.label() + " resumed off its movement grid in x");
+            assertEquals(0, loadedTrainee.tileY() % boundary.movementStride(),
+                    boundary.label() + " resumed off its movement grid in y");
+            assertFootprintOccupied(reloaded, loadedTrainee, boundary.label());
+            int moveX = loadedTrainee.tileX() - 2 * boundary.movementStride();
+            assertTrue(reloaded.orderMove(loadedTrainee, moveX, loadedTrainee.tileY()),
+                    boundary.label() + " could not accept a player movement order");
+        }
+    }
+
+    @Test
+    @DisplayName("a blocked completed trainee remains unborn across save and resume")
+    void aBlockedCompletedTraineeRemainsUnbornAcrossSaveAndResume() throws IOException {
+        Bench bench = bench();
+        World world = bench.world();
+        world.player(0).set(UnitType.Resource.GOLD, 50_000);
+        world.createUnit(bench.types().get("unit-farm"), 0, 2, 2);
+        Unit barracks = world.createUnit(
+                bench.types().get("unit-human-barracks"), 0, 20, 20);
+        assertTrue(world.orderTrain(barracks, bench.types().get("unit-footman")));
+        for (int y = 0; y < world.map().height(); y++) {
+            for (int x = 0; x < world.map().width(); x++) {
+                world.map().field(x, y).addFlags(TileFlag.UNPASSABLE);
+            }
+        }
+        for (int guard = 0;
+                guard < 20_000 && barracks.progress() < barracks.progressGoal(); guard++) {
+            world.tick();
+        }
+        assertTrue(barracks.progress() >= barracks.progressGoal(),
+                "the blocked job never reached full progress");
+        assertFalse(barracks.orderFinished(),
+                "a job with no legal exit claimed it had spawned");
+        assertEquals(0, aliveUnits(world, "unit-footman").size(),
+                "a footman crossed the sealed boundary");
+
+        World reloaded = reload(bench);
+        Unit loadedBarracks = find(reloaded, "unit-human-barracks");
+        assertFalse(loadedBarracks.orderFinished(),
+                "the blocked control acquired a false completion latch");
+        assertEquals(0, aliveUnits(reloaded, "unit-footman").size(),
+                "loading invented a blocked trainee");
+
+        reloaded.map().field(19, 20).removeFlags(TileFlag.UNPASSABLE);
+        for (int guard = 0;
+                guard < 100 && aliveUnits(reloaded, "unit-footman").isEmpty(); guard++) {
+            reloaded.tick();
+        }
+        assertEquals(1, aliveUnits(reloaded, "unit-footman").size(),
+                "freeing one legal exit did not spawn exactly one trainee");
+        for (int guard = 0; guard < 100 && loadedBarracks.producing() != null; guard++) {
+            reloaded.tick();
+            assertEquals(1, aliveUnits(reloaded, "unit-footman").size(),
+                    "the newly unblocked trainee was duplicated");
+        }
+        assertEquals(1, aliveUnits(reloaded, "unit-footman").size(),
+                "the newly unblocked trainee was duplicated");
+        assertTrue(loadedBarracks.producing() == null,
+                "the unblocked completed job did not clear");
+    }
+
+    @Test
     @DisplayName("a blacksmith resumes the research it has already paid for")
     void aBuildingKeepsTheResearchItHasPaidFor() throws IOException {
         Bench bench = bench();
@@ -1463,5 +1589,24 @@ class SaveGameTest {
         return world.units().stream()
                 .filter(unit -> unit.type() != null && ident.equals(unit.type().ident()))
                 .findFirst().orElseThrow();
+    }
+
+    private static List<Unit> aliveUnits(World world, String ident) {
+        return world.units().stream()
+                .filter(Unit::isAlive)
+                .filter(unit -> unit.type() != null && ident.equals(unit.type().ident()))
+                .toList();
+    }
+
+    private static void assertFootprintOccupied(World world, Unit unit, String label) {
+        long occupancy = unit.type().airUnit() ? TileFlag.AIR_UNIT
+                : unit.type().seaUnit() ? TileFlag.SEA_UNIT : TileFlag.LAND_UNIT;
+        for (int dy = 0; dy < unit.type().tileHeight(); dy++) {
+            for (int dx = 0; dx < unit.type().tileWidth(); dx++) {
+                assertTrue(world.map().field(unit.tileX() + dx, unit.tileY() + dy)
+                                .hasFlag(occupancy),
+                        label + " lost footprint occupancy at " + dx + "," + dy);
+            }
+        }
     }
 }

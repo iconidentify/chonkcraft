@@ -601,6 +601,18 @@ class LockstepTest {
     }
 
     @Test
+    void theHashCoversTheCompletedOrderLatch() {
+        World first = battlefield();
+        World second = battlefield();
+        assertEquals(SyncHash.of(first), SyncHash.of(second));
+
+        second.units().getFirst().setOrderFinished(true);
+
+        assertNotEquals(SyncHash.of(first), SyncHash.of(second),
+                "a peer poised to retire an order must desync before it applies the result twice");
+    }
+
+    @Test
     @DisplayName("the multiplayer hash covers destructible and constructed terrain")
     void theHashCoversTerrainChanges() {
         World first = battlefield();
