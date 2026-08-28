@@ -130,9 +130,9 @@ being inferred from the playable campaign fleet:
   telemetry exact through 1,800 cycles. The fixed denominator is 205,200
   computer-player cycles: 202,290 committed-state rows and 202,285 telemetry
   rows are exact. Seven ranked frontiers remain, so fleet certification is
-  incomplete. Java proof `31e6c8e2829d24f465102dfc57697f444c120f66ad3e0009b711b78ae6813eb9`
-  binds all twins to clean source `455bbeb469a1f89dd30f4dec6193f1e9eaac654a`
-  and engine identity `05f3b8b4632748990dda8271fb8676fb493a53333d33a75ba4a919cee71fa244`.
+  incomplete. The retained conductor proof is validated fail-closed against
+  the current clean source, engine, Java adapter, app JAR, ChonkPack and
+  retail `ai.bin` identities.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 
