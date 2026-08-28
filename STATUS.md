@@ -119,12 +119,13 @@ being inferred from the playable campaign fleet:
   regenerates all 240 cells from three hash-pinned Human, Orc, and expansion
   seeds, then reopens the inventory and execution ledger before accepting a
   numerator.
-- Physical player transactions: **0/532** current-source paired certifications.
+- Physical player transactions: **1/532** current-source paired certifications.
   A retained store reopens five native capture closures across the Human and
   Orc campaigns and reruns their packaged Java twins with producer evidence
-  verified, but none currently carries the complete identity-bound physical
-  transaction receipt this denominator requires. Detached or older exact cells
-  remain diagnostics and cannot certify themselves.
+  verified. The single-unit, field/plain/open-ground Move cell is exact across
+  two independent scenarios. The two-unit held-out remains red because its
+  second footman settles two cycles late; it is retained as movement debt rather
+  than hidden by normalization or a scenario-specific exception.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
 - AI fleet: **52/52** current-head mission twins are materialized under one
