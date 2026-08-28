@@ -30,21 +30,21 @@ legacy identities prevent attributing the later difference to either its older
 The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 260.** The lowest common divergence is
-  cycle 261, so the shared proven frontier is cycle 260. Expansion Orc 8 is
-  the sole map at that boundary; every other mission reaches at least cycle
-  263.
+- **52/52 maps are exact through cycle 263.** The lowest common divergence is
+  cycle 264, so the shared proven frontier is cycle 263. Expansion Human 12
+  and expansion Orc 8 and 12 share that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,366 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,369 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,686; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,689; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- The current production-cadence milestone moved three independent campaign
-  frontiers: Human 4 from 493 to 545, Orc 4 from 499 to 584, and expansion Orc
-  4 from 493 to 648. The cycle-400 and cycle-1,800 fleets retained their exact
-  map counts and the h260 regression gate with zero failed cases.
+- The current naval-patrol milestone moves expansion Orc 8 from cycle 261 to
+  264 by retaining a consumed small-warship route behind a moving allied hull.
+  Expansion Human 7 remains at 266 and expansion Orc 11 at 282, and all other
+  51 maps are unchanged across both complete fleets. The cycle-400 and
+  cycle-1,800 map counts remain 27 and 8 with zero failed cases.
 - Computer oil tankers now preserve native action 23 behind the 25-cycle
   depot-ready Still head. Two independent campaigns advance without a fleet
   regression: Orc 7 is exact through 823 instead of 596, and Orc 10 through
@@ -72,15 +72,15 @@ born twice, while a fully blocked trainee remains unborn until a legal exit
 opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
-boundary disagreement before a duplicate can appear. Hosted run `33165685580`
+boundary disagreement before a duplicate can appear. Hosted run `33169087093`
 passed both the data-free and authenticated jobs against revision
-`9f256453c239aa0fdf38161dd6f8953e9b64f6a3`.
+`91a85a119bed859d882f0bb42f8df52f74e68a98`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.92` is the public release, published from revision
-`9f256453c239aa0fdf38161dd6f8953e9b64f6a3` with game JAR SHA-256
-`c61afdd17224e779ed6501b43360996788bd4582c55864a746e32c93e40e353e`.
+Signed engine OTA `2026.0828.93` is the public release, published from revision
+`91a85a119bed859d882f0bb42f8df52f74e68a98` with game JAR SHA-256
+`f9034e03df61376702d882629610891471e1ee908556be1bca2f5e67ebbb9fbb`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
