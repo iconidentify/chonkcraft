@@ -4029,7 +4029,26 @@ final class BattleNetHarvestSystem {
         // spend a ready marker on a farm: Human 11 player 4 kept 720
         // gold through 1399 while retail founded 72,12 and rewrote the
         // land box. Player-issued resource orders keep their loop.
-        if (pauseOilForReadyDispatch(worker, info) || landReadyBoundary) {
+        boolean oilReadyBoundary = pauseOilForReadyDispatch(worker, info);
+        if (oilReadyBoundary) {
+            // An empty AI tanker retains its remembered platform as raw next
+            // action 23 behind the same 25-cycle Still head as land workers.
+            // Orc 10 tanker 1547 surfaces on fixture 439, promotes Resource
+            // on 464, and first strides on 467; Orc 7 tanker 1532 repeats the
+            // independent sequence at 596, 621 and 624. Without the queued
+            // continuation the next idle marker immediately reconstructed
+            // Harvest, one cycle after each depot exit. A tanker with no live
+            // platform deliberately keeps an empty queue so the ready callback
+            // can search or found one instead.
+            if (world.battleNetSequence != null
+                    && !worker.hasQueuedOrders()
+                    && mine != null && mine.isAlive()) {
+                queueDepotHarvestContinuation(worker, mine,
+                        mine.tileX(), mine.tileY());
+            }
+            return;
+        }
+        if (landReadyBoundary) {
             return;
         }
         if (noWoodLeft

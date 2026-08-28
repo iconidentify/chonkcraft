@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2803 tests,   27 skipped
-    no external input          2803 tests, 1188 skipped
+    authenticated inputs       2805 tests,   27 skipped
+    no external input          2805 tests, 1190 skipped
 
 Both can be green.
 
@@ -152,7 +152,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1889, 861),
+        "engine": (1891, 863),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -203,7 +203,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1889, 7),
+        "engine": (1891, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (355, 8),

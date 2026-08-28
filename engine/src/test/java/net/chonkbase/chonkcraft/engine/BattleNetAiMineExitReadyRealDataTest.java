@@ -235,6 +235,24 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an Orc 10 AI tanker pays BNE's depot-ready window")
+    void anOrc10AiTankerPaysBnesDepotReadyWindow() {
+        Mission mission = mission("campaigns/orc/level10o");
+        assertTankerDepotReadyAndResume(mission, 53,
+                439, 464, 467, 8, 18, 6, 18,
+                "native slot 1547");
+    }
+
+    @Test
+    @DisplayName("an Orc 7 AI tanker pays BNE's depot-ready window")
+    void anOrc7AiTankerPaysBnesDepotReadyWindow() {
+        Mission mission = mission("campaigns/orc/level07o");
+        assertTankerDepotReadyAndResume(mission, 68,
+                596, 621, 624, 52, 34, 54, 36,
+                "native slot 1532");
+    }
+
+    @Test
     @DisplayName("an Human 8 empty depot route owns its active idle draw")
     void anHuman8EmptyDepotRouteOwnsItsActiveIdleDraw() {
         Mission mission = mission("campaigns/human/level08h");
@@ -371,6 +389,56 @@ class BattleNetAiMineExitReadyRealDataTest {
                 "native takes the first homeward stride on fixture cycle "
                         + firstStrideCycle);
         assertEquals(strideY, worker.tileY());
+    }
+
+    private static void assertTankerDepotReadyAndResume(Mission mission,
+            int javaId, int exitCycle, int resourceCycle, int firstStrideCycle,
+            int exitX, int exitY, int strideX, int strideY, String nativeSlot) {
+        while (fixtureCycle(mission.world()) < exitCycle) {
+            mission.tick();
+        }
+
+        Unit tanker = byId(mission.world(), javaId);
+        assertNotNull(tanker, nativeSlot + " must remain paired with Java " + javaId);
+        assertEquals("unit-human-oil-tanker", tanker.type().ident());
+        assertEquals(exitX, tanker.tileX());
+        assertEquals(exitY, tanker.tileY());
+        assertEquals(0, tanker.carried());
+        assertEquals(Unit.Order.STILL, tanker.order(),
+                nativeSlot + " must surface through the naval ready boundary");
+        assertEquals(25, tanker.battleNetOrderDelay(),
+                "the empty depot exit must retain BNE's 25-cycle Still head");
+        assertEquals(1, tanker.queuedOrders().size(),
+                "raw next action 23 must remain queued behind that Still head");
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                tanker.queuedOrders().get(0).kind());
+        assertNotNull(tanker.queuedOrders().get(0).target(),
+                "the queued continuation must retain the live oil platform");
+
+        for (int cycle = exitCycle + 1; cycle < resourceCycle; cycle++) {
+            mission.tick();
+            assertEquals(Unit.Order.STILL, tanker.order(),
+                    "native holds the tanker Still through fixture cycle " + cycle);
+            assertEquals(exitX, tanker.tileX());
+            assertEquals(exitY, tanker.tileY());
+        }
+        mission.tick();
+        assertEquals(resourceCycle, fixtureCycle(mission.world()));
+        assertEquals(Unit.Order.HARVEST, tanker.order(),
+                "native promotes action 23 on fixture cycle " + resourceCycle);
+        assertEquals(Unit.Order.HARVEST, tanker.currentAction());
+
+        for (int cycle = resourceCycle + 1; cycle < firstStrideCycle; cycle++) {
+            mission.tick();
+            assertEquals(exitX, tanker.tileX());
+            assertEquals(exitY, tanker.tileY());
+        }
+        mission.tick();
+        assertEquals(firstStrideCycle, fixtureCycle(mission.world()));
+        assertEquals(strideX, tanker.tileX(),
+                "native takes its first doubled tanker stride on fixture cycle "
+                        + firstStrideCycle);
+        assertEquals(strideY, tanker.tileY());
     }
 
     private static Mission mission(String map) {

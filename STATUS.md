@@ -39,12 +39,16 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   frontiers, capped at 400, is 18,366 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,413; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,686; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
 - The current production-cadence milestone moved three independent campaign
   frontiers: Human 4 from 493 to 545, Orc 4 from 499 to 584, and expansion Orc
   4 from 493 to 648. The cycle-400 and cycle-1,800 fleets retained their exact
   map counts and the h260 regression gate with zero failed cases.
+- Computer oil tankers now preserve native action 23 behind the 25-cycle
+  depot-ready Still head. Two independent campaigns advance without a fleet
+  regression: Orc 7 is exact through 823 instead of 596, and Orc 10 through
+  485 instead of 439.
 
 "Tested through cycle 400" or "through cycle 1,800" describes coverage, not a
 claim that every map is exact for that whole window. The common frontier is
@@ -60,7 +64,7 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,803 tests**. The canonical authenticated
+The complete suite now contains **2,805 tests**. The canonical authenticated
 profile runs 2,776 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being

@@ -10633,9 +10633,18 @@ public final class World {
                 // at 12. attack-1/00 without it dest-armed at 10 and finished
                 // two pixels early. An issue-visit Attack (queueWait 0)
                 // dest-arms on that visit.
+                boolean queuedTankerHarvestOpening =
+                        queued.kind() == Unit.QueuedOrderKind.HARVEST
+                        && unit.type() != null
+                        && unit.type().gathering().containsKey(
+                                UnitType.Resource.OIL)
+                        && unit.resourceUnit() != null
+                        && !harvest.battleNetOilTankerReachedApproach(
+                                unit, unit.resourceUnit());
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
                         || queued.kind() == Unit.QueuedOrderKind.PATROL
                         || queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
+                        || queuedTankerHarvestOpening
                         || (queued.kind() == Unit.QueuedOrderKind.MOVE
                                 && unit.destPathOpeningHold())
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
