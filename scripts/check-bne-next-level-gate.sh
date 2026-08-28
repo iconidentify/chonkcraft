@@ -45,6 +45,22 @@ python3 tools/bne-harness/scripts/bne_combat_lifecycle.py inventory \
   tools/bne-harness/combat-lifecycle-requirements.json \
   --output "$OUT/combat-inventory.json" >/dev/null
 
+COMMAND_SEEDS=(
+  tools/bne-harness/work/corpus/campaign-1800/cases/retail-human-01-idle.bnefx
+  tools/bne-harness/work/corpus/campaign-1800/cases/retail-orc-01-idle.bnefx
+  tools/bne-harness/work/corpus/campaign-1800/cases/retail-xhuman-12-idle.bnefx
+)
+for fixture in "${COMMAND_SEEDS[@]}"; do
+  test -f "$fixture" || {
+    echo "missing authenticated command seed: $fixture" >&2
+    exit 1
+  }
+done
+python3 tools/bne-harness/scripts/bne_playtest_explorer.py coverage-inventory \
+  "${COMMAND_SEEDS[@]}" \
+  --max-scenarios 80 \
+  --output "$OUT/coverage-inventory.json"
+
 COMMAND_FIXTURES=()
 while IFS= read -r fixture; do
   COMMAND_FIXTURES+=("$fixture")
@@ -58,11 +74,11 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py execute-commanded \
   "${COMMAND_FIXTURES[@]}" \
   --output "$OUT/execution-ledger.json" \
   --registry "$OUT/native-command-registry.json" \
-  --inventory tools/bne-harness/work/playtest-explorer/coverage-inventory.json \
+  --inventory "$OUT/coverage-inventory.json" \
   --asset-pack "$PACK"
 python3 tools/bne-harness/scripts/bne_playtest_explorer.py worklist \
   "$OUT/execution-ledger.json" \
-  --inventory tools/bne-harness/work/playtest-explorer/coverage-inventory.json \
+  --inventory "$OUT/coverage-inventory.json" \
   --output "$OUT/player-worklist.json" \
   --markdown "$OUT/player-worklist.generated"
 
@@ -83,6 +99,8 @@ STATUS_ARGS=(
   --root "$ROOT"
   --asset-pack "$PACK"
   --command-report "$OUT/command-split-report.json"
+  --command-ledger "$OUT/execution-ledger.json"
+  --command-inventory "$OUT/coverage-inventory.json"
   --output "$OUT/status.json"
   --markdown-output "$OUT/NEXT.md"
 )

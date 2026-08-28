@@ -92,6 +92,19 @@ class PlaytestExplorerTest(unittest.TestCase):
             "--fault", fault,
         ])
 
+    def inventory(self, scenarios, *, families=None, patterns=None):
+        cells = [explorer.command_cell(item) for item in scenarios]
+        return {
+            "schema": explorer.INVENTORY_SCHEMA,
+            "generated_scenarios": len(cells),
+            "families": families or sorted({
+                command["kind"] for item in scenarios
+                for command in item["commands"]
+            }),
+            "patterns": patterns or sorted({item["pattern"] for item in scenarios}),
+            "cells": cells,
+        }
+
     def test_generates_legal_timing_repeat_and_replacement_scenarios(self):
         scenarios = explorer.generate_scenarios(self.seed(), max_scenarios=500)
         self.assertGreater(len(scenarios), 40)
@@ -674,7 +687,12 @@ class PlaytestExplorerTest(unittest.TestCase):
             self.skipTest("authenticated campaign-1800 idle fixtures are missing")
         seeds = [explorer.seed_from_idle_fixture(path) for path in fixtures]
         report = explorer.coverage_inventory(seeds, max_scenarios=80)
-        self.assertGreaterEqual(report["generated_scenarios"], 1)
+        self.assertEqual(explorer.INVENTORY_SCHEMA, report["schema"])
+        self.assertEqual(240, report["generated_scenarios"])
+        self.assertEqual(240, len(report["cells"]))
+        self.assertEqual(240, len({
+            cell["cell_sha256"] for cell in report["cells"]
+        }))
         self.assertEqual(
             report.get("dual_adapter_executed_scenarios", 0), 0,
             "generation without adapters is not dual-adapter execution")
@@ -780,6 +798,7 @@ class PlaytestExplorerTest(unittest.TestCase):
             row = explorer.execution_ledger_row(
                 scenario, native, java, source=f"synthetic-{index}")
             row["command_content_sha256"] = f"{index:064x}"
+            row["command_cell_sha256"] = f"{index + 1:064x}"
             row["families"] = [families[index % len(families)]]
             rows.append(row)
         report = explorer.execution_ledger(rows)
@@ -794,23 +813,107 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertGreaterEqual(split["comparable"], 100)
         self.assertEqual(split["exact_parity"], split["comparable"])
         self.assertEqual(0, split["materially_divergent"])
+        self.assertFalse(split["identity_bound"])
         self.assertFalse(split["complete"])
         self.assertFalse(split["parity"])
 
+    def test_command_cell_binds_map_seed_horizon_and_production_type(self):
+        seed = self.seed()
+        seed["actors"] = [{
+            "id": 7, "player": 0, "domain": "land",
+            "capabilities": ["train"], "type_index": 3,
+        }]
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+
+        def changed(mutator):
+            item = copy.deepcopy(scenario)
+            mutator(item)
+            item["scenario_sha256"] = explorer.digest({
+                key: value for key, value in item.items()
+                if key != "scenario_sha256"
+            })
+            return item
+
+        variants = [
+            changed(lambda item: item["setup"].update(scenario="other.pud")),
+            changed(lambda item: item["seed_identity"].update(seed=14598367)),
+            changed(lambda item: item.update(settle_cycles=121)),
+            changed(lambda item: item["commands"][0].update(type_index=4)),
+        ]
+        original = explorer.command_cell(scenario)["cell_sha256"]
+        self.assertTrue(all(
+            explorer.command_cell(item)["cell_sha256"] != original
+            for item in variants
+        ))
+
+    def test_split_report_ignores_an_exact_historical_cell(self):
+        scenarios = explorer.generate_scenarios(
+            self.seed(), max_scenarios=2)
+        historical, required = scenarios
+        row = explorer.execution_ledger_row(
+            historical, self.result(historical, "native"),
+            self.result(historical, "java"), source="historical.bnefx")
+        split = explorer.split_command_report(
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([required]))
+        self.assertEqual(0, split["comparable"])
+        self.assertEqual(0, split["exact_parity"])
+        self.assertEqual(1, split["unmatched_executed"])
+        self.assertEqual(1, split["missing_cells"])
+        self.assertFalse(split["complete"])
+
+    def test_split_report_recomputes_a_claimed_current_cell(self):
+        scenarios = explorer.generate_scenarios(
+            self.seed(), max_scenarios=2)
+        historical, required = scenarios
+        row = explorer.execution_ledger_row(
+            historical, self.result(historical, "native"),
+            self.result(historical, "java"), source="relabelled.bnefx")
+        required_cell = explorer.command_cell(required)
+        row["command_cell_sha256"] = required_cell["cell_sha256"]
+        row["command_cell"] = required_cell
+        split = explorer.split_command_report(
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([required]))
+        self.assertEqual(0, split["comparable"])
+        self.assertEqual(1, split["infrastructure_failure"])
+        self.assertEqual(1, split["missing_cells"])
+        self.assertFalse(split["complete"])
+
+    def test_duplicate_row_cannot_replace_a_missing_cell(self):
+        scenarios = explorer.generate_scenarios(
+            self.seed(), max_scenarios=2)
+        scenario = scenarios[0]
+        row = explorer.execution_ledger_row(
+            scenario, self.result(scenario, "native"),
+            self.result(scenario, "java"), source="duplicate.bnefx")
+        ledger = explorer.execution_ledger([row, copy.deepcopy(row)])
+        inventory = self.inventory(scenarios)
+        split = explorer.split_command_report(ledger, inventory=inventory)
+        worklist = explorer.command_worklist(ledger, inventory=inventory)
+        self.assertEqual(1, split["exact_parity"])
+        self.assertEqual(1, split["infrastructure_failure"])
+        self.assertEqual(1, split["missing_cells"])
+        self.assertFalse(split["complete"])
+        self.assertFalse(worklist["gate"]["parity"])
+
     def test_split_report_is_complete_only_when_the_generated_denominator_is_exact(self):
-        scenario = explorer.generate_scenarios(
-            self.seed(), max_scenarios=1)[0]
+        scenarios = explorer.generate_scenarios(
+            self.seed(), max_scenarios=2)
+        scenario = scenarios[0]
         native = self.result(scenario, "native")
         java = self.result(scenario, "java")
         row = explorer.execution_ledger_row(
             scenario, native, java, source="only.bnefx")
         split = explorer.split_command_report(
-            explorer.execution_ledger([row]), generated_scenarios=1)
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([scenario]))
         self.assertTrue(split["complete"],
                         "exact_parity == generated is the only complete signal")
         self.assertTrue(split["parity"])
         still_short = explorer.split_command_report(
-            explorer.execution_ledger([row]), generated_scenarios=2)
+            explorer.execution_ledger([row]),
+            inventory=self.inventory(scenarios))
         self.assertFalse(still_short["complete"],
                          "a short executed set must not complete a larger "
                          "generated denominator")
@@ -824,7 +927,8 @@ class PlaytestExplorerTest(unittest.TestCase):
         row = explorer.execution_ledger_row(
             scenario, native, java, source="mismatch.bnefx")
         split = explorer.split_command_report(
-            explorer.execution_ledger([row]), generated_scenarios=10)
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([scenario]))
         self.assertEqual(1, split["comparable"])
         self.assertEqual(0, split["exact_parity"])
         self.assertEqual(1, split["materially_divergent"])
@@ -855,11 +959,9 @@ class PlaytestExplorerTest(unittest.TestCase):
             row(scenario, 5, 5, "fixed.bnefx"),
             row(later, 5, 9, "regressed.bnefx"),
         ])
-        inventory = {
-            "generated_scenarios": 10,
-            "families": ["move", "attack-move"],
-            "patterns": ["single", "group"],
-        }
+        inventory = self.inventory(
+            [scenario, later], families=["move", "attack-move"],
+            patterns=["single", "group"])
         report = explorer.command_worklist(
             current, inventory=inventory, baseline=baseline,
             expected_java_sha256="b" * 64)

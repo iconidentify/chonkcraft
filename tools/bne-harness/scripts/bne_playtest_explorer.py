@@ -34,6 +34,7 @@ RESULT_SCHEMA = "chonkcraft-bne-playtest-result-1"
 REPORT_SCHEMA = "chonkcraft-bne-playtest-exploration-1"
 PACKET_SCHEMA = "chonkcraft-bne-playtest-divergence-1"
 SEED_SCHEMA = "chonkcraft-bne-playtest-seed-1"
+INVENTORY_SCHEMA = "chonkcraft-bne-playtest-coverage-inventory-2"
 PINNED_BNE_EXECUTABLE_SHA256 = (
     "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
 )
@@ -377,6 +378,8 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
         command_cycle: int = 5, distance: int = 4) -> dict[str, Any]:
     """Promote the authenticated movement matrix into an exploration seed."""
     source = fixture.expanduser().resolve()
+    source_manifest = bne_command_matrix._manifest(source)
+    source_run = source_manifest.get("run") or {}
     plan, scripts = bne_command_matrix.compile_matrix(
         source, cycles=cycles, command_cycle=command_cycle, distance=distance)
     actors: dict[int, dict[str, Any]] = {}
@@ -434,6 +437,9 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
             "kind": "sealed-fixture",
             "fixture": str(source),
             "fixture_id": plan["source_fixture_id"],
+            "scenario": source_run.get("requested_scenario"),
+            "seed": source_run.get("initialization_seed"),
+            "cycle_limit": cycles,
             "matrix_lanes": lanes,
         },
         "start_cycle": command_cycle,
@@ -691,6 +697,8 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
     patterns: set[str] = set()
     generated = 0
     per_seed: list[dict[str, Any]] = []
+    cells: list[dict[str, Any]] = []
+    cell_ids: set[str] = set()
     for seed in seeds:
         validate_seed(seed)
         scenarios = generate_scenarios(seed, max_scenarios=max_scenarios)
@@ -701,6 +709,14 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
         families.update(seed_families)
         patterns.update(seed_patterns)
         generated += len(scenarios)
+        for scenario in scenarios:
+            cell = command_cell(scenario)
+            cell_id = cell["cell_sha256"]
+            if cell_id in cell_ids:
+                raise ValueError(
+                    "coverage inventory generated a duplicate command cell")
+            cell_ids.add(cell_id)
+            cells.append(cell)
         per_seed.append({
             "identity": seed.get("identity"),
             "generated_scenarios": len(scenarios),
@@ -715,7 +731,7 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
         executed = int(ledger.get("dual_adapter_executed_scenarios") or 0)
         executed_families = list(ledger.get("families") or [])
     return {
-        "schema": "chonkcraft-bne-playtest-coverage-inventory-1",
+        "schema": INVENTORY_SCHEMA,
         "seed_count": len(seeds),
         "generated_scenarios": generated,
         "dual_adapter_executed_scenarios": executed,
@@ -724,6 +740,7 @@ def coverage_inventory(seeds: list[dict[str, Any]], *,
         "families": sorted(families),
         "patterns": sorted(patterns),
         "seeds": per_seed,
+        "cells": sorted(cells, key=lambda item: item["cell_sha256"]),
         "complete": False,
     }
 
@@ -928,21 +945,76 @@ def scenario_from_commanded_seed(seed: dict[str, Any]) -> dict[str, Any]:
     return scenario
 
 
-def command_content_identity(scenario: dict[str, Any]) -> str:
-    """Identity of the orders themselves, ignoring fixture path wrappers."""
-    validate_scenario(scenario)
-    return digest([
+def _command_content(commands: Any) -> list[dict[str, Any]]:
+    if not isinstance(commands, list) or not commands:
+        raise ValueError("command content needs a non-empty command list")
+    content: list[dict[str, Any]] = []
+    for command in commands:
+        if not isinstance(command, dict):
+            raise ValueError("command content contains a non-object command")
+        if not isinstance(command.get("kind"), str) \
+                or not isinstance(command.get("unit_id"), int) \
+                or not isinstance(command.get("issue_cycle"), int):
+            raise ValueError("command content is missing its required identity")
+        content.append(
         {
             "kind": command["kind"],
             "unit_id": command["unit_id"],
             "x": command.get("x"),
             "y": command.get("y"),
             "target_id": command.get("target_id"),
+            "type_index": command.get("type_index"),
             "issue_cycle": command["issue_cycle"],
             "queued": bool(command.get("queued")),
         }
-        for command in scenario["commands"]
-    ])
+        )
+    return content
+
+
+def command_content_identity(scenario: dict[str, Any]) -> str:
+    """Identity of the orders themselves, ignoring fixture path wrappers."""
+    validate_scenario(scenario)
+    return digest(_command_content(scenario["commands"]))
+
+
+def command_cell(scenario: dict[str, Any]) -> dict[str, Any]:
+    """Bind one resolved-command cell to its map, seed, and outcome horizon.
+
+    A command stream alone is not a matrix cell: the same slots and coordinates
+    can occur on another map, and an 80-cycle observation cannot satisfy a
+    160-cycle outcome contract.  Keep paths out of the identity so the same
+    authenticated inputs reproduce it in another checkout.
+    """
+    validate_scenario(scenario)
+    setup = scenario.get("setup") or {}
+    seed_identity = scenario.get("seed_identity") or {}
+    scenario_name = setup.get("scenario")
+    seed = setup.get("seed", seed_identity.get("seed"))
+    settle = scenario.get("settle_cycles")
+    if not isinstance(scenario_name, str) or not scenario_name:
+        raise ValueError("command cell has no requested scenario")
+    if not isinstance(seed, int):
+        raise ValueError("command cell has no initialization seed")
+    if not isinstance(settle, int) or settle < 1:
+        raise ValueError("command cell has no positive outcome window")
+    terminal_cycle = max(
+        int(command["issue_cycle"]) for command in scenario["commands"]
+    ) + settle
+    content = command_content_identity(scenario)
+    body = {
+        "scenario": scenario_name,
+        "seed": seed,
+        "terminal_cycle": terminal_cycle,
+        "command_content_sha256": content,
+    }
+    return {
+        **body,
+        "pattern": scenario.get("pattern"),
+        "families": sorted({
+            str(command["kind"]) for command in scenario["commands"]
+        }),
+        "cell_sha256": digest(body),
+    }
 
 
 def execution_ledger_row(scenario: dict[str, Any], native: dict[str, Any],
@@ -952,9 +1024,13 @@ def execution_ledger_row(scenario: dict[str, Any], native: dict[str, Any],
     if native["scenario_sha256"] != java["scenario_sha256"]:
         raise ValueError("native and Java ran different scenario identities")
     families = sorted({command["kind"] for command in scenario["commands"]})
+    cell = command_cell(scenario)
     return {
         "scenario_sha256": scenario["scenario_sha256"],
-        "command_content_sha256": command_content_identity(scenario),
+        "scenario": copy.deepcopy(scenario),
+        "command_content_sha256": cell["command_content_sha256"],
+        "command_cell_sha256": cell["cell_sha256"],
+        "command_cell": cell,
         "families": families,
         "commands": copy.deepcopy(scenario["commands"]),
         "source": source,
@@ -969,6 +1045,7 @@ def execution_ledger_row(scenario: dict[str, Any], native: dict[str, Any],
 def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
     qualified = [row for row in rows if row.get("qualifies")]
     contents = {row["command_content_sha256"] for row in qualified}
+    cells = {row["command_cell_sha256"] for row in qualified}
     families: set[str] = set()
     for row in qualified:
         families.update(row.get("families") or [])
@@ -976,8 +1053,9 @@ def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
     # is the only document that may say exact or divergent.
     return {
         "schema": "chonkcraft-bne-playtest-execution-ledger-1",
-        "dual_adapter_executed_scenarios": len(contents),
+        "dual_adapter_executed_scenarios": len(cells),
         "distinct_command_contents": len(contents),
+        "distinct_command_cells": len(cells),
         "families": sorted(families),
         "family_count": len(families),
         "complete": False,
@@ -986,7 +1064,56 @@ def execution_ledger(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _inventory_cells(inventory: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    if inventory.get("schema") != INVENTORY_SCHEMA:
+        raise ValueError("coverage inventory has the wrong schema")
+    generated = inventory.get("generated_scenarios")
+    raw_cells = inventory.get("cells")
+    if not isinstance(generated, int) or generated < 1 \
+            or not isinstance(raw_cells, list) or len(raw_cells) != generated:
+        raise ValueError(
+            "coverage inventory must retain every generated command cell")
+    cells: dict[str, dict[str, Any]] = {}
+    for cell in raw_cells:
+        if not isinstance(cell, dict):
+            raise ValueError("coverage inventory contains a non-object cell")
+        body = {key: cell.get(key) for key in (
+            "scenario", "seed", "terminal_cycle", "command_content_sha256")}
+        cell_id = cell.get("cell_sha256")
+        if not isinstance(body["scenario"], str) or not body["scenario"] \
+                or not isinstance(body["seed"], int) \
+                or not isinstance(body["terminal_cycle"], int) \
+                or body["terminal_cycle"] < 1 \
+                or not _valid_sha256(body["command_content_sha256"]) \
+                or cell_id != digest(body):
+            raise ValueError("coverage inventory contains an invalid command cell")
+        if cell_id in cells:
+            raise ValueError("coverage inventory repeats a command cell")
+        cells[cell_id] = cell
+    return cells
+
+
+def _validated_ledger_cell(row: dict[str, Any]) -> dict[str, Any]:
+    """Recompute a retained row's cell instead of trusting its copied ID."""
+    scenario = row.get("scenario")
+    if not isinstance(scenario, dict):
+        raise ValueError("execution row does not retain its scenario")
+    validate_scenario(scenario)
+    if scenario.get("scenario_sha256") != row.get("scenario_sha256"):
+        raise ValueError("execution row scenario identity changed")
+    if scenario.get("commands") != row.get("commands"):
+        raise ValueError("execution row commands differ from its scenario")
+    cell = command_cell(scenario)
+    if cell != row.get("command_cell") \
+            or cell["cell_sha256"] != row.get("command_cell_sha256") \
+            or cell["command_content_sha256"] != row.get(
+                "command_content_sha256"):
+        raise ValueError("execution row command cell changed")
+    return cell
+
+
 def split_command_report(ledger: dict[str, Any], *,
+        inventory: dict[str, Any] | None = None,
         generated_scenarios: int = 0) -> dict[str, Any]:
     """Split dual-adapter execution from exact parity.
 
@@ -996,7 +1123,10 @@ def split_command_report(ledger: dict[str, Any], *,
     """
     if ledger.get("schema") != "chonkcraft-bne-playtest-execution-ledger-1":
         raise ValueError("split command report needs an execution ledger")
-    generated = int(generated_scenarios)
+    required_cells = _inventory_cells(inventory) if inventory is not None else {}
+    generated = (len(required_cells) if required_cells
+                 else int(generated_scenarios))
+    identity_bound = bool(required_cells)
     executed_native = 0
     executed_java = 0
     comparable = 0
@@ -1005,8 +1135,31 @@ def split_command_report(ledger: dict[str, Any], *,
     infrastructure_failure = 0
     divergent_sources: list[str] = []
     failures: list[str] = []
+    unmatched_sources: list[str] = []
+    matched_cells: set[str] = set()
     for row in ledger.get("rows") or []:
         source = _repo_relative(str(row.get("source") or ""))
+        cell_id = row.get("command_cell_sha256")
+        if identity_bound and cell_id not in required_cells:
+            unmatched_sources.append(source)
+            continue
+        if identity_bound:
+            try:
+                cell = _validated_ledger_cell(row)
+            except (KeyError, TypeError, ValueError):
+                infrastructure_failure += 1
+                failures.append(source)
+                continue
+            if cell != required_cells[cell_id]:
+                infrastructure_failure += 1
+                failures.append(source)
+                continue
+        if identity_bound and cell_id in matched_cells:
+            infrastructure_failure += 1
+            failures.append(source)
+            continue
+        if identity_bound:
+            matched_cells.add(cell_id)
         native = row.get("native_observations")
         java = row.get("java_observations")
         native_ok = isinstance(native, list) and native
@@ -1078,21 +1231,26 @@ def split_command_report(ledger: dict[str, Any], *,
     # Dual-adapter execution is never enough. Completeness is only the
     # generated denominator fully comparable, exact, and infrastructure-clean.
     complete = (
-        generated > 0
+        identity_bound
+        and generated > 0
         and exact_parity == generated
         and comparable == generated
         and infrastructure_failure == 0
         and materially_divergent == 0
     )
+    missing_cells = sorted(set(required_cells) - matched_cells)
     return {
-        "schema": "chonkcraft-bne-command-split-report-1",
+        "schema": "chonkcraft-bne-command-split-report-2",
         "generated": generated,
+        "identity_bound": identity_bound,
         "executed_native": executed_native,
         "executed_java": executed_java,
         "comparable": comparable,
         "exact_parity": exact_parity,
         "materially_divergent": materially_divergent,
         "infrastructure_failure": infrastructure_failure,
+        "unmatched_executed": len(unmatched_sources),
+        "missing_cells": len(missing_cells),
         "complete": complete,
         "parity": complete,
         "meaning": (
@@ -1102,6 +1260,8 @@ def split_command_report(ledger: dict[str, Any], *,
         ),
         "divergent_sources": divergent_sources,
         "infrastructure_sources": failures,
+        "unmatched_sources": unmatched_sources,
+        "missing_cell_sha256": missing_cells,
     }
 
 
@@ -1213,11 +1373,11 @@ def _cluster_priority(fields: list[str]) -> int:
 def _row_exactness(ledger: dict[str, Any]) -> dict[str, bool]:
     result: dict[str, bool] = {}
     for row in ledger.get("rows") or []:
-        content = row.get("command_content_sha256")
-        if not isinstance(content, str):
+        cell_id = row.get("command_cell_sha256")
+        if not isinstance(cell_id, str):
             continue
         try:
-            result[content] = ledger_row_comparison(row)["difference_count"] == 0
+            result[cell_id] = ledger_row_comparison(row)["difference_count"] == 0
         except (KeyError, TypeError, ValueError):
             continue
     return result
@@ -1230,7 +1390,8 @@ def command_worklist(ledger: dict[str, Any], *,
     """Compile a flat commanded fleet into a systemic, regression-aware queue."""
     if ledger.get("schema") != "chonkcraft-bne-playtest-execution-ledger-1":
         raise ValueError("command worklist needs an execution ledger")
-    generated = int((inventory or {}).get("generated_scenarios") or 0)
+    required_cells = _inventory_cells(inventory) if inventory is not None else {}
+    generated = len(required_cells)
     exact = 0
     divergent = 0
     infrastructure = 0
@@ -1239,8 +1400,24 @@ def command_worklist(ledger: dict[str, Any], *,
     java_hashes: set[str] = set()
     queued_commands = 0
     multi_command_scenarios = 0
+    unmatched_executed = 0
     exactness: dict[str, bool] = {}
+    seen_cells: set[str] = set()
     for row in ledger.get("rows") or []:
+        cell_id = row.get("command_cell_sha256")
+        if required_cells and cell_id not in required_cells:
+            unmatched_executed += 1
+            continue
+        if required_cells:
+            try:
+                cell = _validated_ledger_cell(row)
+            except (KeyError, TypeError, ValueError):
+                infrastructure += 1
+                continue
+            if cell != required_cells[cell_id] or cell_id in seen_cells:
+                infrastructure += 1
+                continue
+            seen_cells.add(cell_id)
         commands = row.get("commands") or []
         if len(commands) > 1:
             multi_command_scenarios += 1
@@ -1258,9 +1435,8 @@ def command_worklist(ledger: dict[str, Any], *,
             infrastructure += 1
             continue
         is_exact = comparison["difference_count"] == 0
-        content = row.get("command_content_sha256")
-        if isinstance(content, str):
-            exactness[content] = is_exact
+        if isinstance(cell_id, str):
+            exactness[cell_id] = is_exact
         if is_exact:
             exact += 1
             for family in row_families:
@@ -1335,6 +1511,7 @@ def command_worklist(ledger: dict[str, Any], *,
         value for value in java_hashes
         if expected_java_sha256 is not None and value != expected_java_sha256)
     comparable = exact + divergent
+    missing_cells = len(set(required_cells) - set(exactness))
     report = {
         "schema": "chonkcraft-bne-player-intent-worklist-1",
         "authority": {
@@ -1345,11 +1522,13 @@ def command_worklist(ledger: dict[str, Any], *,
         },
         "fleet": {
             "generated": generated,
-            "executed": int(ledger.get("dual_adapter_executed_scenarios") or 0),
+            "executed": comparable + infrastructure,
             "comparable": comparable,
             "exact": exact,
             "divergent": divergent,
             "infrastructure_failures": infrastructure,
+            "unmatched_executed": unmatched_executed,
+            "missing_cells": missing_cells,
             "exact_percent": round(100.0 * exact / comparable, 3)
             if comparable else 0.0,
         },
@@ -1380,7 +1559,8 @@ def command_worklist(ledger: dict[str, Any], *,
             "no_regressions": not regressions,
             "improved": bool(baseline_delta and baseline_delta["fixed"] > 0
                              and not regressions),
-            "parity": generated > 0 and exact == generated
+            "parity": bool(required_cells) and exact == generated
+                      and divergent == 0 and missing_cells == 0
                       and infrastructure == 0 and not stale_hashes,
             "meaning": (
                 "A green regression gate is not total BNE parity; missing "
@@ -1400,6 +1580,8 @@ def command_worklist_markdown(report: dict[str, Any], *, top: int = 12) -> str:
         (f"**{fleet['exact']} / {fleet['comparable']} exact "
          f"({fleet['exact_percent']:.1f}%) · {fleet['divergent']} divergent · "
          f"{fleet['infrastructure_failures']} infrastructure failures**"), "",
+        (f"Current generated cells missing: **{fleet['missing_cells']}** · "
+         f"historical/unmatched executions: **{fleet['unmatched_executed']}**"), "",
         "Both engines executing a row is not parity. This queue groups the first "
         "normalized behavioral difference so one native rule can close multiple "
         "independent witnesses.", "",
@@ -2225,10 +2407,10 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
         for fixture in args.fixtures:
             seed = seed_from_commanded_fixture(fixture)
             scenario = scenario_from_commanded_seed(seed)
-            content = command_content_identity(scenario)
-            if content in seen:
+            cell_id = command_cell(scenario)["cell_sha256"]
+            if cell_id in seen:
                 continue
-            seen.add(content)
+            seen.add(cell_id)
             native_result = native_mod.run_from_fixture(
                 scenario, fixture.expanduser().resolve(),
                 PINNED_BNE_EXECUTABLE_SHA256, "a" * 64)
@@ -2247,8 +2429,7 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
     inventory_path = getattr(args, "inventory", None)
     inventory = load_json(inventory_path, "coverage inventory") \
         if inventory_path is not None else None
-    generated = int((inventory or {}).get("generated_scenarios") or 0)
-    split = split_command_report(report, generated_scenarios=generated)
+    split = split_command_report(report, inventory=inventory)
     split_path = args.output.with_name("command-split-report.json")
     write_json(split_path, split)
     print(json.dumps({
@@ -2260,6 +2441,8 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
         "exact_parity": split["exact_parity"],
         "materially_divergent": split["materially_divergent"],
         "comparable": split["comparable"],
+        "unmatched_executed": split["unmatched_executed"],
+        "missing_cells": split["missing_cells"],
         "registry": str(registry_path.expanduser().resolve()),
         "split_report": str(split_path.expanduser().resolve()),
     }, indent=2, sort_keys=True))
@@ -2268,7 +2451,10 @@ def execute_commanded_command(args: argparse.Namespace) -> int:
 
 def split_report_command(args: argparse.Namespace) -> int:
     ledger = load_json(args.ledger, "execution ledger")
-    report = split_command_report(ledger, generated_scenarios=args.generated)
+    inventory = load_json(args.inventory, "coverage inventory") \
+        if args.inventory is not None else None
+    report = split_command_report(
+        ledger, inventory=inventory, generated_scenarios=args.generated)
     write_json(args.output, report)
     print(json.dumps({
         "generated": report["generated"],
@@ -2278,6 +2464,8 @@ def split_report_command(args: argparse.Namespace) -> int:
         "exact_parity": report["exact_parity"],
         "materially_divergent": report["materially_divergent"],
         "infrastructure_failure": report["infrastructure_failure"],
+        "unmatched_executed": report["unmatched_executed"],
+        "missing_cells": report["missing_cells"],
         "complete": report["complete"],
         "parity": report["parity"],
     }, indent=2, sort_keys=True))
@@ -2440,7 +2628,7 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--registry", type=Path,
                         help="write the native-command registry next to the ledger")
     execute.add_argument("--inventory", type=Path,
-                        help="generated coverage inventory used only for the split generated count")
+                        help="explicit generated-cell inventory used for identity-joined coverage")
     execute.set_defaults(func=execute_commanded_command)
 
     split = commands.add_parser(
@@ -2449,6 +2637,8 @@ def parser() -> argparse.ArgumentParser:
     split.add_argument("ledger", type=Path)
     split.add_argument("--output", required=True, type=Path)
     split.add_argument("--generated", type=int, default=0)
+    split.add_argument("--inventory", type=Path,
+                       help="explicit generated-cell inventory used for identity-joined coverage")
     split.set_defaults(func=split_report_command)
 
     worklist = commands.add_parser(

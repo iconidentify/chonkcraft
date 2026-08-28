@@ -111,15 +111,24 @@ failure is content-addressed below `divergences/<packet-sha256>/packet.json`.
 
 `split-report` classifies a ledger without claiming parity from dual-adapter
 execution. The counts are generated, executed-native, executed-java,
-comparable, exact parity, materially divergent, and infrastructure failure.
-`complete` and `parity` stay false on that document until the observations
-themselves agree.
+comparable, exact parity, materially divergent, unmatched historical, missing
+current cells, and infrastructure failure. `complete` and `parity` stay false
+until an explicit generated-cell inventory is identity-joined and every current
+observation agrees. A count-only report is diagnostic and can never complete.
 
 ```sh
 python3 tools/bne-harness/scripts/bne_playtest_explorer.py split-report \
   tools/bne-harness/work/playtest-explorer/execution-ledger.json \
-  --generated 240 --output work/playtest-explorer/command-split-report.json
+  --inventory tools/bne-harness/work/playtest-explorer/coverage-inventory.json \
+  --output work/playtest-explorer/command-split-report.json
 ```
+
+Each cell binds the requested map, initialization seed, full command content
+(including a train/research type), and terminal observation cycle. Thus an
+80-cycle historical capture cannot satisfy a 160-cycle generated outcome, and
+the same slots or coordinates on another map cannot collide. The next-level
+scorecard additionally regenerates the 240-cell inventory from its three
+hash-pinned seeds and reopens the ledger before accepting the split.
 
 `worklist` turns that flat split into the queue an implementer should actually
 use. It expands state differences, groups fixtures with the same first

@@ -70,6 +70,22 @@ class NextLevelGateTest(unittest.TestCase):
         }
         self.assertFalse(gate._command_lane(report)["complete"])
 
+    def test_command_report_requires_an_explicit_identity_join(self):
+        report = {
+            "schema": gate.COMMAND_SCHEMA, "complete": True,
+            "identity_bound": False,
+            "generated": 240, "executed_native": 240,
+            "executed_java": 240, "comparable": 240,
+            "exact_parity": 240, "materially_divergent": 0,
+            "infrastructure_failure": 0, "unmatched_executed": 0,
+            "missing_cells": 0,
+        }
+        self.assertFalse(gate._command_lane(report)["complete"])
+        report["identity_bound"] = True
+        self.assertFalse(gate._command_lane(report)["complete"])
+        self.assertTrue(gate._command_lane(
+            report, producer_evidence_verified=True)["complete"])
+
     def test_physical_manifest_override_cannot_replace_canonical_532_cells(self):
         root = Path(__file__).parents[3]
         canonical = (root / "tools/bne-harness" /

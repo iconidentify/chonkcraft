@@ -16,15 +16,24 @@ import bne_campaign_lifecycle as campaign
 import bne_combat_lifecycle as combat
 import bne_divergence_compiler as divergence
 import bne_player_transaction as player
+import bne_playtest_explorer as explorer
 import bne_replay_outcome as replay
 from bne_identity import engine_input_identity
 
 
 SCHEMA = "chonkcraft-bne-next-level-gate-2"
-COMMAND_SCHEMA = "chonkcraft-bne-command-split-report-1"
+COMMAND_SCHEMA = "chonkcraft-bne-command-split-report-2"
 EXPECTED_COMMAND_CELLS = 240
 EXPECTED_PHYSICAL_CELLS = 532
 WORK_ORDER_SCHEMA = "chonkcraft-bne-divergence-work-order-1"
+COMMAND_SEEDS = {
+    "retail-human-01-idle.bnefx":
+        "bfdc64dfb4c72e9d6fde172ece2480a5a00789e2a613fd7e1df703e83e7ba847",
+    "retail-orc-01-idle.bnefx":
+        "cd14b7cacc82e48f19397b154d148be3d62772f5a247198c932d8db5553d941c",
+    "retail-xhuman-12-idle.bnefx":
+        "6a04e95fa9653bc59261a57ce76756f1af7342a4a6f4f7640298431b9dc3dc71",
+}
 
 
 def load(path: Path | None) -> dict[str, Any] | None:
@@ -88,16 +97,20 @@ def identity(root: Path, evidence_paths: list[Path] | None = None) \
     }
 
 
-def _command_lane(report: dict[str, Any] | None) -> dict[str, Any]:
+def _command_lane(report: dict[str, Any] | None, *,
+                  producer_evidence_verified: bool = False) -> dict[str, Any]:
     if report is None:
         return {"complete": False, "debt": "no current 240-cell command report"}
     if report.get("schema") != COMMAND_SCHEMA:
         raise ValueError("command report has the wrong schema")
     values = {name: int(report.get(name, -1)) for name in (
         "generated", "executed_native", "executed_java", "comparable",
-        "exact_parity", "materially_divergent", "infrastructure_failure")}
+        "exact_parity", "materially_divergent", "infrastructure_failure",
+        "unmatched_executed", "missing_cells")}
     complete = bool(
-        report.get("complete") is True
+        producer_evidence_verified
+        and report.get("complete") is True
+        and report.get("identity_bound") is True
         and values["generated"] == EXPECTED_COMMAND_CELLS
         and values["executed_native"] == EXPECTED_COMMAND_CELLS
         and values["executed_java"] == EXPECTED_COMMAND_CELLS
@@ -105,8 +118,49 @@ def _command_lane(report: dict[str, Any] | None) -> dict[str, Any]:
         and values["exact_parity"] == EXPECTED_COMMAND_CELLS
         and values["materially_divergent"] == 0
         and values["infrastructure_failure"] == 0
+        and values["missing_cells"] == 0
     )
-    return {"complete": complete, **values, "report": report}
+    result = {
+        "complete": complete,
+        "producer_evidence_verified": producer_evidence_verified,
+        **values,
+        "report": report,
+    }
+    if not producer_evidence_verified:
+        result["debt"] = (
+            "command summary is diagnostic until its canonical generated-cell "
+            "inventory and dual-adapter ledger are reopened")
+    return result
+
+
+def _validated_command_lane(root: Path, report: dict[str, Any] | None,
+                            ledger: dict[str, Any] | None,
+                            inventory: dict[str, Any] | None) -> dict[str, Any]:
+    if report is None:
+        return _command_lane(None)
+    if ledger is None or inventory is None:
+        return _command_lane(report)
+    seed_root = (root.resolve() /
+                 "tools/bne-harness/work/corpus/campaign-1800/cases")
+    seeds: list[dict[str, Any]] = []
+    for name, expected in COMMAND_SEEDS.items():
+        path = seed_root / name
+        if not path.is_file() or path.is_symlink():
+            raise ValueError(f"canonical command seed is missing or unsafe: {path}")
+        actual = _file_identity(path)["sha256"]
+        if actual != expected:
+            raise ValueError(f"canonical command seed changed: {path}")
+        seeds.append(explorer.seed_from_idle_fixture(path))
+    canonical_inventory = explorer.coverage_inventory(
+        seeds, max_scenarios=80)
+    if inventory != canonical_inventory:
+        raise ValueError(
+            "command inventory is not the canonical current 240-cell generation")
+    recomputed = explorer.split_command_report(ledger, inventory=inventory)
+    if report != recomputed:
+        raise ValueError(
+            "command report does not reproduce from its inventory and ledger")
+    return _command_lane(report, producer_evidence_verified=True)
 
 
 def _canonical_player_requirements(root: Path, requested: Path) \
@@ -337,13 +391,20 @@ def _resolved_work_order(pointer: Path | None,
 def build(args: argparse.Namespace) -> dict[str, Any]:
     evidence_paths: list[Path] = []
     for name in (
-            "command_report", "player_certification", "replay_certification",
+            "command_report", "command_ledger", "command_inventory",
+            "player_certification", "replay_certification",
             "replay_corpus",
             "ai_conductor_report", "ai_discovery", "native_ai", "java_ai",
             "campaign_proof", "divergence_work_order", "divergence_pointer"):
         value = getattr(args, name, None)
         if value is not None:
             evidence_paths.append(value)
+    if getattr(args, "command_report", None) is not None:
+        command_seed_root = (
+            args.root.resolve() /
+            "tools/bne-harness/work/corpus/campaign-1800/cases")
+        evidence_paths.extend(
+            command_seed_root / name for name in COMMAND_SEEDS)
     evidence_paths.extend(getattr(args, "player_transaction", []) or [])
     evidence_paths.extend(getattr(args, "replay_report", []) or [])
     evidence_paths.extend(getattr(args, "combat_proof", []) or [])
@@ -366,7 +427,10 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                                "complete": False, "transactions": 0,
                                "debt": "no physical transaction receipts",
                            })
-    command = _command_lane(load(args.command_report))
+    command = _validated_command_lane(
+        args.root, load(args.command_report),
+        load(getattr(args, "command_ledger", None)),
+        load(getattr(args, "command_inventory", None)))
     player_store = getattr(args, "player_proof_store", None)
     if player_store is not None:
         paired = _retained_player_certification(
@@ -606,6 +670,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--command-report", type=Path)
+    parser.add_argument("--command-ledger", type=Path)
+    parser.add_argument("--command-inventory", type=Path)
     parser.add_argument("--player-transaction", type=Path, action="append", default=[])
     parser.add_argument("--player-proof-store", type=Path)
     parser.add_argument("--player-certification", type=Path)

@@ -7,12 +7,15 @@ it is not the roadmap.
 
 ## Honest starting point
 
-The current authenticated **resolved-command matrix** contains 240 generated
-cells. Both production adapters have executed and made 206 cells comparable:
-all **206/206 are exact**, 34 remain unexecuted, and none failed because of
-infrastructure. This is 100% of the comparable post-resolution rows, not
-240/240 completion. The missing rows remain real coverage debt and the
-separate physical-gesture layer below remains RED.
+The current authenticated **resolved-command matrix** contains 240 explicit
+generated cells and **0/240 are identity-joined to retained dual-adapter
+executions**. The older fleet still contains 206 exact dual-adapter executions,
+but all 206 are historical/unmatched diagnostics rather than members of the
+current fixed set. The old 206/240 headline compared counts, so a differently
+generated map, command, or observation window could fill its numerator. That
+is now rejected. A cell identity binds requested map, initialization seed,
+full command content (including production type), and terminal observation
+cycle. The separate physical-gesture layer below also remains RED.
 
 That 240-cell matrix begins after a command has already been resolved. It is
 deliberately separate from the **532-cell physical gesture transaction**
@@ -428,11 +431,14 @@ Run:
 scripts/check-bne-next-level-gate.sh
 ```
 
-It regenerates the current 240-cell resolved-command matrix and its
-dual-adapter execution ledger, ranked worklist, campaign inventory, Python
-mutation/identity tests and focused Java gates, then writes
+It regenerates the current 240-cell resolved-command matrix from three
+hash-pinned Human, Orc and expansion fixtures and its dual-adapter execution
+ledger, ranked worklist, campaign inventory, Python mutation/identity tests and
+focused Java gates, then writes
 `tools/bne-harness/work/next-level/status.json`. It does not reuse the stale
-checked-in split report.
+checked-in split report. The scorecard reopens the canonical generated-cell
+inventory and ledger and byte-recomputes their split; a detached green summary,
+an old cell, or a capture with a shorter outcome horizon cannot certify.
 
 Add retained evidence when available:
 
