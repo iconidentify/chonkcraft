@@ -125,11 +125,14 @@ being inferred from the playable campaign fleet:
   remain diagnostics and cannot certify themselves.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
-- AI fleet: **0/52** current-head mission twins are materialized under one
-  conductor report. All 52 authenticated native captures are discoverable,
-  and older ledgers remain useful diagnostics, but their partial numerators do
-  not carry across source identities. Fleet certification remains incomplete
-  until one current report materializes and proves all 52 missions.
+- AI fleet: **52/52** current-head mission twins are materialized under one
+  validated conductor report; **45/52** are committed-state and causal-
+  telemetry exact through 1,800 cycles. The fixed denominator is 205,200
+  computer-player cycles: 202,290 committed-state rows and 202,285 telemetry
+  rows are exact. Seven ranked frontiers remain, so fleet certification is
+  incomplete. Java proof `31e6c8e2829d24f465102dfc57697f444c120f66ad3e0009b711b78ae6813eb9`
+  binds all twins to clean source `455bbeb469a1f89dd30f4dec6193f1e9eaac654a`
+  and engine identity `05f3b8b4632748990dda8271fb8676fb493a53333d33a75ba4a919cee71fa244`.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 
