@@ -35,16 +35,21 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   and expansion Orc 8 and 12 share that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,369 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,378 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,689; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,698; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
 - The current naval-patrol milestone moves expansion Orc 8 from cycle 261 to
   264 by retaining a consumed small-warship route behind a moving allied hull.
   Expansion Human 7 remains at 266 and expansion Orc 11 at 282, and all other
   51 maps are unchanged across both complete fleets. The cycle-400 and
   cycle-1,800 map counts remain 27 and 8 with zero failed cases.
+- The crowded-depot milestone moves expansion Orc 12 from cycle 264 to 273 by
+  letting a staged laden worker commit its final entry behind an allied worker
+  whose own entry pixels are still draining. Expansion Human 7 independently
+  proves the same overlap, while pre-stage and stationary-worker controls stay
+  blocked. The other 51 maps are unchanged across both complete fleets.
 - Computer oil tankers now preserve native action 23 behind the 25-cycle
   depot-ready Still head. Two independent campaigns advance without a fleet
   regression: Orc 7 is exact through 823 instead of 596, and Orc 10 through
@@ -64,8 +69,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,806 tests**. The canonical authenticated
-profile runs 2,779 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,810 tests**. The canonical authenticated
+profile runs 2,783 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit

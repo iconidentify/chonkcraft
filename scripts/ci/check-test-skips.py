@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2806 tests,   27 skipped
-    no external input          2806 tests, 1191 skipped
+    authenticated inputs       2810 tests,   27 skipped
+    no external input          2810 tests, 1195 skipped
 
 Both can be green.
 
@@ -152,7 +152,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1892, 864),
+        "engine": (1892, 868),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the

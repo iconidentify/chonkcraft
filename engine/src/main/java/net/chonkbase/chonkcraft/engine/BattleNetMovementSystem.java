@@ -2069,7 +2069,7 @@ final class BattleNetMovementSystem {
             world.setMovementFieldFlags(building, false);
         }
         try {
-            stepMove(worker);
+            stepMove(worker, true, depotDestArm ? building : null);
         } finally {
             if (depotDestArm) {
                 world.setMovementFieldFlags(building, true);
@@ -2430,6 +2430,49 @@ final class BattleNetMovementSystem {
      */
     boolean depotRingDestArm(Unit worker, Unit building) {
         return depotRingReady(worker, building, false);
+    }
+
+    /** Moving action-25 depot body that is transparent to the final dest-arm. */
+    private Unit battleNetDrainingDepotEntryBlocker(
+            Unit worker, Unit depot, int entryX, int entryY) {
+        if (worker == null || depot == null || worker.type() == null
+                || !worker.type().landUnit()
+                || world.battleNetMovementStride(worker) != 1
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || !worker.battleNetResourceApproachStaged()
+                || worker.pathLength() != 1 || worker.isMoving()) {
+            return null;
+        }
+        // The depot building remains first in UnitCache even while its field
+        // bit is temporarily clear, so blockerOnLayer cannot identify the
+        // mobile body sharing the footprint. Walk the live units and select
+        // the one whose actual footprint covers this exact entry anchor.
+        for (Unit blocker : world.unitsSnapshot()) {
+            if (blocker == worker || !blocker.isAlive()
+                    || !blocker.isOnMap() || blocker.isDying()
+                    || blocker.type() == null || blocker.type().building()
+                    || !blocker.type().landUnit()
+                    || entryX < blocker.tileX()
+                    || entryY < blocker.tileY()
+                    || entryX >= blocker.tileX()
+                            + Math.max(1, blocker.type().tileWidth())
+                    || entryY >= blocker.tileY()
+                            + Math.max(1, blocker.type().tileHeight())
+                    || blocker.order() != Unit.Order.HARVEST
+                    || !blocker.returningToDepot() || blocker.carried() <= 0
+                    || blocker.returnDepotGoal() != depot
+                    || !blocker.battleNetResourceApproachStaged()
+                    || !blocker.isMoving() || blocker.pathLength() != 0
+                    || !blocker.routeSpent()
+                    || blocker.battleNetCollisionCounter() != 0
+                    || blocker.battleNetRefusals() != 0
+                    || !world.isAllied(worker.player(), blocker.player())
+                    || !battleNetSoftClearMoveAlly(blocker)) {
+                continue;
+            }
+            return blocker;
+        }
+        return null;
     }
 
     private boolean depotRingReady(Unit worker, Unit building, boolean action25) {
@@ -3037,6 +3080,11 @@ final class BattleNetMovementSystem {
     }
 
     void stepMove(Unit unit, boolean replanOnExhaustion) {
+        stepMove(unit, replanOnExhaustion, null);
+    }
+
+    private void stepMove(Unit unit, boolean replanOnExhaustion,
+            Unit depotDestArmGoal) {
         if (arriveMeleeLeftoverOnOccupiedQuarry(unit)) {
             return;
         }
@@ -3810,6 +3858,17 @@ final class BattleNetMovementSystem {
                                     ? world.canEnterBattleNetTransportAnchor(
                                             unit, nextX, nextY)
                             : world.canEnter(unit, nextX, nextY);
+            if (!canTakeStep && depotDestArmGoal != null
+                    && battleNetDrainingDepotEntryBlocker(
+                            unit, depotDestArmGoal, nextX, nextY) != null) {
+                // The resource order's final dest-arm owns a different
+                // occupancy decision from ordinary action 24. Retail lets it
+                // commit behind a zero-collision worker whose own action-25
+                // entry pixels are still draining, briefly stacking both
+                // workers on the depot point. XOrc 12 slots 1394/1396 do this
+                // at fixture 264; XHuman 7 slots 1458/1446 repeat it at 330.
+                canTakeStep = true;
+            }
             boolean paidParkedRouteReplay =
                     unit.hasBattleNetLongPaidWrapParkedRoute()
                     && unit.pathLength() > 0
