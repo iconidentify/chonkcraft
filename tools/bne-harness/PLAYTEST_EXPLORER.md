@@ -134,6 +134,15 @@ the same slots or coordinates on another map cannot collide. The next-level
 scorecard additionally regenerates the 240-cell inventory from its three
 hash-pinned seeds and reopens the ledger before accepting the split.
 
+Generator pattern and the separately derived family list remain descriptive
+inventory labels rather than cell identity; each command's family is still
+bound inside the full command content. In particular, a sealed one-command
+script retains the exact issue cycle but not the generator's `turn-boundary`
+label. The join therefore recomputes and compares only the map, seed,
+command-content and terminal fields bound by the cell digest; it still rejects
+a relabeled map, command, seed, or horizon and duplicate rows cannot replace
+missing cells.
+
 `worklist` turns that flat split into the queue an implementer should actually
 use. It expands state differences, groups fixtures with the same first
 behavioral signature, ranks clusters by player-visible impact and witness

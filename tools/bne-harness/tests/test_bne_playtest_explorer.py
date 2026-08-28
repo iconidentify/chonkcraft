@@ -897,6 +897,40 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertEqual(1, split["missing_cells"])
         self.assertFalse(split["complete"])
 
+    def test_split_report_joins_a_reconstructed_turn_boundary_cell(self):
+        canonical = next(
+            item for item in explorer.generate_scenarios(
+                self.seed(), max_scenarios=500)
+            if item["pattern"] == "turn-boundary"
+            and len(item["commands"]) == 1)
+        captured = copy.deepcopy(canonical)
+        captured["pattern"] = "single"
+        captured["scenario_sha256"] = explorer.digest({
+            key: value for key, value in captured.items()
+            if key != "scenario_sha256"
+        })
+        self.assertEqual(
+            explorer.command_cell(canonical)["cell_sha256"],
+            explorer.command_cell(captured)["cell_sha256"],
+            "generator pattern is not part of command-cell identity")
+        row = explorer.execution_ledger_row(
+            captured, self.result(captured, "native"),
+            self.result(captured, "java"), source="captured.bnefx")
+        split = explorer.split_command_report(
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([canonical]))
+        worklist = explorer.command_worklist(
+            explorer.execution_ledger([row]),
+            inventory=self.inventory([canonical]))
+        self.assertEqual(1, split["comparable"])
+        self.assertEqual(1, split["exact_parity"])
+        self.assertEqual(0, split["infrastructure_failure"])
+        self.assertEqual(0, split["missing_cells"])
+        self.assertEqual(1, worklist["fleet"]["comparable"])
+        self.assertEqual(1, worklist["fleet"]["exact"])
+        self.assertEqual(0, worklist["fleet"]["infrastructure_failures"])
+        self.assertEqual(0, worklist["fleet"]["missing_cells"])
+
     def test_duplicate_row_cannot_replace_a_missing_cell(self):
         scenarios = explorer.generate_scenarios(
             self.seed(), max_scenarios=2)

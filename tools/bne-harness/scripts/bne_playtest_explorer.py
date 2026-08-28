@@ -1112,6 +1112,14 @@ def _validated_ledger_cell(row: dict[str, Any]) -> dict[str, Any]:
     return cell
 
 
+def _command_cell_identity(cell: dict[str, Any]) -> dict[str, Any]:
+    """Return only the fields the command-cell digest actually binds."""
+    return {key: cell.get(key) for key in (
+        "scenario", "seed", "terminal_cycle", "command_content_sha256",
+        "cell_sha256",
+    )}
+
+
 def split_command_report(ledger: dict[str, Any], *,
         inventory: dict[str, Any] | None = None,
         generated_scenarios: int = 0) -> dict[str, Any]:
@@ -1150,7 +1158,16 @@ def split_command_report(ledger: dict[str, Any], *,
                 infrastructure_failure += 1
                 failures.append(source)
                 continue
-            if cell != required_cells[cell_id]:
+            # Pattern and the derived family list are inventory labels, not
+            # command-cell identity (the command family itself remains bound
+            # inside command content). A sealed commanded fixture can
+            # reconstruct a one-order turn-boundary capture as ``single``
+            # because the native command script retains the issue cycle but not
+            # the generator label. The requested map, initialization seed,
+            # complete command content and terminal cycle are still exact and
+            # are the fields bound by the cell digest.
+            if _command_cell_identity(cell) != _command_cell_identity(
+                    required_cells[cell_id]):
                 infrastructure_failure += 1
                 failures.append(source)
                 continue
@@ -1414,7 +1431,8 @@ def command_worklist(ledger: dict[str, Any], *,
             except (KeyError, TypeError, ValueError):
                 infrastructure += 1
                 continue
-            if cell != required_cells[cell_id] or cell_id in seen_cells:
+            if _command_cell_identity(cell) != _command_cell_identity(
+                    required_cells[cell_id]) or cell_id in seen_cells:
                 infrastructure += 1
                 continue
             seen_cells.add(cell_id)
