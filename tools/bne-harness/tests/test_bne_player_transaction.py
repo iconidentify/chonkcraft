@@ -393,6 +393,28 @@ class PlayerTransactionTest(unittest.TestCase):
             "bne-give-order-0x13",
             native_canonical["commands"][0]["wire"]["protocol"])
 
+    def test_canonical_outcomes_follow_completion_time_not_snapshot_order(self):
+        native_raw = evidence(side="native")
+        java_raw = evidence(side="java")
+        for raw in (native_raw, java_raw):
+            raw["player_outcomes"][0]["terminal_cycle"] = 40
+            raw["player_outcomes"][1]["terminal_cycle"] = 30
+        native_raw["player_outcomes"].reverse()
+        native = transaction.compile_evidence(native_raw, source="native")
+        java = transaction.compile_evidence(java_raw, source="java")
+
+        native_canonical = transaction.canonical_transaction(
+            native["transactions"][0], transaction._unit_identity_index(native),
+            require_stable=True, side="native")
+        java_canonical = transaction.canonical_transaction(
+            java["transactions"][0], transaction._unit_identity_index(java),
+            require_stable=True, side="java")
+
+        self.assertEqual(native_canonical, java_canonical)
+        self.assertEqual(
+            [30, 40],
+            [item["terminal_cycle"] for item in native_canonical["outcomes"]])
+
     def test_wire_normalization_rejects_disagreement_on_either_side(self):
         native_raw = evidence(second_unit=False, side="native")
         native_raw["player_intents"][1]["command"]["wire_hex"] = \

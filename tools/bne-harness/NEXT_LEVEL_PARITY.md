@@ -248,10 +248,14 @@ make the size-1 field/plain/open-ground/move cell exact across the sealed
 passes null to retail `DoRightButton`; the Java twin now preserves that observed
 target resolution instead of inferring a unit from the occupied tile. That
 closes the size-1 occupied-ground Move cell independently on Human 1 and Orc 1,
-so semantic pairing is **2/532**. The independent two-wide open-ground held-out
+and canonical receipts now order terminal outcomes by their recorded completion
+cycle rather than one producer's snapshot order. The terminal cycle remains in
+the comparison, and simultaneous completions retain producer order, so this
+does not hide timing or behavior. It closes the size-2 occupied-ground Move cell
+independently on Human 1 and Orc 1, making semantic pairing **3/532**. The
+independent two-wide open-ground held-out
 keeps its cell red: its second footman settles at 479 rather than native 477.
-The new two-wide occupied-ground Human and Orc witnesses are also retained red,
-so no movement change follows from this transaction-layer correction. The first
+No movement change follows from the transaction-layer correction. The first
 coarse route difference in the original held-out is cycle 173 (Java column 25
 versus native column 26) and later reconverges; it remains movement/pathfinding
 debt rather than being hidden by wire normalization or a one-map timing special

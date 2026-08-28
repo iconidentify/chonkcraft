@@ -1193,7 +1193,7 @@ def _give_order_wire(command: dict[str, Any],
 def canonical_transaction(transaction: dict[str, Any],
         identities: dict[tuple[int, int], str] | None = None,
         *, require_stable: bool = False, side: str | None = None) -> dict[str, Any]:
-    """Retain ordering and behavior, optionally replacing all allocator ids."""
+    """Retain causal ordering and behavior, replacing allocator ids if asked."""
     index = identities or {}
     gesture = transaction.get("gesture")
     canonical_gesture = None
@@ -1260,6 +1260,16 @@ def canonical_transaction(transaction: dict[str, Any],
             index, outcome.get("target_id"), outcome.get("target_generation"),
             required=require_stable and outcome.get("target_id") not in (None, 0))
         outcomes.append(row)
+    # Native writes outcomes when each selected unit reaches its terminal
+    # state.  Java's bounded journal retains command-insertion order and
+    # snapshots every outcome together after the run.  Terminal cycle already
+    # carries the causal order, so normalize both producers to it.  Python's
+    # stable sort preserves producer order for simultaneous completions.
+    outcomes.sort(key=lambda row: (
+        row.get("terminal_cycle") is None,
+        row.get("terminal_cycle") if row.get("terminal_cycle") is not None
+        else 0,
+    ))
     selection_updates = []
     for update in transaction.get("selection_updates") or ():
         selection_updates.append([
