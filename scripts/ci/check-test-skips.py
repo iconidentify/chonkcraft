@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2814 tests,   27 skipped
-    no external input          2814 tests, 1198 skipped
+    authenticated inputs       2815 tests,   27 skipped
+    no external input          2815 tests, 1199 skipped
 
 Both can be green.
 
@@ -164,7 +164,9 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # impossible-building-order and paid-training-food referees are also
         # pack-backed, so both deliberately skip in this profile. The three-map
         # BNE recording matrix likewise skips without its authenticated pack.
-        "desktop": (355, 268),
+        # The sealed-null-target physical transaction referee needs the Human 1
+        # retail mission and adds one more deliberate data-free skip.
+        "desktop": (356, 269),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -177,7 +179,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # this project's FLAC and Ogg writers against the reference decoders. Both
     # CI jobs install them; see .github/workflows/tests.yml.
     #
-    # Re-measured 24 August 2026 against the authenticated retail installation
+    # Re-measured 28 August 2026 against the authenticated retail installation
     # and its derived pack. The twenty-seven that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
@@ -210,7 +212,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "engine": (1892, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (355, 8),
+        "desktop": (356, 8),
         "matchmaker-server": (5, 1),
     },
 }
