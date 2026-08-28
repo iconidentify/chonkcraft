@@ -74,25 +74,27 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,811 tests**. The canonical authenticated
-profile runs 2,784 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,814 tests**. The canonical authenticated
+profile runs 2,787 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
 opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
-boundary disagreement before a duplicate can appear. The new authenticated
-naval regression runs in this profile and deliberately adds one data-free skip.
-Hosted run `33181294334`
-passed both the data-free and authenticated jobs against revision
-`7ae3de6f1826fe928bf2dd9faaa8961dc2c57002`.
+boundary disagreement before a duplicate can appear. Exact-boundary research
+and in-place hall-upgrade referees now prove that resume neither charges again
+for nor revokes completed research, and never duplicates, moves, or resurrects
+a transformed building. Those two retail-roster referees deliberately add two
+data-free skips. A matched-input full run against revision
+`95c9afd99fb87392765150e3954671a65525969a` exercised all 2,787 authenticated
+tests with the exact expected failure identity.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.95` is the public release, published from revision
-`7ae3de6f1826fe928bf2dd9faaa8961dc2c57002` with game JAR SHA-256
-`f91829ab394785ea17e8c3da7142d25942535b29f06873c0fc76817edf4f76f2`.
+Signed engine OTA `2026.0828.97` is the public release, published from revision
+`95c9afd99fb87392765150e3954671a65525969a` with game JAR SHA-256
+`e7b5e578cdf2270f28b93e3de4a5ef58b0bd9e5e6f825589b09e3d3e716bae74`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
