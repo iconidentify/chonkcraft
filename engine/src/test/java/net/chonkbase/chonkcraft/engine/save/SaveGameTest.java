@@ -22,6 +22,8 @@ import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.network.SyncHash;
 import net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecode;
 import net.chonkbase.chonkcraft.engine.ai.AiForce;
+import net.chonkbase.chonkcraft.engine.animation.Animation;
+import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -582,6 +584,108 @@ class SaveGameTest {
         assertTrue(loadedPassenger.removed());
         assertEquals(loadedTransport, loadedPassenger.carrier());
         assertTrue(loadedTransport.cargo().contains(loadedPassenger));
+    }
+
+    @Test
+    @DisplayName("a restored transport can unload and return its passenger to player control")
+    void restoredTransportCanUnloadAControllablePassenger() throws IOException {
+        UnitType transportType = new UnitType("unit-test-transport");
+        transportType.setTileSize(1, 1);
+        transportType.setHitPoints(150);
+        transportType.setSpeed(10);
+        transportType.setSeaUnit(true);
+        transportType.setMaxOnBoard(1);
+        transportType.canTransport_().add("LandUnit");
+        transportType.setAnimationSet(transportTestMover());
+        UnitType passengerType = new UnitType("unit-test-passenger");
+        passengerType.setTileSize(1, 1);
+        passengerType.setHitPoints(60);
+        passengerType.setSpeed(10);
+        passengerType.setLandUnit(true);
+        passengerType.setAnimationSet(transportTestMover());
+        Map<String, UnitType> types = Map.of(
+                transportType.ident(), transportType,
+                passengerType.ident(), passengerType);
+        GameMap map = transportCoast();
+        World world = new World(map);
+        world.setUnitTypes(types);
+        Unit transport = world.createUnit(transportType, 0, 20, 19);
+        Unit passenger = world.createUnit(passengerType, 0, 0, 30);
+        assertNotNull(transport);
+        assertNotNull(passenger);
+        passenger.setTile(transport.tileX(), transport.tileY());
+        assertTrue(world.board(passenger, transport));
+        int passengerId = passenger.id();
+
+        StringWriter out = new StringWriter();
+        SaveGame.write(world, "test-map", null, 0, out);
+        World reloaded = new World(transportCoast());
+        reloaded.setUnitTypes(types);
+        LoadGame.apply(reloaded, out.toString(), types);
+
+        Unit loadedTransport = find(reloaded, transportType.ident());
+        Unit loadedPassenger = find(reloaded, passengerType.ident());
+        assertEquals(passengerId, loadedPassenger.id(),
+                "the passenger lost its network-command identity");
+        assertTrue(loadedPassenger.removed());
+        assertEquals(loadedTransport, loadedPassenger.carrier());
+        assertEquals(List.of(loadedPassenger), loadedTransport.cargo());
+
+        assertTrue(reloaded.orderUnload(loadedTransport,
+                        loadedTransport.tileX(), loadedTransport.tileY(), null),
+                "the restored transport refused an unload order");
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 60
+                && !loadedTransport.cargo().isEmpty(); cycle++) {
+            reloaded.tick();
+        }
+
+        assertTrue(loadedTransport.cargo().isEmpty(),
+                "the restored passenger stayed trapped in the transport");
+        assertTrue(loadedPassenger.isOnMap());
+        assertTrue(loadedPassenger.carrier() == null);
+        assertTrue(reloaded.map().field(loadedPassenger.tileX(), loadedPassenger.tileY())
+                        .hasFlag(TileFlag.LAND_ALLOWED),
+                "the restored passenger unloaded somewhere it cannot stand");
+        assertFootprintOccupied(reloaded, loadedPassenger, "restored passenger");
+        assertEquals(1, aliveUnits(reloaded, passengerType.ident()).size(),
+                "unloading duplicated the restored passenger");
+
+        int startX = loadedPassenger.tileX();
+        int startY = loadedPassenger.tileY();
+        CommandApplier commands = new CommandApplier(
+                reloaded, List.of(loadedPassenger.type()));
+        assertTrue(commands.apply(GameCommand.move(
+                        loadedPassenger.player(), loadedPassenger.id(), 30, 30)),
+                "the owner could not command the restored passenger");
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 20
+                && loadedPassenger.tileX() == startX
+                && loadedPassenger.tileY() == startY; cycle++) {
+            reloaded.tick();
+        }
+        assertTrue(loadedPassenger.tileX() != startX || loadedPassenger.tileY() != startY,
+                "the restored passenger accepted a command but never moved");
+    }
+
+    private static GameMap transportCoast() {
+        GameMap map = new GameMap(40, 40, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(
+                        y < 20 ? TileFlag.WATER_ALLOWED : TileFlag.LAND_ALLOWED);
+            }
+        }
+        map.recordLoadedTerrain();
+        return map;
+    }
+
+    private static AnimationSet transportTestMover() {
+        AnimationSet set = new AnimationSet("save-transport-mover");
+        set.put(AnimationSet.State.STILL,
+                Animation.parse("still", List.of("frame 0", "wait 1")));
+        set.put(AnimationSet.State.MOVE, Animation.parse("move",
+                List.of("frame 0", "move 16", "wait 1",
+                        "frame 5", "move 16", "wait 1")));
+        return set;
     }
 
     @Test
