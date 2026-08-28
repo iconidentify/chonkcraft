@@ -44,7 +44,14 @@ class NextLevelGateTest(unittest.TestCase):
         }
         ai = {
             "complete": False,
-            "fleet": {"complete": False, "materialized_scenarios": 0},
+            "fleet": {
+                "complete": False, "materialized_scenarios": 52,
+                "available_native_captures": 52,
+                "certification": {
+                    "state_exact_scenarios": 45,
+                    "telemetry_exact_scenarios": 45,
+                },
+            },
             "combat_lifecycle": {"complete": False, "exact": 0,
                                  "required": 185},
         }
@@ -58,6 +65,10 @@ class NextLevelGateTest(unittest.TestCase):
                             for item in work["queue"]))
         self.assertTrue(any(item["lane"] == "ai-fleet"
                             for item in work["queue"]))
+        ai_work = next(item for item in work["queue"]
+                       if item["lane"] == "ai-fleet")
+        self.assertIn("52/52 mission AI twins materialized", ai_work["reason"])
+        self.assertIn("45/52 state+telemetry exact", ai_work["reason"])
         self.assertTrue(any(item["lane"] == "campaign-lifecycle"
                             for item in work["queue"]))
 

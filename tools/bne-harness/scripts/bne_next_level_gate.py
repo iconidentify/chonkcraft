@@ -601,10 +601,15 @@ def next_work(player_lane: dict[str, Any], ai_lane: dict[str, Any],
         })
     fleet = ai_lane["fleet"]
     if not fleet["complete"]:
+        certification = fleet.get("certification") or {}
+        exact_scenarios = min(
+            int(certification.get("state_exact_scenarios", 0)),
+            int(certification.get("telemetry_exact_scenarios", 0)))
         queue.append({
             "lane": "ai-fleet", "stage": "capture-or-compare",
             "reason": (f"{fleet.get('materialized_scenarios', 0)}/52 "
-                       "mission AI twins materialized and exact; "
+                       "mission AI twins materialized; "
+                       f"{exact_scenarios}/52 state+telemetry exact; "
                        f"{fleet.get('available_native_captures', 0)} native "
                        "captures currently discoverable"),
             "command": "python3 tools/bne-harness/scripts/bne_java.py ai-conductor",
