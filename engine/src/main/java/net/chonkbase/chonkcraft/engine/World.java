@@ -15068,7 +15068,7 @@ public final class World {
                 && unit.routeSpent();
         boolean paidSmallWarshipBlockedRouteWake = false;
         if (battleNetArmedSmallWarshipPatrol(unit)
-                && !unit.isMoving() && unit.pathLength() > 0
+                && !unit.isMoving() && unit.pathLength() > 1
                 && unit.battleNetOrderDelay() == 0
                 && unit.battleNetAnimationTimer() == 1
                 && unit.battleNetRefusals() >= 8) {
@@ -15083,11 +15083,14 @@ public final class World {
             if (paidSmallWarshipBlockedRouteWake) {
                 // A complete cooperative band reuses its cached head when the
                 // square has opened (XOrc 8 destroyer 164 at fixture 106).
-                // If that head is still occupied, however, the timer-one wake
-                // asks NewPath and replaces the route before moving. Native
-                // destroyer 1431 wakes on fixture 232 with NW still held by a
-                // sibling, writes N,NW and commits N; retrying stale NW opened
-                // a second fifteen-count band and left Java on 94,82.
+                // If the head of a multi-heading tail is still occupied,
+                // however, the timer-one wake asks NewPath and replaces the
+                // route before moving. Native destroyer 1431 wakes on fixture
+                // 232 with four headings left and NW still held by a sibling,
+                // then writes N,NW and commits N. Once only the final NW
+                // remains, submarine 1432 still blocks it on fixture 264;
+                // that terminal cached heading is retained under the ordinary
+                // fifteen-count cooperative band instead of being replaced.
                 unit.clearPath();
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);

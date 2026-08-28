@@ -208,7 +208,7 @@ head2 "What a test run would exercise"
 
 if [[ "$wc2_ok" == 1 && "$pack_ok" == 1 && "$opus_ok" == 1 ]]; then
     printf '  All three external inputs are configured.\n'
-    printf '  Expect 2810 tests, 27 skipped, and about five minutes of wall time.\n'
+    printf '  Expect 2811 tests, 27 skipped, and about five minutes of wall time.\n'
     printf '  The expected skips cover display-only checks, an optional music\n'
     printf '  fixture, fixture-sensitive and custom-map checks, local playtest\n'
     printf '  saves, the opt-in production smoke and two release-sensitive tests.\n'
@@ -226,7 +226,7 @@ elif [[ "$wc2_ok" == 1 ]]; then
 else
     printf '  At least one external input is missing.\n'
     printf '  The suite will still report BUILD SUCCESS, having skipped most of itself:\n'
-    printf '  with no input at all, 1195 of 2810 tests skip.\n'
+    printf '  with no input at all, 1196 of 2811 tests skip.\n'
     printf '  That is not a passing run. See docs/development-setup.md.\n'
 fi
 

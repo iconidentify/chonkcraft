@@ -197,6 +197,42 @@ class BattleNetSmallWarshipPatrolRealDataTest {
         assertEquals(1, destroyer.battleNetAnimationTimer());
     }
 
+    @Test
+    @DisplayName("XOrc 8's paid destroyer route holds its consumed leftover on cycle 264")
+    void xOrc8PaidDestroyerRouteHoldsItsConsumedLeftoverOnCycle264() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 169);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1431");
+
+        tickThrough(mission, 263);
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(94, destroyer.tileX());
+        assertEquals(80, destroyer.tileY());
+        assertEquals(1, destroyer.pathLength(),
+                "the paid wake's replacement route keeps northwest after north");
+        assertEquals(1, destroyer.battleNetPathStepsTaken(),
+                "north must remain recorded as a consumed route heading");
+        assertEquals(1, destroyer.battleNetAnimationTimer(),
+                "the north stride settles on the timer-one wake");
+
+        tickThrough(mission, 264);
+        assertEquals(94, destroyer.tileX(),
+                "the allied submarine blocks the consumed northwest leftover");
+        assertEquals(80, destroyer.tileY(),
+                "native retains the anchor while arming the cooperative hold");
+        assertEquals(1, destroyer.pathLength(),
+                "a consumed leftover is retained rather than replaced");
+        assertEquals(1, destroyer.battleNetPathStepsTaken(),
+                "the retained route keeps its consumed-prefix provenance");
+        assertEquals(15, destroyer.battleNetAnimationTimer(),
+                "the blocked leftover opens the native fifteen-count Move band");
+    }
+
     private static Mission mission(GameData data) {
         Mission mission = data.loadMission(MAP,
                 GameData.personIn(data.campaignMap(MAP)), 1);
