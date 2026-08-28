@@ -65,13 +65,15 @@ expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
 opens. The synchronization hash now covers that completion latch under schema
-2, so peers report the disagreement before a duplicate can appear.
+2, so peers report the disagreement before a duplicate can appear. Hosted run
+`33147089166` passed both the data-free and authenticated jobs against revision
+`58a596feebfa734143a1d2bd4f2de032a99acd45`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.88` is the public release, published from revision
-`93ae15a421a264f19d7246fb1aa6768a53e80e1b` with game JAR SHA-256
-`a7a8cdc11cd1a160ca0bf0f8ba120d1026f06bf48749f1959ac59ec72ea1456f`.
+Signed engine OTA `2026.0828.89` is the public release, published from revision
+`58a596feebfa734143a1d2bd4f2de032a99acd45` with game JAR SHA-256
+`bf6ace3af7ff2d50a461d8213ac4fd38d496d38893d0e1856f48ed7eb5535c8d`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
