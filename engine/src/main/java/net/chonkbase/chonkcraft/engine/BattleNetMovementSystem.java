@@ -2736,11 +2736,16 @@ final class BattleNetMovementSystem {
      * refusal nibble remains nine. The launched behavior-two assault path is
      * excluded: those ships must keep recovering toward their combat home.</p>
      *
-     * <p>The near-goal bound separates this terminal Patrol refusal from a
-     * body encountered on a longer route. XOrc 8 destroyer 1431 is still
-     * seventeen tiles from its map point when submarine 1432 blocks its
-     * leftover northwest heading; native gives that first refusal the ordinary
-     * fifteen-count and then continues the remaining route.</p>
+     * <p>The near-goal bound and route provenance separate this terminal
+     * Patrol refusal from a body encountered on a longer route. XOrc 8
+     * destroyer 1431 is still seventeen tiles from its map point when
+     * submarine 1432 blocks its leftover northwest heading. Submarine 1433 is
+     * already within four tiles of its map point, but has consumed six bytes
+     * of the same cached route when submarine 1434 blocks byte seven. Native
+     * gives both residuals the ordinary fifteen-count and then continues the
+     * remaining route. XHuman 7's terminal pair has consumed only its opening
+     * west stride when this helper takes over, so that short terminal route
+     * remains part of the ladder.</p>
      */
     private boolean refuseBattleNetNavalMapPatrol(Unit unit) {
         if (unit == null || unit.type() == null
@@ -2752,7 +2757,8 @@ final class BattleNetMovementSystem {
                 || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
                         Math.abs(unit.tileY() - unit.orderTargetY())) > 4
                 || unit.isMoving()
-                || unit.pathLength() != 1) {
+                || unit.pathLength() != 1
+                || unit.battleNetPathStepsTaken() > 1) {
             return false;
         }
         battleNetRefuse(unit);

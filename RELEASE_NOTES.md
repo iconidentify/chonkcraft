@@ -1,5 +1,8 @@
 # Gameplay Reliability Update
 
+- Kept small warships on their consumed Battle.net patrol route when a moving
+  allied hull temporarily blocks the final heading. Fresh terminal patrols,
+  coast refusals and combat chases retain their distinct native behavior.
 - Fixed oil tankers disappearing after building an oil platform or returning
   oil through an oppositely aligned shipyard or refinery. A tanker now finds a
   valid visible exit while retaining the original Battle.net movement grid.

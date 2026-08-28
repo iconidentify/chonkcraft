@@ -64,8 +64,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,805 tests**. The canonical authenticated
-profile runs 2,776 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,806 tests**. The canonical authenticated
+profile runs 2,779 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
