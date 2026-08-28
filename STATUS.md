@@ -68,15 +68,15 @@ born twice, while a fully blocked trainee remains unborn until a legal exit
 opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
-boundary disagreement before a duplicate can appear. Hosted run `33151916840`
+boundary disagreement before a duplicate can appear. Hosted run `33158343945`
 passed both the data-free and authenticated jobs against revision
-`379fd6bffef957a940a883299fce86014d58d37b`.
+`852ff44fd866db8a7b5181378be971a2d4c37a08`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.90` is the public release, published from revision
-`379fd6bffef957a940a883299fce86014d58d37b` with game JAR SHA-256
-`fb3831f7868091f37369ec0cddd235b74daf241e5db793259df6de1fe7d6362b`.
+Signed engine OTA `2026.0828.91` is the public release, published from revision
+`852ff44fd866db8a7b5181378be971a2d4c37a08` with game JAR SHA-256
+`f473e33f07cd67492470ce21835a801f9c1df6903fd3f4c1896662764553cb00`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
