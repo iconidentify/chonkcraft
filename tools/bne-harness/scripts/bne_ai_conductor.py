@@ -607,7 +607,7 @@ if not ai_bytes:
 trace_text = trace_raw.decode("utf-8")
 base = derive_ai_base(trace_text, ai_bytes)
 built = ledger_from_native_trace(trace_text, ai_base=base,
-        ai_size=len(ai_bytes), ai_bin=ai_bytes)
+        ai_size=len(ai_bytes), ai_bin=ai_bytes, state_raw=state_raw)
 built["ai_bin_sha256"] = _hashlib.sha256(ai_bytes).hexdigest()
 built["ai_bin_bytes"] = len(ai_bytes)
 print(_json.dumps({"ledger": built,

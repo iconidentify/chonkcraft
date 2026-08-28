@@ -6,6 +6,7 @@ mutation, not merely that two JSON documents differ.
 """
 
 from pathlib import Path
+import io
 import sys
 import unittest
 
@@ -15,6 +16,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 import bne_ai_decision_ledger as ledger
+import bne_fixture as fixture
 
 
 AI_BASE = 0x00B00000
@@ -49,6 +51,49 @@ def sample_row(**overrides):
     )
     fields.update(overrides)
     return ledger.row(**fields)
+
+
+def native_unit(*, player: int = 2, behavior: int = 1,
+                home: tuple[int, int] = (0, 0)) -> bytes:
+    raw = bytearray(152)
+    raw[30] = 0
+    raw[44] = player
+    raw[88:90] = home[0].to_bytes(2, "little")
+    raw[90:92] = home[1].to_bytes(2, "little")
+    raw[94] = behavior
+    return bytes(raw)
+
+
+def native_state_frames(
+        frames: list[list[tuple[int, bytes]]]) -> bytes:
+    out = bytearray(fixture.STATE_HEADER.pack(
+        fixture.STATE_MAGIC, fixture.STATE_MAJOR, fixture.STATE_MINOR,
+        fixture.STATE_HEADER.size, 152, 1600, 16, fixture.STATE_FLAGS))
+    for cycle, deltas in enumerate(frames, 1):
+        players = b"".join(fixture.PLAYER_RECORD.pack(
+            1 if player == 2 else (2 if player == 0 else 3), 0, 0, 0)
+            for player in range(16))
+        pool_count = max((slot for slot, _raw in deltas), default=-1) + 1
+        payload = (fixture.CYCLE_HEADER.pack(
+            cycle, cycle, pool_count, len(deltas)) + players)
+        for slot, raw in deltas:
+            payload += fixture.UNIT_DELTA_HEADER.pack(slot, 1) + raw
+        out += fixture.CHUNK_HEADER.pack(b"CYCL", len(payload)) + payload
+        sim = b"\0" * (16 * fixture.PLAYER_SIM_RECORD.size)
+        changed_tiles = 1 if cycle == 1 else 0
+        aux = fixture.AUX_HEADER.pack(
+            cycle, 0, 0, 1, changed_tiles) + sim
+        if changed_tiles:
+            aux += fixture.MAP_DELTA.pack(0, 0, 0)
+        out += fixture.CHUNK_HEADER.pack(b"AUXL", len(aux)) + aux
+    done = fixture.DONE_RECORD.pack(len(frames))
+    out += fixture.CHUNK_HEADER.pack(b"DONE", len(done)) + done
+    fixture.validate_state_source(io.BytesIO(out), len(frames))
+    return bytes(out)
+
+
+def native_state_stream(units: list[bytes], *, slot: int = 0) -> bytes:
+    return native_state_frames([[(slot, raw)] for raw in units])
 
 
 class AiDecisionLedgerTest(unittest.TestCase):
@@ -206,6 +251,99 @@ class AiDecisionLedgerTest(unittest.TestCase):
             built["rows"][0]["writes"],
             "pointer telemetry must use the same ai.bin offsets as committed state",
         )
+
+    def test_pending_launch_binds_to_native_behavior_two_assignment(self):
+        before = bytearray(raw_state(wait=1, process_pc=True))
+        before[0x09] = 1
+        before[0x0d] = 3
+        before[0x0e] = 1
+        after = bytearray(before)
+        after[0:4] = (0).to_bytes(4, "little")
+        after[0x09] = 0
+        text = (tracer_dump(cycle=1, player=2, profile=0,
+                            raw=bytes(before))
+                + tracer_dump(cycle=2, player=2, profile=0,
+                              raw=bytes(after)))
+        state = native_state_stream([
+            native_unit(behavior=1, home=(4, 5)),
+            native_unit(behavior=2, home=(13, 66)),
+        ])
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE, state_raw=state)
+        self.assertEqual([{
+            "domain": "ground", "requested": 3, "assigned": 1,
+            "target": [13, 66],
+        }], built["rows"][1]["launches"])
+
+    def test_consumed_launch_with_no_assignment_records_null_target(self):
+        before = bytearray(raw_state(wait=1, process_pc=True))
+        before[0x09] = 1
+        before[0x0d] = 3
+        before[0x0e] = 1
+        after = bytearray(before)
+        after[0:4] = (0).to_bytes(4, "little")
+        after[0x09] = 0
+        text = (tracer_dump(cycle=1, player=2, profile=0,
+                            raw=bytes(before))
+                + tracer_dump(cycle=2, player=2, profile=0,
+                              raw=bytes(after)))
+        unchanged = native_unit(behavior=1, home=(4, 5))
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE,
+            state_raw=native_state_stream([unchanged, unchanged]))
+        self.assertEqual([{
+            "domain": "ground", "requested": 3, "assigned": 0,
+            "target": None,
+        }], built["rows"][1]["launches"])
+
+    def test_launch_assignments_with_different_homes_fail_closed(self):
+        before = bytearray(raw_state(wait=1, process_pc=True))
+        before[0x09] = 1
+        before[0x0d] = 2
+        before[0x0e] = 1
+        after = bytearray(before)
+        after[0:4] = (0).to_bytes(4, "little")
+        after[0x09] = 0
+        text = (tracer_dump(cycle=1, player=2, profile=0,
+                            raw=bytes(before))
+                + tracer_dump(cycle=2, player=2, profile=0,
+                              raw=bytes(after)))
+        state = native_state_frames([
+            [(0, native_unit(behavior=1, home=(4, 5))),
+             (1, native_unit(behavior=1, home=(6, 7)))],
+            [(0, native_unit(behavior=2, home=(13, 66))),
+             (1, native_unit(behavior=2, home=(37, 5)))],
+        ])
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE, state_raw=state)
+        self.assertEqual([], built["rows"][1]["launches"])
+
+    def test_same_tick_set_and_consume_is_recovered_before_wait(self):
+        ai = bytearray(AI_SIZE)
+        # SET pending naval launch; WAIT 25. The recurring pass consumes the
+        # launch byte before either boundary can expose its value one.
+        ai[0x120:0x128] = bytes((0, 0x0a, 1, 2, 25, 0, 0, 0))
+        incoming = bytearray(raw_state(wait=0, process_pc=True))
+        incoming[0x0f] = 3
+        incoming[0x10] = 1
+        after = bytearray(incoming)
+        after[0:4] = (25).to_bytes(4, "little")
+        after[0x04:0x08] = (AI_BASE + 0x128).to_bytes(4, "little")
+        text = (tracer_dump(cycle=1, player=2, profile=0,
+                            raw=bytes(incoming))
+                + tracer_dump(cycle=2, player=2, profile=0,
+                              raw=bytes(after)))
+        state = native_state_stream([
+            native_unit(behavior=6, home=(87, 71)),
+            native_unit(behavior=2, home=(98, 122)),
+        ])
+        built = ledger.ledger_from_native_trace(
+            text, ai_base=AI_BASE, ai_size=AI_SIZE, ai_bin=bytes(ai),
+            state_raw=state)
+        self.assertEqual([{
+            "domain": "naval", "requested": 3, "assigned": 1,
+            "target": [98, 122],
+        }], built["rows"][1]["launches"])
 
     def test_a_same_cycle_game_before_does_not_hide_the_previous_wait_write(self):
         # Native AI often thinks after game-after. Cycle N+1's game-before

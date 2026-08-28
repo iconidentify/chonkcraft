@@ -74,7 +74,7 @@ The lower-level commands are:
 
 ```sh
 python3 tools/bne-harness/scripts/bne_ai_decision_ledger.py from-trace \
-  trace.txt --ai-bin ai.bin --active-player 1 \
+  trace.txt --state state.bin --ai-bin ai.bin --active-player 1 \
   --cycle 1 --cycle 2 --output native.json
 
 python3 tools/bne-harness/scripts/bne_ai_decision_ledger.py compare \
@@ -82,10 +82,20 @@ python3 tools/bne-harness/scripts/bne_ai_decision_ledger.py compare \
 ```
 
 `from-trace` reads tracer `ai-build-boundary` 48-byte dumps
-(`CHONK_BNE_TRACE_AI_BUILD_STATE=1`). The trace records a pre- and post-tick
-state for every gameplay cycle. Pointers at `+0x04` / `+0x23` /
-`+0x27` become `ai.bin` file offsets. Two identical native dumps must
-compare equal after normalization.
+(`CHONK_BNE_TRACE_AI_BUILD_STATE=1`) and the sealed `BNESTATE` stream. The
+trace records a pre- and post-tick state for every gameplay cycle. Pointers at
+`+0x04` / `+0x23` / `+0x27` become `ai.bin` file offsets. Two identical native
+dumps must compare equal after normalization.
+
+Ledger schema 2 derives launch receipts from durable native state instead of
+inventing an event the trace hook did not record. A pending ground, naval, or
+air byte supplies `requested`; unit transitions from a non-two AI behavior to
+behavior two supply `assigned`; and the common behavior-two home supplies the
+effective `target` map coordinate. More than one pending domain in a player
+cycle, more assignments than requested, or disagreeing assigned homes fails
+closed. Java records the same coordinate passed to native behavior two, not a
+Java-only enemy object identifier. A launch which assigns no unit has a null
+target.
 Mutation tests shift one PC transition, one predicate result, and one
 state byte and fail at that cycle and field. A retail micro-oracle replay
 is only required after the ledger localizes an unresolved decision.
@@ -120,19 +130,22 @@ consumed.
 
 Human 1 and Human 4 computers SET `+0x0c=0` during install. Native
 `0x428160` already reads that byte as the builder-scan latch and skips the
-map walk when it is zero. Java now arms the latch after install. The current
-head conductor store materializes all 52 campaign missions through 1,800
-cycles under one proof: 42/52 missions and 201,088/205,200 player-cycles are
-committed-state exact; 38/52 missions and 201,040/205,200 player-cycles have
-full causal telemetry. Seven classic/expansion witnesses run SET/JUMP chains
-before WAIT-UNTIL; recovering those native predicate attempts makes Orc 5,
-expansion Orc 4 and expansion Orc 10 fully causal-exact without changing
-simulation. Periodic ground/naval/air launch-byte mutations now join the same
-net-write ledger as bytecode and build-box refresh. The remaining launch rows
-fail closed on native requested/assigned/target evidence rather than hiding
-that proof gap. The ranked committed-state frontiers are Orc 4 at cycle 970,
-expansion Human 2 at 972 and Human 4 at 1,444; those are behavior debt, not a
-reason to invert the already authenticated predicate rules.
+map walk when it is zero. Java now arms the latch after install.
+
+The current proof materializes all 52 campaign missions through 1,800 cycles:
+45/52 missions and 202,290/205,200 player-cycles are committed-state exact;
+45/52 missions and 202,285/205,200 player-cycles have full causal telemetry.
+Schema-2 launch reconstruction removed three instrumentation-only frontiers.
+Native selectors `0x426860` and `0x426930` then removed the independent XOrc
+11 air and XOrc 8 naval launch differences: naval launch points prioritize an
+oil platform, then a shipyard, then the farthest ship; air points prioritize
+the closest gold mine to the target person's anchor, then a hall, then the
+farthest unit. The rules are authenticated by both missions, focused
+cross-domain tests, and unchanged exact land-launch witnesses. The remaining
+launch frontier is XHuman 12 at cycle 449, after that simulation has already
+diverged; it is fallout, not evidence for changing the selector-zero land
+rule. Six later committed-state frontiers remain, so fleet certification is
+still incomplete.
 
 The 0x4273e0 pad after the land walk is 8-bit wrapping minus 5 / plus 8,
 then a signed clamp. A 128-tile computer whose signed min never moves

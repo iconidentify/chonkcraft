@@ -26,7 +26,7 @@ class BneAiDecisionAdapterTest {
                 "--output", output.toString(),
         });
         String json = Files.readString(output);
-        assertTrue(json.contains("\"schema\":\"chonkcraft-bne-ai-decision-ledger-1\""));
+        assertTrue(json.contains("\"schema\":\"chonkcraft-bne-ai-decision-ledger-2\""));
         assertTrue(json.contains("\"cycle\":1"));
         assertTrue(json.contains("\"cycle\":12"));
         assertTrue(json.contains("\"writes\":["));

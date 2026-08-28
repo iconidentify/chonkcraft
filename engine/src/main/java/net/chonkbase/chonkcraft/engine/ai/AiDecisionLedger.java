@@ -14,7 +14,7 @@ import net.chonkbase.chonkcraft.engine.World;
  */
 public final class AiDecisionLedger {
 
-    public static final String SCHEMA = "chonkcraft-bne-ai-decision-ledger-1";
+    public static final String SCHEMA = "chonkcraft-bne-ai-decision-ledger-2";
     public static final String AUTHORITY_SHA256 =
             "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807";
 
@@ -119,9 +119,14 @@ public final class AiDecisionLedger {
                 out.append("{\"domain\":\"").append(launch.domain())
                         .append("\",\"requested\":").append(launch.requested())
                         .append(",\"assigned\":").append(launch.assigned())
-                        .append(",\"target_id\":")
-                        .append(launch.targetId() == null ? "null" : launch.targetId())
-                        .append('}');
+                        .append(",\"target\":");
+                if (launch.targetX() == null || launch.targetY() == null) {
+                    out.append("null");
+                } else {
+                    out.append('[').append(launch.targetX()).append(',')
+                            .append(launch.targetY()).append(']');
+                }
+                out.append('}');
             }
             out.append(']')
                     .append(",\"classification\":\"")

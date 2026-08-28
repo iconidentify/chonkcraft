@@ -150,7 +150,7 @@ public final class AiPlayer {
 
     /** One periodic force-launch request and what it actually assigned. */
     public record DecisionLaunch(String domain, int requested, int assigned,
-            Integer targetId) {}
+            Integer targetX, Integer targetY) {}
 
     private final List<DecisionPredicate> battleNetDecisionPredicates = new ArrayList<>();
     private final List<DecisionWrite> battleNetDecisionWrites = new ArrayList<>();
@@ -655,7 +655,8 @@ public final class AiPlayer {
             }
         }
         int cursor = 0;
-        Integer targetId = null;
+        Integer targetX = null;
+        Integer targetY = null;
         for (int group = 0; group < groupCount && cursor < available.size(); group++) {
             int end = Math.min(available.size(), cursor + groupSize);
             if (end <= cursor) {
@@ -667,9 +668,6 @@ public final class AiPlayer {
             if (enemy == null) {
                 break;
             }
-            if (targetId == null) {
-                targetId = enemy.id();
-            }
             for (Unit member : members) {
                 int goalX = enemy.tileX();
                 int goalY = enemy.tileY();
@@ -678,6 +676,13 @@ public final class AiPlayer {
                             member, goalX, goalY);
                     goalX = normalized[0];
                     goalY = normalized[1];
+                }
+                if (targetX == null) {
+                    // Native FUN_00426ad0 passes this effective map point to
+                    // FUN_004275b0. It does not retain the enemy pointer, so
+                    // the decision ledger records the observable coordinate.
+                    targetX = goalX;
+                    targetY = goalY;
                 }
                 world.markBattleNetForceLaunchThisCycle(member);
                 member.setBattleNetAiBehavior(2);
@@ -702,7 +707,7 @@ public final class AiPlayer {
             cursor = end;
         }
         battleNetDecisionLaunches.add(new DecisionLaunch(domain,
-                groupSize * groupCount, cursor, targetId));
+                groupSize * groupCount, cursor, targetX, targetY));
         battleNetAiState[pendingOffset] = 0;
     }
 
@@ -710,28 +715,103 @@ public final class AiPlayer {
         if (predicate == 4) {
             return battleNetLandForceObjective(world);
         }
-        if (predicate != 6) {
-            Unit enemy = world.findEnemyByFlood(leader, predicate == 4);
-            if (enemy == null && predicate == 4) {
-                enemy = world.findEnemyByFlood(leader, false);
-            }
-            return enemy;
+        int targetPlayer = battleNetMostPopulousPerson(world);
+        return predicate == 5
+                ? battleNetNavalForceObjective(world, targetPlayer)
+                : predicate == 6
+                        ? battleNetAirForceObjective(world, targetPlayer)
+                        : null;
+    }
+
+    /** Native selector one ({@code 0x426860}) for recurring naval launches. */
+    private Unit battleNetNavalForceObjective(World world, int targetPlayer) {
+        if (targetPlayer < 0) {
+            return null;
         }
-        Unit best = null;
-        int distance = Integer.MAX_VALUE;
-        for (Unit candidate : world.units()) {
-            if (!candidate.isAlive() || !candidate.isOnMap()
-                    || candidate.type() == null
-                    || !world.isEnemyPlayer(playerIndex, candidate.player())) {
+        Unit anchor = battleNetLandInfluenceAnchor(world, targetPlayer);
+        if (anchor == null) {
+            return null;
+        }
+        List<Unit> roster = world.playerUnits(targetPlayer);
+        Unit shipyard = null;
+        Unit farthestNaval = null;
+        int farthestDistance = 0;
+        // Native follows the person's newest-first unit chain. Java stores
+        // that same chain in the opposite direction.
+        for (int index = roster.size() - 1; index >= 0; index--) {
+            Unit unit = roster.get(index);
+            if (unit == null || unit.type() == null) {
                 continue;
             }
-            int candidateDistance = leader.distanceTo(candidate);
-            if (candidateDistance < distance) {
-                distance = candidateDistance;
-                best = candidate;
+            UnitType type = unit.type();
+            // CH bit 0x08 (retail flag 0x00000800) belongs exactly to the
+            // two oil-platform types and returns immediately.
+            if (type.building()
+                    && type.givesResource() == UnitType.Resource.OIL) {
+                return unit;
+            }
+            int code = PudUnitTypes.code(type.ident());
+            if (code == 0x48 || code == 0x49) {
+                shipyard = unit;
+            }
+            // CL bit 0x08 is the complete mobile naval family: tankers,
+            // transports and all warships. Strictly greater preserves the
+            // native chain-order tie break.
+            if (type.seaUnit()) {
+                int distance = battleNetMapDistance(
+                        unit, anchor.tileX(), anchor.tileY());
+                if (distance > farthestDistance) {
+                    farthestDistance = distance;
+                    farthestNaval = unit;
+                }
             }
         }
-        return best;
+        return shipyard != null ? shipyard : farthestNaval;
+    }
+
+    /** Native selector two ({@code 0x426930}) for recurring air launches. */
+    private Unit battleNetAirForceObjective(World world, int targetPlayer) {
+        if (targetPlayer < 0) {
+            return null;
+        }
+        Unit anchor = battleNetLandInfluenceAnchor(world, targetPlayer);
+        if (anchor == null) {
+            return null;
+        }
+        List<Unit> roster = world.playerUnits(targetPlayer);
+        Unit nearestMine = null;
+        int nearestMineDistance = 0xffff;
+        Unit hall = null;
+        Unit farthest = null;
+        int farthestDistance = 0;
+        for (int index = roster.size() - 1; index >= 0; index--) {
+            Unit unit = roster.get(index);
+            if (unit == null || unit.type() == null) {
+                continue;
+            }
+            UnitType type = unit.type();
+            int distance = battleNetMapDistance(
+                    unit, anchor.tileX(), anchor.tileY());
+            // PUD type 0x5c is the gold mine. It has first priority, with
+            // the closest mine retained by a strict-less comparison.
+            if (type.givesResource() == UnitType.Resource.GOLD
+                    && distance < nearestMineDistance) {
+                nearestMineDistance = distance;
+                nearestMine = unit;
+            }
+            // AH bit 0x10 (retail flag 0x00001000) is the six hall tiers.
+            // Native overwrites this pointer on every match.
+            if (isGoldDepot(type)) {
+                hall = unit;
+            }
+            if (distance > farthestDistance) {
+                farthestDistance = distance;
+                farthest = unit;
+            }
+        }
+        return nearestMine != null ? nearestMine
+                : hall != null ? hall
+                : farthest != null ? farthest : anchor;
     }
 
     /**

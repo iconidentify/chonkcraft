@@ -60,8 +60,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,799 tests**. The canonical authenticated
-profile runs 2,772 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,803 tests**. The canonical authenticated
+profile runs 2,776 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
@@ -114,9 +114,13 @@ being inferred from the playable campaign fleet:
 - AI fleet: **52/52** current-head mission twins are materialized from
   authenticated native captures. Committed state is exact for **45/52**
   missions and **202,290/205,200** player-cycles. Full causal telemetry is
-  exact for **40/52** missions and **202,244/205,200** player-cycles. Fleet
-  certification remains incomplete until all 52 missions are exact under one
-  proof.
+  exact for **45/52** missions and **202,285/205,200** player-cycles. The
+  schema-2 ledger derives requested/assigned launch receipts and effective
+  behavior-two target coordinates from authenticated native state. Native
+  air and naval target selection makes expansion Orc 11 and expansion Orc 8
+  fully causal-exact; the one remaining launch mismatch is downstream
+  expansion Human 12 fallout. Fleet certification remains incomplete until
+  all 52 missions are exact under one proof.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 

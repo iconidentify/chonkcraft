@@ -409,7 +409,7 @@ class FleetPlanTest(unittest.TestCase):
 
     def test_java_ledger_must_bind_the_pack_ai_bin(self):
         ai = ai_bytes()
-        ledger = {"schema": "chonkcraft-bne-ai-decision-ledger-1"}
+        ledger = {"schema": "chonkcraft-bne-ai-decision-ledger-2"}
         bound = conductor._bind_java_ai_bin(ledger, ai)
         self.assertEqual(hashlib.sha256(ai).hexdigest(), bound["ai_bin_sha256"])
         self.assertEqual(len(ai), bound["ai_bin_bytes"])

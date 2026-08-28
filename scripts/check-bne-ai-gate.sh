@@ -14,7 +14,7 @@ fi
 CHONKCRAFT_ASSET_PACK="${asset_pack}" \
 "${repo_root}/scripts/run-tests.sh" \
   -pl engine -am \
-  '-Dtest=BattleNetAiBytecodeTest,BattleNetAiForcePredicateTest,BattleNetAiRetailDataTest,AiCompetenceTest,BattleNetHumanFiveGuardBehaviorRealDataTest,BattleNetAiPatrolLivenessTest' \
+  '-Dtest=BattleNetAiBytecodeTest,BattleNetAiForcePredicateTest,BattleNetAiRetailDataTest,AiCompetenceTest,BattleNetHumanFiveGuardBehaviorRealDataTest,BattleNetAiPatrolLivenessTest,BattleNetAiForceLaunchObjectiveRealDataTest' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${reports}" <<'PY'
@@ -25,11 +25,12 @@ import xml.etree.ElementTree as ET
 root = Path(sys.argv[1])
 expected = {
     "net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecodeTest": 8,
-    "net.chonkbase.chonkcraft.engine.ai.BattleNetAiForcePredicateTest": 4,
+    "net.chonkbase.chonkcraft.engine.ai.BattleNetAiForcePredicateTest": 6,
     "net.chonkbase.chonkcraft.engine.ai.BattleNetAiRetailDataTest": 1,
     "net.chonkbase.chonkcraft.engine.perf.AiCompetenceTest": 1,
     "net.chonkbase.chonkcraft.engine.BattleNetHumanFiveGuardBehaviorRealDataTest": 1,
     "net.chonkbase.chonkcraft.engine.BattleNetAiPatrolLivenessTest": 3,
+    "net.chonkbase.chonkcraft.engine.BattleNetAiForceLaunchObjectiveRealDataTest": 2,
 }
 for name, count in expected.items():
     report = root / f"TEST-{name}.xml"
@@ -45,7 +46,7 @@ for name, count in expected.items():
             f"{name}: expected {count}/0/0/0 tests/skips/failures/errors, "
             f"got {observed}/{skipped}/{failures}/{errors}"
         )
-print("retail AI inventory: 18 pass, 0 skipped")
+print("retail AI inventory: 22 pass, 0 skipped")
 PY
 
 echo "retail AI gate passed: ai.bin opponent gathers, builds, forms and attacks"

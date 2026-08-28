@@ -50,6 +50,36 @@ class BattleNetAiForcePredicateTest {
         return type;
     }
 
+    private static UnitType building(String name) {
+        UnitType type = new UnitType(name);
+        type.setTileSize(1, 1);
+        type.setHitPoints(600);
+        type.setBuilding(true);
+        return type;
+    }
+
+    private static byte[] launchProfile(
+            int launchOffset, int countOffset, int multiplierOffset) {
+        byte[] profile = new byte[140];
+        profile[0] = 100;
+        profile[100] = 120;
+        profile[102] = 122;
+        int pc = 104;
+        profile[pc++] = 0;
+        profile[pc++] = (byte) launchOffset;
+        profile[pc++] = 1;
+        profile[pc++] = 0;
+        profile[pc++] = (byte) countOffset;
+        profile[pc++] = 1;
+        profile[pc++] = 0;
+        profile[pc++] = (byte) multiplierOffset;
+        profile[pc++] = 1;
+        profile[pc++] = 2;
+        profile[pc] = 100;
+        profile[120] = (byte) 0xff;
+        return profile;
+    }
+
     @Test
     void forceSizeGatesIgnoreMapGuardsAndCountUnmarkedFighters() {
         World world = world();
@@ -170,6 +200,62 @@ class BattleNetAiForcePredicateTest {
         assertEquals(2, java.util.stream.Stream.of(first, second, spare)
                 .filter(unit -> unit.battleNetAiBehavior() == 2)
                 .count());
+    }
+
+    @Test
+    void periodicNavalLaunchPrefersThePersonsOilPlatform() {
+        World world = world();
+        Unit ship = world.createUnit(
+                fighter("unit-human-destroyer", true, false), 0, 2, 2);
+        UnitType hall = building("unit-town-hall");
+        hall.stores().add(UnitType.Resource.GOLD);
+        world.createUnit(hall, 1, 3, 3);
+        world.createUnit(fighter("unit-orc-destroyer", true, false), 1, 14, 14);
+        world.createUnit(building("unit-orc-shipyard"), 1, 10, 10);
+        UnitType platform = building("unit-orc-oil-platform");
+        platform.setGivesResource(UnitType.Resource.OIL);
+        world.createUnit(platform, 1, 12, 12);
+        world.tick();
+
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetBuildProfile(launchProfile(
+                BattleNetAiBytecode.OFF_LAUNCH_NAVAL,
+                BattleNetAiBytecode.OFF_NAVAL_FORCE_COUNT,
+                BattleNetAiBytecode.OFF_NAVAL_FORCE_MULTIPLIER), 0);
+        ai.battleNetRunPeriodicForces(world);
+
+        assertEquals(2, ship.battleNetAiBehavior());
+        assertEquals(12, ship.battleNetAiHomeX(),
+                "native selector one returns its first oil platform immediately");
+        assertEquals(12, ship.battleNetAiHomeY());
+    }
+
+    @Test
+    void periodicAirLaunchPrefersTheClosestGoldMineToThePersonsHall() {
+        World world = world();
+        Unit flyer = world.createUnit(
+                fighter("unit-gryphon-rider", false, true), 0, 2, 2);
+        UnitType hall = building("unit-town-hall");
+        hall.stores().add(UnitType.Resource.GOLD);
+        world.createUnit(hall, 1, 3, 3);
+        UnitType mine = building("unit-gold-mine");
+        mine.setGivesResource(UnitType.Resource.GOLD);
+        world.createUnit(mine, 1, 8, 8);
+        world.createUnit(mine, 1, 14, 14);
+        world.createUnit(fighter("unit-footman", false, false), 1, 15, 1);
+        world.tick();
+
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetBuildProfile(launchProfile(
+                BattleNetAiBytecode.OFF_LAUNCH_AIR,
+                BattleNetAiBytecode.OFF_AIR_FORCE_COUNT,
+                BattleNetAiBytecode.OFF_AIR_FORCE_MULTIPLIER), 0);
+        ai.battleNetRunPeriodicForces(world);
+
+        assertEquals(2, flyer.battleNetAiBehavior());
+        assertEquals(8, flyer.battleNetAiHomeX(),
+                "native selector two gives gold mines priority over halls and distance");
+        assertEquals(8, flyer.battleNetAiHomeY());
     }
 
     @Test

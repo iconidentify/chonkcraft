@@ -18,12 +18,14 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 from pathlib import Path
+import struct
 from typing import Any
 
 
-LEDGER_SCHEMA = "chonkcraft-bne-ai-decision-ledger-1"
+LEDGER_SCHEMA = "chonkcraft-bne-ai-decision-ledger-2"
 STATE_BYTES = 48
 PTR_PC = 0x04
 PTR_LIST = 0x23
@@ -34,6 +36,31 @@ CLASSIFICATIONS = frozenset({"independent-choice", "fallout"})
 PINNED_BNE_EXECUTABLE_SHA256 = (
     "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
 )
+
+# Native FUN_00426ad0 consumes these pending bytes on the recurring 50-cycle
+# pass.  The following byte is the number of fighters per group and the next
+# byte is the number of groups.  The function passes one effective map point
+# to FUN_004275b0 for every assigned unit; it does not retain an enemy pointer.
+LAUNCH_DOMAINS = (
+    ("ground", 0x09, 0x0d, 0x0e),
+    ("naval", 0x0a, 0x0f, 0x10),
+    ("air", 0x0b, 0x11, 0x12),
+)
+
+STATE_HEADER = struct.Struct("<8sHHIIIII")
+CHUNK_HEADER = struct.Struct("<4sI")
+CYCLE_HEADER = struct.Struct("<IIII")
+PLAYER_RECORD_BYTES = 16
+UNIT_DELTA_HEADER = struct.Struct("<II")
+NATIVE_UNIT_BYTES = 152
+NATIVE_UNIT_LIMIT = 1600
+NATIVE_PLAYER_COUNT = 16
+UNIT_FLAGS = 30
+UNIT_OWNER = 44
+UNIT_AI_HOME_X = 88
+UNIT_AI_HOME_Y = 90
+UNIT_AI_BEHAVIOR = 94
+UNIT_FREE_OR_DEAD = 0x05
 
 
 def _u32(raw: bytes, offset: int) -> int:
@@ -380,57 +407,205 @@ def _merge_writes(*groups: list[dict[str, int]]) -> list[dict[str, int]]:
     return [merged[offset] for offset in sorted(merged)]
 
 
-def _opcode3_predicates(ai_bin: bytes | None, incoming: bytes | None,
-        outgoing: bytes, ai_base: int, ai_size: int) -> list[dict[str, Any]]:
-    """Recover WAIT-UNTIL attempts that the boundary snapshots do not hook.
+def _bytecode_events(ai_bin: bytes | None, incoming: bytes | None,
+        outgoing: bytes, ai_base: int, ai_size: int) \
+        -> tuple[list[dict[str, Any]], list[dict[str, int]]]:
+    """Recover one authenticated SET/JUMP path up to its yielding opcode.
 
-    A zero-wait tick walks the pinned bytecode through unconditional SET and
-    JUMP instructions until WAIT or WAIT-UNTIL yields.  A failed opcode-3 gate
-    restores the reached opcode address and writes wait=1; a successful gate
-    advances two bytes.  This is transcribed from ai.bin and the two committed
-    PCs, not inferred from a later visual.  An invalid path or an outgoing PC
-    other than either legal result fails closed with no invented event.
+    The boundary snapshots normally expose net state writes.  They cannot see
+    a launch byte that bytecode sets and the same periodic pass consumes.  A
+    path is accepted only when the outgoing PC is one of the exact legal
+    results of the reached WAIT or WAIT-UNTIL.  Otherwise both predicates and
+    transient SETs fail closed rather than being inferred from nearby bytes.
     """
     if ai_bin is None or incoming is None or _u32(incoming, 0) != 0:
-        return []
+        return [], []
     try:
         pc = normalize_pointer(_u32(incoming, PTR_PC), ai_base, ai_size)
         later = normalize_pointer(_u32(outgoing, PTR_PC), ai_base, ai_size)
     except ValueError:
-        return []
+        return [], []
+    writes: list[dict[str, int]] = []
     visited: set[int] = set()
     while 0 <= pc < len(ai_bin) and pc not in visited:
         visited.add(pc)
         opcode = ai_bin[pc]
         if opcode == 0:  # SET offset, value
-            if pc + 2 >= len(ai_bin):
-                return []
+            if pc + 2 >= len(ai_bin) or ai_bin[pc + 1] >= STATE_BYTES:
+                return [], []
+            writes.append({"offset": ai_bin[pc + 1],
+                           "value": ai_bin[pc + 2]})
             pc += 3
             continue
         if opcode == 1:  # JUMP absolute file offset
             if pc + 2 >= len(ai_bin):
-                return []
+                return [], []
             pc = int.from_bytes(ai_bin[pc + 1:pc + 3], "little")
             continue
-        if opcode == 2:  # WAIT ends this bytecode tick before later bytes.
-            return []
+        if opcode == 2:  # WAIT dword
+            if pc + 4 >= len(ai_bin) or later != pc + 5:
+                return [], []
+            duration = int.from_bytes(ai_bin[pc + 1:pc + 5], "little")
+            if _u32(outgoing, 0) != duration:
+                return [], []
+            return [], writes
         if opcode != 3 or pc + 1 >= len(ai_bin):
-            return []
+            return [], []
         if later == pc:
             result = False
         elif later == pc + 2:
             result = True
         else:
-            return []
-        return [{"id": ai_bin[pc + 1], "result": result}]
-    return []
+            return [], []
+        return [{"id": ai_bin[pc + 1], "result": result}], writes
+    return [], []
+
+
+def _opcode3_predicates(ai_bin: bytes | None, incoming: bytes | None,
+        outgoing: bytes, ai_base: int, ai_size: int) -> list[dict[str, Any]]:
+    """Recover WAIT-UNTIL attempts hidden between committed boundaries."""
+    predicates, _writes = _bytecode_events(
+        ai_bin, incoming, outgoing, ai_base, ai_size)
+    return predicates
+
+
+def _launch_requests(ai_bin: bytes | None, incoming: bytes | None,
+        outgoing: bytes, ai_base: int, ai_size: int) \
+        -> list[dict[str, Any]]:
+    """Describe pending launch edges proved consumed in this native tick."""
+    if incoming is None:
+        return []
+    _predicates, bytecode_writes = _bytecode_events(
+        ai_bin, incoming, outgoing, ai_base, ai_size)
+    transient = bytearray(incoming)
+    for write in bytecode_writes:
+        transient[write["offset"]] = write["value"]
+    requests = []
+    for domain, pending, group_size, group_count in LAUNCH_DOMAINS:
+        armed = transient[pending] != 0
+        consumed = outgoing[pending] == 0
+        if not armed or not consumed:
+            continue
+        requests.append({
+            "domain": domain,
+            "requested": transient[group_size] * transient[group_count],
+        })
+    return requests
+
+
+def _native_launch_evidence(state_raw: bytes,
+        requests: dict[tuple[int, int], list[dict[str, Any]]]) \
+        -> dict[tuple[int, int], list[dict[str, Any]]]:
+    """Bind one-domain launch requests to their sealed unit-state effects.
+
+    Native 0x426e7c refuses units already carrying behavior two, and 0x4275b0
+    writes behavior two plus one effective home point to each unit it accepts.
+    Therefore a transition into behavior two on the request cycle is the
+    durable assignment receipt.  More than one domain in the same player tick
+    is intentionally left without telemetry because the state image alone
+    cannot partition those units without inventing a type predicate.
+    """
+    if not requests:
+        return {}
+    source = io.BytesIO(state_raw)
+    header_raw = source.read(STATE_HEADER.size)
+    if len(header_raw) != STATE_HEADER.size:
+        raise ValueError("native launch evidence has a truncated state header")
+    header = STATE_HEADER.unpack(header_raw)
+    if header != (b"BNESTATE", 1, 1, STATE_HEADER.size,
+                  NATIVE_UNIT_BYTES, NATIVE_UNIT_LIMIT,
+                  NATIVE_PLAYER_COUNT, 15):
+        raise ValueError("native launch evidence requires BNESTATE 1.1")
+    units: list[bytes | None] = [None] * NATIVE_UNIT_LIMIT
+    evidence: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    seen_cycles: set[int] = set()
+    while True:
+        chunk_raw = source.read(CHUNK_HEADER.size)
+        if not chunk_raw:
+            break
+        if len(chunk_raw) != CHUNK_HEADER.size:
+            raise ValueError("native launch evidence has a truncated chunk header")
+        tag, size = CHUNK_HEADER.unpack(chunk_raw)
+        payload_raw = source.read(size)
+        if len(payload_raw) != size:
+            raise ValueError("native launch evidence has a truncated chunk")
+        if tag != b"CYCL":
+            continue
+        payload = io.BytesIO(payload_raw)
+        cycle_raw = payload.read(CYCLE_HEADER.size)
+        if len(cycle_raw) != CYCLE_HEADER.size:
+            raise ValueError("native launch evidence has a truncated cycle")
+        cycle, _seed, _pool_count, changed = CYCLE_HEADER.unpack(cycle_raw)
+        seen_cycles.add(cycle)
+        players_raw = payload.read(NATIVE_PLAYER_COUNT * PLAYER_RECORD_BYTES)
+        if len(players_raw) != NATIVE_PLAYER_COUNT * PLAYER_RECORD_BYTES:
+            raise ValueError("native launch evidence has no player table")
+        changed_rows: list[tuple[int, bytes | None, bytes]] = []
+        changed_slots: set[int] = set()
+        for _ in range(changed):
+            delta_raw = payload.read(UNIT_DELTA_HEADER.size)
+            if len(delta_raw) != UNIT_DELTA_HEADER.size:
+                raise ValueError("native launch evidence has a truncated unit delta")
+            slot, _generation = UNIT_DELTA_HEADER.unpack(delta_raw)
+            raw = payload.read(NATIVE_UNIT_BYTES)
+            if len(raw) != NATIVE_UNIT_BYTES or slot >= NATIVE_UNIT_LIMIT:
+                raise ValueError("native launch evidence has an invalid unit delta")
+            if slot in changed_slots:
+                raise ValueError("native launch evidence repeats a unit in one cycle")
+            changed_slots.add(slot)
+            before = units[slot]
+            units[slot] = raw
+            changed_rows.append((slot, before, raw))
+        for key, tick_requests in requests.items():
+            wanted_cycle, player = key
+            if wanted_cycle != cycle or len(tick_requests) != 1:
+                continue
+            candidates: list[tuple[int, bytes]] = []
+            for slot, before, after in changed_rows:
+                live_after = (after[UNIT_FLAGS] & UNIT_FREE_OR_DEAD) == 0
+                before_behavior = (before[UNIT_AI_BEHAVIOR]
+                                   if before is not None else None)
+                if live_after and after[UNIT_OWNER] == player \
+                        and after[UNIT_AI_BEHAVIOR] == 2 \
+                        and before_behavior != 2:
+                    candidates.append((slot, after))
+            candidates.sort(key=lambda item: item[0])
+            request = tick_requests[0]
+            if len(candidates) > int(request["requested"]):
+                continue
+            target = None
+            if candidates:
+                homes = {
+                    (
+                        int.from_bytes(raw[
+                            UNIT_AI_HOME_X:UNIT_AI_HOME_X + 2], "little"),
+                        int.from_bytes(raw[
+                            UNIT_AI_HOME_Y:UNIT_AI_HOME_Y + 2], "little"),
+                    )
+                    for _slot, raw in candidates
+                }
+                if len(homes) != 1:
+                    continue
+                target = list(next(iter(homes)))
+            evidence[key] = [{
+                "domain": request["domain"],
+                "requested": request["requested"],
+                "assigned": len(candidates),
+                "target": target,
+            }]
+    missing_cycles = {cycle for cycle, _player in requests} - seen_cycles
+    if missing_cycles:
+        raise ValueError("native launch evidence is missing request cycles: "
+                         f"{sorted(missing_cycles)}")
+    return evidence
 
 
 def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
         phase: str = "game-after",
         active_players: list[int] | None = None,
         cycles: list[int] | None = None,
-        ai_bin: bytes | None = None) -> dict[str, Any]:
+        ai_bin: bytes | None = None,
+        state_raw: bytes | None = None) -> dict[str, Any]:
     """Build a compared ledger from tracer ai-build-boundary 48-byte dumps.
 
     Native CHONK_BNE_TRACE_AI_BUILD_STATE writes the live AIPlayerState
@@ -444,6 +619,7 @@ def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
     so a write that lands inside the unit tick is still visible.
     """
     rows: list[dict[str, Any]] = []
+    launch_requests: dict[tuple[int, int], list[dict[str, Any]]] = {}
     committed: dict[int, bytes] = {}
     tick_before: dict[int, bytes] = {}
     for line in text.splitlines():
@@ -479,8 +655,9 @@ def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
         classification = ("independent-choice"
                           if incoming is not None and _u32(incoming, 0) == 0
                           else "fallout")
+        cycle = int(fields.get("index") or 0)
         rows.append(row(
-            cycle=int(fields.get("index") or 0),
+            cycle=cycle,
             player=player,
             profile=int(fields.get("profile") or 0),
             raw_state=raw,
@@ -491,9 +668,18 @@ def ledger_from_native_trace(text: str, *, ai_base: int, ai_size: int,
             writes=writes,
             classification=classification,
         ))
+        requests = _launch_requests(
+            ai_bin, incoming, raw, ai_base, ai_size)
+        if requests:
+            launch_requests[(cycle, player)] = requests
         committed[player] = raw
     if not rows:
         raise ValueError("native trace has no ai-build-boundary dumps")
+    if state_raw is not None and launch_requests:
+        launches = _native_launch_evidence(state_raw, launch_requests)
+        for item in rows:
+            item["launches"] = launches.get(
+                (int(item["cycle"]), int(item["player"])), [])
     return build_ledger(rows, active_players=active_players, cycles=cycles)
 
 
@@ -510,6 +696,8 @@ def main(argv: list[str] | None = None) -> int:
                             help="authenticated maindat entry 277; derives heap base and size")
     from_trace.add_argument("--ai-base", type=lambda value: int(value, 0))
     from_trace.add_argument("--ai-size", type=lambda value: int(value, 0))
+    from_trace.add_argument("--state", type=Path,
+                            help="authenticated BNESTATE 1.1 stream for launch receipts")
     from_trace.add_argument("--output", type=Path, required=True)
     from_trace.add_argument("--phase", default="game-after")
     from_trace.add_argument("--active-player", type=int, action="append")
@@ -534,7 +722,8 @@ def main(argv: list[str] | None = None) -> int:
         built = ledger_from_native_trace(
             trace_text, ai_base=ai_base, ai_size=ai_size, phase=args.phase,
             active_players=args.active_player, cycles=args.cycle,
-            ai_bin=ai_bytes)
+            ai_bin=ai_bytes,
+            state_raw=(args.state.read_bytes() if args.state is not None else None))
         if ai_bytes is not None:
             built["ai_bin_sha256"] = hashlib.sha256(ai_bytes).hexdigest()
             built["ai_bin_bytes"] = len(ai_bytes)

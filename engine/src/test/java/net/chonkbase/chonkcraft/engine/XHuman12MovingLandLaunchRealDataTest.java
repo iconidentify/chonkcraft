@@ -64,8 +64,10 @@ class XHuman12MovingLandLaunchRealDataTest {
                         .stream()
                         .filter(candidate -> "ground".equals(candidate.domain()))
                         .findFirst().orElseThrow();
-                assertEquals(guardTower.id(), launch.targetId(),
-                        "selector zero chooses native guard-tower slot 1429");
+                assertEquals(13, launch.targetX(),
+                        "native records the normalized ground-force point");
+                assertEquals(66, launch.targetY(),
+                        "the launch ledger exposes the coordinate passed to behavior two");
             }
             if (fixture == 57) {
                 assertEquals(10, ogre.tileX(),

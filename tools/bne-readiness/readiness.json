@@ -400,12 +400,14 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/perf/AiCompetenceTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetHumanFiveGuardBehaviorRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetAiPatrolLivenessTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetAiForceLaunchObjectiveRealDataTest.java",
         "scripts/check-bne-ai-gate.sh"
       ],
       "retail_evidence": [
         "Rez/ai.bin, its four opcodes, 32-bit scheduler, eight predicates and per-cycle caller have been transcribed from the pinned retail executable.",
         "An authenticated retail snapshot of runtime unit-type flags proves the exact ground, naval and air combat rosters used by predicates 4, 5 and 6.",
         "The pinned 0x00426ad0/0x0044c260 control flow proves the three pending launch bytes, group sizes/counts, behavior-two assignment and fifty-cycle consumer now used by Java.",
+        "The pinned 0x00426860/0x00426930 selectors and authenticated expansion Orc 8/11 state prove recurring naval objectives prioritize platforms then shipyards, while air objectives prioritize the person's nearest gold mine then hall; focused synthetic priority checks and real campaign coordinates guard both domains.",
         "The authenticated campaign referee executes twenty computer slots with no opponent commands. On the same independently measured slot it observes harvest/return orders, real treasury credits, production and spending, native behavior-two force assignment and sustained attack orders.",
         "Human 5's authenticated 1,800-cycle behavior keeps four authored base guards posted while all five members of a separate grunt/axethrower field squad engage; the pack-only AI gate prevents a tempting global wake-up regression.",
         "A five-minute Human expansion 10 referee follows the six-member first behavior-two wave from its retail ai.bin launch through the long campaign route and requires every survivor to move and enter real combat."
