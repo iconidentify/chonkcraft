@@ -48,9 +48,9 @@ and clean/adverse network lockstep.
 
 The complete suite now contains **2,791 tests**. The canonical authenticated
 profile runs 2,765 and intentionally skips exactly 26, while keeping the exact
-expected 110-test specification-failure set. Hosted run `33135334392` passed
+expected 110-test specification-failure set. Hosted run `33137493539` passed
 both the data-free and authenticated jobs against revision
-`6e04b2536720bef5d1a13dc2bf3a1f4d6b0ac54c`.
+`d5b561ce3a1211a1d09ba441145ab47154d2d8cf`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
@@ -66,14 +66,16 @@ changed, so a server rollout was not required.
 These denominators are deliberately strict and remain open work rather than
 being inferred from the playable campaign fleet:
 
-- Resolved-command cells: **0/240 current generated cells are identity-joined**.
-  The prior 206 dual-adapter executions remain exact historical diagnostics,
-  but all 206 are outside the current fixed set; a count can no longer fill the
-  denominator. Every cell now binds map, initialization seed, complete command
-  content (including production type), and terminal observation cycle. The
-  gate regenerates all 240 cells from three hash-pinned Human, Orc, and expansion
-  seeds, then reopens the inventory and execution ledger before accepting a
-  numerator. All 240 current cells therefore remain honest capture debt.
+- Resolved-command cells: **3/240 current generated cells are identity-joined**:
+  Human 1 Patrol and Orc 1 Move are exact, while expansion Human 12 Harvest is
+  materially divergent; 237 cells remain uncaptured and none failed because of
+  infrastructure. The prior 206 dual-adapter executions plus two first-pass
+  movement captures remain historical/unmatched diagnostics, so a count cannot
+  fill the denominator. Every cell binds map, initialization seed, complete
+  command content (including production type), and terminal observation cycle.
+  The gate regenerates all 240 cells from three hash-pinned Human, Orc, and
+  expansion seeds, then reopens the inventory and execution ledger before
+  accepting a numerator.
 - Physical player transactions: **1/532**. One cell has an exact current-source
   native/Java semantic pair, proven by two independent sealed scenarios. The
   two-unit held-out cell remains red on a real two-cycle terminal difference;

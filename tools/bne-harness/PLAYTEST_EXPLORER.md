@@ -56,6 +56,10 @@ python3 tools/bne-harness/scripts/bne_playtest_explorer.py seed-fixture \
   capture.bnefx --output seed.json
 ```
 
+This entry point uses the same typed-family enrichment as
+`coverage-inventory`, so `generate --max-scenarios N` materializes the exact
+cells in that inventory rather than a movement-only lookalike corpus.
+
 Each generated movement, stop, patrol, attack, harvest, return-goods,
 repair, attack-ground, attack-move, stand-ground or train scenario can be
 encoded directly for the guarded native command injector.

@@ -1,10 +1,12 @@
 import copy
+from argparse import Namespace
 import importlib.util
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPTS = Path(__file__).parents[1] / "scripts"
@@ -162,6 +164,21 @@ class PlaytestExplorerTest(unittest.TestCase):
         self.assertEqual(2, sum(line.startswith("cycle ")
                                 for line in script.splitlines()))
         self.assertIn(repeated["scenario_sha256"], script)
+
+    def test_seed_fixture_cli_uses_the_canonical_enriched_seed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "seed.json"
+            expected = self.seed()
+            args = Namespace(
+                fixture=Path("idle.bnefx"), output=output,
+                cycles=160, command_cycle=5, distance=4)
+            with mock.patch.object(
+                    explorer, "seed_from_idle_fixture",
+                    return_value=expected) as enriched:
+                self.assertEqual(0, explorer.seed_fixture_command(args))
+            enriched.assert_called_once_with(
+                args.fixture, cycles=160, command_cycle=5, distance=4)
+            self.assertEqual(expected, json.loads(output.read_text()))
 
     def test_native_direct_injector_refuses_an_unproved_command_family(self):
         scenario = next(item for item in explorer.generate_scenarios(

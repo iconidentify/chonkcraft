@@ -2374,7 +2374,7 @@ def generate_command(args: argparse.Namespace) -> int:
 
 
 def seed_fixture_command(args: argparse.Namespace) -> int:
-    seed = seed_from_fixture(
+    seed = seed_from_idle_fixture(
         args.fixture, cycles=args.cycles,
         command_cycle=args.command_cycle, distance=args.distance)
     write_json(args.output, seed)
@@ -2603,7 +2603,7 @@ def parser() -> argparse.ArgumentParser:
 
     fixture = commands.add_parser(
         "seed-fixture",
-        help="turn a sealed native movement fixture into an exploration seed")
+        help="turn a sealed native idle fixture into the canonical enriched seed")
     fixture.add_argument("fixture", type=Path)
     fixture.add_argument("--output", required=True, type=Path)
     fixture.add_argument("--cycles", type=int, default=160)
