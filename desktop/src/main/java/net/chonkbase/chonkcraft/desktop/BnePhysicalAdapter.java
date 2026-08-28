@@ -106,7 +106,14 @@ public final class BnePhysicalAdapter {
             for (int cycle = 1; cycle <= last; cycle++) {
                 fixtureCycle.set(cycle);
                 if (cycle == issueCycle) {
-                    Unit under = world.unitAt(tileX, tileY);
+                    Unit under;
+                    if (gesture.containsKey("target_native_id")) {
+                        require(gesture.get("target_native_id") == null,
+                                "explicit native target identities are not supported");
+                        under = null;
+                    } else {
+                        under = world.unitAt(tileX, tileY);
+                    }
                     screen.fieldRightClickForTest(tileX, tileY, under);
                 }
                 mission.tick();

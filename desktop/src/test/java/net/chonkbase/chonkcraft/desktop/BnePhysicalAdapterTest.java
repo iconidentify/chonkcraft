@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.desktop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
@@ -114,6 +115,62 @@ class BnePhysicalAdapterTest {
                 "retail is Still with next Move at cycle 5, not " + five);
         assertTrue(six.contains("\"order\":\"MOVE\""),
                 "retail promotes the queued Move at cycle 6, not " + six);
+    }
+
+    @Test
+    @DisplayName("a sealed null native target remains an occupied-ground move")
+    void aSealedNullNativeTargetRemainsAnOccupiedGroundMove() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-physical-null-target-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("evidence.json");
+        Map<String, Object> scenario = Json.parseObject("""
+                {
+                  "schema": "chonkcraft-bne-physical-scenario-1",
+                  "setup": {
+                    "scenario": "Campaign\\\\Human\\\\Human01.pud",
+                    "seed": 1,
+                    "java_map": "campaigns/human/level01h"
+                  },
+                  "select": [
+                    {"native_id": 1598, "player": 1, "x": 21, "y": 5}
+                  ],
+                  "gesture": {
+                    "origin": "field",
+                    "detail": "right-click",
+                    "tile_x": 17,
+                    "tile_y": 7,
+                    "modifiers": "plain",
+                    "target_native_id": null
+                  },
+                  "issue_cycle": 5,
+                  "cycles": 20
+                }
+                """);
+        Files.writeString(scenarioPath, Json.write(scenario), StandardCharsets.UTF_8);
+
+        BnePhysicalAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "a".repeat(64),
+        });
+
+        Map<String, Object> evidence = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        Map<?, ?> gesture = null;
+        for (Object item : (List<?>) evidence.get("player_intents")) {
+            if (((Map<?, ?>) item).get("gesture") instanceof Map<?, ?> body) {
+                gesture = body;
+                break;
+            }
+        }
+        assertNotNull(gesture);
+        assertEquals("occupied-ground", gesture.get("target_shape"));
+        assertNull(gesture.get("target_id"));
+        Map<?, ?> decision = (Map<?, ?>) ((List<?>) evidence
+                .get("player_decisions")).getFirst();
+        assertEquals("move", decision.get("family"));
     }
 
     @Test

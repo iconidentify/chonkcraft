@@ -243,13 +243,19 @@ the Attack 2562 wait expires, `0x437c80` dest-arms the first leftover
 the same visit `0x44fbd0` answers: native 1591 dest-arms 26,22 at 321
 and 25,27 at 401. Java rebuilt path=2 at 321 and dest-armed at 322
 because the swing-end visit skipped `DoActionMove`. Current-source Java twins
-now make the size-1 field/plain/open-ground/move cell exact across the sealed
-`(25,12)` and `(25,28)` scenarios, so semantic pairing is **1/532**. The
-independent two-wide held-out keeps the next cell red: its second footman
-settles at 479 rather than native 477. The first coarse route difference is
-cycle 173 (Java column 25 versus native column 26) and later reconverges; it is
-retained as movement/pathfinding debt rather than hidden by wire normalization
-or a one-map timing special case. The leftover-27 walk is closed.
+make the size-1 field/plain/open-ground/move cell exact across the sealed
+`(25,12)` and `(25,28)` scenarios. A sealed UI command without `target SLOT`
+passes null to retail `DoRightButton`; the Java twin now preserves that observed
+target resolution instead of inferring a unit from the occupied tile. That
+closes the size-1 occupied-ground Move cell independently on Human 1 and Orc 1,
+so semantic pairing is **2/532**. The independent two-wide open-ground held-out
+keeps its cell red: its second footman settles at 479 rather than native 477.
+The new two-wide occupied-ground Human and Orc witnesses are also retained red,
+so no movement change follows from this transaction-layer correction. The first
+coarse route difference in the original held-out is cycle 173 (Java column 25
+versus native column 26) and later reconverges; it remains movement/pathfinding
+debt rather than being hidden by wire normalization or a one-map timing special
+case. The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

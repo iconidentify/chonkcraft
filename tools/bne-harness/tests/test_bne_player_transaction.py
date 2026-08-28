@@ -610,6 +610,24 @@ class PlayerTransactionTest(unittest.TestCase):
         with self.assertRaisesRegex(transaction.ProofError, "unsupported"):
             transaction._derive_java_scenario(value)
 
+    def test_scenario_derivation_preserves_a_null_native_ui_target(self):
+        native = transaction.compile_evidence(
+            store_evidence("native"), source="trace.txt")
+        value = {
+            "manifest": {"run": {
+                "requested_scenario": "Campaign\\Human\\Human01.pud",
+                "initialization_seed": 1, "cycle_limit": 40,
+                "commands": {"count": 2},
+            }},
+            "receipt": native,
+            "commands_bytes": (b"cycle 10 select unit 7\n"
+                               b"cycle 10 ui-right-click x 12 y 13\n"),
+        }
+        scenario = transaction._derive_java_scenario(value)
+        self.assertIn("target_native_id", scenario["gesture"])
+        self.assertIsNone(scenario["gesture"]["target_native_id"],
+                          "a native null target must not become Java tile lookup")
+
     def test_native_do_right_button_trace_is_one_group_transaction(self):
         compiled = transaction.compile_ui_trace(
             "\n".join([

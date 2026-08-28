@@ -1686,6 +1686,11 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
         "gesture": {
             "origin": "field", "detail": "right-click",
             "tile_x": click[0], "tile_y": click[1], "modifiers": "plain",
+            # The supported native command spells no `target SLOT`, so it
+            # passed a null third argument to DoRightButton.  Preserve that
+            # observed target resolution instead of asking Java to infer a
+            # unit from the clicked tile and changing Move into Follow/Attack.
+            "target_native_id": None,
         },
         "issue_cycle": issue_cycle,
         "cycles": cycles,
