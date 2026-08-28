@@ -71,9 +71,11 @@ being inferred from the playable campaign fleet:
 - Physical player transactions: **1/532**. One cell has an exact current-source
   native/Java semantic pair, proven by two independent sealed scenarios. The
   two-unit held-out cell remains red on a real two-cycle terminal difference;
-  one retained store now reopens all three native capture closures and reruns
-  their packaged Java twins with producer evidence verified. The other 531
-  cells remain open; detached receipts still cannot certify themselves.
+  one retained store now reopens five native capture closures across the Human
+  and Orc campaigns and reruns their packaged Java twins with producer evidence
+  verified. Three reach a real terminal; the Human three-wide and Orc two-wide
+  40-cycle observations remain terminal-incomplete. The other 531 cells remain
+  open; detached receipts still cannot certify themselves.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
 - AI fleet: **52/52** current-head mission twins are materialized from

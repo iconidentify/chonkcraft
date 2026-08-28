@@ -135,8 +135,11 @@ cycle 393 on `(25,28)` with 46 hit points. A two-wide click at the same
 square dest-spreads to `(25,27)` and `(25,29)` with wires `1319001b00ffff03`
 and `1319001d00ffff03`; the first selected footman keeps the voice and the
 second is `group-suppressed`. Those two cells fill the 532-cell matrix.
-The seven older `i9beef` captures remain gesture/selection/acceptance-only. Coverage emits one recipe for every missing
-origin/modifier/family cell. An executable cell carries the real
+The older `i9beef` captures cannot fill the terminal denominator. Two retained
+40-cycle closures add Human three-wide and Orc two-wide cross-map observations
+through first progress, but the proof compiler now rejects their early
+`window-complete` flushes as command terminals. Coverage emits one recipe for
+every missing origin/modifier/family cell. An executable cell carries the real
 `bne_oracle.py run` and import argv; an unobservable cell is
 `blocked-on-hook` with the exact native hook debt. A GiveOrder fixture can
 never satisfy this physical-UI lane.
@@ -148,7 +151,8 @@ Java twins from the sealed command scripts:
 ```sh
 python3 tools/bne-harness/scripts/bne_player_transaction.py materialize-store \
   /path/to/human01-single-2512 /path/to/human01-single-2528 \
-  /path/to/human01-two-wide-2528 \
+  /path/to/human01-two-wide-2528 /path/to/human01-three-wide-observation \
+  /path/to/orc01-two-wide-observation \
   --asset-pack "$CHONKCRAFT_ASSET_PACK" \
   --store tools/bne-harness/work/player-transactions/proof-store
 python3 tools/bne-harness/scripts/bne_player_transaction.py validate-store \
@@ -168,9 +172,13 @@ checks the complete Maven source/JBR/pack/JAR closure, derives the Java
 scenario only from the sealed select/right-click script and native unit
 identities, reruns `BnePhysicalAdapter`, and compares both the evidence and
 cycle log byte-for-byte. Unsupported native command routes fail rather than
-being translated heuristically. The two single-footman positives and the
-two-wide held-out now pass this producer-proof validator together. They retain
-the honest result: the size-1 cell is exact, the size-2 cell is mismatched, and
+being translated heuristically. The two single-footman positives, terminal
+two-wide held-out, and the two early-window cross-map observations now pass
+this producer-proof validator together. A semantic ending is terminal
+immediately; `window-complete` and `acknowledged-no-progress` become terminal
+only after the shared 600-cycle outcome window, never merely because a shorter
+capture ended. The retained result stays honest: the size-1 cell is exact, the
+size-2 terminal cell is mismatched, two observations remain incomplete, and
 the 532-cell certification remains incomplete.
 
 `BnePhysicalAdapter` now drives `GameScreen.fieldRightClickForTest` -- the

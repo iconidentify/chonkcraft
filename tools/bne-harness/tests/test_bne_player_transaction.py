@@ -289,6 +289,54 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertFalse(report["complete"])
         self.assertEqual([1], report["incomplete_transactions"])
 
+    def test_short_observation_flush_is_not_a_command_terminal(self):
+        for reason, first_progress in (
+                ("window-complete", 12),
+                ("acknowledged-no-progress", None)):
+            with self.subTest(reason=reason):
+                raw = evidence(second_unit=False)
+                outcome = raw["player_outcomes"][0]
+                outcome["first_progress_cycle"] = first_progress
+                outcome["terminal_cycle"] = 40
+                outcome["terminal_reason"] = reason
+                compiled = transaction.compile_evidence(raw, source="short")
+                item = compiled["transactions"][0]
+                self.assertFalse(item["coverage"]["terminal"])
+                self.assertFalse(
+                    item["coverage"]["layers"]["terminal-outcome"])
+
+    def test_complete_observation_window_is_an_honest_terminal(self):
+        for reason, first_progress in (
+                ("window-complete", 12),
+                ("acknowledged-no-progress", None)):
+            with self.subTest(reason=reason):
+                raw = evidence(second_unit=False)
+                outcome = raw["player_outcomes"][0]
+                outcome["first_progress_cycle"] = first_progress
+                outcome["terminal_cycle"] = (
+                    outcome["submitted_cycle"]
+                    + transaction.PLAYER_TRANSACTION_OUTCOME_WINDOW)
+                outcome["terminal_reason"] = reason
+                compiled = transaction.compile_evidence(raw, source="window")
+                self.assertTrue(
+                    compiled["transactions"][0]["coverage"]["terminal"])
+
+    def test_unknown_or_timeless_terminal_reason_fails_closed(self):
+        for reason, submitted_cycle, terminal_cycle in (
+                ("capture-ended", 10, 40),
+                ("settled", 10, None),
+                ("settled", None, 40)):
+            with self.subTest(reason=reason, submitted_cycle=submitted_cycle,
+                              terminal_cycle=terminal_cycle):
+                raw = evidence(second_unit=False)
+                outcome = raw["player_outcomes"][0]
+                outcome["submitted_cycle"] = submitted_cycle
+                outcome["terminal_cycle"] = terminal_cycle
+                outcome["terminal_reason"] = reason
+                compiled = transaction.compile_evidence(raw, source="invalid")
+                self.assertFalse(
+                    compiled["transactions"][0]["coverage"]["terminal"])
+
     def test_prewire_production_refusal_has_a_real_fixed_cell_key(self):
         raw = evidence(second_unit=False)
         gesture = raw["player_intents"][0]

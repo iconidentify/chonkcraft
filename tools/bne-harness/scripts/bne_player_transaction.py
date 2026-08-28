@@ -64,6 +64,20 @@ TRANSACTION_LAYERS = (
     "terminal-outcome",
 )
 
+# Both the retail tracer and PlayerIntentJournal keep a command open for 600
+# cycles before an observation-window result becomes conclusive.  A shorter
+# capture is useful progress evidence, but flushing it as ``window-complete``
+# or ``acknowledged-no-progress`` must not turn the capture boundary into a
+# command terminal.  Semantic endings remain terminal immediately.
+PLAYER_TRANSACTION_OUTCOME_WINDOW = 600
+SEMANTIC_TERMINAL_REASONS = frozenset({
+    "settled", "fulfilled", "rejected", "blocked-goal", "superseded",
+    "unit-unavailable", "target-unavailable",
+})
+WINDOW_TERMINAL_REASONS = frozenset({
+    "window-complete", "acknowledged-no-progress",
+})
+
 # Keep this byte-for-byte aligned with the next-level gate.  Physical input is
 # interpreted in desktop/GameScreen before the engine sees a command, so the
 # narrower engine survey identity cannot authenticate a player transaction by
@@ -123,6 +137,23 @@ def _digest(value: Any) -> str:
 def _valid_sha256(value: object) -> bool:
     return (isinstance(value, str) and len(value) == 64
             and all(character in "0123456789abcdef" for character in value))
+
+
+def _terminal_outcome_proved(outcome: dict[str, Any]) -> bool:
+    """Return whether an outcome proves a command terminal, not a short flush."""
+    reason = outcome.get("terminal_reason")
+    terminal_cycle = outcome.get("terminal_cycle")
+    submitted_cycle = outcome.get("submitted_cycle")
+    if type(terminal_cycle) is not int or type(submitted_cycle) is not int:
+        return False
+    if terminal_cycle < submitted_cycle:
+        return False
+    if reason in SEMANTIC_TERMINAL_REASONS:
+        return True
+    return bool(
+        reason in WINDOW_TERMINAL_REASONS
+        and terminal_cycle - submitted_cycle
+        >= PLAYER_TRANSACTION_OUTCOME_WINDOW)
 
 
 def _current_engine_input_sha256() -> str:
@@ -945,7 +976,7 @@ def compile_evidence(evidence: dict[str, Any], *, source: str) -> dict[str, Any]
                 for command in commands)
         terminal = explicit_refusal or (
             exact_outcomes and all(
-                item.get("terminal_reason") is not None for item in outcomes))
+                _terminal_outcome_proved(item) for item in outcomes))
         accepted = explicit_refusal or acceptance_consistent
         feedback = (
             isinstance(transaction.get("feedback"), dict)
