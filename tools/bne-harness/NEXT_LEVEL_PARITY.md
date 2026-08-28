@@ -8,17 +8,20 @@ it is not the roadmap.
 ## Honest starting point
 
 The current authenticated **resolved-command matrix** contains 240 explicit
-generated cells and **6/240 are identity-joined to retained dual-adapter
-executions**. Human 1 Patrol, Orc 1 Move, and Orc 1 turn-boundary Attack are
-exact. Human 1 turn-boundary Attack, expansion Human 12 Harvest, and expansion
-Human 12 turn-boundary Attack are materially divergent. The expansion Attack
-is an order-resolution mismatch: native accepts before the unit becomes
-unavailable, while Java rejects and retains Harvest. The older fleet's 206
-executions plus two first-pass movement captures remain historical/unmatched
-diagnostics rather than members of the current fixed set. The old 206/240
-headline compared counts, so a differently generated map, command, or
-observation window could fill its numerator. That is now rejected. A cell
-identity binds requested map, initialization seed, full command content
+generated cells and **11/240 are identity-joined to retained dual-adapter
+executions; 6/240 are exact**. Human 1 Patrol, Human 1 group Patrol, Orc 1
+Move, Orc 1 group Patrol, Orc 1 turn-boundary Attack, and Orc 1 refused Train
+are exact. Human 1 turn-boundary Attack, Orc 1 occupied-ground Attack Move,
+expansion Human 12 Harvest, expansion Human 12 turn-boundary Attack, and
+expansion Human 12 refused Train are materially divergent. Four more
+authenticated Stand Ground/Stop, Attack Move, and Return Goods/Repair
+executions are useful diagnostics but do not match a current generated-cell
+identity. The expansion Attack is an order-resolution mismatch: native accepts
+before the unit becomes unavailable, while Java rejects and retains Harvest.
+The other historical/unmatched executions remain outside the current fixed
+set. The old 206/240 headline compared counts, so a differently generated map,
+command, or observation window could fill its numerator. That is now rejected.
+A cell identity binds requested map, initialization seed, full command content
 (including production type), and terminal observation cycle. The separate
 physical-gesture layer below also remains RED.
 

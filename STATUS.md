@@ -107,21 +107,32 @@ changed, so a server rollout was not required.
 These denominators are deliberately strict and remain open work rather than
 being inferred from the playable campaign fleet:
 
-- Resolved-command cells: **6/240 current generated cells are identity-joined**:
-  Human 1 Patrol, Orc 1 Move, and Orc 1 turn-boundary Attack are exact. Human 1
-  turn-boundary Attack, expansion Human 12 Harvest, and expansion Human 12
-  turn-boundary Attack are materially divergent; 234 cells remain uncaptured
-  and none failed because of infrastructure. The expansion Attack exposes a
+- Resolved-command cells: **11/240 current generated cells are identity-joined**
+  and **6/240 are exact**. The original Human 1 Patrol, Orc 1 Move, and Orc 1
+  turn-boundary Attack cells remain exact. A breadth-first native capture pass
+  adds exact Human 1 and Orc 1 group-Patrol cells plus an exact Orc 1 refused
+  Train cell. The five explicit divergences are Human 1 turn-boundary Attack,
+  expansion Human 12 Harvest and turn-boundary Attack, Orc 1 occupied-ground
+  Attack Move, and expansion Human 12 refused Train; 229 cells remain
+  uncaptured and none failed because of infrastructure. Four additional
+  authenticated Stand Ground/Stop, Attack Move, and Return Goods/Repair
+  executions do not match a current generated-cell identity and remain
+  diagnostic rather than inflating coverage. The expansion Attack exposes a
   real order-resolution split (native accepts before the unit becomes
   unavailable; Java rejects and leaves Harvest installed), while the Human 1
-  Attack ends at a different tile and hit-point value. The prior 206
-  dual-adapter executions plus two first-pass movement captures remain
-  historical/unmatched diagnostics, so a count cannot fill the denominator.
-  Every cell binds map, initialization seed, complete command content
-  (including production type), and terminal observation cycle. The gate
-  regenerates all 240 cells from three hash-pinned Human, Orc, and expansion
-  seeds, then reopens the inventory and execution ledger before accepting a
-  numerator.
+  Attack ends at a different tile and hit-point value. The other prior
+  dual-adapter executions remain historical/unmatched diagnostics, so a count
+  cannot fill the denominator. Every cell binds map, initialization seed,
+  complete command content (including production type), and terminal
+  observation cycle. The gate regenerates all 240 cells from three hash-pinned
+  Human, Orc, and expansion seeds, then reopens the inventory and execution
+  ledger before accepting a numerator. Current clean scorecard
+  `c02a0327bedcb05f037bad98794e3e0df8293614a60518f5517c0fbee233e418`
+  binds command ledger
+  `93b7fd171979b758fc23629db02ff37a5a3668e02e8f0908f42d98ea7097fa83`
+  and split report
+  `c204a868fc1b6fca3c83b09e6ca0e0446a99938f7c7d0602b7e963d85d260a30`
+  to the current engine identity.
 - Physical player transactions: **3/532** current-source paired certifications.
   A retained store reopens thirteen native capture closures across the Human
   and Orc campaigns and reruns their packaged Java twins with producer evidence
@@ -138,9 +149,13 @@ being inferred from the playable campaign fleet:
   telemetry exact through 1,800 cycles. The fixed denominator is 205,200
   computer-player cycles: 202,290 committed-state rows and 202,285 telemetry
   rows are exact. Seven ranked frontiers remain, so fleet certification is
-  incomplete. The retained conductor proof is validated fail-closed against
-  the current clean source, engine, Java adapter, app JAR, ChonkPack and
-  retail `ai.bin` identities.
+  incomplete. The clean rematerialized Java proof is
+  `f806926a1574113492cb7ab9ca2cc640dcce1c5251fa25b26305a867a0ed35ca`;
+  its retained report SHA-256 is
+  `b119fe863fd00d358e39108a71c9eeb09662556a5d10c63ea856a0a11b41d032`.
+  The conductor proof is validated fail-closed against the current clean
+  source, engine, Java adapter, app JAR, ChonkPack and retail `ai.bin`
+  identities.
 - Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
   accepted trigger twins.
 
