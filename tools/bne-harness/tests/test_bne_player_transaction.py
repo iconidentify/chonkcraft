@@ -215,6 +215,39 @@ def evidence(*, gesture: bool = True, terminal: bool = True,
     }
 
 
+def store_evidence(side: str) -> dict:
+    value = evidence(second_unit=False, side=side)
+    value["player_intents"][0]["gesture"]["modifiers"] = "plain"
+    command = value["player_intents"][1]["command"]
+    command["queued"] = False
+    if side == "java":
+        command["wire_hex"] = command["wire_hex"][:-2] + "00"
+    value["player_decisions"] = [{
+        "transaction_id": 1, "cycle": 10, "accepted": True,
+        "family": "move", "queued": False, "reason": "give-order",
+    }]
+    return value
+
+
+def store_requirements() -> tuple[dict, dict]:
+    requirements = {
+        "minimum_transactions": 1,
+        "minimum_paired_transactions": 1,
+        "minimum_group_transactions": 0,
+        "origins": ["field"], "modifiers": ["plain"],
+        "selection_sizes": [1], "target_shapes": ["open-ground"],
+        "families": ["move"], "queueable_families": [],
+        "rejection_families": [], "feedback_modes": ["voice"],
+        "required_layers": list(transaction.TRANSACTION_LAYERS),
+    }
+    cell = {
+        "id": "ptx-store", "origin": "field", "modifiers": "plain",
+        "selection_size": 1, "target_shape": "open-ground",
+        "family": "move", "queued": False, "accepted": True,
+    }
+    return requirements, cell
+
+
 class PlayerTransactionTest(unittest.TestCase):
 
     def test_group_fanout_stays_one_transaction(self):
@@ -403,6 +436,131 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertFalse(report["complete"])
         self.assertTrue(report["content_exact"])
         self.assertFalse(report["producer_receipts_verified"])
+
+    def test_retained_store_reopens_both_producers_and_rejects_tampering(self):
+        native = transaction.compile_evidence(
+            store_evidence("native"), source="trace.txt")
+        java_evidence = store_evidence("java")
+        requirements, cell = store_requirements()
+        java_proof = {
+            "schema": transaction.BUILD_RECEIPT_SCHEMA,
+            "build_receipt": {
+                "schema": transaction.BUILD_RECEIPT_SCHEMA,
+                "build_inputs": {
+                    "engine": {"engine_input_sha256": JAVA_ENGINE_SHA256},
+                    "program_input_sha256": JAVA_PROGRAM_SHA256,
+                },
+                "jar": {"bytes": 3, "sha256": "c" * 64},
+            },
+            "pack": {"bytes": 4, "sha256": "d" * 64},
+        }
+
+        def emit(_repository, _scenario, _jar, _pack, output, cycles,
+                 _engine, _program, _fixture):
+            output.write_text(json.dumps(java_evidence), encoding="utf-8")
+            cycles.write_text('{"cycle":1}\n', encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            capture = root / "capture"
+            capture.mkdir()
+            commands = (b"cycle 10 select unit 7\n"
+                        b"cycle 10 ui-right-click x 12 y 13\n")
+            manifest = {
+                "run": {
+                    "requested_scenario": "Campaign\\Human\\Human01.pud",
+                    "initialization_seed": 1, "cycle_limit": 40,
+                    "commands": {"count": 2,
+                                 "file": transaction._bytes_identity(commands)},
+                }
+            }
+            manifest_bytes = json.dumps(manifest).encode("utf-8")
+            (capture / "capture.trace.txt").write_text("trace", encoding="utf-8")
+            (capture / "capture.manifest.json").write_bytes(manifest_bytes)
+            with zipfile.ZipFile(capture / "capture.bnefx", "w") as archive:
+                archive.writestr("manifest.json", manifest_bytes)
+                archive.writestr("commands.txt", commands)
+            pack = root / "pack.chonkpack"
+            pack.write_bytes(b"pack")
+            jar = root / "app.jar"
+            jar.write_bytes(b"jar")
+            store = root / "store"
+            current = mock.Mock(return_value=(jar, java_proof))
+            with mock.patch.object(transaction, "_current_java_proof", current), \
+                    mock.patch.object(transaction.bne_fixture, "validate_fixture",
+                                      return_value={"fixture_id": SCENARIO_SHA256,
+                                                    "sha256": "8" * 64}), \
+                    mock.patch.object(transaction, "authority_from_native_manifest",
+                                      return_value=authority("native")), \
+                    mock.patch.object(transaction, "compile_ui_trace",
+                                      return_value=native), \
+                    mock.patch.object(transaction, "_requirements_cells",
+                                      return_value={cell["id"]: cell}):
+                transaction.materialize_proof_store(
+                    [capture], store, pack, repository=root,
+                    build=False, emitter=emit)
+                report = transaction.validate_proof_store(
+                    store, requirements, repository=root, pack=pack,
+                    emitter=emit)
+                self.assertTrue(report["complete"], report)
+                self.assertTrue(report["producer_receipts_verified"])
+                self.assertEqual(1, report["paired_transactions"])
+
+                java_root = next((store / "java").glob("*/*"))
+                (java_root / "cycles.ndjson").write_text(
+                    '{"cycle":2}\n', encoding="utf-8")
+                with self.assertRaisesRegex(
+                        transaction.ProofError, "cycle log"):
+                    transaction.validate_proof_store(
+                        store, requirements, repository=root, pack=pack,
+                        emitter=emit)
+
+    def test_retained_store_rejects_stale_java_build_before_execution(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            store = root / "store"
+            store.mkdir()
+            current = {
+                "schema": transaction.BUILD_RECEIPT_SCHEMA,
+                "build_receipt": {"build_inputs": {}},
+                "pack": {"bytes": 1, "sha256": "a" * 64},
+            }
+            (store / "BUILD.json").write_bytes(transaction._json_bytes(current))
+            catalog = {
+                "schema": transaction.PROOF_STORE_SCHEMA,
+                "java_proof_id": "a" * 64,
+                "build": transaction._bytes_identity(
+                    transaction._json_bytes(current)),
+                "native": [], "twins": [],
+            }
+            catalog["catalog_sha256"] = transaction._digest(catalog)
+            (store / "CATALOG.json").write_bytes(transaction._json_bytes(catalog))
+            jar = root / "app.jar"
+            jar.write_bytes(b"jar")
+            stale = {**current, "pack": {"bytes": 2, "sha256": "b" * 64}}
+            with mock.patch.object(
+                    transaction, "_current_java_proof",
+                    return_value=(jar, stale)):
+                with self.assertRaisesRegex(
+                        transaction.ProofError, "stale for current"):
+                    transaction.validate_proof_store(
+                        store, {}, repository=root, pack=root / "pack")
+
+    def test_scenario_derivation_rejects_unsupported_native_commands(self):
+        native = transaction.compile_evidence(
+            store_evidence("native"), source="trace.txt")
+        value = {
+            "manifest": {"run": {
+                "requested_scenario": "Campaign\\Human\\Human01.pud",
+                "initialization_seed": 1, "cycle_limit": 40,
+                "commands": {"count": 2},
+            }},
+            "receipt": native,
+            "commands_bytes": (b"cycle 10 select unit 7\n"
+                               b"cycle 10 attack unit 9\n"),
+        }
+        with self.assertRaisesRegex(transaction.ProofError, "unsupported"):
+            transaction._derive_java_scenario(value)
 
     def test_native_do_right_button_trace_is_one_group_transaction(self):
         compiled = transaction.compile_ui_trace(

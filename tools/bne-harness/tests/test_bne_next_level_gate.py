@@ -22,6 +22,8 @@ class NextLevelGateTest(unittest.TestCase):
         self.assertIn("AI_DISCOVERY_CURRENT=0", shell)
         self.assertIn('if [[ "$AI_DISCOVERY_CURRENT" == "1" ]]', shell)
         self.assertNotIn('if [[ -f "$AI_DISCOVERY" ]]', shell)
+        self.assertIn('BNE_PLAYER_PROOF_STORE', shell)
+        self.assertIn('--player-proof-store "$BNE_PLAYER_PROOF_STORE"', shell)
         self.assertIn("unknown next-level gate argument", shell)
 
     def test_ai_capture_uses_the_maps_person_slot(self):
@@ -174,6 +176,32 @@ class NextLevelGateTest(unittest.TestCase):
         self.assertFalse(physical["producer_receipts_verified"])
         self.assertFalse(replay["complete"])
         self.assertFalse(replay["producer_reports_verified"])
+
+    def test_retained_player_store_is_validated_not_trusted_as_a_summary(self):
+        validated = {
+            "schema": gate.player.CERTIFICATION_SCHEMA,
+            "complete": False, "paired_transactions": 1,
+            "producer_receipts_verified": True,
+        }
+        with tempfile.TemporaryDirectory() as raw, mock.patch.object(
+                gate.player, "validate_proof_store",
+                return_value=validated) as verify:
+            store = Path(raw) / "store"
+            result = gate._retained_player_certification(
+                store, {"fixed_cell_count": 532},
+                repository=Path(raw), pack=Path(raw) / "pack")
+        self.assertTrue(result["producer_receipts_verified"])
+        self.assertTrue(result["current_engine"])
+        verify.assert_called_once()
+
+    def test_tampered_player_store_is_rejected_not_rounded_down(self):
+        with tempfile.TemporaryDirectory() as raw, mock.patch.object(
+                gate.player, "validate_proof_store",
+                side_effect=gate.player.ProofError("tampered")):
+            with self.assertRaisesRegex(ValueError, "failed validation"):
+                gate._retained_player_certification(
+                    Path(raw) / "store", {}, repository=Path(raw),
+                    pack=Path(raw) / "pack")
 
     def test_loose_work_order_can_never_authorize_an_engine_edit(self):
         document = {

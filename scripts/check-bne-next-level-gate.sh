@@ -134,6 +134,9 @@ if [[ -n "${BNE_PLAYER_TRANSACTION_RECEIPTS:-}" ]]; then
     STATUS_ARGS+=(--player-transaction "$receipt")
   done
 fi
+if [[ -n "${BNE_PLAYER_PROOF_STORE:-}" ]]; then
+  STATUS_ARGS+=(--player-proof-store "$BNE_PLAYER_PROOF_STORE")
+fi
 if [[ "$REQUIRE_CERTIFIED" == "1" ]]; then
   STATUS_ARGS+=(--require-certified)
 fi

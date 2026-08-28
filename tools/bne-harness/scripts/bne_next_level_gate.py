@@ -170,6 +170,19 @@ def _player_certification(document: dict[str, Any] | None,
     return result
 
 
+def _retained_player_certification(path: Path, requirements: dict[str, Any],
+                                   *, repository: Path, pack: Path) \
+        -> dict[str, Any]:
+    try:
+        result = player.validate_proof_store(
+            path, requirements, repository=repository, pack=pack)
+    except player.ProofError as error:
+        raise ValueError(
+            f"retained player proof store failed validation: {error}") from error
+    result["current_engine"] = True
+    return result
+
+
 def _replay_certification(document: dict[str, Any] | None,
                           current_engine: str,
                           current_program: str) -> dict[str, Any]:
@@ -354,7 +367,12 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
                                "debt": "no physical transaction receipts",
                            })
     command = _command_lane(load(args.command_report))
-    if native_player_receipts and java_player_receipts:
+    player_store = getattr(args, "player_proof_store", None)
+    if player_store is not None:
+        paired = _retained_player_certification(
+            player_store, requirements, repository=args.root,
+            pack=args.asset_pack)
+    elif native_player_receipts and java_player_receipts:
         paired = player.certify(
             native_player_receipts, java_player_receipts, requirements,
             current_java_engine_input_sha256=current_engine,
@@ -589,6 +607,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--command-report", type=Path)
     parser.add_argument("--player-transaction", type=Path, action="append", default=[])
+    parser.add_argument("--player-proof-store", type=Path)
     parser.add_argument("--player-certification", type=Path)
     parser.add_argument("--replay-certification", type=Path)
     parser.add_argument("--replay-corpus", type=Path)

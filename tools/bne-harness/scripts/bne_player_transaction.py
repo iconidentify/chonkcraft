@@ -13,15 +13,18 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shlex
 import subprocess
+import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import bne_fixture
 import bne_identity
+import bne_java
 
 
 SCHEMA = "chonkcraft-bne-player-transactions-2"
@@ -29,9 +32,22 @@ CERTIFICATION_SCHEMA = "chonkcraft-bne-player-transaction-certification-2"
 CATALOG_SCHEMA = "chonkcraft-bne-player-transaction-catalog-2"
 REQUIREMENTS_SCHEMA = "chonkcraft-bne-player-transaction-requirements-2"
 UNIT_IDENTITY_SCHEMA = "chonkcraft-bne-player-unit-identities-1"
+PROOF_STORE_SCHEMA = "chonkcraft-bne-player-transaction-proof-store-1"
+BUILD_RECEIPT_SCHEMA = "chonkcraft-bne-player-transaction-java-build-receipt-1"
+NATIVE_SOURCE_SCHEMA = "chonkcraft-bne-player-transaction-native-source-1"
+JAVA_RUN_SCHEMA = "chonkcraft-bne-player-transaction-java-run-1"
 PINNED_BNE_EXECUTABLE_SHA256 = (
     "b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807"
 )
+
+ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_PACK = (Path.home() / ".chonkcraft" / "packs" /
+                "warcraft-ii-battle-net-edition-usa.chonkpack")
+
+
+class ProofError(ValueError):
+    """A retained producer graph is missing, unsafe, stale, or inconsistent."""
+
 
 # A receipt is only as strong as the layers it actually observed.  In
 # particular, an order installed through GiveOrder is not proof of a mouse
@@ -110,16 +126,13 @@ def _valid_sha256(value: object) -> bool:
 
 
 def _current_engine_input_sha256() -> str:
-    root = Path(__file__).resolve().parents[3]
-    value = bne_identity.engine_input_identity(root).get("engine_input_sha256")
+    value = bne_identity.engine_input_identity(ROOT).get("engine_input_sha256")
     if not _valid_sha256(value):
         raise ValueError("current Java engine has no hermetic input identity")
     return str(value)
 
 
-def current_program_input_sha256() -> str:
-    """Hash the current desktop+engine+adapter source/build closure."""
-    root = Path(__file__).resolve().parents[3]
+def _program_input_sha256(root: Path) -> str:
     head = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     diff = subprocess.check_output(
@@ -137,11 +150,128 @@ def current_program_input_sha256() -> str:
     return digest.hexdigest()
 
 
+def current_program_input_sha256() -> str:
+    """Hash the current desktop+engine+adapter source/build closure."""
+    return _program_input_sha256(ROOT)
+
+
 def _load(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"receipt is not an object: {path}")
     return value
+
+
+def _canonical_bytes(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=True).encode("utf-8")
+
+
+def _json_bytes(value: object) -> bytes:
+    return json.dumps(value, indent=2, sort_keys=True,
+                      ensure_ascii=True).encode("utf-8") + b"\n"
+
+
+def _bytes_identity(value: bytes) -> dict[str, object]:
+    return {"bytes": len(value), "sha256": hashlib.sha256(value).hexdigest()}
+
+
+def _path_identity(path: Path) -> dict[str, object]:
+    if path.is_symlink() or not path.is_file():
+        raise ProofError(f"proof input is not a regular file: {path}")
+    digest = hashlib.sha256()
+    size = 0
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            size += len(block)
+            digest.update(block)
+    return {"bytes": size, "sha256": digest.hexdigest()}
+
+
+def _strict_json(raw: bytes, label: str) -> dict[str, Any]:
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        value: dict[str, Any] = {}
+        for key, item in pairs:
+            if key in value:
+                raise ProofError(f"duplicate JSON key in {label}: {key}")
+            value[key] = item
+        return value
+
+    try:
+        value = json.loads(raw, object_pairs_hook=unique)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProofError(f"invalid JSON in {label}: {error}") from error
+    if not isinstance(value, dict):
+        raise ProofError(f"proof member is not a JSON object: {label}")
+    return value
+
+
+def _proof_directory(path: Path, parent: Path, label: str) -> None:
+    if path.parent != parent or path.is_symlink() or not path.is_dir():
+        raise ProofError(f"missing or unsafe retained player {label}: {path}")
+
+
+def _proof_member(path: Path, parent: Path, *, canonical: bool = True) \
+        -> tuple[dict[str, Any], bytes]:
+    if path.parent != parent or path.is_symlink() or not path.is_file():
+        raise ProofError(f"missing or unsafe retained player proof member: {path}")
+    raw = path.read_bytes()
+    value = _strict_json(raw, str(path))
+    if canonical and raw != _json_bytes(value):
+        raise ProofError(f"retained player proof member is not canonical: {path}")
+    return value, raw
+
+
+def _exact_members(path: Path, expected: set[str], label: str) -> None:
+    try:
+        names = {item.name for item in path.iterdir()}
+    except OSError as error:
+        raise ProofError(f"cannot inspect retained player {label}: {error}") \
+            from error
+    if names != expected:
+        missing = sorted(expected - names)
+        unexpected = sorted(names - expected)
+        raise ProofError(
+            f"retained player {label} members differ; missing={missing}, "
+            f"unexpected={unexpected}")
+
+
+def _write_immutable(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if path.is_symlink() or not path.is_file() or path.read_bytes() != data:
+            raise ProofError(
+                f"content-addressed player proof changed in place: {path}")
+        return
+    with tempfile.NamedTemporaryFile(
+            prefix=path.name + ".", suffix=".tmp", dir=path.parent,
+            delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if path.is_symlink() or path.read_bytes() != data:
+                raise ProofError(
+                    f"content-addressed player proof raced with different bytes: "
+                    f"{path}")
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _write_current(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+            prefix=path.name + ".", suffix=".tmp", dir=path.parent,
+            delete=False) as handle:
+        temporary = Path(handle.name)
+        handle.write(data)
+        handle.flush()
+        os.fsync(handle.fileno())
+    temporary.replace(path)
 
 
 def _normalize_unit_identities(raw: object) -> dict[str, Any] | None:
@@ -1267,6 +1397,629 @@ def import_native_captures(capture_dirs: list[Path], output_dir: Path) \
     return catalog
 
 
+BUILD_INPUT_PATHS = (
+    "pom.xml", "assetpack", "runtime", "data", "matchmaking", "engine",
+    "desktop", "launcher/src/main/resources/icons/chonkcraft.png",
+    "scripts/jbr",
+)
+
+
+def _tree_identity(repository: Path, paths: tuple[str, ...]) -> dict[str, object]:
+    raw_paths = subprocess.check_output(
+        ["git", "ls-files", "-z", "--", *paths], cwd=repository).split(b"\0")
+    untracked = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--",
+         *paths], cwd=repository).split(b"\0")
+    names = sorted(set(item for item in raw_paths + untracked if item))
+    digest = hashlib.sha256()
+    for raw in names:
+        path = repository / raw.decode("utf-8", "surrogateescape")
+        if path.is_symlink() or not path.is_file():
+            raise ProofError(f"Java build input is not a regular file: {path}")
+        digest.update(b"path\0" + raw + b"\0")
+        with path.open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+    return {"files": len(names), "sha256": digest.hexdigest()}
+
+
+def _java_build_inputs(repository: Path) -> dict[str, Any]:
+    engine = bne_identity.engine_input_identity(repository)
+    engine_sha = engine.get("engine_input_sha256")
+    if not _valid_sha256(engine_sha):
+        raise ProofError("Java build inputs have no hermetic engine identity")
+    wrapper = repository / "scripts" / "jbr" / "with-jbr-25.sh"
+    try:
+        runtime = subprocess.check_output(
+            [str(wrapper), "java", "-version"], cwd=repository,
+            stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        raise ProofError("pinned JBR 25 is unavailable for player proof") from error
+    return {
+        "engine": engine,
+        "program_input_sha256": _program_input_sha256(repository),
+        "source_closure": _tree_identity(repository, BUILD_INPUT_PATHS),
+        "jbr_version": _bytes_identity(runtime),
+    }
+
+
+def _build_app(repository: Path, inputs: dict[str, Any]) \
+        -> tuple[Path, dict[str, Any]]:
+    subprocess.run(
+        [str(repository / "scripts" / "jbr" / "with-jbr-25.sh"),
+         "mvn", "-q", "-pl", "desktop", "-am", "-DskipTests", "package"],
+        cwd=repository, check=True)
+    jar = repository / "desktop" / "target" / \
+        "chonkcraft-desktop-0.1.0-SNAPSHOT-app.jar"
+    if not jar.is_file():
+        raise ProofError(f"current-source app JAR was not produced: {jar}")
+    if _java_build_inputs(repository) != inputs:
+        raise ProofError("Java player proof inputs changed during the build")
+    receipt = {
+        "schema": BUILD_RECEIPT_SCHEMA,
+        "build_inputs": inputs,
+        "jar": _path_identity(jar),
+    }
+    _write_current(
+        repository / "desktop" / "target" /
+        "bne-player-transaction-build-receipt.json",
+        _json_bytes(receipt))
+    return jar, receipt
+
+
+def _verified_app(repository: Path, *, build: bool) \
+        -> tuple[Path, dict[str, Any]]:
+    inputs = _java_build_inputs(repository)
+    if build:
+        return _build_app(repository, inputs)
+    jar = repository / "desktop" / "target" / \
+        "chonkcraft-desktop-0.1.0-SNAPSHOT-app.jar"
+    receipt_path = (repository / "desktop" / "target" /
+                    "bne-player-transaction-build-receipt.json")
+    if not jar.is_file() or not receipt_path.is_file():
+        raise ProofError(
+            "retained player validation needs the app JAR and its build receipt")
+    receipt, raw = _proof_member(receipt_path, receipt_path.parent)
+    if raw != _json_bytes(receipt) or receipt.get("schema") != BUILD_RECEIPT_SCHEMA:
+        raise ProofError("Java player build receipt has the wrong schema")
+    if receipt.get("build_inputs") != inputs:
+        raise ProofError("Java player build receipt is stale for current inputs")
+    if receipt.get("jar") != _path_identity(jar):
+        raise ProofError("app JAR bytes differ from the player build receipt")
+    return jar, receipt
+
+
+def _current_java_proof(repository: Path, pack: Path, *, build: bool) \
+        -> tuple[Path, dict[str, Any]]:
+    repository = repository.resolve()
+    pack = pack.expanduser()
+    if pack.is_symlink():
+        raise ProofError(f"authenticated ChonkPack is a symlink: {pack}")
+    pack = pack.resolve()
+    pack_identity = _path_identity(pack)
+    jar, receipt = _verified_app(repository, build=build)
+    if _path_identity(pack) != pack_identity:
+        raise ProofError("ChonkPack changed while player proof was computed")
+    return jar, {
+        "schema": BUILD_RECEIPT_SCHEMA,
+        "build_receipt": receipt,
+        "pack": pack_identity,
+    }
+
+
+def _native_capture(directory: Path) -> dict[str, Any]:
+    directory = directory.expanduser()
+    if directory.is_symlink() or not directory.is_dir():
+        raise ProofError(f"native physical capture is missing or unsafe: {directory}")
+    directory = directory.resolve()
+    traces = sorted(directory.glob("*.trace.txt"))
+    manifests = sorted(directory.glob("*.manifest.json"))
+    fixtures = sorted(directory.glob("*.bnefx"))
+    if len(traces) != 1 or len(manifests) != 1 or len(fixtures) != 1:
+        raise ProofError(
+            "physical capture needs exactly one trace, manifest and fixture: "
+            f"{directory}")
+    trace_path, manifest_path, fixture_path = traces[0], manifests[0], fixtures[0]
+    for path in (trace_path, manifest_path, fixture_path):
+        if path.is_symlink() or not path.is_file() or path.parent != directory:
+            raise ProofError(f"unsafe native physical capture member: {path}")
+    trace_bytes = trace_path.read_bytes()
+    manifest_bytes = manifest_path.read_bytes()
+    manifest = _strict_json(manifest_bytes, str(manifest_path))
+    try:
+        with zipfile.ZipFile(fixture_path) as archive:
+            archived_manifest = archive.read("manifest.json")
+            commands_bytes = archive.read("commands.txt")
+    except (zipfile.BadZipFile, KeyError) as error:
+        raise ProofError(f"native fixture omits its physical closure: {fixture_path}") \
+            from error
+    if archived_manifest != manifest_bytes:
+        raise ProofError("physical fixture and sidecar manifest differ")
+    command_identity = _bytes_identity(commands_bytes)
+    commands = ((manifest.get("run") or {}).get("commands") or {}).get("file")
+    if commands != command_identity:
+        raise ProofError("physical fixture commands differ from the manifest")
+    fixture_validation = bne_fixture.validate_fixture(fixture_path)
+    authority = authority_from_native_manifest(
+        manifest, trace_bytes, manifest_source="manifest.json",
+        fixture_validation=fixture_validation)
+    receipt = compile_ui_trace(
+        trace_bytes.decode("utf-8", errors="replace"), source="trace.txt",
+        authority=authority)
+    if receipt.get("receipt_sha256") != _receipt_identity(receipt):
+        raise ProofError("native physical receipt did not close its content")
+    source = {
+        "schema": NATIVE_SOURCE_SCHEMA,
+        "fixture_id": authority["fixture_id"],
+        "receipt_sha256": receipt["receipt_sha256"],
+        "manifest": _bytes_identity(manifest_bytes),
+        "trace": _bytes_identity(trace_bytes),
+        "fixture": _path_identity(fixture_path),
+        "commands": command_identity,
+        "retained": ["manifest.json", "trace.txt", "fixture.bnefx",
+                     "receipt.json"],
+    }
+    return {
+        "manifest": manifest, "manifest_bytes": manifest_bytes,
+        "trace_bytes": trace_bytes, "fixture_path": fixture_path,
+        "fixture_bytes": fixture_path.read_bytes(),
+        "commands_bytes": commands_bytes, "receipt": receipt,
+        "source": source,
+    }
+
+
+def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
+    manifest = native["manifest"]
+    receipt = native["receipt"]
+    try:
+        command_text = native["commands_bytes"].decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ProofError("physical command script is not UTF-8") from error
+    selects: list[int] = []
+    issue_cycle: int | None = None
+    click: tuple[int, int] | None = None
+    action_lines = []
+    for raw in command_text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        action_lines.append(line)
+        selected = re.fullmatch(r"cycle (\d+) select unit (\d+)", line)
+        clicked = re.fullmatch(
+            r"cycle (\d+) ui-right-click x (-?\d+) y (-?\d+)", line)
+        if selected:
+            cycle, unit = int(selected.group(1)), int(selected.group(2))
+            if issue_cycle not in (None, cycle) or click is not None \
+                    or unit in selects:
+                raise ProofError("physical selection script is ambiguous")
+            issue_cycle = cycle
+            selects.append(unit)
+        elif clicked:
+            cycle = int(clicked.group(1))
+            if issue_cycle not in (None, cycle) or click is not None:
+                raise ProofError("physical click script is ambiguous")
+            issue_cycle = cycle
+            click = (int(clicked.group(2)), int(clicked.group(3)))
+        else:
+            raise ProofError(
+                f"unsupported physical command cannot become Java proof: {line}")
+    command_count = ((manifest.get("run") or {}).get("commands") or {}).get(
+        "count")
+    if not selects or click is None or issue_cycle is None \
+            or command_count != len(action_lines):
+        raise ProofError("physical command script has no closed select/click route")
+    transactions = receipt.get("transactions") or []
+    if len(transactions) != 1:
+        raise ProofError("physical proof scenario must contain one transaction")
+    transaction = transactions[0]
+    gesture = transaction.get("gesture") or {}
+    decision = transaction.get("decision") or {}
+    expected_gesture = {
+        "origin": "field", "detail": "right-click", "modifiers": "plain",
+        "tile_x": click[0], "tile_y": click[1],
+        "selected_unit_ids": selects,
+    }
+    if any(gesture.get(key) != value for key, value in expected_gesture.items()) \
+            or decision.get("family") != "move" \
+            or decision.get("accepted") is not True \
+            or decision.get("queued") is not False:
+        raise ProofError("sealed commands disagree with the physical transaction")
+    commands = transaction.get("commands") or []
+    if [item.get("unit_id") for item in commands] != selects:
+        raise ProofError("sealed selection order disagrees with native fan-out")
+    identities = {
+        int(item["local_id"]): item["identity"]
+        for item in ((receipt.get("unit_identities") or {}).get("units") or [])
+    }
+    if set(selects) - set(identities):
+        raise ProofError("sealed selection omits native unit identities")
+    run = manifest.get("run") or {}
+    scenario = run.get("requested_scenario")
+    seed = run.get("initialization_seed")
+    cycles = run.get("cycle_limit")
+    if not isinstance(scenario, str) or not isinstance(seed, int) \
+            or not isinstance(cycles, int) or cycles < issue_cycle:
+        raise ProofError("native manifest has no executable scenario closure")
+    return {
+        "schema": "chonkcraft-bne-physical-scenario-1",
+        "setup": {
+            "scenario": scenario, "seed": seed,
+            "java_map": bne_java.scenario_to_java_map(scenario),
+        },
+        "select": [{
+            "native_id": unit,
+            "player": int(identities[unit]["owner"]),
+            "x": int(identities[unit]["x"]),
+            "y": int(identities[unit]["y"]),
+        } for unit in selects],
+        "gesture": {
+            "origin": "field", "detail": "right-click",
+            "tile_x": click[0], "tile_y": click[1], "modifiers": "plain",
+        },
+        "issue_cycle": issue_cycle,
+        "cycles": cycles,
+    }
+
+
+JavaEmitter = Callable[[Path, dict[str, Any], Path, Path, Path, str, str, str], None]
+
+
+def _run_java_adapter(repository: Path, scenario: dict[str, Any], jar: Path,
+                      pack: Path, output: Path, cycle_log: Path,
+                      engine_sha256: str, program_sha256: str,
+                      scenario_id: str) -> None:
+    scenario_path = output.with_name("scenario-input.json")
+    scenario_path.write_bytes(_json_bytes(scenario))
+    environment = dict(os.environ)
+    environment["CHONKCRAFT_ASSET_PACK"] = str(pack)
+    try:
+        subprocess.run([
+            str(repository / "scripts" / "jbr" / "with-jbr-25.sh"),
+            "java", "-cp", str(jar),
+            "net.chonkbase.chonkcraft.desktop.BnePhysicalAdapter",
+            "--scenario", str(scenario_path), "--output", str(output),
+            "--cycle-log", str(cycle_log),
+            "--build-sha256", engine_sha256,
+            "--program-sha256", program_sha256,
+            "--scenario-id", scenario_id,
+        ], cwd=repository, env=environment, check=True)
+    finally:
+        scenario_path.unlink(missing_ok=True)
+
+
+def _java_authority(java_proof: dict[str, Any]) -> tuple[str, str]:
+    try:
+        inputs = java_proof["build_receipt"]["build_inputs"]
+        engine = inputs["engine"]["engine_input_sha256"]
+        program = inputs["program_input_sha256"]
+    except (KeyError, TypeError) as error:
+        raise ProofError(f"Java player proof omits its input authority: {error}") \
+            from error
+    if not _valid_sha256(engine) or not _valid_sha256(program):
+        raise ProofError("Java player proof has invalid input identities")
+    return str(engine), str(program)
+
+
+def _emit_java_twin(repository: Path, pack: Path, jar: Path,
+                    java_proof_id: str, java_proof: dict[str, Any],
+                    native: dict[str, Any], root: Path,
+                    emitter: JavaEmitter = _run_java_adapter) \
+        -> dict[str, Any]:
+    receipt_sha = str(native["receipt"]["receipt_sha256"])
+    fixture_id = str((native["receipt"].get("authority") or {})["fixture_id"])
+    scenario = _derive_java_scenario(native)
+    engine, program = _java_authority(java_proof)
+    twin_root = root / "java" / java_proof_id / receipt_sha
+    twin_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="player-java-") as raw:
+        temporary = Path(raw)
+        output = temporary / "evidence.json"
+        cycle_log = temporary / "cycles.ndjson"
+        emitter(repository, scenario, jar, pack, output, cycle_log,
+                engine, program, fixture_id)
+        evidence = _strict_json(output.read_bytes(), str(output))
+        evidence_bytes = _json_bytes(evidence)
+        cycles_bytes = cycle_log.read_bytes()
+    java_receipt = compile_evidence(evidence, source="evidence.json")
+    if _receipt_errors(
+            java_receipt, expected_side="java",
+            current_java_engine_input_sha256=engine,
+            current_java_program_input_sha256=program):
+        raise ProofError("Java adapter emitted an invalid player receipt")
+    scenario_bytes = _json_bytes(scenario)
+    receipt_bytes = _json_bytes(java_receipt)
+    run = {
+        "schema": JAVA_RUN_SCHEMA,
+        "java_proof_id": java_proof_id,
+        "native_receipt_sha256": receipt_sha,
+        "java_receipt_sha256": java_receipt["receipt_sha256"],
+        "fixture_id": fixture_id,
+        "scenario": _bytes_identity(scenario_bytes),
+        "evidence": _bytes_identity(evidence_bytes),
+        "cycles": _bytes_identity(cycles_bytes),
+        "receipt": _bytes_identity(receipt_bytes),
+    }
+    for name, data in (
+            ("scenario.json", scenario_bytes), ("evidence.json", evidence_bytes),
+            ("cycles.ndjson", cycles_bytes), ("receipt.json", receipt_bytes),
+            ("RUN.json", _json_bytes(run))):
+        _write_immutable(twin_root / name, data)
+    return {
+        "path": str(twin_root.relative_to(root)),
+        "native_receipt_sha256": receipt_sha,
+        "java_receipt_sha256": java_receipt["receipt_sha256"],
+        "run": _bytes_identity(_json_bytes(run)),
+    }
+
+
+def materialize_proof_store(capture_dirs: list[Path], store: Path, pack: Path,
+                            *, repository: Path = ROOT, build: bool = True,
+                            emitter: JavaEmitter = _run_java_adapter) \
+        -> dict[str, Any]:
+    """Retain native bytes and reproducible current-Java twins as one graph."""
+    if not capture_dirs:
+        raise ProofError("player proof materialization needs native captures")
+    repository = repository.resolve()
+    store = store.expanduser()
+    if store.is_symlink():
+        raise ProofError(f"retained player store is a symlink: {store}")
+    store = store.resolve()
+    store.mkdir(parents=True, exist_ok=True)
+    jar, java_proof = _current_java_proof(repository, pack, build=build)
+    java_proof_bytes = _json_bytes(java_proof)
+    java_proof_id = hashlib.sha256(_canonical_bytes(java_proof)).hexdigest()
+    natives = []
+    twins = []
+    seen: set[str] = set()
+    for capture_dir in capture_dirs:
+        native = _native_capture(capture_dir)
+        receipt = native["receipt"]
+        receipt_sha = str(receipt["receipt_sha256"])
+        if receipt_sha in seen:
+            raise ProofError(f"duplicate native player receipt: {receipt_sha}")
+        seen.add(receipt_sha)
+        native_root = store / "native" / receipt_sha
+        source_bytes = _json_bytes(native["source"])
+        for name, data in (
+                ("manifest.json", native["manifest_bytes"]),
+                ("trace.txt", native["trace_bytes"]),
+                ("fixture.bnefx", native["fixture_bytes"]),
+                ("receipt.json", _json_bytes(receipt)),
+                ("SOURCE.json", source_bytes)):
+            _write_immutable(native_root / name, data)
+        natives.append({
+            "path": str(native_root.relative_to(store)),
+            "fixture_id": (receipt.get("authority") or {})["fixture_id"],
+            "receipt_sha256": receipt_sha,
+            "source": _bytes_identity(source_bytes),
+        })
+        twins.append(_emit_java_twin(
+            repository, pack.expanduser().resolve(), jar, java_proof_id,
+            java_proof, native, store, emitter=emitter))
+    natives.sort(key=lambda item: item["receipt_sha256"])
+    twins.sort(key=lambda item: item["native_receipt_sha256"])
+    catalog: dict[str, Any] = {
+        "schema": PROOF_STORE_SCHEMA,
+        "java_proof_id": java_proof_id,
+        "build": _bytes_identity(java_proof_bytes),
+        "native": natives,
+        "twins": twins,
+    }
+    catalog["catalog_sha256"] = _digest(catalog)
+    _write_current(store / "BUILD.json", java_proof_bytes)
+    _write_current(store / "CATALOG.json", _json_bytes(catalog))
+    return catalog
+
+
+def _retained_native(store: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    receipt_sha = str(entry.get("receipt_sha256") or "")
+    if not _valid_sha256(receipt_sha) \
+            or entry.get("path") != f"native/{receipt_sha}":
+        raise ProofError("player catalog has an invalid native path")
+    parent = store / "native"
+    _proof_directory(parent, store, "native root")
+    root = parent / receipt_sha
+    _proof_directory(root, parent, "native bundle")
+    _exact_members(root, {"SOURCE.json", "manifest.json", "trace.txt",
+                          "fixture.bnefx", "receipt.json"}, "native bundle")
+    source, source_bytes = _proof_member(root / "SOURCE.json", root)
+    receipt, receipt_bytes = _proof_member(root / "receipt.json", root)
+    manifest_path = root / "manifest.json"
+    trace_path = root / "trace.txt"
+    fixture_path = root / "fixture.bnefx"
+    for path in (manifest_path, trace_path, fixture_path):
+        if path.is_symlink() or not path.is_file() or path.parent != root:
+            raise ProofError(f"unsafe retained native player member: {path}")
+    manifest_bytes = manifest_path.read_bytes()
+    trace_bytes = trace_path.read_bytes()
+    manifest = _strict_json(manifest_bytes, str(manifest_path))
+    try:
+        with zipfile.ZipFile(fixture_path) as archive:
+            archived_manifest = archive.read("manifest.json")
+            commands_bytes = archive.read("commands.txt")
+    except (zipfile.BadZipFile, KeyError) as error:
+        raise ProofError("retained player fixture omits its native closure") from error
+    if archived_manifest != manifest_bytes:
+        raise ProofError("retained player fixture and manifest differ")
+    fixture_validation = bne_fixture.validate_fixture(fixture_path)
+    authority = authority_from_native_manifest(
+        manifest, trace_bytes, manifest_source="manifest.json",
+        fixture_validation=fixture_validation)
+    expected_receipt = compile_ui_trace(
+        trace_bytes.decode("utf-8", errors="replace"), source="trace.txt",
+        authority=authority)
+    if receipt != expected_receipt or receipt_bytes != _json_bytes(expected_receipt):
+        raise ProofError("retained native receipt was not reopened from capture bytes")
+    expected_source = {
+        "schema": NATIVE_SOURCE_SCHEMA,
+        "fixture_id": authority["fixture_id"],
+        "receipt_sha256": receipt_sha,
+        "manifest": _bytes_identity(manifest_bytes),
+        "trace": _bytes_identity(trace_bytes),
+        "fixture": _path_identity(fixture_path),
+        "commands": _bytes_identity(commands_bytes),
+        "retained": ["manifest.json", "trace.txt", "fixture.bnefx",
+                     "receipt.json"],
+    }
+    if source != expected_source or source_bytes != _json_bytes(expected_source):
+        raise ProofError("retained native SOURCE disagrees with its bytes")
+    expected_entry = {
+        "path": f"native/{receipt_sha}",
+        "fixture_id": authority["fixture_id"],
+        "receipt_sha256": receipt_sha,
+        "source": _bytes_identity(source_bytes),
+    }
+    if entry != expected_entry:
+        raise ProofError("player catalog native entry disagrees with its bundle")
+    return {
+        "manifest": manifest, "manifest_bytes": manifest_bytes,
+        "trace_bytes": trace_bytes, "fixture_path": fixture_path,
+        "fixture_bytes": fixture_path.read_bytes(),
+        "commands_bytes": commands_bytes, "receipt": receipt,
+        "source": source,
+    }
+
+
+def _retained_java(store: Path, entry: dict[str, Any], native: dict[str, Any],
+                   repository: Path, pack: Path, jar: Path,
+                   java_proof_id: str, java_proof: dict[str, Any],
+                   emitter: JavaEmitter) -> dict[str, Any]:
+    receipt_sha = str(native["receipt"]["receipt_sha256"])
+    expected_path = f"java/{java_proof_id}/{receipt_sha}"
+    if entry.get("path") != expected_path \
+            or entry.get("native_receipt_sha256") != receipt_sha:
+        raise ProofError("player catalog has an invalid Java twin path")
+    java_root = store / "java"
+    proof_root = java_root / java_proof_id
+    root = proof_root / receipt_sha
+    _proof_directory(java_root, store, "Java root")
+    _proof_directory(proof_root, java_root, "Java proof root")
+    _proof_directory(root, proof_root, "Java twin")
+    _exact_members(root, {"RUN.json", "scenario.json", "evidence.json",
+                          "cycles.ndjson", "receipt.json"}, "Java twin")
+    run, run_bytes = _proof_member(root / "RUN.json", root)
+    scenario, scenario_bytes = _proof_member(root / "scenario.json", root)
+    evidence, evidence_bytes = _proof_member(root / "evidence.json", root)
+    receipt, receipt_bytes = _proof_member(root / "receipt.json", root)
+    cycles_path = root / "cycles.ndjson"
+    if cycles_path.is_symlink() or not cycles_path.is_file():
+        raise ProofError("retained Java cycle log is missing or unsafe")
+    cycles_bytes = cycles_path.read_bytes()
+    expected_scenario = _derive_java_scenario(native)
+    if scenario != expected_scenario or scenario_bytes != _json_bytes(expected_scenario):
+        raise ProofError("retained Java scenario differs from sealed native commands")
+    engine, program = _java_authority(java_proof)
+    fixture_id = str((native["receipt"].get("authority") or {})["fixture_id"])
+    with tempfile.TemporaryDirectory(prefix="player-validate-") as raw:
+        temporary = Path(raw)
+        output = temporary / "evidence.json"
+        cycle_log = temporary / "cycles.ndjson"
+        emitter(repository, scenario, jar, pack, output, cycle_log,
+                engine, program, fixture_id)
+        reproduced = _strict_json(output.read_bytes(), str(output))
+        reproduced_cycles = cycle_log.read_bytes()
+    if evidence != reproduced or evidence_bytes != _json_bytes(reproduced):
+        raise ProofError("retained Java evidence was not reproduced by current app")
+    if cycles_bytes != reproduced_cycles:
+        raise ProofError("retained Java cycle log was not reproduced by current app")
+    expected_receipt = compile_evidence(reproduced, source="evidence.json")
+    if receipt != expected_receipt or receipt_bytes != _json_bytes(expected_receipt):
+        raise ProofError("retained Java receipt was not recompiled from execution")
+    expected_run = {
+        "schema": JAVA_RUN_SCHEMA,
+        "java_proof_id": java_proof_id,
+        "native_receipt_sha256": receipt_sha,
+        "java_receipt_sha256": expected_receipt["receipt_sha256"],
+        "fixture_id": fixture_id,
+        "scenario": _bytes_identity(scenario_bytes),
+        "evidence": _bytes_identity(evidence_bytes),
+        "cycles": _bytes_identity(cycles_bytes),
+        "receipt": _bytes_identity(receipt_bytes),
+    }
+    expected_entry = {
+        "path": expected_path,
+        "native_receipt_sha256": receipt_sha,
+        "java_receipt_sha256": expected_receipt["receipt_sha256"],
+        "run": _bytes_identity(run_bytes),
+    }
+    if run != expected_run or run_bytes != _json_bytes(expected_run) \
+            or entry != expected_entry:
+        raise ProofError("retained Java RUN disagrees with its proof graph")
+    return expected_receipt
+
+
+def validate_proof_store(store: Path, requirements: dict[str, Any], *,
+                         repository: Path = ROOT, pack: Path = DEFAULT_PACK,
+                         emitter: JavaEmitter = _run_java_adapter) \
+        -> dict[str, Any]:
+    """Reopen every native byte and rerun every current-Java physical twin."""
+    repository = repository.resolve()
+    store = store.expanduser()
+    pack = pack.expanduser()
+    if store.is_symlink() or not store.is_dir():
+        raise ProofError(f"retained player proof store is missing or unsafe: {store}")
+    if pack.is_symlink():
+        raise ProofError(f"authenticated ChonkPack is a symlink: {pack}")
+    store = store.resolve()
+    pack = pack.resolve()
+    catalog, catalog_bytes = _proof_member(store / "CATALOG.json", store)
+    java_proof, java_proof_bytes = _proof_member(store / "BUILD.json", store)
+    jar, current_proof = _current_java_proof(repository, pack, build=False)
+    if java_proof != current_proof or java_proof_bytes != _json_bytes(current_proof):
+        raise ProofError("retained player build is stale for current Java inputs")
+    java_proof_id = hashlib.sha256(_canonical_bytes(java_proof)).hexdigest()
+    expected_catalog_sha = _digest({
+        key: value for key, value in catalog.items()
+        if key != "catalog_sha256"
+    })
+    if catalog.get("schema") != PROOF_STORE_SCHEMA \
+            or catalog.get("java_proof_id") != java_proof_id \
+            or catalog.get("build") != _bytes_identity(java_proof_bytes) \
+            or catalog.get("catalog_sha256") != expected_catalog_sha:
+        raise ProofError("retained player catalog has invalid authority or identity")
+    native_entries = catalog.get("native")
+    twin_entries = catalog.get("twins")
+    if not isinstance(native_entries, list) or not isinstance(twin_entries, list) \
+            or not native_entries or len(native_entries) != len(twin_entries):
+        raise ProofError("retained player catalog has no complete producer pairs")
+    native_by_receipt: dict[str, dict[str, Any]] = {}
+    native_receipts = []
+    for entry in native_entries:
+        if not isinstance(entry, dict):
+            raise ProofError("retained player native entry is not an object")
+        retained = _retained_native(store, entry)
+        receipt_sha = str(retained["receipt"]["receipt_sha256"])
+        if receipt_sha in native_by_receipt:
+            raise ProofError(f"duplicate retained native receipt: {receipt_sha}")
+        native_by_receipt[receipt_sha] = retained
+        native_receipts.append(retained["receipt"])
+    java_receipts = []
+    seen_twins: set[str] = set()
+    for entry in twin_entries:
+        if not isinstance(entry, dict):
+            raise ProofError("retained player Java entry is not an object")
+        receipt_sha = str(entry.get("native_receipt_sha256") or "")
+        if receipt_sha in seen_twins or receipt_sha not in native_by_receipt:
+            raise ProofError("retained player Java graph duplicates or loses a parent")
+        seen_twins.add(receipt_sha)
+        java_receipts.append(_retained_java(
+            store, entry, native_by_receipt[receipt_sha], repository, pack,
+            jar, java_proof_id, java_proof, emitter))
+    if seen_twins != set(native_by_receipt):
+        raise ProofError("retained player graph has an unpaired native producer")
+    final_jar, final_proof = _current_java_proof(repository, pack, build=False)
+    if final_proof != java_proof or _path_identity(final_jar) != _path_identity(jar):
+        raise ProofError("Java player proof inputs changed during validation")
+    engine, program = _java_authority(java_proof)
+    report = _certify(
+        native_receipts, java_receipts, requirements,
+        current_java_engine_input_sha256=engine,
+        current_java_program_input_sha256=program,
+        producer_receipts_verified=True,
+        proof_store_sha256=hashlib.sha256(catalog_bytes).hexdigest())
+    return report
+
+
 def first_difference(left: dict[str, Any], right: dict[str, Any]) \
         -> dict[str, Any] | None:
     left_rows = left.get("transactions") or []
@@ -1945,11 +2698,13 @@ def coverage(receipts: list[dict[str, Any]], requirements: dict[str, Any], *,
     return report
 
 
-def certify(native: dict[str, Any] | list[dict[str, Any]],
+def _certify(native: dict[str, Any] | list[dict[str, Any]],
         java: dict[str, Any] | list[dict[str, Any]],
         requirements: dict[str, Any], *,
         current_java_engine_input_sha256: str | None = None,
-        current_java_program_input_sha256: str | None = None) -> dict[str, Any]:
+        current_java_program_input_sha256: str | None = None,
+        producer_receipts_verified: bool = False,
+        proof_store_sha256: str | None = None) -> dict[str, Any]:
     """Certify paired native/Java physical transactions fail-closed.
 
     Coverage on one producer is not parity.  This joins the two authenticated
@@ -2058,14 +2813,28 @@ def certify(native: dict[str, Any] | list[dict[str, Any]],
         })
     minimum_paired = len(cells)
     # Receipt JSON is a normalized comparison surface, not its own producer
-    # proof.  A caller must first reopen the native capture closure and the
-    # Java execution/build closure.  Until a retained-store validator supplies
-    # that fact, even 532/532 matching detached receipts remain diagnostic.
+    # proof.  Only validate_proof_store reaches this private helper with the
+    # producer flag after reopening native bytes and rerunning the Java build.
+    # Detached certify() calls therefore remain diagnostic even at 532/532.
     content_exact = (
         native_coverage["complete"] and java_coverage["complete"]
         and exact_cells == minimum_paired and not differences)
-    producer_receipts_verified = False
-    complete = False
+    complete = content_exact and producer_receipts_verified
+    authority = {
+        "java_engine_input_sha256": current_engine,
+        "java_program_input_sha256": current_program,
+        "native_executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
+        "requirements_sha256": _digest(requirements),
+        "native_receipt_sha256": sorted(
+            receipt["receipt_sha256"] for receipt in native_receipts
+            if receipt.get("receipt_sha256")),
+        "java_receipt_sha256": sorted(
+            receipt["receipt_sha256"] for receipt in java_receipts
+            if receipt.get("receipt_sha256")),
+        "paired_receipt_sha256": sorted(paired_receipts),
+    }
+    if proof_store_sha256 is not None:
+        authority["proof_store_sha256"] = proof_store_sha256
     return {
         "schema": CERTIFICATION_SCHEMA,
         "complete": complete,
@@ -2073,19 +2842,7 @@ def certify(native: dict[str, Any] | list[dict[str, Any]],
         "producer_receipts_verified": producer_receipts_verified,
         "debt": (None if producer_receipts_verified else
                  "detached receipt JSON cannot certify its producer evidence"),
-        "authority": {
-            "java_engine_input_sha256": current_engine,
-            "java_program_input_sha256": current_program,
-            "native_executable_sha256": PINNED_BNE_EXECUTABLE_SHA256,
-            "requirements_sha256": _digest(requirements),
-            "native_receipt_sha256": sorted(
-                receipt["receipt_sha256"] for receipt in native_receipts
-                if receipt.get("receipt_sha256")),
-            "java_receipt_sha256": sorted(
-                receipt["receipt_sha256"] for receipt in java_receipts
-                if receipt.get("receipt_sha256")),
-            "paired_receipt_sha256": sorted(paired_receipts),
-        },
+        "authority": authority,
         "paired_transactions": exact_cells,
         "minimum_paired_transactions": minimum_paired,
         "native": native_coverage,
@@ -2095,6 +2852,18 @@ def certify(native: dict[str, Any] | list[dict[str, Any]],
         "differences": differences,
         "cells": paired_rows,
     }
+
+
+def certify(native: dict[str, Any] | list[dict[str, Any]],
+        java: dict[str, Any] | list[dict[str, Any]],
+        requirements: dict[str, Any], *,
+        current_java_engine_input_sha256: str | None = None,
+        current_java_program_input_sha256: str | None = None) -> dict[str, Any]:
+    """Compare detached receipts without treating them as producer proof."""
+    return _certify(
+        native, java, requirements,
+        current_java_engine_input_sha256=current_java_engine_input_sha256,
+        current_java_program_input_sha256=current_java_program_input_sha256)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2119,6 +2888,21 @@ def main(argv: list[str] | None = None) -> int:
     import_parser.add_argument("capture_dirs", nargs="+", type=Path)
     import_parser.add_argument("--output-dir", required=True, type=Path)
     import_parser.add_argument("--catalog", type=Path)
+    store_parser = sub.add_parser(
+        "materialize-store",
+        help="retain native captures and reproducible current-Java twins")
+    store_parser.add_argument("capture_dirs", nargs="+", type=Path)
+    store_parser.add_argument("--store", required=True, type=Path)
+    store_parser.add_argument("--asset-pack", type=Path, default=DEFAULT_PACK)
+    store_parser.add_argument("--skip-build", action="store_true")
+    validate_parser = sub.add_parser(
+        "validate-store",
+        help="reopen native closures and rerun retained Java twins")
+    validate_parser.add_argument("--store", required=True, type=Path)
+    validate_parser.add_argument("--asset-pack", type=Path, default=DEFAULT_PACK)
+    validate_parser.add_argument("--requirements", required=True, type=Path)
+    validate_parser.add_argument("--output", type=Path)
+    validate_parser.add_argument("--require-complete", action="store_true")
     compare_parser = sub.add_parser("compare")
     compare_parser.add_argument("left", type=Path)
     compare_parser.add_argument("right", type=Path)
@@ -2178,6 +2962,21 @@ def main(argv: list[str] | None = None) -> int:
             args.catalog.write_text(rendered, encoding="utf-8")
         print(rendered, end="")
         return 0
+    if args.command == "materialize-store":
+        catalog = materialize_proof_store(
+            args.capture_dirs, args.store, args.asset_pack,
+            build=not args.skip_build)
+        print(json.dumps(catalog, indent=2, sort_keys=True))
+        return 0
+    if args.command == "validate-store":
+        report = validate_proof_store(
+            args.store, _load(args.requirements), pack=args.asset_pack)
+        rendered = json.dumps(report, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered, encoding="utf-8")
+        print(rendered, end="")
+        return 1 if args.require_complete and not report["complete"] else 0
     if args.command == "certify":
         report = certify([_load(path) for path in args.native],
                          [_load(path) for path in args.java],
