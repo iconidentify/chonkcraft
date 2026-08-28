@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import net.chonkbase.chonkcraft.data.map.PudMap;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
@@ -18,6 +19,7 @@ import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
+import net.chonkbase.chonkcraft.engine.network.SyncHash;
 import net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecode;
 import net.chonkbase.chonkcraft.engine.ai.AiForce;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -40,6 +42,34 @@ import org.junit.jupiter.api.io.TempDir;
  * comes back must be the game that went in.
  */
 class SaveGameTest {
+
+    @Test
+    @DisplayName("a save restores units through the map's profiled type table")
+    void mapProfileUnitTypesSurviveSaveAndResume() throws IOException {
+        UnitType catalogOilPatch = new UnitType("unit-oil-patch");
+        catalogOilPatch.setHitPoints(0);
+        Map<String, UnitType> catalog = Map.of(catalogOilPatch.ident(), catalogOilPatch);
+
+        World original = new World(new GameMap(12, 12, new Tileset()));
+        original.setUnitTypes(catalog);
+        UnitType profiled = original.registeredUnitType(catalogOilPatch.ident());
+        assertEquals(1, profiled.hitPoints(),
+                "the fixture did not install BNE's map-world oil-patch overlay");
+        Unit placed = original.createUnit(profiled, 15, 4, 4);
+        assertNotNull(placed);
+        assertEquals(1, placed.hitPoints());
+
+        StringWriter out = new StringWriter();
+        SaveGame.write(original, "island.pud", null, 0, out);
+        World restored = new World(new GameMap(12, 12, new Tileset()));
+        restored.setUnitTypes(catalog);
+        LoadGame.apply(restored, out.toString(), catalog);
+
+        assertEquals(1, find(restored, catalogOilPatch.ident()).hitPoints(),
+                "loading bypassed the map's profiled unit type");
+        assertEquals(SyncHash.of(original), SyncHash.of(restored),
+                "the profiled world changed at the save boundary");
+    }
 
     @Test
     @DisplayName("version four preserves trigger flags and an in-flight victory countdown")

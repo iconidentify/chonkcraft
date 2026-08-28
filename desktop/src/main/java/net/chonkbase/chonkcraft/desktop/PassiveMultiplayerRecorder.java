@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -71,11 +72,71 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private record Stored(Path path, long modified, long bytes) {}
 
+    /** The controller and race table the lobby actually installed. */
+    private record RecordedPlayer(int index, String type, String race) {}
+
+    /** The exact installed game artifact, when this is an OTA-launched build. */
+    record RuntimeIdentity(String gameJarSha256, Long gameJarBytes,
+            String sourceRevision) {
+
+        static RuntimeIdentity current(String build) {
+            try {
+                var source = PassiveMultiplayerRecorder.class.getProtectionDomain()
+                        .getCodeSource();
+                if (source == null || source.getLocation() == null) {
+                    return new RuntimeIdentity(null, null, null);
+                }
+                Path path = Path.of(source.getLocation().toURI()).toAbsolutePath().normalize();
+                return from(path, build);
+            } catch (Exception unavailable) {
+                // Recording must never make an otherwise playable match fail to start.
+                return new RuntimeIdentity(null, null, null);
+            }
+        }
+
+        static RuntimeIdentity from(Path path, String build) {
+            try {
+                path = path.toAbsolutePath().normalize();
+                if (!Files.isRegularFile(path) || Files.isSymbolicLink(path)) {
+                    // A development classes directory has no single artifact identity.
+                    return new RuntimeIdentity(null, null, null);
+                }
+                String jarHash = sha256(path);
+                long jarBytes = Files.size(path);
+                String revision = null;
+                Path metadata = path.resolveSibling("release.properties");
+                if (Files.isRegularFile(metadata) && !Files.isSymbolicLink(metadata)) {
+                    Properties values = new Properties();
+                    try (var in = Files.newInputStream(metadata)) {
+                        values.load(in);
+                    }
+                    // Trust the revision only when the launcher's verified installed
+                    // metadata names this exact byte artifact and advertised build.
+                    if (jarHash.equalsIgnoreCase(values.getProperty("game.sha256", ""))
+                            && build.equals(values.getProperty("version", ""))) {
+                        String candidate = values.getProperty("source.revision", "").trim();
+                        if (candidate.matches("[0-9a-fA-F]{40}")) {
+                            revision = candidate.toLowerCase(java.util.Locale.ROOT);
+                        }
+                    }
+                }
+                return new RuntimeIdentity(jarHash, jarBytes, revision);
+            } catch (Exception unavailable) {
+                return new RuntimeIdentity(null, null, null);
+            }
+        }
+    }
+
     private final Path root;
     private final Path directory;
     private final String mapName;
     private final String mapHash;
+    private final long mapBytes;
     private final String build;
+    private final RuntimeIdentity runtimeIdentity;
+    private final long initialSaveBytes;
+    private final String initialSaveHash;
+    private final List<RecordedPlayer> players;
     private final int localPlayer;
     private final int cyclesPerUpdate;
     private final int lag;
@@ -99,14 +160,25 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
     private volatile long lastSyncHash;
 
     private PassiveMultiplayerRecorder(Path root, Path directory, String mapName,
-            String mapHash, String build, int localPlayer, int cyclesPerUpdate, int lag,
-            Instant createdAt, World world, FileChannel activityChannel,
+            String mapHash, long mapBytes, String build, int localPlayer,
+            int cyclesPerUpdate, int lag, Instant createdAt, World world,
+            long initialSaveBytes, String initialSaveHash, FileChannel activityChannel,
             FileLock activityLock) {
         this.root = root;
         this.directory = directory;
         this.mapName = mapName;
         this.mapHash = mapHash;
+        this.mapBytes = mapBytes;
         this.build = build;
+        runtimeIdentity = RuntimeIdentity.current(build);
+        this.initialSaveBytes = initialSaveBytes;
+        this.initialSaveHash = initialSaveHash;
+        List<RecordedPlayer> roster = new ArrayList<>(world.players().length);
+        for (var player : world.players()) {
+            roster.add(new RecordedPlayer(player.index(), player.type().name(),
+                    player.race().name()));
+        }
+        players = List.copyOf(roster);
         this.localPlayer = localPlayer;
         this.cyclesPerUpdate = cyclesPerUpdate;
         this.lag = lag;
@@ -155,12 +227,14 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
             lock = channel.lock();
             Files.write(directory.resolve(MAP_FILE), mapBytes,
                     StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
-            SaveGame.write(world, mapName, null, 0, directory.resolve(SAVE_FILE));
+            Path initialSave = directory.resolve(SAVE_FILE);
+            SaveGame.write(world, mapName, null, 0, initialSave);
             PassiveMultiplayerRecorder recorder = new PassiveMultiplayerRecorder(
-                    root, directory, mapName, sha256(mapBytes), build, localPlayer,
-                    cyclesPerUpdate, lag, createdAt, world, channel, lock);
+                    root, directory, mapName, sha256(mapBytes), mapBytes.length, build,
+                    localPlayer, cyclesPerUpdate, lag, createdAt, world,
+                    Files.size(initialSave), sha256(initialSave), channel, lock);
             recorder.writeManifest("recording", null, null, 0, 0, -1,
-                    world.cycle(), SyncHash.of(world));
+                    world.cycle(), SyncHash.of(world), 0, null);
             Runtime.getRuntime().addShutdownHook(recorder.shutdownHook);
             recorder.writerThread.start();
             return recorder;
@@ -236,15 +310,23 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         long netCycle = -1;
         long worldCycle = initialWorldCycle;
         long syncHash = initialSyncHash;
+        long streamBytes = 0;
+        MessageDigest streamDigest = sha256Digest();
         try (BufferedWriter out = Files.newBufferedWriter(directory.resolve(STREAM_FILE),
                 StandardCharsets.UTF_8, StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE)) {
             while (true) {
                 Event event = pending.take();
                 if (event instanceof Cycle cycle) {
-                    out.write(cycleJson(cycle));
-                    out.newLine();
+                    String line = cycleJson(cycle);
+                    out.write(line);
+                    // The stream is a platform-independent evidence format, not a
+                    // presentation file. A literal LF makes its digest portable.
+                    out.write('\n');
                     out.flush();
+                    byte[] frame = (line + "\n").getBytes(StandardCharsets.UTF_8);
+                    streamDigest.update(frame);
+                    streamBytes += frame.length;
                     cycles++;
                     commands += cycle.commands().size();
                     netCycle = cycle.netCycle();
@@ -252,21 +334,22 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
                     syncHash = cycle.syncHash();
                     if (cycles % CHECKPOINT_INTERVAL == 0) {
                         writeManifest("recording", null, null, cycles, commands,
-                                netCycle, worldCycle, syncHash);
+                                netCycle, worldCycle, syncHash, streamBytes, null);
                     }
                     continue;
                 }
                 Stop stop = (Stop) event;
                 out.flush();
+                String streamHash = HexFormat.of().formatHex(streamDigest.digest());
                 writeManifest(stop.complete() ? "complete" : "failed", stop.finishedAt(),
                         stop.failure(), cycles, commands, stop.netCycle(), stop.worldCycle(),
-                        stop.syncHash());
+                        stop.syncHash(), streamBytes, streamHash);
                 return;
             }
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             writeFailureManifest("the recorder writer was interrupted", cycles, commands,
-                    worldCycle, syncHash);
+                    worldCycle, syncHash, streamBytes);
         } catch (IOException | RuntimeException failed) {
             writeFailureManifest(failed.getMessage(), cycles, commands, worldCycle, syncHash);
             System.err.println("multiplayer recording failed in " + directory + ": " + failed);
@@ -289,9 +372,14 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private void writeFailureManifest(String failure, long cycles, long commands,
             long worldCycle, long syncHash) {
+        writeFailureManifest(failure, cycles, commands, worldCycle, syncHash, -1);
+    }
+
+    private void writeFailureManifest(String failure, long cycles, long commands,
+            long worldCycle, long syncHash, long streamBytes) {
         try {
             writeManifest("failed", Instant.now(), failure, cycles, commands,
-                    lastNetCycle, worldCycle, syncHash);
+                    lastNetCycle, worldCycle, syncHash, streamBytes, null);
         } catch (IOException manifestFailed) {
             System.err.println("could not finish multiplayer recording manifest in "
                     + directory + ": " + manifestFailed);
@@ -300,16 +388,35 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private void writeManifest(String status, Instant finishedAt, String failure,
             long recordedCycles, long recordedCommands, long finalNetCycle,
-            long finalWorldCycle, long finalSyncHash) throws IOException {
-        StringBuilder out = new StringBuilder(1_024);
+            long finalWorldCycle, long finalSyncHash, long streamBytes,
+            String streamHash) throws IOException {
+        StringBuilder out = new StringBuilder(3_072);
         out.append("{\n");
-        out.append("  \"schema\": 1,\n");
+        out.append("  \"schema\": 2,\n");
+        out.append("  \"sync_hash_schema\": ").append(SyncHash.SCHEMA).append(",\n");
         field(out, "status", status, true);
         field(out, "created_at", createdAt.toString(), true);
         field(out, "finished_at", finishedAt == null ? null : finishedAt.toString(), true);
         field(out, "build", build, true);
+        out.append("  \"runtime\": {\"build\": ").append(quote(build))
+                .append(", \"game_jar_sha256\": ")
+                .append(quote(runtimeIdentity.gameJarSha256()))
+                .append(", \"game_jar_bytes\": ")
+                .append(runtimeIdentity.gameJarBytes() == null
+                        ? "null" : runtimeIdentity.gameJarBytes())
+                .append(", \"source_revision\": ")
+                .append(quote(runtimeIdentity.sourceRevision())).append("},\n");
         field(out, "map_name", mapName, true);
         field(out, "map_sha256", mapHash, true);
+        out.append("  \"players\": [\n");
+        for (int index = 0; index < players.size(); index++) {
+            RecordedPlayer player = players.get(index);
+            out.append("    {\"index\": ").append(player.index())
+                    .append(", \"type\": ").append(quote(player.type()))
+                    .append(", \"race\": ").append(quote(player.race())).append('}');
+            out.append(index + 1 < players.size() ? ",\n" : "\n");
+        }
+        out.append("  ],\n");
         out.append("  \"local_player\": ").append(localPlayer).append(",\n");
         out.append("  \"cycles_per_second\": ").append(World.CYCLES_PER_SECOND).append(",\n");
         out.append("  \"cycles_per_update\": ").append(cyclesPerUpdate).append(",\n");
@@ -326,9 +433,11 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         out.append("  \"final_world_cycle\": ").append(finalWorldCycle).append(",\n");
         field(out, "final_sync_hash", hash(finalSyncHash), true);
         field(out, "failure", failure, true);
-        out.append("  \"artifacts\": {\"map\": \"").append(MAP_FILE)
-                .append("\", \"initial_save\": \"").append(SAVE_FILE)
-                .append("\", \"command_stream\": \"").append(STREAM_FILE).append("\"}\n");
+        out.append("  \"artifacts\": {\n");
+        artifact(out, "map", MAP_FILE, mapBytes, mapHash, true);
+        artifact(out, "initial_save", SAVE_FILE, initialSaveBytes, initialSaveHash, true);
+        artifact(out, "command_stream", STREAM_FILE, streamBytes, streamHash, false);
+        out.append("  }\n");
         out.append("}\n");
         Path manifest = directory.resolve(MANIFEST_FILE);
         Path temporary = directory.resolve("." + MANIFEST_FILE + ".tmp");
@@ -376,6 +485,14 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private static String hash(long hash) {
         return String.format("%016x", hash);
+    }
+
+    private static void artifact(StringBuilder out, String key, String name,
+            long bytes, String sha256, boolean comma) {
+        out.append("    ").append(quote(key)).append(": {\"name\": ")
+                .append(quote(name)).append(", \"bytes\": ").append(bytes)
+                .append(", \"sha256\": ").append(quote(sha256)).append('}')
+                .append(comma ? ",\n" : "\n");
     }
 
     private static void field(StringBuilder out, String name, String value, boolean comma) {
@@ -441,8 +558,24 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
     }
 
     private static String sha256(byte[] bytes) {
+        return HexFormat.of().formatHex(sha256Digest().digest(bytes));
+    }
+
+    private static String sha256(Path path) throws IOException {
+        MessageDigest digest = sha256Digest();
+        try (var in = Files.newInputStream(path)) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = in.read(buffer)) >= 0) {
+                digest.update(buffer, 0, read);
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static MessageDigest sha256Digest() {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("this Java runtime has no SHA-256", impossible);
         }

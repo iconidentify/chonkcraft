@@ -183,6 +183,22 @@ public final class LoadGame {
         NativeSaveReader reader = new NativeSaveReader();
         stubEverything(reader);
 
+        // The PUD's UDTA profile belongs to this world. Reconstructing units
+        // from the shared catalog loses map-specific hit points and other
+        // combat fields (most visibly, an oil patch falls from BNE's live
+        // overlay value of one hit point to the catalog's zero). Resolve every
+        // identifier through the configured world before reading any record.
+        java.util.Map<String, UnitType> restoreTypes = new java.util.LinkedHashMap<>();
+        if (types != null) {
+            restoreTypes.putAll(types);
+        }
+        for (String ident : java.util.List.copyOf(restoreTypes.keySet())) {
+            UnitType profiled = world.registeredUnitType(ident);
+            if (profiled != null) {
+                restoreTypes.put(ident, profiled);
+            }
+        }
+
         int[] savedSyncSeed = new int[1];
         long[] savedSyncDraws = new long[1];
         int[] savedBattleNetSeed = new int[1];
@@ -219,7 +235,7 @@ public final class LoadGame {
             if (args.length < 3) {
                 return new Object[0];
             }
-            UnitType type = types.get(string(args[0]));
+            UnitType type = restoreTypes.get(string(args[0]));
             int player = integer(args[1]);
             int x = 0;
             int y = 0;
@@ -324,7 +340,7 @@ public final class LoadGame {
                 if (state.rawGet("aiBehavior") != null) {
                     explicitAiBehavior.add(unit);
                 }
-                applyUnitState(unit, state, types, unitsBySavedId);
+                applyUnitState(unit, state, restoreTypes, unitsBySavedId);
             }
             return new Object[0];
         });
@@ -431,7 +447,7 @@ public final class LoadGame {
 
         reader.register("RememberBuilding", args -> {
             if (args.length >= 5) {
-                UnitType type = types.get(string(args[1]));
+                UnitType type = restoreTypes.get(string(args[1]));
                 if (type != null) {
                     world.seenBuildings().remember(integer(args[0]),
                             new net.chonkbase.chonkcraft.engine.map.SeenBuildings.Memory(
@@ -487,7 +503,7 @@ public final class LoadGame {
             java.util.Map<UnitType, Integer> wanted = new java.util.LinkedHashMap<>();
             java.util.List<Object> wantedFields = wantedTable.array();
             for (int i = 0; i + 1 < wantedFields.size(); i += 2) {
-                UnitType type = types.get(string(wantedFields.get(i)));
+                UnitType type = restoreTypes.get(string(wantedFields.get(i)));
                 if (type != null) {
                     wanted.put(type, integer(wantedFields.get(i + 1)));
                 }
@@ -512,7 +528,7 @@ public final class LoadGame {
         });
         reader.register("AiPlayerNeeds", args -> {
             if (args.length >= 3) {
-                UnitType type = types.get(string(args[1]));
+                UnitType type = restoreTypes.get(string(args[1]));
                 if (type != null) {
                     world.enableAi(integer(args[0])).need(type, integer(args[2]));
                 }
@@ -521,7 +537,7 @@ public final class LoadGame {
         });
         reader.register("AiPlayerWants", args -> {
             if (args.length >= 3) {
-                UnitType type = types.get(string(args[1]));
+                UnitType type = restoreTypes.get(string(args[1]));
                 if (type != null) {
                     world.enableAi(integer(args[0]))
                             .insertUnitTypeRequest(type, integer(args[2]));

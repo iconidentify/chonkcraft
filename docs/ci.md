@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 1,182 of 2,790 tests skip and
+either way. With nothing configured, 1,184 of 2,796 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,12 +57,13 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **26 skips of 2,790**, re-measured after the BNE
+Asserts the `full` profile: **27 skips of 2,796**, re-measured after the BNE
 parity, explicit-team, multiplayer-wall, allied-vision, wood-command, team-outcome,
 mine-collapse-audio, and gryphon order-handoff coverage additions against the runner's
-authenticated retail installation. One of the twenty-six depends on which release
+authenticated retail installation. Two of the twenty-seven depend on which release
 the installation is: a source exposing the Battle.net Edition stereo video
-path sees 25, while the currently mounted classic source sees 26.
+path and three-map recording matrix sees 25, while the currently mounted classic
+source sees 27.
 `scripts/ci/check-test-skips.py` explains the release-dependent assertion.
 About nine minutes.
 
@@ -90,16 +91,16 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,182 |
-| `full` | installation, pack, Opus vectors | 26 |
+| `data-free` | none | 1,184 |
+| `full` | installation, pack, Opus vectors | 27 |
 
-The twenty-six that skip even in `full` want nothing anyone should have to
+The twenty-seven that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, four are
 fixture-sensitive, five need custom maps absent from the retail pack, three
-need private playtest saves, and the production service smoke runs only in the
-deploy workflow. One video assertion depends on which retail release is
-mounted.
+need private playtest saves, one three-map recording matrix needs a BNE pack,
+and the production service smoke runs only in the deploy workflow. One video
+assertion depends on which retail release is mounted.
 
 ## The failure gate
 

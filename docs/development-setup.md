@@ -27,6 +27,7 @@ them a day.
 - [Reading a test run: skips are not passes](#reading-a-test-run-skips-are-not-passes)
 - [Display, audio and headless](#display-audio-and-headless)
 - [Running the game](#running-the-game)
+- [Certifying a multiplayer flight record](#certifying-a-multiplayer-flight-record)
 - [Continuous integration](ci.md)
 - [Packaging](#packaging)
 - [Linux-specific risks not yet exercised](#linux-specific-risks-not-yet-exercised)
@@ -476,6 +477,39 @@ The map/window/music flags remain `-Dchonkcraft.map`, `-Dchonkcraft.window` and
 `-Dchonkcraft.music` for settings compatibility; those names do not identify a
 source-tree dependency.
 
+## Certifying a multiplayer flight record
+
+An ordinary multiplayer match keeps a bounded local recording under
+`~/.chonkcraft/recordings`. It never uploads the bundle or includes chat. To
+authenticate and deterministically replay one recording against the current
+checkout and a verified pack:
+
+```bash
+scripts/check-bne-recording.sh \
+  ~/.chonkcraft/recordings/game-YYYYMMDD-HHMMSS-map \
+  /path/to/warcraft-ii-bne.chonkpack
+```
+
+The wrapper builds the referee with the pinned JBR, validates the manifest and
+all sealed artifact hashes, reconstructs the exact player table and initial
+world, decodes every 17-byte command, and compares the synchronization hash
+after every released lockstep batch. It prints one JSON report and exits
+non-zero for an unsafe bundle, incomplete evidence identity, unsupported hash
+schema, wrong initial world, or the first replay divergence. A `complete: true`
+report requires all of these:
+
+- current schema-2 artifacts and all 16 player slots are sealed;
+- the producing game JAR is bound to an installed source revision;
+- every recorded batch replays exactly; and
+- the referee is itself bound to a verified installed release or a clean Git
+  revision. A dirty checkout remains identified by its referee JAR SHA-256 but
+  cannot issue a complete certificate.
+
+Schema-1 recordings predate those identities. The reader still authenticates
+their present map, save and stream bytes and can report a bounded exact replay
+prefix, but it labels their inferred roster `legacy-inferred-noncertifying` and
+can never turn them into current evidence.
+
 ## Continuous integration
 
 Moved to its own document: **[ci.md](ci.md)**. Both workflows, the skip gate,
@@ -485,9 +519,9 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 1,182 skips, so 1,608 tests actually run without exposing licensed
-media to public pull-request code. The authenticated lane asserts 26 skips out
-of 2,790 tests. Tests backed by retail sequences deliberately join the hosted
+It asserts 1,184 skips, so 1,612 tests actually run without exposing licensed
+media to public pull-request code. The authenticated lane asserts 27 skips out
+of 2,796 tests. Tests backed by retail sequences deliberately join the hosted
 lane's skip inventory while running on the private authenticated runner.
 
 ## Packaging

@@ -7,10 +7,23 @@ missions load and run from an authenticated ChonkPack built from original game
 media supplied by the player.
 
 Every multiplayer client passively keeps a bounded local flight record under
-`~/.chonkcraft/recordings`: the exact lobby map, cycle-zero save, accepted
-command stream, and sync hashes. It records no chat, uploads nothing, and adds
-no replay viewer; the bundle exists only to harvest a troublesome real match
-after play.
+`~/.chonkcraft/recordings`. Current schema-2 bundles seal the exact lobby map,
+cycle-zero save and accepted command stream by byte count and SHA-256, retain
+the complete 16-slot controller/race table, name the synchronization-hash
+schema, and bind an OTA-launched match to its installed game JAR and source
+revision. They record no chat, upload nothing, and add no replay viewer. The
+strict referee reconstructs the saved world from authenticated game data and
+replays every accepted batch through the ordinary command and tick boundaries.
+
+Legacy schema-1 bundles remain readable diagnostics but can never certify: they
+did not seal their artifacts or retain the player table, producing JAR, source
+revision, or synchronization-hash schema. The held-out 13-hour Forsaken Isles
+recording (282,670 network cycles, 1,413,346 world cycles and 621 commands)
+authenticates structurally, now reconstructs its initial island world exactly,
+and replays through network cycle 256 before the current referee rejects a hash
+difference at cycle 257. That bounded prefix is useful evidence, but the missing
+legacy identities prevent attributing the later difference to either its older
+`2026.0827.77` engine or current source.
 
 ## Measured Battle.net Edition parity
 
@@ -46,8 +59,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,791 tests**. The canonical authenticated
-profile runs 2,765 and intentionally skips exactly 26, while keeping the exact
+The complete suite now contains **2,796 tests**. The canonical authenticated
+profile runs 2,769 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. Hosted run `33138979370` passed
 both the data-free and authenticated jobs against revision
 `4294dcea8b284c4253ce2aac737636b66e43d2a0`.

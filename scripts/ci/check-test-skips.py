@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2791 tests,   26 skipped
-    no external input          2791 tests, 1183 skipped
+    authenticated inputs       2796 tests,   27 skipped
+    no external input          2796 tests, 1184 skipped
 
 Both can be green.
 
@@ -94,8 +94,8 @@ MODULES = (
 # Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
 # authenticated retail installation and derived pack.
 #
-# Twenty-six skip on the current `full` runner. One is release-dependent and
-# is described at the `full` profile below.
+# Twenty-seven skip on the current `full` runner. Two are release-dependent and
+# are described at the `full` profile below.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
 # PlatformFullscreenTest's six. The root pom forces -Djava.awt.headless=true
@@ -150,16 +150,17 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # campaign profiles each and likewise require the authenticated pack.
         # The periodic force-write referee adds one more pack-backed AI test.
         #
-        # production service smoke is opt-in because an ordinary suite run
+        # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1881, 857),
+        "engine": (1882, 857),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
         # gold-mine collapse sound at the post-depletion fog boundary. The
         # impossible-building-order and paid-training-food referees are also
-        # pack-backed, so both deliberately skip in this profile.
-        "desktop": (351, 267),
+        # pack-backed, so both deliberately skip in this profile. The three-map
+        # BNE recording matrix likewise skips without its authenticated pack.
+        "desktop": (355, 268),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -173,23 +174,24 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # CI jobs install them; see .github/workflows/tests.yml.
     #
     # Re-measured 24 August 2026 against the authenticated retail installation
-    # and its derived pack. The twenty-six that skip are: five
+    # and its derived pack. The twenty-seven that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
     # tests in runtime and desktop, four fixture-sensitive checks, five custom-
     # map referees whose maps are absent from the retail pack, three private
-    # playtest-save referees, one opt-in production multiplayer smoke, and one
-    # release-dependent test described below.
+    # playtest-save referees, one three-map recorder referee needing a BNE pack,
+    # one opt-in production multiplayer smoke, and one release-dependent test.
     #
-    # ONE OF THE TWENTY-SIX DEPENDS ON WHICH RELEASE THE INSTALLATION IS, and it
-    # is the reason to read this note before believing a red gate.
+    # TWO OF THE TWENTY-SEVEN DEPEND ON WHICH RELEASE THE INSTALLATION IS, and
+    # are the reason to read this note before believing a red gate.
     # SmackerVideoTest.battleNetStereoAudioUsesTheRightByteOrder asks
     # `videos.source().isBattleNetEdition()` and skips on anything else. This
     # baseline is measured on the mounted classic source, so that test skips. A
-    # Battle.net Edition source runs it and reports one fewer skip.
-    # That is a correct release-dependent difference, not a regression. Nothing here can tell
-    # the two apart, because the profile is a pair of numbers per module and
-    # the release is not an input the profile knows about.
+    # Battle.net Edition source runs it. The three-map recording matrix also
+    # runs only when that source carries its BNE maps, for two fewer skips in
+    # total. Those are correct release-dependent differences, not regressions.
+    # Nothing here can tell the sources apart, because the profile is only a
+    # pair of numbers per module and the release is not an input it knows about.
     "full": {
         "assetpack": (256, 5),
         "runtime": (99, 3),
@@ -201,8 +203,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1881, 7),
-        "desktop": (351, 7),
+        "engine": (1882, 7),
+        # The classic hosted pack cannot run the explicit three-BNE-map
+        # recording matrix, so that proof is a deliberate additional skip.
+        "desktop": (355, 8),
         "matchmaker-server": (5, 1),
     },
 }

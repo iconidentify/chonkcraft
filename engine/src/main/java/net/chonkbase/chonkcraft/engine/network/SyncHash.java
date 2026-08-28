@@ -23,6 +23,15 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
  */
 public final class SyncHash {
 
+    /**
+     * Identity of the exact state projection and mixing order used by {@link #of}.
+     *
+     * <p>Increment this whenever a field, ordering rule, encoding, or mixing
+     * operation changes. Persisted hashes without this identity are useful for
+     * diagnostics, but cannot prove an exact replay under a later engine.
+     */
+    public static final int SCHEMA = 1;
+
     private SyncHash() {
     }
 

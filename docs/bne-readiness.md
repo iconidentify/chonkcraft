@@ -784,6 +784,9 @@ Implementation:
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/NetworkSession.java`
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/SyncHash.java`
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/network/MultiplayerOutcome.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/PassiveMultiplayerRecorder.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/MultiplayerRecording.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/BneRecordingCertification.java`
 - `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/LobbyScreen.java`
 - `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameScreen.java`
 
@@ -794,6 +797,8 @@ Automated checks:
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/LobbyScreenTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/LobbyMapSetupTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/MultiplayerGameOverTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PassiveMultiplayerRecorderTest.java`
+- `scripts/check-bne-recording.sh`
 - `scripts/check-bne-network-gate.sh`
 
 Retail evidence:
@@ -803,6 +808,7 @@ Retail evidence:
 - A deterministic adverse-link referee really drops, delays, duplicates and reorders traffic in both directions; independent peers recover through resend, converge on the same 1,800-cycle prefix and retain equal hashes.
 - The host can assign every occupied human or computer slot to Team 1–8 independently of colour; the committed roster drives symmetric alliance/shared-sight tables and the retail AI attachment on both peers.
 - The synchronized BNE opponent census counts a half-built structure as a surviving real unit, decides victory only after every hostile team is empty, and decides defeat only after the local player's entire alliance is empty. The desktop presents Quit Game and a non-destructive Keep Playing path.
+- Current passive recordings seal their map, initial save, accepted command stream, complete player table, synchronization-hash schema and producing runtime identity. The strict referee reconstructs and exactly replays independent land, island and ladder BNE cases, including a live computer opponent, while corruption, an unknown hash schema and a wrong starting world all fail closed.
 
 Known blockers:
 
