@@ -648,12 +648,11 @@ public final class SaveGame {
         state.append(" progress = ").append(unit.progress()).append(",");
         state.append(" progressGoal = ").append(unit.progressGoal()).append(",");
         state.append(" wait = ").append(unit.waitCycles()).append(",");
-        // Training, research, upgrades, construction and several movement
-        // orders keep their work marker for one cycle after committing the
-        // result.  The live unit's Finished latch is what makes that following
-        // cycle retire the marker instead of applying the result a second
-        // time.  A save at that boundary must carry the latch along with the
-        // newborn unit, completed upgrade, or finished construction state.
+        // Research, upgrades, construction and several movement orders keep
+        // their work marker for one cycle after committing the result. The
+        // live unit's Finished latch makes the following cycle retire that
+        // marker instead of applying the result twice. Schema-2 readers also
+        // accept older training saves that exposed the same boundary.
         if (unit.orderFinished()) {
             state.append(" orderFinished = true,");
         }

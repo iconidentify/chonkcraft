@@ -93,8 +93,8 @@ class BattleNetTrainWorkerTest {
     }
 
     @Test
-    @DisplayName("a computer hall spends four hundred gold after its action-33 train counter exceeds two")
-    void aComputerHallSpendsFourHundredGoldAfterItsAction33TrainCounterExceedsTwo() {
+    @DisplayName("a computer hall spends four hundred gold on its third counted action-33 pulse")
+    void aComputerHallSpendsFourHundredGoldOnItsThirdCountedAction33Pulse() {
         World world = new World(grass(24));
         world.setTrainers(Map.of("unit-peon", Set.of("unit-great-hall")));
         world.player(0).setType(net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER);
@@ -113,15 +113,14 @@ class BattleNetTrainWorkerTest {
         world.recalculateSupply();
         world.enableAi(0);
 
-        // Four Still OP0s with limit 2: counters 0,1,2 then train on the fourth
-        // (old counter 3 > 2). Without script.bin the approximation uses timer 5
-        // between OP0s after the first, so advance until the hall produces.
+        // The opening constructor marker does not touch unit+0x6e. The next
+        // three action-33 pulses record 1, 2, reset and start the peon.
         int guard = 0;
         while (hall.producing() == null && guard++ < 40) {
             world.tick();
         }
         assertNotNull(hall.producing(),
-                "the hall starts a peon train after its action-33 counter exceeds 2");
+                "the hall starts a peon train on its third counted pulse");
         assertEquals("unit-peon", hall.producing().ident(),
                 "the paid job is a peon");
         assertEquals(600, world.player(0).get(UnitType.Resource.GOLD),

@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 class BattleNetTrainDurationTest {
 
     @Test
-    @DisplayName("a forty-five-time worker exits 468 cycles after payment")
+    @DisplayName("a forty-five-time worker exits and retires its job after 468 cycles")
     void aFortyFiveTimeWorkerUsesTheNativePaymentToDropoutClock() {
         World world = new World(grass(24));
         UnitType hallType = hall("unit-great-hall");
@@ -52,6 +52,16 @@ class BattleNetTrainDurationTest {
                 "sealed Human 4, Orc 4, and XOrc 4 recordings all keep the "
                         + "paid worker inside for eighteen cycles longer than "
                         + "the old 450-cycle animation loop");
+        assertTrue(hall.producing() == null,
+                "native retires action 37 in the worker's birth cycle");
+        assertFalse(hall.orderFinished(),
+                "the completed train latch must not leak past the birth cycle");
+        assertEquals(0, hall.battleNetAiTrainCounter(),
+                "the returning action-33 producer clears unit+0x6e");
+        assertEquals(1, hall.battleNetIdlePhase(),
+                "a returning hall resumes the ordinary action-33 loop");
+        assertEquals(3, hall.battleNetAnimationTimer(),
+                "all sealed action-37 returns arm the three-count constructor wait");
     }
 
     @Test

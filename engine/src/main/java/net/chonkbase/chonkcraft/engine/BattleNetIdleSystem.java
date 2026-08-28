@@ -1073,10 +1073,11 @@ final class BattleNetIdleSystem {
      *
      * <p>Native action 33 ({@code 0x418bb0}) increments unit+0x6e each Still
      * OP0; when the previous value exceeds the per-type limit the building
-     * calls its train function. Halls use limit 2 (fourth OP0, peon). Barracks
-     * use limit 1 (third OP0, footman/grunt). Cadence: constructor pair +
-     * WAIT 4. Freeze during the two unrecorded init ticks so the train OP0
-     * lands on fixture world.cycle 12 for buildings that begin on action 33.
+     * calls its train function. The first great-hall constructor marker is
+     * not an action-33 pulse: the sealed unit record keeps +0x6e at zero
+     * there, then records 1, 2, reset on the three WAIT-4 pulses. Freeze
+     * during the two unrecorded init ticks so the train OP0 lands on fixture
+     * world.cycle 12 for buildings that begin on action 33.
      */
     void stepBattleNetHallStill(Unit hall) {
         Player owner = world.player(hall.player());
@@ -1152,15 +1153,17 @@ final class BattleNetIdleSystem {
         if (timer > 0) {
             return;
         }
-        if (computer) {
+        int phase = hall.battleNetIdlePhase();
+        boolean openingHallConstructor = !World.battleNetIsLimit1Trainer(hall)
+                && phase == 0;
+        if (computer && !openingHallConstructor) {
             battleNetBuildingTrainPulse(hall);
         }
-        int phase = hall.battleNetIdlePhase();
         hall.setBattleNetIdlePhase(phase + 1);
-        // Halls that begin Still on action 33 still run the constructor pair
-        // (timer 1 then WAIT 4) so the fourth OP0 lands on fixture world.cycle 12
-        // for peon trains. Barracks/shipyards already on action 33 in the
-        // sealed openings only OP0 every WAIT 4 (native 1520: c2, c7, c12).
+        // Halls that begin Still on action 33 run the constructor pair, but
+        // phase zero above does not increment the action-33 counter. The next
+        // marker and its WAIT-4 repeats are the native c2/c7/c12 pulses.
+        // Barracks/shipyards already on action 33 only use the WAIT-4 cadence.
         if (World.battleNetIsLimit1Trainer(hall) || phase >= 1) {
             hall.setBattleNetAnimationTimer(5);
         } else {
@@ -1190,21 +1193,13 @@ final class BattleNetIdleSystem {
         int pudType = PudUnitTypes.code(building.type().ident());
         int limit;
         if (!ai.battleNetAction33TableLoaded()) {
-            // Unit tests without entry-277 word1: closed class constants.
-            limit = World.battleNetIsLimit1Trainer(building) ? 1 : 2;
+            // Unit tests without entry-277 word1 use the ordinary third-pulse
+            // threshold shared by the authenticated hall and barracks cases.
+            limit = 1;
         } else {
             limit = ai.battleNetAction33Limit(pudType);
             if (limit == 0xffff) {
                 return;
-            }
-            // Hall peon train_fn refuses early tops on several human-campaign
-            // personalities that still encode table limit 1 (profile 3). Until
-            // that refuse is modeled, keep the closed hall limit 2 so the
-            // fourth OP0 (fixture ~c12) remains the first peon debit. Table
-            // limits of 100+ (XHuman 10 p2 profile 67) still suppress trains.
-            if (!World.battleNetIsLimit1Trainer(building) && !World.battleNetIsBlacksmith(building)
-                    && limit < 2) {
-                limit = 2;
             }
         }
         int old = building.battleNetAiTrainCounter();

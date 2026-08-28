@@ -1107,8 +1107,8 @@ class SaveGameTest {
     }
 
     @Test
-    @DisplayName("a completed trainee is not born twice across save and resume")
-    void aCompletedTraineeIsNotBornTwiceAcrossSaveAndResume() throws IOException {
+    @DisplayName("an atomically retired trainee stays unique across save and resume")
+    void anAtomicallyRetiredTraineeStaysUniqueAcrossSaveAndResume() throws IOException {
         List<TrainingBoundary> boundaries = List.of(
                 new TrainingBoundary("land infantry", "unit-human-barracks",
                         "unit-footman", TileFlag.LAND_ALLOWED, 1),
@@ -1130,13 +1130,15 @@ class SaveGameTest {
             assertTrue(world.orderTrain(producer, trainee),
                     boundary.label() + " could not start training");
 
-            for (int guard = 0; guard < 20_000 && !producer.orderFinished(); guard++) {
+            for (int guard = 0; guard < 20_000
+                    && (producer.producing() != null
+                            || aliveUnits(world, boundary.trainee()).isEmpty()); guard++) {
                 world.tick();
             }
-            assertTrue(producer.orderFinished(),
-                    boundary.label() + " never reached the completion boundary");
-            assertNotNull(producer.producing(),
-                    boundary.label() + " did not retain its one-cycle job marker");
+            assertFalse(producer.orderFinished(),
+                    boundary.label() + " leaked its completed-job latch");
+            assertTrue(producer.producing() == null,
+                    boundary.label() + " did not retire its job atomically");
             List<Unit> born = aliveUnits(world, boundary.trainee());
             assertEquals(1, born.size(), boundary.label() + " was not born exactly once");
             Unit original = born.get(0);
@@ -1147,20 +1149,18 @@ class SaveGameTest {
             Unit loadedTrainee = find(reloaded, boundary.trainee());
             assertEquals(original.id(), loadedTrainee.id(),
                     boundary.label() + " lost its saved identity");
-            assertTrue(loadedProducer.orderFinished(),
-                    boundary.label() + " lost the completed-job latch");
+            assertFalse(loadedProducer.orderFinished(),
+                    boundary.label() + " reloaded a stale completed-job latch");
+            assertTrue(loadedProducer.producing() == null,
+                    boundary.label() + " reloaded a retired training job");
 
-            for (int guard = 0; guard < 100 && loadedProducer.producing() != null; guard++) {
+            for (int guard = 0; guard < 20; guard++) {
                 reloaded.tick();
                 assertEquals(1, aliveUnits(reloaded, boundary.trainee()).size(),
-                        boundary.label() + " was duplicated while retiring the saved job");
+                        boundary.label() + " was duplicated after reloading the retired job");
             }
             assertEquals(1, aliveUnits(reloaded, boundary.trainee()).size(),
                     boundary.label() + " was duplicated after resume");
-            assertFalse(loadedProducer.orderFinished(),
-                    boundary.label() + " did not consume the completion latch");
-            assertTrue(loadedProducer.producing() == null,
-                    boundary.label() + " did not clear the completed job");
             assertEquals(originalDemand, reloaded.player(0).demand(),
                     boundary.label() + " debited demand more than once");
             assertEquals(0, loadedTrainee.tileX() % boundary.movementStride(),

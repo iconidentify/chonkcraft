@@ -1997,9 +1997,11 @@ h12 50→51.
 
 **Closed this pass (barracks -600 — action-33 limit 1 + profile arm):**
 
-Native action 33 (`0x418bb0`) increments unit+0x6e each Still OP0 and calls
-the type's train_fn when `old > limit`. Halls use limit 2 (peon). Barracks
-use limit 1 (third OP0) and train_fn `0x40eb70` for footman/grunt (600 gold).
+Native action 33 (`0x418bb0`) increments unit+0x6e each counted Still OP0 and
+calls the type's train_fn when `old > limit`. Barracks use limit 1 (third OP0)
+and train_fn `0x40eb70` for footman/grunt (600 gold). A later full-corpus raw
+state audit established that active hall worker profiles also train with
+`old=2`; the opening great-hall constructor marker is not a counted pulse.
 PUD UNIT.Data non-zero is required (Human 13 data 0 never spends). AI soldier
 want (AIPlayerState+0x14) is the spend gate inside train_fn; sealed corpus
 only debits at cycle 12 for personalities **40** (XOrc 11 p6) and **44**
@@ -2041,15 +2043,16 @@ oil patch, (3) closest any platform, else RNG. Focused regression
 
 Native `0x439000` has no cycle gate; it only enforces reserved-train quota
 `(workers-1)/2+1`. Ready-worker calls it to reserve a slot, not to debit gold.
-The paid peon train starts from computer **great-hall / stronghold / fortress**
-action 33 (`0x418bb0`): each Still OP0 increments unit+0x6e; when the previous
-value exceeds limit 2 the hall starts the train and resets. Human 8 p3 raw:
-OP0s ~c1,c2,c7,c12 with WAIT 4 after the constructor pair. Implementation:
-`World.stepBattleNetHallStill` (constructor pair + WAIT 4, freeze during the
-two unrecorded init ticks) + `battleNetHallTrainPulse`. Town-hall line is
-excluded (Human 5 / Human 8 p2 never auto-debit peasants early). Removed the
-end-of-tick train pulse and ready-path `orderTrain` spend. Closed Human 8/10/13
-and the peon bank class at h12; h12 45→46.
+The paid peon train starts from computer hall action 33 (`0x418bb0`), covering
+both race lines. The opening great-hall constructor marker leaves unit+0x6e at
+zero; the counted c2/c7/c12 pulses record 1, 2, reset for an active limit-1
+profile. A full 52-campaign state audit found 98 paid hall orders: every
+ordinary train began with the previous counter at 2, while suppressed
+limit-100 profiles began with 101. It also found 64/64 action-37 returns with
+counter 0, animation timer 3 and sequence 4982 in the trainee's birth cycle.
+`BattleNetIdleSystem.stepBattleNetHallStill` now preserves that constructor
+and return state instead of compensating with an unrecorded pulse. The
+end-of-tick global train pulse and ready-path `orderTrain` spend remain absent.
 
 **Closed this pass (Orc 10 @12 — 1510/1513 coast free-empty stretch):**
 

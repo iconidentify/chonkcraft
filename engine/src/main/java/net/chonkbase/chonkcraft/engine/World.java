@@ -9209,6 +9209,14 @@ public final class World {
         if (building.producing() == null) {
             return false;
         }
+        // Native action 37 retires the completed job in the same recorded
+        // cycle that the trainee appears. A schema-2 save can still contain
+        // the older one-cycle latch, so consume that state before advancing
+        // the Train animation as well.
+        if (building.orderFinished()) {
+            retireCompletedTraining(building);
+            return true;
+        }
         if (building.battleNetOrderDelay() > 0) {
             // The paid order is already visibly training during construction;
             // only its progress counter is held. Action 37 then selects its
@@ -9238,35 +9246,12 @@ public final class World {
         if (registered != null) {
             what = registered;
         }
-        // The completing cycle still reads as training: upstream's order
-        // spawns the unit and is only Finished, popping to Still on the
-        // next cycle's advance -- level08h's great hall shows train at 272,
-        // the very cycle its peon steps out, and still from 273.
-        if (building.orderFinished()) {
-            building.setOrderFinished(false);
-            building.setProducing(null);
-            building.setProgress(0);
-            UnitType next = building.pollTraining();
-            if (next != null) {
-                startTraining(building, next);
-            } else if (battleNetBuildingCanAction33Train(building)) {
-                // Returning from native action 37 constructs a fresh action-33
-                // Still body with its adjacent constructor markers. Carrying
-                // the pre-train phase/timer instead made every hall wait the
-                // full ordinary loop and put the next worker debit twelve
-                // cycles late in Human 4, Orc 4, and XOrc 4.
-                building.setBattleNetIdlePhase(0);
-                building.setBattleNetAnimationTimer(1);
-            }
-            return true;
-        }
         int[] spot = trainedUnitDropout(what, building);
         if (spot == null) {
             // Nowhere to put it; hold at full progress and try again next
             // cycle, which is what the game does when a base is walled in.
             return true;
         }
-        building.setOrderFinished(true);
         Unit trained = createUnit(what, building.player(), spot[0], spot[1]);
         if (trained != null) {
             // AiTrainingComplete -> AiRemoveFromBuilt:
@@ -9289,8 +9274,30 @@ public final class World {
             // wins outright. No shipped AI sets a rally point, so the
             // difference waits for a person to rally a scout factory.
             fireOnReady(trained);
+            building.setOrderFinished(true);
+            retireCompletedTraining(building);
         }
         return true;
+    }
+
+    /** Retires one committed training job and restores native producer state. */
+    private void retireCompletedTraining(Unit building) {
+        building.setOrderFinished(false);
+        building.setProducing(null);
+        building.setProgress(0);
+        UnitType next = building.pollTraining();
+        if (next != null) {
+            startTraining(building, next);
+        } else if (battleNetBuildingCanAction33Train(building)) {
+            // Every authenticated action-37 -> action-33 transition in the
+            // 52-campaign corpus (64/64) records +0x6e=0, timer=3 and the
+            // action-33 constructor sequence in the trainee's birth cycle.
+            // Phase one means the next marker is an ordinary WAIT-4 pulse,
+            // not the opening great-hall constructor marker.
+            building.setBattleNetAiTrainCounter(0);
+            building.setBattleNetIdlePhase(1);
+            building.setBattleNetAnimationTimer(3);
+        }
     }
 
     /** Selects the west-side birth square for a unit whose training completed. */
