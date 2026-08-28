@@ -65,6 +65,35 @@ PROGRAM_INPUT_PATHS = (
     "scripts/jbr",
 )
 
+# GameCommand is ChonkCraft's deterministic multiplayer envelope.  Retail's
+# physical UI records the smaller replay command that fed GiveOrder instead.
+# These are different transport formats, so certification decodes each one
+# and compares the authenticated GiveOrder fields they have in common.  Keep
+# this tuple in the exact ordinal order of GameCommand.Kind.
+JAVA_WIRE_FAMILIES = (
+    "none", "move", "attack", "stop", "harvest", "build", "train",
+    "research", "cast", "patrol", "repair", "explore", "return-goods",
+    "stand-ground", "attack-ground", "unload", "unload-one", "board",
+    "ping", "quit", "autocast", "follow", "upgrade-to", "cancel-train",
+    "cancel-research", "cancel-upgrade-to", "cancel-build", "rally-point",
+    "dismiss", "attack-move", "defend",
+)
+
+# 0x00475f80 consumes retail's eight-byte 0x13 command as x, y, target slot,
+# then an ORDER_FUNCTIONS index.  These indices are independently grounded by
+# the pinned replay corpus and the native tracer's GiveOrder hook.
+BNE_GIVE_ORDER_FUNCTIONS = {
+    "stop": 2,
+    "move": 3,
+    "patrol": 5,
+    "attack": 8,
+    "attack-move": 8,
+    "attack-ground": 17,
+    "harvest": 23,
+    "return-goods": 24,
+    "repair": 27,
+}
+
 
 def _canonical_family(value: str | None) -> str:
     return str(value or "unknown").strip().lower().replace("_", "-")
@@ -893,9 +922,116 @@ def _stable_unit(index: dict[tuple[int, int], str], local_id: object,
     return stable
 
 
+def _wire_bytes(command: dict[str, Any]) -> bytes:
+    value = command.get("wire_hex")
+    if not _valid_wire_hex(value):
+        raise ValueError("wire is not non-empty even-length hexadecimal")
+    return bytes.fromhex(str(value))
+
+
+def _wire_target_identity(index: dict[tuple[int, int], str],
+        local_id: int | None, generation: object, *, required: bool) \
+        -> str | None:
+    if local_id is None:
+        return None
+    return _stable_unit(index, local_id, generation, required=required)
+
+
+def _give_order_wire(command: dict[str, Any],
+        identities: dict[tuple[int, int], str], *, side: str,
+        require_stable: bool) -> dict[str, Any]:
+    """Decode and validate one producer wire into retail GiveOrder fields.
+
+    Native receipts retain the exact eight-byte 0x13 replay command.  Java
+    receipts retain the exact 17-byte GameCommand lockstep envelope.  Raw byte
+    equality between those protocols is meaningless; equality of the decoded
+    family, destination, target lifetime and native function index is the
+    physical-command contract.  Every redundant field is checked before the
+    normalized value is returned, so normalization cannot hide a malformed or
+    semantically different wire.
+    """
+    wire = _wire_bytes(command)
+    recorded_family = _canonical_family(command.get("family"))
+    expected_function = BNE_GIVE_ORDER_FUNCTIONS.get(recorded_family)
+
+    if side == "native":
+        if expected_function is None:
+            return {"protocol": "native", "wire_hex": wire.hex()}
+        if len(wire) != 8 or wire[0] != 0x13:
+            raise ValueError(
+                f"native {recorded_family} wire is not an eight-byte 0x13 command")
+        x = int.from_bytes(wire[1:3], "little", signed=True)
+        y = int.from_bytes(wire[3:5], "little", signed=True)
+        raw_target = int.from_bytes(wire[5:7], "little")
+        target_id = None if raw_target == 0xffff else raw_target
+        function = wire[7]
+        decoded_family = (
+            "attack" if function == 8 and target_id is not None
+            else "attack-move" if function == 8
+            else next((family for family, index in BNE_GIVE_ORDER_FUNCTIONS.items()
+                       if index == function and family != "attack-move"), None)
+        )
+        if decoded_family != recorded_family:
+            raise ValueError(
+                f"native wire decodes as {decoded_family!r}, not {recorded_family!r}")
+        recorded_target = command.get("target_id")
+        if recorded_target is not None:
+            recorded_target = int(recorded_target)
+        if (x, y, target_id) != (
+                int(command.get("x")), int(command.get("y")), recorded_target):
+            raise ValueError("native wire fields disagree with the observed GiveOrder")
+        if function != expected_function:
+            raise ValueError("native wire has the wrong GiveOrder function index")
+        target_generation = command.get("target_generation")
+    elif side == "java":
+        if len(wire) != 17:
+            raise ValueError("Java wire is not a 17-byte GameCommand")
+        kind = wire[0]
+        if kind >= len(JAVA_WIRE_FAMILIES):
+            raise ValueError(f"Java wire has unknown command kind {kind}")
+        decoded_family = JAVA_WIRE_FAMILIES[kind]
+        player = wire[1]
+        unit_id = int.from_bytes(wire[2:6], "big", signed=True)
+        x = int.from_bytes(wire[6:8], "big", signed=True)
+        y = int.from_bytes(wire[8:10], "big", signed=True)
+        raw_target = int.from_bytes(wire[10:14], "big", signed=True)
+        target_id = None if raw_target == 0 else raw_target
+        type_index = int.from_bytes(wire[14:16], "big", signed=True)
+        if wire[16] not in (0, 1):
+            raise ValueError("Java wire has a non-boolean queued byte")
+        queued = wire[16] == 1
+        recorded_target = command.get("target_id")
+        recorded_target = None if recorded_target in (None, 0) \
+            else int(recorded_target)
+        if decoded_family != recorded_family:
+            raise ValueError(
+                f"Java wire decodes as {decoded_family!r}, not {recorded_family!r}")
+        if (player, unit_id, x, y, target_id, type_index, queued) != (
+                int(command.get("player")), int(command.get("unit_id")),
+                int(command.get("x")), int(command.get("y")), recorded_target,
+                int(command.get("type_index")), bool(command.get("queued"))):
+            raise ValueError("Java wire fields disagree with the journaled command")
+        if expected_function is None:
+            return {"protocol": "java-lockstep", "wire_hex": wire.hex()}
+        function = expected_function
+        target_generation = command.get("target_generation")
+    else:
+        return {"protocol": str(side or "unknown"), "wire_hex": wire.hex()}
+
+    return {
+        "protocol": "bne-give-order-0x13",
+        "family": recorded_family,
+        "function_index": function,
+        "x": x,
+        "y": y,
+        "target_identity": _wire_target_identity(
+            identities, target_id, target_generation, required=require_stable),
+    }
+
+
 def canonical_transaction(transaction: dict[str, Any],
         identities: dict[tuple[int, int], str] | None = None,
-        *, require_stable: bool = False) -> dict[str, Any]:
+        *, require_stable: bool = False, side: str | None = None) -> dict[str, Any]:
     """Retain ordering and behavior, optionally replacing all allocator ids."""
     index = identities or {}
     gesture = transaction.get("gesture")
@@ -923,8 +1059,13 @@ def canonical_transaction(transaction: dict[str, Any],
     for command in transaction.get("commands") or ():
         row = {key: command.get(key) for key in (
             "fanout_ordinal", "family", "player", "x", "y", "type_index",
-            "queued", "wire_hex", "accepted", "feedback",
+            "queued", "accepted", "feedback",
         )}
+        if side is None:
+            row["wire_hex"] = command.get("wire_hex")
+        else:
+            row["wire"] = _give_order_wire(
+                command, index, side=side, require_stable=require_stable)
         row["unit_identity"] = _stable_unit(
             index, command.get("unit_id"), command.get("unit_generation"),
             required=require_stable)
@@ -1035,9 +1176,20 @@ def _receipt_errors(receipt: dict[str, Any], *, expected_side: str | None = None
                 and program != current_java_program_input_sha256:
             errors.append("Java receipt was not produced by current program inputs")
     try:
-        _unit_identity_index(receipt)
+        identities = _unit_identity_index(receipt)
     except ValueError as error:
         errors.append(str(error))
+        identities = {}
+    if side in {"native", "java"}:
+        for transaction in receipt.get("transactions") or ():
+            for command in transaction.get("commands") or ():
+                try:
+                    _give_order_wire(
+                        command, identities, side=side, require_stable=True)
+                except (TypeError, ValueError) as error:
+                    errors.append(
+                        f"transaction {transaction.get('transaction_id')} "
+                        f"command {command.get('intent_id')} wire contract: {error}")
     return errors
 
 
@@ -1119,12 +1271,18 @@ def first_difference(left: dict[str, Any], right: dict[str, Any]) \
         -> dict[str, Any] | None:
     left_rows = left.get("transactions") or []
     right_rows = right.get("transactions") or []
+    left_identities = _unit_identity_index(left)
+    right_identities = _unit_identity_index(right)
+    left_side = (left.get("authority") or {}).get("side")
+    right_side = (right.get("authority") or {}).get("side")
     for index in range(max(len(left_rows), len(right_rows))):
         if index >= len(left_rows) or index >= len(right_rows):
             return {"transaction": index, "field": "transaction-count",
                     "left": len(left_rows), "right": len(right_rows)}
-        a = canonical_transaction(left_rows[index])
-        b = canonical_transaction(right_rows[index])
+        a = canonical_transaction(
+            left_rows[index], left_identities, side=left_side)
+        b = canonical_transaction(
+            right_rows[index], right_identities, side=right_side)
         if a != b:
             for field in (
                     "gesture", "decision", "feedback", "selection_updates",
@@ -1727,7 +1885,8 @@ def coverage(receipts: list[dict[str, Any]], requirements: dict[str, Any], *,
         identities = _unit_identity_index(receipt)
         try:
             canonical = canonical_transaction(
-                transaction, identities, require_stable=True)
+                transaction, identities, require_stable=True,
+                side=(receipt.get("authority") or {}).get("side"))
         except ValueError as error:
             identity_debt.append({
                 "receipt_sha256": receipt["receipt_sha256"],
@@ -1839,7 +1998,8 @@ def certify(native: dict[str, Any] | list[dict[str, Any]],
                     continue
                 try:
                     canonical = canonical_transaction(
-                        transaction, identities, require_stable=True)
+                        transaction, identities, require_stable=True,
+                        side=side)
                 except ValueError:
                     continue
                 result.setdefault(cell_id, []).append({

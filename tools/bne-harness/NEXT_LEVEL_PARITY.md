@@ -93,6 +93,17 @@ requires authenticated native and Java receipts joined by the same sealed
 scenario and compares the transaction from physical gesture through terminal
 result.
 
+The two producers deliberately retain their actual transport bytes: retail's
+eight-byte replay/GiveOrder command and ChonkCraft's 17-byte deterministic
+`GameCommand` envelope. Certification does not compare those unrelated
+envelopes as opaque strings. It decodes both, rejects any disagreement between
+the bytes and the journaled family/player/unit/destination/target/type/queue
+fields, resolves target lifetimes, and compares the shared authenticated
+GiveOrder contract. The current decoder covers every replay-grounded `0x13`
+family (move, stop, patrol, attack/attack-move, attack-ground, harvest,
+return-goods and repair); unsupported packet families remain producer-specific
+and therefore cannot become exact accidentally.
+
 Build, train, research and building-upgrade refusals remain first-class cells.
 The latter three are pre-wire UI decisions, so the manifest also carries a
 blocking hook debt until Java and native emit the refused family, queue mode,
@@ -143,7 +154,8 @@ the next leftover on the same visit. Native `0x44fab0` fails when
 to pay PF_WAIT 10 there, which is why the Human 1 walk sat 27 cycles on
 `23,13` and the second footman sat 27 on `19,12`. Both physical twins now
 keep the 16-cycle leftover through those tiles (`137->153` and `76->92`).
-The held-out walk to `(25,12)` still settles at 121. Native first takes
+The shared held-out walk to `(25,12)` settles at cycle 137 on both sides.
+Native first takes
 damage at 281 (`26,22`, 53 hp). Later HP and Still-after-progress
 settlement remain open; they are not this leftover timer.
 
@@ -182,9 +194,14 @@ offer used to make that OP0 chase onto 25,27. After leftover spent and
 the Attack 2562 wait expires, `0x437c80` dest-arms the first leftover
 the same visit `0x44fbd0` answers: native 1591 dest-arms 26,22 at 321
 and 25,27 at 401. Java rebuilt path=2 at 321 and dest-armed at 322
-because the swing-end visit skipped `DoActionMove`. Certification stays
-0/532 paired -- the shared cell is not exact (0x13 wire vs lockstep
-bytes). The leftover-27 walk is closed.
+because the swing-end visit skipped `DoActionMove`. Current-source Java twins
+now make the size-1 field/plain/open-ground/move cell exact across the sealed
+`(25,12)` and `(25,28)` scenarios, so semantic pairing is **1/532**. The
+independent two-wide held-out keeps the next cell red: its second footman
+settles at 479 rather than native 477. The first coarse route difference is
+cycle 173 (Java column 25 versus native column 26) and later reconverges; it is
+retained as movement/pathfinding debt rather than hidden by wire normalization
+or a one-map timing special case. The leftover-27 walk is closed.
 
 Pair receipts only after the Java side emits the same lossless event contract:
 

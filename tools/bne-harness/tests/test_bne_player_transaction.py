@@ -53,6 +53,20 @@ def production_requirements() -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def move_wire(side: str, unit_id: int) -> str:
+    if side == "native":
+        # Retail 0x13: x=12, y=13, no target, GiveOrder function 3.
+        return "130c000d00ffff03"
+    return bytes((1, 0)).hex() + (
+        unit_id.to_bytes(4, "big", signed=True)
+        + (12).to_bytes(2, "big", signed=True)
+        + (13).to_bytes(2, "big", signed=True)
+        + (0).to_bytes(4, "big", signed=True)
+        + (0).to_bytes(2, "big", signed=True)
+        + bytes((1,))
+    ).hex()
+
+
 def native_manifest(payload: bytes) -> tuple[dict, dict]:
     closure = {
         "oracle_executable": transaction.PINNED_BNE_EXECUTABLE_SHA256,
@@ -137,10 +151,10 @@ def evidence(*, gesture: bool = True, terminal: bool = True,
                 "unit_id": unit_id,
                 "x": 12,
                 "y": 13,
-                "target_id": 0,
+                "target_id": None if side == "native" else 0,
                 "type_index": 0,
                 "queued": True,
-                "wire_hex": "0100",
+                "wire_hex": move_wire(side, unit_id),
             },
         })
     outcomes = []
@@ -277,6 +291,49 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertFalse(report["complete"])
         self.assertEqual(["acknowledgement"], report["missing"]["layers"])
         self.assertEqual(0, report["layer_counts"]["acknowledgement"])
+
+    def test_native_and_java_wires_share_a_validated_give_order_contract(self):
+        native = transaction.compile_evidence(
+            evidence(second_unit=False, side="native"), source="native")
+        java = transaction.compile_evidence(
+            evidence(second_unit=False, side="java"), source="java")
+        native_command = native["transactions"][0]["commands"][0]
+        java_command = java["transactions"][0]["commands"][0]
+        self.assertNotEqual(native_command["wire_hex"], java_command["wire_hex"],
+                            "the producer transports must remain distinct")
+        native_canonical = transaction.canonical_transaction(
+            native["transactions"][0], transaction._unit_identity_index(native),
+            require_stable=True, side="native")
+        java_canonical = transaction.canonical_transaction(
+            java["transactions"][0], transaction._unit_identity_index(java),
+            require_stable=True, side="java")
+        self.assertEqual(native_canonical, java_canonical)
+        self.assertEqual(
+            "bne-give-order-0x13",
+            native_canonical["commands"][0]["wire"]["protocol"])
+
+    def test_wire_normalization_rejects_disagreement_on_either_side(self):
+        native_raw = evidence(second_unit=False, side="native")
+        native_raw["player_intents"][1]["command"]["wire_hex"] = \
+            "130c000d00ffff05"
+        native = transaction.compile_evidence(native_raw, source="native")
+        self.assertTrue(any(
+            "wire contract" in error and "not 'move'" in error
+            for error in transaction._receipt_errors(
+                native, expected_side="native")))
+
+        java_raw = evidence(second_unit=False, side="java")
+        wire = bytearray.fromhex(
+            java_raw["player_intents"][1]["command"]["wire_hex"])
+        wire[7] += 1
+        java_raw["player_intents"][1]["command"]["wire_hex"] = wire.hex()
+        java = transaction.compile_evidence(java_raw, source="java")
+        self.assertTrue(any(
+            "wire contract" in error and "journaled command" in error
+            for error in transaction._receipt_errors(
+                java, expected_side="java",
+                current_java_engine_input_sha256=JAVA_ENGINE_SHA256,
+                current_java_program_input_sha256=JAVA_PROGRAM_SHA256)))
 
     def test_certification_requires_complete_exact_native_and_java_layers(self):
         native = transaction.compile_evidence(

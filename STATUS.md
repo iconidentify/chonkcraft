@@ -68,7 +68,10 @@ being inferred from the playable campaign fleet:
 
 - Commanded scenarios: **206/240 exact and comparable**, zero materially
   divergent, zero infrastructure failures, and 34 not yet comparable.
-- Physical player transactions: **0/532** paired native/Java certifications.
+- Physical player transactions: **1/532** cells has an exact current-source
+  native/Java semantic pair, proven by two independent sealed scenarios. The
+  two-unit held-out cell remains red on a real two-cycle terminal difference;
+  detached producer-proof validation and the other 531 cells remain open.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
 - AI fleet: **52/52** current-head mission twins are materialized from
