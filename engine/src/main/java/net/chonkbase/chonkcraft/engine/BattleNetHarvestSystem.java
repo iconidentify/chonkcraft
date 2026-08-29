@@ -3113,7 +3113,8 @@ final class BattleNetHarvestSystem {
                                         || !world.battleNetClaimedWood
                                                 .containsKey(index))
                                 && battleNetWoodTouchesComponent(
-                                        worker, x, y, connected)) {
+                                        worker, x, y, connected,
+                                        skipClaimed)) {
                             return new int[] {x, y};
                         }
                     }
@@ -3134,14 +3135,27 @@ final class BattleNetHarvestSystem {
 
     /** The 3-by-3 component and terrain test in BNE callback 0x44e150. */
     boolean battleNetWoodTouchesComponent(Unit worker, int x, int y,
-            boolean[] connected) {
+            boolean[] connected, boolean requireUnoccupiedFace) {
         for (int ny = y - 1; ny <= y + 1; ny++) {
             for (int nx = x - 1; nx <= x + 1; nx++) {
                 if (!world.map.contains(nx, ny)) {
                     continue;
                 }
                 int index = nx + ny * world.map.width();
-                if (connected[index] && world.battleNetTerrainPassable(worker, nx, ny)) {
+                if (connected[index]
+                        && world.battleNetTerrainPassable(worker, nx, ny)
+                        // The claimed-tree constructor at native 0x44e230
+                        // reaches 0x44e150 with the live 0x09ce square mask.
+                        // Its 0x0100 land-body bit means an occupied connected
+                        // face cannot make the replacement tree eligible.
+                        // Keep Java's older UnitReady/AI reconstruction on its
+                        // terrain-component view: those callers synthesize
+                        // native pre-search state separately (including the
+                        // failed-gold north-row shift) and are not this
+                        // StartGathering replacement boundary.
+                        && (!requireUnoccupiedFace
+                                || !world.map.field(nx, ny)
+                                        .hasFlag(worker.blockingFlags()))) {
                     return true;
                 }
             }

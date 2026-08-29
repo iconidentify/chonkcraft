@@ -30,16 +30,28 @@ legacy identities prevent attributing the later difference to either its older
 The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 266.** The lowest common divergence is
-  cycle 267, so the shared proven frontier is cycle 266. Expansion Human 11
-  now defines that boundary; expansion Human 12 is exact through cycle 267.
+- **52/52 maps are exact through cycle 267.** The lowest common divergence is
+  cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
+  now defines that boundary; expansion Human 11 is exact through cycle 310.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,437 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,481 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,757; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,801; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The claimed-tree replacement milestone advances expansion Human 11 from
+  exact through cycle 266 to exact through 310. When another woodcutter has
+  claimed the current tree, the native replacement search accepts a candidate
+  only when its connected 3-by-3 neighborhood has an approach face free of
+  the live blocking-body mask. Seven authenticated fleet choices require the
+  full native mask, while 36 held target choices preserve the existing result.
+  Ordinary and AI tree acquisition retain their separate pre-search state.
+  All other 51 maps are unchanged in both complete fleets; cycle-400 and
+  cycle-1,800 aggregates each gain 44 cycles, while clean-map counts remain 27
+  and 8. Accepted run `98bfa977` binds the 1,800-cycle survey and structural
+  source capsule; run `713adea3` records the same fleet result through cycle
+  400.
 - The paid-tail handoff milestone advances expansion Human 12 from exact
   through cycle 264 to exact through 267, raising the shared fleet frontier by
   two cycles. Terrain-wood workers now keep a committed two-byte route behind
@@ -145,9 +157,9 @@ first-step-saturation boundaries.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0829.104` is the public release, published from revision
-`f2a3d646176a3d84f6a5767ed2ad82228e3f4be6` with game JAR SHA-256
-`a5b0d697756046427e1141e45355bdd15f8ec5e141a83d4ab2247de593b24e12`.
+Signed engine OTA `2026.0829.105` is the public release, published from revision
+`2e714386b5138a2b5d5168685eaa6e19cc1ffe46` with game JAR SHA-256
+`43dd02a27d54c5a50720d52550104088bb42e067bcf724552f3382faa700564d`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.

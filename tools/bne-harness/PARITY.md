@@ -17,35 +17,39 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `e0dfea7c` preserves the shared clean horizon at 264
-(earliest divergence 265), with 8 clean / 44 divergent / 0 failed. The
+Accepted cycle-1,800 run `98bfa977` advances the shared clean horizon from 266
+to 267 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. Aggregate per-map
-frontiers advance from 18,421 to 18,434 at cycle 400 and from 33,741 to 33,754
-at cycle 1,800. Human 13 is the only changed case, advancing from exact through
-264 to exact through 277 (first divergence 278), and no map moves backward.
-The durable cycle-400 and accepted cycle-1,800 surveys are retained under
-`.bne-artifacts/runs/cc6a34701a24298ce9e515d2a6f3267dc9f69515ac801e5db929e4bfcec005df`
-and `.bne-artifacts/runs/e0dfea7cf6aec8405bcaffa73ab6ccd53ed8ab6252dca6c34b60204005ad43a7`.
+frontiers advance from 18,437 to 18,481 at cycle 400 and from 33,757 to 33,801
+at cycle 1,800. Expansion Human 11 is the only changed case, advancing from
+exact through 266 to exact through 310 (first divergence 311), and no map moves
+backward. The durable cycle-400 and accepted cycle-1,800 surveys are retained
+under `.bne-artifacts/runs/713adea3ce8f8896940eb1302a12b85a3d225bc730a95b0f86d75d19df0c4b0c`
+and `.bne-artifacts/runs/98bfa97795139db3d9fc625f11084602477ac291629a3c256944cca017bb200c`.
 
-Behavioral delta: a refusal-recovery plain Move now writes the whole bounded
-terrain line while ignoring nonbuilding mobile occupants during planning. The
-stored bytes remain authoritative until consumption; an occupied later byte
-refuses for that visit and causes a redraw on the next. Human 13 native ogre
-1519 stores eleven north bytes at fixture 253, refuses its occupied second
-byte at 265, then replans `NW,NE` and commits north-west at 266. Native ogre
-1510 independently stores `NW,N,NW,N,NW,N,NW,NW,N` at 255, refuses the stored
-north byte at 267, and replans north-west at 268. Sibling ogre 1501 remains the
-held-out occupied-first-square case and keeps its ordinary `N,NW,W` detour;
-fresh acquisitions and borrowed attack-chase moves likewise retain their own
-authenticated planners. The rule is structural and contains no map, unit,
-cycle, or coordinate exception.
+Behavioral delta: when a woodcutter reaches a tree that another worker has
+claimed, the replacement-tree ring search now requires at least one connected
+approach face that is not occupied by a live blocking body. The rule reproduces
+native constructor `0x44e230`, ring walker `0x443cd0`, and callback `0x44e150`:
+the callback accepts a forest square only when its 3-by-3 neighborhood contains
+the worker's connected component and the native `0x09ce` field mask is clear.
+The `0x0100` land-body bit therefore excludes Expansion Human 11's earlier
+tree, whose only connected face is occupied by a catapult, and selects the
+next eligible tree. Ordinary and AI tree acquisition retain Java's separate
+pre-search reconstruction and terrain-component view. The rule is structural
+and contains no map, unit, cycle, or coordinate exception.
 
-Proof delta: the authenticated Human 13 refusal-handoff referee now seals both
-whole-line positive witnesses, both later-byte refusal/redraw boundaries, and
-the held-out occupied-first-square detour in one continuous fixture replay.
-The movement inventory rises from 115 to 116 exact checks. The complete
-cycle-400 and cycle-1,800 fleets show the thirteen-cycle Human 13 gain with all
-other maps unchanged.
+Proof delta: read-only disassembly and raw native field flags authenticate the
+constructor, callback, mask, and occupancy bit. An offline scan of the sealed
+fleet finds seven target choices where the complete native mask matches BNE
+and the earlier terrain-only model does not, plus 36 held target choices where
+both models already match BNE. The focused referee reconstructs Expansion
+Human 11's occupied-face wall and proves the next eligible target and native
+staging delay. A deliberately broader implementation advanced the target case
+but regressed Human 5 at cycle 107 by applying this live occupancy test to an
+ordinary failed-gold search; that candidate was rejected. Scoping the test to
+claimed-tree replacement keeps Human 5 and every other map unchanged in both
+complete fleets.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
@@ -56,13 +60,12 @@ for all 2,817 tests, ran 2,790, and retained the exact 27 skip identities and
 exact 110 expected specification failures; there were no unexpected or stale
 failures.
 
-The next shared-boundary blocker is expansion Human 12 at 265 (native peon
-1360 and grunt 1479 each one diagonal tile from Java). Expansion Human 11
-follows at 267 (peon 1584 vertical position), expansion Orc 12 at 273,
-expansion Orc 6 at 274, and Human 13 now follows at 278. Bounded rejected
-candidates remain reverted:
-blanket and soft visibility variants for Human 12 failed their native route or
-held-out negatives; Human 11's wood-stall timing changed only its target map;
+The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc
+12 follows at 273, expansion Orc 6 at 274, Human 13 at 278, and expansion Orc
+8 at 279; expansion Human 11 now follows at 311. Bounded rejected candidates
+remain reverted: blanket and soft visibility variants for Human 12 failed
+their native route or held-out negatives; Human 11's wood-stall timing changed
+only its target map; the broad all-tree occupancy candidate regressed Human 5;
 Human 13's moving-regroup softening advanced that map by one cycle but did not
 improve the shared horizon or a meaningful aggregate frontier.
 

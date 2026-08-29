@@ -1,5 +1,9 @@
 # Gameplay Reliability Update
 
+- Fixed a Battle.net-compatible woodcutting stall where a worker could choose
+  a replacement tree whose only reachable side was occupied. Claimed-tree
+  searches now continue to the next usable tree without changing ordinary or
+  computer-controlled harvesting searches.
 - Kept small warships on their consumed Battle.net patrol route when a moving
   allied hull temporarily blocks the final heading. Fresh terminal patrols,
   coast refusals and combat chases retain their distinct native behavior.

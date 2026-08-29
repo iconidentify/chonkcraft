@@ -824,6 +824,60 @@ class BattleNetResourceApproachTest {
     }
 
     @Test
+    @DisplayName("XHuman 11 skips a tree whose only connected face is occupied")
+    void xhumanElevenClaimedWoodReaimRequiresAnUnoccupiedFace() {
+        // Retail XHuman 11 slot 1584 at fixture 264 searches from (21,17).
+        // The clockwise ring sees tree (23,19) first, but every one of its
+        // faces is forest except (22,18), where catapult 1541 stands. Native
+        // 0x44e150 rejects that 0x0100 square and accepts (22,19), whose west-
+        // north-west face (21,18) is vacant. Slot 1584 then steps south at 267.
+        GameMap map = new GameMap(32, 32, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        for (int[] tree : new int[][] {
+                {20, 18}, {23, 18}, {24, 18},
+                {22, 19}, {23, 19}, {24, 19},
+                {22, 20}, {23, 20}, {24, 20},
+        }) {
+            map.field(tree[0], tree[1])
+                    .setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+            map.field(tree[0], tree[1]).setValue(100);
+        }
+
+        World world = new World(map);
+        Unit westClaimant = world.createUnit(woodcutter(), 0, 20, 17);
+        Unit eastClaimant = world.createUnit(woodcutter(), 0, 22, 17);
+        Unit arriving = world.createUnit(woodcutter(), 0, 21, 17);
+        UnitType catapult = new UnitType("unit-catapult");
+        catapult.setTileSize(1, 1);
+        catapult.setHitPoints(110);
+        catapult.setLandUnit(true);
+        Unit occupiedFace = world.createUnit(catapult, 0, 22, 18);
+        assertTrue(westClaimant != null && eastClaimant != null
+                && arriving != null && occupiedFace != null,
+                "the three peons and occupied catapult face must place");
+
+        assertTrue(world.orderHarvest(westClaimant, 20, 18));
+        westClaimant.setGatherClockStarted(true);
+        world.battleNetClaimedWood.put(20 + 18 * map.width(), westClaimant);
+        assertTrue(world.orderHarvest(eastClaimant, 23, 18));
+        eastClaimant.setGatherClockStarted(true);
+        world.battleNetClaimedWood.put(23 + 18 * map.width(), eastClaimant);
+        assertTrue(world.orderHarvest(arriving, 20, 18));
+
+        world.tick();
+
+        assertEquals(22, arriving.resourceTileX(),
+                "the occupied face must exclude the earlier eastern tree");
+        assertEquals(19, arriving.resourceTileY());
+        assertEquals(2, arriving.battleNetOrderDelay(),
+                "the replacement retains StartGathering's native staging");
+    }
+
+    @Test
     @DisplayName("a moved woodcutter releases its tree for the next peon")
     void replacingHarvestWithMoveReleasesTreeClaim() {
         GameMap map = new GameMap(12, 12, new Tileset());
