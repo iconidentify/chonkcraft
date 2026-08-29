@@ -10,7 +10,7 @@ and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
     authenticated inputs       2817 tests,   27 skipped
-    no external input          2815 tests, 1199 skipped
+    no external input          2817 tests, 1201 skipped
 
 Both can be green.
 
@@ -156,7 +156,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1892, 871),
+        "engine": (1901, 872),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
