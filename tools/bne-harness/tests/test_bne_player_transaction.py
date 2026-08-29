@@ -787,6 +787,8 @@ class PlayerTransactionTest(unittest.TestCase):
     def test_tracer_hooks_public_give_order_for_layered_field_move(self):
         source = (Path(__file__).parents[1] / "src" / "tracer.c").read_text(
             encoding="utf-8")
+        layout = (Path(__file__).parents[1] / "src" /
+                  "bne_202_layout.h").read_text(encoding="utf-8")
         self.assertIn("traced_give_order", source,
                       "DoRightButton must be observed at public GiveOrder")
         self.assertIn("install_give_order_hook", source,
@@ -800,6 +802,12 @@ class PlayerTransactionTest(unittest.TestCase):
                       "a group keeps one voice; the rest stay silent")
         self.assertIn("BNE_UNIT_PIXEL_X", source)
         self.assertIn("BNE_SQUARE_FOREST", source)
+        self.assertIn("BNE_SQUARE_COAST", source)
+        self.assertIn("return \"shore\"", source)
+        self.assertIn("BNE_SQUARE_WATER", source)
+        self.assertIn("return \"water\"", source)
+        self.assertIn("#define BNE_SQUARE_COAST 0x0002", layout)
+        self.assertIn("#define BNE_SQUARE_WATER 0x0040", layout)
 
     def test_reconstructed_0x13_field_move_compiles_all_eight_layers(self):
         compiled = transaction.compile_ui_trace(

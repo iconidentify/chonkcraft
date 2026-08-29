@@ -186,6 +186,10 @@
 #define BNE_UNIT_X 24
 #define BNE_UNIT_Y 26
 #define BNE_TILE_PIXELS 32
+/* Authenticated state.bin map squares use 0x0002 for the exposed coastal
+ * transition and 0x0040 for open water; occupancy bits remain orthogonal. */
+#define BNE_SQUARE_COAST 0x0002
+#define BNE_SQUARE_WATER 0x0040
 #define BNE_SQUARE_FOREST 0x0080
 #define BNE_SQUARE_UNIT_HERE 0x0100
 #define BNE_UNIT_TYPE_BUILDING 0x00000020UL

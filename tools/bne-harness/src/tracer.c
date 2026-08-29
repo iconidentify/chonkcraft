@@ -1189,6 +1189,12 @@ static const char *player_tx_target_shape(BYTE *pool, DWORD pool_count,
     if ((square & BNE_SQUARE_UNIT_HERE) != 0) {
         return "occupied-ground";
     }
+    if ((square & BNE_SQUARE_COAST) != 0) {
+        return "shore";
+    }
+    if ((square & BNE_SQUARE_WATER) != 0) {
+        return "water";
+    }
     return "open-ground";
 }
 
