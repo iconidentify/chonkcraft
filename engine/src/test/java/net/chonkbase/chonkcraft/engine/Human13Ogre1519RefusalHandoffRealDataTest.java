@@ -200,6 +200,72 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
         }
     }
 
+    @Test
+    @DisplayName("human 13 plain-Move wakes retain the native line until a stored byte refuses")
+    void plainMoveWakesStoreTheWholeTerrainLineBeforeRefusingMobileBodies() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit eastern = unitAt(world, "unit-ogre", 123, 19);
+        Unit southern = unitAt(world, "unit-ogre", 120, 22);
+        Unit heldOut = unitAt(world, "unit-ogre", 116, 25);
+        assertNotNull(eastern, "Human 13 has no native-slot-1519 ogre");
+        assertNotNull(southern, "Human 13 has no native-slot-1510 ogre");
+        assertNotNull(heldOut, "Human 13 has no native-slot-1501 ogre");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 268; fixture++) {
+            mission.tick();
+            if (fixture == 252) {
+                assertEquals(123, heldOut.tileX());
+                assertEquals(29, heldOut.tileY());
+                assertEquals(2, heldOut.pathLength(),
+                        "the occupied first line square keeps the native detour");
+                assertEquals(Direction.fromDelta(-1, -1),
+                        heldOut.peekHeading());
+                assertEquals(Direction.fromDelta(-1, 0),
+                        heldOut.peekHeadingAtDepth(1));
+            } else if (fixture == 253) {
+                assertEquals(122, eastern.tileX());
+                assertEquals(29, eastern.tileY());
+                assertEquals(10, eastern.pathLength(),
+                        "eleven north bytes leave ten after the first step");
+                assertEquals(Direction.fromDelta(0, -1),
+                        eastern.peekHeading());
+            } else if (fixture == 255) {
+                assertEquals(123, southern.tileX());
+                assertEquals(30, southern.tileY());
+                assertEquals(8, southern.pathLength(),
+                        "the nine-byte line leaves eight after north-west");
+                assertEquals(Direction.fromDelta(0, -1),
+                        southern.peekHeading());
+            } else if (fixture == 265) {
+                assertEquals(122, eastern.tileX(),
+                        "the occupied second north byte refuses for one visit");
+                assertEquals(29, eastern.tileY());
+            } else if (fixture == 266) {
+                assertEquals(121, eastern.tileX());
+                assertEquals(28, eastern.tileY(),
+                        "the next visit replans and commits north-west");
+            } else if (fixture == 267) {
+                assertEquals(123, southern.tileX(),
+                        "the southern witness also refuses its second byte");
+                assertEquals(30, southern.tileY());
+            } else if (fixture == 268) {
+                assertEquals(122, southern.tileX());
+                assertEquals(29, southern.tileY(),
+                        "the southern witness replans north-west on 268");
+            }
+        }
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null

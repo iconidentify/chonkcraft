@@ -1307,6 +1307,42 @@ public final class BattleNetPathFinder {
         return new Line(fromX, fromY, toX, toY).next();
     }
 
+    /**
+     * The bounded native line buffer when every square on it is admissible.
+     *
+     * <p>This is the direct-writer half of {@link #find}, without its wall
+     * follower.  Plain-Move refusal recovery uses it after independently
+     * proving that mobile bodies, rather than fixed terrain, are the only
+     * reason the ordinary point planner left the line.</p>
+     */
+    public static PathFinder.Path clearLine(int fromX, int fromY, int toX,
+            int toY, int stride, Passability passability) {
+        if (stride != 1 && stride != 2) {
+            throw new IllegalArgumentException(
+                    "BNE movement stride must be 1 or 2");
+        }
+        if (fromX == toX && fromY == toY) {
+            return new PathFinder.Path(
+                    PathFinder.Result.REACHED, new int[0]);
+        }
+        List<Integer> direct = new ArrayList<>(MAX_PATH);
+        Line line = new Line(fromX, fromY, toX, toY);
+        int x = fromX;
+        int y = fromY;
+        while (direct.size() < MAX_PATH && (x != toX || y != toY)) {
+            int heading = line.next();
+            x += Direction.deltaX(heading) * stride;
+            y += Direction.deltaY(heading) * stride;
+            if (passability.isOutOfBounds(x, y)
+                    || !passability.canEnter(x, y)) {
+                return new PathFinder.Path(
+                        PathFinder.Result.UNREACHABLE, new int[0]);
+            }
+            direct.add(heading);
+        }
+        return found(direct);
+    }
+
     /** Exact transcription of {@code 0x429f10}/{@code 0x429fa0}. */
     private static final class Line {
         private final int major;

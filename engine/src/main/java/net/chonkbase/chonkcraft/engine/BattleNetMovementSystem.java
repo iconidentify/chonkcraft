@@ -864,38 +864,60 @@ final class BattleNetMovementSystem {
                     }
                     unit.setPath(path);
                     unit.setPathGoal(toX, toY);
-                    // Retail's plain Move decides one step fresh toward the
-                    // goal and ignores every mobile occupant while deciding.
-                    // When the occupancy-aware planner's first consumed face
-                    // differs from the fresh line's own face but that face is
-                    // walkable right now, take the line face: Human 13 ogre
-                    // 1510's fixture-255 wake planned a north-first detour
-                    // around brothers parked on the line's fourth square,
-                    // while retail stepped the line's north-west straight
-                    // away. Sibling 1501 keeps its detour untouched -- its
-                    // line face south-west is itself occupied, which is what
-                    // makes this gate safe to leave open everywhere.
+                    // Retail's plain Move writes the whole bounded terrain
+                    // line and ignores mobile occupants while deciding. It
+                    // refuses only when a stored byte is later consumed.
+                    // Human 13 ogre 1519 stores eleven north bytes on fixture
+                    // 253, takes one, then refuses the occupied second byte on
+                    // 265 and replans NW,NE on 266. Java's occupancy route was
+                    // N,NW,NE and therefore took NW one visit early. Ogre 1510
+                    // independently stores NW,N,NW,N,NW,N,NW,NW,N on 255,
+                    // refuses its occupied N byte on 267, and replans on 268.
+                    // Sibling 1501 keeps its N,NW,W detour untouched because
+                    // the line's first NW square is occupied at plan time.
                     // The gate carries refusal history: a fresh acquisition's
                     // first plan is itself retail's answer (XHuman 4's
                     // opening axethrowers wall correctly from cycle three),
-                    // while a wake that follows refusals and a constructor
-                    // band is where retail steps the line face across
-                    // standing brothers. Borrowed attack-chase moves keep
-                    // their own authenticated planning.
+                    // while a wake after refusals and a constructor band owns
+                    // this direct writer. Borrowed attack-chase moves keep
+                    // their independently authenticated planning.
                     if (unit.pathLength() > 0
                             && !unit.battleNetBorrowedMoveForStep()
                             && (unit.battleNetCollisionCounter() > 0
                                     || unit.battleNetRefusals() > 0)) {
                         int lineFirst = BattleNetPathFinder.firstLineHeading(
                                 unit.tileX(), unit.tileY(), toX, toY);
-                        int plannedFirst = unit.peekHeading();
-                        if (plannedFirst != lineFirst) {
-                            int faceX = unit.tileX()
-                                    + Direction.deltaX(lineFirst);
-                            int faceY = unit.tileY()
-                                    + Direction.deltaY(lineFirst);
-                            if (world.canEnter(unit, faceX, faceY)) {
-                                unit.replacePeekHeading(lineFirst);
+                        int faceX = unit.tileX()
+                                + Direction.deltaX(lineFirst);
+                        int faceY = unit.tileY()
+                                + Direction.deltaY(lineFirst);
+                        if (world.canEnter(unit, faceX, faceY)) {
+                            PathFinder.Path line =
+                                    BattleNetPathFinder.clearLine(
+                                            unit.tileX(), unit.tileY(),
+                                            toX, toY, 1,
+                                            (x, y) -> {
+                                                if (!world.map.contains(x, y)
+                                                        || !world
+                                                                .battleNetTerrainPassable(
+                                                                        unit,
+                                                                        x, y)) {
+                                                    return false;
+                                                }
+                                                Unit occupant =
+                                                        world.blockerOnLayer(
+                                                                unit, x, y);
+                                                return occupant == null
+                                                        || occupant == unit
+                                                        || occupant.type()
+                                                                == null
+                                                        || !occupant.type()
+                                                                .building();
+                                            });
+                            if (line.result()
+                                    == PathFinder.Result.FOUND) {
+                                unit.setPath(line);
+                                unit.setBattleNetPlainMoveDirectLine(true);
                             }
                         }
                     }
@@ -7554,6 +7576,18 @@ final class BattleNetMovementSystem {
                             && !ally.isDying()
                             && world.isAllied(unit.player(), ally.player());
                     if (alliedBlock) {
+                        if (unit.battleNetPlainMoveDirectLine()) {
+                            // The terrain-only plain-Move writer deliberately
+                            // leaves mobile bodies in later bytes. A refusal
+                            // parks that buffer and redraws on the next visit;
+                            // it must not enter the residual free-compass arm
+                            // that belongs to an occupancy-planned detour.
+                            battleNetRefuse(unit);
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            return;
+                        }
                         int strideDetour =
                                 world.battleNetMovementStride(unit);
                         int curDist = Math.max(

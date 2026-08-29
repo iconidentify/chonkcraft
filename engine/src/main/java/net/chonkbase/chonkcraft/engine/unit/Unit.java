@@ -2849,6 +2849,17 @@ public final class Unit {
 
     private boolean battleNetMoveFreeDetourPending;
 
+    /** Whether the current plain-Move buffer came from the terrain-only ray. */
+    public boolean battleNetPlainMoveDirectLine() {
+        return battleNetPlainMoveDirectLine;
+    }
+
+    public void setBattleNetPlainMoveDirectLine(boolean directLine) {
+        battleNetPlainMoveDirectLine = directLine;
+    }
+
+    private boolean battleNetPlainMoveDirectLine;
+
     /**
      * Multi-step leftover residual opened Attack at post-OP0; the next melee
      * OP10 may land damage without a presentation pend (Human 13 ogre 1510).
@@ -4305,6 +4316,7 @@ public final class Unit {
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
+        this.battleNetPlainMoveDirectLine = false;
     }
 
     public void clearPath() {
@@ -4319,6 +4331,7 @@ public final class Unit {
         this.battleNetWoodResidualSettles = 0;
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
+        this.battleNetPlainMoveDirectLine = false;
     }
 
     /**

@@ -31,15 +31,26 @@ The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
 - **52/52 maps are exact through cycle 264.** The lowest common divergence is
-  cycle 265, so the shared proven frontier is cycle 264. Human 13 and
-  expansion Human 12 share that boundary.
+  cycle 265, so the shared proven frontier is cycle 264. Expansion Human 12
+  now defines that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,421 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,434 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,741; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,754; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The plain-Move route-writer milestone moves Human 13 from exact through
+  cycle 264 to exact through 277. After refusal recovery, native writes the
+  whole bounded terrain line while ignoring mobile occupants during planning;
+  it refuses only when a stored byte is later consumed, then redraws on the
+  next visit. Human 13 ogres 1519 and 1510 independently authenticate the
+  behavior with different line buffers and refusal cycles. Sibling 1501 keeps
+  its ordinary detour when the first line square is already occupied, while
+  fresh acquisitions and borrowed attack-chase routes remain outside the
+  rule. All other 51 maps are unchanged in both complete fleets. Durable
+  cycle-400 run `cc6a3470` and accepted cycle-1,800 run `e0dfea7c` record the
+  thirteen-cycle gain and bind their structural source capsules.
 - The complete naval-route milestone moves expansion Human 7 from exact
   through cycle 265 to exact through 285. A full twenty-byte route remains
   authoritative after its first headings are spent instead of being rewritten
@@ -95,8 +106,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,816 tests**. The canonical authenticated
-profile runs 2,789 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,817 tests**. The canonical authenticated
+profile runs 2,790 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
@@ -111,9 +122,11 @@ and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run associated with accepted parity run
-`4f638ea20a0e407659835f27b2d372d4301dc6124be4b36232ecba3bb2ceba4c`
-exercised all 2,789 authenticated tests with the exact expected failure
-identity.
+`e0dfea7cf6aec8405bcaffa73ab6ccd53ed8ab6252dca6c34b60204005ad43a7`
+exercised all 2,790 authenticated tests with the exact expected failure
+identity. Its new referee seals two independent whole-line plain-Move wakes,
+both later-byte refusal/redraw boundaries, and the occupied-first-square
+detour control.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

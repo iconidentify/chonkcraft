@@ -17,48 +17,50 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `4f638ea2` preserves the shared clean horizon at 264
+Accepted cycle-1,800 run `e0dfea7c` preserves the shared clean horizon at 264
 (earliest divergence 265), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. Aggregate per-map
-frontiers advance from 18,401 to 18,421 at cycle 400 and from 33,721 to 33,741
-at cycle 1,800. Expansion Human 7 is the only changed case, advancing from
-exact through 265 to exact through 285 (first divergence 286), and no map moves
-backward. The durable cycle-400 and accepted cycle-1,800 surveys are retained
-under `.bne-artifacts/runs/f76fe8587f6fcc2611fc4064a5da5fa63d0ddc721fa548dc6c17593a1406c043`
-and `.bne-artifacts/runs/4f638ea20a0e407659835f27b2d372d4301dc6124be4b36232ecba3bb2ceba4c`.
+frontiers advance from 18,421 to 18,434 at cycle 400 and from 33,741 to 33,754
+at cycle 1,800. Human 13 is the only changed case, advancing from exact through
+264 to exact through 277 (first divergence 278), and no map moves backward.
+The durable cycle-400 and accepted cycle-1,800 surveys are retained under
+`.bne-artifacts/runs/cc6a34701a24298ce9e515d2a6f3267dc9f69515ac801e5db929e4bfcec005df`
+and `.bne-artifacts/runs/e0dfea7cf6aec8405bcaffa73ab6ccd53ed8ab6252dca6c34b60204005ad43a7`.
 
-Behavioral delta: a complete twenty-byte native naval route buffer is now
-authoritative after its early headings are spent. Expansion Human 7 native
-submarine 1511 proves that the route `SE,SE,SE,SE,S,...` retains and commits
-the cached south heading at fixture 266 even though a free southeast step is
-strictly closer to the patrol point. Orc 13 native tanker 1454 independently
-proves the same boundary at fixture 687: after four southeast headings it
-retains cached east while free northeast is strictly closer. Expansion Orc 11
-destroyer 1558 remains the held-out short-route form and still free-closers its
-four-byte wall-follow residual onto southeast; the capital-ship wall-detour
-control still keeps its west heading. The rule is structural and contains no
-map, unit, cycle, or coordinate exception.
+Behavioral delta: a refusal-recovery plain Move now writes the whole bounded
+terrain line while ignoring nonbuilding mobile occupants during planning. The
+stored bytes remain authoritative until consumption; an occupied later byte
+refuses for that visit and causes a redraw on the next. Human 13 native ogre
+1519 stores eleven north bytes at fixture 253, refuses its occupied second
+byte at 265, then replans `NW,NE` and commits north-west at 266. Native ogre
+1510 independently stores `NW,N,NW,N,NW,N,NW,NW,N` at 255, refuses the stored
+north byte at 267, and replans north-west at 268. Sibling ogre 1501 remains the
+held-out occupied-first-square case and keeps its ordinary `N,NW,W` detour;
+fresh acquisitions and borrowed attack-chase moves likewise retain their own
+authenticated planners. The rule is structural and contains no map, unit,
+cycle, or coordinate exception.
 
-Proof delta: the authenticated coast-goal referee now seals Expansion Human
-7's complete-buffer transition through fixture 266. Orc 13 supplies the second
-independent native witness, while the short destroyer residual and capital-ship
-detour remain held-out negative boundaries. The complete cycle-400 and
-cycle-1,800 fleets show the twenty-cycle Expansion Human 7 gain with all other
-maps unchanged.
+Proof delta: the authenticated Human 13 refusal-handoff referee now seals both
+whole-line positive witnesses, both later-byte refusal/redraw boundaries, and
+the held-out occupied-first-square detour in one continuous fixture replay.
+The movement inventory rises from 115 to 116 exact checks. The complete
+cycle-400 and cycle-1,800 fleets show the thirteen-cycle Human 13 gain with all
+other maps unchanged.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
 gate kept all 39 lockstep cases through cycle 1,800 and completed real
 two-process startup, map transfer, 180 rendered cycles, and terminal hash
 `1b9dd8ad7b9a1f51`. The canonical isolated-home, matched-media suite accounted
-for all 2,816 tests with the exact 27 skip identities and exact 110 expected
-specification failures; there were no unexpected or stale failures.
+for all 2,817 tests, ran 2,790, and retained the exact 27 skip identities and
+exact 110 expected specification failures; there were no unexpected or stale
+failures.
 
-The next shared-boundary blockers are Human 13 at 265 (ogre 1519 horizontal
-position) and expansion Human 12 at 265 (native peon 1360 and grunt 1479 each
-one diagonal tile from Java). Expansion Human 11 follows at 267 (peon 1584
-vertical position), expansion Orc 12 at 273, and expansion Human 7 now follows
-at 286 (peon 1451 position). Bounded rejected candidates remain reverted:
+The next shared-boundary blocker is expansion Human 12 at 265 (native peon
+1360 and grunt 1479 each one diagonal tile from Java). Expansion Human 11
+follows at 267 (peon 1584 vertical position), expansion Orc 12 at 273,
+expansion Orc 6 at 274, and Human 13 now follows at 278. Bounded rejected
+candidates remain reverted:
 blanket and soft visibility variants for Human 12 failed their native route or
 held-out negatives; Human 11's wood-stall timing changed only its target map;
 Human 13's moving-regroup softening advanced that map by one cycle but did not
