@@ -157,20 +157,24 @@ being inferred from the playable campaign fleet:
   computer-player cycles: 202,290 committed-state rows and 202,285 telemetry
   rows are exact. Seven ranked frontiers remain, so fleet certification is
   incomplete. The clean rematerialized Java proof is
-  `f806926a1574113492cb7ab9ca2cc640dcce1c5251fa25b26305a867a0ed35ca`;
+  `63785b8fedc43433c6bf2141f5aed6e444efef407dddfa1890dd91c5a79bafb3`;
   its retained report SHA-256 is
-  `b119fe863fd00d358e39108a71c9eeb09662556a5d10c63ea856a0a11b41d032`.
+  `fc1e7c74093fa50404de9e24d040cea72fd365359fae849a07d9311afd55f9a4`.
   The conductor proof is validated fail-closed against the current clean
   source, engine, Java adapter, app JAR, ChonkPack and retail `ai.bin`
   identities.
-- Combat lifecycle: **0/185** accepted cells. Campaign lifecycle: **0/137**
-  accepted trigger twins.
+- Combat lifecycle: **21/185** accepted cells across four independently
+  retained melee, ranged and siege proofs. Every proof is reopened from its
+  producer evidence and bound to the pinned native executable, current clean
+  Java engine, and current requirements; stale or mixed-authority proof sets
+  contribute no borrowed credit and cannot certify the lane. Campaign
+  lifecycle: **0/137** accepted trigger twins.
 
-The zero numerators do not mean those game systems are absent. The 52-map
-`semantic-v1` survey and the playability lanes do not emit these proof types.
-Each lane accepts only a complete native/Java twin report bound to the current
-engine and program identity, and it fails closed rather than carrying forward
-partial, detached, legacy, or stale receipts.
+The remaining zero numerators do not mean those game systems are absent. The
+52-map `semantic-v1` survey and the playability lanes do not emit these proof
+types. Each lane accepts only a complete native/Java twin report bound to the
+current engine and program identity, and it fails closed rather than carrying
+forward partial, detached, legacy, or stale receipts.
 
 The source of truth is executable evidence: the enforced test profiles, the
 18-lane playability receipt, the authenticated retail comparison harness under
