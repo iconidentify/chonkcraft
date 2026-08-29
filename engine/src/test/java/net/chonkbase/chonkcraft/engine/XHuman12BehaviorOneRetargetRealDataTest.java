@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -587,6 +588,12 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         // idle callback.
         Unit longTailRetargetChaser = unitAt(
                 world, "unit-grunt", 31, 38);
+        // Native slot 1479 / Java 121 is the independent long-tail witness.
+        // It settles the fourth heading of a twenty-byte knight route on
+        // fixture 265, changes to guard tower 1483, writes SW,SW,S and commits
+        // southwest immediately. Its sixteen-byte incumbent and two prior
+        // refusals differ from slot 1503's fourteen-byte/refusal-one shape.
+        Unit frontierLongTailRetarget = unitById(world, 121);
         Unit guardTower = unitAt(
                 world, "unit-human-guard-tower", 39, 41);
         Unit defenderKnight = unitAt(world, "unit-knight", 30, 44);
@@ -599,6 +606,8 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "XHuman 12 has no native-slot-1513 grunt");
         assertNotNull(longTailRetargetChaser,
                 "XHuman 12 has no native-slot-1503 grunt");
+        assertNotNull(frontierLongTailRetarget,
+                "XHuman 12 has no native-slot-1479 grunt");
         assertNotNull(guardTower,
                 "XHuman 12 has no native-slot-1485 guard tower");
         assertNotNull(defenderKnight,
@@ -710,6 +719,41 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "NewPath clears the obsolete collision generation");
         assertEquals(76, guardTower.hitPoints(),
                 "the retarget does not steal the native melee-damage draw");
+
+        while (fixtureCycle(world) < 264) {
+            mission.tick();
+        }
+        assertEquals(30, frontierLongTailRetarget.tileX());
+        assertEquals(36, frontierLongTailRetarget.tileY());
+        assertEquals(-2, frontierLongTailRetarget.offsetX());
+        assertEquals(2, frontierLongTailRetarget.offsetY(),
+                "fixture 264 still owes the final northeast pixels");
+        assertEquals(16, frontierLongTailRetarget.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                frontierLongTailRetarget.battleNetPathInitialLength());
+        assertEquals(4,
+                frontierLongTailRetarget.battleNetPathStepsTaken());
+        assertEquals(3,
+                frontierLongTailRetarget.battleNetCollisionCounter());
+        assertEquals(2, frontierLongTailRetarget.battleNetRefusals());
+        assertEquals(defenderKnight, frontierLongTailRetarget.target());
+
+        mission.tick();
+        assertEquals(265, fixtureCycle(world));
+        assertEquals(29, frontierLongTailRetarget.tileX(),
+                "the long-tail retarget commits southwest without construction");
+        assertEquals(37, frontierLongTailRetarget.tileY());
+        assertEquals(Direction.fromDelta(-1, 1),
+                frontierLongTailRetarget.lastStepHeading());
+        assertEquals(2, frontierLongTailRetarget.pathLength(),
+                "the committed southwest leaves southwest,south cached");
+        assertEquals(Direction.fromDelta(-1, 1),
+                frontierLongTailRetarget.peekHeading());
+        assertTargetAt(frontierLongTailRetarget,
+                "unit-human-guard-tower", 25, 42,
+                "the settle callback publishes native guard tower 1483");
+        assertEquals(0,
+                frontierLongTailRetarget.battleNetCollisionCounter());
     }
 
     private static int fixtureCycle(World world) {
@@ -730,6 +774,15 @@ class XHuman12BehaviorOneRetargetRealDataTest {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null
                     && ident.equals(unit.type().ident())
                     && unit.tileX() == x && unit.tileY() == y) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }

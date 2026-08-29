@@ -44,7 +44,7 @@ production module, runtime resource, launcher/release path, Maven reactor entry,
 and any supplied JAR or ZIP artifact for an executable-script dependency or
 interpreter class. Both checks run in CI and release verification.
 
-The 17 playability lanes then prove that the authenticated pack can boot and
+The 18 playability lanes then prove that the authenticated pack can boot and
 exercise the player-visible subsystems without a source checkout. The 52-case
 precision gate remains the regression net for simulation changes.
 

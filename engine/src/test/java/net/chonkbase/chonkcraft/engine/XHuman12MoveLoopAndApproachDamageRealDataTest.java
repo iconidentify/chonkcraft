@@ -563,6 +563,45 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 woodPeon.peekHeadingAtDepth(3));
         assertEquals(Direction.fromDelta(1, 1),
                 woodPeon.peekHeadingAtDepth(4));
+
+        while (fixtureCycle(world) < 263) {
+            mission.tick();
+        }
+        assertEquals(12, woodPeon.tileX());
+        assertEquals(87, woodPeon.tileY());
+        assertEquals(-2, woodPeon.offsetX());
+        assertEquals(2, woodPeon.offsetY(),
+                "fixture 263 still owes the final northeast pixels");
+        assertEquals(2, woodPeon.pathLength(),
+                "east,southeast remain in the authenticated buffer");
+        assertEquals(Direction.fromDelta(1, 0), woodPeon.peekHeading());
+        assertEquals(false, woodPeon.returningToDepot());
+        assertEquals(null, woodPeon.resourceUnit());
+        assertEquals(true, woodPeon.resourceTileX() >= 0);
+        assertEquals(true, woodPeon.resourceTileY() >= 0);
+        assertEquals(6, woodPeon.battleNetPathInitialLength());
+        assertEquals(4, woodPeon.battleNetPathStepsTaken());
+
+        mission.tick();
+        assertEquals(264, fixtureCycle(world));
+        assertEquals(12, woodPeon.tileX(),
+                "the allied-worker refusal retains the settled square");
+        assertEquals(87, woodPeon.tileY());
+        assertEquals(2, woodPeon.pathLength(),
+                "native keeps east,southeast through the refusal band");
+        assertEquals(Direction.fromDelta(1, 0), woodPeon.peekHeading());
+        assertEquals(1, woodPeon.battleNetCollisionCounter());
+        assertEquals(14, woodPeon.battleNetOrderDelay());
+        assertEquals(15, woodPeon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(265, fixtureCycle(world));
+        assertEquals(12, woodPeon.tileX(),
+                "Move timer fourteen must not redraw northeast");
+        assertEquals(87, woodPeon.tileY());
+        assertEquals(2, woodPeon.pathLength());
+        assertEquals(13, woodPeon.battleNetOrderDelay());
+        assertEquals(14, woodPeon.battleNetAnimationTimer());
     }
 
     private static int fixtureCycle(World world) {

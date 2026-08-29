@@ -346,8 +346,7 @@ final class BattleNetHarvestSystem {
                         worker.battleNetRefusalHold()
                         && info != null && info.terrainHarvester()
                         && worker.resourceUnit() == null
-                        && worker.pathLength() > 0
-                        && worker.battleNetCollisionCounter() >= 4;
+                        && worker.pathLength() > 0;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
                 // A queued mine-exit Return Goods promotion starts action
@@ -401,13 +400,12 @@ final class BattleNetHarvestSystem {
                                 worker.battleNetAnimationTimer() - 1);
                     }
                 }
-                // Saturated terrain-wall refusals retain their cached route,
-                // so they are not part of the empty action-23 construction
-                // body above. They own Move 15..1 instead. XHuman 12 peon
-                // 1385 keeps SE,NE through fixtures 235..249 and wakes to
-                // consume SE on 250; leaving the cursor at fifteen made the
-                // semantic position right but the authenticated program state
-                // fourteen cycles wrong.
+                // Retained terrain-wall refusals are not part of the empty
+                // action-23 construction body above. They own Move 15..1
+                // instead. XHuman 12 peon 1385 keeps SE,NE at collision four
+                // through fixtures 235..249, while peon 1360 independently
+                // keeps E,SE at collision one from fixture 264. Route shape,
+                // not a particular collision generation, owns the cursor.
                 if (parkSaturatedWoodRoute
                         && world.battleNetSequence != null) {
                     int moveStart = world.idle.battleNetSequenceStart(

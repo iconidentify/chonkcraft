@@ -4048,15 +4048,19 @@ final class BattleNetCombatSystem {
                             settledMeleeResidualRetarget
                             && unit.battleNetPathInitialLength()
                                     == BattleNetPathFinder.MAX_PATH
-                            && keepPathn == 14
-                            && unit.battleNetPathStepsTaken() == 6
+                            && keepPathn >= 14
+                            && unit.battleNetPathStepsTaken()
+                                    == BattleNetPathFinder.MAX_PATH - keepPathn
                             && unit.battleNetCollisionCounter() == 3
-                            && unit.battleNetRefusals() == 1
+                            && unit.battleNetRefusals() > 0
                             && previous.type() != null
                             && !previous.type().building()
                             && candidate.type() != null
                             && candidate.type().building()
                             && settledResidualHeadFree;
+                    boolean repeatedPaidLongTailRetarget =
+                            longPaidTailRetargetRemainsLive
+                            && unit.battleNetRefusals() > 1;
                     boolean pressuredResidualRetargetConstruction =
                             (spentOneStepRetargetConstruction
                                 || behaviorOneStrictMobileUpgradeConstruction
@@ -4494,6 +4498,15 @@ final class BattleNetCombatSystem {
                             unit.setBattleNetCollisionCounter(0);
                         }
                         if (completedSettledRefusalBand) {
+                            if (repeatedPaidLongTailRetarget) {
+                                planRepeatedPaidLongTailRetarget(
+                                        unit, chased);
+                                unit.setBattleNetCollisionCounter(0);
+                                unit.setBattleNetRetargetResidualRoutePark(
+                                        false);
+                                stepMoveTowardsTarget(unit);
+                                return;
+                            }
                             boolean retainPaidMobileWallFace =
                                     unit.battleNetRefusals() > 0
                                     && chased.type() != null
@@ -4603,7 +4616,10 @@ final class BattleNetCombatSystem {
                                     .battleNetRetargetResidualRoutePark();
                             world.actionSettledMeleeReplacementAfterPaidBand =
                                     replacementAfterPaidBand;
-                            if (incumbentPlanBeforePaidRefillRetarget) {
+                            if (repeatedPaidLongTailRetarget) {
+                                planRepeatedPaidLongTailRetarget(
+                                        unit, chased);
+                            } else if (incumbentPlanBeforePaidRefillRetarget) {
                                 // A route which was parked and then refilled
                                 // owns one final NewPath transaction against
                                 // its incumbent before target scan publishes
@@ -4769,6 +4785,19 @@ final class BattleNetCombatSystem {
                                     && keepHeading >= 0
                                     && unit.pathLength() > 0) {
                                 unit.replacePeekHeading(keepHeading);
+                            }
+                            if (longPaidTailRetargetRemainsLive
+                                    && unit.pathLength() > 0
+                                    && !unit.isMoving()) {
+                                // A paid long tail stays inside the live Move
+                                // transaction when target scan replaces its
+                                // mobile quarry with a building. The fresh
+                                // route head belongs to this same callback,
+                                // not the next scheduler visit. Independent
+                                // XHuman 12 witnesses retain fourteen and
+                                // sixteen old bytes before committing E and
+                                // SW respectively.
+                                stepMoveTowardsTarget(unit);
                             }
                             // The old route-park provenance was needed while
                             // choosing the replacement ray, but must not park
@@ -7579,6 +7608,27 @@ final class BattleNetCombatSystem {
         return true;
     }
 
+
+    /** Writes the paid refusal-two target handoff's bounded direct prefix. */
+    private void planRepeatedPaidLongTailRetarget(Unit unit, Unit target) {
+        // Repeated hard refusals have already bought the bounded direct
+        // writer. Target scan keeps its first three line bytes when replacing
+        // the quarry instead of immediately tracing a fresh wall around the
+        // same formation. XHuman 12's independent refusal-two long tail
+        // writes SW,SW,S before committing SW.
+        PathFinder.Path direct = BattleNetPathFinder.clearLine(
+                unit.tileX(), unit.tileY(), target.tileX(), target.tileY(),
+                world.battleNetMovementStride(unit), world.map::contains);
+        if (direct.result() == PathFinder.Result.FOUND
+                && direct.length() > 3) {
+            int[] headings = direct.headings();
+            direct = new PathFinder.Path(PathFinder.Result.FOUND,
+                    java.util.Arrays.copyOfRange(headings,
+                            headings.length - 3, headings.length));
+        }
+        unit.setPath(direct);
+        unit.setPathGoal(target.tileX(), target.tileY());
+    }
 
     /**
      * Aims a unit at something it chose for itself.

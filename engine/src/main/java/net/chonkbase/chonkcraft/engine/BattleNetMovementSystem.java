@@ -3431,6 +3431,52 @@ final class BattleNetMovementSystem {
                 }
             }
         }
+        if (mayDecide && !goldMidRoute && !chaseMoveSequence
+                && unit.stepDrained() && !unit.isMoving()
+                && !unit.returningToDepot() && unit.resourceUnit() == null
+                && unit.resourceTileX() >= 0 && unit.resourceTileY() >= 0
+                && unit.pathLength() == 2
+                && unit.battleNetPathInitialLength() > unit.pathLength()
+                && unit.battleNetPathStepsTaken() > 0) {
+            int heading = unit.peekHeading();
+            int stride = world.battleNetMovementStride(unit);
+            Unit blocker = world.blockerOnLayer(unit,
+                    unit.tileX() + Direction.deltaX(heading) * stride,
+                    unit.tileY() + Direction.deltaY(heading) * stride);
+            boolean alliedWorker = blocker != null && blocker != unit
+                    && blocker.isOnMap() && !blocker.isDying()
+                    && blocker.type() != null
+                    && ("unit-peon".equals(blocker.type().ident())
+                            || "unit-peasant".equals(
+                                    blocker.type().ident()))
+                    && world.isAllied(unit.player(), blocker.player());
+            if (alliedWorker) {
+                // A terrain worker whose committed residual lands behind a
+                // two-byte allied-worker tail keeps that tail under the
+                // complete FUN_004379e0 Move band. The cursor is not parked
+                // for a shortcut or an action-23 redraw. XHuman 12 peons 1385
+                // and 1360 independently retain SE,NE and E,SE respectively;
+                // their collision generations differ, so the two-byte
+                // residual transaction rather than a particular nibble owns
+                // the band. Six-byte shortcut and four-byte terminal-
+                // construction routes keep their separate handlers below.
+                int collision = unit.battleNetCollisionCounter() + 1;
+                unit.setBattleNetCollisionCounter(
+                        collision > 14 ? 0 : collision);
+                unit.setBattleNetRefusals(0);
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(14);
+                unit.setBattleNetRefusalHold(true);
+                int moveStart = world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                }
+                unit.setBattleNetAnimationTimer(15);
+                return;
+            }
+        }
         if (mayDecide && unit.battleNetNearlyFullFreeDetour()
                 && unit.stepDrained() && !unit.isMoving()) {
             // A detached detour can itself be the complete native route. If

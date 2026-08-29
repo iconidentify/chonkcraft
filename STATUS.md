@@ -30,16 +30,30 @@ legacy identities prevent attributing the later difference to either its older
 The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 264.** The lowest common divergence is
-  cycle 265, so the shared proven frontier is cycle 264. Expansion Human 12
-  now defines that boundary.
+- **52/52 maps are exact through cycle 266.** The lowest common divergence is
+  cycle 267, so the shared proven frontier is cycle 266. Expansion Human 11
+  now defines that boundary; expansion Human 12 is exact through cycle 267.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,434 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,437 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,754; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,757; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The paid-tail handoff milestone advances expansion Human 12 from exact
+  through cycle 264 to exact through 267, raising the shared fleet frontier by
+  two cycles. Terrain-wood workers now keep a committed two-byte route behind
+  an allied worker for the native Move refusal band instead of redrawing early,
+  and combatants with a repeatedly refused long route commit the bounded
+  replacement prefix in the same target-handoff visit. Independent native
+  positives cover different route shapes and refusal generations; short
+  construction routes, quiet shortcut candidates, fresh collision visits,
+  compact combat pressure, dying targets, and saturated first steps remain
+  outside the rules. The cycle-400 and cycle-1,800 aggregate frontiers each
+  gain three cycles, clean-map counts remain 27 and 8, and none of the other
+  51 maps regresses. Accepted run `81972961` binds the 1,800-cycle survey and
+  its structural source capsule; run `d983ebc0` records the same fleet result
+  through cycle 400.
 - The plain-Move route-writer milestone moves Human 13 from exact through
   cycle 264 to exact through 277. After refusal recovery, native writes the
   whole bounded terrain line while ignoring mobile occupants during planning;
@@ -121,18 +135,19 @@ intentional data-free skips and run in the authenticated profile. Exact-boundary
 and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
-data-free skips. A matched-input full run associated with accepted parity run
-`e0dfea7cf6aec8405bcaffa73ab6ccd53ed8ab6252dca6c34b60204005ad43a7`
+data-free skips. A matched-input full run after accepted parity run
+`81972961bcbf026a6a03ae560e082121829abe710f91893d0f27395b87d45c09`
 exercised all 2,790 authenticated tests with the exact expected failure
-identity. Its new referee seals two independent whole-line plain-Move wakes,
-both later-byte refusal/redraw boundaries, and the occupied-first-square
-detour control.
+identity. Its new referees seal two independent terrain-worker residual holds
+and two independent paid combat-target handoffs, together with the held-out
+construction, shortcut, fresh-collision, pressure, dying-target, and
+first-step-saturation boundaries.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0829.102` is the public release, published from revision
-`a5facd29be95fcd7c0c71fd55003d5c27549fc3c` with game JAR SHA-256
-`4b67261c3f4a8061d164eba55327815a4d649e6144e99196ad2224dc36dca8be`.
+Signed engine OTA `2026.0829.104` is the public release, published from revision
+`f2a3d646176a3d84f6a5767ed2ad82228e3f4be6` with game JAR SHA-256
+`a5b0d697756046427e1141e45355bdd15f8ec5e141a83d4ab2247de593b24e12`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
