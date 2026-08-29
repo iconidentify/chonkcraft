@@ -132,8 +132,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,817 tests**. The canonical authenticated
-profile runs 2,790 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,818 tests**. The canonical authenticated
+profile runs 2,791 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
@@ -148,18 +148,18 @@ and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run after accepted parity run
-`81972961bcbf026a6a03ae560e082121829abe710f91893d0f27395b87d45c09`
-exercised all 2,790 authenticated tests with the exact expected failure
-identity. Its new referees seal two independent terrain-worker residual holds
-and two independent paid combat-target handoffs, together with the held-out
-construction, shortcut, fresh-collision, pressure, dying-target, and
-first-step-saturation boundaries.
+`98bfa97795139db3d9fc625f11084602477ac291629a3c256944cca017bb200c`
+exercised all 2,791 authenticated tests with the exact expected failure
+identity. Its new claimed-tree referee reconstructs expansion Human 11's
+occupied-face forest wall and proves both the next eligible tree and the native
+staging delay; the complete preceding terrain-worker and paid combat-target
+boundary inventory remains green.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0829.105` is the public release, published from revision
-`2e714386b5138a2b5d5168685eaa6e19cc1ffe46` with game JAR SHA-256
-`43dd02a27d54c5a50720d52550104088bb42e067bcf724552f3382faa700564d`.
+Signed engine OTA `2026.0829.106` is the public release, published from revision
+`5e4e994be78dde86d865c17639860e511ec2b763` with game JAR SHA-256
+`84c3bbd668b35f36241a9d68e6886bfeb1cf1956f25324d0963195b67a936b1c`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.

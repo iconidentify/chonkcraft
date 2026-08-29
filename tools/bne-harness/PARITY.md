@@ -56,7 +56,7 @@ Milestone acceptance repeated the complete 18-lane player-contract gate with
 gate kept all 39 lockstep cases through cycle 1,800 and completed real
 two-process startup, map transfer, 180 rendered cycles, and terminal hash
 `1b9dd8ad7b9a1f51`. The canonical isolated-home, matched-media suite accounted
-for all 2,817 tests, ran 2,790, and retained the exact 27 skip identities and
+for all 2,818 tests, ran 2,791, and retained the exact 27 skip identities and
 exact 110 expected specification failures; there were no unexpected or stale
 failures.
 
