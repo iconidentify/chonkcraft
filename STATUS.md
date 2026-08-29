@@ -30,16 +30,24 @@ legacy identities prevent attributing the later difference to either its older
 The current public release has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
-- **52/52 maps are exact through cycle 263.** The lowest common divergence is
-  cycle 264, so the shared proven frontier is cycle 263. Expansion Human 12
-  is now the only map at that boundary.
+- **52/52 maps are exact through cycle 264.** The lowest common divergence is
+  cycle 265, so the shared proven frontier is cycle 264. Human 13 and
+  expansion Human 12 share that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,393 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,401 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,713; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,721; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The repeated laden-convoy return milestone moves Human 14's exact frontier
+  from cycle 391 to 398. When a paid return-route refusal band expires and the
+  same clean moving laden convoy still blocks its cached heading, the worker
+  retries that byte for another native Move 15 band. Human 14 and expansion
+  Human 10 independently authenticate the behavior; a collision-marked
+  returner and a vacated blocker authenticate the park-and-redraw boundaries.
+  All other 51 maps are unchanged in both complete fleets. Accepted run
+  `10c982f2` binds the cycle-1,800 survey and structural source capsule.
 - The pressured-hull route-redraw milestone moves expansion Orc 8 from cycle
   268 to 279. A targetless naval router with multi-step route provenance parks
   its cached route when the allied mobile hull ahead has entered its own
@@ -92,9 +100,10 @@ intentional data-free skips and run in the authenticated profile. Exact-boundary
 and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
-data-free skips. A matched-input full run against revision
-`c3b6929f6a0cc26e05116fe5c0ccf2d4b1ca6e1a` exercised all 2,789 authenticated
-tests with the exact expected failure identity.
+data-free skips. A matched-input full run associated with accepted parity run
+`10c982f280fca17840e9263f4937509d8ccba594d8f3ac4f0e84e42751fab677`
+exercised all 2,789 authenticated tests with the exact expected failure
+identity.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

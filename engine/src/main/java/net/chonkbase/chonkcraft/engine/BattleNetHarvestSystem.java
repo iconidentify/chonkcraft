@@ -431,6 +431,48 @@ final class BattleNetHarvestSystem {
                     }
                 }
                 if (left == 0 && parkCooperativeReturn) {
+                    int heading = worker.pathLength() > 0
+                            ? worker.peekHeading() : -1;
+                    int stride = world.battleNetMovementStride(worker);
+                    Unit blocker = heading >= 0 && heading < Direction.COUNT
+                            ? world.blockerOnLayer(worker,
+                                    worker.tileX()
+                                            + Direction.deltaX(heading)
+                                                    * stride,
+                                    worker.tileY()
+                                            + Direction.deltaY(heading)
+                                                    * stride)
+                            : null;
+                    boolean ladenConvoyStillBlocks = blocker != null
+                            && blocker.returningToDepot()
+                            && blocker.carried() > 0
+                            && world.battleNetCooperativeBlocker(
+                                    worker, blocker);
+                    int counter = worker.battleNetCollisionCounter() + 1;
+                    worker.setBattleNetCollisionCounter(
+                            counter > 14 ? 0 : counter);
+                    if (ladenConvoyStillBlocks) {
+                        // A paid return route retries the same cached byte
+                        // when the clean moving convoy which earned its first
+                        // refusal is still there at timer one. Independent
+                        // Human 14 and XHuman 10 workers both restart Move
+                        // 15; a vacated square and a collision-marked blocker
+                        // retain the park-and-redraw behavior below.
+                        worker.setBattleNetRefusals(0);
+                        worker.setWaitCycles(0);
+                        worker.setBattleNetOrderDelay(14);
+                        worker.setBattleNetRefusalHold(true);
+                        if (world.battleNetSequence != null) {
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(worker,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                worker.setBattleNetSequenceOffset(moveStart);
+                                worker.setBattleNetAnimationTimer(15);
+                            }
+                        }
+                        return;
+                    }
                     // A laden worker whose buffered heading was refused by an
                     // allied mover does not retry that stale heading when the
                     // fifteen-count expires. FUN_004379e0 counts the second
@@ -441,9 +483,6 @@ final class BattleNetHarvestSystem {
                     // either takes a stale diagonal or re-arms the same wait.
                     worker.clearPath();
                     worker.setRouteSpent(false);
-                    int counter = worker.battleNetCollisionCounter() + 1;
-                    worker.setBattleNetCollisionCounter(
-                            counter > 14 ? 0 : counter);
                     worker.setBattleNetRefusalHold(false);
                 }
                 if (left > 0) {

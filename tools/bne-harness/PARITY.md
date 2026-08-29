@@ -17,26 +17,29 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `eecef5dd` advances the shared clean horizon from 263
-to 264 (earliest divergence 265), with 8 clean / 44 divergent / 0 failed. The
+Accepted cycle-1,800 run `10c982f2` preserves the shared clean horizon at 264
+(earliest divergence 265), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. Aggregate per-map
-frontiers advance from 18,393 to 18,394 at cycle 400 and from 33,713 to 33,714
-at cycle 1,800. Expansion Human 12 is the only changed case (263 -> 264), and
-no map moves backward. The durable accepted survey and manifest are retained
-under `.bne-artifacts/runs/eecef5dd3825b234958be565f945f8b29b51c89f2951f12ab90be14555fe5bdc`.
+frontiers advance from 18,394 to 18,401 at cycle 400 and from 33,714 to 33,721
+at cycle 1,800. Human 14 is the only changed case, advancing its exact frontier
+from 391 to 398, and no map moves backward. The durable accepted survey and
+manifest are retained under
+`.bne-artifacts/runs/10c982f280fca17840e9263f4937509d8ccba594d8f3ac4f0e84e42751fab677`.
 
-Closed this stretch: after a moving router completes four collision refusals,
-collision-marked moving allies behind it on the replacement target's major
-approach axis remain authoritative walls during the paid-band redraw. Native
-grunt 1494 proves the positive at fixture 245: with the four rear-rank allied
-bodies still collision-marked, retail draws `NE,NE,NE,SE,SE,E...`; the prior
-Java planner incorrectly softened them and drew `NE,E,E,NE,SE,SE...`. The
-real-data regression seals the second and third northeast steps through
-fixtures 263 and 264. Expansion Human 10's native grunt 1490 remains the
-opposite-boundary positive: its paid-refusal wake must keep softening departing
-allies and route `E,E,SE`. Expansion Human 12's earlier two-refusal router and
-1494's cold cycle-5 route are held-out negatives, so the rule does not turn
-ordinary cooperative traffic into hard occupancy.
+Behavioral delta: a laden worker at the end of a paid return-route refusal
+band now retries the same cached heading when the clean moving laden convoy
+which caused the refusal still occupies that heading. Human 14 native slot
+1539 proves the repeated Move 2600/15 band at fixtures 391 and 392 behind
+native slot 1537. Expansion Human 10 native slot 1588 independently proves the
+same retained-route behavior at fixtures 270 and 285. Expansion Human 10 slot
+1584 behind a collision-marked returner and Expansion Human 8 slot 1498 after
+its blocker vacates are held-out negatives: both retain the prior park-and-
+redraw behavior. The implementation is structural and contains no map, unit,
+cycle, or coordinate exception.
+
+Proof delta: the authenticated return-route referee now seals both positive
+witnesses and both negative boundaries. The complete cycle-400 and cycle-1,800
+fleets show the seven-cycle Human 14 gain with all other maps unchanged.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network

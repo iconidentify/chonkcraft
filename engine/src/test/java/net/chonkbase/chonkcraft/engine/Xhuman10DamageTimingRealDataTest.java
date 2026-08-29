@@ -1693,7 +1693,7 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
-    @DisplayName("xhuman 10's laden peon retains its refused return route")
+    @DisplayName("independent laden peons retain a repeatedly refused return route")
     void xhuman10LadenPeonRetainsItsRefusedReturnRoute() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -1754,6 +1754,66 @@ class Xhuman10DamageTimingRealDataTest {
                 "the second timer-one refusal advances the same generation");
         assertEquals(2600, peon.battleNetSequenceOffset());
         assertEquals(15, peon.battleNetAnimationTimer());
+
+        // Independent native slot 1539 / Java 61 on Human 14 retains its
+        // final south byte through Move 2600/15..1. At fixture 391 the clean
+        // laden convoy in slot 1537 is still draining through that square, so
+        // retail advances the collision generation and starts another full
+        // band without erasing the cached byte. Java used to park the route
+        // and commit a fresh southeast detour on fixture 392.
+        Mission human14 = data.loadMission("campaigns/human/level14h",
+                GameData.personIn(data.campaignMap(
+                        "campaigns/human/level14h")), 1);
+        Assumptions.assumeTrue(human14 != null,
+                "Human 14 is not in the pack");
+        World human14World = human14.world();
+        Unit returner = unitById(human14World, 61);
+        Unit convoy = unitById(human14World, 63);
+        assertNotNull(returner,
+                "Human 14 has no native-slot-1539 return peon");
+        assertNotNull(convoy,
+                "Human 14 has no native-slot-1537 convoy peon");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            human14.tick();
+        }
+        while (human14World.cycle() - BNE_INITIALIZATION_TICKS < 390) {
+            human14.tick();
+        }
+
+        assertEquals(56, returner.tileX());
+        assertEquals(57, returner.tileY());
+        assertTrue(returner.returningToDepot());
+        assertEquals(100, returner.carried());
+        assertEquals(1, returner.pathLength());
+        assertEquals(1, returner.battleNetCollisionCounter());
+        assertEquals(1, returner.battleNetAnimationTimer());
+        assertTrue(convoy.isMoving());
+        assertTrue(convoy.returningToDepot());
+        assertEquals(100, convoy.carried());
+        assertEquals(0, convoy.battleNetCollisionCounter());
+        assertTrue(human14World.battleNetCooperativeBlocker(
+                returner, convoy));
+
+        human14.tick();
+        assertEquals(391,
+                human14World.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(56, returner.tileX());
+        assertEquals(57, returner.tileY());
+        assertEquals(1, returner.pathLength(),
+                "the still-blocked cached south byte remains live");
+        assertEquals(2, returner.battleNetCollisionCounter());
+        assertEquals(2600, returner.battleNetSequenceOffset());
+        assertEquals(15, returner.battleNetAnimationTimer());
+        assertEquals(14, returner.battleNetOrderDelay());
+
+        human14.tick();
+        assertEquals(392,
+                human14World.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(56, returner.tileX(),
+                "the repeated band prevents Java's early southeast detour");
+        assertEquals(57, returner.tileY());
+        assertEquals(1, returner.pathLength());
+        assertEquals(14, returner.battleNetAnimationTimer());
     }
 
     @Test
