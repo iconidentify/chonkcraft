@@ -755,16 +755,30 @@ final class BattleNetMovementSystem {
                                 && (movingWanderBlocker.isMoving()
                                         || movingWanderBlocker.walkHolding())) {
                             // Empty FOUND against a body which still owns its
-                            // walk is provisional. Retail leaves the critter's
-                            // Move visible and asks again until that body has
-                            // settled; only the standing occupant completes
-                            // the empty wander into Still. Orc 4 critter 1583
-                            // targets 1581's occupied north square on fixture
-                            // 235, remains Move through 239, and promotes Still
-                            // when 1581 finishes on fixture 240. Completing on
-                            // Java's first empty query made 1583 Still at 238.
+                            // walk is a real FUN_004379e0 refusal, not a free
+                            // provisional retry. Retail leaves Move visible,
+                            // advances the sticky refusal nibble on each
+                            // retry, and from refusal eight pays the complete
+                            // Move 15..1 band. Orc 13 critter 1456 reaches
+                            // collision ten while 1457 owns its northeast
+                            // square; Human 10 slot 1577 and Human 14 slot
+                            // 1524 independently reach nine and eight. The
+                            // old free retry left Java at collision zero and
+                            // promoted Still as soon as the blocker settled.
+                            int refusals = battleNetRefuse(unit);
                             unit.setRouteSpent(false);
-                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            pickUpMoveAnimation(unit);
+                            if (world.battleNetSequence != null) {
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(
+                                            refusals >= 8 ? 15 : 1);
+                                }
+                            }
                             return;
                         }
                         // Empty-route Still. Native FUN_004376c0 promotes

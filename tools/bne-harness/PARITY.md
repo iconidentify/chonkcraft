@@ -17,48 +17,44 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `98bfa977` advances the shared clean horizon from 266
-to 267 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
-cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. Aggregate per-map
-frontiers advance from 18,437 to 18,481 at cycle 400 and from 33,757 to 33,801
-at cycle 1,800. Expansion Human 11 is the only changed case, advancing from
-exact through 266 to exact through 310 (first divergence 311), and no map moves
-backward. The durable cycle-400 and accepted cycle-1,800 surveys are retained
-under `.bne-artifacts/runs/713adea3ce8f8896940eb1302a12b85a3d225bc730a95b0f86d75d19df0c4b0c`
-and `.bne-artifacts/runs/98bfa97795139db3d9fc625f11084602477ac291629a3c256944cca017bb200c`.
+Accepted cycle-1,800 run `e8309fec` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
+cycle-400 fleet advances from 27 clean / 25 divergent to 29 clean / 23
+divergent / 0 failed. Aggregate per-map frontiers rise from 18,481 to 18,609 at
+cycle 400 and from 33,801 to 34,821 at cycle 1,800. Human 11 advances 281 ->
+299; Human 14 advances 398 -> 400 at short horizon and 405 at long horizon;
+Orc 13 advances 292 -> 400 and 548; expansion Human 1 advances 554 -> 1,293 at
+long horizon. No case moves backward. The durable cycle-400 and accepted
+cycle-1,800 surveys are retained under
+`.bne-artifacts/runs/182cd53fa85eba34bf78b376b11429a3eb7cdaec1da2ac1e5488ea6f95768bc2`
+and `.bne-artifacts/runs/e8309fec394b189d9ca6d0b6f4256170f814d3ef2d1f1c55c5f5f92a30bb0fd4`.
 
-Behavioral delta: when a woodcutter reaches a tree that another worker has
-claimed, the replacement-tree ring search now requires at least one connected
-approach face that is not occupied by a live blocking body. The rule reproduces
-native constructor `0x44e230`, ring walker `0x443cd0`, and callback `0x44e150`:
-the callback accepts a forest square only when its 3-by-3 neighborhood contains
-the worker's connected component and the native `0x09ce` field mask is clear.
-The `0x0100` land-body bit therefore excludes Expansion Human 11's earlier
-tree, whose only connected face is occupied by a catapult, and selects the
-next eligible tree. Ordinary and AI tree acquisition retain Java's separate
-pre-search reconstruction and terrain-component view. The rule is structural
-and contains no map, unit, cycle, or coordinate exception.
+Behavioral delta: an empty critter route whose destination is still owned by a
+moving animal now enters native `FUN_004379e0` refusal handling. Each retry
+advances the sticky collision nibble and refusal eight begins the full Move
+15..1 payment band. Previously Java treated this as a free provisional retry,
+left collision at zero, and promoted Still as soon as the blocker settled.
+The change is structural and contains no map, unit, cycle, or coordinate
+exception.
 
-Proof delta: read-only disassembly and raw native field flags authenticate the
-constructor, callback, mask, and occupancy bit. An offline scan of the sealed
-fleet finds seven target choices where the complete native mask matches BNE
-and the earlier terrain-only model does not, plus 36 held target choices where
-both models already match BNE. The focused referee reconstructs Expansion
-Human 11's occupied-face wall and proves the next eligible target and native
-staging delay. A deliberately broader implementation advanced the target case
-but regressed Human 5 at cycle 107 by applying this live occupancy test to an
-ordinary failed-gold search; that candidate was rejected. Scoping the test to
-claimed-tree replacement keeps Human 5 and every other map unchanged in both
-complete fleets.
+Proof delta: Orc 13 critter 1456 and Human 14 critter 1524 independently retain
+Move at occupied destinations with native collision values ten and eight.
+Earlier completed one-tile wanders by those same animals are held-out negatives
+and still promote Still. Human 10 and Human 11 supply additional native
+diagnostic witnesses, while unoccupied completions and unrelated idle-wander
+directions remain outside the rule. The focused Orc 13 and Human 14 referee is
+green, and both complete fleets show only gains.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
 gate kept all 39 lockstep cases through cycle 1,800 and completed real
 two-process startup, map transfer, 180 rendered cycles, and terminal hash
-`1b9dd8ad7b9a1f51`. The canonical isolated-home, matched-media suite accounted
-for all 2,818 tests, ran 2,791, and retained the exact 27 skip identities and
-exact 110 expected specification failures; there were no unexpected or stale
-failures.
+`1b9dd8ad7b9a1f51`. The matched-media suite accounted for all 2,820 tests. The
+hosted profile runs 2,793 with 27 exact skips; the local profile with three
+private playtest-save referees runs 2,796 with 24 exact skips. Both retain the
+exact 110 expected specification failures. The data-free profile runs 1,617
+with 1,203 exact skips and the same 89 expected failures; there were no
+unexpected or stale failures.
 
 The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc
 12 follows at 273, expansion Orc 6 at 274, Human 13 at 278, and expansion Orc
@@ -67,7 +63,11 @@ remain reverted: blanket and soft visibility variants for Human 12 failed
 their native route or held-out negatives; Human 11's wood-stall timing changed
 only its target map; the broad all-tree occupancy candidate regressed Human 5;
 Human 13's moving-regroup softening advanced that map by one cycle but did not
-improve the shared horizon or a meaningful aggregate frontier.
+improve the shared horizon or a meaningful aggregate frontier. A recurring
+behavior-one home-Move give-up changed one expansion Human 12 symptom but made
+no fleet-level gain and was reverted. The subsequent three-position expansion
+Human 12 diagnostic exposed different causes rather than one systemic rule, so
+the work switched clusters before production code was changed.
 
 ## Prior release checkpoint — 2026-08-26
 

@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2817 tests,   27 skipped
-    no external input          2817 tests, 1201 skipped
+    authenticated inputs       2820 tests,   27 skipped
+    no external input          2820 tests, 1203 skipped
 
 Both can be green.
 
@@ -94,8 +94,9 @@ MODULES = (
 # Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
 # authenticated retail installation and derived pack.
 #
-# Twenty-seven skip on the current `full` runner. Two are release-dependent and
-# are described at the `full` profile below.
+# Twenty-seven skip on the current `full` runner. A development machine with
+# the three private playtest-save referees installed runs those as well and is
+# covered exactly by `full-with-playtest-saves`.
 #
 # Seven need a **display**: AppWindowTest's four, and three of
 # PlatformFullscreenTest's six. The root pom forces -Djava.awt.headless=true
@@ -154,9 +155,13 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # completion-boundary save/resume referees need the retail roster and
         # deliberately add two more data-free skips while running in full.
         #
+        # The occupied-critter refusal batch adds two pack-backed campaign
+        # witnesses. They run in both authenticated profiles and deliberately
+        # add two skips here.
+        #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1901, 872),
+        "engine": (1904, 874),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -210,9 +215,24 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1901, 7),
+        "engine": (1904, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
+        "desktop": (357, 8),
+        "matchmaker-server": (5, 1),
+    },
+    # The same authenticated inputs as `full`, on a development machine that
+    # also has the three private playtest-save referees named above. Keeping a
+    # separate exact profile prevents stronger local coverage from being
+    # mistaken for a malformed test run without weakening the hosted gate.
+    "full-with-playtest-saves": {
+        "assetpack": (256, 5),
+        "runtime": (99, 3),
+        "data": (139, 3),
+        "extractor": (9, 0),
+        "launcher": (49, 0),
+        "matchmaking": (2, 0),
+        "engine": (1904, 4),
         "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },

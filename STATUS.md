@@ -33,13 +33,25 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
   cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
   now defines that boundary; expansion Human 11 is exact through cycle 310.
-- **27/52 maps are exact through the full 400-cycle window**, with 25 later
+- **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,481 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,609 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,801; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,821; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The occupied-critter refusal milestone makes an empty route to a square still
+  owned by a moving animal enter the native sticky collision ladder instead of
+  receiving a free retry and standing down as soon as traffic clears. Orc 13
+  and Human 14 independently authenticate the occupied branch, while earlier
+  completed wanders by the same two animals preserve the unoccupied terminal
+  branch. The rule contains no map, unit, cycle, or coordinate exception.
+  Human 11 advances from exact through 281 to 299; Human 14 from 398 to 400 in
+  the short fleet and to 405 at long horizon; Orc 13 from 292 to 400 and 548;
+  and expansion Human 1 from 554 to 1,293. The cycle-400 aggregate gains 128
+  cycles and two clean maps, while the cycle-1,800 aggregate gains 1,020 cycles
+  with no regression. Durable cycle-400 run `182cd53f` and accepted
+  cycle-1,800 run `e8309fec` bind the surveys and structural source capsules.
 - The claimed-tree replacement milestone advances expansion Human 11 from
   exact through cycle 266 to exact through 310. When another woodcutter has
   claimed the current tree, the native replacement search accepts a candidate
@@ -132,12 +144,15 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,818 tests**. The canonical authenticated
-profile runs 2,791 and intentionally skips exactly 27, while keeping the exact
-expected 110-test specification-failure set. The added boundary matrix proves
-that completed land, naval and air trainees survive save/resume without being
-born twice, while a fully blocked trainee remains unborn until a legal exit
-opens. New training completions now retire atomically in the trainee's birth
+The complete suite now contains **2,820 tests**. The canonical hosted
+authenticated profile runs 2,793 and intentionally skips exactly 27. A local
+profile with the three private playtest-save referees installed runs 2,796 and
+skips exactly 24. Both retain the exact expected 110-test
+specification-failure set. With no licensed inputs, 1,617 tests run, 1,203 skip,
+and the exact 89-test data-free failure set remains unchanged. The added
+boundary matrix proves that completed land, naval and air trainees survive
+save/resume without being born twice, while a fully blocked trainee remains
+unborn until a legal exit opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
 boundary disagreement before a duplicate can appear. The physical transaction
@@ -148,12 +163,11 @@ and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run after accepted parity run
-`98bfa97795139db3d9fc625f11084602477ac291629a3c256944cca017bb200c`
-exercised all 2,791 authenticated tests with the exact expected failure
-identity. Its new claimed-tree referee reconstructs expansion Human 11's
-occupied-face forest wall and proves both the next eligible tree and the native
-staging delay; the complete preceding terrain-worker and paid combat-target
-boundary inventory remains green.
+`e8309fec394b189d9ca6d0b6f4256170f814d3ef2d1f1c55c5f5f92a30bb0fd4`
+exercised all 2,796 locally available authenticated tests with the exact
+expected failure identity. Its two new critter referees reconstruct Orc 13 and
+Human 14 occupied wander traffic and pair each positive with an earlier
+same-unit completion; the complete preceding movement inventory remains green.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
