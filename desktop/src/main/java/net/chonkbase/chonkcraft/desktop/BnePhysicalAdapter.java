@@ -80,6 +80,7 @@ public final class BnePhysicalAdapter {
             List<Unit> chosen = new ArrayList<>();
             List<Map<String, Object>> identities = new ArrayList<>();
             Map<Integer, Integer> javaToNative = new LinkedHashMap<>();
+            Map<Integer, Unit> nativeToJava = new LinkedHashMap<>();
             for (Object row : select) {
                 Map<String, Object> actor = object(row, "select");
                 int nativeId = number(actor.get("native_id"), "native id");
@@ -89,6 +90,8 @@ public final class BnePhysicalAdapter {
                 Unit match = uniqueAt(world, player, x, y);
                 require(match != null, "no Java unit at " + x + "," + y
                         + " for native " + nativeId);
+                require(nativeToJava.put(nativeId, match) == null,
+                        "duplicate native selection " + nativeId);
                 chosen.add(match);
                 javaToNative.put(match.id(), nativeId);
                 identities.add(identityOf(match, nativeId));
@@ -108,9 +111,33 @@ public final class BnePhysicalAdapter {
                 if (cycle == issueCycle) {
                     Unit under;
                     if (gesture.containsKey("target_native_id")) {
-                        require(gesture.get("target_native_id") == null,
-                                "explicit native target identities are not supported");
-                        under = null;
+                        Object targetValue = gesture.get("target_native_id");
+                        if (targetValue == null) {
+                            under = null;
+                        } else {
+                            int targetNativeId = number(targetValue,
+                                    "target_native_id");
+                            Map<String, Object> target = object(
+                                    scenario.get("target"), "target");
+                            require(number(target.get("native_id"),
+                                            "target native id") == targetNativeId,
+                                    "sealed target identity does not match its locator");
+                            int targetPlayer = optionalNumber(
+                                    target.get("player"), person);
+                            int targetX = number(target.get("x"), "target x");
+                            int targetY = number(target.get("y"), "target y");
+                            under = uniqueAt(world, targetPlayer, targetX, targetY);
+                            require(under != null, "no Java target at " + targetX
+                                    + "," + targetY + " for native "
+                                    + targetNativeId);
+                            Unit known = nativeToJava.putIfAbsent(targetNativeId, under);
+                            require(known == null || known.id() == under.id(),
+                                    "native target collides with a selected unit");
+                            if (!javaToNative.containsKey(under.id())) {
+                                javaToNative.put(under.id(), targetNativeId);
+                                identities.add(identityOf(under, targetNativeId));
+                            }
+                        }
                     } else {
                         under = world.unitAt(tileX, tileY);
                     }

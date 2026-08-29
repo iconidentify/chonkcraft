@@ -134,14 +134,21 @@ being inferred from the playable campaign fleet:
   `c204a868fc1b6fca3c83b09e6ca0e0446a99938f7c7d0602b7e963d85d260a30`
   to the current engine identity.
 - Physical player transactions: **3/532** current-source paired certifications.
-  A retained store reopens thirteen native capture closures across the Human
+  A retained store reopens seventeen native capture closures across the Human
   and Orc campaigns and reruns their packaged Java twins with producer evidence
   verified. The single-unit, field/plain Move cells for open and occupied ground
   are each exact across two independent scenarios. The two-unit occupied-ground
   cell is also exact across independent Human and Orc scenarios after canonical
   receipts order terminal outcomes by their recorded completion cycle. The
   two-unit open-ground held-out remains red by two cycles and stays explicit
-  movement debt rather than receiving a scenario-specific exception.
+  movement debt rather than receiving a scenario-specific exception. Four new
+  sealed captures authenticate friendly unit and building targets independently
+  on Human 1 and Orc 1, expanding observed target shapes from open/occupied
+  ground to unit/building and reducing the executable capture debt from seventeen
+  to fifteen cells. They deliberately do not increase the numerator: retail
+  serializes both targeted right-clicks as Move-with-target, Java selects Follow
+  for a friendly unit, and the building approaches settle at different tiles or
+  cycles. No gameplay change follows from that bounded cross-map diagnostic.
 - Replay twin: **0/764,756** dispatcher records in a complete 27-replay paired
   certification.
 - AI fleet: **52/52** current-head mission twins are materialized under one

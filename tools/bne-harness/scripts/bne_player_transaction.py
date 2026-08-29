@@ -1618,7 +1618,7 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
         raise ProofError("physical command script is not UTF-8") from error
     selects: list[int] = []
     issue_cycle: int | None = None
-    click: tuple[int, int] | None = None
+    click: tuple[int, int, int | None] | None = None
     action_lines = []
     for raw in command_text.splitlines():
         line = raw.strip()
@@ -1627,7 +1627,8 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
         action_lines.append(line)
         selected = re.fullmatch(r"cycle (\d+) select unit (\d+)", line)
         clicked = re.fullmatch(
-            r"cycle (\d+) ui-right-click x (-?\d+) y (-?\d+)", line)
+            r"cycle (\d+) ui-right-click x (-?\d+) y (-?\d+)"
+            r"(?: target (\d+))?", line)
         if selected:
             cycle, unit = int(selected.group(1)), int(selected.group(2))
             if issue_cycle not in (None, cycle) or click is not None \
@@ -1640,7 +1641,9 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
             if issue_cycle not in (None, cycle) or click is not None:
                 raise ProofError("physical click script is ambiguous")
             issue_cycle = cycle
-            click = (int(clicked.group(2)), int(clicked.group(3)))
+            click = (int(clicked.group(2)), int(clicked.group(3)),
+                     (int(clicked.group(4))
+                      if clicked.group(4) is not None else None))
         else:
             raise ProofError(
                 f"unsupported physical command cannot become Java proof: {line}")
@@ -1674,6 +1677,21 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
     }
     if set(selects) - set(identities):
         raise ProofError("sealed selection omits native unit identities")
+    target_native_id = click[2]
+    command_targets = {item.get("target_id") for item in commands}
+    if command_targets != {target_native_id}:
+        raise ProofError("sealed target disagrees with native fan-out")
+    target = None
+    if target_native_id is not None:
+        if target_native_id not in identities:
+            raise ProofError("sealed target omits its native unit identity")
+        identity = identities[target_native_id]
+        target = {
+            "native_id": target_native_id,
+            "player": int(identity["owner"]),
+            "x": int(identity["x"]),
+            "y": int(identity["y"]),
+        }
     run = manifest.get("run") or {}
     scenario = run.get("requested_scenario")
     seed = run.get("initialization_seed")
@@ -1696,12 +1714,13 @@ def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
         "gesture": {
             "origin": "field", "detail": "right-click",
             "tile_x": click[0], "tile_y": click[1], "modifiers": "plain",
-            # The supported native command spells no `target SLOT`, so it
-            # passed a null third argument to DoRightButton.  Preserve that
-            # observed target resolution instead of asking Java to infer a
-            # unit from the clicked tile and changing Move into Follow/Attack.
-            "target_native_id": None,
+            # Preserve the exact third argument passed to retail
+            # DoRightButton. A missing target must stay null rather than
+            # becoming Java tile lookup, while a sealed target must resolve
+            # through its independently observed initial-unit identity.
+            "target_native_id": target_native_id,
         },
+        "target": target,
         "issue_cycle": issue_cycle,
         "cycles": cycles,
     }

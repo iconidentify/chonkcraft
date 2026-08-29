@@ -1478,6 +1478,55 @@ static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
                 (unsigned int) read_word(unit, BNE_UNIT_Y),
                 ordinal);
     }
+    /* A targeted right-click needs the target's stable initial identity on
+     * the Java side as well. Emit each non-selected target once; the sealed
+     * GiveOrder rows below remain the authority for which target was used. */
+    for (index = 0; index < player_tx_order_count; index++) {
+        DWORD target_slot = player_tx_orders[index].target_slot;
+        BYTE *target;
+        unsigned int ordinal = 0;
+        DWORD earlier;
+        BOOL already_emitted = FALSE;
+
+        if (pool == NULL || target_slot == SCRIPT_NO_TARGET
+                || target_slot >= pool_count) {
+            continue;
+        }
+        for (earlier = 0; earlier < player_tx_order_count; earlier++) {
+            if (player_tx_orders[earlier].slot == target_slot
+                    || (earlier < index
+                        && player_tx_orders[earlier].target_slot == target_slot)) {
+                already_emitted = TRUE;
+                break;
+            }
+        }
+        if (already_emitted) {
+            continue;
+        }
+        target = pool + target_slot * BNE_UNIT_BYTES;
+        for (earlier = 0; earlier < target_slot; earlier++) {
+            BYTE *other = pool + earlier * BNE_UNIT_BYTES;
+            if ((other[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
+                continue;
+            }
+            if (other[BNE_UNIT_OWNER] == target[BNE_UNIT_OWNER]
+                    && other[BNE_UNIT_TYPE] == target[BNE_UNIT_TYPE]
+                    && read_word(other, BNE_UNIT_X) == read_word(target, BNE_UNIT_X)
+                    && read_word(other, BNE_UNIT_Y) == read_word(target, BNE_UNIT_Y)) {
+                ordinal++;
+            }
+        }
+        trace_write("# bne-trace event=player-unit-identity local-id=%lu "
+                "generation=%lu origin=initial owner=%u type=%s x=%u y=%u "
+                "ordinal=%u",
+                (unsigned long) target_slot,
+                (unsigned long) (unit_generations[target_slot] == 0
+                        ? 0 : unit_generations[target_slot] - 1),
+                (unsigned int) target[BNE_UNIT_OWNER],
+                bne_unit_type_name(target[BNE_UNIT_TYPE]),
+                (unsigned int) read_word(target, BNE_UNIT_X),
+                (unsigned int) read_word(target, BNE_UNIT_Y), ordinal);
+    }
     for (index = 0; index < player_tx_order_count; index++) {
         const player_tx_order *order = &player_tx_orders[index];
         DWORD intent = player_tx_next_intent++;

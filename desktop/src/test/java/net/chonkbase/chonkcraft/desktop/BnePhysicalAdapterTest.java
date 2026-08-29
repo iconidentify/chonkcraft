@@ -174,6 +174,72 @@ class BnePhysicalAdapterTest {
     }
 
     @Test
+    @DisplayName("a sealed native unit target drives the same Java field click")
+    void aSealedNativeUnitTargetDrivesTheSameJavaFieldClick() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        Path directory = Files.createTempDirectory("bne-physical-unit-target-");
+        Path scenarioPath = directory.resolve("scenario.json");
+        Path output = directory.resolve("evidence.json");
+        Map<String, Object> scenario = Json.parseObject("""
+                {
+                  "schema": "chonkcraft-bne-physical-scenario-1",
+                  "setup": {
+                    "scenario": "Campaign\\\\Human\\\\Human01.pud",
+                    "seed": 1,
+                    "java_map": "campaigns/human/level01h"
+                  },
+                  "select": [
+                    {"native_id": 1598, "player": 1, "x": 21, "y": 5}
+                  ],
+                  "gesture": {
+                    "origin": "field",
+                    "detail": "right-click",
+                    "tile_x": 17,
+                    "tile_y": 7,
+                    "modifiers": "plain",
+                    "target_native_id": 1597
+                  },
+                  "target": {
+                    "native_id": 1597, "player": 1, "x": 17, "y": 7
+                  },
+                  "issue_cycle": 5,
+                  "cycles": 20
+                }
+                """);
+        Files.writeString(scenarioPath, Json.write(scenario), StandardCharsets.UTF_8);
+
+        BnePhysicalAdapter.main(new String[] {
+                "--scenario", scenarioPath.toString(),
+                "--output", output.toString(),
+                "--build-sha256", "a".repeat(64),
+        });
+
+        Map<String, Object> evidence = Json.parseObject(
+                Files.readString(output, StandardCharsets.UTF_8));
+        Map<?, ?> gesture = null;
+        Map<?, ?> order = null;
+        for (Object item : (List<?>) evidence.get("player_intents")) {
+            if (((Map<?, ?>) item).get("gesture") instanceof Map<?, ?> body) {
+                gesture = body;
+            }
+            if (((Map<?, ?>) item).get("command") instanceof Map<?, ?> command) {
+                order = command;
+            }
+        }
+        assertNotNull(gesture);
+        assertEquals("unit", gesture.get("target_shape"));
+        assertNotNull(gesture.get("target_id"));
+        assertNotNull(order);
+        assertEquals("FOLLOW", order.get("kind"),
+                "the explicit target must reach smart right-click dispatch");
+        assertNotNull(order.get("target_id"));
+        Map<?, ?> identities = (Map<?, ?>) evidence.get("unit_identities");
+        assertEquals(2, ((List<?>) identities.get("units")).size(),
+                "the selected actor and sealed target both need stable identities");
+    }
+
+    @Test
     @DisplayName("an xhuman 2 wood click dest-spreads five retail harvest wires")
     void anXhuman2WoodClickDestSpreadsFiveRetailHarvestWires() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,

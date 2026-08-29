@@ -264,6 +264,21 @@ versus native column 26) and later reconverges; it remains movement/pathfinding
 debt rather than being hidden by wire normalization or a one-map timing special
 case. The leftover-27 walk is closed.
 
+Targeted physical right-click proof is now executable rather than adapter debt.
+The sealed command parser preserves an explicit `target SLOT`, the native tracer
+retains the target's stable initial identity, and the packaged Java twin resolves
+that identity rather than guessing from the clicked tile. Four bounded captures
+cover friendly unit and building targets independently on Human 1 and Orc 1.
+That grows the retained producer graph from thirteen to seventeen authenticated
+native/Java pairs, expands observed target shapes to unit and building, and
+reduces the partial-executable capture plan from seventeen to fifteen cells.
+Semantic pairing intentionally remains **3/532**. On both factions retail sends
+GiveOrder function 3 (Move with a target); Java sends Follow for the friendly
+unit, while the building approaches differ in terminal tile or cycle. The
+cross-map agreement is enough to name one systemic contract gap, but not to
+justify a gameplay change. The lane therefore stops here instead of tuning
+either opening map.
+
 Pair receipts only after the Java side emits the same lossless event contract:
 
 ```sh

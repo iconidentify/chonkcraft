@@ -650,6 +650,59 @@ class PlayerTransactionTest(unittest.TestCase):
         self.assertIsNone(scenario["gesture"]["target_native_id"],
                           "a native null target must not become Java tile lookup")
 
+    def test_scenario_derivation_preserves_a_sealed_native_ui_target(self):
+        native = transaction.compile_evidence(
+            store_evidence("native"), source="trace.txt")
+        item = native["transactions"][0]
+        item["gesture"]["tile_x"] = 14
+        item["gesture"]["tile_y"] = 15
+        item["gesture"]["target_shape"] = "unit"
+        item["commands"][0]["target_id"] = 9
+        native["unit_identities"]["units"].append({
+            "local_id": 9,
+            "generation": 0,
+            "identity": {
+                "origin": "initial", "owner": 0,
+                "type": "footman", "x": 14, "y": 15, "ordinal": 0,
+            },
+        })
+        value = {
+            "manifest": {"run": {
+                "requested_scenario": "Campaign\\Human\\Human01.pud",
+                "initialization_seed": 1, "cycle_limit": 40,
+                "commands": {"count": 2},
+            }},
+            "receipt": native,
+            "commands_bytes": (b"cycle 10 select unit 7\n"
+                               b"cycle 10 ui-right-click x 14 y 15 target 9\n"),
+        }
+        scenario = transaction._derive_java_scenario(value)
+        self.assertEqual(9, scenario["gesture"]["target_native_id"])
+        self.assertEqual({
+            "native_id": 9, "player": 0, "x": 14, "y": 15,
+        }, scenario["target"])
+
+    def test_scenario_derivation_rejects_a_target_without_identity(self):
+        native = transaction.compile_evidence(
+            store_evidence("native"), source="trace.txt")
+        item = native["transactions"][0]
+        item["gesture"]["tile_x"] = 14
+        item["gesture"]["tile_y"] = 15
+        item["commands"][0]["target_id"] = 9
+        value = {
+            "manifest": {"run": {
+                "requested_scenario": "Campaign\\Human\\Human01.pud",
+                "initialization_seed": 1, "cycle_limit": 40,
+                "commands": {"count": 2},
+            }},
+            "receipt": native,
+            "commands_bytes": (b"cycle 10 select unit 7\n"
+                               b"cycle 10 ui-right-click x 14 y 15 target 9\n"),
+        }
+        with self.assertRaisesRegex(transaction.ProofError,
+                                    "omits its native unit identity"):
+            transaction._derive_java_scenario(value)
+
     def test_native_do_right_button_trace_is_one_group_transaction(self):
         compiled = transaction.compile_ui_trace(
             "\n".join([
