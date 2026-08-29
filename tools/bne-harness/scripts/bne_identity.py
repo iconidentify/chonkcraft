@@ -10,8 +10,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 
-IDENTITY_SCHEMA = 2
-INPUT_POLICY = "engine-input-v1"
+IDENTITY_SCHEMA = 3
+INPUT_POLICY = "engine-input-v2"
 
 #: Everything the engine trace and its comparison are actually built from.
 #: ``mvn -pl engine -am`` builds ``engine`` plus its reactor dependencies
@@ -82,15 +82,6 @@ def _index_entries(root: Path) -> dict[str, str]:
     return entries
 
 
-def _head_entries(root: Path) -> dict[str, str]:
-    entries: dict[str, str] = {}
-    for chunk in _split_z(_git(root, "ls-tree", "-r", "-z", "HEAD")):
-        meta, _, name = chunk.partition(b"\t")
-        mode, _kind, blob = meta.split()
-        entries[os.fsdecode(name)] = f"{mode.decode()} {blob.decode()}"
-    return entries
-
-
 def _status_paths(root: Path) -> tuple[set[str], set[str]]:
     """Return every path git reports as changed, and the untracked subset."""
     changed: set[str] = set()
@@ -133,35 +124,54 @@ def _file_bytes(path: Path) -> int:
         return 0
 
 
-def scan(root: Path) -> dict[str, Any]:
-    """Fingerprint the declared engine inputs and count everything else."""
-    root = Path(root).expanduser().resolve()
-    head = _git_text(root, "rev-parse", "HEAD")
+def _matches_pathspec(relative: str, pathspecs: Iterable[str]) -> bool:
+    return any(relative == spec or relative.startswith(f"{spec}/")
+               for spec in pathspecs)
+
+
+def _input_records(root: Path, predicate) \
+        -> tuple[list[tuple[str, str, str]], set[str], set[str]]:
     index = _index_entries(root)
-    committed = _head_entries(root)
     changed, untracked = _status_paths(root)
-
-    relevant = {name for name in index if is_engine_input(name)}
-    relevant.update(name for name in untracked if is_engine_input(name))
-
+    relevant = {name for name in index if predicate(name)}
+    relevant.update(name for name in untracked if predicate(name))
     records: list[tuple[str, str, str]] = []
-    dirty = False
     for name in sorted(relevant):
         staged = index.get(name, "-")
         if name in changed or name not in index:
-            # Only a path git already reports as touched needs to be read;
-            # an unmodified tracked file is its index blob by definition.
             content = _worktree_sha256(root / name) or "-"
             working = f"sha256 {content}" if content != "-" else "absent"
         else:
             working = f"index {staged}"
-        if staged != committed.get(name, "-") or name in changed:
-            dirty = True
         records.append((name, staged, working))
+    return records, changed, untracked
+
+
+def pathspec_input_sha256(root: Path, pathspecs: Iterable[str], *,
+                          policy: str) -> str:
+    """Hash only the declared staged and working-tree program inputs."""
+    root = Path(root).expanduser().resolve()
+    specs = tuple(pathspecs)
+    records, _changed, _untracked = _input_records(
+        root, lambda name: _matches_pathspec(name, specs))
+    digest = hashlib.sha256()
+    digest.update(f"policy\0{policy}\0".encode())
+    for name, staged, working in records:
+        digest.update(b"path\0" + os.fsencode(name) + b"\0")
+        digest.update(b"index\0" + staged.encode("ascii") + b"\0")
+        digest.update(b"worktree\0" + working.encode("ascii") + b"\0")
+    return digest.hexdigest()
+
+
+def scan(root: Path) -> dict[str, Any]:
+    """Fingerprint the declared engine inputs and count everything else."""
+    root = Path(root).expanduser().resolve()
+    head = _git_text(root, "rev-parse", "HEAD")
+    records, changed, _untracked = _input_records(root, is_engine_input)
+    dirty = any(is_engine_input(name) for name in changed)
 
     digest = hashlib.sha256()
     digest.update(f"policy\0{INPUT_POLICY}\0schema\0{IDENTITY_SCHEMA}\0".encode())
-    digest.update(b"head\0" + head.encode("ascii") + b"\0")
     for name, staged, working in records:
         digest.update(b"path\0" + os.fsencode(name) + b"\0")
         digest.update(b"index\0" + staged.encode("ascii") + b"\0")

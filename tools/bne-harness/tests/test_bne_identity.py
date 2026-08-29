@@ -163,6 +163,31 @@ class EngineInputIdentityTest(unittest.TestCase):
             "unrelated scratch produced a false engine cache miss",
         )
 
+    def test_committing_excluded_prose_does_not_move_the_identity(self):
+        before = bne_identity.engine_input_identity(self.root)
+        write(self.root, "STATUS.md", "published posture\n")
+        git(self.root, "add", "STATUS.md")
+        git(self.root, "commit", "-qm", "publish status")
+        after = bne_identity.engine_input_identity(self.root)
+        self.assertNotEqual(before["head"], after["head"])
+        self.assertEqual(
+            before["engine_input_sha256"], after["engine_input_sha256"],
+            "an excluded prose-only commit invalidated engine evidence",
+        )
+
+    def test_pathspec_identity_ignores_commits_outside_its_closure(self):
+        before = bne_identity.pathspec_input_sha256(
+            self.root, ("engine",), policy="test-program-v1")
+        write(self.root, "STATUS.md", "published posture\n")
+        git(self.root, "add", "STATUS.md")
+        git(self.root, "commit", "-qm", "publish status")
+        self.assertEqual(before, bne_identity.pathspec_input_sha256(
+            self.root, ("engine",), policy="test-program-v1"))
+        write(self.root, "engine/src/main/java/World.java",
+              "class World { int hp = 90; }\n")
+        self.assertNotEqual(before, bne_identity.pathspec_input_sha256(
+            self.root, ("engine",), policy="test-program-v1"))
+
     def test_build_output_inside_a_module_is_not_an_input(self):
         before = self.identity()
         write(self.root, "engine/target/classes/World.class", "\0\0\0\0")

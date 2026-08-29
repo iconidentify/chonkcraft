@@ -164,21 +164,8 @@ def _current_engine_input_sha256() -> str:
 
 
 def _program_input_sha256(root: Path) -> str:
-    head = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
-    diff = subprocess.check_output(
-        ["git", "diff", "--binary", "HEAD", "--", *PROGRAM_INPUT_PATHS],
-        cwd=root)
-    digest = hashlib.sha256()
-    digest.update(b"next-level-program-v1\0" + head.encode() + b"\0" + diff)
-    untracked = subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--",
-         *PROGRAM_INPUT_PATHS], cwd=root).split(b"\0")
-    for raw in sorted(item for item in untracked if item):
-        path = root / raw.decode("utf-8", "surrogateescape")
-        digest.update(b"path\0" + raw + b"\0")
-        digest.update(path.read_bytes())
-    return digest.hexdigest()
+    return bne_identity.pathspec_input_sha256(
+        root, PROGRAM_INPUT_PATHS, policy="next-level-program-v2")
 
 
 def current_program_input_sha256() -> str:

@@ -66,7 +66,10 @@ reverted on disk is still a different engine. Build output, prose and every
 `.bne-*`, `goal/`, work and log path is outside the policy, counted and
 reported beside the survey as `workspace_noise`, and never mixed into the hash.
 
-The record declares `schema: 2` and `policy: engine-input-v1`. An older record
+The record declares `schema: 3` and `policy: engine-input-v2`. The reported
+commit identifies the checkout but is not mixed into the content hash: a
+prose-only commit outside the declared closure cannot invalidate executable
+evidence. An older record
 carrying `workspace_sha256` stays readable and is reported as legacy; it can
 never be mistaken for a current one, and a future policy cannot alias this one.
 

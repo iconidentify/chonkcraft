@@ -18,7 +18,7 @@ import bne_divergence_compiler as divergence
 import bne_player_transaction as player
 import bne_playtest_explorer as explorer
 import bne_replay_outcome as replay
-from bne_identity import engine_input_identity
+from bne_identity import engine_input_identity, pathspec_input_sha256
 
 
 SCHEMA = "chonkcraft-bne-next-level-gate-2"
@@ -110,6 +110,11 @@ def _combat_coverage(requirements: dict[str, Any],
     return report
 
 
+def _program_input_sha256(root: Path) -> str:
+    return pathspec_input_sha256(
+        root, PROGRAM_PATHS, policy="next-level-program-v2")
+
+
 def identity(root: Path, evidence_paths: list[Path] | None = None) \
         -> dict[str, Any]:
     head = subprocess.check_output(
@@ -119,15 +124,6 @@ def identity(root: Path, evidence_paths: list[Path] | None = None) \
     diff = subprocess.check_output(
         ["git", "diff", "--binary", "HEAD", "--", *PROGRAM_PATHS],
         cwd=root)
-    program = hashlib.sha256()
-    program.update(b"next-level-program-v1\0" + head.encode() + b"\0" + diff)
-    untracked = subprocess.check_output(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z", "--",
-         *PROGRAM_PATHS], cwd=root).split(b"\0")
-    for raw in sorted(item for item in untracked if item):
-        path = root / raw.decode("utf-8", "surrogateescape")
-        program.update(b"path\0" + raw + b"\0")
-        program.update(path.read_bytes())
     evidence = []
     for path in sorted(set(
             item.expanduser().resolve() for item in (evidence_paths or []))):
@@ -139,7 +135,7 @@ def identity(root: Path, evidence_paths: list[Path] | None = None) \
         "dirty": bool(status),
         "status": status.splitlines(),
         "tracked_diff_sha256": hashlib.sha256(diff).hexdigest(),
-        "program_input_sha256": program.hexdigest(),
+        "program_input_sha256": _program_input_sha256(root),
         "engine": engine_input_identity(root),
         "evidence_inputs": evidence,
     }

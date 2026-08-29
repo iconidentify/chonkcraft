@@ -41,6 +41,15 @@ class NextLevelGateTest(unittest.TestCase):
         self.assertIn('--player-proof-store "$BNE_PLAYER_PROOF_STORE"', shell)
         self.assertIn("unknown next-level gate argument", shell)
 
+    def test_scorecard_and_player_lane_share_one_program_identity(self):
+        root = Path(__file__).parents[3]
+        expected = gate.player.current_program_input_sha256()
+        self.assertEqual(
+            gate._program_input_sha256(root),
+            expected)
+        self.assertEqual(expected, gate.identity(root)[
+            "program_input_sha256"])
+
     def test_ai_capture_uses_the_maps_person_slot(self):
         capture = (Path(__file__).parents[3] / "scripts" /
                    "capture-bne-ai-cycle.sh").read_text(encoding="utf-8")
