@@ -6845,8 +6845,33 @@ public final class World {
                         && Math.floorMod(unit.lastStepHeading()
                                 - directHeading, Direction.COUNT)
                                 == Direction.COUNT / 2;
+                int routerDeltaX = Math.abs(
+                        unit.tileX() - target.tileX());
+                int routerDeltaY = Math.abs(
+                        unit.tileY() - target.tileY());
+                boolean candidateBehindMajorApproach = routerDeltaX >= routerDeltaY
+                        ? Math.abs(candidate.tileX() - target.tileX())
+                                > routerDeltaX
+                        : Math.abs(candidate.tileY() - target.tileY())
+                                > routerDeltaY;
+                boolean rearCollisionPaidBandWall = paidBandMoveAlly
+                        && unit.battleNetCollisionCounter() >= 4
+                        && candidate.battleNetCollisionCounter() > 0
+                        && candidateBehindMajorApproach;
                 boolean paidBandSoft = paidBandMoveAlly
                         && !saturatedFormationWall
+                        // A completed refusal band only releases friends
+                        // which advanced into the replacement quarry's
+                        // formation. Once the router is saturated, collision-
+                        // marked bodies behind it on the major approach axis
+                        // retain native unit+0x1d occupancy on the wall face.
+                        // XHuman 12 slot 1494 therefore routes above the rear
+                        // 1512/1503/1510 rank at fixture 245,
+                        // storing NE,NE,NE,SE,SE,E...; clearing that rank cuts
+                        // through one body and stores NE,E,E,NE,SE,SE.... The
+                        // closer paid-band ally remains cooperative (XHuman
+                        // 10 grunt 1490's E,E,SE replacement).
+                        && !rearCollisionPaidBandWall
                         // The first collision generation is still a wall to
                         // another member of the same building assault when it
                         // occupies that member's diagonal opening square.

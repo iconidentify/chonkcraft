@@ -377,6 +377,11 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(36, paidTailRetarget.tileY());
         assertEquals(37, saturatedMobileRetarget.tileX());
         assertEquals(39, saturatedMobileRetarget.tileY());
+        assertEquals(17, saturatedMobileRetarget.pathLength(),
+                "the saturated router keeps native's long rear-rank route");
+        assertEquals(Direction.fromDelta(1, -1),
+                saturatedMobileRetarget.peekHeading(),
+                "the second northeast remains cached while the first step settles");
         assertEquals(10, woodcutter.tileX());
         assertEquals(89, woodcutter.tileY(),
                 "the full free-prefix shortcut enters wood construction instead of moving north");
@@ -396,6 +401,15 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(Direction.fromDelta(-1, 1),
                 paidTailRetarget.lastStepHeading());
         assertEquals(3, paidTailRetarget.pathLength());
+        assertEquals(38, saturatedMobileRetarget.tileX());
+        assertEquals(38, saturatedMobileRetarget.tileY(),
+                "the paid redraw follows native above the collision-marked rear rank");
+        assertEquals(Direction.fromDelta(1, -1),
+                saturatedMobileRetarget.lastStepHeading());
+        assertEquals(16, saturatedMobileRetarget.pathLength());
+        assertEquals(Direction.fromDelta(1, -1),
+                saturatedMobileRetarget.peekHeading(),
+                "native's third northeast remains behind the committed second step");
         assertEquals(2, woodcutter.battleNetAnimationTimer());
         mission.tick();
         assertEquals(265, fixtureCycle(world));

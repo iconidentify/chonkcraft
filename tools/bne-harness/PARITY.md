@@ -17,44 +17,45 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `196c84ca` keeps the shared clean horizon at 263
-(earliest divergence 264), with 8 clean / 44 divergent / 0 failed. The
-cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. The aggregate
-per-map frontiers improve from 18,382 to 18,393 at cycle 400 and from 33,702
-to 33,713 at cycle 1,800, with no map moving backward. Expansion Orc 8 is the
-only changed case: its frontier advances 268 -> 279. Complete retained outputs
-are under `work/surveys/candidate-pressured-multistep-c400-20260829` and
-`work/surveys/candidate-pressured-multistep-c1800-20260829`.
+Accepted cycle-1,800 run `eecef5dd` advances the shared clean horizon from 263
+to 264 (earliest divergence 265), with 8 clean / 44 divergent / 0 failed. The
+cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. Aggregate per-map
+frontiers advance from 18,393 to 18,394 at cycle 400 and from 33,713 to 33,714
+at cycle 1,800. Expansion Human 12 is the only changed case (263 -> 264), and
+no map moves backward. The durable accepted survey and manifest are retained
+under `.bne-artifacts/runs/eecef5dd3825b234958be565f945f8b29b51c89f2951f12ab90be14555fe5bdc`.
 
-Closed this stretch: a targetless naval router whose cached route has
-multi-step provenance now parks that route when the allied mobile hull ahead
-has entered its own collision ladder, then redraws on its next visit. Native
-submarines 1432 and 1434 independently prove the rule at fixture 267 behind
-destroyers carrying first- and ninth-refusal pressure; at fixture 268 they
-redraw west and southwest respectively. Destroyer 1431 at fixture 264 is the
-pressured one-step negative and retains its consumed northwest route.
-Destroyer 1431 at fixture 38 is the unpressured negative and retains its normal
-fifteen-cycle cooperative hold. The real-data regression continues the same
-mission through both positive redraws and was checked to fail when the
-production arm was removed.
+Closed this stretch: after a moving router completes four collision refusals,
+collision-marked moving allies behind it on the replacement target's major
+approach axis remain authoritative walls during the paid-band redraw. Native
+grunt 1494 proves the positive at fixture 245: with the four rear-rank allied
+bodies still collision-marked, retail draws `NE,NE,NE,SE,SE,E...`; the prior
+Java planner incorrectly softened them and drew `NE,E,E,NE,SE,SE...`. The
+real-data regression seals the second and third northeast steps through
+fixtures 263 and 264. Expansion Human 10's native grunt 1490 remains the
+opposite-boundary positive: its paid-refusal wake must keep softening departing
+allies and route `E,E,SE`. Expansion Human 12's earlier two-refusal router and
+1494's cold cycle-5 route are held-out negatives, so the rule does not turn
+ordinary cooperative traffic into hard occupancy.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
-18 passes and zero skips, failures, blocks, or timeouts. The network gate kept
-all 39 lockstep cases through cycle 1,800 and completed the real two-process
-startup, map transfer, 180 rendered cycles, and terminal hash
-`1b9dd8ad7b9a1f51`. The local matched-media suite ran all 2,816 tests with the
-exact 110 expected specification failures and no unexpected failures. Its 24
-skips differ from the canonical 27 only because three SaveGame referees ran and
-passed against the richer local fixture; authenticated CI at source base
-`8f4569c5` records the canonical 27 identities and exact 110 failures.
+18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
+gate kept all 39 lockstep cases through cycle 1,800 and completed real
+two-process startup, map transfer, 180 rendered cycles, and terminal hash
+`1b9dd8ad7b9a1f51`. The canonical isolated-home, matched-media suite accounted
+for all 2,816 tests with the exact 27 skip identities and exact 110 expected
+specification failures; there were no unexpected or stale failures.
 
-The next ranked fleet blockers are expansion Human 12 at 264 (grunt 1494
-vertical position), Human 13 at 265 (ogre 1519 horizontal position), expansion
-Human 7 at 266 (submarine 1511 horizontal position), and expansion Human 11 at
-267 (peon 1584 vertical position). Two bounded candidates are rejected and
-fully reverted: making hard allied bodies visible during expansion Human 12's
-cycle-264 decision regressed that map to 166, while clearing Human 13's
-pre-move allied body advanced only one point and produced no broad fleet gain.
+The next shared-boundary blockers are Human 13 at 265 (ogre 1519 horizontal
+position) and expansion Human 12 at 265 (native peon 1360 and grunt 1479 each
+one diagonal tile from Java). Expansion Human 7 follows at 266 (submarine 1511
+horizontal position), then expansion Human 11 at 267 (peon 1584 vertical
+position). Bounded rejected candidates remain reverted: blanket and soft
+visibility variants for Human 12 failed their native route or held-out
+negatives; Human 7's naval residual closer and Human 11's wood-stall timing
+changed only their target map; Human 13's moving-regroup softening advanced
+that map by one cycle but did not improve the shared horizon or a meaningful
+aggregate frontier.
 
 ## Prior release checkpoint — 2026-08-26
 
