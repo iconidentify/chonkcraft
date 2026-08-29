@@ -21,6 +21,11 @@ from bne_fixture import validate_fixture
 
 REQUIREMENTS_SCHEMA = "chonkcraft-bne-combat-lifecycle-requirements-1"
 PROOF_SCHEMA = "chonkcraft-bne-combat-lifecycle-proof-2"
+AUTHORITY_FIELDS = (
+    "native_executable_sha256",
+    "java_engine_input_sha256",
+    "requirements_sha256",
+)
 
 
 def canonical_bytes(value: object) -> bytes:
@@ -43,7 +48,8 @@ def file_identity(path: Path) -> dict[str, Any]:
 
 
 def seal_proof(rows: list[dict[str, Any]], evidence: dict[str, Any], *,
-        diagnosis: dict[str, Any] | None = None) \
+        diagnosis: dict[str, Any] | None = None,
+        authority: dict[str, str] | None = None) \
         -> dict[str, Any]:
     proof: dict[str, Any] = {
         "schema": PROOF_SCHEMA,
@@ -52,6 +58,8 @@ def seal_proof(rows: list[dict[str, Any]], evidence: dict[str, Any], *,
     }
     if diagnosis is not None:
         proof["diagnosis"] = diagnosis
+    if authority is not None:
+        proof["authority"] = authority
     proof["proof_sha256"] = digest(proof)
     return proof
 
@@ -64,6 +72,15 @@ def validate_proof(proof: dict[str, Any]) -> None:
             if key != "proof_sha256"}
     if not isinstance(claimed, str) or claimed != digest(body):
         raise ValueError("combat lifecycle proof identity changed")
+    authority = proof.get("authority")
+    if authority is not None:
+        if not isinstance(authority, dict) or any(
+                not isinstance(authority.get(key), str)
+                or len(authority[key]) != 64
+                or any(character not in "0123456789abcdef"
+                       for character in authority[key])
+                for key in AUTHORITY_FIELDS):
+            raise ValueError("combat lifecycle proof authority is malformed")
     evidence = proof.get("evidence")
     if not isinstance(evidence, dict) or not evidence.get("fixture") \
             or not evidence.get("native_receipt") \
@@ -103,6 +120,17 @@ def validate_evidence(proof_path: Path, proof: dict[str, Any]) -> None:
     explorer.validate_result(java, scenario, "java")
     if native["scenario_sha256"] != java["scenario_sha256"]:
         raise ValueError("combat lifecycle receipts ran different scenarios")
+    authority = proof.get("authority")
+    if authority is not None:
+        native_authority = (native.get("producer") or {}).get(
+            "authority_sha256")
+        java_engine = (java.get("producer") or {}).get("build_sha256")
+        if authority["native_executable_sha256"] != native_authority:
+            raise ValueError(
+                "combat lifecycle native authority does not match receipt")
+        if authority["java_engine_input_sha256"] != java_engine:
+            raise ValueError(
+                "combat lifecycle Java authority does not match receipt")
     diagnosis = proof.get("diagnosis")
     if diagnosis is not None:
         if not isinstance(diagnosis, dict) \
@@ -627,6 +655,13 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as directory:
         java = adapter.run(scenario, Path(directory))
     _write_json(java_path, java)
+    native_authority = (native.get("producer") or {}).get(
+        "authority_sha256")
+    java_engine = (java.get("producer") or {}).get("build_sha256")
+    if native_authority != explorer.PINNED_BNE_EXECUTABLE_SHA256:
+        raise ValueError("combat native receipt has the wrong executable authority")
+    if not isinstance(java_engine, str) or len(java_engine) != 64:
+        raise ValueError("combat Java receipt has no engine-input authority")
     if not java_causal_path.is_file():
         raise ValueError("combat Java adapter wrote no causal trace")
     diagnosis = damage_rng_diagnosis(
@@ -661,8 +696,13 @@ def observe_commanded(args: argparse.Namespace) -> dict[str, Any]:
         "native_causal": evidence_item(native_causal_path),
         "java_causal": evidence_item(java_causal_path),
         "rng_diagnosis": evidence_item(rng_diagnosis_path),
-        "engine_input_sha256": java["producer"]["build_sha256"],
-    }, diagnosis=diagnosis)
+        "engine_input_sha256": java_engine,
+    }, diagnosis=diagnosis, authority={
+        "native_executable_sha256": native_authority,
+        "java_engine_input_sha256": java_engine,
+        "requirements_sha256": file_identity(
+            args.requirements.expanduser().resolve())["sha256"],
+    })
     _write_json(output, proof)
     validate_evidence(output, proof)
     return proof

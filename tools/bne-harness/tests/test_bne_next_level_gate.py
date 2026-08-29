@@ -15,6 +15,21 @@ import bne_next_level_gate as gate
 
 class NextLevelGateTest(unittest.TestCase):
 
+    @staticmethod
+    def combat_proof(rows, *, native="a", engine="b", requirements="c"):
+        def sha256(value):
+            return value if len(value) == 64 else value * 64
+        item = {"path": "evidence.json", "bytes": 1,
+                "sha256": "a" * 64}
+        return gate.combat.seal_proof(rows, {
+            "fixture": item, "native_receipt": item,
+            "java_receipt": item, "scenario": item,
+        }, authority={
+            "native_executable_sha256": sha256(native),
+            "java_engine_input_sha256": sha256(engine),
+            "requirements_sha256": sha256(requirements),
+        })
+
     def test_shell_is_cwd_independent_and_never_reuses_stale_discovery(self):
         shell = (Path(__file__).parents[3] / "scripts" /
                  "check-bne-next-level-gate.sh").read_text(encoding="utf-8")
@@ -31,6 +46,66 @@ class NextLevelGateTest(unittest.TestCase):
                    "capture-bne-ai-cycle.sh").read_text(encoding="utf-8")
         self.assertIn("BneAiDecisionAdapter", capture)
         self.assertNotIn("--player 0", capture)
+
+    def test_combat_coverage_excludes_stale_later_proofs(self):
+        requirements = {
+            "encounters": 1,
+            "required_cells": 2,
+            "cells": [
+                {"encounter": "melee", "stance": "attack",
+                 "phase": "acquire"},
+                {"encounter": "melee", "stance": "attack",
+                 "phase": "damage"},
+            ],
+        }
+        def row(phase):
+            return {"encounter": "melee", "stance": "attack",
+                    "phase": phase, "native_observed": True,
+                    "java_observed": True, "exact": True,
+                    "causal_order_exact": True}
+        current = self.combat_proof(
+            [row("acquire")], native=gate.conductor.PINNED,
+            engine="e", requirements="c")
+        stale = self.combat_proof(
+            [row("damage")], native=gate.conductor.PINNED,
+            engine="f", requirements="c")
+        report = gate._combat_coverage(
+            requirements, [current, stale], "e" * 64, "c" * 64)
+        self.assertEqual(1, report["exact"])
+        self.assertEqual(1, report["current_proofs"])
+        self.assertEqual(2, report["supplied_proofs"])
+        self.assertFalse(report["current_authority"])
+        self.assertFalse(report["complete"])
+
+    def test_combat_coverage_accepts_an_all_current_proof_set(self):
+        requirements = {
+            "encounters": 1,
+            "required_cells": 1,
+            "cells": [{"encounter": "melee", "stance": "attack",
+                       "phase": "damage"}],
+        }
+        row = {"encounter": "melee", "stance": "attack",
+               "phase": "damage", "native_observed": True,
+               "java_observed": True, "exact": True,
+               "causal_order_exact": True}
+        proof = self.combat_proof(
+            [row], native=gate.conductor.PINNED,
+            engine="e", requirements="c")
+        report = gate._combat_coverage(
+            requirements, [proof], "e" * 64, "c" * 64)
+        self.assertEqual(1, report["exact"])
+        self.assertTrue(report["current_authority"])
+        self.assertTrue(report["complete"])
+
+    def test_scorecard_reopens_each_combat_proofs_evidence(self):
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "proof.json"
+            path.write_text('{"schema":"diagnostic"}', encoding="utf-8")
+            with mock.patch.object(gate.combat, "validate_evidence") as verify:
+                proofs = gate._load_combat_proofs([path])
+        self.assertEqual([{"schema": "diagnostic"}], proofs)
+        verify.assert_called_once_with(
+            path.expanduser().resolve(), {"schema": "diagnostic"})
 
     def test_next_work_names_all_open_lanes(self):
         player = {

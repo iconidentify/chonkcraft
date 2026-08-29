@@ -62,6 +62,54 @@ def _file_identity(path: Path) -> dict[str, Any]:
             "sha256": hashlib.sha256(raw).hexdigest()}
 
 
+def _load_combat_proofs(paths: list[Path]) -> list[dict[str, Any]]:
+    proofs = []
+    for path in paths:
+        proof = load(path)
+        if proof is None:
+            continue
+        combat.validate_evidence(path.expanduser().resolve(), proof)
+        proofs.append(proof)
+    return proofs
+
+
+def _combat_coverage(requirements: dict[str, Any],
+                     proofs: list[dict[str, Any]], current_engine: str,
+                     requirements_sha256: str) -> dict[str, Any]:
+    current = []
+    for proof in proofs:
+        authority = proof.get("authority") or {}
+        if (authority.get("native_executable_sha256") == conductor.PINNED
+                and authority.get("java_engine_input_sha256")
+                == current_engine
+                and authority.get("requirements_sha256")
+                == requirements_sha256):
+            current.append(proof)
+    if current:
+        report = combat.coverage(requirements, *current)
+    else:
+        report = {
+            "complete": False,
+            "exact": 0,
+            "required": requirements["required_cells"],
+            "debts": [],
+            "duplicates": [],
+            "debt": "no current-authority combat lifecycle proof receipt",
+        }
+    all_current = bool(proofs) and len(current) == len(proofs)
+    report["supplied_proofs"] = len(proofs)
+    report["current_proofs"] = len(current)
+    report["producer_evidence_verified"] = bool(proofs)
+    report["current_authority"] = all_current
+    report["complete"] = bool(report.get("complete") and all_current)
+    if proofs and not all_current:
+        report["debt"] = (
+            f"{len(proofs) - len(current)} supplied combat proof(s) are not "
+            "bound to the pinned native, current Java engine, and current "
+            "requirements")
+    return report
+
+
 def identity(root: Path, evidence_paths: list[Path] | None = None) \
         -> dict[str, Any]:
     head = subprocess.check_output(
@@ -481,28 +529,10 @@ def build(args: argparse.Namespace) -> dict[str, Any]:
     java_coverage = ai.coverage_report(java) if java else {
         "complete": False, "debt": "no current-head per-cycle Java AI ledger"}
     combat_requirements = combat.load_requirements(args.combat_requirements)
-    combat_proofs = [loaded for path in (args.combat_proof or [])
-                     if (loaded := load(path))]
-    combat_coverage = (combat.coverage(combat_requirements, *combat_proofs)
-                       if combat_proofs else {
-                           "complete": False,
-                           "exact": 0,
-                           "required": combat_requirements["required_cells"],
-                           "debt": "no pinned-native combat lifecycle proof receipt",
-                       })
-    combat_authority = (combat_proofs[0] if combat_proofs else {}).get(
-        "authority") or {}
-    combat_current = bool(
-        combat_proofs
-        and combat_authority.get("native_executable_sha256")
-        == conductor.PINNED
-        and combat_authority.get("java_engine_input_sha256") == current_engine
-        and combat_authority.get("requirements_sha256")
-        == _file_identity(args.combat_requirements.resolve())["sha256"]
-    )
-    combat_coverage["current_authority"] = combat_current
-    combat_coverage["complete"] = bool(
-        combat_coverage.get("complete") and combat_current)
+    combat_proofs = _load_combat_proofs(args.combat_proof or [])
+    combat_coverage = _combat_coverage(
+        combat_requirements, combat_proofs, current_engine,
+        _file_identity(args.combat_requirements.resolve())["sha256"])
     ai_complete = bool(ai_fleet["complete"] and combat_coverage["complete"])
     ai_lane = {
         "complete": ai_complete,

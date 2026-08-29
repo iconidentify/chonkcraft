@@ -83,6 +83,24 @@ class CombatLifecycleTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "identity changed"):
             combat.validate_proof(proof)
 
+    def test_proof_seals_current_authority_into_its_identity(self):
+        authority = {
+            "native_executable_sha256": "a" * 64,
+            "java_engine_input_sha256": "b" * 64,
+            "requirements_sha256": "c" * 64,
+        }
+        item = {"path": "evidence.json", "bytes": 1,
+                "sha256": "d" * 64}
+        proof = combat.seal_proof([], {
+            "fixture": item, "native_receipt": item,
+            "java_receipt": item, "scenario": item,
+        }, authority=authority)
+        combat.validate_proof(proof)
+        self.assertEqual(authority, proof["authority"])
+        proof["authority"]["java_engine_input_sha256"] = "e" * 64
+        with self.assertRaisesRegex(ValueError, "identity changed"):
+            combat.validate_proof(proof)
+
     def test_lifecycle_derives_only_observed_exact_causal_phases(self):
         def result(side, changed=False):
             events = []
