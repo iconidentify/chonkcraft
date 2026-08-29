@@ -1452,7 +1452,7 @@ def _tree_identity(repository: Path, paths: tuple[str, ...]) -> dict[str, object
 
 
 def _java_build_inputs(repository: Path) -> dict[str, Any]:
-    engine = bne_identity.engine_input_identity(repository)
+    engine = bne_identity.engine_input_authority(repository)
     engine_sha = engine.get("engine_input_sha256")
     if not _valid_sha256(engine_sha):
         raise ProofError("Java build inputs have no hermetic engine identity")

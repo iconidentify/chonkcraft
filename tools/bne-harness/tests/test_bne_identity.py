@@ -165,6 +165,7 @@ class EngineInputIdentityTest(unittest.TestCase):
 
     def test_committing_excluded_prose_does_not_move_the_identity(self):
         before = bne_identity.engine_input_identity(self.root)
+        before_authority = bne_identity.engine_input_authority(self.root)
         write(self.root, "STATUS.md", "published posture\n")
         git(self.root, "add", "STATUS.md")
         git(self.root, "commit", "-qm", "publish status")
@@ -174,6 +175,11 @@ class EngineInputIdentityTest(unittest.TestCase):
             before["engine_input_sha256"], after["engine_input_sha256"],
             "an excluded prose-only commit invalidated engine evidence",
         )
+        self.assertEqual(
+            before_authority, bne_identity.engine_input_authority(self.root),
+            "an excluded prose-only commit invalidated artifact authority",
+        )
+        self.assertNotIn("head", before_authority)
 
     def test_pathspec_identity_ignores_commits_outside_its_closure(self):
         before = bne_identity.pathspec_input_sha256(

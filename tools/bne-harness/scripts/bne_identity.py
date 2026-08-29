@@ -199,8 +199,19 @@ def scan(root: Path) -> dict[str, Any]:
 
 
 def engine_input_identity(root: Path) -> dict[str, Any]:
-    """Return only the fields a cache key may depend on."""
+    """Return the content identity plus informational checkout metadata."""
     return scan(root)["identity"]
+
+
+def engine_input_authority(root: Path) -> dict[str, Any]:
+    """Return the engine fields that may authenticate a produced artifact.
+
+    ``head`` identifies the checkout that reported the content, but it is not
+    executable input.  In particular, committing excluded prose must not make
+    a byte-identical application JAR or its retained evidence stale.
+    """
+    identity = engine_input_identity(root)
+    return {key: value for key, value in identity.items() if key != "head"}
 
 
 def workspace_noise(root: Path) -> dict[str, Any]:

@@ -69,7 +69,9 @@ reported beside the survey as `workspace_noise`, and never mixed into the hash.
 The record declares `schema: 3` and `policy: engine-input-v2`. The reported
 commit identifies the checkout but is not mixed into the content hash: a
 prose-only commit outside the declared closure cannot invalidate executable
-evidence. An older record
+evidence. Producer receipts likewise use the content authority without that
+informational commit field, while reports may still show the commit for
+diagnosis. An older record
 carrying `workspace_sha256` stays readable and is reported as legacy; it can
 never be mistaken for a current one, and a future policy cannot alias this one.
 

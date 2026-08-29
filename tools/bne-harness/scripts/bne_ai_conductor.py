@@ -700,8 +700,8 @@ def _extract_ai_bin(pack: Path, *, require_pinned: bool = True) -> bytes:
 
 
 def _engine_identity(repository: Path) -> dict[str, Any]:
-    from bne_identity import engine_input_identity
-    return engine_input_identity(repository)
+    from bne_identity import engine_input_authority
+    return engine_input_authority(repository)
 
 
 def _java_build_inputs(repository: Path) -> dict[str, Any]:
