@@ -269,9 +269,9 @@ The sealed command parser preserves an explicit `target SLOT`, the native tracer
 retains the target's stable initial identity, and the packaged Java twin resolves
 that identity rather than guessing from the clicked tile. Four bounded captures
 cover friendly unit and building targets independently on Human 1 and Orc 1.
-That grows the retained producer graph from thirteen to seventeen authenticated
+That grows the retained producer graph from seventeen to twenty-one authenticated
 native/Java pairs, expands observed target shapes to unit and building, and
-reduces the partial-executable capture plan from seventeen to fifteen cells.
+reduces the partial-executable capture plan from fifteen to thirteen cells.
 Semantic pairing intentionally remains **3/532**. On both factions retail sends
 GiveOrder function 3 (Move with a target); Java sends Follow for the friendly
 unit, while the building approaches differ in terminal tile or cycle. The

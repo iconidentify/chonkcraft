@@ -127,17 +127,18 @@ being inferred from the playable campaign fleet:
   observation cycle. The gate regenerates all 240 cells from three hash-pinned
   Human, Orc, and expansion seeds, then reopens the inventory and execution
   ledger before accepting a numerator. Current clean scorecard
-  `4b5c86e07d6de41c502b459198575c20b73c190a53dd4091ac900baea14c052c`
+  `0805a47817d4991639c94d7296519937ab0aa2f3a0af1c202d662b341564ceec`
   binds command ledger
   `43b114deaefb346c57b36e54397b5a89ce660a3c688ee975deb0452135007a7b`
   and split report
   `c204a868fc1b6fca3c83b09e6ca0e0446a99938f7c7d0602b7e963d85d260a30`
   to the current engine identity.
 - Physical player transactions: **3/532** current-source paired certifications.
-  A retained store reopens seventeen native capture closures across the Human
+  A retained store reopens twenty-one native capture closures across the Human
   and Orc campaigns and reruns their packaged Java twins with producer evidence
-  verified. The current proof-store identity is
-  `a3f757bbc8910b30be5f4a0130df6c9620e84c8a032ef01412bf02f10e880ae2`.
+  verified. Eight fixed cells are observed on both producers. The current
+  proof-store identity is
+  `9a116fdfa0f12b502a7cb79c39afbcc9606e0d5a5ce63b66ba846b833c6a661a`.
   The single-unit, field/plain Move cells for open and occupied ground are each
   exact across two independent scenarios. The two-unit occupied-ground cell is
   also exact across independent Human and Orc scenarios after canonical
@@ -146,8 +147,8 @@ being inferred from the playable campaign fleet:
   movement debt rather than receiving a scenario-specific exception. Four new
   sealed captures authenticate friendly unit and building targets independently
   on Human 1 and Orc 1, expanding observed target shapes from open/occupied
-  ground to unit/building and reducing the executable capture debt from seventeen
-  to fifteen cells. They deliberately do not increase the numerator: retail
+  ground to unit/building and reducing the executable capture debt from fifteen
+  to thirteen cells. They deliberately do not increase the numerator: retail
   serializes both targeted right-clicks as Move-with-target, Java selects Follow
   for a friendly unit, and the building approaches settle at different tiles or
   cycles. No gameplay change follows from that bounded cross-map diagnostic.
