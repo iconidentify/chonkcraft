@@ -35,11 +35,21 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   expansion Human 12 share that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,401 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,421 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,721; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,741; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The complete naval-route milestone moves expansion Human 7 from exact
+  through cycle 265 to exact through 285. A full twenty-byte route remains
+  authoritative after its first headings are spent instead of being rewritten
+  onto a free but geometrically closer patrol corridor. Expansion Human 7's
+  submarine and Orc 13's tanker independently authenticate different retained
+  headings; expansion Orc 11's short wall-follow residual and a capital-ship
+  detour preserve the free-closer and detour boundaries. All other 51 maps are
+  unchanged in both complete fleets. Accepted run `4f638ea2` binds the
+  cycle-1,800 survey and structural source capsule; cycle-400 run `f76fe858`
+  records the same twenty-cycle gain.
 - The repeated laden-convoy return milestone moves Human 14's exact frontier
   from cycle 391 to 398. When a paid return-route refusal band expires and the
   same clean moving laden convoy still blocks its cached heading, the worker
@@ -101,15 +111,15 @@ and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run associated with accepted parity run
-`10c982f280fca17840e9263f4937509d8ccba594d8f3ac4f0e84e42751fab677`
+`4f638ea20a0e407659835f27b2d372d4301dc6124be4b36232ecba3bb2ceba4c`
 exercised all 2,789 authenticated tests with the exact expected failure
 identity.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0829.99` is the public release, published from revision
-`c3b6929f6a0cc26e05116fe5c0ccf2d4b1ca6e1a` with game JAR SHA-256
-`f6d76bd2fdd36a01784b598e7c2095be412dfc8555e06c18e0998fe0f0375097`.
+Signed engine OTA `2026.0829.102` is the public release, published from revision
+`a5facd29be95fcd7c0c71fd55003d5c27549fc3c` with game JAR SHA-256
+`4b67261c3f4a8061d164eba55327815a4d649e6144e99196ad2224dc36dca8be`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.

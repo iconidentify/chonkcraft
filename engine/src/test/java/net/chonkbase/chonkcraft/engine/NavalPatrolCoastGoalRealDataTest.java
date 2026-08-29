@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -141,5 +143,33 @@ class NavalPatrolCoastGoalRealDataTest {
         assertEquals(58, sub.tileY());
         assertEquals(17, sub.pathLength(),
                 "fixture 180 consumes exactly one retained route byte");
+
+        // The same native route begins SE,SE,SE,SE,S. Once the fourth
+        // diagonal lands on fixture 223, free SE is two Chebyshev tiles
+        // closer to the patrol point than the cached S. Retail nevertheless
+        // trusts the complete twenty-byte buffer and commits S on 266. The
+        // short wall-follow residual in XOrc 11 remains the held-out
+        // free-closer form.
+        while (mission.world().cycle() < 225) {
+            mission.tick();
+        }
+        assertEquals(26, sub.tileX());
+        assertEquals(60, sub.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                sub.battleNetPathInitialLength());
+        assertEquals(16, sub.pathLength());
+        assertEquals(4, sub.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(0, 1), sub.peekHeading(),
+                "the full native route exposes south after four diagonals");
+
+        while (mission.world().cycle() < 268) {
+            mission.tick();
+        }
+        assertEquals(26, sub.tileX(),
+                "a full-buffer patrol must not free-closer southeast");
+        assertEquals(62, sub.tileY(),
+                "native spends the cached south heading on fixture 266");
+        assertEquals(Direction.fromDelta(0, 1), sub.lastStepHeading());
+        assertEquals(15, sub.pathLength());
     }
 }
