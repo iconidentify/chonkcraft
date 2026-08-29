@@ -15,7 +15,48 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-26
+## Current release checkpoint — 2026-08-29
+
+Accepted cycle-1,800 run `196c84ca` keeps the shared clean horizon at 263
+(earliest divergence 264), with 8 clean / 44 divergent / 0 failed. The
+cycle-400 fleet remains 27 clean / 25 divergent / 0 failed. The aggregate
+per-map frontiers improve from 18,382 to 18,393 at cycle 400 and from 33,702
+to 33,713 at cycle 1,800, with no map moving backward. Expansion Orc 8 is the
+only changed case: its frontier advances 268 -> 279. Complete retained outputs
+are under `work/surveys/candidate-pressured-multistep-c400-20260829` and
+`work/surveys/candidate-pressured-multistep-c1800-20260829`.
+
+Closed this stretch: a targetless naval router whose cached route has
+multi-step provenance now parks that route when the allied mobile hull ahead
+has entered its own collision ladder, then redraws on its next visit. Native
+submarines 1432 and 1434 independently prove the rule at fixture 267 behind
+destroyers carrying first- and ninth-refusal pressure; at fixture 268 they
+redraw west and southwest respectively. Destroyer 1431 at fixture 264 is the
+pressured one-step negative and retains its consumed northwest route.
+Destroyer 1431 at fixture 38 is the unpressured negative and retains its normal
+fifteen-cycle cooperative hold. The real-data regression continues the same
+mission through both positive redraws and was checked to fail when the
+production arm was removed.
+
+Milestone acceptance repeated the complete 18-lane player-contract gate with
+18 passes and zero skips, failures, blocks, or timeouts. The network gate kept
+all 39 lockstep cases through cycle 1,800 and completed the real two-process
+startup, map transfer, 180 rendered cycles, and terminal hash
+`1b9dd8ad7b9a1f51`. The local matched-media suite ran all 2,816 tests with the
+exact 110 expected specification failures and no unexpected failures. Its 24
+skips differ from the canonical 27 only because three SaveGame referees ran and
+passed against the richer local fixture; authenticated CI at source base
+`8f4569c5` records the canonical 27 identities and exact 110 failures.
+
+The next ranked fleet blockers are expansion Human 12 at 264 (grunt 1494
+vertical position), Human 13 at 265 (ogre 1519 horizontal position), expansion
+Human 7 at 266 (submarine 1511 horizontal position), and expansion Human 11 at
+267 (peon 1584 vertical position). Two bounded candidates are rejected and
+fully reverted: making hard allied bodies visible during expansion Human 12's
+cycle-264 decision regressed that map to 166, while clearing Human 13's
+pre-move allied body advanced only one point and produced no broad fleet gain.
+
+## Prior release checkpoint — 2026-08-26
 
 Accepted pointer: run `03d44b64` (common clean 254, earliest divergence 255,
 gate PASS, clean engine input `a40cd311` at commit `ee974f26`). The full

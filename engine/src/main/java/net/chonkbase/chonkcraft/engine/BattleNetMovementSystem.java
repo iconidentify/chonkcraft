@@ -4945,6 +4945,34 @@ final class BattleNetMovementSystem {
                     boolean temporaryBody = blocker != null
                             && blocker != unit
                             && !blocker.type().building();
+                    boolean pressuredTemporaryBody = temporaryBody
+                            && (blocker.battleNetCollisionCounter() > 0
+                                    || blocker.battleNetRefusals() > 0);
+                    if (pressuredTemporaryBody && unit.target() == null
+                            && !unit.isMoving()
+                            && unit.pathLength() > 0
+                            && unit.battleNetPathStepsTaken() > 1) {
+                        // A hull which has already entered its own collision
+                        // ladder is no longer a cooperative mover expected to
+                        // vacate this exact cached heading. Retail parks the
+                        // stale route, advances the router's refusal nibble,
+                        // and redraws on the next visit. XOrc 8 supplies two
+                        // independent route shapes on fixture 267: submarine
+                        // 1432 parks a three-byte head behind destroyer 1430's
+                        // first collision, while submarine 1434 parks a
+                        // consumed two-byte tail behind destroyer 1435's ninth.
+                        // A one-step provenance is different: destroyer 1431
+                        // retains its single consumed northwest leftover behind
+                        // a pressured submarine at fixture 264. The unpressured
+                        // control is the same destroyer at fixture 38:
+                        // submarine 1432 still has collision zero there, so the
+                        // cached northwest tail keeps its full Move band and
+                        // commits only after that blocker leaves.
+                        battleNetRefuse(unit);
+                        unit.setRouteSpent(false);
+                        unit.setBattleNetOrderDelay(0);
+                        return;
+                    }
                     if (temporaryBody
                             && refuseBattleNetNavalMapPatrol(unit)) {
                         return;

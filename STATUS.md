@@ -35,21 +35,24 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   is now the only map at that boundary.
 - **27/52 maps are exact through the full 400-cycle window**, with 25 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,382 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,393 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  33,702; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  33,713; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
-- The terminal-route naval milestone moves expansion Orc 8 from cycle 264 to
-  268. A paid small-warship congestion wake may replace a blocked route while
-  several headings remain, but retains its final consumed heading for the
-  ordinary cooperative hold. Two native-backed final-tail cases and held-out
-  fresh-route, coast, attack and multi-heading controls protect the systemic
-  distinction. All other 51 maps are unchanged across both complete fleets;
-  the cycle-400 and cycle-1,800 counts remain 27 and 8 with zero failed cases.
-  Clean accepted receipt `1c162ee068cd64ef21279aa7e2dcda729470fd979b4668a7a8f48aa9ccf37bf0`
-  binds source `7ae3de6f1826fe928bf2dd9faaa8961dc2c57002` to engine-input identity
-  `0ec4cb11a50eae80dfa0c981f7fc9538f6a5f80ad340fd0bdc929333c3c20a71`.
+- The pressured-hull route-redraw milestone moves expansion Orc 8 from cycle
+  268 to 279. A targetless naval router with multi-step route provenance parks
+  its cached route when the allied mobile hull ahead has entered its own
+  collision ladder, then redraws on the next visit. Two independent native
+  submarines authenticate different route shapes behind different pressured
+  destroyers. A one-step consumed route behind a pressured hull and the same
+  congestion shape behind an unpressured hull both retain their ordinary hold,
+  protecting the systemic distinction. All other 51 maps are unchanged across
+  both complete fleets; the cycle-400 and cycle-1,800 counts remain 27 and 8
+  with zero failed cases. Accepted cycle-1,800 run `196c84ca` binds survey
+  `9af422e2d064fa81e65b9991db8f1cf9c44d13ea92678dd4ba497c803515f3c8`
+  to engine-input identity
+  `035cfeba01a33b1fd47b806e2d1b9c16ce2e5c0a42679ba97aa7e3e7ca73c043`.
 - The crowded-depot milestone moves expansion Orc 12 from cycle 264 to 273 by
   letting a staged laden worker commit its final entry behind an allied worker
   whose own entry pixels are still draining. Expansion Human 7 independently

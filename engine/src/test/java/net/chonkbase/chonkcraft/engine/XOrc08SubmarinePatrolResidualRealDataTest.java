@@ -63,6 +63,44 @@ class XOrc08SubmarinePatrolResidualRealDataTest {
         assertEquals(78, submarine.tileY());
         assertEquals(1, submarine.pathLength());
         assertEquals(14, submarine.battleNetAnimationTimer());
+
+        assertRedrawAroundCollisionPressuredAlliedHulls(mission);
+    }
+
+    private static void assertRedrawAroundCollisionPressuredAlliedHulls(
+            Mission mission) {
+        Unit westSubmarine = unitById(mission.world(), 168);
+        Unit southwestSubmarine = unitById(mission.world(), 166);
+        Unit westBlocker = unitById(mission.world(), 170);
+        Unit northwestBlocker = unitById(mission.world(), 165);
+        assertNotNull(westSubmarine,
+                "XOrc 8 has no Java twin for native submarine 1432");
+        assertNotNull(southwestSubmarine,
+                "XOrc 8 has no Java twin for native submarine 1434");
+        assertNotNull(westBlocker,
+                "XOrc 8 has no Java twin for native destroyer 1430");
+        assertNotNull(northwestBlocker,
+                "XOrc 8 has no Java twin for native destroyer 1435");
+
+        tickThrough(mission, 267);
+        assertTrue(westBlocker.battleNetRefusals() > 0,
+                "the west blocker must carry collision pressure");
+        assertTrue(northwestBlocker.battleNetRefusals() > 0,
+                "the northwest blocker must carry collision pressure");
+        assertEquals(0, westSubmarine.pathLength(),
+                "the stale northwest route is parked before redraw");
+        assertEquals(0, southwestSubmarine.pathLength(),
+                "the consumed northwest tail is parked before redraw");
+        assertEquals(0, westSubmarine.battleNetOrderDelay());
+        assertEquals(0, southwestSubmarine.battleNetOrderDelay());
+
+        tickThrough(mission, 268);
+        assertEquals(90, westSubmarine.tileX(),
+                "native submarine 1432 redraws west on fixture 268");
+        assertEquals(80, westSubmarine.tileY());
+        assertEquals(88, southwestSubmarine.tileX(),
+                "native submarine 1434 redraws southwest on fixture 268");
+        assertEquals(78, southwestSubmarine.tileY());
     }
 
     private static Mission mission(GameData data) {
@@ -102,6 +140,15 @@ class XOrc08SubmarinePatrolResidualRealDataTest {
                     && unit.tileX() == x && unit.tileY() == y
                     && unit.type() != null
                     && "unit-human-submarine".equals(unit.type().ident())) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }
