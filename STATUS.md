@@ -74,8 +74,8 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,815 tests**. The canonical authenticated
-profile runs 2,788 and intentionally skips exactly 27, while keeping the exact
+The complete suite now contains **2,816 tests**. The canonical authenticated
+profile runs 2,789 and intentionally skips exactly 27, while keeping the exact
 expected 110-test specification-failure set. The added boundary matrix proves
 that completed land, naval and air trainees survive save/resume without being
 born twice, while a fully blocked trainee remains unborn until a legal exit
@@ -83,21 +83,21 @@ opens. New training completions now retire atomically in the trainee's birth
 cycle while schema-2 loading remains compatible with older saved completion
 latches. The synchronization hash covers that latch, so peers report any old
 boundary disagreement before a duplicate can appear. The physical transaction
-adapter now has a retail-backed referee for a sealed null target over occupied
-ground; it adds one intentional data-free skip and runs in the authenticated
-profile. Exact-boundary research
+adapter now has retail-backed referees for both a sealed null target over
+occupied ground and a sealed explicit friendly-unit target; they add two
+intentional data-free skips and run in the authenticated profile. Exact-boundary research
 and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run against revision
-`ff10970dfb03c63c5551b4e5bab3279235fd9239` exercised all 2,788 authenticated
+`c3b6929f6a0cc26e05116fe5c0ccf2d4b1ca6e1a` exercised all 2,789 authenticated
 tests with the exact expected failure identity.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0828.98` is the public release, published from revision
-`ff10970dfb03c63c5551b4e5bab3279235fd9239` with game JAR SHA-256
-`5b964a28def4a49e2f83cb17361c0a588ea56b2bf2239a5a8ef57e4d2f5e6fe4`.
+Signed engine OTA `2026.0829.99` is the public release, published from revision
+`c3b6929f6a0cc26e05116fe5c0ccf2d4b1ca6e1a` with game JAR SHA-256
+`f6d76bd2fdd36a01784b598e7c2095be412dfc8555e06c18e0998fe0f0375097`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.

@@ -164,9 +164,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # impossible-building-order and paid-training-food referees are also
         # pack-backed, so both deliberately skip in this profile. The three-map
         # BNE recording matrix likewise skips without its authenticated pack.
-        # The sealed-null-target physical transaction referee needs the Human 1
-        # retail mission and adds one more deliberate data-free skip.
-        "desktop": (356, 269),
+        # The sealed-null-target and explicit-unit-target physical transaction
+        # referees need the Human 1 retail mission and add two deliberate
+        # data-free skips.
+        "desktop": (357, 270),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -212,7 +213,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "engine": (1892, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (356, 8),
+        "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },
 }
