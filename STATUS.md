@@ -127,18 +127,20 @@ being inferred from the playable campaign fleet:
   observation cycle. The gate regenerates all 240 cells from three hash-pinned
   Human, Orc, and expansion seeds, then reopens the inventory and execution
   ledger before accepting a numerator. Current clean scorecard
-  `c02a0327bedcb05f037bad98794e3e0df8293614a60518f5517c0fbee233e418`
+  `9e5b7f37872378d3e211caba88f93ed0c788a125f0e4af250808e1614cff71b7`
   binds command ledger
-  `93b7fd171979b758fc23629db02ff37a5a3668e02e8f0908f42d98ea7097fa83`
+  `4857768fb63e066bcd50242fc9b05cbd5ceef2564ec29ef2f2fa3483130608f8`
   and split report
   `c204a868fc1b6fca3c83b09e6ca0e0446a99938f7c7d0602b7e963d85d260a30`
   to the current engine identity.
 - Physical player transactions: **3/532** current-source paired certifications.
   A retained store reopens seventeen native capture closures across the Human
   and Orc campaigns and reruns their packaged Java twins with producer evidence
-  verified. The single-unit, field/plain Move cells for open and occupied ground
-  are each exact across two independent scenarios. The two-unit occupied-ground
-  cell is also exact across independent Human and Orc scenarios after canonical
+  verified. The current proof-store identity is
+  `4b9272b9bc822fe3874bc7f6df60d25ac22ad63907171eaa05f185bbdaa45b86`.
+  The single-unit, field/plain Move cells for open and occupied ground are each
+  exact across two independent scenarios. The two-unit occupied-ground cell is
+  also exact across independent Human and Orc scenarios after canonical
   receipts order terminal outcomes by their recorded completion cycle. The
   two-unit open-ground held-out remains red by two cycles and stays explicit
   movement debt rather than receiving a scenario-specific exception. Four new
@@ -157,9 +159,9 @@ being inferred from the playable campaign fleet:
   computer-player cycles: 202,290 committed-state rows and 202,285 telemetry
   rows are exact. Seven ranked frontiers remain, so fleet certification is
   incomplete. The clean rematerialized Java proof is
-  `63785b8fedc43433c6bf2141f5aed6e444efef407dddfa1890dd91c5a79bafb3`;
+  `eaf07760182c11c3f1219487274ac208078a01a0b1c68fd37cab7713d2aa7a99`;
   its retained report SHA-256 is
-  `fc1e7c74093fa50404de9e24d040cea72fd365359fae849a07d9311afd55f9a4`.
+  `17b2f9c5fecc09d09928d23608a7cab87196b6c36d4e328c0255645419b0562b`.
   The conductor proof is validated fail-closed against the current clean
   source, engine, Java adapter, app JAR, ChonkPack and retail `ai.bin`
   identities.
