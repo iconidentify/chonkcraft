@@ -17,48 +17,47 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-29
 
-Accepted cycle-1,800 run `e8309fec` preserves the shared clean horizon at 267
+Accepted cycle-1,800 run `3cc105b0` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
-cycle-400 fleet advances from 27 clean / 25 divergent to 29 clean / 23
-divergent / 0 failed. Aggregate per-map frontiers rise from 18,481 to 18,609 at
-cycle 400 and from 33,801 to 34,821 at cycle 1,800. Human 11 advances 281 ->
-299; Human 14 advances 398 -> 400 at short horizon and 405 at long horizon;
-Orc 13 advances 292 -> 400 and 548; expansion Human 1 advances 554 -> 1,293 at
-long horizon. No case moves backward. The durable cycle-400 and accepted
+cycle-400 fleet remains 29 clean / 23 divergent / 0 failed. Aggregate per-map
+frontiers rise from 18,609 to 18,710 at cycle 400 and from 34,821 to 34,922 at
+cycle 1,800. Expansion Orc 12 advances from exact through 273 to exact through
+374; every other map is unchanged. The durable cycle-400 and accepted
 cycle-1,800 surveys are retained under
-`.bne-artifacts/runs/182cd53fa85eba34bf78b376b11429a3eb7cdaec1da2ac1e5488ea6f95768bc2`
-and `.bne-artifacts/runs/e8309fec394b189d9ca6d0b6f4256170f814d3ef2d1f1c55c5f5f92a30bb0fd4`.
+`.bne-artifacts/runs/18b00e6949b3ae6373e8f0d26504b849ec9295c0fabc63246a783f9784e9c7c5`
+and `.bne-artifacts/runs/3cc105b04f4eb4797ccca508987a33b87d39bdf9113448774f317945ced36f54`.
+The accepted receipt binds clean engine-input identity `d014bc0c` to source
+revision `eaa3fe87`.
 
-Behavioral delta: an empty critter route whose destination is still owned by a
-moving animal now enters native `FUN_004379e0` refusal handling. Each retry
-advances the sticky collision nibble and refusal eight begins the full Move
-15..1 payment band. Previously Java treated this as a free provisional retry,
-left collision at zero, and promoted Still as soon as the blocker settled.
-The change is structural and contains no map, unit, cycle, or coordinate
-exception.
+Behavioral delta: a loaded worker returning to a depot now retains the native
+direct route byte when another loaded worker for the same depot is already
+queued to vacate that lane. A later direct byte may replace a two-byte detour
+only when the replacement preserves the same endpoint. The same queued sibling
+also qualifies a longer cached route for the native refusal-eight Move 15..1
+payment band. Previously Java either inserted an unnecessary detour or redrew
+after traffic had already committed to leave. The rule is structural and
+contains no map, unit, cycle, or coordinate exception.
 
-Proof delta: Orc 13 critter 1456 and Human 14 critter 1524 independently retain
-Move at occupied destinations with native collision values ten and eight.
-Earlier completed one-tile wanders by those same animals are held-out negatives
-and still promote Still. Human 10 and Human 11 supply additional native
-diagnostic witnesses, while unoccupied completions and unrelated idle-wander
-directions remain outside the rule. The focused Orc 13 and Human 14 referee is
-green, and both complete fleets show only gains.
+Proof delta: expansion Orc 12 peasant 1439 independently proves the retained
+`NE,NE,N` prefix through peasant 1434, while expansion Human 12 peon 1550
+proves the complete refusal band behind peon 1557 and first-steps north as the
+sibling vacates. The existing expansion Human 9 direct-ray refusal witness and
+expansion Human 8 occupied and negative-Move cases remain held-out controls.
+The complete focused referee is green, and both complete fleets show the same
+single 101-cycle gain with no regression.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
 gate kept all 39 lockstep cases through cycle 1,800 and completed real
 two-process startup, map transfer, 180 rendered cycles, and terminal hash
-`1b9dd8ad7b9a1f51`. The matched-media suite accounted for all 2,820 tests. The
-hosted profile runs 2,793 with 27 exact skips; the local profile with three
-private playtest-save referees runs 2,796 with 24 exact skips. Both retain the
-exact 110 expected specification failures. The data-free profile runs 1,617
-with 1,203 exact skips and the same 89 expected failures; there were no
-unexpected or stale failures.
+`1b9dd8ad7b9a1f51`. The matched-media suite accounted for all 2,820 tests; the
+local profile with three private playtest-save referees ran 2,796 with 24 exact
+skips and retained the exact 110 expected specification failures. Pack parity
+also passed all eight structural checks and all 20 BNE music tracks.
 
-The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc
-12 follows at 273, expansion Orc 6 at 274, Human 13 at 278, and expansion Orc
-8 at 279; expansion Human 11 now follows at 311. Bounded rejected candidates
+The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc 6
+follows at 274, Human 13 at 278, expansion Orc 8 at 279, and expansion Orc 11
+at 282; expansion Human 11 follows at 311. Bounded rejected candidates
 remain reverted: blanket and soft visibility variants for Human 12 failed
 their native route or held-out negatives; Human 11's wood-stall timing changed
 only its target map; the broad all-tree occupancy candidate regressed Human 5;

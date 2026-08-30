@@ -35,11 +35,24 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 310.
 - **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,609 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,710 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,821; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,922; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The shared-depot return milestone advances expansion Orc 12 from exact
+  through cycle 273 to exact through 374. Loaded workers now retain a native
+  direct route byte through a loaded same-depot sibling that is already queued
+  to vacate it; a later direct byte replaces only a two-byte detour with the
+  same endpoint, and the immediate queued sibling qualifies longer cached
+  routes for the native refusal-eight Move 15..1 band. Expansion Orc 12 and
+  expansion Human 12 independently authenticate the two forms. Existing
+  direct-ray, occupied-route, and negative-Move controls retain their prior
+  behavior. All other 51 maps are unchanged, so both aggregate fleets gain
+  101 cycles without changing clean-map counts or the shared horizon. Durable
+  cycle-400 run `18b00e69` and accepted cycle-1,800 run `3cc105b0` bind the
+  clean source revision and engine input. The rule has no map, unit, cycle, or
+  coordinate exception.
 - The occupied-critter refusal milestone makes an empty route to a square still
   owned by a moving animal enter the native sticky collision ladder instead of
   receiving a free retry and standing down as soon as traffic clears. Orc 13
@@ -162,12 +175,11 @@ intentional data-free skips and run in the authenticated profile. Exact-boundary
 and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
-data-free skips. A matched-input full run after accepted parity run
-`e8309fec394b189d9ca6d0b6f4256170f814d3ef2d1f1c55c5f5f92a30bb0fd4`
-exercised all 2,796 locally available authenticated tests with the exact
-expected failure identity. Its two new critter referees reconstruct Orc 13 and
-Human 14 occupied wander traffic and pair each positive with an earlier
-same-unit completion; the complete preceding movement inventory remains green.
+data-free skips. A matched-input full run exercised all 2,796 locally available
+authenticated tests with the exact expected failure identity before the
+shared-depot receipt was promoted. The loaded-worker assertions extend the
+existing authenticated mine-exit referee without changing the suite or skip
+inventory; the complete preceding movement inventory remains green.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
