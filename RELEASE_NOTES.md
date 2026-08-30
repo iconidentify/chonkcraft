@@ -1,5 +1,9 @@
 # Gameplay Reliability Update
 
+- Fixed loaded oil tankers stopping short of a refinery when a legal route
+  anchor touched coastline. Tanker returns now use the original Battle.net
+  route-grid spread before choosing the refinery edge, including mixed
+  horizontal, vertical, and ordinary shoreline approaches.
 - Fixed loaded workers walking into a moving gold-return convoy after long
   congestion. They now wait out the original Battle.net movement cadence and
   replan when the route opens, while already-consumed return routes keep their

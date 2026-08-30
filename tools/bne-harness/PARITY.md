@@ -15,7 +15,53 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (saturated fresh laden-return route)
+## Current release checkpoint — 2026-08-30 (tanker anchor spread)
+
+Accepted cycle-1,800 run `85cc4484` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `38cf0658` raises the short-fleet count to 32 clean / 20
+divergent / 0 failed. Aggregate per-map frontiers are 19,175 at cycle 400 and
+35,564 at cycle 1,800. Human 7 advances from exact through cycle 281 to 404;
+every other map frontier is unchanged. The receipts are retained under
+`.bne-artifacts/runs/38cf06586e6ccc1f8fca01fec2387dbf74431033161f7379ca9841847d0ddcb4`
+and
+`.bne-artifacts/runs/85cc44848855866b6496f747323cc1f67c2152ba1e19cd616ae1f9f9414c8659`.
+Both bind dirty engine-input identity `5b700bb4` at base revision `f9552529`
+to replayable source capsule `500a66e4`.
+
+Behavioral delta: the resource-order SpreadUnit search for a loaded oil tanker
+tests route-grid anchors. It does not reject an anchor because the tanker's
+rendered second hull cell touches coast. The later MoveToDepot handoff can
+therefore classify the shoreline correctly, replace that spread point with
+the refinery edge, and retain the native return route. The rule is structural
+and contains no map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: Human 7 tanker 1524 accepts anchor (68,69), stores spread point
+(69,69), then replaces it with refinery edge (72,72) and writes
+`[SE,SE,SE,S,SE]`. It moves south at fixture 282 instead of stopping early at
+(68,68). Expansion Orc 8 independently authenticates the ordinary refinery
+handoff from spread point (97,65) to edge (89,71). Orc 10 and expansion Human
+6 retain their vertical shoreline rule, normalizing the even coordinate while
+preserving the odd one. The complete short fleet gains 119 aggregate cycles
+and one clean map; the long fleet gains 123 aggregate cycles with zero
+regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks, including all 20 music tracks with a worst decoded comparison of 22.2
+dB. The matched BNE-media suite accounts for 2,835 tests: 2,805 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged. The separately measured data-free profile ran 1,622,
+skipped 1,213, and retained its exact 89 expected failures. The pinned
+662,253,608-byte source archive and signed pack passed the full 1,412-asset and
+1,411-payload provenance inventory.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Human 13 and expansion Human 4 follow at 281, Orc 8 at 289, and Human 11 and
+expansion Orc 11 at 300.
+
+## Prior release checkpoint — 2026-08-30 (saturated fresh laden-return route)
 
 Accepted cycle-1,800 run `eb371304` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

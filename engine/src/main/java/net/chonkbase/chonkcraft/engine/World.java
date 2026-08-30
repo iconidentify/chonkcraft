@@ -5170,7 +5170,21 @@ public final class World {
         return battleNetSpreadUnitGoal(unit, goalX, goalY, 1, 1);
     }
 
-    /** SpreadUnit variant whose free ray must admit the mover's footprint. */
+    /**
+     * SpreadUnit variant retained for callers which explicitly supply a
+     * placement footprint.
+     *
+     * <p>The resource-order constructor does not use the mobile unit's full
+     * hull here. It tests the route-grid anchor. Human 7 tanker 1524 proves
+     * the distinction: (68,69) is admissible although the second hull cell
+     * (69,69) is coast, so native stores the preceding (69,69), replaces it
+     * with refinery edge (72,72) in MoveToDepot, and writes SE,SE,SE,S,SE.
+     * Testing a 2x1 hull skipped that anchor, stored (68,69), and falsely
+     * entered the vertical-shoreline exception. XOrc 8 independently keeps
+     * the ordinary anchor-spread/refinery-edge handoff (97,65 -> 89,71),
+     * while Orc 10 and XHuman 6 retain their vertical odd-coordinate form.
+     * </p>
+     */
     int[] battleNetSpreadUnitGoal(Unit unit, int goalX, int goalY,
             int footprintWidth, int footprintHeight) {
         if (unit == null || unit.type() == null

@@ -33,13 +33,27 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
   cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
   now defines that boundary; expansion Human 11 is exact through cycle 319.
-- **31/52 maps are exact through the full 400-cycle window**, with 21 later
+- **32/52 maps are exact through the full 400-cycle window**, with 20 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 19,056 cycles; no map moved backward.
+  frontiers, capped at 400, is 19,175 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  35,441; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,564; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The tanker anchor-spread milestone advances Human 7 from exact through cycle
+  281 to 404. A loaded tanker's resource-order SpreadUnit search judges each
+  route-grid anchor rather than its rendered 2x1 or 1x2 hull before
+  MoveToDepot replaces the spread point with the refinery edge. Human 7's
+  tanker 1524 now retains native `[SE,SE,SE,S,SE]` instead of stopping at
+  (68,68). Expansion Orc 8 independently authenticates the ordinary refinery
+  handoff, while Orc 10 and expansion Human 6 preserve their distinct vertical
+  odd-shoreline form. All other 51 fleet frontiers are unchanged. The
+  cycle-400 aggregate gains 119 cycles and one clean map; the cycle-1,800
+  aggregate gains 123 cycles without changing its clean count or shared
+  horizon. Durable cycle-400 run `38cf0658` and accepted cycle-1,800 run
+  `85cc4484` bind engine input `5b700bb4` at base revision `f9552529` to
+  replayable source capsule `500a66e4`. The rule has no map, unit, cycle,
+  coordinate, or faction exception.
 - The saturated fresh laden-return route milestone advances expansion Orc 6
   from exact through cycle 284 to 520. After a loaded land worker has climbed
   the sticky refusal ladder, a newly generated return route whose first step
@@ -288,14 +302,14 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,832 tests**. The canonical hosted
-authenticated profile runs 2,805 and intentionally skips exactly 27. A local
+The complete suite now contains **2,835 tests**. The canonical hosted
+authenticated profile runs 2,808 and intentionally skips exactly 27. A local
 classic-install profile with the three private playtest-save referees installed
-runs 2,808 and skips exactly 24. The exact BNE-source profile used for the
-current milestone runs 2,802 and skips exactly 30; its release-format-specific
+runs 2,811 and skips exactly 24. The exact BNE-source profile used for the
+current milestone runs 2,805 and skips exactly 30; its release-format-specific
 skip identities are recorded separately rather than weakening either classic
 profile. All retain the exact expected 110-test specification-failure set.
-With no licensed inputs, 1,622 tests run, 1,210 skip,
+With no licensed inputs, 1,622 tests run, 1,213 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -361,6 +375,15 @@ suite tests accounted for with 2,804 run and 30 exact BNE skips, and the same
 110 expected failure identities. The pinned original source and signed pack
 also passed the full 1,412-asset provenance and payload inventory with zero
 skips or failures.
+The tanker anchor-spread candidate repeated that complete sequence: 18/18
+playability lanes, 39/39 clean/adverse lockstep cases through cycle 1,800, the
+real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity checks
+including all 20 music tracks at a worst 22.2 dB, all 2,835 suite tests
+accounted for with 2,805 run and 30 exact BNE skips, and the same 110 expected
+failure identities. The separately measured data-free profile ran 1,622,
+skipped 1,213, and retained the same 89 expected failure identities. The
+pinned original source and signed pack again passed the full 1,412-asset and
+1,411-payload provenance inventory with zero skips or failures.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

@@ -1696,11 +1696,7 @@ final class BattleNetHarvestSystem {
                 : null;
         int[] returnPoint = doubledTankerSpread
                 ? world.battleNetSpreadUnitGoal(worker,
-                        returnGoalX, returnGoalY,
-                        verticalDoubledTankerSpread ? 1
-                                : worker.type().tileWidth(),
-                        verticalDoubledTankerSpread
-                                ? worker.type().tileHeight() : 1)
+                        returnGoalX, returnGoalY)
                 : dropPoint;
         String resourceTrace = System.getenv("CHONKCRAFT_TRACE_RESOURCE");
         if (resourceTrace != null
