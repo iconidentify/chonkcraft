@@ -35,11 +35,25 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,779 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,781 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,991; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,993; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The corpse-owner handoff milestone advances expansion Human 2 from exact
+  through cycle 349 to exact through 351. Retail leaves a newly installed
+  corpse or rubble record with the living unit's owner through its first held
+  decay frame, then transfers the fading scenery to neutral on the next frame
+  transition; Java now does the same. The sealed fleet contains 76 observable
+  mobile-body handoffs and 13 building-rubble handoffs across ten campaigns,
+  while 77 body creations retain their living owner. All 70 bodies that expire
+  inside the capture are neutral before release. Revealers, corpseless balloon
+  and zeppelin deaths, and unrelated live type changes remain outside the rule.
+  Every other map is unchanged, so both aggregate fleets gain two cycles with
+  no change to the shared horizon or clean-map counts. Durable cycle-400 run
+  `34910153` and accepted cycle-1,800 run `3fc6c609` bind engine input
+  `aebf63ec` and replayable source capsule `7f1eb2d1`. The rule has no map,
+  unit, cycle, coordinate, or faction exception.
 - The unified-corpse milestone advances expansion Orc 11 from exact through
   cycle 281 to exact through 283. All 14 authenticated naval deaths in the
   sealed fleet become native raw type 105, covering human and orc destroyers,
@@ -199,14 +213,14 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,825 tests**. The canonical hosted
-authenticated profile runs 2,798 and intentionally skips exactly 27. A local
+The complete suite now contains **2,827 tests**. The canonical hosted
+authenticated profile runs 2,800 and intentionally skips exactly 27. A local
 classic-install profile with the three private playtest-save referees installed
-runs 2,801 and skips exactly 24. The exact BNE-source profile used for the
-current milestone runs 2,795 and skips exactly 30; its release-format-specific
+runs 2,803 and skips exactly 24. The exact BNE-source profile used for the
+current milestone runs 2,797 and skips exactly 30; its release-format-specific
 skip identities are recorded separately rather than weakening either classic
 profile. All retain the exact expected 110-test specification-failure set.
-With no licensed inputs, 1,620 tests run, 1,205 skip,
+With no licensed inputs, 1,622 tests run, 1,205 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -237,6 +251,11 @@ cases through cycle 1,800, a real two-process 180-cycle match at hash
 `1b9dd8ad7b9a1f51`, 8/8 exact BNE pack-parity checks, all 2,825 suite tests
 accounted for under the 30-skip BNE profile, and the same 110 expected failure
 identities.
+The corpse-owner handoff candidate repeated the same acceptance sequence:
+18/18 playability lanes, 39/39 clean/adverse lockstep cases through cycle
+1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
+checks, all 2,827 suite tests accounted for with 2,797 run and 30 exact skips,
+and the same 110 expected failure identities.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

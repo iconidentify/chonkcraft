@@ -17,6 +17,51 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-30
 
+Accepted cycle-1,800 run `3fc6c609` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `34910153` likewise keeps 29 clean / 23 divergent / 0 failed.
+Aggregate per-map frontiers are 18,781 at cycle 400 and 34,993 at cycle 1,800.
+Expansion Human 2 advances from exact through 349 to 351; every other map is
+unchanged. The receipts are retained under
+`.bne-artifacts/runs/34910153594b07a318723c575a6155ef455728147089b86779a8aa3a2c3dbdea`
+and `.bne-artifacts/runs/3fc6c609253af1b97345fd4c091857e9d07add9f80017a76ab0605ef837d54e4`.
+Both bind dirty engine-input identity `aebf63ec` at base revision `8dc34926` to
+replayable source capsule `7f1eb2d1`.
+
+Behavioral delta: a newly installed corpse or building-rubble record retains
+the living unit's owner through its first held decay frame, then becomes
+player 15 on the first decay-frame transition. The owner has already paid the
+unit-roster removal, so only the fading record changes owner. Revealers are
+timed vision records rather than scenery and remain owned; balloon and
+zeppelin deaths that install no corpse still disappear directly. The rule is
+structural and contains no map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: all 76 mobile-body owner handoffs observable inside the sealed
+cycle-1,800 fleet and all 13 building-rubble handoffs occur on that first frame
+transition across ten campaigns. All 77 mobile-body creations initially keep
+the living owner, and all 70 bodies that expire within the capture are neutral
+before release. No unrelated live type transition hands ownership to neutral.
+Focused tests hold the first-frame boundary and revealer exclusion. The two
+complete fleets each gain two aggregate cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks. The matched BNE-media suite accounts for 2,827 tests: 2,797 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268. Its
+three simultaneous mismatches have distinct causes. A bounded branch witness
+at native `0x453050`, called by the Still handler, proves the slot-1359
+axethrower's raw Move-to-Still write at `0x453097` is gated by the alignment
+branch at `0x45308a`; this is the already rejected behavior-one home-Move
+give-up cluster, so no second production edit was attempted there. Expansion
+Orc 6 follows at 274, Human 13 at 278, expansion Orc 11 at 282, expansion Orc 8
+at 302, and expansion Human 11 at 320.
+
+## Prior release checkpoint — 2026-08-30 (unified corpses)
+
 Accepted cycle-1,800 run `41c1d87e` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 29 clean / 23 divergent / 0 failed. Aggregate per-map

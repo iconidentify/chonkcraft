@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2825 tests,   27 skipped
-    no external input          2825 tests, 1205 skipped
+    authenticated inputs       2827 tests,   27 skipped
+    no external input          2827 tests, 1205 skipped
 
 Both can be green.
 
@@ -164,7 +164,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1904, 876),
+        "engine": (1906, 876),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -218,7 +218,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1904, 7),
+        "engine": (1906, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (357, 8),
@@ -235,7 +235,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1904, 4),
+        "engine": (1906, 4),
         "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },
@@ -257,7 +257,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1909, 12),
+        "engine": (1911, 12),
         "desktop": (357, 6),
         "matchmaker-server": (5, 1),
     },

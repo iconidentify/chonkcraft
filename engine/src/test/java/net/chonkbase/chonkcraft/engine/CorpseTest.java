@@ -128,6 +128,21 @@ class CorpseTest {
         return type;
     }
 
+    private static UnitType fadingBody(String ident, boolean revealer) {
+        UnitType type = new UnitType(ident);
+        type.setTileSize(1, 1);
+        type.setHitPoints(1);
+        type.setVanishes(true);
+        type.setRevealer(revealer);
+        type.setNumDirections(1);
+        AnimationSet set = new AnimationSet("fading-body");
+        set.put(AnimationSet.State.DEATH, Animation.parse("death",
+                List.of("unbreakable begin", "frame 0", "wait 3",
+                        "frame 10", "wait 3", "unbreakable end", "wait 1")));
+        type.setAnimationSet(set);
+        return type;
+    }
+
     private static UnitType peasant() {
         UnitType type = new UnitType("unit-peasant");
         type.setTileSize(1, 1);
@@ -195,6 +210,53 @@ class CorpseTest {
                         .count(),
                 "there is more than one body for one peasant, so a second was made rather"
                         + " than the first being turned into it");
+    }
+
+    @Test
+    @DisplayName("a body's first completed decay hold hands its scenery to neutral")
+    void theFirstDecayFrameHandsTheBodyToNeutral() {
+        UnitType body = fadingBody("unit-human-dead-body", false);
+        World world = new World(grass(20));
+        world.setUnitTypes(Map.of(body.ident(), body));
+        UnitType living = peasant();
+        living.setCorpse(body.ident());
+        Unit worker = world.createUnit(living, 3, 5, 5);
+        world.kill(worker);
+
+        while (!"unit-human-dead-body".equals(worker.type().ident())) {
+            world.tick();
+        }
+        assertEquals(3, worker.player(),
+                "becoming a corpse itself must retain the living owner");
+
+        while (worker.animation().waitCycles() > 1) {
+            world.tick();
+            assertEquals(3, worker.player(),
+                    "the corpse became neutral before its first decay hold expired");
+        }
+        world.tick();
+        assertEquals(3, worker.player(),
+                "finishing the wait alone must not predate the next decay frame");
+        world.tick();
+        assertEquals(World.NEUTRAL_PLAYER, worker.player(),
+                "the first decay-frame transition did not make the corpse neutral");
+    }
+
+    @Test
+    @DisplayName("a revealed death marker stays outside the corpse handoff")
+    void aRevealerDoesNotUseTheCorpseNeutralHandoff() {
+        UnitType marker = fadingBody("unit-dead-vision-1-4", true);
+        World world = new World(grass(20));
+        world.setUnitTypes(Map.of(marker.ident(), marker));
+        Unit unit = world.createUnit(marker, 3, 5, 5);
+        unit.setOrder(Unit.Order.DYING);
+
+        for (int cycle = 0; cycle < 5; cycle++) {
+            world.tick();
+        }
+
+        assertEquals(3, unit.player(),
+                "a revealer is a timed vision record, not decaying corpse scenery");
     }
 
     @Test

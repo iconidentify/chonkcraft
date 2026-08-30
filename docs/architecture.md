@@ -90,6 +90,13 @@ collaborators beside it, each constructed once by `World` and each holding the
 | `BattleNetConstructionSystem` | Putting a building up, and keeping it up |
 | `BattleNetBuildingPlacement` | Where the computer decides to put a building |
 
+Death keeps the living owner on a newly installed corpse or rubble record,
+then transfers ordinary vanishing scenery to neutral on its first decay-frame
+transition. The owner has already paid its roster removal before that handoff,
+so this changes the dying record without re-enlisting it. Timed revealers are
+not scenery and remain owned; air units without a corpse still disappear
+directly.
+
 The boundaries are drawn along the questions a parity investigation actually
 asks. When the 52-case corpus reports that a peasant stepped a cycle early,
 the file to open is the movement system; when a grunt attacked where retail
@@ -266,6 +273,6 @@ and proves 180 lockstep cycles converge to one world hash. A recorded match
 between two physically separate player machines remains useful field
 confirmation; it is no longer the only evidence for the public network path.
 
-The test suite is **2,825 tests**. On a fully configured CI machine 27 skip; with
+The test suite is **2,827 tests**. On a fully configured CI machine 27 skip; with
 no external inputs 1,205 do. Both numbers matter and the difference between them is the
 subject of [ci.md](ci.md).

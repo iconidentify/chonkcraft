@@ -12051,7 +12051,22 @@ public final class World {
         Animation death = set == null ? null : set.get(AnimationSet.State.DEATH);
         if (death != null) {
             unit.animation().switchTo(death);
+            int frameBefore = unit.frame();
             advance(unit);
+            // COrder_Die leaves the living owner on the newly installed body,
+            // then hands the decaying scenery to neutral when its first held
+            // frame expires.  This is a lifecycle boundary, not a corpse-type
+            // exception: all 76 observable mobile bodies and 13 building
+            // rubble records in the sealed campaign corpus make the same
+            // owner -> player-15 transition, while revealers and corpseless
+            // deaths do not.  The old owner is already absent from the unit
+            // roster (LetUnitDie paid that before the body was installed), so
+            // only the record owner changes here.
+            if (unit.frame() != frameBefore
+                    && unit.type().vanishes() && !unit.type().revealer()
+                    && unit.player() != NEUTRAL_PLAYER) {
+                unit.setPlayer(NEUTRAL_PLAYER);
+            }
             if (unit.animation().unbreakable()) {
                 return;
             }
