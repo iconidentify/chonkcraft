@@ -453,6 +453,45 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a first refusal after a long chase keeps the direct progressive face")
+    void firstSaturatedChaseRefusalKeepsDirectProgressiveFace() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 119);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1481 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 267) {
+            mission.tick();
+        }
+
+        assertEquals(31, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(1, grunt.battleNetRefusals());
+        assertEquals(0, grunt.pathLength(),
+                "the refused northeast tail is parked at route index twenty");
+
+        mission.tick();
+        assertEquals(268, fixtureCycle(world));
+        assertEquals(30, grunt.tileX());
+        assertEquals(41, grunt.tileY(),
+                "the native refill is the one-byte southwest progressive face");
+        assertEquals(Direction.fromDelta(-1, 1), grunt.lastStepHeading());
+        assertEquals(0, grunt.pathLength(),
+                "native stores and consumes a complete one-byte refill");
+    }
+
+    @Test
     @DisplayName("a hard-parked paid refill continues the retained wall face")
     void hardParkedPaidRefillContinuesRetainedWallFace() {
         AssetSource assets = AssetSource.fromEnvironment();

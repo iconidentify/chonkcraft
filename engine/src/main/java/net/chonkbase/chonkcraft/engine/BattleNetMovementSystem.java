@@ -6740,6 +6740,19 @@ final class BattleNetMovementSystem {
                                 && unit.target().type() != null
                                 && !unit.target().type().building()
                                 && !World.battleNetRangedChaseUnit(unit);
+                        boolean firstSaturatedResidualProgressiveRefill =
+                                !postRetargetParkRefill
+                                && unit.stepDrained() && !unit.isMoving()
+                                && unit.battleNetPathInitialLength()
+                                        == BattleNetPathFinder.MAX_PATH
+                                && unit.battleNetPathStepsTaken() >= 3
+                                && unit.battleNetCollisionCounter() == 0
+                                && unit.battleNetRefusals() == 0
+                                && unit.target() != null
+                                && unit.target().isAlive()
+                                && unit.target().type() != null
+                                && !unit.target().type().building()
+                                && !World.battleNetRangedChaseUnit(unit);
                         if (unit.stepDrained() && !unit.isMoving()) {
                             int collision =
                                     unit.battleNetCollisionCounter() + 1;
@@ -6756,6 +6769,22 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetParkedRefusalHeading(heading);
                         }
                         int refusals = battleNetRefuse(unit);
+                        if (firstSaturatedResidualProgressiveRefill
+                                && refusals == 1) {
+                            // A saturated collision-free chase which has
+                            // already consumed several bytes owns a distinct
+                            // first-refusal refill. Native XHuman 12 slot 1481
+                            // parks its blocked NE tail at fixture 267, then
+                            // retains the free progressive SW face as a
+                            // complete one-byte route instead of cold-
+                            // searching the opposite NW wall. Carry only the
+                            // provenance; the next target-route draw still
+                            // proves whether the direct face is free and
+                            // strictly closer.
+                            unit
+                                    .setBattleNetFirstSaturatedResidualProgressiveRefill(
+                                            true);
+                        }
                         if (paidFourByteParkRedraw) {
                             // The one-step paid route is parked with its raw
                             // bytes intact, but NewPath owns a fresh buffer on

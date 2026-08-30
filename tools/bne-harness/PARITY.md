@@ -15,7 +15,55 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (tanker anchor spread)
+## Current release checkpoint — 2026-08-30 (saturated chase first-refusal refill)
+
+Accepted follow-on receipt `98601a77` preserves the shared clean horizon at
+267 (earliest divergence 268), all individual campaign frontiers, and the
+cycle-1,800 totals of 8 clean / 44 divergent / 0 failed and 35,564 aggregate
+exact cycles. It reduces expansion Human 12's cycle-268 findings from four to
+three by eliminating the native-slot-1481 grunt's north/south position split.
+The receipt is retained under
+`.bne-candidate-evidence/first-saturated-progressive-52x1800/gate-artifacts/runs/98601a77d55f35485ec85db6e454ab4759cb09a9d5b4a79b0aac741d7f9f1d5c`.
+It binds dirty engine-input identity `b196455c` at base revision `2763222` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`.
+
+Behavioral delta: when a collision-free melee chase has consumed at least
+three headings from a saturated twenty-byte route and hard-refuses its next
+heading for the first time, retail gives the ensuing target-route refill one
+direct progressive face. Java now replaces a multi-byte cold plan only when
+its first heading makes no progress, the direct Bresenham heading is free, and
+that heading is strictly closer to the live mobile quarry. The rule is native
+route-buffer and refusal provenance; it contains no map, unit, cycle,
+coordinate, faction, or arbitrary route-length exception.
+
+Proof delta: expansion Human 12 native slot 1481 and Java unit 119 are exact at
+(31,40) through fixture 267 after three headings from a saturated route. Their
+blocked northeast tail owns collision/refusal 1/1 and an empty parked cursor.
+On fixture 268 native stores and consumes the complete one-byte southwest
+refill, reaching (30,41); Java previously cold-searched a northwest-led wall
+route and reached (30,39). The focused 22-test collision/refill class passes,
+and efficacy receipt
+`.bne-test-efficacy/first-saturated-progressive/runs/8ca7724e3df996c5679aae2fbaa7a20cce6f16b2994796b00cbbff8fc4344636`
+proves the new assertion fails on `2763222` and passes on the candidate. All
+30 `bne_java.py` tests pass. The gate also treats identical content-addressed
+packs as the same input after a machine transfer when their absolute paths
+differ, while retaining hash-and-byte fail-closed checks.
+
+The broad reactor test was attempted once under `CHONKCRAFT_ASSET_PACK`; that
+mixed BNE media into synthetic default-profile tests and produced 94 failures,
+50 errors, and 196 skips, including sandbox-denied UDP cases. It is not a
+valid acceptance profile for this change. The focused BNE class and fixed
+52-case semantic gate above are green. The prior tanker checkpoint below
+remains the latest complete release-scale player-contract, lockstep, pack,
+provenance, and BNE-media validation bundle.
+
+The remaining shared-boundary findings are expansion Human 12 native slot
+1359's Still-versus-Move handoff and native slot 1386's harvest-route position
+split at cycle 268. The prior axethrower cluster hypothesis is rejected; the
+next actionable family is the worker's earlier harvest path choice.
+
+## Prior release checkpoint — 2026-08-30 (tanker anchor spread)
 
 Accepted cycle-1,800 run `85cc4484` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

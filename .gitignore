@@ -5,6 +5,7 @@ target/
 *.iml
 tmp/
 /.bne-artifacts/
+/.bne-candidate-evidence/
 /.bne-ai-evidence/
 /.bne-lab/
 /.bne-counterfactual/

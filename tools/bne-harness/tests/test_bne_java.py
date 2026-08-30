@@ -343,6 +343,23 @@ first divergence at cycle 22 (3 finding(s)):
                 [baseline], candidate, allow_asset_migration=True,
             )
 
+    def test_gate_accepts_the_same_content_addressed_pack_after_transfer(self):
+        baseline = survey_report(21, {"case-a": "clean"})
+        candidate = survey_report(22, {"case-a": "clean"}, head="candidate")
+        baseline["asset_source"] = {
+            "kind": "chonkpack", "path": "/old-machine/game.chonkpack",
+            "bytes": 1234, "sha256": "a" * 64,
+        }
+        candidate["asset_source"] = {
+            "kind": "chonkpack", "path": "/new-machine/game.chonkpack",
+            "bytes": 1234, "sha256": "a" * 64,
+        }
+
+        gate = bne_java.evaluate_gate([baseline], candidate)
+
+        self.assertTrue(gate["passed"])
+        self.assertIsNone(gate["asset_migration"])
+
     def test_maps_every_retail_campaign_family(self):
         self.assertEqual(
             "campaigns/human/level01h",

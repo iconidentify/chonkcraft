@@ -5492,6 +5492,62 @@ final class BattleNetCombatSystem {
                     } else {
                         world.planTowards(unit, chased,
                                 collidedResidualRefill);
+                        if (unit
+                                .battleNetFirstSaturatedResidualProgressiveRefill()) {
+                            unit
+                                    .setBattleNetFirstSaturatedResidualProgressiveRefill(
+                                            false);
+                            int direct = World
+                                    .battleNetFirstBresenhamHeading(
+                                            unit.tileX(), unit.tileY(),
+                                            chased.tileX(), chased.tileY());
+                            int stride = world.battleNetMovementStride(unit);
+                            boolean validDirect = direct >= 0
+                                    && direct < Direction.COUNT;
+                            int directX = validDirect ? unit.tileX()
+                                    + Direction.deltaX(direct) * stride
+                                    : unit.tileX();
+                            int directY = validDirect ? unit.tileY()
+                                    + Direction.deltaY(direct) * stride
+                                    : unit.tileY();
+                            int currentDistance = Math.max(
+                                    Math.abs(chased.tileX() - unit.tileX()),
+                                    Math.abs(chased.tileY() - unit.tileY()));
+                            int directDistance = Math.max(
+                                    Math.abs(chased.tileX() - directX),
+                                    Math.abs(chased.tileY() - directY));
+                            int plannedHeading = unit.pathLength() == 0
+                                    ? -1 : unit.peekHeading();
+                            int plannedX = plannedHeading < 0
+                                    ? unit.tileX()
+                                    : unit.tileX()
+                                            + Direction.deltaX(plannedHeading)
+                                                    * stride;
+                            int plannedY = plannedHeading < 0
+                                    ? unit.tileY()
+                                    : unit.tileY()
+                                            + Direction.deltaY(plannedHeading)
+                                                    * stride;
+                            int plannedDistance = Math.max(
+                                    Math.abs(chased.tileX() - plannedX),
+                                    Math.abs(chased.tileY() - plannedY));
+                            if (validDirect
+                                    && unit.pathLength() > 1
+                                    && directDistance < currentDistance
+                                    && plannedDistance >= currentDistance
+                                    && world.canEnter(unit, directX, directY)) {
+                                world.causalTrace.event(world.cycle,
+                                        "path.first-saturated-refusal-progressive",
+                                        unit.id(),
+                                        "target", chased.id(),
+                                        "heading", direct,
+                                        "discarded_heading", plannedHeading);
+                                unit.setPath(new PathFinder.Path(
+                                        PathFinder.Result.FOUND,
+                                        new int[] {direct}));
+                                unit.setRouteSpent(false);
+                            }
+                        }
                     }
                     if (paidWrapRouteRedraw
                             && unit.battleNetAttackWrapDestArmPending()

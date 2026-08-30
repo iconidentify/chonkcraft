@@ -2328,6 +2328,7 @@ public final class Unit {
             battleNetRangedCloseHitHelpWallFace = false;
             battleNetColdNoProgressRefusalLoop = false;
             battleNetPaidLongResidualRefill = false;
+            battleNetFirstSaturatedResidualProgressiveRefill = false;
         }
         this.target = target;
         if (target == null) {
@@ -3479,6 +3480,18 @@ public final class Unit {
     }
 
     private boolean battleNetPaidLongResidualRefill;
+
+    /** A first refusal after consuming a saturated route owns one direct refill. */
+    public boolean battleNetFirstSaturatedResidualProgressiveRefill() {
+        return battleNetFirstSaturatedResidualProgressiveRefill;
+    }
+
+    public void setBattleNetFirstSaturatedResidualProgressiveRefill(
+            boolean refill) {
+        battleNetFirstSaturatedResidualProgressiveRefill = refill;
+    }
+
+    private boolean battleNetFirstSaturatedResidualProgressiveRefill;
 
     /** A paid naval Patrol park must route against the pass-start hull view. */
     public boolean battleNetNavalPaidParkedRoute() {

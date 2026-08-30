@@ -1128,6 +1128,22 @@ def _asset_migration_proof(baselines: list[dict[str, Any]],
     }
 
 
+def _same_asset_source(left: object, right: object) -> bool:
+    """Treat a content-addressed pack as identical after a machine transfer."""
+    if left == right:
+        return True
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    if left.get("kind") != "chonkpack" or right.get("kind") != "chonkpack":
+        return False
+    return (
+        isinstance(left.get("sha256"), str)
+        and left.get("sha256") == right.get("sha256")
+        and isinstance(left.get("bytes"), int)
+        and left.get("bytes") == right.get("bytes")
+    )
+
+
 def evaluate_gate(baselines: list[dict[str, Any]],
         candidate: dict[str, Any], *,
         allow_asset_migration: bool = False) -> dict[str, Any]:
@@ -1137,7 +1153,8 @@ def evaluate_gate(baselines: list[dict[str, Any]],
     if candidate.get("comparison_tier") != baseline.get("comparison_tier"):
         raise ValueError("candidate and baseline use different comparison tiers")
     asset_migration = None
-    if candidate.get("asset_source") != baseline.get("asset_source"):
+    if not _same_asset_source(
+            candidate.get("asset_source"), baseline.get("asset_source")):
         if not allow_asset_migration:
             raise ValueError("candidate and baseline use different asset sources")
         asset_migration = _asset_migration_proof(baselines, candidate)
