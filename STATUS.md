@@ -32,14 +32,29 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
   cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
-  now defines that boundary; expansion Human 11 is exact through cycle 310.
+  now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,733 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,777 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,945; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,989; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The consumed depot-tail milestone advances expansion Human 5 from exact
+  through cycle 287 to exact through 322 and expansion Human 11 from 310 to
+  319. When a laden land worker has already consumed a route and reaches a
+  refused two-byte tail containing the same cardinal heading twice near its
+  depot, native discards that stale tail and replans on the next return visit;
+  Java now does the same instead of restoring and retrying the wrong cardinal
+  after traffic clears. The two campaigns independently authenticate different
+  cardinal pairs and replacement headings. Fresh duplicate routes, one-byte
+  routes, non-duplicate consumed tails, duplicate diagonal tails, direct
+  one-byte refusal, and shared-blocker traffic remain outside the rule. All
+  other 50 maps are unchanged, so both aggregate fleets gain 44 cycles without
+  changing clean-map counts or the shared horizon. Durable cycle-400 run
+  `efd79afa` and cycle-1,800 run `ba7c7b36` bind the final engine input;
+  accepted receipt `b0c7fe14` seals replayable source capsule `054ac971`.
+  The rule has no map, unit, cycle, or coordinate exception.
 - The paid naval patrol-redraw milestone advances expansion Orc 8 from exact
   through cycle 278 to exact through 301. A targetless behavior-six small
   warship with a consumed cached tail now parks behind a collision-pressured
@@ -171,11 +186,11 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,820 tests**. The canonical hosted
-authenticated profile runs 2,793 and intentionally skips exactly 27. A local
-profile with the three private playtest-save referees installed runs 2,796 and
+The complete suite now contains **2,823 tests**. The canonical hosted
+authenticated profile runs 2,796 and intentionally skips exactly 27. A local
+profile with the three private playtest-save referees installed runs 2,799 and
 skips exactly 24. Both retain the exact expected 110-test
-specification-failure set. With no licensed inputs, 1,617 tests run, 1,203 skip,
+specification-failure set. With no licensed inputs, 1,618 tests run, 1,205 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -189,14 +204,18 @@ intentional data-free skips and run in the authenticated profile. Exact-boundary
 and in-place hall-upgrade referees now prove that resume neither charges again
 for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
-data-free skips. A matched-input full run exercised all 2,796 locally available
-authenticated tests with the exact expected failure identity before the
-paid naval patrol-redraw receipt was promoted. The new patrol assertions extend
+data-free skips. The paid naval predecessor exercised all 2,796 then-available
+locally authenticated tests with the exact expected failure identity before
+its receipt was promoted. Its patrol assertions extend
 the authenticated small-warship referee without changing the suite or skip
 inventory; the complete preceding movement inventory remains green. The same
 candidate passed all 18 playability lanes, all 39 clean/adverse lockstep cases
 through cycle 1,800, and a real two-process 180-cycle match with terminal hash
-`1b9dd8ad7b9a1f51`.
+`1b9dd8ad7b9a1f51`. The consumed depot-tail candidate repeated the complete
+matched-input profile at 2,799 run and exactly 24 skips, including its three
+new authenticated sequence referees, with the same exact 110 expected failure
+identities. It then repeated all 18 playability lanes and the clean/adverse
+network checks without a regression.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

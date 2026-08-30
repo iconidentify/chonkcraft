@@ -519,9 +519,9 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 1,203 skips, so 1,617 tests actually run without exposing licensed
+It asserts 1,205 skips, so 1,618 tests actually run without exposing licensed
 media to public pull-request code. The authenticated lane asserts 27 skips out
-of 2,820 tests; a development machine with the three private playtest-save
+of 2,823 tests; a development machine with the three private playtest-save
 referees installed uses `full-with-playtest-saves` and asserts 24. Tests backed
 by retail sequences deliberately join the hosted lane's skip inventory while
 running on the private authenticated runner.

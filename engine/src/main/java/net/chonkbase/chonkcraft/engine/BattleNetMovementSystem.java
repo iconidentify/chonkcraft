@@ -7804,13 +7804,25 @@ final class BattleNetMovementSystem {
                 }
                 if (ladenLandReturn && unit.distanceTo(returnDepot) <= 2) {
                     int remaining = unit.pathLength();
-                    int[] headings = new int[remaining];
-                    for (int depth = 0; depth < remaining; depth++) {
-                        headings[remaining - 1 - depth] =
-                                unit.peekHeadingAtDepth(depth);
+                    boolean consumedDuplicateCardinalTail =
+                            consumedDuplicateCardinalTail(unit, remaining);
+                    if (!consumedDuplicateCardinalTail) {
+                        int[] headings = new int[remaining];
+                        for (int depth = 0; depth < remaining; depth++) {
+                            headings[remaining - 1 - depth] =
+                                    unit.peekHeadingAtDepth(depth);
+                        }
+                        ladenReturnRoute = new PathFinder.Path(
+                                PathFinder.Result.FOUND, headings);
                     }
-                    ladenReturnRoute = new PathFinder.Path(
-                            PathFinder.Result.FOUND, headings);
+                    // A consumed N,N or S,S depot tail is stale once its head
+                    // refuses. Retail parks it and lets the next resource
+                    // visit redraw the two-diagonal bypass: independent peons
+                    // in XHuman 11 and XHuman 5 take NE,NW and SW,SE. Restoring
+                    // the old tail makes Java retry after the blocker has
+                    // vacated and miss the native diagonal. Fresh/direct
+                    // two-byte routes, one-byte depot rays, and nonduplicate
+                    // tails retain the established refusal ladder.
                 }
                 int refusals = battleNetRefuse(unit);
                 if (ladenReturnRoute != null && refusals < 15) {
@@ -8122,6 +8134,17 @@ final class BattleNetMovementSystem {
             unit.setRandomMoveSleep(0);
             unit.setAttackScanSleep(0);
         }
+    }
+
+    static boolean consumedDuplicateCardinalTail(Unit unit, int remaining) {
+        if (remaining != 2
+                || unit.battleNetPathInitialLength() <= remaining
+                || unit.battleNetPathStepsTaken() <= 0) {
+            return false;
+        }
+        int head = unit.peekHeading();
+        return !Direction.isDiagonal(head)
+                && unit.peekHeadingAtDepth(1) == head;
     }
 
     /**
