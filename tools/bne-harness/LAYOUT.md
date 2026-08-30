@@ -173,6 +173,16 @@ records show that high nibble matches the collision counter (1→`0x10`,
 flag `0x8000` is the pathfinder goal mark written by `0x4508f0` (not the
 LegacyEngine `BUILDING` occupancy bit).
 
+The coarse order byte is not sufficient to identify that Move action state.
+In the sealed expansion Human 12 fixture-204 branch witness, map occupant
+(12,87) resolves through `0x45019b` to slot 1358. Its order byte is 3 (Move),
+but its animation/action byte at offset 8 remains 2 through fixtures 203..205;
+the `0x4501c8` comparison therefore keeps it solid. The action byte becomes 3
+only at fixture 206. By contrast, slot 1363's same-pass Still-to-regroup-Move
+promotion at fixture 199 is transiently soft while its two-tick pending-Move
+delay is freshly armed. The fixture-204 wall trace rejects that occupied cell
+and ultimately stores its optimized sixteen-heading route at `0x4505ed`.
+
 Wall-follow step selection at `0x450114`–`0x45020f`: an out-of-bounds
 candidate step fails the entire face (`jae 0x450315` at `0x45015c` /
 `0x45016a`) without rotating; blocked terrain only rotates the heading until

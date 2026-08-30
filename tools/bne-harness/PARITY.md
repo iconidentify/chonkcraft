@@ -15,7 +15,46 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (saturated chase first-refusal refill)
+## Current release checkpoint — 2026-08-30 (promotion-pass regroup occupancy)
+
+Accepted cycle-1,800 receipt `6aa99cad` preserves the shared clean horizon at
+267 (earliest divergence 268), every individual campaign frontier, and the
+cycle-1,800 totals of 8 clean / 44 divergent / 0 failed. Aggregate exact cycles
+rise from 35,564 to 35,608. The receipt is retained under
+`.bne-artifacts/runs/6aa99cad72a6aae3cec5f0d244da57d6fa0487f8d1f0471d29af21c9f79587ce`.
+It binds dirty engine-input identity `5e3dc64c` at base revision `8370ac3` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and includes a replayable source capsule.
+
+Behavioral delta: a behavior-one land ally promoted from Still to a regroup
+Move is soft to wall following on the promotion pass, while its two-tick
+pending-Move delay is freshly armed. After that delay falls to one, the coarse
+order can already be Move while the unit is still executing native action
+state 2 (Still); it remains solid until the Move sequence actually begins.
+Normal moving-body, collision-nibble, lifecycle, and refusal soft-clear rules
+are unchanged. The rule is structural and contains no map, unit, cycle,
+coordinate, faction, or arbitrary route-length exception.
+
+Proof delta: at expansion Human 12 fixture 204, native's candidate cell
+(12,87) resolves to slot 1358. The grunt has coarse order Move but action byte
+2, so `0x4501c8` keeps occupancy flag `0x100` set. Native therefore rejects
+(12,85), (12,86), (12,87), (11,87), and (10,87) before accepting (10,86).
+Its raw wall trace
+`[6,6,6,5,3,6,5,3,2,2,1,0,2,2,1,0,0,0]` optimizes to the sealed sixteen-byte
+route `[6,6,6,5,5,4,3,2,2,1,1,2,1,0,0,0]`; worker 1386 consumes its first
+west heading on that fixture. Slot 1363 independently authenticates the
+positive same-promotion-pass soft arm at fixture 199. The focused 44-test
+movement family passes, and efficacy receipt
+`.bne-test-efficacy/fresh-regroup-occupancy/runs/4a5b595e6204bb60209260a3c1233b3b4de4a5675ec2cff4b51a7ea68cf68a61`
+proves the new assertion fails on `8370ac3` and passes on the candidate.
+Expansion Human 12's cycle-268 findings fall from three to one: both worker
+position fields are exact, leaving only native slot 1359's Still-versus-Move
+handoff. The previously rejected broad axethrower-cluster hypothesis remains
+excluded; the next investigation should isolate this exact order transition
+with a branch witness.
+
+## Prior release checkpoint — 2026-08-30 (saturated chase first-refusal refill)
 
 Accepted follow-on receipt `98601a77` preserves the shared clean horizon at
 267 (earliest divergence 268), all individual campaign frontiers, and the

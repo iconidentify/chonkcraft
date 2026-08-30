@@ -1247,7 +1247,13 @@ final class BattleNetMovementSystem {
                 && regroupUnit
                 && candidate.order() == Unit.Order.MOVE
                 && candidate.pathLength() == 0
-                && candidate.battleNetOrderDelay() > 0
+                // beginBattleNetPendingMove arms two on the promotion pass.
+                // Once that drops to one, the coarse Move order can still be
+                // executing the old Still body and must remain solid until
+                // the Move sequence actually starts (XHuman 12 grunt 1358,
+                // native action-state 2 at fixtures 203..205). Grunt 1363's
+                // same-pass fixture-199 promotion retains the soft arm.
+                && candidate.battleNetOrderDelay() > 1
                 && candidate.orderTargetX() == candidate.battleNetAiHomeX()
                 && candidate.orderTargetY() == candidate.battleNetAiHomeY();
         // The same player pass can leave Move queued behind a Still program.
