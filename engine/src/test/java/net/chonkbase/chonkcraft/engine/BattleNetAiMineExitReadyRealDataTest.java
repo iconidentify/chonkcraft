@@ -164,6 +164,29 @@ class BattleNetAiMineExitReadyRealDataTest {
         assertEquals(61, peon.tileX());
         assertEquals(4, peon.tileY(),
                 "native releases the cached south ray on fixture 244");
+
+        Mission siblingMission = mission("campaigns/human-exp/levelx12h");
+        Unit siblingPeon = byId(siblingMission.world(), 50);
+        assertNotNull(siblingPeon,
+                "native slot 1550 must remain paired with Java peon 50");
+
+        while (fixtureCycle(siblingMission.world()) < 253) {
+            siblingMission.tick();
+        }
+        assertEquals(6, siblingPeon.tileX());
+        assertEquals(29, siblingPeon.tileY());
+        assertEquals(100, siblingPeon.carried());
+        assertEquals(10, siblingPeon.battleNetRefusals());
+        assertEquals(14, siblingPeon.battleNetOrderDelay(),
+                "the queued sibling owns one complete Move refusal band");
+        assertEquals(15, siblingPeon.battleNetAnimationTimer());
+
+        while (fixtureCycle(siblingMission.world()) < 268) {
+            siblingMission.tick();
+        }
+        assertEquals(6, siblingPeon.tileX());
+        assertEquals(28, siblingPeon.tileY(),
+                "native first-steps north as the queued sibling vacates");
     }
 
     @Test
@@ -346,6 +369,24 @@ class BattleNetAiMineExitReadyRealDataTest {
                 "the final cached north heading stays on the already-reached keep skirt");
         assertEquals(2, peasant.battleNetOrderDelay(),
                 "native enters action 25 on the same cycle that residual movement settles");
+
+        Unit siblingPeasant = byId(mission.world(), 161);
+        assertNotNull(siblingPeasant,
+                "native slot 1439 must remain paired with Java peasant 161");
+
+        while (fixtureCycle(mission.world()) < 251) {
+            mission.tick();
+        }
+        assertEquals(74, siblingPeasant.tileX());
+        assertEquals(53, siblingPeasant.tileY(),
+                "the first north-east byte is shared by native and Java");
+
+        while (fixtureCycle(mission.world()) < 273) {
+            mission.tick();
+        }
+        assertEquals(75, siblingPeasant.tileX());
+        assertEquals(52, siblingPeasant.tileY(),
+                "native keeps the second north-east byte through the vacating sibling");
     }
 
     private static void assertMineExitReady(Unit worker, String message) {

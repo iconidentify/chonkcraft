@@ -7381,37 +7381,108 @@ public final class World {
         }
         int direct = battleNetFirstBresenhamHeading(
                 unit.tileX(), unit.tileY(), goalX, goalY);
-        if (direct < 0 || direct >= Direction.COUNT
-                || path.headings()[path.length() - 1] == direct) {
+        if (direct < 0 || direct >= Direction.COUNT) {
             return path;
         }
-        int directX = unit.tileX() + Direction.deltaX(direct);
-        int directY = unit.tileY() + Direction.deltaY(direct);
-        Unit blocker = blockerOnLayer(unit, directX, directY);
-        if (blocker == null || blocker == unit || blocker.type() == null
+        if (path.headings()[path.length() - 1] != direct) {
+            int directX = unit.tileX() + Direction.deltaX(direct);
+            int directY = unit.tileY() + Direction.deltaY(direct);
+            Unit blocker = blockerOnLayer(unit, directX, directY);
+            if (!battleNetQueuedLandReturnBlocker(unit, target, blocker)) {
+                return path;
+            }
+            int[] optimized = path.headings();
+            int retained = Math.max(1, optimized.length - 1);
+            int[] nativePrefix = new int[retained];
+            if (retained > 1) {
+                System.arraycopy(optimized, 1, nativePrefix, 0, retained - 1);
+            }
+            nativePrefix[retained - 1] = direct;
+            return new PathFinder.Path(PathFinder.Result.FOUND, nativePrefix);
+        }
+
+        // The same writer keeps a direct byte later in the bounded prefix
+        // when a freshly surfaced sibling is already queued to vacate it.
+        // XOrc 12 peasant 1439 first-steps NE from (73,54), then native keeps
+        // the second NE through queued peasant 1434 on (75,52) and closes N.
+        // Java's hard occupancy view instead wrote NE,N,NE.  Preserve only a
+        // two-byte permutation with the same endpoint, and only while every
+        // earlier byte is still the direct ray; execution continues to test
+        // the real occupancy when the retained byte reaches the route head.
+        int x = unit.tileX();
+        int y = unit.tileY();
+        for (int depth = 0; depth + 1 < path.length(); depth++) {
+            int index = path.length() - 1 - depth;
+            int planned = path.headings()[index];
+            int directAtDepth = battleNetFirstBresenhamHeading(
+                    x, y, goalX, goalY);
+            if (planned == directAtDepth) {
+                x += Direction.deltaX(planned);
+                y += Direction.deltaY(planned);
+                continue;
+            }
+            if (directAtDepth < 0 || directAtDepth >= Direction.COUNT) {
+                return path;
+            }
+            int directX = x + Direction.deltaX(directAtDepth);
+            int directY = y + Direction.deltaY(directAtDepth);
+            Unit blocker = blockerOnLayer(unit, directX, directY);
+            if (!battleNetQueuedLandReturnBlocker(
+                    unit, target, blocker, true)) {
+                return path;
+            }
+            int following = path.headings()[index - 1];
+            int replacementX = Direction.deltaX(planned)
+                    + Direction.deltaX(following)
+                    - Direction.deltaX(directAtDepth);
+            int replacementY = Direction.deltaY(planned)
+                    + Direction.deltaY(following)
+                    - Direction.deltaY(directAtDepth);
+            int replacement = Direction.fromDelta(replacementX, replacementY);
+            if (replacement < 0 || replacement >= Direction.COUNT) {
+                return path;
+            }
+            int[] nativePrefix = path.headings().clone();
+            nativePrefix[index] = directAtDepth;
+            nativePrefix[index - 1] = replacement;
+            return new PathFinder.Path(path.result(), nativePrefix);
+        }
+        return path;
+    }
+
+    /** Queued loaded land sibling that will vacate a shared depot lane. */
+    boolean battleNetQueuedLandReturnBlocker(
+            Unit unit, Unit target, Unit blocker) {
+        return battleNetQueuedLandReturnBlocker(
+                unit, target, blocker, false);
+    }
+
+    private boolean battleNetQueuedLandReturnBlocker(
+            Unit unit, Unit target, Unit blocker,
+            boolean includePromotionVisit) {
+        if (unit == null || target == null || blocker == null
+                || blocker == unit || blocker.type() == null
                 || !blocker.type().landUnit() || blocker.type().building()
                 || !isAllied(unit.player(), blocker.player())
-                || blocker.order() != Unit.Order.STILL
                 || !blocker.returningToDepot() || blocker.carried() <= 0
                 || blocker.carrying() != UnitType.Resource.GOLD
                 || blocker.returnDepotGoal() != target
-                || blocker.battleNetCollisionCounter() != 0
-                || blocker.battleNetOrderDelay() <= 0
-                || !blocker.queuedReplacementPending()
-                || blocker.queuedOrders().isEmpty()
-                || blocker.queuedOrders().getFirst().kind()
-                        != Unit.QueuedOrderKind.RETURN_GOODS
-                || blocker.queuedOrders().getFirst().target() != target) {
-            return path;
+                || blocker.battleNetCollisionCounter() != 0) {
+            return false;
         }
-        int[] optimized = path.headings();
-        int retained = Math.max(1, optimized.length - 1);
-        int[] nativePrefix = new int[retained];
-        if (retained > 1) {
-            System.arraycopy(optimized, 1, nativePrefix, 0, retained - 1);
-        }
-        nativePrefix[retained - 1] = direct;
-        return new PathFinder.Path(PathFinder.Result.FOUND, nativePrefix);
+        boolean queuedReturn = blocker.order() == Unit.Order.STILL
+                && blocker.battleNetOrderDelay() > 0
+                && blocker.queuedReplacementPending()
+                && !blocker.queuedOrders().isEmpty()
+                && blocker.queuedOrders().getFirst().kind()
+                        == Unit.QueuedOrderKind.RETURN_GOODS
+                && blocker.queuedOrders().getFirst().target() == target;
+        boolean promotingReturn = includePromotionVisit
+                && blocker.order() == Unit.Order.HARVEST
+                && !blocker.isMoving() && blocker.pathLength() == 0
+                && blocker.stepDrained()
+                && blocker.battleNetOrderDelay() >= 0;
+        return queuedReturn || promotingReturn;
     }
 
     /**

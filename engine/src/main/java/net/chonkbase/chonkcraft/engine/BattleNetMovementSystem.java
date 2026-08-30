@@ -7737,6 +7737,11 @@ final class BattleNetMovementSystem {
                         && returnDepot != null && unit.pathLength() > 0;
                 if (ladenLandReturn && unit.distanceTo(returnDepot) > 2) {
                     boolean directReturnRay = unit.pathLength() == 1;
+                    Unit queuedReturnBlocker = world.blockerOnLayer(
+                            unit, nextX, nextY);
+                    boolean queuedReturnHead =
+                            world.battleNetQueuedLandReturnBlocker(
+                                    unit, returnDepot, queuedReturnBlocker);
                     int collision = unit.battleNetCollisionCounter() + 1;
                     int refusals = battleNetRefuse(unit);
                     if (refusals >= 15) {
@@ -7748,15 +7753,17 @@ final class BattleNetMovementSystem {
                             collision > 14 ? 0 : collision);
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
-                    // A standing body on a one-heading direct return ray
-                    // raises all eight native refusal generations, then the
-                    // eighth owns the complete Move 15..1 band. XHuman 9
-                    // peon 1596 refuses S at (61,3) on fixtures 222..229 and
-                    // first-steps S only on 244. Immediate redraw is retained
-                    // for generations one through seven and for the farther
-                    // multi-heading hard-refusal witnesses.
+                    // A standing body on a one-heading direct return ray, or
+                    // a queued loaded sibling on the direct head, raises all
+                    // eight native refusal generations and then the eighth
+                    // owns the complete Move 15..1 band. XHuman 9 peon 1596
+                    // proves the one-heading form. XHuman 12 peon 1550 has a
+                    // longer cached route but reaches refusal ten against
+                    // queued peon 1557 on (6,28); native pays one complete
+                    // band and first-steps north exactly as that sibling
+                    // vacates. Other multi-heading hard blockers still redraw.
                     boolean directReturnRefusalBand = refusals >= 8
-                            && directReturnRay;
+                            && (directReturnRay || queuedReturnHead);
                     unit.setBattleNetOrderDelay(
                             directReturnRefusalBand ? 14 : 0);
                     unit.setBattleNetRefusalHold(false);
