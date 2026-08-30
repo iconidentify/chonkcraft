@@ -15,7 +15,53 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (promotion-pass regroup occupancy)
+## Current release checkpoint — 2026-08-30 (collided regroup-worker refusal)
+
+Accepted cycle-1,800 receipt `839b6bf9` advances the shared clean horizon from
+267 to 269 (earliest divergence 270), preserves every other campaign frontier,
+and retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52
+per-case exact prefixes sum to 35,566, two more than the authenticated baseline
+survey. The receipt is retained under
+`.bne-artifacts/runs/839b6bf9c9bfc2f3c84e5a7d6c6cb6d2985040bd9adf49fe4269230606e4ff3b`.
+It binds dirty engine-input identity `971ce88b` at base revision `7cb55a0` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule `8cf4be6f`.
+
+Behavioral delta: the fresh route of a recurring behavior-one land regroup may
+plan cooperatively through a moving harvest worker only before the mover owns a
+collision generation. Its first occupied head retains the cooperative route
+and raises collision zero to one. If that cached route later wakes behind a
+moving worker which already owns a collision generation, retail parks the
+route at cursor 20, advances the mover's packed collision generation without
+entering the fifteen-refusal band, and leaves a one-count Move body. The next
+route query keeps the collided worker solid; an empty replacement ends the
+plain Move. The rule is expressed entirely in native order, AI behavior, route,
+movement-layer, ownership, and collision state, with no map, unit-ID, cycle,
+coordinate, faction, or arbitrary route-length exception.
+
+Proof delta: expansion Human 12 axethrower 1359 stores `N,NE,SE,E,E` at
+fixture 252, refuses its occupied north head, and carries raw collision byte
+`0x10`. At fixture 266 peasant 1385 occupies (12,88) with collision `0x40`.
+The fixture-267 retry leaves Move visible, writes the axethrower's collision
+byte as `0x20`, parks its route cursor at 20, and holds animation timer one;
+fixture 268 then has an empty route and both native action and order Still.
+The authenticated branch trace identifies the final order writer at
+`0x00453097`, reached from the failed Move path at `0x0043789a`. Java unit 241
+now follows all of those transitions, eliminating the last cycle-268 finding.
+The focused real-data test passes, and efficacy receipt
+`.bne-test-efficacy/collided-regroup-worker/runs/808ff729bde90a6d8a60ef55a70d647c1e12d3ad6f9e29f407f90a85bf26b5e5`
+proves its extended assertions fail on `7cb55a0` and pass on the candidate.
+All 30 `bne_java.py` tests pass. A 122-test synthetic movement comparison keeps
+the same 113 passes and nine pre-existing failures on `7cb55a0` and the
+candidate; the fixed 52-case semantic gate is the authoritative regression
+proof.
+
+The newly exposed blocker is expansion Human 12 native ogre 1356 at fixture
+270: native is at (10,85), while Java is at (11,86). The accepted compiler
+routes this position transition to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (promotion-pass regroup occupancy)
 
 Accepted cycle-1,800 receipt `6aa99cad` preserves the shared clean horizon at
 267 (earliest divergence 268), every individual campaign frontier, and the

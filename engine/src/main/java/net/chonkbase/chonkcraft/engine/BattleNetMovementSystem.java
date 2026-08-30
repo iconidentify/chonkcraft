@@ -4436,6 +4436,54 @@ final class BattleNetMovementSystem {
                     }
                     return;
                 }
+                boolean collidedRegroupWorkerRefusal =
+                        unit.order() == Unit.Order.MOVE
+                        && !unit.battleNetPlayerCommandMove()
+                        && unit.battleNetAiBehavior() == 1
+                        && unit.hasBattleNetAiHome()
+                        && unit.orderTargetX() == unit.battleNetAiHomeX()
+                        && unit.orderTargetY() == unit.battleNetAiHomeY()
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetCollisionCounter() > 0
+                        && stageSixBlocker != null
+                        && stageSixBlocker != unit
+                        && stageSixBlocker.isMoving()
+                        && stageSixBlocker.order() == Unit.Order.HARVEST
+                        && stageSixBlocker.type() != null
+                        && stageSixBlocker.type().moveType()
+                                == UnitType.Movement.LAND
+                        && stageSixBlocker.battleNetCollisionCounter() > 0
+                        && world.isAllied(unit.player(),
+                                stageSixBlocker.player());
+                if (collidedRegroupWorkerRefusal) {
+                    // The cached cooperative route can wake behind a
+                    // different worker. If that worker already owns a native
+                    // collision nibble, FUN_004379e0 parks the route at index
+                    // twenty and advances the mover's packed generation
+                    // without entering the fifteen-refusal band. XHuman 12
+                    // axethrower 1359 is 0x10 -> 0x20 at fixture 267 while
+                    // collision-four peasant 1385 occupies its north byte.
+                    // On the next visit NewPath sees that worker as solid,
+                    // returns an empty route, and the ordinary Move handler
+                    // promotes Still at fixture 268.
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    unit.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    unit.setBattleNetRefusals(0);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
                 boolean paidRecoveryResidualTailPark =
                         unit.battleNetPaidRefusalRecoveryApproach()
                         && world.actionMoveWalked

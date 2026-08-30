@@ -6108,6 +6108,10 @@ public final class World {
                             || queuedRegroupConstruction);
                 boolean regroupThroughMovingWorker =
                         recurringLandRegroupRoute
+                        // Only the fresh route owns the cooperative view.
+                        // After that route refuses, the mover's collision
+                        // generation makes a later moving worker a hard wall.
+                        && unit.battleNetCollisionCounter() == 0
                         && candidate.isMoving()
                         && candidate.order() == Unit.Order.HARVEST
                         && candidate.type() != null
@@ -6159,11 +6163,13 @@ public final class World {
                         && candidate.battleNetCollisionCounter() == 0
                         && !ordinaryMoveAllySoft
                         && !pendingLandAssaultYieldsToWood;
-                // The recurring behavior-one regroup planner draws through a
-                // moving worker even when that worker still owns a collision
-                // nibble. Execution remains hard: XHuman 12 axethrower 1359
-                // stores N,NW,SE,E,E at fixture 252, then refuses the occupied
-                // north head instead of walking through peasant 1335.
+                // The fresh recurring behavior-one regroup planner draws
+                // through a moving worker. Execution remains hard: XHuman 12
+                // axethrower 1359 stores N,NE,SE,E,E at fixture 252, then
+                // refuses the occupied north head instead of walking through
+                // peasant 1365. Its collision generation is therefore one;
+                // the fixture-267 retry sees collision-four peasant 1385 as
+                // solid and the empty replacement route promotes Still.
                 // Native 0x4500f0 clears the occupancy bit for an allied unit
                 // whose current animation is Move. Attack-sequence allies keep
                 // hard occupancy even while residual/path leftover makes

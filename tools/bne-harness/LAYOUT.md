@@ -183,6 +183,20 @@ promotion at fixture 199 is transiently soft while its two-tick pending-Move
 delay is freshly armed. The fixture-204 wall trace rejects that occupied cell
 and ultimately stores its optimized sixteen-heading route at `0x4505ed`.
 
+The recurring-regroup soft view belongs only to the fresh route generation.
+Expansion Human 12 axethrower 1359 stores `[N,NE,SE,E,E]` at fixture 252 and
+raises its collision byte from zero to `0x10` when the north heading refuses.
+At fixture 266 its later north blocker, peasant 1385, is Move animation 3 but
+already carries collision `0x40`, so the occupancy test keeps it solid. On
+fixture 267 the axethrower's raw byte advances `0x10`→`0x20`, its route index
+at offset 126 becomes 20, and its animation timer is one; the low refusal
+nibble remains zero. The following route query fails and fixture 268 records
+action/order byte 2 (Still) with an empty route. The authenticated order branch
+trace writes that 2 at `0x00453097` after the failed Move path calls the setter
+from `0x0043789a`. Thus a moving worker is not an unconditional regroup
+soft-clear: mover and blocker collision generations distinguish the initial
+cooperative route from its hard retry.
+
 Wall-follow step selection at `0x450114`–`0x45020f`: an out-of-bounds
 candidate step fails the entire face (`jae 0x450315` at `0x45015c` /
 `0x45016a`) without rotating; blocked terrain only rotates the heading until
