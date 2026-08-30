@@ -183,9 +183,9 @@ inventory; the complete preceding movement inventory remains green.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0829.107` is the public release, published from revision
-`6d53f9707aa49c1d2c3c2ed261985a8cda596318` with game JAR SHA-256
-`9824599818c94c42f91f1e2b6d8d27a2a4d88bb0095af9c368a9435bc12362a0`.
+Signed engine OTA `2026.0830.108` is the public release, published from revision
+`f852c56ae9933597c0201b9bd4497758741052bd` with game JAR SHA-256
+`5eb86dbb3b625741ad3bdf2a831a3cc486c0a8edf96c058c614f7e819b706716`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
