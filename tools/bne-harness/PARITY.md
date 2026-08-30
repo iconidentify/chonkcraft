@@ -17,6 +17,49 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-30
 
+Accepted cycle-1,800 run `8a25ffb7` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `eafece73` raises the clean count to 30 / 22 divergent / 0 failed.
+Aggregate per-map frontiers are 18,910 at cycle 400 and 35,175 at cycle 1,800.
+Expansion Human 7 advances from exact through 285 to 302 and Orc 5 from 288 to
+453; every other map is unchanged. The receipts are retained under
+`.bne-artifacts/runs/eafece73a7ad91931a83a58d30267f2ca31117527a7ffdad4f5ed4cc570297df`
+and `.bne-artifacts/runs/8a25ffb7de0725742baf7736a2b27355c4d166274b1e502d39beab0c2d04b76a`.
+Both bind dirty engine-input identity `16015d02` at base revision `2d600406` to
+replayable source capsule `4aeffc43`.
+
+Behavioral delta: when a laden land worker's paid cooperative return wait
+reaches timer one, the retry is that same action visit. If the cached next
+square has opened, the worker consumes the retained heading immediately while
+preserving its collision generation. A still-present laden convoy renews the
+full native Move 15..1 band, while any other remaining obstruction advances
+the collision and parks the route for a next-visit replan. The rule is
+structural and contains no map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: expansion Human 7 peon 1451 retains `[E,NE,E]` at route index 1
+and collision 1 through timer one, then takes NE on fixture 286. Orc 5 peasant
+1529 independently retains `[SE,SE,E]` and takes SE on fixture 289 without a
+new collision. Held-out expansion Orc 6 advances its uninterrupted cached
+route on the prior fixture-274 cadence. Existing expansion Human 8 proves a
+still-blocked timer-one wake parks and replans, while expansion Human 10 proves
+a continuing laden convoy renews the paid band. The focused three-test referee
+and both held-out negative referees are green; the complete fleets gain 129
+and 182 aggregate cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks. The matched BNE-media suite accounts for 2,830 tests: 2,800 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged. The data-free profile separately ran 1,622, skipped
+the exact 1,208 authenticated checks, and retained its exact 89 failures.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Expansion Orc 6 follows at 274, Human 13 at 278, expansion Human 4 at 281,
+Human 7 at 282, expansion Orc 11 at 284, and Orc 8 at 289.
+
+## Prior release checkpoint — 2026-08-30 (corpse ownership)
+
 Accepted cycle-1,800 run `3fc6c609` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
 cycle-400 run `34910153` likewise keeps 29 clean / 23 divergent / 0 failed.

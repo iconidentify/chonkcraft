@@ -428,28 +428,45 @@ final class BattleNetHarvestSystem {
                         worker.setBattleNetRefusalHold(true);
                     }
                 }
+                boolean resumeFreeCooperativeReturn = false;
                 if (left == 0 && parkCooperativeReturn) {
                     int heading = worker.pathLength() > 0
                             ? worker.peekHeading() : -1;
                     int stride = world.battleNetMovementStride(worker);
+                    int nextX = heading >= 0 && heading < Direction.COUNT
+                            ? worker.tileX()
+                                    + Direction.deltaX(heading) * stride
+                            : worker.tileX();
+                    int nextY = heading >= 0 && heading < Direction.COUNT
+                            ? worker.tileY()
+                                    + Direction.deltaY(heading) * stride
+                            : worker.tileY();
                     Unit blocker = heading >= 0 && heading < Direction.COUNT
-                            ? world.blockerOnLayer(worker,
-                                    worker.tileX()
-                                            + Direction.deltaX(heading)
-                                                    * stride,
-                                    worker.tileY()
-                                            + Direction.deltaY(heading)
-                                                    * stride)
+                            ? world.blockerOnLayer(worker, nextX, nextY)
                             : null;
                     boolean ladenConvoyStillBlocks = blocker != null
                             && blocker.returningToDepot()
                             && blocker.carried() > 0
                             && world.battleNetCooperativeBlocker(
                                     worker, blocker);
-                    int counter = worker.battleNetCollisionCounter() + 1;
-                    worker.setBattleNetCollisionCounter(
-                            counter > 14 ? 0 : counter);
-                    if (ladenConvoyStillBlocks) {
+                    boolean cachedHeadNowFree = heading >= 0
+                            && heading < Direction.COUNT
+                            && world.canEnter(worker, nextX, nextY);
+                    if (cachedHeadNowFree) {
+                        // Timer one is itself the retry visit. When the cached
+                        // return head has opened, native consumes it without
+                        // parking route index twenty or advancing the collision
+                        // generation: XHuman 7 peon 1451 keeps RI1/collision 1
+                        // through fixture 285 and takes NE on 286; Orc 5
+                        // peasant 1529 independently takes its retained SE on
+                        // 289. Returning here made both one callback late.
+                        resumeFreeCooperativeReturn = true;
+                    } else {
+                        int counter = worker.battleNetCollisionCounter() + 1;
+                        worker.setBattleNetCollisionCounter(
+                                counter > 14 ? 0 : counter);
+                    }
+                    if (!cachedHeadNowFree && ladenConvoyStillBlocks) {
                         // A paid return route retries the same cached byte
                         // when the clean moving convoy which earned its first
                         // refusal is still there at timer one. Independent
@@ -471,22 +488,24 @@ final class BattleNetHarvestSystem {
                         }
                         return;
                     }
-                    // A laden worker whose buffered heading was refused by an
-                    // allied mover does not retry that stale heading when the
-                    // fifteen-count expires. FUN_004379e0 counts the second
-                    // refusal, parks the route cursor at 20, and lets the next
-                    // action visit plan around the now-vacated body. XHuman 8
-                    // peon 1498 holds NW through fixture 270, parks on 271,
-                    // then replans and steps W on 272. Retrying NW here instead
-                    // either takes a stale diagonal or re-arms the same wait.
-                    worker.clearPath();
-                    worker.setRouteSpent(false);
-                    worker.setBattleNetRefusalHold(false);
+                    if (!cachedHeadNowFree) {
+                        // A laden worker whose buffered heading is still
+                        // refused when the fifteen-count expires parks the
+                        // route cursor at 20 and lets the next action visit
+                        // plan around that body. XHuman 8 peon 1498 holds NW
+                        // through fixture 270, parks on 271, then replans and
+                        // steps W on 272.
+                        worker.clearPath();
+                        worker.setRouteSpent(false);
+                        worker.setBattleNetRefusalHold(false);
+                    }
                 }
                 if (left > 0) {
                     return;
                 }
-                return;
+                if (!resumeFreeCooperativeReturn) {
+                    return;
+                }
             }
         }
         // An empty action-24 depot route does not become a synthetic Still

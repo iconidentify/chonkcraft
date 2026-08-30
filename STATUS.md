@@ -33,13 +33,28 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
   cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
   now defines that boundary; expansion Human 11 is exact through cycle 319.
-- **29/52 maps are exact through the full 400-cycle window**, with 23 later
+- **30/52 maps are exact through the full 400-cycle window**, with 22 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,781 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,910 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,993; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,175; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The laden-return timer-one milestone advances expansion Human 7 from exact
+  through cycle 285 to 302 and Orc 5 from 288 to 453. When a worker's paid
+  cooperative return wait reaches timer one and its cached next square has
+  opened, retail consumes that retained heading in the same visit without
+  adding another collision or parking the route; Java now does the same.
+  Expansion Human 7 and Orc 5 independently authenticate different diagonal
+  headings and vacated blockers. Expansion Orc 6 holds the uninterrupted-route
+  boundary, while expansion Human 8 still parks and replans when the head
+  remains blocked and expansion Human 10 renews the full band behind a laden
+  convoy. All other 50 maps are unchanged. The cycle-400 aggregate gains 129
+  cycles and one clean map; the cycle-1,800 aggregate gains 182 cycles without
+  changing its clean count or the shared horizon. Durable cycle-400 run
+  `eafece73` and accepted cycle-1,800 run `8a25ffb7` bind engine input
+  `16015d02` and replayable source capsule `4aeffc43`. The rule has no map,
+  unit, cycle, coordinate, or faction exception.
 - The corpse-owner handoff milestone advances expansion Human 2 from exact
   through cycle 349 to exact through 351. Retail leaves a newly installed
   corpse or rubble record with the living unit's owner through its first held
@@ -213,14 +228,14 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,827 tests**. The canonical hosted
-authenticated profile runs 2,800 and intentionally skips exactly 27. A local
+The complete suite now contains **2,830 tests**. The canonical hosted
+authenticated profile runs 2,803 and intentionally skips exactly 27. A local
 classic-install profile with the three private playtest-save referees installed
-runs 2,803 and skips exactly 24. The exact BNE-source profile used for the
-current milestone runs 2,797 and skips exactly 30; its release-format-specific
+runs 2,806 and skips exactly 24. The exact BNE-source profile used for the
+current milestone runs 2,800 and skips exactly 30; its release-format-specific
 skip identities are recorded separately rather than weakening either classic
 profile. All retain the exact expected 110-test specification-failure set.
-With no licensed inputs, 1,622 tests run, 1,205 skip,
+With no licensed inputs, 1,622 tests run, 1,208 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -256,6 +271,13 @@ The corpse-owner handoff candidate repeated the same acceptance sequence:
 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
 checks, all 2,827 suite tests accounted for with 2,797 run and 30 exact skips,
 and the same 110 expected failure identities.
+The laden-return timer-one candidate repeated that acceptance sequence:
+18/18 playability lanes, 39/39 clean/adverse lockstep cases through cycle
+1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
+checks, all 2,830 suite tests accounted for with 2,800 run and 30 exact BNE
+skips, and the same 110 expected failure identities. The separately measured
+data-free profile ran 1,622 tests, intentionally skipped 1,208, and retained
+the same 89 expected failure identities.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
