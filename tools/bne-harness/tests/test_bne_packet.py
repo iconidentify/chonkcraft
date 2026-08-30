@@ -16,6 +16,14 @@ import bne_packet
 
 class BneDivergencePacketTest(unittest.TestCase):
 
+    def test_primary_java_diagnostic_matches_the_primary_native_slot(self):
+        pairings = {268: {1359: 241, 1386: 214, 1481: 119}}
+        self.assertEqual(
+            (1359, 241),
+            bne_packet._primary_focus_pair(
+                {1359, 1386, 1481}, pairings, 268),
+        )
+
     def test_summarizes_java_path_and_step_cycles_in_fixture_numbering(self):
         summary = bne_packet.summarize_java_diagnostics("""\
 JBNEPATH cycle=8 unit=242 from=10,90 goal=26,87 stride=1 result=FOUND path=201 near=large

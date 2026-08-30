@@ -372,8 +372,28 @@ def _survey_findings(survey_path: Path, case: str) -> list[dict[str, Any]]:
     return [item for item in record.get("findings", []) if isinstance(item, dict)]
 
 
+def _rehome_strings(value: Any, source_root: Path, destination_root: Path) \
+        -> Any:
+    """Replace private staging paths with the paths they have after publish."""
+    if isinstance(value, dict):
+        return {
+            key: _rehome_strings(item, source_root, destination_root)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _rehome_strings(item, source_root, destination_root)
+            for item in value
+        ]
+    if isinstance(value, str):
+        return value.replace(str(source_root), str(destination_root))
+    return value
+
+
 def _build_packet(source: dict[str, Any], destination: Path, *,
-        before: int, after: int) -> tuple[dict[str, Any] | None, str | None]:
+        before: int, after: int,
+        published_destination: Path | None = None) \
+        -> tuple[dict[str, Any] | None, str | None]:
     """Build the frame, resolving retained paths against the sealed receipt.
 
     A retained survey names its traces relative to the receipt, because the
@@ -385,19 +405,41 @@ def _build_packet(source: dict[str, Any], destination: Path, *,
 
     survey_path = source["survey"]
     try:
+        resolved_survey = None
         inputs_root = source.get("inputs_root")
         if inputs_root is not None:
             from bne_evidence import resolve_retained_survey
 
-            resolved = resolve_retained_survey(survey_path, inputs_root)
+            resolved_survey = resolve_retained_survey(survey_path, inputs_root)
+        corpus_index = source.get("corpus_index")
+        if corpus_index is not None:
+            if resolved_survey is None:
+                resolved_survey = json.loads(
+                    Path(survey_path).read_text(encoding="utf-8"))
+            resolved_survey["index"] = str(Path(corpus_index).resolve())
+        asset_pack = source.get("asset_pack")
+        if asset_pack is not None:
+            if resolved_survey is None:
+                resolved_survey = json.loads(
+                    Path(survey_path).read_text(encoding="utf-8"))
+            resolved_survey["asset_source"] = {
+                **(resolved_survey.get("asset_source") or {}),
+                "path": str(Path(asset_pack).resolve()),
+            }
+        if resolved_survey is not None:
             survey_path = destination.parent / "resolved-survey.json"
-            _write_json(survey_path, resolved)
+            _write_json(survey_path, resolved_survey)
         packet = generate_packet(
             survey_path, source["case"], destination,
             before=before, after=after,
             source_dir=(Path(source["source_dir"]).expanduser().resolve()
                         if source.get("source_dir") else None),
         )
+        if published_destination is not None:
+            packet = _rehome_strings(
+                packet, destination.parent.resolve(),
+                published_destination.parent.resolve())
+            _write_json(destination / "packet.json", packet)
         return packet, None
     except Exception as failure:
         return None, f"{type(failure).__name__}: {failure}"
@@ -428,6 +470,8 @@ def compile_evidence(target: Path | None, *, artifact_root: Path,
         output_root: Path, repository: Path,
         before: int = 4, after: int = 0,
         capabilities: dict[str, Any] | None = None,
+        corpus_index: Path | None = None,
+        asset_pack: Path | None = None,
         force: bool = False) -> dict[str, Any]:
     """Compile one accepted receipt into a current, routed work order."""
     started = time.monotonic()
@@ -436,6 +480,34 @@ def compile_evidence(target: Path | None, *, artifact_root: Path,
     damaged = _authenticate_receipt_artifacts(run_root, receipt)
     survey_path = _candidate_survey(run_root, receipt)
     capsule = _capsule_state(run_root, receipt)
+    repository = Path(repository).expanduser().resolve()
+    corpus_index_identity = None
+    if corpus_index is not None:
+        corpus_index = Path(corpus_index).expanduser().resolve()
+        if not corpus_index.is_file():
+            raise FrontierError(
+                f"the replacement corpus index is gone: {corpus_index}")
+        corpus_index_identity = {
+            "path": str(corpus_index), **file_identity(corpus_index),
+        }
+    asset_pack_identity = None
+    if asset_pack is not None:
+        asset_pack = Path(asset_pack).expanduser().resolve()
+        if not asset_pack.is_file():
+            raise FrontierError(
+                f"the replacement asset pack is gone: {asset_pack}")
+        candidate = json.loads(survey_path.read_text(encoding="utf-8"))
+        recorded = candidate.get("asset_source") or {}
+        expected = {key: recorded.get(key) for key in ("bytes", "sha256")}
+        if not all(expected.values()):
+            raise FrontierError(
+                "the accepted survey has no authenticated asset-pack identity")
+        actual = file_identity(asset_pack)
+        if actual != expected:
+            raise FrontierError(
+                f"the replacement asset pack does not match the accepted "
+                f"survey: {asset_pack}")
+        asset_pack_identity = {"path": str(asset_pack), **actual}
 
     request = {
         "kind": "frontier-evidence-compile",
@@ -450,6 +522,9 @@ def compile_evidence(target: Path | None, *, artifact_root: Path,
             "capsule_sha256": capsule.get("capsule_sha256"),
         },
         "analysis": analysis_identity(),
+        "repository": str(repository),
+        "corpus_index": corpus_index_identity,
+        "asset_pack": asset_pack_identity,
         "window": {"before": before, "after": after},
     }
     request_sha256 = canonical_digest(request)
@@ -481,7 +556,24 @@ def compile_evidence(target: Path | None, *, artifact_root: Path,
                 capsule, damaged, request, request_sha256,
                 before=before, after=after, capabilities=capabilities,
                 repository=repository, destination=destination,
+                corpus_index=corpus_index, asset_pack=asset_pack,
             )
+            if corpus_index is not None \
+                    and file_identity(corpus_index) != {
+                        key: corpus_index_identity[key]
+                        for key in ("bytes", "sha256")
+                    }:
+                raise FrontierError(
+                    "the replacement corpus index changed during compilation: "
+                    f"{corpus_index}")
+            if asset_pack is not None \
+                    and file_identity(asset_pack) != {
+                        key: asset_pack_identity[key]
+                        for key in ("bytes", "sha256")
+                    }:
+                raise FrontierError(
+                    "the replacement asset pack changed during compilation: "
+                    f"{asset_pack}")
             manifest = {
                 "schema": FRONTIER_SCHEMA,
                 "kind": FRONTIER_KIND,
@@ -599,12 +691,21 @@ def _compile_into(staging: Path, receipt: dict[str, Any], run_root: Path,
         manifest_path: Path, survey_path: Path, capsule: dict[str, Any],
         damaged: list[str], request: dict[str, Any], request_sha256: str, *,
         before: int, after: int, capabilities: dict[str, Any] | None,
-        repository: Path, destination: Path) -> dict[str, Any]:
+        repository: Path, destination: Path,
+        corpus_index: Path | None = None,
+        asset_pack: Path | None = None) -> dict[str, Any]:
     from bne_experiments import hp_evidence
     from bne_whychain import build_why_chain, format_why_chain
 
     frontier = receipt.get("frontier", {})
     sources = _blocker_sources(run_root, receipt, survey_path)
+    for source in sources:
+        if not source.get("source_dir"):
+            source["source_dir"] = str(repository)
+        if corpus_index is not None:
+            source["corpus_index"] = str(corpus_index)
+        if asset_pack is not None:
+            source["asset_pack"] = str(asset_pack)
     packets: dict[str, str] = {}
     shapes: dict[str, dict[str, Any]] = {}
     contexts: dict[str, dict[str, Any]] = {}
@@ -634,7 +735,10 @@ def _compile_into(staging: Path, receipt: dict[str, Any], run_root: Path,
             failure = None
         else:
             packet, failure = _build_packet(
-                source, directory / "packet", before=before, after=after)
+                source, directory / "packet", before=before, after=after,
+                published_destination=(
+                    destination / "blockers" / case / "packet"),
+            )
         if packet is None:
             record.update({
                 "frame": "blocked",

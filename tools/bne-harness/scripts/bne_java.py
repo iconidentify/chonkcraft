@@ -1893,7 +1893,8 @@ def frontier_compile_command(args: argparse.Namespace) -> int:
             args.accepted, artifact_root=args.artifact_root,
             output_root=args.output_root, repository=ROOT,
             before=args.before, after=args.after,
-            capabilities=capabilities, force=args.force,
+            capabilities=capabilities, corpus_index=args.corpus_index,
+            asset_pack=args.asset_pack, force=args.force,
         )
         print(format_status(status))
         print(f"\ncache {status['cache']} in {status['elapsed_seconds']:.3f}s")
@@ -1911,7 +1912,8 @@ def frontier_compile_command(args: argparse.Namespace) -> int:
                 args.accepted, artifact_root=args.artifact_root,
                 output_root=args.output_root, repository=ROOT,
                 before=args.before, after=args.after,
-                capabilities=capabilities, force=False,
+                capabilities=capabilities, corpus_index=args.corpus_index,
+                asset_pack=args.asset_pack, force=False,
             )
             if status["request_sha256"] != previous:
                 previous = status["request_sha256"]
@@ -3052,6 +3054,14 @@ def parser() -> argparse.ArgumentParser:
                                   default=ROOT / ".bne-frontier-evidence")
     frontier_compile.add_argument("--before", type=int, default=4)
     frontier_compile.add_argument("--after", type=int, default=0)
+    frontier_compile.add_argument(
+        "--corpus-index", type=Path,
+        help=("replacement corpus index for a receipt transferred from "
+              "another machine; fixture identity is still authenticated"))
+    frontier_compile.add_argument(
+        "--asset-pack", type=Path,
+        help=("replacement asset-pack path for a transferred receipt; its "
+              "identity must match the accepted survey"))
     frontier_compile.add_argument(
         "--native-trace", action="append", default=[], metavar="CASE=PATH",
         help="authenticated native trace available for one case (repeatable)")

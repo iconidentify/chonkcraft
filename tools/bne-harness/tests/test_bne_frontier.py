@@ -60,12 +60,17 @@ class ReceiptFixture:
         self.trace.write_text("cycle 44\n", encoding="utf-8")
         self.index = self.work / "corpus-index.json"
         write_json(self.index, {"schema": 1, "cases": []})
+        self.pack = self.work / "bne.chonkpack"
+        self.pack.write_bytes(b"authenticated test pack\n")
 
         survey = {
             "schema": 1, "comparison_tier": "semantic-v1", "through": 80,
             "engine": {"head": "a" * 40, "dirty": True,
                        "workspace_sha256": "b" * 64},
-            "asset_source": {"kind": "chonkpack"},
+            "asset_source": {
+                "kind": "chonkpack", "path": str(self.pack),
+                **identity(self.pack),
+            },
             "runtime": {"source_dir": str(self.root / "chonkcraft")},
             "index": str(self.index),
             "cases": [self.survey_record()],
@@ -225,6 +230,67 @@ class FrontierCompilerTest(unittest.TestCase):
             (self.root / "chonkcraft").resolve(), passed,
             "the compiler replaced a recorded source tree with a placeholder",
         )
+
+    def test_a_transferred_receipt_can_use_an_authenticated_local_corpus(self):
+        manifest = json.loads(
+            self.receipt.manifest_path.read_text(encoding="utf-8"))
+        candidate = self.receipt.run_root / manifest["candidate"]["survey"]
+        source = bne_frontier._blocker_sources(
+            self.receipt.run_root, manifest, candidate)[0]
+        local_index = self.root / "transferred" / "corpus-index.json"
+        write_json(local_index, {"schema": 1, "cases": []})
+        local_pack = self.root / "transferred" / "bne.chonkpack"
+        local_pack.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.receipt.pack, local_pack)
+        source["corpus_index"] = local_index
+        source["asset_pack"] = local_pack
+        destination = self.root / "frame"
+
+        def assert_rehomed(survey_path, case_id, output_dir, **kwargs):
+            survey = json.loads(Path(survey_path).read_text(encoding="utf-8"))
+            self.assertEqual(str(local_index.resolve()), survey["index"])
+            self.assertEqual(
+                str(local_pack.resolve()), survey["asset_source"]["path"])
+            return fake_generate_packet(
+                survey_path, case_id, output_dir, **kwargs)
+
+        with mock.patch("bne_packet.generate_packet",
+                        side_effect=assert_rehomed):
+            packet, failure = bne_frontier._build_packet(
+                source, destination, before=4, after=0)
+        self.assertIsNone(failure)
+        self.assertIsNotNone(packet)
+
+    def test_the_corpus_rehome_is_part_of_the_compile_identity(self):
+        status = self.compile(
+            corpus_index=self.receipt.index, asset_pack=self.receipt.pack)
+        run = self.output / "runs" / status["request_sha256"]
+        manifest = json.loads(
+            (run / "manifest.json").read_text(encoding="utf-8"))
+        recorded = manifest["request"]["corpus_index"]
+        self.assertEqual(str(self.receipt.index.resolve()), recorded["path"])
+        self.assertEqual(identity(self.receipt.index), {
+            key: recorded[key] for key in ("bytes", "sha256")
+        })
+        recorded_pack = manifest["request"]["asset_pack"]
+        self.assertEqual(str(self.receipt.pack.resolve()),
+                         recorded_pack["path"])
+        self.assertEqual(identity(self.receipt.pack), {
+            key: recorded_pack[key] for key in ("bytes", "sha256")
+        })
+
+    def test_a_missing_corpus_rehome_is_rejected(self):
+        missing = self.root / "missing-corpus-index.json"
+        with self.assertRaises(bne_frontier.FrontierError) as caught:
+            self.compile(corpus_index=missing)
+        self.assertIn("replacement corpus index is gone", str(caught.exception))
+
+    def test_an_asset_rehome_with_the_wrong_identity_is_rejected(self):
+        wrong = self.root / "wrong.chonkpack"
+        wrong.write_bytes(b"not the accepted pack\n")
+        with self.assertRaises(bne_frontier.FrontierError) as caught:
+            self.compile(asset_pack=wrong)
+        self.assertIn("does not match the accepted survey", str(caught.exception))
 
     def test_the_promised_artifacts_are_all_written(self):
         status = self.compile()

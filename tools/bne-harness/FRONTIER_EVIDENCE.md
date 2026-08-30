@@ -46,6 +46,21 @@ python3 tools/bne-harness/scripts/bne_java.py frontier-compile [RECEIPT]
 `.bne-artifacts/latest-accepted.json`. It writes only beneath
 `--output-root`, which defaults to `.bne-frontier-evidence/`.
 
+After moving an accepted receipt to another machine, rehome its external
+inputs explicitly:
+
+```sh
+python3 tools/bne-harness/scripts/bne_java.py frontier-compile \
+  --corpus-index /local/oracle/output/campaign-1800/corpus-index.json \
+  --asset-pack /local/packs/warcraft-ii-battle-net-edition-usa.chonkpack
+```
+
+The compiler never rewrites the accepted receipt. The replacement index path
+and identity become part of the compiled request, packet generation verifies
+the selected fixture ID, size and SHA-256, and an asset replacement is accepted
+only when its size and SHA-256 match the pack sealed by the survey. Generated
+rerun commands use the current repository and these authenticated local paths.
+
 `--watch SECONDS` recompiles whenever the accepted proof changes. It installs
 nothing; there is no service and this task did not enable one.
 

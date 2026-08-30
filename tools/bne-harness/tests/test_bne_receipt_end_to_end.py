@@ -233,6 +233,14 @@ class ReceiptToForensicFrameTest(unittest.TestCase):
             (compiled / "manifest.json").read_text(encoding="utf-8"))
         self.assertIn("blockers/orc-08/resolved-survey.json",
                       manifest["artifacts"])
+        packet = json.loads(
+            (compiled / "blockers" / "orc-08" / "packet.json").read_text(
+                encoding="utf-8"))
+        recorded = Path(packet["identities"]["survey"]["path"])
+        self.assertTrue(recorded.is_file(),
+                        f"the packet retained its staging survey path: {recorded}")
+        self.assertTrue(recorded.is_relative_to(compiled.resolve()),
+                        f"the packet survey escaped its published run: {recorded}")
 
     def _commands(self, value) -> list[str]:
         """Collect every command string anywhere in a compiled work order."""

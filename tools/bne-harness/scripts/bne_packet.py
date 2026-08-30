@@ -951,6 +951,16 @@ def _focus_units(case_record: dict[str, Any], extra_units: list[int]) -> set[int
     return units
 
 
+def _primary_focus_pair(focus_slots: set[int],
+        pairings: dict[int, dict[int, int]], cycle: int) \
+        -> tuple[int | None, int | None]:
+    """Keep the recommended native and Java diagnostics on the same unit."""
+    primary_native = min(focus_slots) if focus_slots else None
+    primary_java = pairings.get(cycle, {}).get(primary_native) \
+        if primary_native is not None else None
+    return primary_native, primary_java
+
+
 def _resolve_fixture(survey: dict[str, Any], case_id: str,
         case_record: dict[str, Any]) -> tuple[Path, dict[str, Any]]:
     index_path = Path(survey["index"]).expanduser().resolve()
@@ -1067,9 +1077,8 @@ def generate_packet(survey_path: Path, case_id: str, output_dir: Path,
                - {None}
         for cycle in cycles
     }
-    divergence_java_ids = sorted(java_focus.get(divergence, set()))
-    primary_native = min(focus_slots) if focus_slots else None
-    primary_java = divergence_java_ids[0] if divergence_java_ids else None
+    primary_native, primary_java = _primary_focus_pair(
+        focus_slots, pairings, divergence)
     asset = survey.get("asset_source") or {}
     recorded_source = (survey.get("runtime") or {}).get("source_dir")
     rerun_source = (str(source_dir.expanduser().resolve())
