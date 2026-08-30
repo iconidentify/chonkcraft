@@ -15,7 +15,52 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (queued-return convoy route)
+## Current release checkpoint — 2026-08-30 (unreachable-attack Still handoff)
+
+Accepted cycle-1,800 run `950fd9d2` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `02a525ea` retains 30 clean / 22 divergent / 0 failed. Aggregate
+per-map frontiers are 18,940 at cycle 400 and 35,205 at cycle 1,800. Expansion
+Orc 11 advances from exact through cycle 283 to 299; every other map frontier
+is unchanged. The receipts are retained under
+`.bne-artifacts/runs/02a525eabaecc1cd131d38f07de72435cbe2c5b8be59dfbe99ed5f6b4df50b9f`
+and
+`.bne-artifacts/runs/950fd9d2aeee838ab58dfc69ea60138fa446bd8e3be87213ff62d4e9baabab9f`.
+Both bind dirty engine-input identity `f2c8cfc9` at base revision `ec6273da`
+to replayable source capsule `ce0786ee`.
+
+Behavioral delta: when a land attacker's route request returns empty and the
+quarry is unreachable over terrain, retail's GiveOrder exit installs the
+unit's Still program with timer one. Java now preserves that direct handoff
+instead of rebuilding Still with the generic three-tick order constructor.
+The first ordinary idle opcode therefore runs on the next action visit and the
+shared random stream remains aligned. The rule is structural and contains no
+map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: expansion Orc 11 axethrower 1517 winds Attack 3,2,1 through
+fixtures 250..252, proves the empty terrain-unreachable route on 253, and
+records Still@825/1, OP0@4983/1, then 4985/4. Shoreline axethrowers 1507 and
+1498 independently authenticate the same timer-one GiveOrder handoff at
+fixtures 155 and 156. Expansion Human 4's reachable packed axethrower retains
+Attack and refills its route; Human 13 and expansion Human 4 ordinary attack
+ends retain their three-tick Still construction; expansion Human 10's boxed
+defender keeps its separate same-visit retry/release behavior. The focused
+case moves from first divergence 284 to 300, and both complete fleets gain
+sixteen aggregate cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks, including all 20 music tracks with a worst decoded comparison of 22.2
+dB. The matched BNE-media suite accounts for 2,832 tests: 2,802 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Human 13 and expansion Human 4 follow at 281, Human 7 at 282, expansion Orc 6
+at 285, Orc 8 at 289, and Human 11 and expansion Orc 11 at 300.
+
+## Prior release checkpoint — 2026-08-30 (queued-return convoy route)
 
 Accepted cycle-1,800 run `3fbd5a8c` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

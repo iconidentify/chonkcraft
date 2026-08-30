@@ -6374,6 +6374,20 @@ final class BattleNetCombatSystem {
                     // its opening chase is exact.
                     unit.setChasing(false);
                     world.finishAttackOrder(unit);
+                    if (world.battleNetSequence != null) {
+                        // GiveOrder returns this failed Attack directly at the
+                        // fresh Still marker with one tick left. XOrc 11's
+                        // axethrower 1517 records Still@825/1 on fixture 253
+                        // and dispatches its first OP0 on 254. Reconstructing
+                        // Still through the generic order installer leaves the
+                        // normal 3,2,1 construction here, two ticks late.
+                        int stillStart = world.idle
+                                .battleNetStillSequenceStart(unit);
+                        if (stillStart >= 0) {
+                            unit.setBattleNetSequenceOffset(stillStart);
+                            unit.setBattleNetAnimationTimer(1);
+                        }
+                    }
                     return;
                 }
                 refilled = true;

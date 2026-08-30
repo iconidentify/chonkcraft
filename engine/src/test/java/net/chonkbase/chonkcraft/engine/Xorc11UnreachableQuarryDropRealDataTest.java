@@ -16,10 +16,11 @@ import org.junit.jupiter.api.Test;
  * <p>Axethrower 1517 (Java 83) stands in a shore compound whose land gate no
  * route crosses to the enemy archer row it acquires at fixture 248. Retail
  * winds the Attack construction 3,2,1 across fixtures 250..252 and on 253
- * clears the target and returns to Still without a single step -- the
- * GiveOrder epilogue at 0x00453097 proved by capture. This implementation
- * used to promote the chase once the order delay ran out and then loop the
- * windup timer against the wall forever.
+ * clears the target and returns to Still@825/1 without a single step, then
+ * dispatches OP0 to 4983/1 on 254 -- the GiveOrder epilogue at 0x00453097
+ * proved by capture. This implementation used to promote the chase once the
+ * order delay ran out and then loop the windup timer against the wall forever;
+ * its first correction still rebuilt Still with a generic 3,2,1 delay.
  */
 class Xorc11UnreachableQuarryDropRealDataTest {
 
@@ -60,12 +61,26 @@ class Xorc11UnreachableQuarryDropRealDataTest {
                 "retail clears the unroutable quarry on fixture 253");
         assertEquals(Unit.Order.STILL, thrower.order(),
                 "the axethrower returns to Still when the windup ends");
+        assertEquals(825, thrower.battleNetSequenceOffset(),
+                "retail returns at the fresh Still marker on fixture 253");
+        assertEquals(1, thrower.battleNetAnimationTimer(),
+                "GiveOrder leaves one tick before the first Still opcode");
 
         mission.tick();
+        assertEquals(254, fixtureCycle(world));
+        assertEquals(4983, thrower.battleNetSequenceOffset(),
+                "the first Still OP0 dispatches on fixture 254");
+        assertEquals(1, thrower.battleNetAnimationTimer(),
+                "the first idle frame owns its native one-tick hold");
+
         mission.tick();
         assertEquals(255, fixtureCycle(world));
         assertEquals(Unit.Order.STILL, thrower.order(),
                 "the axethrower stays Still instead of chasing");
+        assertEquals(4985, thrower.battleNetSequenceOffset(),
+                "retail advances to the next idle frame on fixture 255");
+        assertEquals(4, thrower.battleNetAnimationTimer(),
+                "the second idle frame retains its four-tick hold");
         assertEquals(4, thrower.tileX(),
                 "no chase step ever leaves the pocket");
         assertEquals(37, thrower.tileY(),

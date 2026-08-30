@@ -35,11 +35,26 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **30/52 maps are exact through the full 400-cycle window**, with 22 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,924 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,940 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  35,189; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,205; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The unreachable-attack Still-handoff milestone advances expansion Orc 11
+  from exact through cycle 283 to 299. When a land attacker's fresh route is
+  empty and the quarry is unreachable over terrain, retail's GiveOrder exit
+  installs the type's Still program with one tick remaining; Java now does the
+  same instead of rebuilding the ordinary three-tick Still constructor. The
+  walled expansion Orc 11 axethrower authenticates the failed-route exit at
+  cycle 253, while two shoreline helpers independently authenticate the same
+  timer-one GiveOrder handoff at cycles 155 and 156. Reachable congestion,
+  ordinary completed attacks, and the boxed-defender retry/release path retain
+  their distinct timing. All other 51 fleet frontiers are unchanged, so both
+  aggregates gain sixteen cycles without changing the shared horizon or clean-
+  map counts. Durable cycle-400 run `02a525ea` and accepted cycle-1,800 run
+  `950fd9d2` bind engine input `f2c8cfc9` and replayable source capsule
+  `ce0786ee`. The rule has no map, unit, cycle, coordinate, or faction
+  exception.
 - The queued-return convoy milestone advances expansion Orc 6 from exact
   through cycle 273 to 284. A collision-free queued gold returner immediately
   behind a stopped collision-bearing same-depot returner on the direct depot
@@ -314,6 +329,11 @@ parity checks, all 2,830 suite tests accounted for with 2,800 run and 30 exact
 BNE skips, and the same 110 expected failure identities.
 The queued-return convoy candidate repeated that complete sequence on its final
 code: 18/18 playability lanes, 39/39 clean/adverse lockstep cases through cycle
+1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
+checks, all 2,832 suite tests accounted for with 2,802 run and 30 exact BNE
+skips, and the same 110 expected failure identities.
+The unreachable-attack Still-handoff candidate repeated that complete sequence:
+18/18 playability lanes, 39/39 clean/adverse lockstep cases through cycle
 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
 checks, all 2,832 suite tests accounted for with 2,802 run and 30 exact BNE
 skips, and the same 110 expected failure identities.
