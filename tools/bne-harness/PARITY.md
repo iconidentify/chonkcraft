@@ -15,7 +15,50 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (collided regroup-worker refusal)
+## Current release checkpoint — 2026-08-30 (assault-patrol worker refusal)
+
+Accepted cycle-1,800 receipt `d93dd71c` advances the shared clean horizon from
+269 to 270 (earliest divergence 271), preserves every other campaign frontier,
+and retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52
+per-case exact prefixes sum to 35,567, one more than the preceding accepted
+survey. The receipt is retained under
+`.bne-artifacts/runs/d93dd71c6dec904332d50783c71030c3d1ddc80f2d4e0445add05d9a48840425`.
+It binds dirty engine-input identity `5db0d938` at base revision `2e6cb19` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule `fd555406`.
+
+Behavioral delta: a behavior-two land Patrol may draw a fresh point route
+through an allied harvester whose Move body is mid-stride. If restored live
+occupancy still owns the first cached heading, retail retains the complete
+route, raises the patrol's collision generation from zero to one, and pays one
+fifteen-count Move band rather than clearing and redrawing the route on every
+visit. Java's borrowed `Patrol -> Move -> Patrol` call seam now preserves that
+native Move cursor, and the Patrol delay counts it down in lockstep. The rule
+is expressed entirely in order provenance, AI behavior, movement layer,
+alliance, worker action, route generation, collision state, and sub-tile
+motion; it contains no map, unit-ID, cycle, coordinate, or faction exception.
+
+Proof delta: expansion Human 12 ogre 1356 finishes its prior east route on
+fixture 240 and constructs Patrol through fixture 254. On fixture 255 it
+stores `[NW,NE]` toward its behavior-two home while allied harvesting peon
+1386 owns (10,85) mid-stride. Native retains route index zero, writes collision
+byte `0x10`, and exposes Move `586/15`; the timer falls to one on fixture 269.
+On fixture 270 the worker has drained far enough for the ogre to consume NW,
+reach (10,85), and retain NE behind route index one. Java unit 244 now follows
+that exact route, collision, cursor, timer, and position sequence. Efficacy
+receipt
+`.bne-test-efficacy/assault-patrol-worker/runs/ae409b95f00a7e95b5033b7102cdf859013a419da0fce1104099e3d28a574dfb`
+proves `XHuman12PatrolWorkerRefusalRealDataTest` assertion-fails on `2e6cb19`
+and passes on the candidate. The full Patrol-focused test family and all 30
+`bne_java.py` tests pass.
+
+The newly exposed blocker remains expansion Human 12, now at fixture 271:
+native grunt 1492 is one tile north of Java, while native grunt 1503 is one
+tile southeast of Java. The accepted compiler routes the complete three-field
+position frame to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (collided regroup-worker refusal)
 
 Accepted cycle-1,800 receipt `839b6bf9` advances the shared clean horizon from
 267 to 269 (earliest divergence 270), preserves every other campaign frontier,

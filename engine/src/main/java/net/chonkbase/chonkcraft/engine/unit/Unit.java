@@ -1683,8 +1683,15 @@ public final class Unit {
                 && type.canAttack() && battleNetDoubleStep
                 && order == Order.MOVE && battleNetBorrowedMoveForStep
                 && previous == Order.PATROL;
+        boolean assaultPatrolRefusalCursor = type != null
+                && type.moveType() == UnitType.Movement.LAND
+                && battleNetAiBehavior == 2
+                && battleNetCollisionCounter > 0
+                && pathLength() > 0
+                && battleNetSequenceOffset >= 0
+                && (order == Order.PATROL || borrowedPatrolMove);
         boolean nativeSequencedPatrol = capitalPatrolCursor
-                || flyerPatrolStrideCursor;
+                || flyerPatrolStrideCursor || assaultPatrolRefusalCursor;
         if (order != Order.STILL && !nativeSequencedPatrol) {
             // Still keeps its cursor so the idle dispatcher can fire.
             // Capital-ship Patrol used to wipe that same cursor, so XOrc 11's
@@ -1694,7 +1701,10 @@ public final class Unit {
             // Armed doubled flyers also carry the cursor across the borrowed
             // MOVE used for a Patrol stride. Other Patrol (unarmed scouts,
             // destroyers) still wipe -- keeping those cursors shifted Human
-            // 12's async scout dest off 107,51.
+            // 12's async scout dest off 107,51. A behaviour-two land patrol
+            // which has paid its first collision generation likewise owns a
+            // native Move refusal program across the borrowed-order seam;
+            // XHuman 12 ogre 1356 keeps Move 586/15 while retaining NW,NE.
             battleNetSequenceOffset = -1;
         }
     }

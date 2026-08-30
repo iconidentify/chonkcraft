@@ -197,6 +197,20 @@ from `0x0043789a`. Thus a moving worker is not an unconditional regroup
 soft-clear: mover and blocker collision generations distinguish the initial
 cooperative route from its hard retry.
 
+Behavior-two land Patrol has a separate cooperative worker handoff. Expansion
+Human 12 ogre 1356 is settled at (11,86) after draining its old route, while
+harvesting peon 1386 owns (10,85) in Move action state 3 with nonzero sub-tile
+motion. On fixture 255 the Patrol point writer stores `[NW,NE]` through that
+worker. The following live-occupancy visit does not park route index 20:
+native retains index zero, writes collision byte `0x10`, and installs the
+ogre's Move program at sequence 586 with timer 15. The route and collision
+byte remain unchanged while that timer falls to one on fixture 269. Fixture
+270 then consumes NW, changes the ogre's tile to (10,85), and advances the
+route index to one. This establishes that planner transparency and execution
+occupancy are two halves of one refusal protocol; treating the first occupied
+heading as a generic refusal loses the cached route and delays the step seven
+cycles.
+
 Wall-follow step selection at `0x450114`–`0x45020f`: an out-of-bounds
 candidate step fails the entire face (`jae 0x450315` at `0x45015c` /
 `0x45016a`) without rotating; blocked terrain only rotates the heading until

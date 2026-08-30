@@ -4393,6 +4393,49 @@ final class BattleNetMovementSystem {
                     }
                     return;
                 }
+                boolean assaultPatrolWorkerRefusal =
+                        unit.battleNetBorrowedMoveForStep()
+                        && unit.battleNetAiBehavior() == 2
+                        && unit.patrolX() >= 0
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.LAND
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0
+                        && stageSixBlocker != null
+                        && stageSixBlocker != unit
+                        && stageSixBlocker.isMoving()
+                        && stageSixBlocker.order() == Unit.Order.HARVEST
+                        && stageSixBlocker.type() != null
+                        && stageSixBlocker.type().moveType()
+                                == UnitType.Movement.LAND
+                        && Math.max(Math.abs(stageSixBlocker.offsetX()),
+                                Math.abs(stageSixBlocker.offsetY())) < 32
+                        && world.isAllied(unit.player(),
+                                stageSixBlocker.player());
+                if (assaultPatrolWorkerRefusal) {
+                    // Behaviour-two land Patrol uses the same cooperative
+                    // occupancy handoff as its point writer: a mid-stride
+                    // allied harvester is transparent while the route is
+                    // drawn, then live occupancy owns the first Move visit.
+                    // Retail keeps the complete route and pays one collision
+                    // generation plus a fifteen-count Move band. XHuman 12
+                    // ogre 1356 therefore retains NW,NE at fixture 255 and
+                    // consumes NW when peon 1386 drains at fixture 270.
+                    unit.setBattleNetCollisionCounter(1);
+                    unit.setBattleNetRefusals(0);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(15);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
                 boolean recurringRegroupWorkerRefusal =
                         unit.order() == Unit.Order.MOVE
                         && !unit.battleNetPlayerCommandMove()

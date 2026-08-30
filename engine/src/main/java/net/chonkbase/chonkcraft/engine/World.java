@@ -14673,13 +14673,27 @@ public final class World {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             // Small-warship Patrol is not sequence-owned like a capital ship,
             // but a cooperative movement refusal still exposes Move's native
-            // 15..1 timer while the order delay runs. Keep the raw cursor in
-            // lockstep with that hold. The sticky refusal token confines this
-            // to FUN_004379e0's naval band rather than ordinary Patrol delays.
-            if (unit.type() != null && unit.type().seaUnit()
-                    && unit.battleNetDoubleStep()
-                    && unit.battleNetRefusals() > 0
-                    && unit.battleNetAnimationTimer() > 1) {
+            // 15..1 timer while the order delay runs. Behaviour-two land
+            // Patrol has the same band when its first cached byte meets the
+            // mid-stride harvester which planning treated cooperatively. Keep
+            // the raw cursor in lockstep with those holds; the refusal/collision
+            // state confines this to FUN_004379e0 rather than ordinary delays.
+            int moveStart = unit.type() == null ? -1
+                    : idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+            boolean landAssaultWorkerRefusal =
+                    unit.type() != null
+                    && unit.type().moveType() == UnitType.Movement.LAND
+                    && unit.battleNetAiBehavior() == 2
+                    && unit.battleNetCollisionCounter() > 0
+                    && unit.pathLength() > 0
+                    && moveStart >= 0
+                    && unit.battleNetSequenceOffset() == moveStart;
+            if (unit.battleNetAnimationTimer() > 1
+                    && (unit.type() != null && unit.type().seaUnit()
+                            && unit.battleNetDoubleStep()
+                            && unit.battleNetRefusals() > 0
+                        || landAssaultWorkerRefusal)) {
                 unit.setBattleNetAnimationTimer(
                         unit.battleNetAnimationTimer() - 1);
             }
