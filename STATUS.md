@@ -387,9 +387,9 @@ pinned original source and signed pack again passed the full 1,412-asset and
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0830.117` is the public release, published from revision
-`e8d90b16cd73d2577080a717d36118a6a2cb0c11` with game JAR SHA-256
-`75dd9cb29e105985f5ef6c8a35364b7ff7a4b0bc7fe8d507a624899531e7ad39`.
+Signed engine OTA `2026.0830.118` is the public release, published from revision
+`0bec08013fffc873d7f66ba557698271f0ecd725` with game JAR SHA-256
+`05a92d1086c163dbddf5811c8c6cefe26f98776a0d3240ad72e452689484db65`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
