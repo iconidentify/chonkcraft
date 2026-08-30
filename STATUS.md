@@ -200,9 +200,9 @@ through cycle 1,800, and a real two-process 180-cycle match with terminal hash
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0830.108` is the public release, published from revision
-`f852c56ae9933597c0201b9bd4497758741052bd` with game JAR SHA-256
-`5eb86dbb3b625741ad3bdf2a831a3cc486c0a8edf96c058c614f7e819b706716`.
+Signed engine OTA `2026.0830.109` is the public release, published from revision
+`8b05b47523a027acc588cb7ae8628539193012b5` with game JAR SHA-256
+`c632541df1fd7e73141ac30d8c48dd3d016404ed79a157edf38600039b106650`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
