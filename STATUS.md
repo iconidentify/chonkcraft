@@ -364,9 +364,9 @@ skips or failures.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
-Signed engine OTA `2026.0830.116` is the public release, published from revision
-`c2766f4871af935a217b036b4e0cb09c50e319c0` with game JAR SHA-256
-`4e54bd2840eb552d345af17207d5201df086af9e3b2b91ac09fb60311f98223e`.
+Signed engine OTA `2026.0830.117` is the public release, published from revision
+`e8d90b16cd73d2577080a717d36118a6a2cb0c11` with game JAR SHA-256
+`75dd9cb29e105985f5ef6c8a35364b7ff7a4b0bc7fe8d507a624899531e7ad39`.
 Its workflow proved both local installation and a fresh launcher install from
 the public endpoint. No matchmaking protocol, service, or infrastructure path
 changed, so a server rollout was not required.
