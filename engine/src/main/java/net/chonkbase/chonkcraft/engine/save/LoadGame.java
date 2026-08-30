@@ -843,6 +843,10 @@ public final class LoadGame {
             unit.setBattleNetStopAfterLeftover(
                     truthy(state.rawGet("stopAfterLeftover")));
         }
+        if (state.rawGet("navalPaidParkedRoute") != null) {
+            unit.setBattleNetNavalPaidParkedRoute(
+                    truthy(state.rawGet("navalPaidParkedRoute")));
+        }
         if (state.rawGet("saturatedResidualFaceRetry") != null) {
             unit.setBattleNetSaturatedResidualFaceRetry(
                     truthy(state.rawGet("saturatedResidualFaceRetry")));

@@ -108,6 +108,24 @@ class BattleNetSmallWarshipPatrolRealDataTest {
         assertNotNull(destroyer,
                 "XOrc 8 has no player-two human destroyer at 102,92");
 
+        tickThrough(mission, 38);
+        Unit unpressuredBlocker = unitById(mission.world(), 168);
+        assertNotNull(unpressuredBlocker,
+                "XOrc 8 has no Java twin for native submarine 1432");
+        assertEquals(0, unpressuredBlocker.battleNetCollisionCounter());
+        assertEquals(0, unpressuredBlocker.battleNetRefusals(),
+                "the opening submarine has no collision pressure");
+        assertEquals(1, destroyer.pathLength(),
+                "an unpressured temporary hull keeps the cached northwest tail");
+        assertTrue(!destroyer.battleNetNavalPaidParkedRoute(),
+                "the unpressured control must not arm a parked redraw");
+        assertEquals(15, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 53);
+        assertEquals(100, destroyer.tileX());
+        assertEquals(88, destroyer.tileY(),
+                "the unpressured control commits its retained northwest tail");
+
         tickThrough(mission, 84);
         assertEquals(100, destroyer.tileX());
         assertEquals(88, destroyer.tileY());
@@ -225,12 +243,36 @@ class BattleNetSmallWarshipPatrolRealDataTest {
                 "the allied submarine blocks the consumed northwest leftover");
         assertEquals(80, destroyer.tileY(),
                 "native retains the anchor while arming the cooperative hold");
-        assertEquals(1, destroyer.pathLength(),
-                "a consumed leftover is retained rather than replaced");
-        assertEquals(1, destroyer.battleNetPathStepsTaken(),
-                "the retained route keeps its consumed-prefix provenance");
+        assertEquals(0, destroyer.pathLength(),
+                "native parks the consumed tail behind a pressured hull");
+        assertEquals(0, destroyer.battleNetPathStepsTaken(),
+                "the parked route no longer exposes consumed provenance");
         assertEquals(15, destroyer.battleNetAnimationTimer(),
                 "the blocked leftover opens the native fifteen-count Move band");
+
+        Unit pressuredBlocker = unitById(mission.world(), 167);
+        assertNotNull(pressuredBlocker,
+                "XOrc 8 has no Java twin for native submarine 1433");
+        assertTrue(pressuredBlocker.battleNetCollisionCounter() > 0
+                        || pressuredBlocker.battleNetRefusals() > 0,
+                "the later submarine must carry collision pressure");
+        assertTrue(destroyer.battleNetNavalPaidParkedRoute(),
+                "the paid parked route must preserve pass-start occupancy");
+        tickThrough(mission, 278);
+        assertEquals(94, destroyer.tileX());
+        assertEquals(80, destroyer.tileY());
+        assertEquals(1, destroyer.battleNetAnimationTimer(),
+                "the parked tail still pays the complete Move band");
+
+        tickThrough(mission, 279);
+        assertEquals(92, destroyer.tileX());
+        assertEquals(82, destroyer.tileY(),
+                "the paid wake redraws southwest instead of retrying northwest");
+        assertEquals(6, destroyer.pathLength(),
+                "southwest is consumed from the native seven-heading redraw");
+        assertEquals(1, destroyer.battleNetPathStepsTaken());
+        assertTrue(!destroyer.battleNetNavalPaidParkedRoute(),
+                "the pass-start occupancy marker is one redraw wide");
     }
 
     private static Mission mission(GameData data) {

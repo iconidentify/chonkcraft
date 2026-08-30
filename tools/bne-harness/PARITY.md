@@ -15,36 +15,36 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-29
+## Current release checkpoint — 2026-08-30
 
-Accepted cycle-1,800 run `3cc105b0` preserves the shared clean horizon at 267
+Accepted cycle-1,800 run `cbca1296` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 29 clean / 23 divergent / 0 failed. Aggregate per-map
-frontiers rise from 18,609 to 18,710 at cycle 400 and from 34,821 to 34,922 at
-cycle 1,800. Expansion Orc 12 advances from exact through 273 to exact through
-374; every other map is unchanged. The durable cycle-400 and accepted
+frontiers rise from 18,710 to 18,733 at cycle 400 and from 34,922 to 34,945 at
+cycle 1,800. Expansion Orc 8 advances from exact through 278 to exact through
+301; every other map is unchanged. The durable cycle-400 and accepted
 cycle-1,800 surveys are retained under
-`.bne-artifacts/runs/18b00e6949b3ae6373e8f0d26504b849ec9295c0fabc63246a783f9784e9c7c5`
-and `.bne-artifacts/runs/3cc105b04f4eb4797ccca508987a33b87d39bdf9113448774f317945ced36f54`.
-The accepted receipt binds clean engine-input identity `d014bc0c` to source
-revision `eaa3fe87`.
+`.bne-artifacts/runs/65b7a2e84bf4cc6786476124567820cac40a57999057f9d331971fc39ccaf3fa`
+and `.bne-artifacts/runs/cbca12964ae7395a08ba983b889656762e96a5293fcf0cfaf7c44d0068ce27d3`.
+The accepted receipt binds engine-input identity `3c4624dd` to the candidate
+capsule rooted at source revision `6aa230d4`.
 
-Behavioral delta: a loaded worker returning to a depot now retains the native
-direct route byte when another loaded worker for the same depot is already
-queued to vacate that lane. A later direct byte may replace a two-byte detour
-only when the replacement preserves the same endpoint. The same queued sibling
-also qualifies a longer cached route for the native refusal-eight Move 15..1
-payment band. Previously Java either inserted an unnecessary detour or redrew
-after traffic had already committed to leave. The rule is structural and
-contains no map, unit, cycle, or coordinate exception.
+Behavioral delta: a targetless behavior-six small naval patrol now parks a
+consumed cached tail when the allied hull ahead has entered its own collision
+ladder. A one-step consumed tail pays the full native Move 15..1 band, then
+redraws by continuing its refused wall face against beginning-of-pass
+occupancy; longer consumed histories redraw immediately. An unpressured
+temporary hull remains a cooperative mover, so the patrol keeps its cached
+tail and commits after that hull vacates. The rule is structural and contains
+no map, unit, cycle, or coordinate exception.
 
-Proof delta: expansion Orc 12 peasant 1439 independently proves the retained
-`NE,NE,N` prefix through peasant 1434, while expansion Human 12 peon 1550
-proves the complete refusal band behind peon 1557 and first-steps north as the
-sibling vacates. The existing expansion Human 9 direct-ray refusal witness and
-expansion Human 8 occupied and negative-Move cases remain held-out controls.
+Proof delta: expansion Orc 8 submarines 1432 and 1434 independently prove two
+multi-step parks behind different pressured destroyers. Destroyer 1431 proves
+the one-step paid park and southwest redraw behind a pressured submarine, and
+the same destroyer earlier proves the held-out unpressured tail commits after
+the blocker vacates. Its fresh-route patrol remains a second negative control.
 The complete focused referee is green, and both complete fleets show the same
-single 101-cycle gain with no regression.
+single 23-cycle gain with no regression.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
@@ -56,8 +56,8 @@ skips and retained the exact 110 expected specification failures. Pack parity
 also passed all eight structural checks and all 20 BNE music tracks.
 
 The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc 6
-follows at 274, Human 13 at 278, expansion Orc 8 at 279, and expansion Orc 11
-at 282; expansion Human 11 follows at 311. Bounded rejected candidates
+follows at 274, Human 13 at 278, expansion Orc 11 at 282, expansion Orc 8 at
+302, and expansion Human 11 at 311. Bounded rejected candidates
 remain reverted: blanket and soft visibility variants for Human 12 failed
 their native route or held-out negatives; Human 11's wood-stall timing changed
 only its target map; the broad all-tree occupancy candidate regressed Human 5;
@@ -66,7 +66,10 @@ improve the shared horizon or a meaningful aggregate frontier. A recurring
 behavior-one home-Move give-up changed one expansion Human 12 symptom but made
 no fleet-level gain and was reverted. The subsequent three-position expansion
 Human 12 diagnostic exposed different causes rather than one systemic rule, so
-the work switched clusters before production code was changed.
+the work switched clusters before production code was changed. A queued
+same-depot bypass moved expansion Orc 6 from 274 to 285 but regressed expansion
+Human 10 from 347 to 269, so it was rejected at cycle 400 and immediately
+reverted.
 
 ## Prior release checkpoint — 2026-08-26
 

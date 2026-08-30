@@ -35,11 +35,25 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 310.
 - **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,710 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,733 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,922; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,945; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The paid naval patrol-redraw milestone advances expansion Orc 8 from exact
+  through cycle 278 to exact through 301. A targetless behavior-six small
+  warship with a consumed cached tail now parks behind a collision-pressured
+  allied hull. A one-step consumed tail pays the native Move 15..1 band before
+  redrawing by continuing its refused wall face against beginning-of-pass
+  occupancy; longer consumed histories redraw immediately. Two submarines
+  independently authenticate longer parks behind different pressured
+  destroyers, and a destroyer authenticates the paid one-step form. The same
+  destroyer earlier keeps its tail behind an unpressured submarine and commits
+  after that hull vacates; a fresh route is a second negative control. All
+  other 51 maps are unchanged, so both aggregate fleets gain 23 cycles without
+  changing clean-map counts or the shared horizon. Durable cycle-400 run
+  `65b7a2e8` and accepted cycle-1,800 run `cbca1296` bind the candidate source
+  capsule. The rule has no map, unit, cycle, or coordinate exception.
 - The shared-depot return milestone advances expansion Orc 12 from exact
   through cycle 273 to exact through 374. Loaded workers now retain a native
   direct route byte through a loaded same-depot sibling that is already queued
@@ -125,11 +139,11 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   its cached route when the allied mobile hull ahead has entered its own
   collision ladder, then redraws on the next visit. Two independent native
   submarines authenticate different route shapes behind different pressured
-  destroyers. A one-step consumed route behind a pressured hull and the same
-  congestion shape behind an unpressured hull both retain their ordinary hold,
-  protecting the systemic distinction. All other 51 maps are unchanged across
-  both complete fleets; the cycle-400 and cycle-1,800 counts remain 27 and 8
-  with zero failed cases. Accepted cycle-1,800 run `196c84ca` binds survey
+  destroyers. At that checkpoint the one-step form remained a held-out
+  boundary; the current paid patrol-redraw milestone above closes its pressured
+  form while preserving the unpressured hold. All other 51 maps are unchanged
+  across both complete fleets; the cycle-400 and cycle-1,800 counts remain 27
+  and 8 with zero failed cases. Accepted cycle-1,800 run `196c84ca` binds survey
   `9af422e2d064fa81e65b9991db8f1cf9c44d13ea92678dd4ba497c803515f3c8`
   to engine-input identity
   `035cfeba01a33b1fd47b806e2d1b9c16ce2e5c0a42679ba97aa7e3e7ca73c043`.
@@ -177,9 +191,12 @@ for nor revokes completed research, and never duplicates, moves, or resurrects
 a transformed building. Those two retail-roster referees deliberately add two
 data-free skips. A matched-input full run exercised all 2,796 locally available
 authenticated tests with the exact expected failure identity before the
-shared-depot receipt was promoted. The loaded-worker assertions extend the
-existing authenticated mine-exit referee without changing the suite or skip
-inventory; the complete preceding movement inventory remains green.
+paid naval patrol-redraw receipt was promoted. The new patrol assertions extend
+the authenticated small-warship referee without changing the suite or skip
+inventory; the complete preceding movement inventory remains green. The same
+candidate passed all 18 playability lanes, all 39 clean/adverse lockstep cases
+through cycle 1,800, and a real two-process 180-cycle match with terminal hash
+`1b9dd8ad7b9a1f51`.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

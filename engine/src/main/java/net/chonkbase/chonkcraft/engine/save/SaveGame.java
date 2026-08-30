@@ -744,6 +744,9 @@ public final class SaveGame {
         if (unit.battleNetMovingQuarryResidual()) {
             state.append(" movingQuarryResidual = true,");
         }
+        if (unit.battleNetNavalPaidParkedRoute()) {
+            state.append(" navalPaidParkedRoute = true,");
+        }
         if (unit.battleNetSaturatedResidualFaceRetry()) {
             state.append(" saturatedResidualFaceRetry = true,");
         }

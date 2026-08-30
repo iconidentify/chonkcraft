@@ -6204,21 +6204,25 @@ public final class World {
                     && !unit.battleNetSaturatedWoodCornerLadder();
             AiPlayer pointOrderAi = ais.get(unit.player());
             boolean preserveVacatedPatrolSquare =
-                    unit.order() == Unit.Order.PATROL
-                    && unit.battleNetAiBehavior() == 2
-                    && unit.type() != null
-                    && unit.type().moveType() == UnitType.Movement.LAND
-                    && pointOrderAi != null
-                    && pointOrderAi.battleNetBuildProfileId() == 0
-                    && !unit.isMoving()
-                    && unit.pathLength() == 0
-                    && unit.stepDrained()
-                    && softBlockers.stream().noneMatch(candidate ->
-                            candidate.order() == Unit.Order.HARVEST
+                    unit.battleNetNavalPaidParkedRoute()
+                    || (unit.order() == Unit.Order.PATROL
+                            && unit.battleNetAiBehavior() == 2
+                            && unit.type() != null
+                            && unit.type().moveType()
+                                    == UnitType.Movement.LAND
+                            && pointOrderAi != null
+                            && pointOrderAi.battleNetBuildProfileId() == 0
+                            && !unit.isMoving()
+                            && unit.pathLength() == 0
+                            && unit.stepDrained()
+                            && softBlockers.stream().noneMatch(candidate ->
+                                    candidate.order()
+                                            == Unit.Order.HARVEST
                                     && candidate.isMoving()
-                                    && Math.max(Math.abs(candidate.offsetX()),
+                                    && Math.max(
+                                            Math.abs(candidate.offsetX()),
                                             Math.abs(candidate.offsetY()))
-                                            < 32);
+                                            < 32));
             BattleNetPathFinder.Passability traversalPassability =
                     new BattleNetPathFinder.Passability() {
                         @Override
@@ -6307,6 +6311,23 @@ public final class World {
                     doubledPatrolWallOnTie,
                     preserveVacatedPatrolSquare, false, false,
                     doubledAirPatrolHardDirect);
+            if (unit.battleNetNavalPaidParkedRoute()
+                    && unit.battleNetParkedRefusalHeading() >= 0
+                    && unit.battleNetParkedRefusalHeading()
+                            < Direction.COUNT) {
+                PathFinder.Path continued = BattleNetPathFinder
+                        .continueWallFace(
+                                unit.tileX(), unit.tileY(), toX, toY,
+                                unit.battleNetParkedRefusalHeading(), -1,
+                                battleNetMovementStride(unit),
+                                traversalPassability,
+                                optimizationPassability, goalMarker);
+                if (continued.result() == PathFinder.Result.FOUND
+                        && continued.length() > 0) {
+                    path = continued;
+                }
+                unit.setBattleNetParkedRefusalHeading(-1);
+            }
             traceBattleNetPath(unit, toX, toY, path);
             return path;
         } finally {

@@ -1667,12 +1667,17 @@ public final class Unit {
     public void setOrder(Order order) {
         Order previous = this.order;
         this.order = order;
+        boolean borrowedPatrolMove = order == Order.MOVE
+                && battleNetBorrowedMoveForStep
+                && previous == Order.PATROL;
+        if (order != Order.PATROL && !borrowedPatrolMove) {
+            battleNetNavalPaidParkedRoute = false;
+        }
         boolean capitalPatrolCursor = type != null && type.seaUnit()
                 && ("unit-battleship".equals(type.ident())
                         || "unit-ogre-juggernaught".equals(type.ident()))
                 && (order == Order.PATROL
-                        || (order == Order.MOVE && battleNetBorrowedMoveForStep
-                                && previous == Order.PATROL));
+                        || borrowedPatrolMove);
         boolean flyerPatrolStrideCursor = type != null
                 && type.moveType() == UnitType.Movement.FLY
                 && type.canAttack() && battleNetDoubleStep
@@ -3463,6 +3468,17 @@ public final class Unit {
     }
 
     private boolean battleNetPaidLongResidualRefill;
+
+    /** A paid naval Patrol park must route against the pass-start hull view. */
+    public boolean battleNetNavalPaidParkedRoute() {
+        return battleNetNavalPaidParkedRoute;
+    }
+
+    public void setBattleNetNavalPaidParkedRoute(boolean parked) {
+        battleNetNavalPaidParkedRoute = parked;
+    }
+
+    private boolean battleNetNavalPaidParkedRoute;
 
     /** A cold mobile-quarry handoff keeps retrying while no free step closes. */
     public boolean battleNetColdNoProgressRefusalLoop() {

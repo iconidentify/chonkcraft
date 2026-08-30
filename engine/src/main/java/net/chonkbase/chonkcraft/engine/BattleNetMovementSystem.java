@@ -1486,6 +1486,7 @@ final class BattleNetMovementSystem {
                 return;
             }
             PathFinder.Path path = world.findBattleNetPointPath(worker, tileX, tileY);
+            worker.setBattleNetNavalPaidParkedRoute(false);
             if (path == null) {
                 worker.setOrder(Unit.Order.STILL);
                 world.idle.stepStill(worker);
@@ -5042,26 +5043,50 @@ final class BattleNetMovementSystem {
                     if (pressuredTemporaryBody && unit.target() == null
                             && !unit.isMoving()
                             && unit.pathLength() > 0
-                            && unit.battleNetPathStepsTaken() > 1) {
+                            && unit.battleNetPathStepsTaken() > 0) {
                         // A hull which has already entered its own collision
                         // ladder is no longer a cooperative mover expected to
                         // vacate this exact cached heading. Retail parks the
                         // stale route, advances the router's refusal nibble,
-                        // and redraws on the next visit. XOrc 8 supplies two
-                        // independent route shapes on fixture 267: submarine
-                        // 1432 parks a three-byte head behind destroyer 1430's
-                        // first collision, while submarine 1434 parks a
-                        // consumed two-byte tail behind destroyer 1435's ninth.
-                        // A one-step provenance is different: destroyer 1431
-                        // retains its single consumed northwest leftover behind
-                        // a pressured submarine at fixture 264. The unpressured
-                        // control is the same destroyer at fixture 38:
-                        // submarine 1432 still has collision zero there, so the
-                        // cached northwest tail keeps its full Move band and
-                        // commits only after that blocker leaves.
+                        // and redraws. XOrc 8 supplies three route shapes:
+                        // submarine 1432 parks a three-byte head behind
+                        // destroyer 1430's first collision on fixture 267,
+                        // while submarine 1434 parks a consumed two-byte tail
+                        // behind destroyer 1435's ninth. Both redraw on 268.
+                        // Destroyer 1431 parks its one-step consumed northwest
+                        // tail behind the pressured submarine 1432 on fixture
+                        // 264, but that shortest provenance still owns the
+                        // complete Move 15..1 band before it redraws southwest
+                        // on 279. The unpressured control is the same destroyer
+                        // at fixture 38: submarine 1432 still has collision zero,
+                        // so the cached northwest tail remains live through the
+                        // band and commits when that blocker leaves on 53.
+                        boolean paidConsumedTail =
+                                unit.battleNetPathStepsTaken() == 1;
+                        int parkedHeading = paidConsumedTail
+                                ? unit.peekHeading() : -1;
                         battleNetRefuse(unit);
                         unit.setRouteSpent(false);
-                        unit.setBattleNetOrderDelay(0);
+                        unit.setWaitCycles(0);
+                        unit.setBattleNetOrderDelay(
+                                paidConsumedTail ? 14 : 0);
+                        unit.setBattleNetNavalPaidParkedRoute(
+                                paidConsumedTail);
+                        if (paidConsumedTail) {
+                            unit.setBattleNetParkedRefusalHeading(
+                                    parkedHeading);
+                        }
+                        if (paidConsumedTail
+                                && world.battleNetSequence != null
+                                && world.battleNetMoveAnimation(unit)) {
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                            }
+                            unit.setBattleNetAnimationTimer(15);
+                        }
                         return;
                     }
                     if (temporaryBody
@@ -8163,8 +8188,9 @@ final class BattleNetMovementSystem {
                     < Unit.TILE_PIXELS - 3) {
                 continue;
             }
-            int oldX = candidate.tileX() + Integer.signum(ox);
-            int oldY = candidate.tileY() + Integer.signum(oy);
+            int stride = world.battleNetMovementStride(candidate);
+            int oldX = candidate.tileX() + Integer.signum(ox) * stride;
+            int oldY = candidate.tileY() + Integer.signum(oy) * stride;
             if (oldX == x && oldY == y) {
                 return true;
             }
