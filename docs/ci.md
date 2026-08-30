@@ -16,7 +16,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 1,205 of 2,823 tests skip and
+either way. With nothing configured, 1,205 of 2,825 tests skip and
 the run takes 25 seconds.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
@@ -57,14 +57,15 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **27 skips of 2,823**, re-measured after the BNE
+Asserts the `full` profile: **27 skips of 2,825**, re-measured after the BNE
 parity, explicit-team, multiplayer-wall, allied-vision, wood-command, team-outcome,
 mine-collapse-audio, and gryphon order-handoff coverage additions against the runner's
-authenticated retail installation. Two of the twenty-seven depend on which release
-the installation is: a source exposing the Battle.net Edition stereo video
-path and three-map recording matrix sees 25, while the currently mounted classic
-source sees 27.
-`scripts/ci/check-test-skips.py` explains the release-dependent assertion.
+authenticated classic retail installation. An exact Battle.net Edition source
+has a different per-module inventory because its data lives in TOMEs and it
+does not expose several classic loose-file fixtures. That layout is covered by
+the separate `full-bne-with-playtest-saves` profile instead of being folded
+into the classic count.
+`scripts/ci/check-test-skips.py` explains each release-dependent assertion.
 About nine minutes.
 
 It builds an asset pack from the mounted installation and runs the whole suite
@@ -94,6 +95,7 @@ in the first place, one at a time, with nothing objecting.
 | `data-free` | none | 1,205 |
 | `full` | installation, pack, Opus vectors | 27 |
 | `full-with-playtest-saves` | full inputs plus three private save referees | 24 |
+| `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |
 
 The twenty-seven that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
@@ -107,6 +109,12 @@ The `full-with-playtest-saves` profile is the exact local counterpart for a
 development machine that has the three private save referees installed. It
 runs those checks instead of weakening the hosted `full` profile when stronger
 local coverage legitimately removes three skips.
+
+The `full-bne-with-playtest-saves` profile is the exact counterpart for the
+sealed Battle.net Edition source archive and its matching signed pack. Its 30
+skips are not weaker authentication: they record BNE's TOME layout, data-only
+CUE, absent classic loose-map fixtures, display-only checks, optional music
+fixture, release-sensitive unit declarations, and opt-in production smoke.
 
 ## The failure gate
 

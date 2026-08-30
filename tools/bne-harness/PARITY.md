@@ -17,45 +17,44 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-08-30
 
-Accepted cycle-1,800 run `ba7c7b36` preserves the shared clean horizon at 267
+Accepted cycle-1,800 run `41c1d87e` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. The
 cycle-400 fleet remains 29 clean / 23 divergent / 0 failed. Aggregate per-map
-frontiers rise from 18,733 to 18,777 at cycle 400 and from 34,945 to 34,989 at
-cycle 1,800. Expansion Human 5 advances from exact through 287 to 322 and
-expansion Human 11 from 310 to 319; every other map is unchanged. The durable
-cycle-400 and accepted cycle-1,800 surveys are retained under
-`.bne-artifacts/runs/efd79afaf0e43abd10c623464557a592f9eab27e9f0c7c8552d8c774db23487b`
-and `.bne-artifacts/runs/ba7c7b363955e1c9b946c287872e4298a145361ab418473a66f0f1e0a1287162`.
-Accepted receipt `b0c7fe14` binds engine-input identity `5629da47` to
-replayable source capsule `054ac971`, rooted at source revision `c8ffa9b6`.
+frontiers are 18,779 at cycle 400 and 34,991 at cycle 1,800. Expansion Orc 11
+advances from exact through 281 to 283; every other map is unchanged from the
+preceding accepted fleet. The durable cycle-400 and accepted cycle-1,800
+receipts are retained under `.bne-artifacts/runs/83be37f2405ab9f8cff923f576a90bcc501313fff7800575ef79dceba352b367`
+and `.bne-artifacts/runs/41c1d87e4d12071574455d94cc12834a41b198a346d3f152529a7974fe6a6451`.
+The accepted receipt binds engine-input identity `b5287494` to replayable
+source capsule `157f3535`, rooted at source revision `a4b0ee72`.
 
-Behavioral delta: a laden land worker returning near its depot now discards a
-refused two-byte tail when it has already consumed part of the route and both
-remaining bytes hold the same cardinal heading. The next resource visit then
-redraws the native diagonal bypass instead of restoring the stale tail and
-retrying it after traffic clears. Fresh duplicate routes, one-byte routes,
-non-duplicate consumed tails, and duplicate diagonal tails retain their prior
-behavior. The rule is structural and contains no map, unit, cycle, or
+Behavioral delta: generated unit definitions now normalize the legacy
+`unit-dead-sea-body` corpse alias onto `unit-human-dead-body`, just as the
+existing orc corpse alias already did. All 14 authenticated vessel deaths in
+the sealed campaign fleet become native raw type 105, across both factions and
+four combat-vessel classes. The 77 authenticated land deaths use the same raw
+type. Destroyed buildings retain their sized rubble definitions, balloons and
+zeppelins retain no corpse, and the rule contains no map, unit, cycle, or
 coordinate exception.
 
-Proof delta: expansion Human 5 independently proves a consumed S,S tail parks
-and redraws SW,SE, while expansion Human 11 proves a consumed N,N tail parks
-and redraws NE,NW. Focused negatives cover a fresh duplicate route, a one-byte
-route, a non-duplicate consumed tail, and a duplicate diagonal tail; fleet
-controls cover direct one-byte refusal, non-duplicate tails, current-edge
-drift, a different route form, and shared-blocker traffic. The three-test
-focused referee is green, and both complete fleets show the same 44-cycle
+Proof delta: expansion Human 7 supplies one orc destroyer death, expansion Orc
+8 supplies human and orc destroyers, and expansion Orc 11 supplies both
+destroyer factions plus a battleship and ogre juggernaught. Focused generated-
+definition referees cover those four vessel classes and hold 2-by-2 and 3-by-3
+building rubble plus no-corpse air units outside the rule. The three-test
+focused selection is green, and both complete fleets show the same two-cycle
 aggregate gain with no regression.
 
 Milestone acceptance repeated the complete 18-lane player-contract gate with
 18 passes and zero skips, failures, blocks, or timeouts. The dedicated network
 gate kept all 39 lockstep cases through cycle 1,800 and completed real
 two-process startup, map transfer, 180 rendered cycles, and terminal hash
-`1b9dd8ad7b9a1f51`. The matched-media suite accounted for all 2,823 tests; the
-local profile with three private playtest-save referees ran 2,799 with 24 exact
-skips and retained the exact 110 expected specification failures. Pack parity
-also passed all eight structural checks, including the authenticated classic
-33-track order.
+`1b9dd8ad7b9a1f51`. The matched exact-BNE-media suite accounted for all 2,825
+tests; the named BNE profile with three private playtest-save referees ran
+2,795 with 30 exact release-format skips and retained the exact 110 expected
+specification failures. Pack parity passed all eight structural checks against
+the source archive whose SHA-256 is sealed in the signed pack, including all 20
+music tracks with a worst decoded comparison of 22.2 dB.
 
 The next shared-boundary blocker is expansion Human 12 at 268. Expansion Orc 6
 follows at 274, Human 13 at 278, expansion Orc 11 at 282, expansion Orc 8 at

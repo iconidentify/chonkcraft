@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2823 tests,   27 skipped
-    no external input          2823 tests, 1205 skipped
+    authenticated inputs       2825 tests,   27 skipped
+    no external input          2825 tests, 1205 skipped
 
 Both can be green.
 
@@ -237,6 +237,28 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "matchmaking": (2, 0),
         "engine": (1904, 4),
         "desktop": (357, 8),
+        "matchmaker-server": (5, 1),
+    },
+    # The exact authenticated Battle.net Edition source archive, its matching
+    # signed pack, the Opus references and all three private playtest saves.
+    # This is deliberately separate from the classic-install profiles above:
+    # BNE's CD filesystem stores game data in SUPPORT/TOMES instead of a loose
+    # DATA directory and does not install the classic ALAMO.PUD fixture beside
+    # the game. Those release-format facts account for AssetSourceSeamTest's
+    # two, RealButtonPanelTest's seven, and CdMusicTest's one skip. The remaining
+    # two engine skips are fixture predicates that BNE's own unit declarations
+    # do not satisfy. Conversely, BNE's pack runs two desktop checks that the
+    # classic pack cannot. The data module's three are the BNE data-only CUE's
+    # two CD-audio checks and the absent legacy archive 5000 check.
+    "full-bne-with-playtest-saves": {
+        "assetpack": (256, 5),
+        "runtime": (99, 3),
+        "data": (139, 3),
+        "extractor": (9, 0),
+        "launcher": (49, 0),
+        "matchmaking": (2, 0),
+        "engine": (1909, 12),
+        "desktop": (357, 6),
         "matchmaker-server": (5, 1),
     },
 }

@@ -38,15 +38,17 @@ public final class UnitTypeCatalog {
      * a mechanical explosion merely because they are airborne.
      */
     private void applyBattleNetDeathEffects() {
-        // Retail BNE points both land-unit race families at native corpse type
-        // 105. Type 106 remains present in the table, but is not the CorpseType
-        // of the orc infantry/cavalry entries represented by the legacy orc
-        // body alias. This is visible without relying on art or names: across
-        // the sealed 52-case campaign corpus every one of 77 witnessed corpse
-        // transitions becomes type 105, including all 31 witnesses from orc
-        // types 1, 7 and 9; none becomes 106.
+        // Retail BNE points every witnessed mobile-unit corpse family at
+        // native type 105. Type 106 remains present in the table, but is not
+        // the CorpseType represented by either legacy alternate-body alias.
+        // This is visible without relying on art or names: across the sealed
+        // 52-case campaign corpus all 77 witnessed land transitions become
+        // type 105, including 31 from orc types 1, 7 and 9. Fourteen more
+        // transitions from both destroyer factions, battleships and
+        // juggernaughts also become 105; none becomes a distinct sea body.
         for (UnitType type : types.values()) {
-            if ("unit-orc-dead-body".equals(type.corpse())) {
+            if ("unit-orc-dead-body".equals(type.corpse())
+                    || "unit-dead-sea-body".equals(type.corpse())) {
                 type.setCorpse("unit-human-dead-body");
             }
         }

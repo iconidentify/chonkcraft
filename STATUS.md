@@ -27,7 +27,7 @@ legacy identities prevent attributing the later difference to either its older
 
 ## Measured Battle.net Edition parity
 
-The current public release has been compared with Warcraft II: Battle.net
+The current accepted source has been compared with Warcraft II: Battle.net
 Edition 2.02b across the complete 52-map authenticated campaign fleet:
 
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
@@ -35,11 +35,24 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **29/52 maps are exact through the full 400-cycle window**, with 23 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,777 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,779 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  34,989; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  34,991; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The unified-corpse milestone advances expansion Orc 11 from exact through
+  cycle 281 to exact through 283. All 14 authenticated naval deaths in the
+  sealed fleet become native raw type 105, covering human and orc destroyers,
+  a battleship, and an ogre juggernaught across three campaigns; the existing
+  77 authenticated land deaths use the same raw type. Java now normalizes the
+  legacy sea-body alias onto the same generated corpse definition as the
+  existing orc-body alias. Destroyed buildings keep their sized rubble,
+  balloons and zeppelins still leave no corpse, and all other 51 maps remain
+  unchanged. Both aggregate fleets gain two cycles without changing the shared
+  horizon or clean-map counts. Durable cycle-400 receipt `83be37f2` and accepted
+  cycle-1,800 receipt `41c1d87e` bind engine input `b5287494` and replayable
+  source capsule `157f3535`. The rule has no map, unit, cycle, or coordinate
+  exception.
 - The consumed depot-tail milestone advances expansion Human 5 from exact
   through cycle 287 to exact through 322 and expansion Human 11 from 310 to
   319. When a laden land worker has already consumed a route and reaches a
@@ -186,11 +199,14 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,823 tests**. The canonical hosted
-authenticated profile runs 2,796 and intentionally skips exactly 27. A local
-profile with the three private playtest-save referees installed runs 2,799 and
-skips exactly 24. Both retain the exact expected 110-test
-specification-failure set. With no licensed inputs, 1,618 tests run, 1,205 skip,
+The complete suite now contains **2,825 tests**. The canonical hosted
+authenticated profile runs 2,798 and intentionally skips exactly 27. A local
+classic-install profile with the three private playtest-save referees installed
+runs 2,801 and skips exactly 24. The exact BNE-source profile used for the
+current milestone runs 2,795 and skips exactly 30; its release-format-specific
+skip identities are recorded separately rather than weakening either classic
+profile. All retain the exact expected 110-test specification-failure set.
+With no licensed inputs, 1,620 tests run, 1,205 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -215,7 +231,12 @@ through cycle 1,800, and a real two-process 180-cycle match with terminal hash
 matched-input profile at 2,799 run and exactly 24 skips, including its three
 new authenticated sequence referees, with the same exact 110 expected failure
 identities. It then repeated all 18 playability lanes and the clean/adverse
-network checks without a regression.
+network checks without a regression. The unified-corpse candidate repeated
+that acceptance sequence: 18/18 playability lanes, 39/39 clean/adverse lockstep
+cases through cycle 1,800, a real two-process 180-cycle match at hash
+`1b9dd8ad7b9a1f51`, 8/8 exact BNE pack-parity checks, all 2,825 suite tests
+accounted for under the 30-skip BNE profile, and the same 110 expected failure
+identities.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

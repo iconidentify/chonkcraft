@@ -60,6 +60,34 @@ class CorpseTest {
     }
 
     @Test
+    @DisplayName("BNE uses its type-105 body for both naval race families")
+    void generatedNavalUnitsUseTheRetailUnifiedCorpseType() {
+        UnitTypeCatalog catalog = UnitTypeCatalog.generated(
+                AnimationCatalog.generated());
+        // The sealed corpus directly witnesses each of these four classes,
+        // spanning both destroyer factions and both capital-ship factions.
+        for (String ident : List.of("unit-human-destroyer", "unit-orc-destroyer",
+                "unit-battleship", "unit-ogre-juggernaught")) {
+            assertEquals("unit-human-dead-body",
+                    catalog.types().get(ident).corpse(), ident);
+        }
+    }
+
+    @Test
+    @DisplayName("unified mobile corpses do not change other death families")
+    void generatedUnifiedCorpsesLeaveHeldOutDeathFamiliesAlone() {
+        UnitTypeCatalog catalog = UnitTypeCatalog.generated(
+                AnimationCatalog.generated());
+
+        assertEquals("unit-destroyed-2x2-place",
+                catalog.types().get("unit-human-guard-tower").corpse());
+        assertEquals("unit-destroyed-3x3-place",
+                catalog.types().get("unit-human-barracks").corpse());
+        assertEquals("", catalog.types().get("unit-balloon").corpse());
+        assertEquals("", catalog.types().get("unit-zeppelin").corpse());
+    }
+
+    @Test
     @DisplayName("BNE infantry bodies hold four visible decay intervals")
     void generatedInfantryBodiesUseTheRetailDecayProgram() {
         AnimationCatalog catalog = AnimationCatalog.generated();
