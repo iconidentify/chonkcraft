@@ -167,10 +167,13 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The queued-return convoy batch adds two pack-backed campaign route
         # witnesses. They run in authenticated profiles and deliberately add
         # two skips here.
+        # The saturated fresh laden-return batch adds two more pack-backed
+        # campaign witnesses. They run in authenticated profiles and
+        # deliberately add two skips here.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1911, 881),
+        "engine": (1913, 883),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -224,7 +227,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1911, 7),
+        "engine": (1913, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (357, 8),
@@ -241,7 +244,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1911, 4),
+        "engine": (1913, 4),
         "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },
@@ -263,7 +266,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1916, 12),
+        "engine": (1918, 12),
         "desktop": (357, 6),
         "matchmaker-server": (5, 1),
     },
