@@ -35,11 +35,25 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **30/52 maps are exact through the full 400-cycle window**, with 22 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,910 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,913 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  35,175; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,178; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The plain-Move refusal-replacement milestone advances Human 13 from exact
+  through cycle 277 to 280. When a terrain-only plain-Move buffer refuses a
+  later byte, its next route generation plans through allied plain-Move bodies
+  that are actively draining a collision-free route, while settled or collided
+  allies remain solid. That replacement generation cannot invoke the initial
+  terrain-line writer again. Human 13's eastern and southern ogres independently
+  authenticate `[NW,NE]` and `[NW,NE,NW,W]` replacement routes after different
+  refused buffers. Their initial full terrain lines, a sibling's occupied-face
+  detour, and the existing non-cooperative residual rule remain unchanged. All
+  other 51 maps are unchanged, so both aggregate fleets gain three cycles with
+  no change to the shared horizon or clean-map counts. Durable cycle-400 run
+  `592e8de8` and accepted cycle-1,800 run `152de1e7` bind engine input
+  `b9bfdd8a` and replayable source capsule `f53764f9`. The rule has no map,
+  unit, cycle, coordinate, or faction exception.
 - The laden-return timer-one milestone advances expansion Human 7 from exact
   through cycle 285 to 302 and Orc 5 from 288 to 453. When a worker's paid
   cooperative return wait reaches timer one and its cached next square has
@@ -278,6 +292,11 @@ checks, all 2,830 suite tests accounted for with 2,800 run and 30 exact BNE
 skips, and the same 110 expected failure identities. The separately measured
 data-free profile ran 1,622 tests, intentionally skipped 1,208, and retained
 the same 89 expected failure identities.
+The plain-Move refusal-replacement candidate repeated the complete applicable
+sequence: 18/18 playability lanes, 39/39 clean/adverse lockstep cases through
+cycle 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-
+parity checks, all 2,830 suite tests accounted for with 2,800 run and 30 exact
+BNE skips, and the same 110 expected failure identities.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

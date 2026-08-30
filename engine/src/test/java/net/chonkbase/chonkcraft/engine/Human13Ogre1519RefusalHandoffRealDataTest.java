@@ -221,7 +221,7 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        for (int fixture = 1; fixture <= 268; fixture++) {
+        for (int fixture = 1; fixture <= 278; fixture++) {
             mission.tick();
             if (fixture == 252) {
                 assertEquals(123, heldOut.tileX());
@@ -254,6 +254,10 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
                 assertEquals(121, eastern.tileX());
                 assertEquals(28, eastern.tileY(),
                         "the next visit replans and commits north-west");
+                assertEquals(1, eastern.pathLength(),
+                        "the native replacement leaves only north-east");
+                assertEquals(Direction.fromDelta(1, -1),
+                        eastern.peekHeading());
             } else if (fixture == 267) {
                 assertEquals(123, southern.tileX(),
                         "the southern witness also refuses its second byte");
@@ -262,6 +266,19 @@ class Human13Ogre1519RefusalHandoffRealDataTest {
                 assertEquals(122, southern.tileX());
                 assertEquals(29, southern.tileY(),
                         "the southern witness replans north-west on 268");
+                assertEquals(3, southern.pathLength(),
+                        "the replacement retains north-east,north-west,west");
+                assertEquals(Direction.fromDelta(1, -1),
+                        southern.peekHeading());
+                assertEquals(Direction.fromDelta(-1, -1),
+                        southern.peekHeadingAtDepth(1));
+                assertEquals(Direction.fromDelta(-1, 0),
+                        southern.peekHeadingAtDepth(2));
+            } else if (fixture == 278) {
+                assertEquals(122, eastern.tileX(),
+                        "the cached north-east replacement commits on 278");
+                assertEquals(27, eastern.tileY(),
+                        "the replacement must not wait behind the settled ally");
             }
         }
     }

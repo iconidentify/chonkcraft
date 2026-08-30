@@ -687,6 +687,8 @@ final class BattleNetMovementSystem {
                 unit.setOrder(Unit.Order.STILL);
                 return;
             }
+            boolean plainMoveRefusalReplacement = unit.moveRange() == 0
+                    && unit.battleNetPlainMoveRefusalReplacement();
             PathFinder.Path path = unit.moveRange() == 0
                     ? world.findBattleNetPointPath(unit, toX, toY)
                     : world.pathFinder.find(unit.tileX(), unit.tileY(),
@@ -708,6 +710,10 @@ final class BattleNetMovementSystem {
                     path = wall;
                 }
             }
+            // The native replacement view belongs to one route generation.
+            // Consume it even when that generation reaches or fails so it
+            // cannot leak into a widened range probe or a later order.
+            unit.setBattleNetPlainMoveRefusalReplacement(false);
             switch (path.result()) {
                 case REACHED -> {
                     resetDisplacement(unit);
@@ -897,6 +903,7 @@ final class BattleNetMovementSystem {
                     // their independently authenticated planning.
                     if (unit.pathLength() > 0
                             && !unit.battleNetBorrowedMoveForStep()
+                            && !plainMoveRefusalReplacement
                             && (unit.battleNetCollisionCounter() > 0
                                     || unit.battleNetRefusals() > 0)) {
                         int lineFirst = BattleNetPathFinder.firstLineHeading(
@@ -7668,6 +7675,7 @@ final class BattleNetMovementSystem {
                             // it must not enter the residual free-compass arm
                             // that belongs to an occupancy-planned detour.
                             battleNetRefuse(unit);
+                            unit.setBattleNetPlainMoveRefusalReplacement(true);
                             unit.setRouteSpent(false);
                             unit.setWaitCycles(0);
                             unit.setBattleNetOrderDelay(0);

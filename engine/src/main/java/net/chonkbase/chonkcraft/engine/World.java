@@ -6070,6 +6070,7 @@ public final class World {
             }
             boolean queuedRegroupConstruction = false;
             boolean behaviorSixCapitalPatrolThroughMovingHull = false;
+            boolean plainMoveRefusalThroughMovingAlly = false;
             if (isAllied(unit.player(), candidate.player())) {
                 queuedRegroupConstruction = !candidate.isMoving()
                         && candidate.battleNetAiBehavior() == 1
@@ -6118,6 +6119,32 @@ public final class World {
                         && candidate.type() != null
                         && candidate.type().seaUnit()
                         && candidate.isMoving();
+                boolean ordinaryMoveAllySoft =
+                        movement.battleNetSoftClearMoveAlly(candidate);
+                boolean pendingLandAssaultYieldsToWood = movement
+                        .battleNetPendingLandAssaultYieldsToWood(
+                                unit, candidate);
+                // A terrain-only plain-Move buffer that refuses a later byte
+                // returns through the occupancy planner once. Native removes
+                // an allied plain-Move body which is actively draining a
+                // collision-free route from both its traversal and shortcut
+                // views. Settled/collided allies remain walls. Human 13's
+                // eastern and southern ogres independently replace their
+                // refused rays this way; their initial rays and the sibling
+                // whose first line square is occupied retain the normal view.
+                plainMoveRefusalThroughMovingAlly =
+                        unit.order() == Unit.Order.MOVE
+                        && !unit.battleNetBorrowedMoveForStep()
+                        && unit.pathLength() == 0
+                        && unit.battleNetPlainMoveRefusalReplacement()
+                        && candidate.type() != null
+                        && !candidate.type().building()
+                        && candidate.order() == Unit.Order.MOVE
+                        && candidate.isMoving()
+                        && candidate.pathLength() > 0
+                        && candidate.battleNetCollisionCounter() == 0
+                        && !ordinaryMoveAllySoft
+                        && !pendingLandAssaultYieldsToWood;
                 // The recurring behavior-one regroup planner draws through a
                 // moving worker even when that worker still owns a collision
                 // nibble. Execution remains hard: XHuman 12 axethrower 1359
@@ -6139,9 +6166,9 @@ public final class World {
                         || (!regroupThroughMovingWorker
                                 && !assaultPatrolThroughMidstrideWorker
                                 && !behaviorSixCapitalPatrolThroughMovingHull
-                                && !movement.battleNetSoftClearMoveAlly(candidate)
-                        && !movement.battleNetPendingLandAssaultYieldsToWood(
-                                unit, candidate))) {
+                                && !plainMoveRefusalThroughMovingAlly
+                                && !ordinaryMoveAllySoft
+                                && !pendingLandAssaultYieldsToWood)) {
                     continue;
                 }
             } else if (!hostilesStandAside || candidate.type().building()) {
@@ -6171,7 +6198,8 @@ public final class World {
             // behind collision one and Move 15. Treating destroyer 1570 as
             // an optimizer wall chooses the free northeast bypass instead.
             if (!queuedRegroupConstruction
-                    && !behaviorSixCapitalPatrolThroughMovingHull) {
+                    && !behaviorSixCapitalPatrolThroughMovingHull
+                    && !plainMoveRefusalThroughMovingAlly) {
                 optimizerBlockers.add(candidate);
             }
         }

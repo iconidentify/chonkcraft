@@ -15,7 +15,52 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30
+## Current release checkpoint — 2026-08-30 (plain-Move refusal replacement)
+
+Accepted cycle-1,800 run `152de1e7` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `592e8de8` retains 30 clean / 22 divergent / 0 failed. Aggregate
+per-map frontiers are 18,913 at cycle 400 and 35,178 at cycle 1,800. Human 13
+advances from exact through 277 to 280; every other map is unchanged. The
+receipts are retained under
+`.bne-artifacts/runs/592e8de8fbcdf07e7c2fb991e0782ed034f801c27029b6d2ffe20b32fc6fab8b`
+and
+`.bne-artifacts/runs/152de1e7236d7f4e33e43a681901b15b8847059c7d174e268c5ff71b9035b5ed`.
+Both bind dirty engine-input identity `b9bfdd8a` at base revision `a9c6a91c`
+to replayable source capsule `f53764f9`.
+
+Behavioral delta: after a terrain-only plain-Move buffer refuses a later byte,
+its immediate replacement route temporarily removes an allied, non-building
+plain-Move body from both path views only while that ally is actively moving,
+still has a route, and has collision zero. Settled or collided allies remain
+solid, and the one-shot provenance prevents the replacement from re-entering
+the initial terrain-only line writer. The rule is structural and contains no
+map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: Human 13's eastern ogre stores eleven north bytes, refuses the
+second, and replaces them with `[NW,NE]`; its southern ogre independently
+refuses the second byte of a nine-byte line and replaces it with
+`[NW,NE,NW,W]`. The actively walking allied grunt is absent from the replacement
+view while the settled collision-bearing ogre remains a wall. The witnesses'
+initial full terrain lines and the sibling ogre's occupied-first-face
+`[N,NW,W]` detour remain held-out negatives, and the existing non-cooperative
+residual free-compass referee is green. The focused comparison advances Human
+13's next divergence from 278 to 281; both complete fleets gain three aggregate
+cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks, including all 20 music tracks with a worst decoded comparison of 22.2
+dB. The matched BNE-media suite accounts for 2,830 tests: 2,800 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Expansion Orc 6 follows at 274; Human 13 and expansion Human 4 are tied at 281,
+then Human 7 at 282, expansion Orc 11 at 284, and Orc 8 at 289.
+
+## Prior release checkpoint — 2026-08-30 (laden-return timer-one)
 
 Accepted cycle-1,800 run `8a25ffb7` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

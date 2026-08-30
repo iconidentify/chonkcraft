@@ -2865,6 +2865,17 @@ public final class Unit {
 
     private boolean battleNetPlainMoveDirectLine;
 
+    /** The next plain-Move route replaces a refused terrain-only buffer. */
+    public boolean battleNetPlainMoveRefusalReplacement() {
+        return battleNetPlainMoveRefusalReplacement;
+    }
+
+    public void setBattleNetPlainMoveRefusalReplacement(boolean replacement) {
+        battleNetPlainMoveRefusalReplacement = replacement;
+    }
+
+    private boolean battleNetPlainMoveRefusalReplacement;
+
     /**
      * Multi-step leftover residual opened Attack at post-OP0; the next melee
      * OP10 may land damage without a presentation pend (Human 13 ogre 1510).
@@ -4333,6 +4344,7 @@ public final class Unit {
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
         this.battleNetPlainMoveDirectLine = false;
+        this.battleNetPlainMoveRefusalReplacement = false;
     }
 
     public void clearPath() {
@@ -4348,6 +4360,7 @@ public final class Unit {
         this.battleNetWoodRouteIndex20 = false;
         this.battleNetMoveFreeDetourPending = false;
         this.battleNetPlainMoveDirectLine = false;
+        this.battleNetPlainMoveRefusalReplacement = false;
     }
 
     /**
