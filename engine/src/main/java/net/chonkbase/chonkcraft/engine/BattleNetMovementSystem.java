@@ -3263,21 +3263,29 @@ final class BattleNetMovementSystem {
                 && unit.returnDepotGoal() != null) {
             int[] refreshedDepotEdge = world.battleNetDepotEntryPoint(
                     unit, unit.returnDepotGoal());
-            boolean lateralTwoByteDepotReaim = unit.pathLength() == 2
+            boolean lateralDepotReaimTail =
+                    (unit.pathLength() == 1
+                            && unit.peekHeading()
+                                    == Direction.fromDelta(-1, -1))
+                    || (unit.pathLength() == 2
+                            && unit.peekHeading()
+                                    == Direction.fromDelta(0, -1));
+            boolean lateralDepotReaim = lateralDepotReaimTail
                     && unit.battleNetCollisionCounter() == 0
                     && unit.lastStepHeading()
                             == Direction.fromDelta(1, -1)
-                    && unit.peekHeading() == Direction.fromDelta(0, -1)
                     && refreshedDepotEdge[1] == unit.orderTargetY()
                     && Math.abs(refreshedDepotEdge[0]
                             - unit.orderTargetX()) == 2;
-            if (lateralTwoByteDepotReaim) {
+            if (lateralDepotReaim) {
                 // This is the retained-tail footprint handoff proved by the
                 // sealed XHuman 12 route, not a rule for every nearest-edge
                 // change. The NE residual crosses a four-wide hall's lateral
-                // midpoint while two cached bytes remain; native publishes
-                // the opposite edge, parks the old N,NW tail at cursor twenty
-                // with collision one, and redraws on the following visit.
+                // midpoint with the cached NW tail still live; native
+                // publishes the opposite edge, parks that tail at cursor
+                // twenty with collision one, and redraws on the following
+                // visit. The two-byte N,NW form is retained for callers that
+                // have not passed through the convoy-transparent route view.
                 // Other gold carriers keep their cached route when their edge
                 // drifts by one cell or under a different residual shape.
                 unit.setOrderTarget(

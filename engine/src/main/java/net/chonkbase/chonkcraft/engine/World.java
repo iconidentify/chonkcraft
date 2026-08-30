@@ -6769,12 +6769,14 @@ public final class World {
             Unit keepSpecificMovingAllyHard) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> reservedMoveBodies = new ArrayList<>();
+        java.util.List<Unit> transparentQueuedReturners = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         for (Unit candidate : units) {
             if (candidate == unit || candidate == target
                     || !candidate.isOnMap() || candidate.isDying()) {
                 continue;
             }
+            boolean queuedReturnBehindCollidedRayBlocker = false;
             if (isAllied(unit.player(), candidate.player())) {
                 if (keepMovingAlliesHard
                         || candidate == keepSpecificMovingAllyHard) {
@@ -6792,6 +6794,10 @@ public final class World {
                         unit.tileX(), unit.tileY(),
                         directGoalX, directGoalY);
                 int directStride = battleNetMovementStride(unit);
+                queuedReturnBehindCollidedRayBlocker =
+                        battleNetQueuedReturnBehindCollidedRayBlocker(
+                                unit, target, candidate,
+                                directGoalX, directGoalY);
                 boolean retainedLongPressureRayBlocker =
                         settledResidualRetarget
                         && target.type() != null
@@ -6971,7 +6977,8 @@ public final class World {
                 // 0x450690 may cross a friendly unit whose Move sequence has
                 // already begun. Attack-sequence chasers keep hard occupancy
                 // (XHuman 12 residual replan east wall-follow).
-                if (!movement.battleNetSoftClearMoveAlly(candidate)
+                if (!queuedReturnBehindCollidedRayBlocker
+                        && !movement.battleNetSoftClearMoveAlly(candidate)
                         && !paidBandSoft) {
                     continue;
                 }
@@ -6987,6 +6994,9 @@ public final class World {
             }
             setMovementFieldFlags(candidate, false);
             softBlockers.add(candidate);
+            if (queuedReturnBehindCollidedRayBlocker) {
+                transparentQueuedReturners.add(candidate);
+            }
             if (movement.battleNetArmedDrainedMoveAlly(candidate)) {
                 reservedMoveBodies.add(candidate);
             }
@@ -7043,7 +7053,8 @@ public final class World {
             // 19 without it, so it stays until that rule is found.
             for (int i = softBlockers.size() - 1; i >= 0; i--) {
                 Unit ally = softBlockers.get(i);
-                if (settledResidualRetarget
+                if (transparentQueuedReturners.contains(ally)
+                        || settledResidualRetarget
                         || battleNetPaidEmptySharedWallMoveAlly(
                                 unit, target, ally)
                         || !battleNetApproachCorridorHardAlly(
@@ -7064,7 +7075,9 @@ public final class World {
             java.util.List<Unit> optimizationSoftBlockers =
                     softBlockers.stream()
                             .filter(candidate ->
-                                    !reservedMoveBodies.contains(candidate))
+                                    !reservedMoveBodies.contains(candidate)
+                                    && !transparentQueuedReturners
+                                            .contains(candidate))
                             .toList();
 
             // A live movable goal is not an ordinary wall to BNE's router.
@@ -7504,6 +7517,70 @@ public final class World {
             Unit unit, Unit target, Unit blocker) {
         return battleNetQueuedLandReturnBlocker(
                 unit, target, blocker, false);
+    }
+
+    /**
+     * A queued returner behind a collided convoy head is absent from both
+     * native route views.
+     *
+     * <p>The distinction is positional rather than map-specific. A surfaced
+     * worker remains a promised-but-current blocker when it is the first
+     * occupied byte on an otherwise clear depot ray. If the preceding ray
+     * byte already contains a stopped, collision-bearing returner for the
+     * same hall, the queued body immediately behind that convoy head is
+     * transparent to both traversal and wall optimization. XOrc 6 slots
+     * 1515/1516/1517 therefore write NW,NE at fixture 252, and XHuman 12
+     * slots 1554/1550/1552 write NE,NW at fixture 225. XHuman 10's direct
+     * surfaced blocker and XOrc 12's later blocker on a clear ray retain the
+     * collision-prefix behavior below.</p>
+     */
+    private boolean battleNetQueuedReturnBehindCollidedRayBlocker(
+            Unit unit, Unit target, Unit candidate,
+            int goalX, int goalY) {
+        if (unit == null || target == null || candidate == null
+                || unit.type() == null || !unit.type().landUnit()
+                || battleNetMovementStride(unit) != 1
+                || !unit.returningToDepot() || unit.carried() <= 0
+                || unit.carrying() != UnitType.Resource.GOLD
+                || target.type() == null
+                || !target.type().storesResource(UnitType.Resource.GOLD)
+                || !battleNetQueuedLandReturnBlocker(
+                        unit, target, candidate)) {
+            return false;
+        }
+        int x = unit.tileX();
+        int y = unit.tileY();
+        Unit previousRayBlocker = null;
+        while (x != goalX || y != goalY) {
+            int heading = battleNetFirstBresenhamHeading(
+                    x, y, goalX, goalY);
+            if (heading < 0 || heading >= Direction.COUNT) {
+                return false;
+            }
+            x += Direction.deltaX(heading);
+            y += Direction.deltaY(heading);
+            if (candidate.tileX() == x && candidate.tileY() == y) {
+                return previousRayBlocker != null
+                        && previousRayBlocker != candidate
+                        && previousRayBlocker.type() != null
+                        && previousRayBlocker.type().landUnit()
+                        && !previousRayBlocker.type().building()
+                        && isAllied(unit.player(),
+                                previousRayBlocker.player())
+                        && previousRayBlocker.returningToDepot()
+                        && previousRayBlocker.carried() > 0
+                        && previousRayBlocker.carrying()
+                                == UnitType.Resource.GOLD
+                        && previousRayBlocker.returnDepotGoal() == target
+                        && previousRayBlocker.order() == Unit.Order.HARVEST
+                        && !previousRayBlocker.isMoving()
+                        && previousRayBlocker.pathLength() == 0
+                        && previousRayBlocker
+                                .battleNetCollisionCounter() > 0;
+            }
+            previousRayBlocker = blockerOnLayer(unit, x, y);
+        }
+        return false;
     }
 
     private boolean battleNetQueuedLandReturnBlocker(

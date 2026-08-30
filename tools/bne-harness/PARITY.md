@@ -15,7 +15,49 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (plain-Move refusal replacement)
+## Current release checkpoint — 2026-08-30 (queued-return convoy route)
+
+Accepted cycle-1,800 run `3fbd5a8c` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `bd3e9f5e` retains 30 clean / 22 divergent / 0 failed. Aggregate
+per-map frontiers are 18,924 at cycle 400 and 35,189 at cycle 1,800. Expansion
+Orc 6 advances from exact through cycle 273 to 284; every other map frontier is
+unchanged. The receipts are retained under
+`.bne-artifacts/runs/bd3e9f5ebb4acfe1de15a39ee07cb615ba96fd3db41eff29da4f9f0011701925`
+and
+`.bne-artifacts/runs/3fbd5a8c0dd80ba5260fee49363fb4fb744fb0fd143376383294bde513b14386`.
+Both bind dirty engine-input identity `897305ed` at base revision `0b6eb4ee`
+to replayable source capsule `628f6044`.
+
+Behavioral delta: on a laden land worker's direct depot ray, a collision-free
+queued same-depot gold returner is absent from both native path views when the
+preceding ray square already contains a stopped, collision-bearing same-depot
+returner. A queued worker that is the first obstruction, or one reached later
+on an otherwise clear ray, remains solid. The rule is structural and contains
+no map, unit, cycle, coordinate, or faction exception.
+
+Proof delta: expansion Orc 6 slots 1515/1516/1517 write `[NW,NE]` at fixture
+252 and consume the northeast tail at 274; expansion Human 12 slots
+1554/1550/1552 independently write `[NE,NW]` at fixture 225. The latter also
+authenticates native tail invalidation and the opposite hall-edge retarget at
+247, followed by the north redraw at 248. Expansion Human 10's direct first
+queued blocker, expansion Orc 12's later clear-ray blocker, and the existing
+laden paid-wake cases are held-out negatives. The complete fleets gain eleven
+aggregate cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks, including all 20 music tracks with a worst decoded comparison of 22.2
+dB. The matched BNE-media suite accounts for 2,832 tests: 2,802 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Human 13 and expansion Human 4 follow at 281, Human 7 at 282, expansion Orc 11
+at 284, expansion Orc 6 at 285, and Orc 8 at 289.
+
+## Prior release checkpoint — 2026-08-30 (plain-Move refusal replacement)
 
 Accepted cycle-1,800 run `152de1e7` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

@@ -35,11 +35,26 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
   now defines that boundary; expansion Human 11 is exact through cycle 319.
 - **30/52 maps are exact through the full 400-cycle window**, with 22 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,913 cycles; no map moved backward.
+  frontiers, capped at 400, is 18,924 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  35,178; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,189; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The queued-return convoy milestone advances expansion Orc 6 from exact
+  through cycle 273 to 284. A collision-free queued gold returner immediately
+  behind a stopped collision-bearing same-depot returner on the direct depot
+  ray is transparent to both route traversal and wall optimization. Expansion
+  Orc 6 and expansion Human 12 independently authenticate the resulting
+  two-diagonal routes with opposite opening headings. A queued returner as the
+  first obstruction, a later queued returner on an otherwise clear ray, and
+  blocked or vacated paid-wake cases retain their prior behavior. Expansion
+  Human 12 also proves the retained tail is invalidated when its nearest hall
+  edge changes, preserving the native cycle-247 retarget and cycle-248 redraw.
+  All other 51 fleet frontiers are unchanged, so both aggregates gain eleven
+  cycles without changing the shared horizon or clean-map counts. Durable
+  cycle-400 run `bd3e9f5e` and accepted cycle-1,800 run `3fbd5a8c` bind engine
+  input `897305ed` and replayable source capsule `628f6044`. The rule has no
+  map, unit, cycle, coordinate, or faction exception.
 - The plain-Move refusal-replacement milestone advances Human 13 from exact
   through cycle 277 to 280. When a terrain-only plain-Move buffer refuses a
   later byte, its next route generation plans through allied plain-Move bodies
@@ -242,14 +257,14 @@ orders, economy, construction, combat, projectiles, naval oil, spells, retail
 AI, campaign triggers, save/load, rendering and input, sound, control liveness,
 and clean/adverse network lockstep.
 
-The complete suite now contains **2,830 tests**. The canonical hosted
-authenticated profile runs 2,803 and intentionally skips exactly 27. A local
+The complete suite now contains **2,832 tests**. The canonical hosted
+authenticated profile runs 2,805 and intentionally skips exactly 27. A local
 classic-install profile with the three private playtest-save referees installed
-runs 2,806 and skips exactly 24. The exact BNE-source profile used for the
-current milestone runs 2,800 and skips exactly 30; its release-format-specific
+runs 2,808 and skips exactly 24. The exact BNE-source profile used for the
+current milestone runs 2,802 and skips exactly 30; its release-format-specific
 skip identities are recorded separately rather than weakening either classic
 profile. All retain the exact expected 110-test specification-failure set.
-With no licensed inputs, 1,622 tests run, 1,208 skip,
+With no licensed inputs, 1,622 tests run, 1,210 skip,
 and the exact 89-test data-free failure set remains unchanged. The added
 boundary matrix proves that completed land, naval and air trainees survive
 save/resume without being born twice, while a fully blocked trainee remains
@@ -297,6 +312,11 @@ sequence: 18/18 playability lanes, 39/39 clean/adverse lockstep cases through
 cycle 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-
 parity checks, all 2,830 suite tests accounted for with 2,800 run and 30 exact
 BNE skips, and the same 110 expected failure identities.
+The queued-return convoy candidate repeated that complete sequence on its final
+code: 18/18 playability lanes, 39/39 clean/adverse lockstep cases through cycle
+1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
+checks, all 2,832 suite tests accounted for with 2,802 run and 30 exact BNE
+skips, and the same 110 expected failure identities.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.

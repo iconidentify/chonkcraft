@@ -498,7 +498,8 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
         // on the settle visit is one semantic cycle early.
         assertEquals(7, returningPeon.tileX());
         assertEquals(29, returningPeon.tileY());
-        assertEquals(2, returningPeon.pathLength());
+        assertEquals(1, returningPeon.pathLength(),
+                "the corrected native route retains only its northwest tail");
         assertEquals(0, returningPeon.battleNetCollisionCounter());
         assertEquals(6, returningPeon.orderTargetX());
         assertEquals(23, returningPeon.orderTargetY());

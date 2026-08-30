@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2830 tests,   27 skipped
-    no external input          2830 tests, 1208 skipped
+    authenticated inputs       2832 tests,   27 skipped
+    no external input          2832 tests, 1210 skipped
 
 Both can be green.
 
@@ -164,10 +164,13 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The laden-return timer-one batch adds three pack-backed campaign
         # sequence referees. They run in authenticated profiles and
         # deliberately join this profile's skip inventory.
+        # The queued-return convoy batch adds two pack-backed campaign route
+        # witnesses. They run in authenticated profiles and deliberately add
+        # two skips here.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1909, 879),
+        "engine": (1911, 881),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -221,7 +224,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1909, 7),
+        "engine": (1911, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (357, 8),
@@ -238,7 +241,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1909, 4),
+        "engine": (1911, 4),
         "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },
@@ -260,7 +263,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1914, 12),
+        "engine": (1916, 12),
         "desktop": (357, 6),
         "matchmaker-server": (5, 1),
     },
