@@ -2141,8 +2141,10 @@ final class BattleNetMovementSystem {
                     && (worker.pathLength() > 0
                             && worker.battleNetOrderDelay() > 0
                             || worker.pathLength() == 0
-                                    && worker.battleNetOrderDelay() == 0
-                                    && retainedTimer == 1)) {
+                                    && (worker.battleNetOrderDelay() > 0
+                                            && worker.battleNetRefusals() >= 8
+                                        || worker.battleNetOrderDelay() == 0
+                                            && retainedTimer == 1))) {
                 worker.setBattleNetSequenceOffset(retainedSequence);
                 worker.setBattleNetAnimationTimer(retainedTimer);
             }
@@ -5680,9 +5682,49 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetOrderDelay(0);
                             return;
                         }
+                        boolean saturatedFreshLadenReturnPark =
+                                unit.battleNetBorrowedMoveForStep()
+                                && unit.returningToDepot()
+                                && unit.carried() > 0
+                                && unit.type() != null
+                                && unit.type().moveType()
+                                        == UnitType.Movement.LAND
+                                && unit.battleNetRefusals() >= 8
+                                && unit.battleNetPathStepsTaken() == 0
+                                && unit.stepDrained() && !unit.isMoving()
+                                && unit.pathLength() > 0
+                                && world.battleNetCooperativeBlocker(
+                                        unit, movingBlocker);
                         int counter = unit.battleNetCollisionCounter() + 1;
                         unit.setBattleNetCollisionCounter(
                                 counter > 14 ? 0 : counter);
+                        if (saturatedFreshLadenReturnPark) {
+                            // Once a laden land return has completed the
+                            // eight-refusal ladder, an occupied first byte of
+                            // its fresh replacement is parked even when the
+                            // body would ordinarily earn a cooperative cached-
+                            // route wait. The full Move band still belongs to
+                            // this visit. XOrc 6 peasant 1516 independently
+                            // parks west- and north-led replacements; XHuman
+                            // 12 peon 1550 supplies an independent member of
+                            // the same saturated fresh-route rule. A route
+                            // with a consumed prefix remains live, as witnessed
+                            // by XHuman 10 peon 1588 and Human 14 peon 1539.
+                            battleNetRefuse(unit);
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(14);
+                            unit.setBattleNetRefusalHold(false);
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                                unit.setBattleNetAnimationTimer(15);
+                                unit.setBattleNetChaseStepReady(false);
+                            }
+                            return;
+                        }
                         // This first cooperative wait is a real visit to
                         // FUN_004379e0, so it also owns the sticky refusal
                         // nibble.  Keep the local collision count separate --
@@ -7778,6 +7820,9 @@ final class BattleNetMovementSystem {
                         && returnDepot != null && unit.pathLength() > 0;
                 if (ladenLandReturn && unit.distanceTo(returnDepot) > 2) {
                     boolean directReturnRay = unit.pathLength() == 1;
+                    boolean saturatedFreshReturnRoute =
+                            unit.battleNetRefusals() >= 8
+                            && unit.battleNetPathStepsTaken() == 0;
                     Unit queuedReturnBlocker = world.blockerOnLayer(
                             unit, nextX, nextY);
                     boolean queuedReturnHead =
@@ -7804,7 +7849,8 @@ final class BattleNetMovementSystem {
                     // band and first-steps north exactly as that sibling
                     // vacates. Other multi-heading hard blockers still redraw.
                     boolean directReturnRefusalBand = refusals >= 8
-                            && (directReturnRay || queuedReturnHead);
+                            && (directReturnRay || queuedReturnHead
+                                    || saturatedFreshReturnRoute);
                     unit.setBattleNetOrderDelay(
                             directReturnRefusalBand ? 14 : 0);
                     unit.setBattleNetRefusalHold(false);

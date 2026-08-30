@@ -1,5 +1,9 @@
 # Gameplay Reliability Update
 
+- Fixed loaded workers walking into a moving gold-return convoy after long
+  congestion. They now wait out the original Battle.net movement cadence and
+  replan when the route opens, while already-consumed return routes keep their
+  existing retry behavior.
 - Fixed a Battle.net-compatible woodcutting stall where a worker could choose
   a replacement tree whose only reachable side was occupied. Claimed-tree
   searches now continue to the next usable tree without changing ordinary or

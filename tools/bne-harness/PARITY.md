@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (unreachable-attack Still handoff)
+## Current release checkpoint — 2026-08-30 (saturated fresh laden-return route)
+
+Accepted cycle-1,800 run `eb371304` preserves the shared clean horizon at 267
+(earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable
+cycle-400 run `3f545407` raises the short-fleet count to 31 clean / 21
+divergent / 0 failed. Aggregate per-map frontiers are 19,056 at cycle 400 and
+35,441 at cycle 1,800. Expansion Orc 6 advances from exact through cycle 284
+to 520; every other map frontier is unchanged. The receipts are retained
+under
+`.bne-artifacts/runs/3f5454073df84d15d81d305f438c8d10430a7ac088b7e8b854ee224b76e60e6f`
+and
+`.bne-artifacts/runs/eb3713045a55f8d83174a300af781d4b28417657441e90519289197191151c6d`.
+Both bind dirty engine-input identity `1fc94920` at base revision `5c5b5d5a`
+to replayable source capsule `1d797910`.
+
+Behavioral delta: a loaded land worker that has reached at least eight sticky
+refusals may generate a fresh return route whose first step is occupied by a
+cooperating moving ally. Retail parks that unconsumed route at cursor 20,
+increments the sticky refusal, and pays Move 15..1 before replanning. Java now
+preserves the same empty-route Move sequence across the borrowed harvest walk
+and gives every saturated fresh return route the full hard-refusal band. The
+rule is structural and contains no map, unit, cycle, coordinate, or faction
+exception.
+
+Proof delta: expansion Orc 6's loaded peon 1516 independently generates
+`[W,W,NW,N,NE,E,SE]` at fixture 270 and `[N,N,N,N,NW]` at fixture 285. Their
+first headings are occupied by cooperating moving allies; native parks both at
+cursor 20 with refusals 9 and 10 respectively and Move timer 15, then steps
+north when the second blocker opens at fixture 300. Expansion Human 12's
+loaded peon 1550 separately parks fresh `[N,N,N,N,NW,N]` at fixture 253 with
+refusal 10 and Move timer 15 behind an ordinary moving ally. Expansion Human
+10 peon 1588 and Human 14 peon 1539 retain and retry consumed residual return
+routes, while expansion Orc 6's preceding queued-return convoy route remains
+intact. The focused expansion Orc 6 trace is exact through all 400 shared
+cycles. The complete short fleet gains 116 aggregate cycles and one clean map;
+the long fleet gains 236 aggregate cycles with zero regression.
+
+Milestone acceptance repeated all 18 player-contract lanes, all 39 clean and
+adverse lockstep cases through cycle 1,800, and a real two-process 180-cycle
+match with terminal hash `1b9dd8ad7b9a1f51`. Pack parity passed all eight
+checks, including all 20 music tracks with a worst decoded comparison of 22.2
+dB. The matched BNE-media suite accounts for 2,834 tests: 2,804 ran, 30
+release-format skips matched exactly, and the exact 110 expected specification
+failures were unchanged. The pinned 662,253,608-byte source archive and signed
+pack also passed the full 1,412-asset provenance and payload inventory.
+
+The next shared-boundary blocker remains expansion Human 12 at cycle 268.
+Human 13 and expansion Human 4 follow at 281, Human 7 at 282, Orc 8 at 289,
+Human 11 at 300, and expansion Orc 11 at 300.
+
+## Prior release checkpoint — 2026-08-30 (unreachable-attack Still handoff)
 
 Accepted cycle-1,800 run `950fd9d2` preserves the shared clean horizon at 267
 (earliest divergence 268), with 8 clean / 44 divergent / 0 failed. Durable

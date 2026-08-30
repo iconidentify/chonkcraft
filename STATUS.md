@@ -33,13 +33,29 @@ Edition 2.02b across the complete 52-map authenticated campaign fleet:
 - **52/52 maps are exact through cycle 267.** The lowest common divergence is
   cycle 268, so the shared proven frontier is cycle 267. Expansion Human 12
   now defines that boundary; expansion Human 11 is exact through cycle 319.
-- **30/52 maps are exact through the full 400-cycle window**, with 22 later
+- **31/52 maps are exact through the full 400-cycle window**, with 21 later
   divergences and no execution failures. The sum of all per-map exact
-  frontiers, capped at 400, is 18,940 cycles; no map moved backward.
+  frontiers, capped at 400, is 19,056 cycles; no map moved backward.
 - **8/52 maps are exact through the full 1,800-cycle window**, with 44 later
   divergences and no execution failures. Their all-map exact-frontier sum is
-  35,205; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
+  35,441; no map moved backward. The eight are Human 1, 2, and 9; Orc 1, 2,
   and 6; and expansion Orc 1 and 9.
+- The saturated fresh laden-return route milestone advances expansion Orc 6
+  from exact through cycle 284 to 520. After a loaded land worker has climbed
+  the sticky refusal ladder, a newly generated return route whose first step
+  is occupied by a cooperating moving ally now parks at route cursor 20 and
+  pays the native Move 15..1 band before replanning. Expansion Orc 6
+  authenticates two different fresh routes and blockers at cycles 270 and
+  285; expansion Human 12 independently authenticates the same park at cycle
+  253. Consumed residual return routes in expansion Human 10 and Human 14,
+  plus expansion Orc 6's preceding queued-return convoy route, retain their
+  distinct retry behavior. All other 51 fleet frontiers are unchanged. The
+  cycle-400 aggregate gains 116 cycles and one clean map; the cycle-1,800
+  aggregate gains 236 cycles without changing its clean count or shared
+  horizon. Durable cycle-400 run `3f545407` and accepted cycle-1,800 run
+  `eb371304` bind engine input `1fc94920` and replayable source capsule
+  `1d797910`. The rule has no map, unit, cycle, coordinate, or faction
+  exception.
 - The unreachable-attack Still-handoff milestone advances expansion Orc 11
   from exact through cycle 283 to 299. When a land attacker's fresh route is
   empty and the quarry is unreachable over terrain, retail's GiveOrder exit
@@ -337,6 +353,14 @@ The unreachable-attack Still-handoff candidate repeated that complete sequence:
 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-parity
 checks, all 2,832 suite tests accounted for with 2,802 run and 30 exact BNE
 skips, and the same 110 expected failure identities.
+The saturated fresh laden-return route candidate repeated that complete
+sequence: 18/18 playability lanes, 39/39 clean/adverse lockstep cases through
+cycle 1,800, the real two-process match at hash `1b9dd8ad7b9a1f51`, 8/8 pack-
+parity checks including all 20 music tracks at a worst 22.2 dB, all 2,834
+suite tests accounted for with 2,804 run and 30 exact BNE skips, and the same
+110 expected failure identities. The pinned original source and signed pack
+also passed the full 1,412-asset provenance and payload inventory with zero
+skips or failures.
 
 The next-level readiness inventory passes its present fail-closed executable
 checks while correctly remaining open for the incomplete proof lanes below.
