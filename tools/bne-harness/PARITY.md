@@ -15,7 +15,63 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-289 loaded tanker swept-corner refusal)
+## Current release checkpoint — 2026-08-30 (cycle-295 saturated progressive settlement)
+
+Accepted cycle-1,800 receipt `ee9944e8` advances the shared clean horizon from
+289 to 295 (earliest divergence 296), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,963, six more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/ee9944e8b7d2bb9c1a15f1d0853a9a9e313e47d5f782ff5453d7e163b6c2ec57`.
+It binds dirty engine-input identity `39782c11` at base revision `fba0491` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`93b439fc09e4ed93868f103911ee5ece141f3b66d07332644331457a6d38a91d`.
+
+Behavioral delta: the first refusal after a melee chaser consumes a saturated
+twenty-byte route can select a direct one-byte progressive refill while the
+unit is still draining the committed step's pixel residual. That refill now
+retains ownership through residual settlement. When its paid head then refuses,
+Java retires the refill's path and collision generation and enters the native
+active-order Still cadence: Attack `3,2,1`, repeatedly rearmed every three
+cycles while no strictly closer free neighbor exists. Ordinary one-step
+diagonal refills without this saturated-first-refusal provenance retain their
+existing completed Move band. The rule uses path saturation, refill provenance,
+residual lifecycle, refusal state, and live local geometry; it contains no map,
+fixture, coordinate, cycle, faction, or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt 1481 / Java 119 at `(30,41)` consumes a
+southwest one-byte refill on fixture 268 and drains its final pixels through
+fixture 283. Native settles on fixture 284 with no path, collision, or refusal
+generation and opens Attack `2539/3`; the cadence drains on 285 and 286, then
+reopens at timer three on fixtures 287 and 290. Java formerly promoted the
+generic completed Move `2482/15` and omitted those asynchronous idle draws.
+Restoring the fixture-284, -287, and -290 consumers aligns all three fixture-290
+melee rolls: native/Java damage becomes 8, 8, and 7, leaving grunt 1441 at 34
+HP, footman 1449 at 47 HP, and grunt 1495 at 28 HP. Grunt 1495 / Java 105 at
+fixture 174 is the held-out negative: its visually similar diagonal settlement
+lacks saturated-progressive ownership and correctly remains in Move `2482/15`.
+
+Efficacy receipt
+`.bne-test-efficacy/h290-first-saturated-progressive-settle/runs/236eea10d33969abdd05ee0404d54ba42fc0914c77552c25517269761f8af541`
+proves the expanded Human 12 regression fails on `fba0491` and passes on the
+candidate. The five focused collision/refill, saturated construction,
+three-cardinal terminator, retarget, and move/damage real-data classes pass,
+along with all 30 `bne_java.py` tests. The 52-case cycle-400 survey reports
+33 clean / 19 divergent / 0 failed, and both it and the cycle-1,800 survey pass
+their accepted regression gates. The executable next-level gate exits zero
+after 209 Python checks and 95 focused engine/desktop checks; its command
+worklist remains 11 comparable scenarios (6 exact / 5 divergent) without
+regression or infrastructure failure. The broader certification lanes remain
+intentionally incomplete.
+
+The newly exposed blocker remains expansion Human 12, now at fixture 296:
+native peon 1376 is at x=12 while Java is at x=13. The accepted compiler
+retains the focused paired position frame and routes the blocker to cadence
+analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-289 loaded tanker swept-corner refusal)
 
 Accepted cycle-1,800 receipt `2272220f` advances the shared clean horizon from
 288 to 289 (earliest divergence 290), preserves every campaign frontier, and

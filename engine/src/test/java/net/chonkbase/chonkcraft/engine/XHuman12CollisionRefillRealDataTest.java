@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -501,7 +502,15 @@ class XHuman12CollisionRefillRealDataTest {
         Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
         World world = mission.world();
         Unit grunt = unitById(world, 119);
+        Unit damagedGrunt = unitById(world, 159);
+        Unit damagedFootman = unitById(world, 151);
+        Unit westernGrunt = unitById(world, 105);
         assertNotNull(grunt, "XHuman 12 has no native-slot-1481 grunt");
+        assertNotNull(damagedGrunt, "XHuman 12 has no native-slot-1441 grunt");
+        assertNotNull(damagedFootman,
+                "XHuman 12 has no native-slot-1449 footman");
+        assertNotNull(westernGrunt,
+                "XHuman 12 has no native-slot-1495 grunt");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
@@ -525,6 +534,56 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(Direction.fromDelta(-1, 1), grunt.lastStepHeading());
         assertEquals(0, grunt.pathLength(),
                 "native stores and consumes a complete one-byte refill");
+
+        while (fixtureCycle(world) < 283) {
+            mission.tick();
+        }
+        assertTrue(grunt.isMoving(),
+                "fixture 283 retains the progressive step's final pixels");
+
+        mission.tick();
+        assertEquals(284, fixtureCycle(world));
+        assertFalse(grunt.isMoving(),
+                "fixture 284 settles the paid progressive step");
+        assertEquals(0, grunt.pathLength(),
+                "native parks the spent one-byte cursor at route index twenty");
+        assertEquals(0, grunt.battleNetCollisionCounter(),
+                "active-order Still clears the retired collision generation");
+        assertEquals(0, grunt.battleNetRefusals(),
+                "active-order Still clears the retired refusal generation");
+        assertEquals(world.idle.battleNetSequenceStart(
+                        grunt, BattleNetSequence.ATTACK_ANIMATION),
+                grunt.battleNetSequenceOffset(),
+                "settlement opens native Attack construction");
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "fixture 284 owns the first three-count construction");
+        assertEquals(0x179cfada, world.battleNetRandomSeed,
+                "fixture 284 includes the progressive step's idle draw");
+
+        mission.tick();
+        assertEquals(2, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(1, grunt.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(287, fixtureCycle(world));
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "the boxed retry reopens construction every three visits");
+        assertEquals(0xe39784ed, world.battleNetRandomSeed,
+                "fixture 287 includes the second active-order idle draw");
+
+        while (fixtureCycle(world) < 290) {
+            mission.tick();
+        }
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "fixture 290 reopens the still-boxed constructor");
+        assertEquals(34, damagedGrunt.hitPoints(),
+                "native's first cycle-290 melee roll deals eight");
+        assertEquals(47, damagedFootman.hitPoints(),
+                "native's second cycle-290 melee roll deals eight");
+        assertEquals(28, westernGrunt.hitPoints(),
+                "native's third cycle-290 melee roll deals seven");
+        assertEquals(0x5a765747, world.battleNetRandomSeed,
+                "the third idle draw restores the complete cycle-290 ledger");
     }
 
     @Test

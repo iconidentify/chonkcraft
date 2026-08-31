@@ -5204,14 +5204,60 @@ final class BattleNetCombatSystem {
                                 "refusals", unit.battleNetRefusals(),
                                 "last_heading", unit.lastStepHeading());
                         int settledHeading = unit.lastStepHeading();
+                        boolean firstSaturatedProgressiveStepSettled =
+                                unit
+                                        .battleNetFirstSaturatedResidualProgressiveRefill();
                         boolean retainedAttackPromotion =
-                                unit.battleNetRefusals() > 0
+                                !firstSaturatedProgressiveStepSettled
+                                && unit.battleNetRefusals() > 0
                                 && settledHeading >= 0
                                 && (settledHeading & 1) != 0;
+                        unit.setBattleNetFirstSaturatedResidualProgressiveRefill(
+                                false);
                         unit.clearPath();
                         unit.setWaitCycles(0);
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetChaseEmptyRouteReplan(false);
+                        if (firstSaturatedProgressiveStepSettled) {
+                            // The direct one-byte face retained after a
+                            // saturated route's first refusal returns to
+                            // active-order Still when its pixels land. It is
+                            // not the ordinary diagonal direct-probe handoff
+                            // below: native retires the old collision nibble,
+                            // pays 0040AD58, and opens Attack 3,2,1. If no free
+                            // compass square closes weapon distance, that
+                            // Still callback repeats every three visits.
+                            // XHuman 12 slot 1481 is the sealed witness: its
+                            // SW refill settles on fixture 284 and owns idle
+                            // draws on 284, 287 and 290. Omitting the first two
+                            // assigns the wrong random values to all three
+                            // fixture-290 melee blows. Slot 1495's ordinary
+                            // diagonal recovery at fixture 174 never owns this
+                            // saturated-refill provenance and remains on Move.
+                            unit.setBattleNetCollisionCounter(0);
+                            unit.setBattleNetRefusals(0);
+                            unit.setBattleNetDirectRecoveryGeneration(0);
+                            unit.setBattleNetDirectRefusalRecoveryProbe(false);
+                            unit.setBattleNetAttackRefusalRecoveryStage(0);
+                            unit.setBattleNetRefusalHold(false);
+                            unit.setBattleNetRetargetResidualRoutePark(false);
+                            unit.setBattleNetChaseReplanResidualHold(false);
+                            unit.setBattleNetParkedRefusalHeading(-1);
+                            unit.setBattleNetChaseEmptyRouteReplan(true);
+                            boolean boxed = !world.movement
+                                    .battleNetHasStrictlyCloserFreeNeighbour(
+                                            unit, retryTarget);
+                            unit.setBattleNetColdNoProgressRefusalLoop(boxed);
+                            world.causalTrace.event(world.cycle,
+                                    "path.first-saturated-progressive-settle",
+                                    unit.id(),
+                                    "target", retryTarget.id(),
+                                    "last_heading", settledHeading,
+                                    "boxed", boxed);
+                            if (rearmBattleNetHardRefusalAttack(unit, false)) {
+                                return;
+                            }
+                        }
                         if (retainedAttackPromotion) {
                             // The paid diagonal remains under Move ownership.
                             // Native advances its single packed refusal nibble
@@ -5734,6 +5780,15 @@ final class BattleNetCombatSystem {
                                         PathFinder.Result.FOUND,
                                         new int[] {direct}));
                                 unit.setRouteSpent(false);
+                                // Keep the saturated-refill owner attached to
+                                // the one committed heading until its pixel
+                                // residual settles. That later callback, not
+                                // this route writer, decides between native's
+                                // active-order Still handoff and the ordinary
+                                // diagonal recovery band.
+                                unit
+                                        .setBattleNetFirstSaturatedResidualProgressiveRefill(
+                                                true);
                             }
                         }
                     }
