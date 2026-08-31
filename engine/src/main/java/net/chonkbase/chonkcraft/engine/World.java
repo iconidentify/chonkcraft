@@ -7162,6 +7162,26 @@ public final class World {
                     && unit.battleNetAttackWrapDestArmPending()
                     && unit.battleNetCollisionCounter() == 0
                     && unit.battleNetRefusals() == 0;
+            // A clean paid melee tail whose replacement quarry is exactly one
+            // square beyond the target skirt resumes the opposite wall face.
+            // XHuman 4 slot 1518 turns the cold NW,NE,E,SE answer into E,NE
+            // and commits east on fixture 281. This is target geometry rather
+            // than a generic wrap rule: Human 13 grunt 1507's longer chase at
+            // fixture 114 retains the ordinary face.
+            boolean cleanParkedMeleeRetargetWallFace =
+                    unit.battleNetAttackWrapDestArmPending()
+                    && unit.battleNetChaseLegOpensCold()
+                    && !unit.battleNetChaseEmptyRouteReplan()
+                    && !unit.isMoving() && unit.pathLength() == 0
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetRefusals() == 0
+                    && unit.type() != null
+                    && unit.type().maxAttackRange() <= 1
+                    && movableTarget
+                    && unit.offeredTarget() == target
+                    && Math.max(
+                            Math.abs(unit.tileX() - target.tileX()),
+                            Math.abs(unit.tileY() - target.tileY())) == 3;
             // A paid long-route refill runs later in the same object pass as
             // allied movers with larger object ids.  Those allies may already
             // have committed their next tile in Java, but native's path view
@@ -7244,7 +7264,8 @@ public final class World {
                     || (saturatedResidualFace
                             && unit.battleNetCollisionCounter() >= 5);
             boolean reverseWallFace = saturatedResidualFace
-                    || rangedCloseHitWallFace;
+                    || rangedCloseHitWallFace
+                    || cleanParkedMeleeRetargetWallFace;
             PathFinder.Path path = BattleNetPathFinder.find(
                     unit.tileX(), unit.tileY(), goalX, goalY,
                     battleNetMovementStride(unit), traversalPassability,

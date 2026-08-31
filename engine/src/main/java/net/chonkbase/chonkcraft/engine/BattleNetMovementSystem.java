@@ -622,6 +622,7 @@ final class BattleNetMovementSystem {
         // NextPathElement, and so anything that could end the order, only when
         // the unit is neither mid-step nor mid-animation
 
+        boolean coldBehaviorOneChaseReturnReplacement = false;
         if (!unit.isMoving() && !isStepping(unit) && unit.pathLength() == 0) {
             // A spent route whose final tile is the requested point is a
             // completed Move, not an intermediate empty route. Retail closes
@@ -689,6 +690,15 @@ final class BattleNetMovementSystem {
             }
             boolean plainMoveRefusalReplacement = unit.moveRange() == 0
                     && unit.battleNetPlainMoveRefusalReplacement();
+            coldBehaviorOneChaseReturnReplacement =
+                    plainMoveRefusalReplacement
+                    && unit.battleNetAiBehavior() == 1
+                    && unit.hasBattleNetAiHome()
+                    && unit.orderTargetX() == unit.battleNetAiHomeX()
+                    && unit.orderTargetY() == unit.battleNetAiHomeY()
+                    && unit.battleNetChaseLegOpensCold()
+                    && unit.battleNetAttackOp0OutOfRange()
+                    && unit.battleNetCollisionCounter() >= 2;
             PathFinder.Path path = unit.moveRange() == 0
                     ? world.findBattleNetPointPath(unit, toX, toY)
                     : world.pathFinder.find(unit.tileX(), unit.tileY(),
@@ -946,6 +956,22 @@ final class BattleNetMovementSystem {
             }
         }
         stepMove(unit);
+        if (coldBehaviorOneChaseReturnReplacement
+                && !unit.isMoving() && unit.pathLength() > 0
+                && unit.battleNetCollisionCounter() >= 3) {
+            // The first replacement head is occupied as well. Retail keeps
+            // its newly written bytes, advances the packed collision ladder,
+            // and pays the complete Move band rather than parking the route a
+            // second time. Human 13 slot 1511 retains NW,NE under 586/15.
+            unit.setBattleNetOrderDelay(14);
+            int moveStart = world.idle.battleNetSequenceStart(unit,
+                    BattleNetSequence.MOVE_ANIMATION);
+            if (moveStart >= 0) {
+                unit.setBattleNetSequenceOffset(moveStart);
+                unit.setBattleNetAnimationTimer(15);
+                unit.setBattleNetChaseStepReady(false);
+            }
+        }
     }
 
     private void battleNetEmptyRouteStillAndDispatch(Unit unit) {
@@ -7933,6 +7959,45 @@ final class BattleNetMovementSystem {
                             && !ally.isDying()
                             && world.isAllied(unit.player(), ally.player());
                     if (alliedBlock) {
+                        boolean coldBehaviorOneChaseReturn =
+                                unit.battleNetAiBehavior() == 1
+                                && unit.hasBattleNetAiHome()
+                                && unit.orderTargetX()
+                                        == unit.battleNetAiHomeX()
+                                && unit.orderTargetY()
+                                        == unit.battleNetAiHomeY()
+                                && unit.battleNetChaseLegOpensCold()
+                                && unit.battleNetAttackOp0OutOfRange()
+                                && !unit.battleNetPlainMoveDirectLine();
+                        if (coldBehaviorOneChaseReturn) {
+                            // A cold Attack chase which has returned to its
+                            // behavior-one home remains in the native packed
+                            // collision ladder. Its occupied cached head parks
+                            // at route index twenty; it does not take the free
+                            // compass detour used by an ordinary occupancy-
+                            // planned Move. Human 13 slot 1511 advances raw
+                            // collision 0x10 -> 0x20 on fixture 280, then its
+                            // replacement NW head owns 0x30 and Move 15.
+                            battleNetRefuse(unit);
+                            unit.setBattleNetRefusals(0);
+                            int collision =
+                                    unit.battleNetCollisionCounter() + 1;
+                            unit.setBattleNetCollisionCounter(
+                                    collision > 14 ? 0 : collision);
+                            unit.setBattleNetPlainMoveRefusalReplacement(true);
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            int moveStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.MOVE_ANIMATION);
+                            if (moveStart >= 0) {
+                                unit.setBattleNetSequenceOffset(moveStart);
+                                unit.setBattleNetAnimationTimer(1);
+                                unit.setBattleNetChaseStepReady(false);
+                            }
+                            return;
+                        }
                         if (unit.battleNetPlainMoveDirectLine()) {
                             // The terrain-only plain-Move writer deliberately
                             // leaves mobile bodies in later bytes. A refusal

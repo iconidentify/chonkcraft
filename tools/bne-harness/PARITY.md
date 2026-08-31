@@ -15,7 +15,61 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-280 paid-wrap handoff)
+## Current release checkpoint — 2026-08-30 (cycle-283 cold-chase returns)
+
+Accepted cycle-1,800 receipt `30b01eb3` advances the shared clean horizon from
+280 to 283 (earliest divergence 284), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,824, 216 more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/30b01eb363a2be8524a9472c72035f37b7ef08c6105e210c723ec29113f361b1`.
+It binds dirty engine-input identity `689d75d2` at base revision `3bad5ac` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule `52f2ce56`.
+
+Behavioral delta: a behavior-one plain Move returning to its AI home now keeps
+the native packed collision ladder when an allied body owns its cached head.
+The cold, out-of-range chase handoff parks the cursor and increments the
+collision generation; if its replacement route is occupied at collision three,
+it retains that route and pays the full fifteen-count Move band. Separately, a
+clean paid melee tail which retargets exactly one tile beyond the melee skirt
+reuses the reverse wall face selected by its completed wrap instead of drawing
+Java's cold forward prefix. A longer Human 13 chase is a held-out negative for
+that geometry rule. Both mechanisms are expressed in order provenance, AI home,
+chase state, collision ownership, target geometry, and route lifecycle, with no
+map, unit-ID, cycle, coordinate, faction, or arbitrary route-length exception.
+
+Proof delta: Human 13 native ogre 1511 / Java 89 stays at (122,28) on fixture
+280, parks its route cursor, and raises packed collision to two. On fixture 281
+it retains `[NW,NE]`, raises collision to three, and exposes Move `586/15`
+without moving. Expansion Human 4 native footman 1518 / Java 82 finishes its
+paid melee retarget on fixture 281 by consuming east to (74,61), retaining
+northeast, and exposing sequence `2485/1`; Java previously drew northwest and
+moved to (72,60). Human 13 is exact through fixture 493 and expansion Human 4
+is exact through fixture 283.
+
+Efficacy receipts
+`.bne-test-efficacy/plain-move-home-collision-band/runs/40599f0229e18037fa1b51b116f3b8b0d3063060ea3be1fadad3f170dad7dee8`
+and
+`.bne-test-efficacy/clean-wrap-reverse-face/runs/4012b5a19cb90e97e05623db805e0dad5ba137a7adc5a2befe63eacc929d85fe`
+prove the new focused assertions fail on `3bad5ac` and pass on the candidate.
+Both changed real-data classes, `BattleNetPathFinderTest`, and all 30
+`bne_java.py` tests pass. The 52-case cycle-400 and cycle-1,800 surveys report
+no regression, and the accepted regression gate passes. The executable
+next-level gate exits zero after 209 Python checks and 95 focused
+engine/desktop checks. Its command worklist has 11 comparable scenarios (6
+exact / 5 divergent) with no regression or infrastructure failure; retained
+physical, replay, AI, combat, and campaign certification lanes remain
+intentionally incomplete. Remote AI discovery failed closed because the
+`i9beef` SSH host key changed; no SSH trust state was modified.
+
+The newly exposed blocker is expansion Human 4 at fixture 284: native footman
+1510 is at (74,59), while Java is at (73,60). The accepted compiler has a
+complete paired position frame and retained Java trace, and routes the blocker
+to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-280 paid-wrap handoff)
 
 Accepted cycle-1,800 receipt `9db0c4cd` advances the shared clean horizon from
 274 to 280 (earliest divergence 281), preserves every campaign frontier, and

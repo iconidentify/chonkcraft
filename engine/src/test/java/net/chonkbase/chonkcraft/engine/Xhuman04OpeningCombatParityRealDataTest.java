@@ -10,6 +10,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
@@ -72,6 +73,47 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "stationary action 16 releases its dead quarry on fixture 236");
         assertEquals(2477, stationaryPeer.battleNetSequenceOffset());
         assertEquals(3, stationaryPeer.battleNetAnimationTimer());
+    }
+
+    @Test
+    @DisplayName("xhuman 4's parked melee retarget reuses its paid chase face")
+    void xhuman4sParkedMeleeRetargetReusesItsPaidChaseFace() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        Unit footman = unitAt(world, "unit-footman", 72, 60);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1518 footman");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 280) {
+            mission.tick();
+        }
+        assertEquals(73, footman.tileX());
+        assertEquals(61, footman.tileY());
+        assertEquals(Unit.Order.ATTACK, footman.order());
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(1, footman.battleNetAnimationTimer(),
+                "the replacement quarry reaches Attack OP0 on fixture 281");
+
+        mission.tick();
+        assertEquals(281, world.cycle() - INITIALIZATION_TICKS);
+        assertEquals(74, footman.tileX(),
+                "the retained chase face must commit east, not cold-plan northwest");
+        assertEquals(61, footman.tileY());
+        assertEquals(Direction.fromDelta(1, 0), footman.lastStepHeading());
+        assertEquals(1, footman.pathLength(),
+                "northeast remains cached behind the committed east byte");
+        assertEquals(Direction.fromDelta(1, -1), footman.peekHeading());
+        assertEquals(2485, footman.battleNetSequenceOffset());
+        assertEquals(1, footman.battleNetAnimationTimer());
     }
 
     @Test

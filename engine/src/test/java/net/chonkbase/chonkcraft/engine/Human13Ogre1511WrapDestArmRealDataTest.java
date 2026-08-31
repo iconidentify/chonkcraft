@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.network.CommandApplier;
 import net.chonkbase.chonkcraft.engine.network.GameCommand;
@@ -203,6 +204,51 @@ class Human13Ogre1511WrapDestArmRealDataTest {
                 "native fixture 147 rolls five damage before constructor jitter");
         assertTrue(throwerShotAt147.battleNetConstructorDrawn());
         assertTrue(throwerShotAt147.battleNetMotion());
+    }
+
+    @Test
+    @DisplayName("human 13's plain-Move collision wake parks before its replacement route")
+    void human13sPlainMoveCollisionWakeParksBeforeItsReplacementRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit ogre = unitAt(world, "unit-ogre", 125, 22);
+        assertNotNull(ogre, "Human 13 has no native-slot-1511 ogre");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 280) {
+            mission.tick();
+        }
+        assertEquals(122, ogre.tileX());
+        assertEquals(28, ogre.tileY());
+        assertEquals(Unit.Order.MOVE, ogre.order());
+        assertEquals(0, ogre.pathLength(),
+                "the occupied cached north head parks at route index twenty");
+        assertEquals(2, ogre.battleNetCollisionCounter(),
+                "the first plain-Move refusal raises native generation two");
+        assertEquals(586, ogre.battleNetSequenceOffset());
+        assertEquals(1, ogre.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(281, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(122, ogre.tileX(),
+                "the replacement northwest head remains parked");
+        assertEquals(28, ogre.tileY());
+        assertEquals(2, ogre.pathLength());
+        assertEquals(Direction.fromDelta(-1, -1), ogre.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, -1), ogre.peekHeadingAtDepth(1));
+        assertEquals(3, ogre.battleNetCollisionCounter(),
+                "the replacement occupied head owns native generation three");
+        assertEquals(586, ogre.battleNetSequenceOffset());
+        assertEquals(15, ogre.battleNetAnimationTimer(),
+                "the replacement refusal owns the complete Move band");
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {
