@@ -1617,9 +1617,23 @@ public final class Unit {
 
     public void setBattleNetCollisionCounter(int counter) {
         this.battleNetCollisionCounter = Math.max(0, counter);
+        if (this.battleNetCollisionCounter == 0) {
+            battleNetBuildingFootprintParkCollision = false;
+        }
     }
 
     private int battleNetCollisionCounter;
+
+    /** Collision generation opened by a near-building footprint route park. */
+    public boolean battleNetBuildingFootprintParkCollision() {
+        return battleNetBuildingFootprintParkCollision;
+    }
+
+    public void setBattleNetBuildingFootprintParkCollision(boolean owned) {
+        battleNetBuildingFootprintParkCollision = owned;
+    }
+
+    private boolean battleNetBuildingFootprintParkCollision;
 
     /**
      * How many times in a row this unit has been refused its next step.
@@ -4358,7 +4372,7 @@ public final class Unit {
         // follow soft-cleared that cell while native 0x4501c0 nibble-refuse
         // kept face-two from stepping W (BTS face2 step1).
         if (headings.length == 1 && this.battleNetCollisionCounter < 2) {
-            this.battleNetCollisionCounter = 0;
+            setBattleNetCollisionCounter(0);
         }
         // Caller marks free-prefix / long-approach after setPath when known.
         this.battleNetGoldFreePrefix = false;

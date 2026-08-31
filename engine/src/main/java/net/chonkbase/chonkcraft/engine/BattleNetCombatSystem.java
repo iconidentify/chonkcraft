@@ -3476,7 +3476,20 @@ final class BattleNetCombatSystem {
                                 unit.setRouteSpent(false);
                                 unit.setWaitCycles(0);
                                 unit.setBattleNetOrderDelay(0);
-                                world.planTowards(unit, pathn1Quarry, true);
+                                int collision =
+                                        unit.battleNetCollisionCounter() + 1;
+                                unit.setBattleNetCollisionCounter(
+                                        collision > 14 ? 0 : collision);
+                                unit.setBattleNetBuildingFootprintParkCollision(
+                                        unit.battleNetCollisionCounter() > 0);
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(1);
+                                    unit.setBattleNetChaseStepReady(false);
+                                }
                                 return;
                             }
                             // A sticky native refusal means this is also a
@@ -4888,6 +4901,9 @@ final class BattleNetCombatSystem {
                         }
                     }
                 } else if (unit.pathLength() == 0) {
+                    int landPatrolAttackCollision =
+                            unit.battleNetLandPatrolAttackRoutePending()
+                                    ? unit.battleNetCollisionCounter() : -1;
                     int parkedRefusalHeading =
                             unit.battleNetParkedRefusalHeading();
                     boolean paidWrapRouteParked =
@@ -5333,6 +5349,7 @@ final class BattleNetCombatSystem {
                             // the park above. XHuman 12 slot 1482 commits NE
                             // on fixture 127 instead of waiting and taking N.
                             && !paidCollisionFourImmediateRefill
+                            && !unit.battleNetLandPatrolAttackRoutePending()
                             && !unit.battleNetChaseEmptyRouteReplan()) {
                         unit.setRouteSpent(false);
                         unit.clearPath();
@@ -5413,6 +5430,7 @@ final class BattleNetCombatSystem {
                     } else if (unit.battleNetRetargetResidualParkRefill()
                             && unit.battleNetRetargetResidualParkSteps() == 1
                             && (unit.battleNetCollisionCounter() == 1
+                                    || paidWrapRouteRedraw
                                     || (chased.type() != null
                                             && chased.type().building()
                                             && unit.battleNetCollisionCounter()
@@ -5440,6 +5458,16 @@ final class BattleNetCombatSystem {
                             // discarded stale head: XHuman 12 slot 1517 keeps
                             // SE,SE,SW after parking E at fixture 262.
                             unit.setPath(retainedPaidWrapTail);
+                        } else if (paidWrapRouteRedraw) {
+                            // A compact completed-wrap tail that is refused
+                            // after its committed first stride returns to the
+                            // paid wall writer. Unlike the first post-wrap
+                            // replay above, no stale bytes remain to restore;
+                            // collision ownership selects native's retained
+                            // clockwise face. XHuman 12 slot 1517 writes the
+                            // southeast-led full buffer on fixture 280.
+                            world.planTowardsAfterPaidWrapPark(
+                                    unit, chased);
                         } else {
                             world.planTowardsAfterRetargetPark(unit, chased);
                         }
@@ -5671,16 +5699,56 @@ final class BattleNetCombatSystem {
                                     "collision",
                                             unit.battleNetCollisionCounter(),
                                     "refusals", unit.battleNetRefusals());
-                            unit.replacePeekHeading(continuedHeading);
+                            boolean saturatedRetargetContinuation =
+                                    unit.battleNetSaturatedRetargetRouteBand();
+                            if (saturatedRetargetContinuation
+                                    && unit.pathLength() > 1
+                                    && unit.peekHeadingAtDepth(1)
+                                            == continuedHeading) {
+                                // The parked face promotes the matching second
+                                // compass byte to the native route head without
+                                // discarding the route writer's first byte.
+                                // XHuman 12 slot 1496 turns NE,SE,NE into
+                                // SE,NE,NE when its paid east face resumes.
+                                int first = unit.peekHeading();
+                                unit.replacePeekHeading(continuedHeading);
+                                unit.replacePeekHeadingAfterNext(first);
+                            } else {
+                                unit.replacePeekHeading(continuedHeading);
+                            }
+                            if (saturatedRetargetContinuation) {
+                                // Move must see that this is the second half of
+                                // the route-index-twenty transaction. Its
+                                // occupied head owns collision generation three
+                                // and a complete Move 15..1 band.
+                                unit.setBattleNetRetargetResidualRoutePark(true);
+                            }
                         }
                     }
-                    unit.setBattleNetParkedRefusalHeading(-1);
+                    if (!unit.battleNetSaturatedRetargetRouteBand()) {
+                        unit.setBattleNetParkedRefusalHeading(-1);
+                    }
                     unit.setBattleNetSaturatedResidualFaceRetry(false);
                     if (rangedCollidedResidualRefill) {
                         preserveCollidedRangedWallHead(unit, chased);
                     }
                     if (sameQuarryCollisionRefill) {
                         unit.setBattleNetRetargetResidualParkRefill(false);
+                    }
+                    if (landPatrolAttackCollision > 0
+                            && unit.battleNetLandPatrolAttackRoutePending()
+                            && unit.pathLength() > 0
+                            && unit.battleNetCollisionCounter() == 0) {
+                        // A Patrol -> Attack pop owns the packed collision
+                        // generation across its first chase-route writer.
+                        // Unit.setPath normally clears generation one for a
+                        // one-byte chase refill, but native's Patrol owner
+                        // survives that overwrite. XHuman 12 slot 1356 parks
+                        // at generation one on fixture 75, writes and commits
+                        // its single NE byte on 76, and remains generation
+                        // one until the residual hands control back to Attack.
+                        unit.setBattleNetCollisionCounter(
+                                landPatrolAttackCollision);
                     }
                     if (goalMoved
                             && unit.type().moveType()
@@ -6804,6 +6872,8 @@ final class BattleNetCombatSystem {
                 && unit.pathLength() == 1;
         boolean paidReplacementBand = unit != null
                 && unit.battleNetChaseReplanResidualHold();
+        boolean saturatedRetargetBandWake = unit != null
+                && unit.battleNetSaturatedRetargetRouteBand();
         boolean paidEmptyReplacement = paidReplacementBand
                 && unit.pathLength() == 0;
         boolean saturatedPaidEmptyResidualConstruction =
@@ -6819,6 +6889,7 @@ final class BattleNetCombatSystem {
                 && !World.battleNetRangedChaseUnit(unit);
         if (world.battleNetSequence == null || unit == null
                 || retainedTailReachabilityProbe
+                || saturatedRetargetBandWake
                 || unit.type() == null || !unit.chasing() || unit.isMoving()
                 || !unit.stepDrained()
                 || (!paidReplacementBand && unit.pathLength() < 4)

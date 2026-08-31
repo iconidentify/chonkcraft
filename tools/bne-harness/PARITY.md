@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-271 chase handoffs)
+## Current release checkpoint — 2026-08-30 (cycle-280 paid-wrap handoff)
+
+Accepted cycle-1,800 receipt `9db0c4cd` advances the shared clean horizon from
+274 to 280 (earliest divergence 281), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,608, 37 more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/9db0c4cd98e1ab428741095dbbb2b97f2298874a61a2995c90a720ac887d02ae`.
+It binds dirty engine-input identity `89cb7750` at base revision `3358394` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule `0a1565c1`.
+
+Behavioral delta: native collision ownership now survives the complete family
+of saturated chase handoffs exposed from fixtures 75 through 280. A one-byte
+near-building footprint park records the origin of its collision generation,
+so a later behavior-one regroup order releases only that retired generation;
+generic Human 13 collision surrogates remain intact. Patrol -> Attack preserves
+its packed collision generation through the first chase refill and releases it
+when the committed residual hands control back to Attack. A saturated mobile
+retarget promotes its retained wall face into the route head and pays the full
+Move band before waking. Finally, a compact completed-wrap tail which parks
+after its committed stride returns to the paid wall writer: collision-marked
+moving formation bodies remain hard, and a successful offered-target wake may
+retain collision one. The nearer saturated cardinal park enters its
+active-order Attack callback instead of waiting for Java's generic decision
+gate. These rules use order provenance, route lifecycle, collision generation,
+target kind, offer identity, and moving-body state; production branches contain
+no map, unit-ID, cycle, coordinate, faction, or arbitrary route exception.
+
+Proof delta: expansion Human 12 native grunt 1496 / Java 104 now stays at
+(36,39) through fixture 275 after its continued route raises collision three
+and owns Move 15..1. The earlier fixture-199 regroup collision, fixture-75
+Patrol collision, and fixture-88 Attack handback witnesses also match. On
+fixture 279 native slot 1504 / Java 96 parks at (30,40), while native slot 1517
+/ Java 83 parks at (31,38); offered native slot 1512 / Java 88 retains
+collision one. On fixture 280 slot 1504 enters Attack `2539/3` without moving,
+and slot 1517 consumes southeast to (32,39) while retaining nineteen route
+headings. Expansion Human 12 is consequently exact through fixture 284, with
+its next local divergence at 285.
+
+Four efficacy receipts prove each added assertion fails on `3358394` and passes
+on the candidate:
+`.bne-test-efficacy/saturated-retarget-residual-park/runs/93e809e7bc151ef18022211084939496816c4e42e5efeb921ca3cfcd17574817`,
+`.bne-test-efficacy/regroup-order-collision-release/runs/b1c1ae0114b3aae330f61f08a024bf882683f89bd647090bbd65b1fd05db05a4`,
+`.bne-test-efficacy/patrol-attack-collision-handoff/runs/4496cc96aacb700f8360cbbd001529eb81b0760e26f09015481d91dfd1abd055`,
+and
+`.bne-test-efficacy/paid-wrap-collision-wall/runs/2eb041510a106e2d62a5cd7f11892caf8a7fbec51e802658b3f65882236afcdc`.
+All changed real-data classes, `BattleNetPathFinderTest`, and all 30
+`bne_java.py` tests pass. The executable next-level gate also passes its 209
+Python checks and 95 focused engine/desktop checks; its retained physical,
+replay, AI, combat, and campaign proof lanes remain intentionally incomplete.
+The broad engine suite reports 1,924 tests with the same 94 known synthetic
+failures and 196 skips; none belong to a changed focused class.
+
+The accepted compiler retains two tied blockers at fixture 281. Human 13 native
+ogre 1511 is at (122,28), while Java is at (123,27); expansion Human 4 native
+footman 1518 is at (74,61), while Java is at (72,60). Both have complete paired
+frames and retained Java traces, and both route next to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-271 chase handoffs)
 
 Accepted cycle-1,800 receipt `d71aefea` advances the shared clean horizon from
 270 to 274 (earliest divergence 275), preserves every other campaign frontier,

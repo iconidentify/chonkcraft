@@ -6791,7 +6791,7 @@ public final class World {
                 completedRefusalBand, keepMovingAlliesHard,
                 retainPaidBandWallFace, keepSaturatedAlliesHard,
                 goalPaddingOverride, forceSharedWallBuffer,
-                keepSpecificMovingAllyHard, false);
+                keepSpecificMovingAllyHard, false, false);
     }
 
     private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
@@ -6803,7 +6803,8 @@ public final class World {
             int goalPaddingOverride,
             boolean forceSharedWallBuffer,
             Unit keepSpecificMovingAllyHard,
-            boolean continueSaturatedRetargetWallFace) {
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> reservedMoveBodies = new ArrayList<>();
         java.util.List<Unit> transparentQueuedReturners = new ArrayList<>();
@@ -6816,7 +6817,11 @@ public final class World {
             boolean queuedReturnBehindCollidedRayBlocker = false;
             if (isAllied(unit.player(), candidate.player())) {
                 if (keepMovingAlliesHard
-                        || candidate == keepSpecificMovingAllyHard) {
+                        || candidate == keepSpecificMovingAllyHard
+                        || (keepCollisionMarkedAlliesHard
+                                && candidate.isMoving()
+                                && candidate
+                                        .battleNetCollisionCounter() > 0)) {
                     continue;
                 }
                 int directGoalX = battleNetFootprintGoal(
@@ -12389,6 +12394,13 @@ public final class World {
         return planTowards(unit, target, true, true, retainFirstWallFace);
     }
 
+    /** Paid wrap redraw retaining every collision-marked moving formation body. */
+    PathFinder.Result planTowardsAfterPaidWrapPark(
+            Unit unit, Unit target) {
+        return planTowards(unit, target, true, true, true,
+                false, false, false, true);
+    }
+
     /** A completed-band target replacement re-hardens its chosen moving head. */
     PathFinder.Result planTowardsAfterCompletedRefusalBandRetarget(
             Unit unit, Unit target, boolean retainFirstWallFace) {
@@ -12803,6 +12815,20 @@ public final class World {
             boolean keepSaturatedAlliesHard,
             boolean hardenMovingRouteHead,
             boolean continueSaturatedRetargetWallFace) {
+        return planTowards(unit, target, settledResidualRetarget,
+                completedRefusalBand, retainPaidBandWallFace,
+                keepSaturatedAlliesHard, hardenMovingRouteHead,
+                continueSaturatedRetargetWallFace, false);
+    }
+
+    private PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            boolean hardenMovingRouteHead,
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard) {
         // Aimed at anywhere this unit could hit the target from, not at the
         // square the target is standing on. That square is occupied by
         // definition, so a route to it can only end on top of somebody: the
@@ -12832,7 +12858,8 @@ public final class World {
                 completedRefusalBand, false,
                 retainPaidBandWallFace,
                 keepSaturatedAlliesHard, -1, false, null,
-                continueSaturatedRetargetWallFace);
+                continueSaturatedRetargetWallFace,
+                keepCollisionMarkedAlliesHard);
         if (hardenMovingRouteHead && path != null
                 && path.result() == PathFinder.Result.FOUND
                 && path.length() > 0) {
@@ -12867,7 +12894,8 @@ public final class World {
                         completedRefusalBand, false,
                         retainPaidBandWallFace,
                         keepSaturatedAlliesHard, -1, false,
-                        movingRouteHeadWall);
+                        movingRouteHeadWall, false,
+                        keepCollisionMarkedAlliesHard);
             }
         }
         path = battleNetSaturatedCollisionWallPrefix(unit, target, path);
@@ -12885,7 +12913,8 @@ public final class World {
                     completedRefusalBand, false,
                     retainPaidBandWallFace,
                     keepSaturatedAlliesHard, -1, true,
-                    movingRouteHeadWall);
+                    movingRouteHeadWall, false,
+                    keepCollisionMarkedAlliesHard);
         }
         path = battleNetPaidEmptySharedWallPrefix(
                 unit, target, path, paidEmptySharedWallPath);

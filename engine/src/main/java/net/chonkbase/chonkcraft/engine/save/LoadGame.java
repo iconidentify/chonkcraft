@@ -906,6 +906,10 @@ public final class LoadGame {
             unit.setBattleNetSaturatedRetargetRouteBand(
                     truthy(state.rawGet("saturatedRetargetRouteBand")));
         }
+        if (state.rawGet("buildingFootprintParkCollision") != null) {
+            unit.setBattleNetBuildingFootprintParkCollision(
+                    truthy(state.rawGet("buildingFootprintParkCollision")));
+        }
         if (state.rawGet("oilAction") != null) {
             try {
                 unit.setBattleNetOilAction(Unit.BattleNetOilAction.valueOf(

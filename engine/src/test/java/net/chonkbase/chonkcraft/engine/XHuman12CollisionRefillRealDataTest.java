@@ -255,6 +255,7 @@ class XHuman12CollisionRefillRealDataTest {
         World world = mission.world();
         Unit grunt = unitById(world, 83);
         Unit formationMate = unitById(world, 110);
+        Unit offeredCollisionWall = unitById(world, 88);
         Unit formationPressure = unitById(world, 96);
         Unit paidTailRetarget = unitById(world, 120);
         Unit saturatedMobileRetarget = unitById(world, 106);
@@ -263,6 +264,8 @@ class XHuman12CollisionRefillRealDataTest {
         assertNotNull(grunt, "XHuman 12 has no native-slot-1517 grunt");
         assertNotNull(formationMate,
                 "XHuman 12 has no native-slot-1490 grunt");
+        assertNotNull(offeredCollisionWall,
+                "XHuman 12 has no native-slot-1512 grunt");
         assertNotNull(formationPressure,
                 "XHuman 12 has no native-slot-1504 grunt");
         assertNotNull(paidTailRetarget,
@@ -424,6 +427,39 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(1, woodcutter.pathLength(),
                 "east remains cached behind the committed southeast byte");
         assertEquals(Direction.fromDelta(1, 0), woodcutter.peekHeading());
+
+        while (fixtureCycle(world) < 279) {
+            mission.tick();
+        }
+        assertEquals(30, formationPressure.tileX());
+        assertEquals(40, formationPressure.tileY());
+        assertEquals(0, formationPressure.pathLength(),
+                "the saturated cardinal tail parks at RI 20");
+        assertTrue(formationPressure
+                        .battleNetResidualEmptyApproachIdlePending(),
+                "the saturated wrap queues the active-order callback");
+        assertEquals(31, grunt.tileX());
+        assertEquals(38, grunt.tileY());
+        assertEquals(0, grunt.pathLength(),
+                "the occupied paid-wrap tail parks for one Move visit");
+        assertEquals(1, offeredCollisionWall.battleNetCollisionCounter(),
+                "the offered cached-route wake retains native collision one");
+
+        mission.tick();
+        assertEquals(280, fixtureCycle(world));
+        assertEquals(30, formationPressure.tileX(),
+                "the nearer saturated grunt must enter Attack construction");
+        assertEquals(40, formationPressure.tileY());
+        assertEquals(world.idle.battleNetSequenceStart(formationPressure,
+                        BattleNetSequence.ATTACK_ANIMATION),
+                formationPressure.battleNetSequenceOffset());
+        assertEquals(3, formationPressure.battleNetAnimationTimer());
+        assertEquals(32, grunt.tileX(),
+                "the paid-wrap refill owns the open southeast square");
+        assertEquals(39, grunt.tileY());
+        assertEquals(Direction.fromDelta(1, 1), grunt.lastStepHeading());
+        assertEquals(19, grunt.pathLength(),
+                "native retains nineteen headings after committing southeast");
     }
 
     @Test
@@ -1043,6 +1079,85 @@ class XHuman12CollisionRefillRealDataTest {
         assertEquals(41, directRefill.tileY(),
                 "the paid residual must consume BNE's direct south refill");
         assertEquals(Direction.fromDelta(0, 1), directRefill.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("parked saturated retargets preserve native refill ownership")
+    void parkedSaturatedRetargetsPreserveNativeRefillOwnership() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit footprintChaser = unitById(world, 92);
+        Unit saturatedRetarget = unitById(world, 104);
+        assertNotNull(footprintChaser,
+                "XHuman 12 has no native-slot-1508 grunt");
+        assertNotNull(saturatedRetarget,
+                "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 270) {
+            mission.tick();
+        }
+        assertEquals(39, footprintChaser.tileX());
+        assertEquals(44, footprintChaser.tileY());
+        assertEquals(0, footprintChaser.pathLength(),
+                "the retained footprint route parks for one native visit");
+        assertEquals(1, footprintChaser.battleNetCollisionCounter());
+        assertEquals(2482, footprintChaser.battleNetSequenceOffset());
+        assertEquals(1, footprintChaser.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(271, fixtureCycle(world));
+        assertEquals(38, footprintChaser.tileX(),
+                "the replacement route commits west after the parked visit");
+        assertEquals(44, footprintChaser.tileY());
+        assertEquals(2, footprintChaser.pathLength(),
+                "northwest and northeast remain behind the committed west byte");
+        assertEquals(Direction.fromDelta(-1, -1),
+                footprintChaser.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, -1),
+                footprintChaser.peekHeadingAtDepth(1));
+        assertEquals(1, footprintChaser.battleNetCollisionCounter());
+
+        assertEquals(36, saturatedRetarget.tileX());
+        assertEquals(39, saturatedRetarget.tileY());
+        assertEquals(0, saturatedRetarget.pathLength(),
+                "the first retained refusal parks at route index twenty");
+        assertEquals(2, saturatedRetarget.battleNetCollisionCounter());
+        assertEquals(2482, saturatedRetarget.battleNetSequenceOffset());
+        assertEquals(1, saturatedRetarget.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(272, fixtureCycle(world));
+        assertEquals(3, saturatedRetarget.battleNetCollisionCounter(),
+                "the continued occupied head raises native generation three");
+        assertEquals(2482, saturatedRetarget.battleNetSequenceOffset());
+        assertEquals(15, saturatedRetarget.battleNetAnimationTimer());
+        int[] route = {
+            3, 1, 1, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 6, 7, 7, 7, 6, 6
+        };
+        assertEquals(route.length, saturatedRetarget.pathLength());
+        for (int depth = 0; depth < route.length; depth++) {
+            assertEquals(route[depth],
+                    saturatedRetarget.peekHeadingAtDepth(depth),
+                    "native fixture-272 route heading at depth " + depth);
+        }
+
+        while (fixtureCycle(world) < 275) {
+            mission.tick();
+        }
+        assertEquals(12, saturatedRetarget.battleNetAnimationTimer(),
+                "the parked replacement owns the complete Move 15..1 band");
+        assertEquals(route.length, saturatedRetarget.pathLength(),
+                "the paid band must not spend its retained route early");
     }
 
     private static int fixtureCycle(World world) {

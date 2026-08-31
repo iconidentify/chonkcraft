@@ -811,6 +811,9 @@ public final class SaveGame {
         if (unit.battleNetSaturatedRetargetRouteBand()) {
             state.append(" saturatedRetargetRouteBand = true,");
         }
+        if (unit.battleNetBuildingFootprintParkCollision()) {
+            state.append(" buildingFootprintParkCollision = true,");
+        }
         if (unit.battleNetAttackWrapDestArmPending()) {
             state.append(" attackWrapDestArmPending = true,");
         }

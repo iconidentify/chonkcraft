@@ -688,7 +688,7 @@ final class BattleNetIdleSystem {
             if (distance < regroupDistance) {
                 continue;
             }
-            unit.setBattleNetPendingMove(homeX, homeY);
+            queueBattleNetLandRegroupMove(unit, homeX, homeY);
             if (World.BNE_IDLE_TRACE) {
                 System.err.printf("JBNEHOME cycle=%d unit=%d recurring=1 "
                                 + "at=%d,%d home=%d,%d distance=%d "
@@ -848,7 +848,7 @@ final class BattleNetIdleSystem {
                                 unit.battleNetAnimationTimer());
                     }
                     if (distance >= regroupDistance) {
-                        unit.setBattleNetPendingMove(homeX, homeY);
+                        queueBattleNetLandRegroupMove(unit, homeX, homeY);
                         continue;
                     }
                 }
@@ -874,6 +874,29 @@ final class BattleNetIdleSystem {
             unit.setBattleNetPendingPatrol(x, y);
             unit.setBattleNetScoutPatrol(true);
         }
+    }
+
+    /** Writes a behavior-one regroup behind Still as a fresh native order. */
+    private void queueBattleNetLandRegroupMove(Unit unit, int homeX,
+            int homeY) {
+        unit.setBattleNetPendingMove(homeX, homeY);
+        if (unit.battleNetBuildingFootprintParkCollision()) {
+            // GiveOrder releases the collision generation owned by a retired,
+            // near-building footprint route when it writes Move into
+            // NextAction.
+            // The Still body remains current until its action marker promotes
+            // that Move, but cooperative pathing already sees the queued
+            // departure. XHuman 12 slot 1358 changes next_order 60 -> 3 and
+            // raw collision 1 -> 0 on the fixture-199 pass; retaining the Java
+            // generation makes peon 1365 route around its square instead of
+            // committing southeast.
+            unit.setBattleNetCollisionCounter(0);
+            unit.setBattleNetRefusals(0);
+        }
+        // Generic empty or live route collision surrogates are negative
+        // witnesses. Human 13 slots 1519 and 1510 must retain theirs across
+        // the same recurring pass: clearing them consumes NW too early for
+        // 1519 and lets 1510's fresh route consume N instead of native NW.
     }
 
 

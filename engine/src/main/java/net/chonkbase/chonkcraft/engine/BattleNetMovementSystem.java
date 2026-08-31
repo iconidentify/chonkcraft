@@ -3329,7 +3329,7 @@ final class BattleNetMovementSystem {
                 return;
             }
         }
-        if (mayDecide && (walkedThisCycle || world.actionMoveWalked)
+        if ((walkedThisCycle || world.actionMoveWalked)
                 && unit.stepDrained()
                 && !unit.isMoving()
                 && unit.battleNetLandPatrolAttackRoutePending()) {
@@ -3340,15 +3340,19 @@ final class BattleNetMovementSystem {
             // consuming the Java pathfinder's longer cached tail. That idle
             // callback owns one asynchronous draw and re-arms Attack 3,2,1.
             //
-            // Keep the cached tail while the first stride is in flight: it
-            // remains cooperative movement authority for nearby walkers.
-            // Hardening the opening path itself changed collision timing for
-            // an unrelated builder beside XHuman 12's ogre 1356. Parking
-            // only here preserves both the authentic NE stride and the
-            // native construction callback at fixture 88.
+            // This Patrol owner is itself the native decision boundary; it
+            // does not wait for Java's generic Move OP0 gate. Keep the cached
+            // tail while the first stride is in flight: it remains
+            // cooperative movement authority for nearby walkers. Hardening
+            // the opening path itself changed collision timing for an
+            // unrelated builder beside XHuman 12's ogre 1356. Parking only
+            // here preserves both the authentic NE stride and the native
+            // construction callback at fixture 88.
             unit.setBattleNetLandPatrolAttackRoutePending(false);
             unit.clearPath();
             unit.setRouteSpent(false);
+            unit.setBattleNetCollisionCounter(0);
+            unit.setBattleNetRefusals(0);
             unit.setBattleNetChaseStepReady(false);
             world.combat.rearmBattleNetHardRefusalAttack(unit);
             return;
@@ -4182,7 +4186,11 @@ final class BattleNetMovementSystem {
                     // XHuman 12 grunt 1496 keeps eighteen headings and arms
                     // Move 15 at fixture 256; discarding them let Java step
                     // southeast on 257 while retail remained on 36,39.
-                    unit.setBattleNetSaturatedRetargetRouteBand(false);
+                    boolean continuedParkedFace =
+                            unit.battleNetParkedRefusalHeading() >= 0
+                            && unit.battleNetParkedRefusalHeading()
+                                    < Direction.COUNT;
+                    unit.setBattleNetSaturatedRetargetRouteBand(true);
                     int collision =
                             unit.battleNetCollisionCounter() + 1;
                     unit.setBattleNetCollisionCounter(
@@ -4196,6 +4204,13 @@ final class BattleNetMovementSystem {
                         unit.setBattleNetSequenceOffset(moveStart);
                         unit.setBattleNetAnimationTimer(15);
                         unit.setBattleNetChaseStepReady(false);
+                    }
+                    if (continuedParkedFace) {
+                        // The continued face now owns its complete paid Move
+                        // band. Retire the one-refill provenance so its later
+                        // wake follows the ordinary cached-route lifecycle.
+                        unit.setBattleNetSaturatedRetargetRouteBand(false);
+                        unit.setBattleNetParkedRefusalHeading(-1);
                     }
                     return;
                 }
@@ -5458,6 +5473,20 @@ final class BattleNetMovementSystem {
                         unit, nextX, nextY);
                 boolean postRetargetParkRefill =
                         unit.battleNetRetargetResidualParkRefill();
+                boolean paidWrapShortResidualPark =
+                        postRetargetParkRefill
+                        && unit.battleNetAttackWrapDestArmPending()
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.battleNetPathInitialLength() == 3
+                        && unit.pathLength() == 2
+                        && unit.battleNetPathStepsTaken() == 1
+                        && unit.battleNetCollisionCounter() == 1
+                        && unit.battleNetRefusals() == 0
+                        && unit.target() != null
+                        && unit.target().isAlive()
+                        && unit.target().type() != null
+                        && !unit.target().type().building()
+                        && !World.battleNetRangedChaseUnit(unit);
                 boolean saturatedBuildingRetargetFormationRetry =
                         postRetargetParkRefill
                         && unit.battleNetRetargetResidualParkSteps() == 1
@@ -6879,7 +6908,34 @@ final class BattleNetMovementSystem {
                             // same wall face.
                             unit.setBattleNetParkedRefusalHeading(heading);
                         }
+                        if (unit.battleNetSaturatedRetargetRouteBand()
+                                && heading >= 0
+                                && heading < Direction.COUNT) {
+                            // The first paid band ends by parking its retained
+                            // head. Native's following NewPath continues from
+                            // that compass face instead of starting a cold
+                            // opposite-side wall search.
+                            unit.setBattleNetParkedRefusalHeading(heading);
+                        }
                         int refusals = battleNetRefuse(unit);
+                        if (paidWrapShortResidualPark) {
+                            // The compact tail retained behind a completed
+                            // Attack wrap remains one paid route transaction.
+                            // When its first cached byte is occupied as the
+                            // committed stride settles, native advances the
+                            // collision generation and parks RI 20, but does
+                            // not start a new hard-refusal ladder. The next
+                            // Move OP0 owns a fresh full wall writer. XHuman
+                            // 12 slot 1517 parks S on fixture 279, then writes
+                            // SE,SE,E,NE... and commits SE on fixture 280.
+                            unit.setBattleNetRefusals(0);
+                            unit.setBattleNetChaseEmptyRouteReplan(true);
+                            unit.setBattleNetRetargetResidualParkRefill(true);
+                            unit.setBattleNetRetargetResidualParkSteps(1);
+                            unit.markBattleNetLongPaidWrapParkedRoute();
+                            unit.setBattleNetParkedRefusalHeading(-1);
+                            refusals = 0;
+                        }
                         if (firstSaturatedResidualProgressiveRefill
                                 && refusals == 1) {
                             // A saturated collision-free chase which has
@@ -6975,6 +7031,10 @@ final class BattleNetMovementSystem {
                     }
                 }
                 if (canTakeStep) {
+                    if (unit.battleNetSaturatedRetargetRouteBand()) {
+                        unit.setBattleNetSaturatedRetargetRouteBand(false);
+                        unit.setBattleNetParkedRefusalHeading(-1);
+                    }
                     if (unit.battleNetAttackRefusalRecoveryStage() == 6
                             && unit.battleNetParkedRefusalHeading()
                                     == heading) {
@@ -7741,6 +7801,21 @@ final class BattleNetMovementSystem {
                         unit.setBattleNetRefusals(0);
                         unit.setBattleNetChaseEmptyRouteReplan(true);
                         unit.setBattleNetOrderDelay(0);
+                        if (unit.battleNetAttackWrapDestArmPending()
+                                && parkedCollision >= 5
+                                && !Direction.isDiagonal(heading)) {
+                            // The saturated last cardinal is the end of the
+                            // completed Attack wrap, not another paid wall
+                            // refill. This RI-20 visit hands the next callback
+                            // to active-order Still, which clears pressure and
+                            // opens Attack construction. XHuman 12 slot 1504
+                            // parks S on fixture 279 and exposes Attack 3 on
+                            // fixture 280.
+                            unit.setBattleNetSaturatedResidualFaceRetry(true);
+                            unit.setBattleNetResidualEmptyApproachIdlePending(
+                                    true);
+                            unit.setStepDrained(false);
+                        }
                         return;
                     }
                 }
@@ -8044,9 +8119,20 @@ final class BattleNetMovementSystem {
             // XHuman 12 slot 1496 steps SE with 0x40 still installed on
             // fixture 90 and later parks at 0x50.  Keeping that saturated
             // provenance makes the departing unit remain solid to the other
-            // members of its crowded attack formation.
+            // members of its crowded attack formation. A first-generation
+            // cached route whose quarry also became its live attack-back
+            // offer retains the same ownership: XHuman 12 slot 1512 is hit
+            // while waiting on its twelve-byte knight route, commits NE when
+            // the head opens, and remains raw 0x10. A non-offered twenty-byte
+            // wake in the same fixture clears normally, as does XHuman 10's
+            // collision-two paid wake.
             if (unit.battleNetRefusalHold()) {
-                if (unit.battleNetCollisionCounter() < 4) {
+                boolean offeredCollisionOneWake =
+                        unit.battleNetCollisionCounter() == 1
+                        && unit.target() != null
+                        && unit.offeredTarget() == unit.target();
+                if (!offeredCollisionOneWake
+                        && unit.battleNetCollisionCounter() < 4) {
                     unit.setBattleNetCollisionCounter(0);
                 }
                 unit.setBattleNetRefusals(0);

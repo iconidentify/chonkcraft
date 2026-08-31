@@ -36,10 +36,15 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
         advanceToFixture(mission, 198);
         Unit firstRegroup = unitAt(world, "unit-grunt", 12, 88);
         Unit delayedRegroup = unitAt(world, "unit-grunt", 12, 87);
+        Unit collisionWorker = unitById(world, 235);
         assertNotNull(firstRegroup,
                 "XHuman 12 has no native-slot-1363 regroup grunt");
         assertNotNull(delayedRegroup,
                 "XHuman 12 has no native-slot-1358 regroup grunt");
+        assertNotNull(collisionWorker,
+                "XHuman 12 has no native-slot-1365 wood worker");
+        assertEquals(1, delayedRegroup.battleNetCollisionCounter(),
+                "the tower chase retains native generation one through fixture 198");
 
         mission.tick();
         assertEquals(199, fixtureCycle(world));
@@ -48,6 +53,19 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
                 "the promotion-pass body has not started pixel movement");
         assertTrue(world.movement.battleNetSoftClearMoveAlly(firstRegroup),
                 "the freshly promoted regroup must retain its same-pass soft arm");
+        assertEquals(Unit.Order.STILL, delayedRegroup.order(),
+                "the recurring regroup remains queued behind Still");
+        assertTrue(delayedRegroup.hasBattleNetPendingMove(),
+                "native writes Move into NextAction on the fixture-199 pass");
+        assertEquals(0, delayedRegroup.battleNetCollisionCounter(),
+                "the queued Move releases the retired chase collision generation");
+        assertTrue(world.movement.battleNetSoftClearMoveAlly(delayedRegroup),
+                "the queued departure is already soft to same-pass wood pathing");
+
+        advanceToFixture(mission, 201);
+        assertEquals(12, collisionWorker.tileX(),
+                "the worker must consume native's southeast route through the queued departure");
+        assertEquals(90, collisionWorker.tileY());
 
         advanceToFixture(mission, 203);
         Unit worker = unitAt(world, "unit-peon", 14, 84);
@@ -93,5 +111,11 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
             }
         }
         return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        return world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == id)
+                .findFirst().orElse(null);
     }
 }
