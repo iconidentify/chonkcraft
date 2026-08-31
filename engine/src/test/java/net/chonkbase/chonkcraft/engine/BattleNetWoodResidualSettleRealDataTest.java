@@ -155,6 +155,63 @@ class BattleNetWoodResidualSettleRealDataTest {
         assertEquals(Direction.fromDelta(1, 1), worker.peekHeading());
     }
 
+    @Test
+    void xhuman12BlockedWoodOrderPointReplansAfterItsOneStepPrefix() {
+        // XHuman 12 peon 1376 / Java 224 approaches tree (14,89) from
+        // (11,88). Static blocked square (13,88) is native orderXY, so the
+        // first route contains only NE. Peon 1387 claims that tree before the
+        // residual settles at (12,87), so action 23 replaces it with the next
+        // unclaimed tree (15,89), pays 3,2,1, and redraws NE,E,SE,S. A direct
+        // tree route caches NE,E,E,SE and consumes its stale east tail on
+        // fixture 296 instead.
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit worker = world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == 224)
+                .findFirst().orElse(null);
+        assertNotNull(worker,
+                "XHuman 12 must contain native peon 1376 / Java 224");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 280) {
+            mission.tick();
+        }
+        assertPosition(worker, 12, 87, -32, 32,
+                "fixture 280 commits the one-step northeast prefix");
+        assertEquals(0, worker.pathLength(),
+                "native does not cache the tree-directed east tail");
+
+        while (fixtureCycle(world) < 295) {
+            mission.tick();
+        }
+        assertPosition(worker, 12, 87, -2, 2,
+                "fixture 295 retains the final northeast pixels");
+
+        mission.tick();
+        assertPosition(worker, 12, 87, 0, 0,
+                "fixture 296 settles and starts the three-call replan");
+        assertEquals(0, worker.pathLength(),
+                "settlement retains route index twenty");
+        assertEquals(2, worker.battleNetOrderDelay(),
+                "fixture 296 is the first action-23 construction visit");
+        assertEquals(15, worker.resourceTileX(),
+                "the fresh construction skips the tree another peon claimed");
+        assertEquals(89, worker.resourceTileY());
+        assertEquals(15, worker.battleNetWoodOrderX(),
+                "native writes the replacement tree into orderXY on the"
+                        + " settle visit");
+        assertEquals(89, worker.battleNetWoodOrderY());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - INITIALIZATION_TICKS;
     }

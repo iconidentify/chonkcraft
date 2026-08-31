@@ -631,4 +631,19 @@ class BattleNetAiWoodTest {
                 "retail stores the last static blocker before open terrain");
     }
 
+    @Test
+    @DisplayName("a blocked reverse tip wins even when the tree first step is diagonal")
+    void blockedReverseTipBeatsTheTreesDiagonalFirstStep() {
+        GameMap map = grass(100);
+        map.field(14, 89).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+        map.field(13, 88).setFlags(TileFlag.WALL | TileFlag.UNPASSABLE);
+        World world = new World(map);
+        Unit worker = world.createUnit(woodcutter(), 0, 11, 88);
+
+        assertArrayEquals(new int[] {13, 88},
+                world.harvest.battleNetWoodOrderPoint(worker, 14, 89),
+                "a static blocked order point must not be replaced by the tree"
+                        + " merely to preserve its diagonal first step");
+    }
+
 }

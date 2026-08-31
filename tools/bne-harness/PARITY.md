@@ -15,7 +15,68 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-295 saturated progressive settlement)
+## Current release checkpoint — 2026-08-31 (cycle-296 blocked wood-order replacement)
+
+Accepted cycle-1,800 receipt `0196efcc` advances the shared clean horizon from
+295 to 296 (earliest divergence 297), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,964, one more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/0196efcc0f4861e0b7e7d3b79c84635070c485019ac28ec011c0896605f8ad99`.
+It binds dirty engine-input identity `4c190f71` at base revision `e0f63df` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`7ff2260ea9b801329606c0daef34bc427e09f9a51a570c39d84c3ebd5b903816`.
+
+Behavioral delta: the reverse tree ray's last static blocker remains the wood
+order point even when its first step is cardinal and the direct tree route
+would begin diagonally. When that short blocked-face prefix settles after
+another active worker has claimed its tree, action 23 uses the existing
+fifteen-square claimed-tree replacement search and writes the replacement into
+both the resource target and wood order point on its first construction visit.
+It retains route index twenty and pays the native three-call construction band
+before redrawing. Open reverse-free order points, unclaimed targets, and
+ordinary adjacent-tree settlement keep their existing behavior. The rule uses
+static terrain, route lifecycle, active claim ownership, and the shared local
+replacement search; it contains no map, fixture, coordinate, cycle, faction,
+or unit-ID branch.
+
+Proof delta: expansion Human 12 peon 1376 / Java 224 approaches tree `(14,89)`
+from `(11,88)`. Native stores blocked square `(13,88)` as `orderXY`, commits the
+single northeast byte on fixture 280, and drains its pixel residual through
+fixture 295. Peon 1387 claims the old tree before settlement. On fixture 296,
+native centers 1376 at `(12,87)`, keeps route index twenty, opens action 23 at
+timer three, and immediately replaces both the resource target and `orderXY`
+with unclaimed tree `(15,89)`. Java formerly discarded the static blocker in
+favor of a direct `NE,E,E,SE` tree route, then consumed its stale east byte at
+fixture 296. The corrected test intentionally stops at that authenticated
+common frontier: a different unit changes occupancy on fixture 297, so native's
+later four-byte redraw is not used as evidence for this fix. Retail Human 8's
+open reverse-free cases around fixtures 1510-1511 and the existing ordinary
+short-prefix cases remain negative controls.
+
+Efficacy receipt
+`.bne-test-efficacy/h296-blocked-order-claimed-replacement/runs/ddec319c9e763cd872605db14d53e56908165a093ae8b021156ce485f0cca802`
+proves the new real-data regression fails on `e0f63df` and passes on the
+candidate. The focused wood-order, residual-settlement, harvest destination,
+terminal-refusal, saturated-route, and collision-ladder tests pass. The seven
+broader gold-approach failures and the Human 13 wood-wall failure reproduce
+unchanged on `e0f63df` and are pre-existing. The 52-case cycle-400 survey
+reports 33 clean / 19 divergent / 0 failed, and receipts `842d7724` and
+`0196efcc` prove the cycle-400 and cycle-1,800 accepted regression gates pass.
+The executable next-level gate exits zero after 209 Python checks and 95
+focused engine/desktop checks; its command worklist remains 11 comparable
+scenarios (6 exact / 5 divergent) without regression or infrastructure
+failure. Strict SSH host-key verification leaves AI discovery unavailable;
+the broader certification lanes remain intentionally incomplete.
+
+The newly exposed blocker remains expansion Human 12, now at fixture 297:
+native peon 1385 is at `(12,88)` while Java 215 is at `(13,87)`. The accepted
+compiler retains the paired position frame and routes the blocker to cadence
+analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-295 saturated progressive settlement)
 
 Accepted cycle-1,800 receipt `ee9944e8` advances the shared clean horizon from
 289 to 295 (earliest divergence 296), preserves every campaign frontier, and

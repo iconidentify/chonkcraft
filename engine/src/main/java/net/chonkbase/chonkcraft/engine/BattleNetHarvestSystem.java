@@ -2302,14 +2302,51 @@ final class BattleNetHarvestSystem {
                 // Re-aiming that full prefix to (50,47) parked the peon in an
                 // invented action-23 delay and made it look frozen.
                 if (shortFreePrefix || freeLen == 0) {
-                    int[] localTree = findAdjacentForest(worker.tileX(),
-                            worker.tileY());
+                    int[] localTree = null;
+                    boolean claimedReplacement = false;
+                    int targetX = worker.resourceTileX();
+                    int targetY = worker.resourceTileY();
+                    if (world.map.contains(targetX, targetY)) {
+                        int targetIndex = targetX
+                                + targetY * world.map.width();
+                        Unit claimant = world.battleNetClaimedWood
+                                .get(targetIndex);
+                        if (claimant != null
+                                && !isActiveWoodClaim(claimant,
+                                        targetX, targetY)) {
+                            world.battleNetClaimedWood.remove(targetIndex);
+                            claimant = null;
+                        }
+                        if (claimant != null && claimant != worker) {
+                            // The completed prefix re-enters action 23 after
+                            // another worker has changed this tree from -2 to
+                            // -4. Use the same fifteen-square replacement as
+                            // StartGathering: XHuman 12 peon 1376 settles its
+                            // one-byte wall prefix while peon 1387 owns
+                            // (14,89), then selects (15,89) and redraws
+                            // NE,E,SE,S to its north face.
+                            localTree = findClaimedWoodReplacement(worker);
+                            claimedReplacement = localTree != null;
+                        }
+                    }
+                    if (localTree == null) {
+                        localTree = findAdjacentForest(worker.tileX(),
+                                worker.tileY());
+                    }
                     if (localTree == null) {
                         localTree = world.findTerrainType(worker,
                                 worker.tileX(), worker.tileY(), 1);
                     }
                     if (localTree != null) {
                         worker.setResourceTile(localTree[0], localTree[1]);
+                        if (claimedReplacement) {
+                            // The replacement constructor writes its new
+                            // forest point immediately, alongside RI20 and
+                            // timer three; route bytes are redrawn only after
+                            // the following two timer visits.
+                            worker.setBattleNetWoodOrder(
+                                    localTree[0], localTree[1]);
+                        }
                     }
                     worker.setBattleNetOrderDelay(2);
                     return;
@@ -2922,10 +2959,15 @@ final class BattleNetHarvestSystem {
                 workerX, workerY, treeX, treeY);
         boolean freeDiagonal = freeStep[0] != workerX && freeStep[1] != workerY;
         boolean treeDiagonal = treeStep[0] != workerX && treeStep[1] != workerY;
-        // Reverse-free east (4,67→8,66) must not beat the tree's north-east
-        // (4,67→9,65). Reverse-free north-east (2,67→4,62) must keep winning
-        // over the tree's pure north (2,67→4,61).
-        if (!freeDiagonal && treeDiagonal) {
+        // An open reverse-free east (4,67→8,66) must not beat the tree's
+        // north-east (4,67→9,65). A static blocker remembered as native
+        // orderXY is different: XHuman 12 peon 1376 stores wall square
+        // (13,88), whose one-step wall face is NE, rather than expanding the
+        // tree-directed route to NE,E,E,SE. That one-byte prefix settles and
+        // gives action 23 a fresh three-call redraw on the opposite face.
+        // Reverse-free north-east (2,67→4,62) must keep winning over the
+        // tree's pure north (2,67→4,61).
+        if (!sawBlocked && !freeDiagonal && treeDiagonal) {
             return new int[] {treeX, treeY};
         }
         // Human 8 peasant 1499: tree 85,83 and reverse-free 86,82 both take a
