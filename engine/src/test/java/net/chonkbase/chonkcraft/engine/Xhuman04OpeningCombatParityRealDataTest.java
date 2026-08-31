@@ -117,6 +117,47 @@ class Xhuman04OpeningCombatParityRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 4's aligned parked retarget keeps its ordinary wall face")
+    void xhuman4sAlignedParkedRetargetKeepsItsOrdinaryWallFace() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        Unit footman = unitAt(world, "unit-footman", 71, 60);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1510 footman");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 283) {
+            mission.tick();
+        }
+        assertEquals(73, footman.tileX());
+        assertEquals(60, footman.tileY());
+        assertEquals(Unit.Order.ATTACK, footman.order());
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(1, footman.battleNetAnimationTimer(),
+                "the aligned replacement finishes Attack construction first");
+
+        mission.tick();
+        assertEquals(284, world.cycle() - INITIALIZATION_TICKS);
+        assertEquals(74, footman.tileX());
+        assertEquals(59, footman.tileY(),
+                "the ordinary wall face must commit northeast, not refuse southeast");
+        assertEquals(Direction.fromDelta(1, -1), footman.lastStepHeading());
+        assertEquals(1, footman.pathLength());
+        assertEquals(Direction.fromDelta(1, 1), footman.peekHeading(),
+                "southeast remains behind the committed northeast byte");
+        assertEquals(2485, footman.battleNetSequenceOffset());
+        assertEquals(1, footman.battleNetAnimationTimer());
+    }
+
+    @Test
     @DisplayName("xhuman 4's melee loop restores its banked retaliation target")
     void xhuman4MeleeLoopRestoresItsBankedRetaliationTarget() {
         AssetSource assets = AssetSource.fromEnvironment();

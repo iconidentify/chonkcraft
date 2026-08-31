@@ -7162,12 +7162,14 @@ public final class World {
                     && unit.battleNetAttackWrapDestArmPending()
                     && unit.battleNetCollisionCounter() == 0
                     && unit.battleNetRefusals() == 0;
-            // A clean paid melee tail whose replacement quarry is exactly one
-            // square beyond the target skirt resumes the opposite wall face.
+            // A clean paid melee tail whose off-axis replacement quarry is
+            // exactly one square beyond the target skirt resumes the opposite
+            // wall face.
             // XHuman 4 slot 1518 turns the cold NW,NE,E,SE answer into E,NE
             // and commits east on fixture 281. This is target geometry rather
-            // than a generic wrap rule: Human 13 grunt 1507's longer chase at
-            // fixture 114 retains the ordinary face.
+            // than a generic wrap rule: its cardinal-aligned sibling slot
+            // 1510 retains the ordinary NE,SE face on fixture 284, and Human
+            // 13 grunt 1507's longer chase at fixture 114 does the same.
             boolean cleanParkedMeleeRetargetWallFace =
                     unit.battleNetAttackWrapDestArmPending()
                     && unit.battleNetChaseLegOpensCold()
@@ -7179,6 +7181,8 @@ public final class World {
                     && unit.type().maxAttackRange() <= 1
                     && movableTarget
                     && unit.offeredTarget() == target
+                    && unit.tileX() != target.tileX()
+                    && unit.tileY() != target.tileY()
                     && Math.max(
                             Math.abs(unit.tileX() - target.tileX()),
                             Math.abs(unit.tileY() - target.tileY())) == 3;

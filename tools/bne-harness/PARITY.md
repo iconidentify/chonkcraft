@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-283 cold-chase returns)
+## Current release checkpoint — 2026-08-30 (cycle-284 aligned chase face)
+
+Accepted cycle-1,800 receipt `886cf418` advances the shared clean horizon from
+283 to 284 (earliest divergence 285), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,877, 53 more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/886cf418598b533e0ccd4acc1f57924f074fac0a28a3f6453b3a9d97f8b253ed`.
+It binds dirty engine-input identity `6b2df45c` at base revision `72d073c` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`30238cb511f31f665d6a198c0d9ddfe8cf299a965d236ce541056fb85dffe37e`.
+
+Behavioral delta: a clean paid melee tail which retargets exactly one tile
+beyond the melee skirt reuses its completed wrap's reverse wall face only when
+the replacement lies off both of the attacker's axes. A replacement aligned
+on either axis retains the ordinary wall face. This refines the preceding
+chase-return mechanism in target geometry, route lifecycle, and order
+provenance, with no map, unit-ID, cycle, coordinate, faction, or arbitrary
+route-length exception. The longer Human 13 chase remains a held-out negative.
+
+Proof delta: the earlier off-axis expansion Human 4 footman 1518 / Java 82
+still consumes east and retains northeast on fixture 281. The newly matched
+aligned footman 1510 / Java 90 is parked at (73,60) with `[SE,SE]` on fixture
+280, retargets with Attack timer three on fixture 281, and on fixture 284
+draws `[NE,SE]`, consumes northeast to (74,59), retains southeast, and exposes
+sequence `2485/1`. Java previously chose the reverse face, found southeast
+occupied, and remained at (73,60).
+
+Efficacy receipt
+`.bne-test-efficacy/aligned-parked-retarget-wall-face/runs/80a251431bae3b9f947fc2d22a02107329cbfee161b3f2628e7f9e3b69529096`
+proves the new aligned assertion fails on `72d073c` and passes on the
+candidate. The seven changed real-data tests, all 29
+`BattleNetPathFinderTest` tests, and all 30 `bne_java.py` tests pass. The
+52-case cycle-400 survey reports 33 clean / 19 divergent / 0 failed and moves
+expansion Human 4's next local divergence to fixture 337. The cycle-1,800
+survey and accepted regression gate report no regression. The executable
+next-level gate exits zero after 209 Python checks and 95 focused
+engine/desktop checks. Its command worklist has 11 comparable scenarios (6
+exact / 5 divergent) with no regression or infrastructure failure; retained
+physical, replay, AI, combat, and campaign certification lanes remain
+intentionally incomplete. Remote AI discovery failed closed because the
+`i9beef` SSH host key changed; no SSH trust state was modified.
+
+The newly exposed blocker is expansion Human 12 at fixture 285: native grunt
+1506 is at y=39, while Java is at y=38. The accepted compiler has a complete
+paired position frame and retained Java trace, and routes the blocker to
+cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-283 cold-chase returns)
 
 Accepted cycle-1,800 receipt `30b01eb3` advances the shared clean horizon from
 280 to 283 (earliest divergence 284), preserves every campaign frontier, and
