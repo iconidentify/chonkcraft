@@ -15,7 +15,64 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-311 long patrol-route authority)
+## Current release checkpoint — 2026-08-31 (cycle-320 live depot-tail authority)
+
+Accepted cycle-1,800 receipt `9dbeb3f7` preserves the shared clean horizon at
+fixture 311 and improves every campaign frontier. The fleet remains 10 clean /
+42 divergent / 0 failed, while the 52 per-case exact prefixes sum to 37,762,
+an increase of 164. Expansion Human 11 advances from fixture 320 to 484. The
+cycle-400 fleet improves from 36 clean / 16 divergent to 37 clean / 15
+divergent / 0 failed under receipt `fad99efb`. The long receipt is retained at
+`.bne-artifacts/runs/9dbeb3f7ec22e7f04eba149fcfeb8bcc4c1aff65030682f57feb034f336f8bd4`.
+It binds dirty engine-input identity `afd62952` at base revision `7c099ea` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`2826f546eab6f83f8918d46f69c6cb90d61f49e0e43f3ecd4c7b13975fedef1e`.
+
+Behavioral delta: when a laden land worker's northeast residual crosses a
+depot's lateral midpoint, the resource action refreshes the closest depot edge
+even if a cached tail remains. Only a stale northwest tail, or the established
+north-then-northwest form, parks under collision one; a live duplicate north
+tail remains authoritative and may commit on the settle visit. The narrowed
+rule uses carrying/return state, movement stride, residual phase, collision
+generation, route shape and a measured depot-edge transition. It contains no
+mission, map, coordinate, fixture, cycle, faction or unit-ID branch.
+
+Proof delta: expansion Human 11 peon slot 1495 / Java 105 carries gold toward
+the great hall on the six-heading `N,N,N,NE,N,N` route. Its northeast stride
+leaves the final duplicate north tail and drains through fixture 319 at
+`(19,87)` toward depot edge `(18,84)`. On fixture 320 native refreshes that
+edge to `(20,84)`, consumes north, advances route index four to five and
+anchors at `(19,86)` while preserving the exact pixel `(608,2784)`. Java
+formerly treated every two-byte north-headed tail as stale, parked it at
+route-index twenty with collision one, and committed north on fixture 321.
+The corrected shape keeps the edge refresh but consumes the live tail, makes
+the case exact through fixture 400, and moves its first divergence to 484.
+
+Efficacy receipt
+`.bne-test-efficacy/c320-lateral-depot-tail-isolated/runs/d8d7189916f2a665f1408d4d77a7ef94fbb6fc8d534570cc753bd8d0f7eb47dd`
+proves the focused fixture-320 assertion fails on `7c099ea` and passes on the
+candidate. All 18 consumed-tail, laden-return and XHuman 12 movement controls
+pass, including the stale one-byte northwest-tail negative witness. Both fixed
+52-case gates pass. The ordinary executable next-level gate exits zero after
+209 Python checks and 95 engine/desktop checks; its command worklist remains
+11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` still reports the documented
+incomplete producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312. Expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java. Frontier compilation under
+`.bne-field-evidence/cycle311-post-c320-worker-frontier-compile` authenticates
+the frame. Cadence and temporal analysis prove a low-refusal consumed tail
+returns on the next visit, but cold redraw, both continued wall faces, and a
+parked-occupancy redraw all fail to produce native's west-leading route. Those
+route-publication hypotheses are retained only as private evidence; returning
+to this family requires a new native/static discriminator rather than another
+fitted route variant.
+
+## Prior release checkpoint — 2026-08-31 (cycle-311 long patrol-route authority)
 
 Accepted cycle-1,800 receipt `85d6f4b5` advances the shared clean horizon from
 fixture 310 through 311 and preserves or improves every campaign frontier. The

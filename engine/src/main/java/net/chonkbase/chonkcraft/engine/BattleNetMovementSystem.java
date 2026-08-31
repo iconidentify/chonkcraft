@@ -3320,21 +3320,26 @@ final class BattleNetMovementSystem {
                 && unit.returnDepotGoal() != null) {
             int[] refreshedDepotEdge = world.battleNetDepotEntryPoint(
                     unit, unit.returnDepotGoal());
-            boolean lateralDepotReaimTail =
+            int north = Direction.fromDelta(0, -1);
+            int northwest = Direction.fromDelta(-1, -1);
+            boolean staleLateralDepotReaimTail =
                     (unit.pathLength() == 1
-                            && unit.peekHeading()
-                                    == Direction.fromDelta(-1, -1))
+                            && unit.peekHeading() == northwest)
                     || (unit.pathLength() == 2
-                            && unit.peekHeading()
-                                    == Direction.fromDelta(0, -1));
-            boolean lateralDepotReaim = lateralDepotReaimTail
-                    && unit.battleNetCollisionCounter() == 0
+                            && unit.peekHeading() == north
+                            && unit.peekHeadingAtDepth(1) == northwest);
+            boolean lateralDepotReaim =
+                    unit.battleNetCollisionCounter() == 0
                     && unit.lastStepHeading()
                             == Direction.fromDelta(1, -1)
                     && refreshedDepotEdge[1] == unit.orderTargetY()
                     && Math.abs(refreshedDepotEdge[0]
                             - unit.orderTargetX()) == 2;
             if (lateralDepotReaim) {
+                unit.setOrderTarget(
+                        refreshedDepotEdge[0], refreshedDepotEdge[1]);
+            }
+            if (lateralDepotReaim && staleLateralDepotReaimTail) {
                 // This is the retained-tail footprint handoff proved by the
                 // sealed XHuman 12 route, not a rule for every nearest-edge
                 // change. The NE residual crosses a four-wide hall's lateral
@@ -3343,10 +3348,11 @@ final class BattleNetMovementSystem {
                 // twenty with collision one, and redraws on the following
                 // visit. The two-byte N,NW form is retained for callers that
                 // have not passed through the convoy-transparent route view.
+                // A duplicate N,N tail remains live while the edge point
+                // changes: XHuman 11 slot 1495 refreshes (18,84) to (20,84)
+                // and consumes N on fixture 320.
                 // Other gold carriers keep their cached route when their edge
                 // drifts by one cell or under a different residual shape.
-                unit.setOrderTarget(
-                        refreshedDepotEdge[0], refreshedDepotEdge[1]);
                 int collision = unit.battleNetCollisionCounter() + 1;
                 unit.setBattleNetCollisionCounter(
                         collision > 14 ? 0 : collision);

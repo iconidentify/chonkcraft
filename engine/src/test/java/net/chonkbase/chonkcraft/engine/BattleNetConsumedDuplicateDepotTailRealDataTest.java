@@ -75,6 +75,47 @@ class BattleNetConsumedDuplicateDepotTailRealDataTest {
     }
 
     @Test
+    @DisplayName("XHuman 11 keeps a free N,N tail across lateral depot re-aim")
+    void xhuman11KeepsFreeNorthTailAcrossLateralDepotReaim() {
+        Mission mission = mission("campaigns/human-exp/levelx11h");
+        Unit peon = byId(mission.world(), 105);
+        assertNotNull(peon,
+                "native slot 1495 must remain paired with Java peon 105");
+
+        advanceToFixture(mission, 319);
+        assertEquals(100, peon.carried());
+        assertTrue(peon.returningToDepot());
+        assertEquals(19, peon.tileX());
+        assertEquals(87, peon.tileY());
+        assertEquals(2, peon.pathLength(),
+                "the consumed six-byte route retains its final N,N tail");
+        assertEquals(4, peon.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(1, -1), peon.lastStepHeading());
+        assertEquals(Direction.fromDelta(0, -1), peon.peekHeading());
+        assertEquals(Direction.fromDelta(0, -1),
+                peon.peekHeadingAtDepth(1));
+        assertEquals(18, peon.orderTargetX());
+        assertEquals(84, peon.orderTargetY());
+        assertEquals(0, peon.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(320, fixtureCycle(mission.world()));
+        assertEquals(19, peon.tileX());
+        assertEquals(86, peon.tileY(),
+                "native consumes the free north head on the settle visit");
+        assertEquals(608, peon.pixelX());
+        assertEquals(2784, peon.pixelY());
+        assertEquals(1, peon.pathLength());
+        assertEquals(5, peon.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(0, -1), peon.lastStepHeading());
+        assertEquals(Direction.fromDelta(0, -1), peon.peekHeading());
+        assertEquals(20, peon.orderTargetX(),
+                "the depot edge still refreshes across the hall midpoint");
+        assertEquals(84, peon.orderTargetY());
+        assertEquals(0, peon.battleNetCollisionCounter());
+    }
+
+    @Test
     @DisplayName("fresh, one-byte, nonduplicate, and diagonal tails stay outside the rule")
     void onlyAConsumedDuplicateCardinalTwoByteTailQualifies() {
         UnitType type = new UnitType("unit-peon");
