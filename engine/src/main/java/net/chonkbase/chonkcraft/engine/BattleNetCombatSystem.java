@@ -68,6 +68,32 @@ final class BattleNetCombatSystem {
     }
 
     /**
+     * Whether a paid mobile retarget kept the complete first wall buffer.
+     *
+     * <p>The writer has consumed its diagonal opening, leaving nineteen
+     * headings and the immediately counterclockwise cardinal wall face at the
+     * cursor. Unlike an ordinary saturated face, this buffer need not begin
+     * with a three-heading straight run. Its prior hard refusals and live
+     * mobile quarry distinguish it from a fresh saturated path.</p>
+     */
+    private boolean retainedPaidMobileFirstWallBuffer(Unit unit) {
+        Unit target = unit.target();
+        int consumed = unit.lastStepHeading();
+        return unit.pathLength() == BattleNetPathFinder.MAX_PATH - 1
+                && unit.battleNetPathInitialLength()
+                        == BattleNetPathFinder.MAX_PATH
+                && unit.battleNetPathStepsTaken() == 1
+                && unit.battleNetCollisionCounter() == 0
+                && unit.battleNetRefusals() > 0
+                && Direction.isDiagonal(consumed)
+                && !Direction.isDiagonal(unit.peekHeading())
+                && unit.peekHeading()
+                        == Math.floorMod(consumed - 1, Direction.COUNT)
+                && target != null && target.isAlive() && target.isOnMap()
+                && target.type() != null && !target.type().building();
+    }
+
+    /**
      * Whether a building retarget retains a reusable route behind its first
      * cardinal stride.
      *
@@ -446,6 +472,7 @@ final class BattleNetCombatSystem {
                             || unit.battleNetRefusals() == 0);
             boolean retainedPaidConstruction = paidReplacementBand
                     && (saturatedRetainedRouteFace(unit)
+                            || retainedPaidMobileFirstWallBuffer(unit)
                             || retainedBuildingReplay
                             || (unit.battleNetAttackWrapDestArmPending()
                                     && (unit.pathLength() == 4
@@ -2068,6 +2095,7 @@ final class BattleNetCombatSystem {
                     && unit.type().moveType() == UnitType.Movement.NAVAL;
             boolean retainedReplanConstruction = replanResidualHold
                     && (saturatedRetainedRouteFace(unit)
+                            || retainedPaidMobileFirstWallBuffer(unit)
                             || retainedBuildingRetargetReplay(unit)
                             || (unit.battleNetAttackWrapDestArmPending()
                                     && (unit.pathLength() == 4
@@ -2236,7 +2264,8 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetBlockedChaseAttackConstruction(true);
                         if (unit.pathLength()
-                                == BattleNetPathFinder.MAX_PATH - 1) {
+                                == BattleNetPathFinder.MAX_PATH - 1
+                                && !retainedPaidMobileFirstWallBuffer(unit)) {
                             // This is a paid, saturated buffer rather than a
                             // reusable short tail. Keep its refusal owner
                             // through Attack construction so a moved quarry
@@ -4709,9 +4738,31 @@ final class BattleNetCombatSystem {
                                     // leaving packed melee units visibly idle.
                                     world.planTowards(unit, chased, true);
                                 } else {
+                                    boolean retainPaidMobileFirstWallBuffer =
+                                            replacementAfterPaidBand
+                                            && unit.battleNetRefusals() > 0
+                                            && !Direction.isDiagonal(
+                                                    unit.lastStepHeading())
+                                            && Direction.isDiagonal(
+                                                    oldReplacementHeading)
+                                            && chased.type() != null
+                                            && !chased.type().building();
+                                    // A compact route which hard-refused before
+                                    // its residual park has paid the first wall
+                                    // writer even when the replacement quarry
+                                    // is mobile. Keep that writer's complete
+                                    // buffer when a cardinal committed leg left
+                                    // a diagonal tail, instead of selecting the
+                                    // shorter opposite face: XHuman 12 slot 1506
+                                    // writes SW,S,SE... on fixture 266, then
+                                    // retains S through Attack construction and
+                                    // commits it on fixture 285. A diagonal leg
+                                    // with its same-face tail, and refusal-free
+                                    // compact tails, keep the optimized face.
                                     world.planTowardsAfterRefusalBand(
                                             unit, chased,
-                                            (Direction.isDiagonal(
+                                            retainPaidMobileFirstWallBuffer
+                                                    || (Direction.isDiagonal(
                                                     oldReplacementHeading)
                                                     && (keepPathn
                                                             >= BattleNetPathFinder

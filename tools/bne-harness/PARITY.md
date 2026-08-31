@@ -15,7 +15,62 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-284 aligned chase face)
+## Current release checkpoint — 2026-08-30 (cycle-285 paid mobile wall buffer)
+
+Accepted cycle-1,800 receipt `a39fb431` advances the shared clean horizon from
+284 to 285 (earliest divergence 286), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,878, one more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/a39fb431d703acf5032fae26386cecae16fce68ad68c75805dd77bea0a931047`.
+It binds dirty engine-input identity `cc0b86c9` at base revision `5dadf73` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`c160bf8514b3f1e4e18ef10b9ef2778502d0588feff4d1d804515de9d920a1db`.
+
+Behavioral delta: a compact melee route which hard-refused before its residual
+park has already paid the first wall writer when its paid-band replacement is
+a mobile quarry. When a cardinal committed leg left a diagonal tail, Java now
+keeps that writer's complete first wall buffer rather than selecting the
+shorter opposite face. After the consumed diagonal opening settles, its
+structural route state—one step consumed from the fixed native buffer, a
+counterclockwise cardinal head, prior hard refusals, and a live mobile
+quarry—also enters the real blocked-chase Attack constructor. It drains
+`3,2,1` and transfers the retained heading on the timer-one callback. A
+diagonal committed leg with its same-face diagonal tail remains on the
+optimized short face. The rule uses route lifecycle, refusal ownership,
+heading geometry, target mobility, and the native buffer bound; it contains no
+map, fixture, coordinate, cycle, faction, or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt 1506 / Java 94 switches quarry on
+fixture 266, writes `SW,S,SE,...`, consumes `SW`, and retains nineteen bytes
+with `S` at the cursor. Its residual settles on fixture 282 at Attack
+`2539/3`, drains timers two and one on 283 and 284, then consumes `S` to
+`(33,39)` on fixture 285 with eighteen bytes and `SE` retained. Java formerly
+wrote the optimized three-byte tail and remained at `(33,38)`. Grunt 1479 /
+Java 121 is the held-out negative: its diagonal committed leg retains the
+ordinary optimized face and no longer regresses at fixture 284.
+
+Efficacy receipt
+`.bne-test-efficacy/paid-mobile-first-wall-buffer/runs/fc78564b26bcf21168e9ba6e9ad12f54bf2d2cc09e1e3d7a765ca1fd119133b7`
+proves the route/construction regression assertion fails on `5dadf73` and
+passes on the candidate. All three focused real-data tests and all 30
+`bne_java.py` tests pass. The 52-case cycle-400 survey reports 33 clean / 19
+divergent / 0 failed, and both it and the cycle-1,800 survey pass their
+accepted regression gates. The executable next-level gate exits zero after
+209 Python checks and 95 focused engine/desktop checks; its command worklist
+remains 11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. The broader certification lanes remain intentionally
+incomplete. An exploratory unfiltered engine-module sweep is not an acceptance
+gate and remains red at 94 failures among 1,928 tests; this checkpoint does not
+claim or consume that separate project-test debt.
+
+The newly exposed blocker is expansion Human 12 at fixture 286: native grunt
+1492 is at x=28, while Java is at x=29. The accepted compiler retains a
+complete paired position frame and routes the blocker to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-284 aligned chase face)
 
 Accepted cycle-1,800 receipt `886cf418` advances the shared clean horizon from
 283 to 284 (earliest divergence 285), preserves every campaign frontier, and

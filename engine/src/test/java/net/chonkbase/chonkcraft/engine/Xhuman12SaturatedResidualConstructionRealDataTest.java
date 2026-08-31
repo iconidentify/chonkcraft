@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +83,72 @@ class Xhuman12SaturatedResidualConstructionRealDataTest {
                 "native retains nineteen bytes after its first east step");
         assertEquals(Direction.fromDelta(1, 1), grunt.peekHeading(),
                 "the second replacement byte is south-east");
+    }
+
+    @Test
+    @DisplayName("a paid mobile retarget retains its first wall buffer through attack construction")
+    void paidMobileRetargetDrainsConstructionBeforeItsNextWallHeading() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 94);
+        assertNotNull(grunt,
+                "XHuman 12 has no Java unit 94 / native grunt 1506");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 266) {
+            mission.tick();
+        }
+
+        assertEquals(33, grunt.tileX());
+        assertEquals(38, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength(),
+                "the consumed south-west opening retains the complete wall buffer");
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(-1, 1), grunt.lastStepHeading(),
+                "the paid writer consumes south-west immediately");
+        assertEquals(Direction.fromDelta(0, 1), grunt.peekHeading(),
+                "south remains at the retained route cursor");
+
+        while (fixtureCycle(world) < 282) {
+            mission.tick();
+        }
+
+        int attackStart = world.idle.battleNetSequenceStart(grunt,
+                net.chonkbase.chonkcraft.engine.animation.BattleNetSequence
+                        .ATTACK_ANIMATION);
+        assertEquals(attackStart, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "residual settlement opens native Attack construction");
+        assertEquals(0, grunt.battleNetOrderDelay(),
+                "the visible constructor owns the delay");
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1, grunt.pathLength());
+
+        mission.tick();
+        assertEquals(2, grunt.battleNetAnimationTimer(),
+                "fixture 283 drains Attack construction timer two");
+        mission.tick();
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "fixture 284 drains Attack construction timer one");
+        mission.tick();
+
+        assertEquals(33, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "timer one's fixture-285 callback consumes south");
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2, grunt.pathLength());
+        assertEquals(Direction.fromDelta(0, 1), grunt.lastStepHeading());
+        assertEquals(Direction.fromDelta(1, 1), grunt.peekHeading(),
+                "south-east follows the committed south wall face");
     }
 
     @Test
