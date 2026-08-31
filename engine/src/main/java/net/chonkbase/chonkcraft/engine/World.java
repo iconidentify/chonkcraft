@@ -12426,6 +12426,13 @@ public final class World {
                 false, false, false, true);
     }
 
+    /** Completed long-tail redraw retaining collided formation bodies. */
+    PathFinder.Result planTowardsAfterCompletedLongTailBuildingRetarget(
+            Unit unit, Unit target) {
+        return planTowards(unit, target, true, true, false,
+                false, false, false, true);
+    }
+
     /** A completed-band target replacement re-hardens its chosen moving head. */
     PathFinder.Result planTowardsAfterCompletedRefusalBandRetarget(
             Unit unit, Unit target, boolean retainFirstWallFace) {

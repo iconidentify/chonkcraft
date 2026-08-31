@@ -4039,6 +4039,16 @@ final class BattleNetCombatSystem {
                                     unit.tileY() + Direction.deltaY(
                                             unit.peekHeading())
                                             * world.battleNetMovementStride(unit));
+                    boolean completedBlockedLongTailBuildingRetarget =
+                            completedSettledRefusalBand
+                            && keepPathn >= BattleNetPathFinder.MAX_PATH - 6
+                            && unit.battleNetCollisionCounter() == 2
+                            && unit.battleNetRefusals() == 0
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.type() != null
+                            && candidate.type().building()
+                            && !settledResidualHeadFree;
                     // Consuming the only byte closes the old Move program.
                     // If target scan replaces its quarry on that residual-settle
                     // visit, native first constructs Attack 3,2,1 and only then
@@ -4620,6 +4630,19 @@ final class BattleNetCombatSystem {
                             if (retainPaidMobileWallFace) {
                                 world.planTowardsAfterCompletedRefusalBandRetarget(
                                         unit, chased, true);
+                            } else if (completedBlockedLongTailBuildingRetarget) {
+                                // A completed second-generation refusal after
+                                // three saturated-route headings still sees
+                                // collided formation bodies as walls when it
+                                // replaces a mobile quarry with a building.
+                                // XHuman 12 slot 1503 routes around slots
+                                // 1510/1516 (raw nibbles one), while collision-
+                                // zero slot 1520 remains soft, writing E,SE,E,
+                                // SE,S,S,SW,SW,W,W,W,NW,NE. Soft-clearing all
+                                // three wrote a duplicate SE whose first
+                                // visible error was fixture 287.
+                                world.planTowardsAfterCompletedLongTailBuildingRetarget(
+                                        unit, chased);
                             } else {
                                 world.planTowardsAfterRefusalBand(
                                         unit, chased, false);

@@ -15,7 +15,56 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-286 saturated retarget queued Attack)
+## Current release checkpoint — 2026-08-30 (cycle-288 collided long-tail building redraw)
+
+Accepted cycle-1,800 receipt `9392b251` advances the shared clean horizon from
+286 to 288 (earliest divergence 289), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,882, three more than the preceding accepted survey.
+The receipt is retained under
+`.bne-artifacts/runs/9392b251259a4c768bd041db6bb11bdfa226ea0e3e02fb49b8b7fae054a2bd4e`.
+It binds dirty engine-input identity `f8aaed1a` at base revision `7642407` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`ba775091c7fed2febea9396e651311a8f05864205ad732c160134a80201376d9`.
+
+Behavioral delta: a melee chaser which settles a blocked long cached tail in
+its second collision generation, with no outstanding refusal, has completed
+the cooperative Move band before replacing a mobile quarry with a building.
+Its replacement path now keeps moving allies with nonzero collision state as
+hard formation bodies, while collision-zero movers remain soft. Compact and
+expired completed-band building handoffs retain their existing soft route.
+The positive predicate uses the completed refusal lifecycle, retained native
+buffer depth, collision generation, blocked residual, and target mobility; it
+contains no map, fixture, coordinate, cycle, faction, or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt 1503 / Java 97 changes from footman 123
+to guard tower 1483 on fixture 252 after retaining fourteen old-route bytes.
+Native draws `E,SE,E,SE,S,S,SW,SW,W,W,W,NW,NE`: collided formation grunts
+1510 and 1516 remain walls, while collision-zero grunt 1520 is soft. Java
+formerly softened all three and drew `E,SE,SE,S,S,S,SW,W,W,W,NW,NE`.
+Both routes commit the first east byte immediately, hiding the error until
+fixture 287; the corrected third byte then advances east to `(42,39)` exactly,
+and the sealed case remains exact through fixture 289.
+
+Efficacy receipt
+`.bne-test-efficacy/h287-completed-long-tail-building-retarget/runs/90938964c7c3ce5854baf58895265719ba8b354965bdf2092958cbd41920333a`
+proves the expanded route/frontier regression fails on `7642407` and passes on
+the candidate. All 11 focused real-data tests and all 30 `bne_java.py` tests
+pass. The 52-case cycle-400 survey reports 33 clean / 19 divergent / 0 failed,
+and both it and the cycle-1,800 survey pass their accepted regression gates.
+The executable next-level gate exits zero after 209 Python checks and 95
+focused engine/desktop checks; its command worklist remains 11 comparable
+scenarios (6 exact / 5 divergent) without regression or infrastructure
+failure. The broader certification lanes remain intentionally incomplete.
+
+The newly exposed blocker is retail Orc 8 at fixture 289: native human oil
+tanker 1478 is at `(84,104)` while Java is at `(82,102)`. The accepted
+compiler retains the complete paired position frame and routes the blocker to
+cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-286 saturated retarget queued Attack)
 
 Accepted cycle-1,800 receipt `277fb87f` advances the shared clean horizon from
 285 to 286 (earliest divergence 287), preserves every campaign frontier, and

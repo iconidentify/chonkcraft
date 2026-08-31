@@ -710,11 +710,28 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         assertTargetAt(longTailRetargetChaser,
                 "unit-human-guard-tower", 39, 41,
                 "the landing callback installs the native building target");
-        assertEquals(11, longTailRetargetChaser.pathLength(),
+        assertEquals(12, longTailRetargetChaser.pathLength(),
                 "the committed east byte leaves the native route tail");
-        assertEquals(Direction.fromDelta(1, 1),
-                longTailRetargetChaser.peekHeading(),
-                "the replacement route next turns south-east");
+        int[] retainedBuildingTail = {
+            Direction.fromDelta(1, 1),
+            Direction.fromDelta(1, 0),
+            Direction.fromDelta(1, 1),
+            Direction.fromDelta(0, 1),
+            Direction.fromDelta(0, 1),
+            Direction.fromDelta(-1, 1),
+            Direction.fromDelta(-1, 1),
+            Direction.fromDelta(-1, 0),
+            Direction.fromDelta(-1, 0),
+            Direction.fromDelta(-1, 0),
+            Direction.fromDelta(-1, -1),
+            Direction.fromDelta(1, -1),
+        };
+        for (int depth = 0; depth < retainedBuildingTail.length; depth++) {
+            assertEquals(retainedBuildingTail[depth],
+                    longTailRetargetChaser.peekHeadingAtDepth(depth),
+                    "the paid building redraw retains native heading "
+                            + depth);
+        }
         assertEquals(0, longTailRetargetChaser.battleNetCollisionCounter(),
                 "NewPath clears the obsolete collision generation");
         assertEquals(76, guardTower.hitPoints(),
@@ -760,7 +777,7 @@ class XHuman12BehaviorOneRetargetRealDataTest {
         }
         assertEquals(40, longTailRetargetChaser.tileX());
         assertEquals(38, longTailRetargetChaser.tileY());
-        assertEquals(11, longTailRetargetChaser.pathLength(),
+        assertEquals(12, longTailRetargetChaser.pathLength(),
                 "Attack construction retains the free southeast head");
 
         mission.tick();
@@ -773,11 +790,37 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "the free southeast step has only committed its residual");
         assertEquals(Direction.fromDelta(1, 1),
                 longTailRetargetChaser.lastStepHeading());
-        assertEquals(10, longTailRetargetChaser.pathLength(),
+        assertEquals(11, longTailRetargetChaser.pathLength(),
                 "the timer-one step consumes exactly one cached heading");
         assertEquals(0,
                 longTailRetargetChaser.battleNetCollisionCounter(),
                 "a free retained head does not open a refusal generation");
+
+        while (fixtureCycle(world) < 286) {
+            mission.tick();
+        }
+        assertEquals(41, longTailRetargetChaser.tileX());
+        assertEquals(39, longTailRetargetChaser.tileY());
+        assertEquals(-2, longTailRetargetChaser.offsetX());
+        assertEquals(-2, longTailRetargetChaser.offsetY(),
+                "fixture 286 still owes the last southeast residual pixels");
+        assertEquals(Direction.fromDelta(1, 0),
+                longTailRetargetChaser.peekHeading(),
+                "the third cached byte is native east, not duplicate southeast");
+
+        mission.tick();
+        assertEquals(287, fixtureCycle(world));
+        assertEquals(42, longTailRetargetChaser.tileX(),
+                "the native third heading advances east at the shared frontier");
+        assertEquals(39, longTailRetargetChaser.tileY());
+        assertEquals(-32, longTailRetargetChaser.offsetX());
+        assertEquals(0, longTailRetargetChaser.offsetY());
+        assertEquals(Direction.fromDelta(1, 0),
+                longTailRetargetChaser.lastStepHeading());
+        assertEquals(10, longTailRetargetChaser.pathLength());
+        assertEquals(Direction.fromDelta(1, 1),
+                longTailRetargetChaser.peekHeading(),
+                "the east commit retains the following southeast byte");
     }
 
     private static int fixtureCycle(World world) {
