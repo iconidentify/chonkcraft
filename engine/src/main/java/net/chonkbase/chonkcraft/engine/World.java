@@ -15297,10 +15297,13 @@ public final class World {
         // taken. Flyers keep the same pre-consult drain for self-patrol.
         boolean residualSettledThisVisit = false;
         boolean pendingAttackAtResidualStart = unit.pendingAttack() != null;
+        boolean behaviorFourOddDestEvenStop =
+                battleNetBehaviorFourOddDestEvenStop(unit);
         if (unit.battleNetDoubleStep() && unit.isMoving()
                 && (unit.type().seaUnit()
                 || (unit.type().moveType() == UnitType.Movement.FLY
-                        && unit.pathLength() == 0))) {
+                        && (unit.pathLength() == 0
+                                || behaviorFourOddDestEvenStop)))) {
             // Fly pathn-0 residual drain was limited to the self-patrol
             // endpoint (tile==orderTarget). Mid-journey balloons that spent
             // a short pathfinder prefix (XORc 8 1452: E then SE onto 82,70
@@ -15426,6 +15429,17 @@ public final class World {
                 && !battleNetPatrolEndpointReached(unit)) {
             unit.setRouteSpent(false);
             unit.setWaitCycles(0);
+        }
+        // An odd behaviour-four point is not on an armed flyer's doubled
+        // movement lattice. Retail drains the stride onto the adjacent even
+        // anchor, parks the final cached byte at route index 20, and installs
+        // Still on that same visit. XOrc 8 rider 1560 reaches (4,8) for point
+        // (4,7) with one north byte left; spending it moved Java to (4,6) at
+        // fixture 304 while native reconstructed Still 2233/3 on (4,8).
+        if (residualSettledThisVisit && behaviorFourOddDestEvenStop) {
+            int stillTimer = unit.battleNetPathStepsTaken() > 1 ? 3 : 1;
+            finishBattleNetBehaviorFourFlyerScout(unit, stillTimer);
+            return;
         }
         // A recurring behaviour-four ray can spend a saturated cardinal
         // prefix on the skirt of its literal point.  That is not the same
@@ -17287,6 +17301,26 @@ public final class World {
                 && unit.battleNetDoubleStep()
                 && unit.type().moveType() == UnitType.Movement.FLY
                 && unit.type().canAttack();
+    }
+
+    /** Whether an armed behaviour-four scout has reached an odd point's skirt. */
+    private boolean battleNetBehaviorFourOddDestEvenStop(Unit unit) {
+        if (!battleNetArmedFlyerPatrol(unit)
+                || !unit.battleNetScoutPatrol()
+                || !unit.battleNetFlyerScoutExhausted()
+                || unit.battleNetAiBehavior() == 2
+                || unit.pathLength() != 1) {
+            return false;
+        }
+        int destX = unit.orderTargetX();
+        int destY = unit.orderTargetY();
+        if (destX < 0 || destY < 0
+                || (destX % 2 == 0 && destY % 2 == 0)
+                || (unit.tileX() & 1) != 0 || (unit.tileY() & 1) != 0) {
+            return false;
+        }
+        return Math.max(Math.abs(unit.tileX() - destX),
+                Math.abs(unit.tileY() - destY)) == 1;
     }
 
     /** Whether this Patrol is an armed doubled non-capital warship. */

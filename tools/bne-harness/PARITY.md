@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-303 retained naval refusal routes)
+## Current release checkpoint — 2026-08-31 (cycle-310 odd-point flyer completion)
+
+Accepted cycle-1,800 receipt `7cb1c8e4` advances the shared clean horizon from
+fixture 303 through 310 and preserves or improves every campaign frontier. The
+fleet remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,597, an increase of seven. The cycle-400 fleet remains 36
+clean / 16 divergent / 0 failed under receipt `090af527`. The long receipt is
+retained at
+`.bne-artifacts/runs/7cb1c8e4c4917b2e38d867325ab6d50911c0b43fadf3e44d8fc9e7ba4e3cf530`.
+It binds dirty engine-input identity `8b8fca16` at base revision `b87fa7a` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`0f744a3edd3481707c2cf101cfa3ffd18e9e258aa98660a07ec619b3e47eacde`.
+
+Behavioral delta: an odd behavior-four scout point is outside an armed
+flyer's doubled movement lattice. When its committed stride settles on the
+adjacent even anchor with only the overshoot byte left, Java now parks that
+cached byte and completes the one-shot scout instead of consuming the byte in
+the same visit. A multi-step scout generation reconstructs the native
+three-call Still head. The rule uses behavior, scout lifecycle, doubled
+movement, endpoint parity, route cursor and residual-settle phase; it contains
+no mission, map, coordinate, fixture, cycle, faction or unit-ID branch.
+
+Proof delta: expansion Orc 8 gryphon-rider slot 1560 / Java 40 follows the
+native `N,NE,N,NE,N` route toward odd point `(4,7)`. Through fixture 303 both
+engines have consumed four headings, retain the final north byte and are
+finishing their northeast residual on anchor `(4,8)`. On fixture 304 native
+settles at pixel `(128,256)`, parks route index 4 at 20 and reconstructs
+Still@2233/3. Java formerly consumed the parked north byte and reported Patrol
+at `(4,6)`. The corrected lifecycle keeps `(4,8)` Still and moves expansion
+Orc 8's first divergence from fixture 304 to 311.
+
+Efficacy receipt
+`.bne-test-efficacy/c304-armed-flyer-odd-point/runs/0102eba3d45e042c27ddb658748295dd0b3f10b3f2d4893568be84ae7db973f1`
+proves the focused fixture-304 regression assertion-fails on `b87fa7a` and
+passes on the candidate. All 63 focused flyer, pathfinder, stride-destination
+and occupancy controls pass, as do both fixed 52-case gates. The ordinary
+executable next-level gate exits zero after 209 Python checks and 95
+engine/desktop checks; its command worklist remains 11 comparable scenarios
+(6 exact / 5 divergent) without regression or infrastructure failure.
+`--require-certified` still reports the documented incomplete producer lanes;
+remote AI discovery also stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier is now fixture 311. Expansion Orc 8 human destroyer slot
+1431 is at `(90,82)` natively versus `(92,80)` in Java. Frontier compilation
+under `.bne-field-evidence/cycle310-frontier-compile` authenticates the frame
+and routes the position/movement mismatch to cadence next.
+
+## Prior release checkpoint — 2026-08-31 (cycle-303 retained naval refusal routes)
 
 Accepted cycle-1,800 receipt `cf53f6d8` advances the shared clean horizon from
 fixture 302 through 303 and preserves or improves every campaign frontier. The

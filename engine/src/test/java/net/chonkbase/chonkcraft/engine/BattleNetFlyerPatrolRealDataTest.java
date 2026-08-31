@@ -139,6 +139,24 @@ class BattleNetFlyerPatrolRealDataTest {
                 "the queued force Patrol promotes on the native marker");
         assertEquals(2233, rider.battleNetSequenceOffset());
         assertEquals(3, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 303);
+        assertEquals(Unit.Order.PATROL, rider.order());
+        assertEquals(4, rider.tileX());
+        assertEquals(8, rider.tileY(),
+                "the fourth route stride lands beside the odd scout point");
+        assertEquals(1, rider.pathLength(),
+                "the floored doubled route still carries its overshoot byte");
+
+        tickThrough(mission, 304);
+        assertEquals(Unit.Order.STILL, rider.order(),
+                "the even anchor beside the odd point completes the scout leg");
+        assertEquals(4, rider.tileX());
+        assertEquals(8, rider.tileY(),
+                "the leftover north byte must not overshoot the odd point");
+        assertEquals(0, rider.pathLength());
+        assertEquals(2233, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer());
     }
 
     @Test
