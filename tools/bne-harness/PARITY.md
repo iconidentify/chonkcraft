@@ -15,7 +15,64 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-299 collision-lifecycle consolidation)
+## Current release checkpoint — 2026-08-31 (cycle-299 critter wander generations)
+
+Accepted cycle-1,800 receipt `3c80d2f0` preserves the shared clean horizon
+through fixture 299 while removing one of the two tied cycle-300 blockers. The
+fleet improves from 8 clean / 44 divergent / 0 failed to 10 clean / 42
+divergent / 0 failed, and the 52 per-case exact prefixes now sum to 37,459, an
+increase of 1,346. The cycle-400 fleet improves from 34 clean / 18 divergent
+to 36 clean / 16 divergent / 0 failed under receipt `17ac80bb`. The long
+receipt is retained at
+`.bne-artifacts/runs/3c80d2f076265d10eea57f47fc55c56308620540646740e5577a6923c9815d05`.
+It binds dirty engine-input identity `9c9d0b73` at base revision `9ee9d5c` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`8a90a44960c260a6052eefb6c91adfefc16bf93ce493098d7ca76394b009ce2e`.
+
+Behavioral delta: a critter's completed-wander pause and packed refusal count
+belong to that wander generation. When an idle action marker successfully
+installs a replacement wander target, Java now retires the old pause and
+refusal count before the new target starts its order delay. Refusals against
+one unchanged target remain sticky and still open the native fifteen-cycle
+Move band on the eighth refusal. The rule is confined to the BNE critter idle
+marker and uses accepted order construction plus target replacement; it
+contains no mission, map, coordinate, fixture, cycle, faction, or unit-ID
+branch.
+
+Proof delta: Human 11 native critter slot 1498 / Java 102 receives east target
+`(75,50)` on fixture 257, counts refusals one through eight on fixtures
+260-267, and pays that generation's Move band through 281. The fixture-282
+idle marker replaces the target with northeast `(75,49)`; native changes the
+packed collision byte from `0x80` to `0x00`, while Java formerly carried eight.
+The fresh target then counts one through eight on fixtures 285-292, remains
+Move at the old fleet blocker on 300, and commits northeast on 307. Human 11's
+exact prefix advances 299 -> 670. The same systemic change advances Human 10
+341 -> 548 and makes Human 3 and expansion Human 1 exact through the full
+1,800-cycle horizon (from 1,539 and 1,293 respectively). Orc 13 and Human 14's
+occupied-wander controls still preserve their refusal generations.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/1cf064e8aa2eeee395e9903de4a77084a0778107a3d4f904cfe11e1546d2dedc`
+proves the new real-data regression assertion-fails on `9ee9d5c` at the
+fixture-282 reset and passes on the candidate. Five focused replacement,
+occupied-wander, and critter-wait checks pass. Both fixed 52-case cycle-400
+and cycle-1,800 gates pass. The executable next-level gate exits zero after
+209 Python checks and 95 focused engine/desktop checks; its command worklist
+remains 11 comparable scenarios (6 exact / 5 divergent) with no regression or
+infrastructure failure. Strict SSH verification still rejects the changed
+`i9beef` host key, so remote AI discovery and the broader certification lanes
+remain intentionally incomplete.
+
+The sole shared frontier blocker is now expansion Orc 11 at fixture 300:
+native battleship slot 1511 has 105 HP while its paired Java unit has 117 HP.
+The accepted damage-shape classifier finds different change cycles and counts,
+so randomized damage is not suspected and the work order routes to causal
+combat/event ordering. Expansion Orc 8 follows at fixture 302 and expansion
+Human 7 at fixture 303.
+
+## Prior release checkpoint — 2026-08-31 (cycle-299 collision-lifecycle consolidation)
 
 Accepted cycle-1,800 receipt `8858bbe1` advances the shared clean horizon from
 296 to 299 (two tied earliest divergences at 300), preserves or improves every

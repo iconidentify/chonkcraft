@@ -1601,12 +1601,14 @@ final class BattleNetIdleSystem {
                 unit.setBattleNetOccupiedEmptyReWander(false);
                 unit.setBattleNetCoastEmptyExtraWait(false);
                 if (critter) {
-                    // The empty-route pause belongs to the completed wander.
-                    // Once a Still marker installs the next wander, retail
-                    // starts that action's own delay immediately; carrying the
-                    // old pause into the new Move parks an animal for another
-                    // seven cycles after it has already accepted the order.
+                    // The pause and refusal count belong to the completed
+                    // wander. Once an idle marker installs the next wander,
+                    // retail starts that action's own delay and refusal
+                    // generation immediately. Human 11 slot 1498 clears a
+                    // saturated east generation when it re-aims northeast;
+                    // ordinary retries against either target remain sticky.
                     unit.setWaitCycles(0);
+                    unit.setBattleNetRefusals(0);
                 }
             }
             if (moved && critter && world.battleNetSequence != null) {

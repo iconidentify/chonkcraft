@@ -1653,7 +1653,9 @@ public final class Unit {
      * cleared merely by taking a step, laying a route, or arriving. Retail's
      * peon 1521 in Orc 12 is still carrying eight twenty-four cycles after it
      * started walking again; XHuman 12 grunt 1504 instead changes four to zero
-     * exactly when the handoff installs Attack at fixture 87.
+     * exactly when the handoff installs Attack at fixture 87. A critter's
+     * idle marker likewise clears the old generation when it installs a new
+     * wander target, while retries against that target keep accumulating.
      *
      * <p>This is deliberately not {@link #battleNetCollisionCounter}, which
      * this implementation also uses to choose which wait band a refusal takes and
