@@ -754,6 +754,30 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "the settle callback publishes native guard tower 1483");
         assertEquals(0,
                 frontierLongTailRetarget.battleNetCollisionCounter());
+
+        while (fixtureCycle(world) < 270) {
+            mission.tick();
+        }
+        assertEquals(40, longTailRetargetChaser.tileX());
+        assertEquals(38, longTailRetargetChaser.tileY());
+        assertEquals(11, longTailRetargetChaser.pathLength(),
+                "Attack construction retains the free southeast head");
+
+        mission.tick();
+        assertEquals(271, fixtureCycle(world));
+        assertEquals(41, longTailRetargetChaser.tileX(),
+                "timer one consumes the retained free building-route head");
+        assertEquals(39, longTailRetargetChaser.tileY());
+        assertEquals(-32, longTailRetargetChaser.offsetX());
+        assertEquals(-32, longTailRetargetChaser.offsetY(),
+                "the free southeast step has only committed its residual");
+        assertEquals(Direction.fromDelta(1, 1),
+                longTailRetargetChaser.lastStepHeading());
+        assertEquals(10, longTailRetargetChaser.pathLength(),
+                "the timer-one step consumes exactly one cached heading");
+        assertEquals(0,
+                longTailRetargetChaser.battleNetCollisionCounter(),
+                "a free retained head does not open a refusal generation");
     }
 
     private static int fixtureCycle(World world) {

@@ -1215,6 +1215,16 @@ final class BattleNetMovementSystem {
     }
 
     boolean battleNetSoftClearMoveAlly(Unit candidate) {
+        return battleNetSoftClearMoveAlly(candidate, false);
+    }
+
+    /** Native Move view when a live route proves Java's refusal proxy stale. */
+    boolean battleNetSoftClearLiveRouteRefusalAlly(Unit candidate) {
+        return battleNetSoftClearMoveAlly(candidate, true);
+    }
+
+    private boolean battleNetSoftClearMoveAlly(Unit candidate,
+            boolean ignoreLiveRouteRefusal) {
         // Native's test at 0x004507b5 is the action-state byte at record
         // offset 8 reading 3 -- the Move body -- and its last test is
         // 0x1e & 0x4000, which is carried by 2,271 of the 2,524 records that
@@ -1287,10 +1297,14 @@ final class BattleNetMovementSystem {
                 && retainedMeleeTarget != candidate.target()
                 && (retainedMeleeTarget.isDying()
                         || !retainedMeleeTarget.isAlive());
+        boolean liveRouteRefusalProxy = ignoreLiveRouteRefusal
+                && candidate.pathLength() > 0
+                && candidate.battleNetCollisionCounter() == 0;
         if (!armedDrainedMove
                 && (candidate.battleNetCollisionCounter() > 0
                         || (candidate.battleNetRefusals() > 0
-                                && !retiredMeleeRefusal))) {
+                                && !retiredMeleeRefusal
+                                && !liveRouteRefusalProxy))) {
             return false;
         }
         // A committed melee swing may still name the retired quarry after

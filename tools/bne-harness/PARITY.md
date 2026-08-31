@@ -15,7 +15,55 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (assault-patrol worker refusal)
+## Current release checkpoint — 2026-08-30 (cycle-271 chase handoffs)
+
+Accepted cycle-1,800 receipt `d71aefea` advances the shared clean horizon from
+270 to 274 (earliest divergence 275), preserves every other campaign frontier,
+and retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52
+per-case exact prefixes sum to 35,571, four more than the preceding accepted
+survey. The receipt is retained under
+`.bne-artifacts/runs/d71aefeab9a6ad01883c8c94b0f2c8dbbcfa0730cb4104371d54b82363431df5`.
+It binds dirty engine-input identity `64248823` at base revision `b309e43` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule `c262f1e4`.
+
+Behavioral delta: two independent chase handoffs now distinguish route
+ownership from head occupancy. First, a completed Attack constructor transfers
+a retained building route directly to Move when its cached head is free; only
+an occupied head parks and redraws the route-index-twenty replay. Second, a
+saturated melee chase which changes from a building quarry to a mobile quarry
+as its residual settles continues the already-paid clockwise wall face rather
+than drawing a cold Bresenham prefix. That continuation uses native's split
+occupancy view: a Move-action ally with a live route and raw collision zero is
+soft to wall tracing even when Java's separate refusal proxy remains, but stays
+hard to optimization and to the later movement probe. Replacing the quarry
+retires the old collision generation before that probe. Both rules are
+expressed in route ownership, target kind, residual settlement, movement action,
+collision generation, and live occupancy, with no map, unit-ID, cycle,
+coordinate, faction, or arbitrary route-length exception.
+
+Proof delta: expansion Human 12 native grunt 1503 / Java 97 retains southeast
+behind its fixture-252 east leg. On fixture 271 the square is free, so the
+timer-one handoff consumes southeast, commits (40,38)→(41,39), and leaves ten
+route bytes without opening a collision generation. Independently, native
+grunt 1492 / Java 108 settles at (28,37), replaces guard tower 1483 with the
+knight at (30,43), and writes the complete route
+`E,E,E,SE,SE,SE,E,E,E,NE,NE,NE,SE,S,SE,SE,S,S,SW,SW`. The occupied east head
+is retained, the new collision generation becomes one, and Move starts at
+timer fifteen without changing tile. Efficacy receipts
+`.bne-test-efficacy/building-free-retained-head/runs/47a5e8cf3f7e41054fd86f360da2f72a98b532a78db14ad7c7f6a81ab6bcb0a8`
+and
+`.bne-test-efficacy/saturated-building-mobile-wall-continuation/runs/b50b1edbd4e62964b2d93ae5c30c68b3d8328e3d123600207e3cb774aa366ada`
+prove the focused assertions fail on `b309e43` and pass on the candidate. The
+two focused real-data classes, `BattleNetPathFinderTest`, and all 30
+`bne_java.py` tests pass.
+
+The newly exposed blocker remains expansion Human 12, now at fixture 275:
+native grunt 1496 is at (36,39), while Java is at (37,38). The accepted
+compiler routes this position transition to cadence analysis.
+
+## Prior release checkpoint — 2026-08-30 (assault-patrol worker refusal)
 
 Accepted cycle-1,800 receipt `d93dd71c` advances the shared clean horizon from
 269 to 270 (earliest divergence 271), preserves every other campaign frontier,

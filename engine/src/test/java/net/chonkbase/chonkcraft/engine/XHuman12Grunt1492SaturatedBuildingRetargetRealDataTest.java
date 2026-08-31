@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -87,6 +88,43 @@ class XHuman12Grunt1492SaturatedBuildingRetargetRealDataTest {
                 "the paid replacement eventually releases south-west");
         assertEquals(37, grunt.tileY());
         assertEquals(Direction.fromDelta(-1, 1), grunt.lastStepHeading());
+
+        tickThrough(mission, 270);
+        assertEquals(28, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(2, grunt.offsetX());
+        assertEquals(-2, grunt.offsetY(),
+                "fixture 270 still owes the final southwest residual");
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                grunt.pathLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        assertEquals(7, grunt.battleNetCollisionCounter());
+        assertNotNull(grunt.target());
+        assertEquals("unit-human-guard-tower",
+                grunt.target().type().ident());
+        assertEquals(25, grunt.target().tileX());
+        assertEquals(42, grunt.target().tileY());
+
+        tickThrough(mission, 271);
+        assertEquals(28, grunt.tileX(),
+                "the occupied continuation head must not move the grunt");
+        assertEquals(37, grunt.tileY());
+        assertEquals(0, grunt.offsetX());
+        assertEquals(0, grunt.offsetY());
+        assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength(),
+                "the refused continuation retains all twenty route bytes");
+        assertEquals(Direction.fromDelta(1, 0), grunt.peekHeading(),
+                "the paid clockwise face opens east, not cold-route south");
+        assertEquals(1, grunt.battleNetCollisionCounter(),
+                "the replacement quarry starts a fresh refusal generation");
+        assertEquals(15, grunt.battleNetAnimationTimer(),
+                "the occupied east head enters native Move 15");
+        assertNotNull(grunt.target());
+        assertEquals("unit-knight", grunt.target().type().ident());
+        assertEquals(30, grunt.target().tileX());
+        assertEquals(43, grunt.target().tileY());
     }
 
     private static Mission mission(String map) {

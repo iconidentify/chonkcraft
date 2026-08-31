@@ -6787,6 +6787,23 @@ public final class World {
             int goalPaddingOverride,
             boolean forceSharedWallBuffer,
             Unit keepSpecificMovingAllyHard) {
+        return findBattleNetTargetPath(unit, target, settledResidualRetarget,
+                completedRefusalBand, keepMovingAlliesHard,
+                retainPaidBandWallFace, keepSaturatedAlliesHard,
+                goalPaddingOverride, forceSharedWallBuffer,
+                keepSpecificMovingAllyHard, false);
+    }
+
+    private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean keepMovingAlliesHard,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            int goalPaddingOverride,
+            boolean forceSharedWallBuffer,
+            Unit keepSpecificMovingAllyHard,
+            boolean continueSaturatedRetargetWallFace) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> reservedMoveBodies = new ArrayList<>();
         java.util.List<Unit> transparentQueuedReturners = new ArrayList<>();
@@ -6997,8 +7014,14 @@ public final class World {
                 // 0x450690 may cross a friendly unit whose Move sequence has
                 // already begun. Attack-sequence chasers keep hard occupancy
                 // (XHuman 12 residual replan east wall-follow).
+                boolean softClearMoveAlly =
+                        movement.battleNetSoftClearMoveAlly(candidate)
+                        || (continueSaturatedRetargetWallFace
+                                && movement
+                                        .battleNetSoftClearLiveRouteRefusalAlly(
+                                                candidate));
                 if (!queuedReturnBehindCollidedRayBlocker
-                        && !movement.battleNetSoftClearMoveAlly(candidate)
+                        && !softClearMoveAlly
                         && !paidBandSoft) {
                     continue;
                 }
@@ -7245,6 +7268,25 @@ public final class World {
                     true, false, false, preferMarkedWallOnTie,
                     sharedSaturatedWall, reverseWallFace,
                     retainPaidBandWallFace || rangedCloseHitWallFace);
+            if (continueSaturatedRetargetWallFace) {
+                int continuedHeading = battleNetFirstBresenhamHeading(
+                        unit.tileX(), unit.tileY(), goalX, goalY);
+                PathFinder.Path continued = BattleNetPathFinder
+                        .continueWallFace(
+                                unit.tileX(), unit.tileY(), goalX, goalY,
+                                continuedHeading, -1,
+                                battleNetMovementStride(unit),
+                                traversalPassability,
+                                optimizationPassability,
+                                (x, y) -> x >= targetLeft - goalPadding
+                                        && x <= targetRight + goalPadding
+                                        && y >= targetTop - goalPadding
+                                        && y <= targetBottom + goalPadding);
+                if (continued.result() == PathFinder.Result.FOUND
+                        && continued.length() > 0) {
+                    path = continued;
+                }
+            }
             if (unit.battleNetPaidLongResidualRefill()
                     && unit.battleNetParkedRefusalHeading() >= 0
                     && unit.battleNetParkedRefusalHeading() < Direction.COUNT) {
@@ -12373,6 +12415,13 @@ public final class World {
                 false, false, false, false, true);
     }
 
+    /** Continues the paid clockwise wall face on a saturated mobile retarget. */
+    PathFinder.Result planTowardsAfterSaturatedBuildingRetarget(
+            Unit unit, Unit target) {
+        return planTowards(unit, target,
+                true, false, false, false, false, true);
+    }
+
     /**
      * Restores the bounded route written by a collision-three formation probe.
      *
@@ -12742,6 +12791,18 @@ public final class World {
             boolean retainPaidBandWallFace,
             boolean keepSaturatedAlliesHard,
             boolean hardenMovingRouteHead) {
+        return planTowards(unit, target, settledResidualRetarget,
+                completedRefusalBand, retainPaidBandWallFace,
+                keepSaturatedAlliesHard, hardenMovingRouteHead, false);
+    }
+
+    private PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            boolean hardenMovingRouteHead,
+            boolean continueSaturatedRetargetWallFace) {
         // Aimed at anywhere this unit could hit the target from, not at the
         // square the target is standing on. That square is occupied by
         // definition, so a route to it can only end on top of somebody: the
@@ -12770,7 +12831,8 @@ public final class World {
                 unit, target, settledResidualRetarget,
                 completedRefusalBand, false,
                 retainPaidBandWallFace,
-                keepSaturatedAlliesHard, -1, false, null);
+                keepSaturatedAlliesHard, -1, false, null,
+                continueSaturatedRetargetWallFace);
         if (hardenMovingRouteHead && path != null
                 && path.result() == PathFinder.Result.FOUND
                 && path.length() > 0) {

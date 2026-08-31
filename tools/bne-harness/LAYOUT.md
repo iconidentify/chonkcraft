@@ -211,6 +211,19 @@ occupancy are two halves of one refusal protocol; treating the first occupied
 heading as a generic refusal loses the cached route and delays the step seven
 cycles.
 
+The same two-view protocol survives stale port-only refusal state during a
+saturated target replacement. On expansion Human 12 fixture 271, native slots
+1479, 1480, 1506, and 1489 are in Move action 3 with raw collision byte zero;
+the wall tracer clears their land occupancy even though their Java twins still
+carry separate refusal proxies. Native grunt 1492 continues its paid clockwise
+face and writes
+`E,E,E,SE,SE,SE,E,E,E,NE,NE,NE,SE,S,SE,SE,S,S,SW,SW`. Occupancy is restored
+before Move consumes the buffer, so slot 1479 on the first east square refuses
+that head. The router's old raw collision byte `0x80` is retired with the guard
+tower quarry and the new refusal writes `0x10`, while the route index remains
+zero and the animation timer becomes fifteen. Thus the route writer's soft
+view does not imply that execution may enter the same square.
+
 Wall-follow step selection at `0x450114`–`0x45020f`: an out-of-bounds
 candidate step fails the entire face (`jae 0x450315` at `0x45015c` /
 `0x45016a`) without rotating; blocked terrain only rotates the heading until

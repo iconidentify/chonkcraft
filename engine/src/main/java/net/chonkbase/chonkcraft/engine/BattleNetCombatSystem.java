@@ -459,6 +459,18 @@ final class BattleNetCombatSystem {
                     retainedPaidConstruction
                             && unit.pathLength()
                                     == BattleNetPathFinder.MAX_PATH - 1;
+            int retainedBuildingHeading = retainedBuildingReplay
+                    ? unit.peekHeading() : -1;
+            int retainedBuildingStride = retainedBuildingReplay
+                    ? world.battleNetMovementStride(unit) : 0;
+            boolean retainedBuildingHeadBlocked = retainedBuildingReplay
+                    && !world.canEnter(unit,
+                            unit.tileX() + Direction.deltaX(
+                                    retainedBuildingHeading)
+                                    * retainedBuildingStride,
+                            unit.tileY() + Direction.deltaY(
+                                    retainedBuildingHeading)
+                                    * retainedBuildingStride);
             saturatedPaidEmptyImmediateStep = paidReplacementBand
                     && unit.pathLength() == 0
                     && unit.battleNetCollisionCounter() == 0
@@ -574,7 +586,7 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetAttackRefusalRecoveryStage(0);
                 return;
             }
-            if (retainedBuildingReplay) {
+            if (retainedBuildingHeadBlocked) {
                 // The native cursor is parked past the route buffer on this
                 // visit. The consumed cardinal opening is still present in
                 // raw storage, but NewPath redraws the complete footprint-
@@ -592,6 +604,11 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetChaseStepReady(false);
                 return;
             }
+            // A free cached head is still owned by the completed Attack
+            // constructor. It transfers directly to Move and is consumed
+            // below on this timer-one visit; only a refused head takes the
+            // route-index-twenty replay above. XHuman 12 slot 1503 retains
+            // southeast after its fixture-252 east leg and spends it on 271.
             if (longRetainedPaidConstruction) {
                 // The timer-one handoff itself only transfers ownership.
                 // Native keeps every cached byte and exposes the complete
@@ -3855,6 +3872,25 @@ final class BattleNetCombatSystem {
                             settledMeleeResidualRetarget
                             && unit.battleNetCollisionCounter() >= 4
                             && unit.battleNetRefusals() == 0;
+                    boolean saturatedBuildingQuarryRetarget =
+                            saturatedSettledResidualRetarget
+                            && unit.battleNetPathInitialLength()
+                                    == BattleNetPathFinder.MAX_PATH
+                            && unit.battleNetPathStepsTaken() == 1
+                            && unit.battleNetCollisionCounter() >= 5
+                            && previous.type() != null
+                            && previous.type().building()
+                            && candidate.type() != null
+                            && !candidate.type().building()
+                            && world.canEnter(unit,
+                                    unit.tileX() + Direction.deltaX(
+                                            unit.peekHeading())
+                                            * world.battleNetMovementStride(
+                                                    unit),
+                                    unit.tileY() + Direction.deltaY(
+                                            unit.peekHeading())
+                                            * world.battleNetMovementStride(
+                                                    unit));
                     boolean incumbentPlanBeforePaidRefillRetarget =
                             settledMeleeResidualRetarget
                             && unit.battleNetRetargetResidualParkRefill()
@@ -4772,6 +4808,28 @@ final class BattleNetCombatSystem {
                                 } else {
                                     world.planTowards(unit, chased, true);
                                 }
+                            } else if (saturatedBuildingQuarryRetarget) {
+                                // A saturated building chase which replaces
+                                // its quarry on residual settlement continues
+                                // the already-paid clockwise wall face. The
+                                // continuation uses native's Move-action view:
+                                // a live-route ally with raw collision zero is
+                                // soft to the wall trace even when Java's
+                                // separate refusal proxy remains, but stays
+                                // hard to optimization and the later movement
+                                // probe. XHuman 12 slot 1492 therefore writes
+                                // the twenty-byte E-led route on fixture 271,
+                                // then refuses its occupied east head and
+                                // starts Move 15. A cold redraw chose S,SE and
+                                // moved immediately.
+                                world.planTowardsAfterSaturatedBuildingRetarget(
+                                        unit, chased);
+                                // Target replacement retires the saturated
+                                // building generation before Move tests the
+                                // continued head. Native changes raw 0x80 to
+                                // 0x10 on the occupied east probe: zero for
+                                // the new quarry, then the first refusal.
+                                unit.setBattleNetCollisionCounter(0);
                             } else {
                                 world.planTowards(unit, chased, true);
                             }
