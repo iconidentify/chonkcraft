@@ -15,7 +15,58 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-310 odd-point flyer completion)
+## Current release checkpoint — 2026-08-31 (cycle-311 long patrol-route authority)
+
+Accepted cycle-1,800 receipt `85d6f4b5` advances the shared clean horizon from
+fixture 310 through 311 and preserves or improves every campaign frontier. The
+fleet remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,598, an increase of one. The cycle-400 fleet remains 36
+clean / 16 divergent / 0 failed under receipt `855e6439`. The long receipt is
+retained at
+`.bne-artifacts/runs/85d6f4b5059a65b7170cf3a88f5e8317aff727323006f89c11947762d9b0a0b7`.
+It binds dirty engine-input identity `59215f3e` at base revision `a35d0e0` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`5438af580007ec849983504114cd725966523f7e61c90f4e07f6a48c5f83e777`.
+
+Behavioral delta: the naval Patrol residual free-closer correction belongs to
+a short wall-follow generation of at most four cached headings. A longer paid
+route remains authoritative after its first stride settles even when another
+free compass heading is closer to the Patrol point. The narrowed rule uses
+movement class, Patrol provenance, route-generation length, route cursor and
+residual-settle phase; it contains no mission, map, coordinate, fixture,
+cycle, faction or unit-ID branch.
+
+Proof delta: expansion Orc 8 human destroyer slot 1431 / Java 169 draws the
+seven-heading `SW,W,W,NW,N,N,NE` paid route from `(94,80)` toward point
+`(88,73)`. Its southwest stride leaves six cached headings and settles through
+fixture 310 at `(92,82)` with west at the cursor. On fixture 311 native consumes
+that west byte, advances route index one to two and anchors at `(90,82)`.
+Java formerly applied the four-heading wall-follow correction, discarded the
+six-byte tail and chose free north because it was closer to the Patrol point,
+anchoring at `(92,80)`. The corrected route authority moves expansion Orc 8's
+first divergence from fixture 311 to 312.
+
+Efficacy receipt
+`.bne-test-efficacy/c311-long-destroyer-route/runs/bcba026bc78b72d7240feb48a4e60d3091f9d3404dd011973b310561871eb268`
+proves the focused fixture-311 regression assertion-fails on `a35d0e0` and
+passes on the candidate. All 62 focused small-warship, pathfinder,
+stride-destination and occupancy controls pass, as do both fixed 52-case
+gates. The ordinary executable next-level gate exits zero after 209 Python
+checks and 95 engine/desktop checks; its command worklist remains 11 comparable
+scenarios (6 exact / 5 divergent) without regression or infrastructure
+failure. The broader certified producer lanes remain incomplete, and remote AI
+discovery still stops at strict SSH verification of the changed `i9beef` host
+key, which was not modified.
+
+The shared frontier is now fixture 312. Expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java. Frontier compilation under
+`.bne-field-evidence/cycle311-frontier-compile` authenticates the frame and
+routes the position/movement mismatch to cadence and temporal state-machine
+analysis next.
+
+## Prior release checkpoint — 2026-08-31 (cycle-310 odd-point flyer completion)
 
 Accepted cycle-1,800 receipt `7cb1c8e4` advances the shared clean horizon from
 fixture 303 through 310 and preserves or improves every campaign frontier. The

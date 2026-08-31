@@ -8,6 +8,7 @@ import java.io.StringWriter;
 import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.save.LoadGame;
 import net.chonkbase.chonkcraft.engine.save.SaveGame;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -315,6 +316,38 @@ class BattleNetSmallWarshipPatrolRealDataTest {
         assertEquals(1, destroyer.battleNetPathStepsTaken());
         assertTrue(!destroyer.battleNetNavalPaidParkedRoute(),
                 "the pass-start occupancy marker is one redraw wide");
+    }
+
+    @Test
+    @DisplayName("XOrc 8's long paid destroyer route retains west on cycle 311")
+    void xOrc8LongPaidDestroyerRouteRetainsWestOnCycle311() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 169);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1431");
+
+        tickThrough(mission, 310);
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(92, destroyer.tileX());
+        assertEquals(82, destroyer.tileY());
+        assertEquals(6, destroyer.pathLength(),
+                "the seven-heading paid redraw retains six cached bytes");
+        assertEquals(1, destroyer.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(-1, 0), destroyer.peekHeading(),
+                "west is the authoritative next byte before residual settle");
+
+        tickThrough(mission, 311);
+        assertEquals(90, destroyer.tileX(),
+                "native consumes cached west instead of free-closering north");
+        assertEquals(82, destroyer.tileY());
+        assertEquals(Direction.fromDelta(-1, 0), destroyer.lastStepHeading());
+        assertEquals(5, destroyer.pathLength(),
+                "the remaining five-byte tail stays live after west commits");
+        assertEquals(2, destroyer.battleNetPathStepsTaken());
     }
 
     private static Mission mission(GameData data) {

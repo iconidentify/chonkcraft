@@ -3958,7 +3958,10 @@ final class BattleNetMovementSystem {
             // Orc 13 tanker 1454 independently retains free E after four SE
             // headings on fixture 687 while free NE is strictly closer. The
             // XOrc 11 destroyer correction above owns a short four-byte
-            // wall-follow residual, not either full-buffer route.
+            // wall-follow residual, not either full-buffer route. A longer
+            // paid patrol route is authoritative as well: XOrc 8 destroyer
+            // 1431 retains W with six of seven bytes left at fixture 311 even
+            // though free N is closer to its odd patrol point.
             boolean capitalDoubleStep = unit.battleNetDoubleStep()
                     && ("unit-battleship".equals(unit.type().ident())
                     || "unit-ogre-juggernaught".equals(unit.type().ident()));
@@ -3986,8 +3989,7 @@ final class BattleNetMovementSystem {
                     && !unit.chasing()
                     && unit.resourceUnit() == null
                     && unit.pathLength() > 1
-                    && unit.battleNetPathInitialLength()
-                            < BattleNetPathFinder.MAX_PATH
+                    && unit.battleNetPathInitialLength() <= 4
                     && unit.orderTargetX() >= 0
                     && unit.orderTargetY() >= 0) {
                 int patrolGoalX = unit.orderTargetX();
