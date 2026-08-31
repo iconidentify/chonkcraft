@@ -251,6 +251,9 @@ final class BattleNetHarvestSystem {
         worker.setGatherClockStarted(false);
         worker.setBattleNetWoodReadyPathRequired(false);
         worker.setBattleNetSaturatedWoodCornerLadder(false);
+        worker.setBattleNetSaturatedWoodConstructionRoute(false);
+        worker.setBattleNetSaturatedWoodConstructionRedraw(false);
+        worker.setBattleNetSaturatedWoodClaimedReplacement(false);
         // Default off; gold free-prefix forest re-aim and range-one leftover
         // routes arm the walk claim themselves. A plain adjacent wood order
         // only draws at work 2660 (standing start).
@@ -263,6 +266,23 @@ final class BattleNetHarvestSystem {
         worker.setResourceWaitLadder(0);
         worker.setResourceUnreachableTries(0);
         worker.setResourceMoveCycles(0);
+        boolean unmatchedPaidCollisionOwner =
+                worker.battleNetCollisionCounter()
+                        > worker.battleNetRefusals();
+        if (unmatchedPaidCollisionOwner) {
+            // A fresh COrder_Resource retires the packed collision owner from
+            // the failed order. Equal Java collision/refusal pairs still carry
+            // route-construction provenance used by the replacement planner;
+            // an unmatched paid owner does not. XHuman 12 peon 1386 reaches
+            // UnitReady with collision/refusal 2/1 after its gold walk, while
+            // native clears unit+0x1d from 0x20 to zero as the fixture-168 wood
+            // order is constructed. Carrying that owner into the sixteen-byte
+            // wood route made its occupied east head look like a stale
+            // residual at fixture 316, discard the route, and redraw north.
+            worker.setBattleNetCollisionCounter(0);
+            worker.setBattleNetRefusals(0);
+            worker.setBattleNetRefusalHold(false);
+        }
         worker.setCarrying(info.resource());
         worker.setResourceUnit(building);
         worker.setResourceDepot(null);
@@ -347,6 +367,12 @@ final class BattleNetHarvestSystem {
                         && info != null && info.terrainHarvester()
                         && worker.resourceUnit() == null
                         && worker.pathLength() > 0;
+                boolean saturatedWoodConstructionBand =
+                        worker.battleNetSaturatedWoodConstructionRoute()
+                        && info != null && info.terrainHarvester()
+                        && worker.resourceUnit() == null
+                        && worker.pathLength() == 0
+                        && worker.battleNetCollisionCounter() >= 8;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
                 // A queued mine-exit Return Goods promotion starts action
@@ -426,6 +452,27 @@ final class BattleNetHarvestSystem {
                         // on its timer-one wake so the accepted saturated step
                         // keeps collision four.
                         worker.setBattleNetRefusalHold(true);
+                    }
+                }
+                if (saturatedWoodConstructionBand
+                        && world.battleNetSequence != null) {
+                    int moveStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        worker.setBattleNetSequenceOffset(moveStart);
+                        worker.setBattleNetAnimationTimer(left + 1);
+                    }
+                    if (left == 0) {
+                        // The paid timer-one callback retires the empty
+                        // construction loop, but not its packed collision
+                        // generation. XHuman 12 peon 1385 keeps collision
+                        // eight while its next resource visit redraws and
+                        // commits NE on fixture 307; the repeated cached NE
+                        // advances that same generation to nine on 323.
+                        worker.setBattleNetSaturatedWoodConstructionRoute(
+                                false);
+                        worker.setBattleNetSaturatedWoodConstructionRedraw(
+                                true);
                     }
                 }
                 boolean resumeFreeCooperativeReturn = false;
@@ -2181,6 +2228,46 @@ final class BattleNetHarvestSystem {
                 boolean alliedBlocker = blocker != null && blocker != worker
                         && blocker.isOnMap() && !blocker.isDying()
                         && world.isAllied(worker.player(), blocker.player());
+                Unit saturatedConstructionBlocker =
+                        worker.battleNetSaturatedWoodConstructionRedraw()
+                                ? world.blockerOnLayer(worker, nextX, nextY)
+                                : null;
+                boolean saturatedConstructionRedrawRouteHold =
+                        saturatedConstructionBlocker != null
+                        && saturatedConstructionBlocker != worker
+                        && saturatedConstructionBlocker.isOnMap()
+                        && !saturatedConstructionBlocker.isDying()
+                        && world.isAllied(worker.player(),
+                                saturatedConstructionBlocker.player())
+                        && worker.pathLength() >= 2
+                        && worker.battleNetCollisionCounter() >= 8
+                        && worker.lastStepHeading() == heading
+                        && Direction.isDiagonal(heading);
+                if (saturatedConstructionRedrawRouteHold) {
+                    // A route merged after the paid construction band still
+                    // belongs to that collision generation. Native XHuman 12
+                    // peon 1385 commits the first NE with collision eight,
+                    // drains it, then retains the second occupied NE and
+                    // advances 8 -> 9 on fixture 323. The guide is still
+                    // moving through this square, so query its live footprint
+                    // rather than only its logical tile. Treating the visit as
+                    // an ordinary repeated diagonal discarded the tail and
+                    // free-compassed east on 324.
+                    int collision = worker.battleNetCollisionCounter() + 1;
+                    worker.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    worker.setRouteSpent(false);
+                    worker.setWaitCycles(0);
+                    worker.setBattleNetOrderDelay(14);
+                    worker.setBattleNetRefusalHold(true);
+                    int moveStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        worker.setBattleNetSequenceOffset(moveStart);
+                        worker.setBattleNetAnimationTimer(15);
+                    }
+                    return;
+                }
                 if (alliedBlocker) {
                     int shortcut = BattleNetPathFinder.twoHeadingShortcut(
                             worker.lastStepHeading(), heading);
@@ -2294,6 +2381,34 @@ final class BattleNetHarvestSystem {
                 }
                 worker.setRouteSpent(false);
                 boolean shortFreePrefix = freeLen > 0 && freeLen < 3;
+                boolean saturatedFullPrefix = freeLen >= 3
+                        && worker.battleNetCollisionCounter() >= 3;
+                if (saturatedFullPrefix) {
+                    // A full terrain prefix normally replans immediately, but
+                    // a collision-saturated prefix has returned to action 23
+                    // itself. Its construction callbacks own a fresh packed
+                    // collision lifetime. XHuman 12 peon 1385 drains its
+                    // four-byte prefix at (12,88), clears collision four,
+                    // pays 2657/3,2,1, and only then draws through the moving
+                    // peon to its north. The collision-free XHuman 2
+                    // three-byte mid-journey prefix still replans now.
+                    worker.setBattleNetCollisionCounter(0);
+                    worker.setBattleNetRefusals(0);
+                    worker.setBattleNetSaturatedWoodConstructionRoute(true);
+                    worker.setWaitCycles(0);
+                    worker.setBattleNetOrderDelay(2);
+                    worker.setBattleNetWoodOrder(
+                            worker.resourceTileX(), worker.resourceTileY());
+                    if (world.battleNetSequence != null) {
+                        int gatherStart = world.idle.battleNetSequenceStart(
+                                worker, BattleNetSequence.ATTACK_ANIMATION);
+                        if (gatherStart >= 0) {
+                            worker.setBattleNetSequenceOffset(gatherStart);
+                            worker.setBattleNetAnimationTimer(3);
+                        }
+                    }
+                    return;
+                }
                 // Only the short free-tip family re-aims to a newly adjacent
                 // tree. A full direct prefix can finish beside intervening
                 // forest while still owning its original order point: Human
@@ -2348,6 +2463,11 @@ final class BattleNetHarvestSystem {
                                     localTree[0], localTree[1]);
                         }
                     }
+                    boolean saturatedClaimedShortPrefix =
+                            claimedReplacement && freeLen == 1
+                            && worker.battleNetCollisionCounter() >= 3;
+                    worker.setBattleNetSaturatedWoodClaimedReplacement(
+                            saturatedClaimedShortPrefix);
                     worker.setBattleNetOrderDelay(2);
                     return;
                 }
@@ -2413,6 +2533,8 @@ final class BattleNetHarvestSystem {
                     && !terminalBlocker.isDying()
                     && world.isAllied(worker.player(),
                             terminalBlocker.player());
+            boolean saturatedClaimedReplacementRedraw =
+                    worker.battleNetSaturatedWoodClaimedReplacement();
             boolean aimAtResource =
                     world.battleNetRayReachesResource(worker, treeX, treeY)
                     // The blocked diagonal which ended the previous direct
@@ -2422,7 +2544,15 @@ final class BattleNetHarvestSystem {
                     // visit must still aim at tree 20,18, producing E,SE
                     // around the blocker; recomputing an intermediate order
                     // point chooses a one-byte south route instead.
-                    || diagonalTerminalRedraw;
+                    || diagonalTerminalRedraw
+                    // The collision-saturated one-byte prefix has already
+                    // selected its replacement tree in action 23. Native
+                    // keeps that exact forest point for the constructor's
+                    // first redraw even when an occupied square interrupts
+                    // the direct ray. XHuman 12 peon 1376 therefore routes
+                    // NE,E,SE,S toward tree (15,89), rather than accepting
+                    // the intervening (14,88) square as a one-byte goal.
+                    || saturatedClaimedReplacementRedraw;
             int[] orderPoint = aimAtResource
                     ? new int[] {treeX, treeY}
                     : battleNetWoodOrderPoint(worker, treeX, treeY);
@@ -2437,6 +2567,9 @@ final class BattleNetHarvestSystem {
                             false, false, false)
                     : world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker, true);
+            if (saturatedClaimedReplacementRedraw) {
+                worker.setBattleNetSaturatedWoodClaimedReplacement(false);
+            }
             if (path.result() == PathFinder.Result.FOUND
                     && path.length() == 1) {
                 int first = path.headings()[path.length() - 1];

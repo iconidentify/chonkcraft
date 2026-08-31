@@ -3363,6 +3363,54 @@ final class BattleNetMovementSystem {
                 }
                 return;
             }
+            int returnHeading = unit.peekHeading();
+            int returnStride = world.battleNetMovementStride(unit);
+            int returnX = unit.tileX()
+                    + Direction.deltaX(returnHeading) * returnStride;
+            int returnY = unit.tileY()
+                    + Direction.deltaY(returnHeading) * returnStride;
+            Unit returnBlocker = world.blockerOnLayer(
+                    unit, returnX, returnY);
+            boolean pressuredLadenConvoyTail =
+                    unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetPathStepsTaken() > 0
+                    && returnBlocker != null && returnBlocker != unit
+                    && returnBlocker.isMoving()
+                    && returnBlocker.returningToDepot()
+                    && returnBlocker.carried() > 0
+                    && returnBlocker.returnDepotGoal()
+                            == unit.returnDepotGoal()
+                    && world.isAllied(
+                            unit.player(), returnBlocker.player())
+                    // Native keeps this convoy body solid when unit+0x1d's
+                    // collision nibble is set. Java may carry that raw owner
+                    // only in its separate refusal proxy after the body has
+                    // spent its visible route, so accept either projection.
+                    && (returnBlocker.battleNetCollisionCounter() > 0
+                            || returnBlocker.battleNetRefusals() > 0);
+            if (pressuredLadenConvoyTail) {
+                // A collision-marked returner is no longer the clean moving
+                // convoy for which FUN_004379e0 preserves a cached heading
+                // through Move 15..1. The consumed route parks for this one
+                // visit and the resource order redraws on the next. XHuman 12
+                // slot 1552 drains its NW residual at fixture 302 while raw
+                // collision-one slot 1561 occupies the cached north square;
+                // native writes RI20/collision one, then redraws NE,NW and
+                // commits NE on fixture 303.
+                unit.setBattleNetCollisionCounter(1);
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(0);
+                int moveStart = world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                    unit.setBattleNetChaseStepReady(false);
+                }
+                return;
+            }
         }
         if ((walkedThisCycle || world.actionMoveWalked)
                 && unit.stepDrained()
@@ -4465,6 +4513,61 @@ final class BattleNetMovementSystem {
             }
             if (!canTakeStep) {
                 Unit stageSixBlocker = world.unitAt(nextX, nextY);
+                Unit saturatedWoodBlocker = world.blockerOnLayer(
+                        unit, nextX, nextY);
+                boolean saturatedWoodConstructionRefusal =
+                        unit.battleNetSaturatedWoodConstructionRoute()
+                        && (unit.order() == Unit.Order.HARVEST
+                                || unit.battleNetBorrowedMoveForStep())
+                        && !unit.returningToDepot()
+                        && unit.resourceUnit() == null
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.pathLength() > 0
+                        && unit.battleNetCollisionCounter() < 8
+                        && saturatedWoodBlocker != null
+                        && saturatedWoodBlocker != unit
+                        && saturatedWoodBlocker.order()
+                                == Unit.Order.HARVEST
+                        && !saturatedWoodBlocker.returningToDepot()
+                        && saturatedWoodBlocker.resourceUnit() == null
+                        && saturatedWoodBlocker.isMoving()
+                        && saturatedWoodBlocker.routeSpent()
+                        && saturatedWoodBlocker.battleNetGoldFreePrefix()
+                        && saturatedWoodBlocker
+                                .battleNetGoldFreePrefixLength() > 0
+                        && saturatedWoodBlocker
+                                .battleNetGoldFreePrefixLength() < 3
+                        && world.battleNetMoveAnimation(
+                                saturatedWoodBlocker)
+                        && world.isAllied(unit.player(),
+                                saturatedWoodBlocker.player());
+                if (saturatedWoodConstructionRefusal) {
+                    // The action-23 constructor completes before the packed
+                    // collision lifetime begins. Count every naked refusal:
+                    // XHuman 12 peon 1385 is generation one on fixture 285,
+                    // generation three on 287, and generation eight/Move 15
+                    // on 292 before its fresh NE step on fixture 307. Folding
+                    // the first three raw generations into Java's first
+                    // visible callback armed the band two visits early.
+                    int collision = unit.battleNetCollisionCounter() == 0
+                            ? 1 : unit.battleNetCollisionCounter() + 1;
+                    unit.setBattleNetCollisionCounter(collision);
+                    unit.setBattleNetRefusals(0);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(collision >= 8 ? 14 : 0);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(
+                                collision >= 8 ? 15 : 1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    return;
+                }
                 boolean behaviorSixCapitalPatrolMovingHullRefusal =
                         unit.battleNetBorrowedMoveForStep()
                         && unit.battleNetAiBehavior() == 6
@@ -7222,6 +7325,42 @@ final class BattleNetMovementSystem {
                             int woodOrderDistance = Math.max(
                                     Math.abs(woodOrderX - unit.tileX()),
                                     Math.abs(woodOrderY - unit.tileY()));
+                            boolean freshFarCardinalWoodRouteHold =
+                                    unit.pathLength() > 1
+                                    && unit.battleNetCollisionCounter() == 0
+                                    && unit.battleNetRefusals() == 0
+                                    && Direction.isDiagonal(
+                                            unit.lastStepHeading())
+                                    && !Direction.isDiagonal(heading)
+                                    && woodOrderDistance >= 3
+                                    && woodBlocker.isMoving()
+                                    && !walkedThisCycle;
+                            if (freshFarCardinalWoodRouteHold) {
+                                // A fresh terrain route can be planned through
+                                // a moving ally, then meet that body at the
+                                // execution probe after its preceding diagonal
+                                // residual settles. This first refusal keeps the
+                                // progressive cardinal tail and owns a complete
+                                // Move 15..1 band. XHuman 12 peon 1386 retains
+                                // E,E,NE,NE,E,NE,N,N,N at (10,88) on fixture
+                                // 316, raises native unit+0x1d from zero to one,
+                                // and takes the same E only on fixture 331.
+                                // Parking the route cold-redrew N,NE instead.
+                                unit.setBattleNetCollisionCounter(1);
+                                unit.setBattleNetRefusals(0);
+                                unit.setRouteSpent(false);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(14);
+                                unit.setBattleNetRefusalHold(true);
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(15);
+                                }
+                                return;
+                            }
                             boolean saturatedWoodCornerLadder = unit
                                     .battleNetSaturatedWoodCornerLadder()
                                     && unit.pathLength() >= 4
@@ -8251,12 +8390,46 @@ final class BattleNetMovementSystem {
                         unit.battleNetCollisionCounter() == 1
                         && unit.target() != null
                         && unit.offeredTarget() == unit.target();
+                boolean retainedGenerationThreePaidWake =
+                        unit.battleNetCollisionCounter() == 3
+                        && unit.battleNetRefusals() == 1
+                        && unit.battleNetRetargetResidualParkSteps() == 4
+                        && unit.battleNetPathInitialLength()
+                                == BattleNetPathFinder.MAX_PATH - 1
+                        // The accepted byte is popped immediately below, so
+                        // this gate observes the paid route at cursor zero.
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.target() != null
+                        && unit.target().type() != null
+                        && !unit.target().type().building()
+                        && !World.battleNetRangedChaseUnit(unit);
                 if (!offeredCollisionOneWake
+                        && !retainedGenerationThreePaidWake
                         && unit.battleNetCollisionCounter() < 4) {
                     unit.setBattleNetCollisionCounter(0);
                 }
+                if (retainedGenerationThreePaidWake) {
+                    unit.setBattleNetFourStepPaidCollisionRefill(true);
+                }
                 unit.setBattleNetRefusals(0);
                 unit.setBattleNetRefusalHold(false);
+            }
+            boolean fourStepPaidCollisionFourRefill =
+                    unit.battleNetFourStepPaidCollisionRefill()
+                    && unit.battleNetCollisionCounter() == 4
+                    && unit.battleNetRefusals() <= 1
+                    && unit.target() != null
+                    && unit.target().type() != null
+                    && !unit.target().type().building()
+                    && !World.battleNetRangedChaseUnit(unit);
+            if (fourStepPaidCollisionFourRefill) {
+                // The generation participates in the already-paid wall draw,
+                // then NewPath clears it as the replacement byte commits.
+                // XHuman 12 slot 1496 is raw 0x40 at RI20 on fixture 303
+                // and 0x00 after its replacement N step on fixture 304.
+                unit.setBattleNetCollisionCounter(0);
+                unit.setBattleNetRefusals(0);
+                unit.setBattleNetFourStepPaidCollisionRefill(false);
             }
             if (unit.battleNetSaturatedNearRecoveryFullRoute()
                     && !unit.battleNetDirectRefusalRecoveryProbe()
@@ -8628,6 +8801,7 @@ final class BattleNetMovementSystem {
         }
         return false;
     }
+
 
     /** Whether one passable compass step strictly improves BNE range. */
     boolean battleNetHasStrictlyCloserFreeNeighbour(

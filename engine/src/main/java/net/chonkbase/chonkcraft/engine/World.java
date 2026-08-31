@@ -6077,6 +6077,15 @@ public final class World {
                 : -1;
         Unit restoredCornerBlocker = restoreWoodCorner
                 ? unitAt(restoredCornerX, restoredCornerY) : null;
+        boolean saturatedWoodConstructionRoute =
+                unit.battleNetSaturatedWoodConstructionRoute()
+                && (unit.order() == Unit.Order.HARVEST
+                        || unit.battleNetBorrowedMoveForStep())
+                && !unit.returningToDepot()
+                && unit.resourceUnit() == null
+                && !unit.isMoving() && unit.pathLength() == 0
+                && unit.stepDrained()
+                && unit.battleNetCollisionCounter() < 8;
         for (Unit candidate : units) {
             if (candidate == unit || !candidate.isOnMap()
                     || candidate.isDying()) {
@@ -6085,6 +6094,7 @@ public final class World {
             boolean queuedRegroupConstruction = false;
             boolean behaviorSixCapitalPatrolThroughMovingHull = false;
             boolean plainMoveRefusalThroughMovingAlly = false;
+            boolean saturatedWoodThroughShortPrefix = false;
             if (isAllied(unit.player(), candidate.player())) {
                 queuedRegroupConstruction = !candidate.isMoving()
                         && candidate.battleNetAiBehavior() == 1
@@ -6142,6 +6152,17 @@ public final class World {
                 boolean pendingLandAssaultYieldsToWood = movement
                         .battleNetPendingLandAssaultYieldsToWood(
                                 unit, candidate);
+                saturatedWoodThroughShortPrefix =
+                        saturatedWoodConstructionRoute
+                        && candidate.order() == Unit.Order.HARVEST
+                        && !candidate.returningToDepot()
+                        && candidate.resourceUnit() == null
+                        && candidate.isMoving()
+                        && candidate.routeSpent()
+                        && candidate.battleNetGoldFreePrefix()
+                        && candidate.battleNetGoldFreePrefixLength() > 0
+                        && candidate.battleNetGoldFreePrefixLength() < 3
+                        && battleNetMoveAnimation(candidate);
                 // A terrain-only plain-Move buffer that refuses a later byte
                 // returns through the occupancy planner once. Native removes
                 // an allied plain-Move body which is actively draining a
@@ -6188,7 +6209,8 @@ public final class World {
                                 && !behaviorSixCapitalPatrolThroughMovingHull
                                 && !plainMoveRefusalThroughMovingAlly
                                 && !ordinaryMoveAllySoft
-                                && !pendingLandAssaultYieldsToWood)) {
+                                && !pendingLandAssaultYieldsToWood
+                                && !saturatedWoodThroughShortPrefix)) {
                     continue;
                 }
             } else if (!hostilesStandAside || candidate.type().building()) {
@@ -6219,7 +6241,8 @@ public final class World {
             // an optimizer wall chooses the free northeast bypass instead.
             if (!queuedRegroupConstruction
                     && !behaviorSixCapitalPatrolThroughMovingHull
-                    && !plainMoveRefusalThroughMovingAlly) {
+                    && !plainMoveRefusalThroughMovingAlly
+                    && !saturatedWoodThroughShortPrefix) {
                 optimizerBlockers.add(candidate);
             }
         }
@@ -6275,7 +6298,14 @@ public final class World {
                     new BattleNetPathFinder.Passability() {
                         @Override
                         public boolean canEnter(int x, int y) {
-                            return (!preserveVacatedWoodSquare
+                            return (!saturatedWoodConstructionRoute
+                                    || !battleNetNonSolidImmediateCacheBody(
+                                            unit, x, y))
+                                    && (!unit
+                                            .battleNetSaturatedWoodClaimedReplacement()
+                                            || !battleNetNonSolidClaimedMajorAxisBody(
+                                                    unit, toX, toY, x, y))
+                                    && (!preserveVacatedWoodSquare
                                     || !movement
                                             .battleNetWorkerAllyJustVacated(
                                                     unit, x, y))
@@ -6289,7 +6319,14 @@ public final class World {
                         @Override
                         public boolean canEnterIgnoringMobileOccupancy(
                                 int x, int y) {
-                            return (!preserveVacatedWoodSquare
+                            return (!saturatedWoodConstructionRoute
+                                    || !battleNetNonSolidImmediateCacheBody(
+                                            unit, x, y))
+                                    && (!unit
+                                            .battleNetSaturatedWoodClaimedReplacement()
+                                            || !battleNetNonSolidClaimedMajorAxisBody(
+                                                    unit, toX, toY, x, y))
+                                    && (!preserveVacatedWoodSquare
                                     || !movement
                                             .battleNetWorkerAllyJustVacated(
                                                     unit, x, y))
@@ -6357,8 +6394,35 @@ public final class World {
                     traversalPassability, optimizationPassability, goalMarker,
                     emptyFailure, blockedForestGoal, false,
                     doubledPatrolWallOnTie,
-                    preserveVacatedPatrolSquare, false, false,
+                    preserveVacatedPatrolSquare,
+                    false, false,
                     doubledAirPatrolHardDirect);
+            path = battleNetSaturatedWoodGuidePath(unit, goalMarker,
+                    traversalPassability, path);
+            if (unit.battleNetSaturatedWoodClaimedReplacement()) {
+                // The claimed-tree constructor resumes the wall face which
+                // produced its saturated one-byte prefix instead of drawing
+                // a cold Bresenham face. Its next rejected probe is the goal's
+                // major-axis heading: XHuman 12 peon 1376 continues around
+                // east as NE,E,SE,S, while a cold tree search picks E,E,SE.
+                boolean xMajor = Math.abs(toX - unit.tileX())
+                        >= Math.abs(toY - unit.tileY());
+                int continuedHeading = battleNetFirstBresenhamHeading(
+                        unit.tileX(), unit.tileY(),
+                        xMajor ? toX : unit.tileX(),
+                        xMajor ? unit.tileY() : toY);
+                PathFinder.Path continued = BattleNetPathFinder
+                        .continueWallFace(
+                                unit.tileX(), unit.tileY(), toX, toY,
+                                continuedHeading, -1,
+                                battleNetMovementStride(unit),
+                                traversalPassability,
+                                optimizationPassability, goalMarker);
+                if (continued.result() == PathFinder.Result.FOUND
+                        && continued.length() > 0) {
+                    path = continued;
+                }
+            }
             if (unit.battleNetNavalPaidParkedRoute()
                     && unit.battleNetParkedRefusalHeading() >= 0
                     && unit.battleNetParkedRefusalHeading()
@@ -6805,6 +6869,50 @@ public final class World {
             Unit keepSpecificMovingAllyHard,
             boolean continueSaturatedRetargetWallFace,
             boolean keepCollisionMarkedAlliesHard) {
+        return findBattleNetTargetPath(unit, target, settledResidualRetarget,
+                completedRefusalBand, keepMovingAlliesHard,
+                retainPaidBandWallFace, keepSaturatedAlliesHard,
+                goalPaddingOverride, forceSharedWallBuffer,
+                keepSpecificMovingAllyHard,
+                continueSaturatedRetargetWallFace,
+                keepCollisionMarkedAlliesHard, false);
+    }
+
+    private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean keepMovingAlliesHard,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            int goalPaddingOverride,
+            boolean forceSharedWallBuffer,
+            Unit keepSpecificMovingAllyHard,
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard,
+            boolean keepSettledRetargetAlliesHard) {
+        return findBattleNetTargetPath(unit, target, settledResidualRetarget,
+                completedRefusalBand, keepMovingAlliesHard,
+                retainPaidBandWallFace, keepSaturatedAlliesHard,
+                goalPaddingOverride, forceSharedWallBuffer,
+                keepSpecificMovingAllyHard,
+                continueSaturatedRetargetWallFace,
+                keepCollisionMarkedAlliesHard,
+                keepSettledRetargetAlliesHard, false);
+    }
+
+    private PathFinder.Path findBattleNetTargetPath(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean keepMovingAlliesHard,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            int goalPaddingOverride,
+            boolean forceSharedWallBuffer,
+            Unit keepSpecificMovingAllyHard,
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard,
+            boolean keepSettledRetargetAlliesHard,
+            boolean alignOfferedBuildingResidualAxisSkirt) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> reservedMoveBodies = new ArrayList<>();
         java.util.List<Unit> transparentQueuedReturners = new ArrayList<>();
@@ -6921,14 +7029,15 @@ public final class World {
                         && target.type() != null
                         && target.type().building()
                         && unit.battleNetCollisionCounter() == 1
-                        && unit.battleNetRefusals() == 0
                         && candidate.target() == target
                         && candidate.type() != null
                         && candidate.type().maxAttackRange() <= 1
                         && candidate.battleNetCollisionCounter() == 1
                         && candidate.battleNetRefusals() == 0
-                        && Math.abs(candidate.tileX() - unit.tileX()) == 1
-                        && Math.abs(candidate.tileY() - unit.tileY()) == 1;
+                        && ((unit.battleNetRefusals() == 0
+                                && Math.abs(candidate.tileX() - unit.tileX()) == 1
+                                && Math.abs(candidate.tileY() - unit.tileY()) == 1)
+                            || candidate.offeredTarget() == target);
                 boolean retainedReversingPaidMobileWall =
                         retainPaidBandWallFace
                         && target.type() != null
@@ -6977,6 +7086,15 @@ public final class World {
                         // Keeping 1516 solid draws E,SE,SE,S,S,S,SW,W,W,W,NW,
                         // NE exactly; standing it aside draws a blocked SE
                         // head which the same callback immediately refuses.
+                        // The same first-generation ownership can be carried
+                        // by COrder_Attack's offered target beyond the adjacent
+                        // opening square. On XHuman 12 fixture 257, slot 1516
+                        // is moving on the tower's offered pointer with raw
+                        // collision one, so it remains the only hard body on
+                        // slot 1512's paid replacement wall. Slot 1510 has the
+                        // collision but no offer; slot 1520 has the offer but
+                        // raw collision zero. Preserving 1516 writes native's
+                        // NE,SE,SE,SE fourth byte instead of south.
                         && !firstGenerationBuildingFormationWall
                         // A transferred diagonal head retains the paid wall
                         // face as well as its route byte. Collision-marked
@@ -7084,6 +7202,25 @@ public final class World {
                 goalY = unit.tileY() < targetBottom
                         ? targetTop + targetHeight / 2
                         : targetBottom;
+            }
+
+            if (alignOfferedBuildingResidualAxisSkirt) {
+                // COrder_Attack's offered-building pointer survives the target
+                // replacement through UpdatePathFinderData. When the settled
+                // melee chaser is already inside the mobile quarry's skirt on
+                // the minor axis, native preserves that coordinate for the
+                // route ray while publishing the quarry's real point as orderXY.
+                // XHuman 12 slots 1508/1520/1516 therefore draw toward (32,44)
+                // from (38,44), with occupancy-dependent detours. Slot 1510 is
+                // the paired negative: its offered pointer is null and its ray
+                // aims directly at the footman on (32,43).
+                int deltaX = Math.abs(goalX - unit.tileX());
+                int deltaY = Math.abs(goalY - unit.tileY());
+                if (deltaX > deltaY) {
+                    goalY = unit.tileY();
+                } else if (deltaY > deltaX) {
+                    goalX = unit.tileX();
+                }
             }
 
             // Re-harden short-leftover combat allies on the approach corridor
@@ -7196,7 +7333,7 @@ public final class World {
             // existing counter-clockwise wall continuation write NW,NE,E...
             // exactly as the sealed route does; releasing it lets the tracer
             // close a four-step loop and fall back to the wrong NE head.
-            boolean preserveVisitStartAllySquare =
+            boolean preserveRecentlyVacatedAllySquare =
                     unit.battleNetPaidLongResidualRefill();
             int destArmSkirtPadding = goalPaddingOverride >= 0
                     ? goalPaddingOverride : battleNetMovementStride(unit);
@@ -7217,10 +7354,14 @@ public final class World {
                                             ? map.isFootprintFree(x, y, 1, 1,
                                                     unit.movementMask(),
                                                     targetSkirtFixedBlocking)
-                                            : ((!preserveVisitStartAllySquare
+                                            : ((!preserveRecentlyVacatedAllySquare
                                                     || !movement
                                                             .battleNetAllyJustVacated(
                                                                     unit, x, y))
+                                                    && (!keepSettledRetargetAlliesHard
+                                                            || !battleNetUnitOccupies(
+                                                                    softBlockers,
+                                                                    x, y))
                                                     && !battleNetReservedMoveDestinationOccupies(
                                                             reservedMoveBodies, x, y)
                                                     && base.canEnter(x, y)));
@@ -8079,6 +8220,166 @@ public final class World {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a non-solid cache entry still owns an immediate construction
+     * route probe even though it has no map-field occupancy bit.
+     */
+    private boolean battleNetNonSolidImmediateCacheBody(
+            Unit router, int x, int y) {
+        if (Math.max(Math.abs(x - router.tileX()),
+                Math.abs(y - router.tileY())) != 1) {
+            return false;
+        }
+        for (Unit candidate : units) {
+            if (candidate != router && candidate.isOnMap()
+                    && !candidate.isDying() && candidate.type() != null
+                    && (candidate.type().revealer()
+                            || candidate.type().vanishes()
+                            || candidate.type().nonSolid())
+                    && candidate.covers(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a claimed-tree continuation meets the far cell of a non-solid
+     * cache footprint on its major-axis corridor.
+     *
+     * <p>The replacement constructor does not make the whole cache body
+     * solid: its immediately adjacent and off-axis skirt remains available.
+     * XHuman 12 peon 1376 can therefore enter the top row of the 2x2 dead-
+     * vision body at (13,86), while its far horizontal cell (14,87) keeps the
+     * continuing wall face on NE,E,SE,S.</p>
+     */
+    private boolean battleNetNonSolidClaimedMajorAxisBody(
+            Unit router, int toX, int toY, int x, int y) {
+        int deltaX = toX - router.tileX();
+        int deltaY = toY - router.tileY();
+        boolean xMajor = Math.abs(deltaX) >= Math.abs(deltaY);
+        int distance;
+        if (xMajor) {
+            if (y != router.tileY()
+                    || Integer.signum(x - router.tileX())
+                            != Integer.signum(deltaX)) {
+                return false;
+            }
+            distance = Math.abs(x - router.tileX());
+        } else {
+            if (x != router.tileX()
+                    || Integer.signum(y - router.tileY())
+                            != Integer.signum(deltaY)) {
+                return false;
+            }
+            distance = Math.abs(y - router.tileY());
+        }
+        if (distance <= 1) {
+            return false;
+        }
+        for (Unit candidate : units) {
+            if (candidate != router && candidate.isOnMap()
+                    && !candidate.isDying() && candidate.type() != null
+                    && (candidate.type().revealer()
+                            || candidate.type().vanishes()
+                            || candidate.type().nonSolid())
+                    && candidate.covers(x, y)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Reuses the opened tail of the allied wood route which owned a paid
+     * construction refusal band.
+     *
+     * <p>The merge is deliberately narrow: the guide must be a nearby moving
+     * terrain harvester, its resource square must neighbor the router's, the
+     * guide's next cell must be reachable by at most two identical headings,
+     * and the inherited tail must finish on this search's marked skirt.
+     * XHuman 12 peon 1385 then stores NE,NE,SE,S on fixture 307 by joining
+     * peon 1376's remaining E,SE,S route one cell ahead.</p>
+     */
+    private PathFinder.Path battleNetSaturatedWoodGuidePath(Unit router,
+            BattleNetPathFinder.GoalMarker goalMarker,
+            BattleNetPathFinder.Passability passability,
+            PathFinder.Path fallback) {
+        if (!router.battleNetSaturatedWoodConstructionRedraw()
+                || goalMarker == null) {
+            return fallback;
+        }
+        for (Unit guide : units) {
+            if (guide == router || !guide.isOnMap() || guide.isDying()
+                    || !isAllied(router.player(), guide.player())
+                    || guide.order() != Unit.Order.HARVEST
+                    || guide.returningToDepot()
+                    || guide.resourceUnit() != null
+                    || !guide.isMoving() || guide.pathLength() < 2
+                    || Math.max(Math.abs(guide.tileX() - router.tileX()),
+                            Math.abs(guide.tileY() - router.tileY())) > 2
+                    || Math.max(
+                            Math.abs(guide.resourceTileX()
+                                    - router.resourceTileX()),
+                            Math.abs(guide.resourceTileY()
+                                    - router.resourceTileY())) > 1) {
+                continue;
+            }
+            int guideHeading = guide.peekHeading();
+            int joinX = guide.tileX()
+                    + Direction.deltaX(guideHeading);
+            int joinY = guide.tileY()
+                    + Direction.deltaY(guideHeading);
+            int deltaX = joinX - router.tileX();
+            int deltaY = joinY - router.tileY();
+            int joinLength = Math.max(Math.abs(deltaX), Math.abs(deltaY));
+            if (joinLength < 1 || joinLength > 2
+                    || (deltaX != 0 && deltaY != 0
+                            && Math.abs(deltaX) != Math.abs(deltaY))) {
+                continue;
+            }
+            int joinHeading = Direction.fromDelta(
+                    Integer.signum(deltaX), Integer.signum(deltaY));
+            int probeX = router.tileX();
+            int probeY = router.tileY();
+            boolean joinOpen = true;
+            for (int step = 0; step < joinLength; step++) {
+                probeX += Direction.deltaX(joinHeading);
+                probeY += Direction.deltaY(joinHeading);
+                if (!passability.canEnter(probeX, probeY)) {
+                    joinOpen = false;
+                    break;
+                }
+            }
+            if (!joinOpen) {
+                continue;
+            }
+            java.util.List<Integer> forward = new ArrayList<>();
+            for (int step = 0; step < joinLength; step++) {
+                forward.add(joinHeading);
+            }
+            int endX = joinX;
+            int endY = joinY;
+            // The join already reaches the square produced by depth zero;
+            // inherit only the guide headings which follow that square.
+            for (int depth = 1; depth < guide.pathLength(); depth++) {
+                int heading = guide.peekHeadingAtDepth(depth);
+                forward.add(heading);
+                endX += Direction.deltaX(heading);
+                endY += Direction.deltaY(heading);
+            }
+            if (forward.size() > 28 || !goalMarker.contains(endX, endY)) {
+                continue;
+            }
+            int[] stored = new int[forward.size()];
+            for (int index = 0; index < forward.size(); index++) {
+                stored[forward.size() - 1 - index] = forward.get(index);
+            }
+            return new PathFinder.Path(PathFinder.Result.FOUND, stored);
+        }
+        return fallback;
     }
 
     /** Emits the same opt-in path diagnostic for point and resource goals. */
@@ -12419,6 +12720,13 @@ public final class World {
         return planTowards(unit, target, true, true, retainFirstWallFace);
     }
 
+    /** Paid redraw after its accepted first step retired the collision owner. */
+    PathFinder.Result planTowardsAfterRefusalBandKeepingCollidedAllies(
+            Unit unit, Unit target, boolean retainFirstWallFace) {
+        return planTowards(unit, target, true, true, retainFirstWallFace,
+                false, false, false, true);
+    }
+
     /** Paid wrap redraw retaining every collision-marked moving formation body. */
     PathFinder.Result planTowardsAfterPaidWrapPark(
             Unit unit, Unit target) {
@@ -12464,6 +12772,20 @@ public final class World {
             Unit unit, Unit target) {
         return planTowards(unit, target,
                 true, false, false, false, false, true);
+    }
+
+    /** Half-spent settled retarget retaining its moving formation as walls. */
+    PathFinder.Result planTowardsAfterSettledRetargetKeepingMovingAlliesHard(
+            Unit unit, Unit target) {
+        return planTowards(unit, target,
+                true, false, false, false, false, false, false, true);
+    }
+
+    /** Offered-building residual keeps the already-reached mobile skirt axis. */
+    PathFinder.Result planTowardsAfterOfferedBuildingResidualAxisSkirt(
+            Unit unit, Unit target) {
+        return planTowards(unit, target,
+                true, false, false, false, false, false, false, false, true);
     }
 
     /**
@@ -12628,10 +12950,8 @@ public final class World {
         int detourX = unit.tileX() + Direction.deltaX(detour) * stride;
         int detourY = unit.tileY() + Direction.deltaY(detour) * stride;
         Unit detourBlocker = unitAt(detourX, detourY);
-        boolean sharedWallEntry = canEnter(unit, detourX, detourY)
-                || battleNetPaidEmptySharedWallBlocker(
-                        unit, target, detourBlocker);
-        if (!sharedWallEntry) {
+        if (!battleNetPaidEmptySharedWallBlocker(
+                unit, target, detourBlocker)) {
             return path;
         }
         int currentDistance = battleNetDistance(unit, target);
@@ -12641,6 +12961,12 @@ public final class World {
         if (detourDistance > currentDistance) {
             return path;
         }
+        // The retained byte exists because the first wall face entered the
+        // paid formation mate's still-cached silhouette. A geometrically free
+        // detour is not equivalent: both failed probes leave the native
+        // buffer empty. XHuman 12 slot 1490 is the negative witness at fixture
+        // 299; admitting its free south square manufactures S,SW and moves it
+        // out of the repeated active-order Attack constructor.
         // PathFinder.Path is a stack: the last element is consumed first.
         return new PathFinder.Path(PathFinder.Result.FOUND,
                 new int[] {direct, detour});
@@ -12861,6 +13187,40 @@ public final class World {
             boolean hardenMovingRouteHead,
             boolean continueSaturatedRetargetWallFace,
             boolean keepCollisionMarkedAlliesHard) {
+        return planTowards(unit, target, settledResidualRetarget,
+                completedRefusalBand, retainPaidBandWallFace,
+                keepSaturatedAlliesHard, hardenMovingRouteHead,
+                continueSaturatedRetargetWallFace,
+                keepCollisionMarkedAlliesHard, false);
+    }
+
+    private PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            boolean hardenMovingRouteHead,
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard,
+            boolean keepSettledRetargetAlliesHard) {
+        return planTowards(unit, target, settledResidualRetarget,
+                completedRefusalBand, retainPaidBandWallFace,
+                keepSaturatedAlliesHard, hardenMovingRouteHead,
+                continueSaturatedRetargetWallFace,
+                keepCollisionMarkedAlliesHard,
+                keepSettledRetargetAlliesHard, false);
+    }
+
+    private PathFinder.Result planTowards(Unit unit, Unit target,
+            boolean settledResidualRetarget,
+            boolean completedRefusalBand,
+            boolean retainPaidBandWallFace,
+            boolean keepSaturatedAlliesHard,
+            boolean hardenMovingRouteHead,
+            boolean continueSaturatedRetargetWallFace,
+            boolean keepCollisionMarkedAlliesHard,
+            boolean keepSettledRetargetAlliesHard,
+            boolean alignOfferedBuildingResidualAxisSkirt) {
         // Aimed at anywhere this unit could hit the target from, not at the
         // square the target is standing on. That square is occupied by
         // definition, so a route to it can only end on top of somebody: the
@@ -12891,7 +13251,9 @@ public final class World {
                 retainPaidBandWallFace,
                 keepSaturatedAlliesHard, -1, false, null,
                 continueSaturatedRetargetWallFace,
-                keepCollisionMarkedAlliesHard);
+                keepCollisionMarkedAlliesHard,
+                keepSettledRetargetAlliesHard,
+                alignOfferedBuildingResidualAxisSkirt);
         if (hardenMovingRouteHead && path != null
                 && path.result() == PathFinder.Result.FOUND
                 && path.length() > 0) {
@@ -12927,7 +13289,9 @@ public final class World {
                         retainPaidBandWallFace,
                         keepSaturatedAlliesHard, -1, false,
                         movingRouteHeadWall, false,
-                        keepCollisionMarkedAlliesHard);
+                        keepCollisionMarkedAlliesHard,
+                        keepSettledRetargetAlliesHard,
+                        alignOfferedBuildingResidualAxisSkirt);
             }
         }
         path = battleNetSaturatedCollisionWallPrefix(unit, target, path);
@@ -12946,7 +13310,9 @@ public final class World {
                     retainPaidBandWallFace,
                     keepSaturatedAlliesHard, -1, true,
                     movingRouteHeadWall, false,
-                    keepCollisionMarkedAlliesHard);
+                    keepCollisionMarkedAlliesHard,
+                    keepSettledRetargetAlliesHard,
+                    alignOfferedBuildingResidualAxisSkirt);
         }
         path = battleNetPaidEmptySharedWallPrefix(
                 unit, target, path, paidEmptySharedWallPath);

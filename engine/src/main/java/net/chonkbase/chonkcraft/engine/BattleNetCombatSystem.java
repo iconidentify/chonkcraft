@@ -3156,6 +3156,45 @@ final class BattleNetCombatSystem {
                                 world.actionMoveWalked ? 1 : 0);
                     }
                 }
+                boolean offeredBuildingResidualRefusal =
+                        residualBlockedBuilding
+                        && previous != null && previous.type() != null
+                        && previous.type().building()
+                        && unit.offeredTarget() == previous
+                        && unit.battleNetCollisionCounter() == 1
+                        && unit.battleNetRefusals() == 0;
+                if (offeredBuildingResidualRefusal) {
+                    // A building route whose first collision generation is
+                    // still owned by COrder_Attack's offered pointer does not
+                    // enter the ordinary free-compass fallback when a later
+                    // cached diagonal refuses. It advances that generation,
+                    // retains the complete tail, and pays Move 15..1 before
+                    // probing the same byte again. XHuman 12 slot 1512 stores
+                    // NE,SE,SE,SE... on fixture 257; its fourth byte meets the
+                    // moving slot 1503 on fixture 323, leaving route index
+                    // three and changing raw unit+0x1d from 0x10 to 0x20.
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    unit.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    unit.setBattleNetRefusalHold(true);
+                    unit.setBattleNetChaseStepReady(false);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(15);
+                    }
+                    world.causalTrace.event(world.cycle,
+                            "path.offered-building-residual-refusal", unit.id(),
+                            "target", previous.id(),
+                            "path_length", unit.pathLength(),
+                            "heading", unit.peekHeading(),
+                            "collision", unit.battleNetCollisionCounter());
+                    return;
+                }
                 // A later-generation route to the same mobile quarry parks
                 // as a whole when the next cached byte is blocked after the
                 // current stride settles.  Native advances one collision
@@ -3938,6 +3977,19 @@ final class BattleNetCombatSystem {
                             && (world.actionMoveWalked
                                     || unit.battleNetRetargetResidualRoutePark())
                             && !world.targets.inAttackRange(unit, candidate);
+                    boolean behaviorOneHalfSpentMobileRetarget =
+                            settledMeleeResidualRetarget
+                            && unit.battleNetAiBehavior() == 1
+                            && unit.battleNetPathInitialLength()
+                                    == BattleNetPathFinder.MAX_PATH
+                            && unit.battleNetPathStepsTaken()
+                                    == BattleNetPathFinder.MAX_PATH / 2
+                            && unit.battleNetCollisionCounter() == 0
+                            && unit.battleNetRefusals() == 0
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.type() != null
+                            && !candidate.type().building();
                     boolean saturatedSettledResidualRetarget =
                             settledMeleeResidualRetarget
                             && unit.battleNetCollisionCounter() >= 4
@@ -4211,6 +4263,24 @@ final class BattleNetCombatSystem {
                             && world.movement
                                     .battleNetRefusalBandSoftClearMoveAlly(
                                             oldReplacementBlocker);
+                    boolean offeredBuildingResidualAxisSkirt =
+                            settledMeleeResidualRetarget
+                            && previous.type() != null
+                            && previous.type().building()
+                            && candidate.type() != null
+                            && !candidate.type().building()
+                            && unit.offeredTarget() == previous
+                            && unit.battleNetCollisionCounter() == 1
+                            && unit.battleNetRefusals() == 0
+                            && world.actionMoveWalked
+                            && Math.min(
+                                    Math.abs(candidate.tileX() - unit.tileX()),
+                                    Math.abs(candidate.tileY() - unit.tileY()))
+                                            == 1
+                            && Math.max(
+                                    Math.abs(candidate.tileX() - unit.tileX()),
+                                    Math.abs(candidate.tileY() - unit.tileY()))
+                                            > 1;
                     if (unit.pathLength() > 1
                             && previous.type().building()
                             && candidate.type().building()) {
@@ -4743,6 +4813,20 @@ final class BattleNetCombatSystem {
                             world.actionSettledMeleeReplacementRoute = true;
                             boolean replacementAfterPaidBand = unit
                                     .battleNetRetargetResidualRoutePark();
+                            // A successful first replacement step retires
+                            // native's paid collision owner. Java keeps its
+                            // separate refusal proxy through the residual and
+                            // following Attack constructor; preserve the paid
+                            // handoff's timing, but do not let that stale proxy
+                            // clear collision-marked movers from a second route
+                            // generation. XHuman 12 slot 1480 is raw collision
+                            // zero after its fixture-264 SW commit. Its fixture-
+                            // 283 route keeps raw collision-one slot 1490 solid
+                            // and stores SE,SE,SE..., not SE,S,SW.
+                            boolean paidOwnerRetiredAfterAcceptedStep =
+                                    replacementAfterPaidBand
+                                    && unit.battleNetCollisionCounter() == 0
+                                    && unit.battleNetRefusals() > 0;
                             world.actionSettledMeleeReplacementAfterPaidBand =
                                     replacementAfterPaidBand;
                             if (repeatedPaidLongTailRetarget) {
@@ -4810,10 +4894,9 @@ final class BattleNetCombatSystem {
                                     // commits it on fixture 285. A diagonal leg
                                     // with its same-face tail, and refusal-free
                                     // compact tails, keep the optimized face.
-                                    world.planTowardsAfterRefusalBand(
-                                            unit, chased,
+                                    boolean retainReplacementWallFace =
                                             retainPaidMobileFirstWallBuffer
-                                                    || (Direction.isDiagonal(
+                                            || (Direction.isDiagonal(
                                                     oldReplacementHeading)
                                                     && (keepPathn
                                                             >= BattleNetPathFinder
@@ -4824,11 +4907,19 @@ final class BattleNetCombatSystem {
                                                                     && chased
                                                                             .type()
                                                                             .building()))
-                                                    || (keepPathn >= 19
-                                                            && chased.type()
-                                                                    != null
-                                                            && chased.type()
-                                                                    .building()));
+                                            || (keepPathn >= 19
+                                                    && chased.type() != null
+                                                    && chased.type()
+                                                            .building());
+                                    if (paidOwnerRetiredAfterAcceptedStep) {
+                                        world.planTowardsAfterRefusalBandKeepingCollidedAllies(
+                                                unit, chased,
+                                                retainReplacementWallFace);
+                                    } else {
+                                        world.planTowardsAfterRefusalBand(
+                                                unit, chased,
+                                                retainReplacementWallFace);
+                                    }
                                 }
                                 world.actionSettledMeleeReplacementBroadRoute =
                                         replacementThroughCollidedMover;
@@ -4946,7 +5037,24 @@ final class BattleNetCombatSystem {
                                 // the new quarry, then the first refusal.
                                 unit.setBattleNetCollisionCounter(0);
                             } else {
-                                world.planTowards(unit, chased, true);
+                                if (behaviorOneHalfSpentMobileRetarget) {
+                                    // A behavior-one mobile chase which changes
+                                    // quarry exactly halfway through its full
+                                    // route retains the formation's hard wall
+                                    // view for the replacement draw. XHuman 12
+                                    // slot 1476 therefore stores four opening
+                                    // northeast bytes toward knight 125 on
+                                    // fixture 290. The ordinary cooperative
+                                    // view stored NE,E and turned east when the
+                                    // second byte was consumed on fixture 309.
+                                    world.planTowardsAfterSettledRetargetKeepingMovingAlliesHard(
+                                            unit, chased);
+                                } else if (offeredBuildingResidualAxisSkirt) {
+                                    world.planTowardsAfterOfferedBuildingResidualAxisSkirt(
+                                            unit, chased);
+                                } else {
+                                    world.planTowards(unit, chased, true);
+                                }
                             }
                             // A strict behavior-one building upgrade inherits
                             // the already-approved first compass element even
@@ -6094,13 +6202,19 @@ final class BattleNetCombatSystem {
                 // empty parked buffer may use this visit to cache the new
                 // route. A changed target whose replacement head is already
                 // free executes immediately: native XHuman 10 slot 1497 lays
-                // SW and spends it on fixture 74. A blocked replacement still
-                // returns after planning and lets the following Move probe own
-                // its refusal band (slot 1475).
+                // SW and spends it on fixture 74. A cooperative blocker in
+                // front of that same infantry replacement is also probed now
+                // when the prior accepted stride has retired native's packed
+                // collision owner but Java still carries its separate paid-
+                // refusal provenance: native starts Move 15 on the construction
+                // handoff itself. A fresh collision owner and other blocked
+                // replacements retain the distinct plan-only visit before their
+                // following Move probe.
                 changedDuringPaidConstruction =
                         unit.target() != chaseTargetBeforeWalk;
                 boolean changedReplacementEnterable = false;
                 boolean changedReplacementFree = false;
+                boolean changedReplacementCooperativeRefusal = false;
                 if (changedDuringPaidConstruction
                         && unit.pathLength() > 0) {
                     int changedHeading = unit.peekHeading();
@@ -6119,10 +6233,20 @@ final class BattleNetCombatSystem {
                             // knight at fixtures 66/67).
                             && "unit-grunt".equals(unit.type().ident())
                             && changedReplacementEnterable;
+                    Unit changedBlocker = world.blockerOnLayer(
+                            unit, changedX, changedY);
+                    changedReplacementCooperativeRefusal = unit.type() != null
+                            && "unit-grunt".equals(unit.type().ident())
+                            && !changedReplacementEnterable
+                            && unit.battleNetCollisionCounter() == 0
+                            && unit.battleNetRefusals() > 0
+                            && world.battleNetCooperativeBlocker(
+                                    unit, changedBlocker);
                 }
                 if (planOnlyAfterEmptyPaidConstruction
                         || (changedDuringPaidConstruction
-                                && !changedReplacementFree)) {
+                                && !changedReplacementFree
+                                && !changedReplacementCooperativeRefusal)) {
                     if (!planOnlyAfterEmptyPaidConstruction
                             && changedReplacementEnterable) {
                         // Cavalry pays a distinct plan-only visit before it

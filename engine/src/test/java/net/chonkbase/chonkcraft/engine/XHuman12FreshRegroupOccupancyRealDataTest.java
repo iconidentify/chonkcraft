@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -90,6 +91,80 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
             assertEquals(remaining[depth], worker.peekHeadingAtDepth(depth),
                     "native fixture-204 route heading at depth " + depth);
         }
+    }
+
+    @Test
+    @DisplayName("a fresh terrain harvest retires the prior refusal generation")
+    void aFreshTerrainHarvestRetiresThePriorRefusalGeneration() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit worker = unitById(world, 214);
+        assertNotNull(worker,
+                "XHuman 12 has no native-slot-1386 resource worker");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        advanceToFixture(mission, 167);
+        assertEquals(2, worker.battleNetCollisionCounter(),
+                "the failed gold walk still owns its second collision generation");
+        assertEquals(1, worker.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(168, fixtureCycle(world));
+        assertEquals(Unit.Order.HARVEST, worker.order());
+        assertEquals(null, worker.resourceUnit(),
+                "UnitReady replaces the failed mine with terrain wood");
+        assertEquals(18, worker.resourceTileX());
+        assertEquals(80, worker.resourceTileY());
+        assertEquals(0, worker.battleNetCollisionCounter(),
+                "the fresh action-23 order clears native unit+0x1d");
+        assertEquals(0, worker.battleNetRefusals());
+        assertEquals(0, worker.pathLength());
+        assertEquals(3, worker.battleNetAnimationTimer(),
+                "the replacement begins action 23's three-call constructor");
+
+        advanceToFixture(mission, 315);
+        assertEquals(10, worker.tileX());
+        assertEquals(88, worker.tileY());
+        assertEquals(9, worker.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), worker.peekHeading(),
+                "the cached east head remains behind the southeast stride");
+        assertEquals(0, worker.battleNetCollisionCounter(),
+                "the fresh wood route has no stale gold refusal generation");
+
+        mission.tick();
+        assertEquals(316, fixtureCycle(world));
+        assertEquals(10, worker.tileX(),
+                "the occupied east head opens a refusal instead of redrawing north");
+        assertEquals(88, worker.tileY());
+        assertEquals(9, worker.pathLength(),
+                "native retains the full east-led tail through the refusal band");
+        assertEquals(Direction.fromDelta(1, 0), worker.peekHeading());
+        assertEquals(1, worker.battleNetCollisionCounter());
+        assertEquals(14, worker.battleNetOrderDelay());
+        assertEquals(15, worker.battleNetAnimationTimer());
+
+        advanceToFixture(mission, 330);
+        assertEquals(10, worker.tileX());
+        assertEquals(88, worker.tileY());
+        assertEquals(9, worker.pathLength());
+        assertEquals(1, worker.battleNetAnimationTimer(),
+                "the complete Move band expires before the cached east step");
+
+        mission.tick();
+        assertEquals(331, fixtureCycle(world));
+        assertEquals(11, worker.tileX());
+        assertEquals(88, worker.tileY());
+        assertEquals(8, worker.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), worker.lastStepHeading());
     }
 
     private static int fixtureCycle(World world) {

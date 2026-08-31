@@ -823,6 +823,137 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "the east commit retains the following southeast byte");
     }
 
+    @Test
+    @DisplayName("a half-spent behavior-one retarget keeps its formation wall")
+    void halfSpentBehaviorOneRetargetKeepsItsFormationWall() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1476 / Java 124 finishes its old chase residual while
+        // replacing a mobile quarry exactly halfway through a twenty-byte
+        // route on fixture 290. Native retains the formation's hard wall view
+        // and opens NE,NE,NE,NE,SE. The ordinary cooperative draw opened NE,E
+        // and made the second step turn east on fixture 309.
+        Unit grunt = unitById(world, 124);
+        Unit knight = unitById(world, 125);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1476 grunt");
+        assertNotNull(knight, "XHuman 12 has no replacement knight");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 290) {
+            mission.tick();
+        }
+
+        assertEquals(26, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(knight, grunt.target(),
+                "fixture 290 installs native's replacement quarry");
+        assertEquals(30, knight.tileX());
+        assertEquals(43, knight.tileY());
+        assertEquals(19, grunt.pathLength(),
+                "the first northeast byte is committed immediately");
+        int[] remainingRoute = {
+            Direction.fromDelta(1, -1),
+            Direction.fromDelta(1, -1),
+            Direction.fromDelta(1, -1),
+            Direction.fromDelta(1, 1),
+        };
+        for (int depth = 0; depth < remainingRoute.length; depth++) {
+            assertEquals(remainingRoute[depth],
+                    grunt.peekHeadingAtDepth(depth),
+                    "fixture 290 retains native heading " + depth);
+        }
+
+        while (fixtureCycle(world) < 308) {
+            mission.tick();
+        }
+        assertEquals(26, grunt.tileX(),
+                "Attack construction keeps the committed tile through timer one");
+        assertEquals(39, grunt.tileY());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(309, fixtureCycle(world));
+        assertEquals(27, grunt.tileX());
+        assertEquals(38, grunt.tileY(),
+                "timer one consumes native's second northeast byte");
+        assertEquals(Direction.fromDelta(1, -1), grunt.lastStepHeading());
+    }
+
+    @Test
+    @DisplayName("a blocked post-construction replacement probes on timer one")
+    void blockedPostConstructionReplacementProbesOnTimerOne() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1501 / Java 99 finishes its first replacement stride,
+        // pays Attack construction on fixtures 293..295, then changes from
+        // knight 1475 to footman 1477. The newly written north-led route is
+        // occupied by an allied grunt. Retail probes it on the timer-one
+        // construction handoff and exposes Move 15/collision one on fixture
+        // 296. Deferring that probe to fixture 297 delayed the free north step
+        // from fixture 314 to 315.
+        Unit grunt = unitById(world, 99);
+        Unit footman = unitById(world, 123);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1501 grunt");
+        assertNotNull(footman, "XHuman 12 has no native-slot-1477 footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 296) {
+            mission.tick();
+        }
+
+        assertEquals(36, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(footman, grunt.target(),
+                "timer one installs the replacement mobile quarry");
+        assertEquals(20, grunt.pathLength(),
+                "the refused north-led replacement remains cached");
+        assertEquals(Direction.fromDelta(0, -1), grunt.peekHeading());
+        assertEquals(1, grunt.battleNetCollisionCounter(),
+                "the same callback owns native collision generation one");
+        assertEquals(world.idle.battleNetSequenceStart(grunt,
+                        net.chonkbase.chonkcraft.engine.animation
+                                .BattleNetSequence.MOVE_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(15, grunt.battleNetAnimationTimer(),
+                "the immediate occupied-head probe starts Move fifteen");
+
+        while (fixtureCycle(world) < 313) {
+            mission.tick();
+        }
+        assertEquals(36, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "Attack construction drains through fixture 313");
+
+        mission.tick();
+        assertEquals(314, fixtureCycle(world));
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "the free cached north heading commits on fixture 314");
+        assertEquals(Direction.fromDelta(0, -1), grunt.lastStepHeading());
+        assertEquals(19, grunt.pathLength());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

@@ -2352,6 +2352,7 @@ public final class Unit {
             battleNetRangedCloseHitHelpWallFace = false;
             battleNetColdNoProgressRefusalLoop = false;
             battleNetPaidLongResidualRefill = false;
+            battleNetFourStepPaidCollisionRefill = false;
             battleNetFirstSaturatedResidualProgressiveRefill = false;
         }
         this.target = target;
@@ -2999,6 +3000,52 @@ public final class Unit {
     private boolean battleNetSaturatedWoodCornerLadder;
 
     /**
+     * A collision-saturated terrain prefix has returned through action 23's
+     * fresh construction callbacks and still owns the route/refusal lifetime
+     * created by that handoff.
+     */
+    public boolean battleNetSaturatedWoodConstructionRoute() {
+        return battleNetSaturatedWoodConstructionRoute;
+    }
+
+    public void setBattleNetSaturatedWoodConstructionRoute(boolean armed) {
+        battleNetSaturatedWoodConstructionRoute = armed;
+    }
+
+    private boolean battleNetSaturatedWoodConstructionRoute;
+
+    /**
+     * The paid collision-eight construction band has retired, and its wood
+     * redraw/merged route still owns that collision generation. The flag
+     * survives route construction so a blocked cached head can be refused
+     * before the route lifecycle itself retires.
+     */
+    public boolean battleNetSaturatedWoodConstructionRedraw() {
+        return battleNetSaturatedWoodConstructionRedraw;
+    }
+
+    public void setBattleNetSaturatedWoodConstructionRedraw(boolean armed) {
+        battleNetSaturatedWoodConstructionRedraw = armed;
+    }
+
+    private boolean battleNetSaturatedWoodConstructionRedraw;
+
+    /**
+     * A collision-saturated one-byte terrain prefix selected a claimed-tree
+     * replacement during action 23. Its first post-construction redraw keeps
+     * that forest point rather than recomputing an intermediate order point.
+     */
+    public boolean battleNetSaturatedWoodClaimedReplacement() {
+        return battleNetSaturatedWoodClaimedReplacement;
+    }
+
+    public void setBattleNetSaturatedWoodClaimedReplacement(boolean armed) {
+        battleNetSaturatedWoodClaimedReplacement = armed;
+    }
+
+    private boolean battleNetSaturatedWoodClaimedReplacement;
+
+    /**
      * Far multi-step residual refuse hold (Orc 12 peon 1521). Armed on the
      * residual-settle refuse onto a cooperative gold ally when a free closer
      * neighbour also exists; keeps FUN_004379e0 coll bands 1..7 (timer 1)
@@ -3504,6 +3551,17 @@ public final class Unit {
     }
 
     private boolean battleNetPaidLongResidualRefill;
+
+    /** A generation-three paid wake must clear on its collision-four refill. */
+    public boolean battleNetFourStepPaidCollisionRefill() {
+        return battleNetFourStepPaidCollisionRefill;
+    }
+
+    public void setBattleNetFourStepPaidCollisionRefill(boolean refill) {
+        battleNetFourStepPaidCollisionRefill = refill;
+    }
+
+    private boolean battleNetFourStepPaidCollisionRefill;
 
     /** A first refusal after consuming a saturated route owns one direct refill. */
     public boolean battleNetFirstSaturatedResidualProgressiveRefill() {

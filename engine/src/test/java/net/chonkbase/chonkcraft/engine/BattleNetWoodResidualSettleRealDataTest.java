@@ -210,6 +210,110 @@ class BattleNetWoodResidualSettleRealDataTest {
                 "native writes the replacement tree into orderXY on the"
                         + " settle visit");
         assertEquals(89, worker.battleNetWoodOrderY());
+
+        while (fixtureCycle(world) < 299) {
+            mission.tick();
+        }
+        assertPosition(worker, 13, 86, -32, 32,
+                "fixture 299 commits the replacement route's northeast head");
+        assertEquals(Direction.fromDelta(1, -1), worker.lastStepHeading());
+        assertEquals(3, worker.pathLength(),
+                "the replacement redraw retains E,SE,S after its first step");
+        assertEquals(Direction.fromDelta(1, 0),
+                worker.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, 1),
+                worker.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(0, 1),
+                worker.peekHeadingAtDepth(2));
+    }
+
+    @Test
+    void xhuman12SaturatedFullPrefixPaysItsRefusalBandAndMergesTheOpenRoute() {
+        // XHuman 12 peon 1385 / Java 215 exhausts a four-byte free prefix at
+        // (12,88) with collision four. Native returns through action 23,
+        // starts a fresh collision lifetime against moving peon 1376, reaches
+        // collision eight, pays Move 15..1, and then merges onto that peon's
+        // open forest tail as NE,NE,SE,S.
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit worker = world.unitsSnapshot().stream()
+                .filter(unit -> unit.id() == 215)
+                .findFirst().orElse(null);
+        assertNotNull(worker,
+                "XHuman 12 must contain native peon 1385 / Java 215");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 285) {
+            mission.tick();
+        }
+        assertPosition(worker, 12, 88, 0, 0,
+                "fixture 285 is the first visible construction refusal");
+        assertEquals(1, worker.battleNetCollisionCounter(),
+                "the constructor starts a fresh collision generation");
+        assertEquals(0, worker.pathLength(),
+                "each naked refusal parks the constructed route");
+
+        while (fixtureCycle(world) < 292) {
+            mission.tick();
+        }
+        assertEquals(8, worker.battleNetCollisionCounter(),
+                "fixture 292 reaches the paid collision-eight band");
+        assertEquals(14, worker.battleNetOrderDelay());
+        assertEquals(15, worker.battleNetAnimationTimer(),
+                "collision eight begins Move 15..1");
+
+        while (fixtureCycle(world) < 306) {
+            mission.tick();
+        }
+        assertPosition(worker, 12, 88, 0, 0,
+                "the paid band holds the worker through timer one");
+        assertEquals(1, worker.battleNetAnimationTimer());
+        assertEquals(0, worker.pathLength());
+
+        mission.tick();
+        assertEquals(307, fixtureCycle(world));
+        assertPosition(worker, 13, 87, -32, 32,
+                "the post-band redraw commits northeast immediately");
+        assertEquals(8, worker.battleNetCollisionCounter(),
+                "the redraw keeps the paid collision generation");
+        assertEquals(Direction.fromDelta(1, -1), worker.lastStepHeading());
+        assertEquals(3, worker.pathLength(),
+                "the redraw retains the allied route's NE,SE,S tail");
+        assertEquals(Direction.fromDelta(1, -1),
+                worker.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, 1),
+                worker.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(0, 1),
+                worker.peekHeadingAtDepth(2));
+
+        while (fixtureCycle(world) < 323) {
+            mission.tick();
+        }
+        assertPosition(worker, 13, 87, 0, 0,
+                "fixture 323 settles the first northeast residual");
+        assertEquals(9, worker.battleNetCollisionCounter(),
+                "the blocked cached northeast advances collision eight to nine");
+        assertEquals(14, worker.battleNetOrderDelay());
+        assertEquals(15, worker.battleNetAnimationTimer());
+        assertEquals(3, worker.pathLength(),
+                "the repeated occupied diagonal retains the merged tail");
+        assertEquals(Direction.fromDelta(1, -1),
+                worker.peekHeadingAtDepth(0));
+
+        mission.tick();
+        assertEquals(324, fixtureCycle(world));
+        assertPosition(worker, 13, 87, 0, 0,
+                "fixture 324 remains in the paid collision-nine band");
+        assertEquals(14, worker.battleNetAnimationTimer());
     }
 
     private static int fixtureCycle(World world) {

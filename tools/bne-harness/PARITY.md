@@ -15,7 +15,73 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-296 blocked wood-order replacement)
+## Current release checkpoint — 2026-08-31 (cycle-299 collision-lifecycle consolidation)
+
+Accepted cycle-1,800 receipt `8858bbe1` advances the shared clean horizon from
+296 to 299 (two tied earliest divergences at 300), preserves or improves every
+campaign frontier, and retains the fleet totals of 8 clean / 44 divergent / 0
+failed. The 52 per-case exact prefixes now sum to 36,113, an increase of 149.
+The cycle-400 fleet improves from 33 clean / 19 divergent to 34 clean / 18
+divergent / 0 failed under receipt `42463ada`. The long receipt is retained at
+`.bne-artifacts/runs/8858bbe1ee3b6a902dba93de595d33ac57c2f78882e4f54a81d7c34c152eac85`.
+It binds dirty engine-input identity `ca0f5b7b` at base revision `88aab36` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`3bcb35f88bf9ce3a8a6e8be2ef1ba9e3abb00baf412b1fa6fdda5f481718652e`.
+
+Behavioral delta: packed collision ownership now survives the native
+active-order seams which actually retain it, and retires at the seams which
+construct a fresh order. A settled combat replacement can preserve a
+half-spent formation wall, probe a blocked post-construction route on its
+timer-one handoff, keep an offered-building skirt axis, and keep only a mover
+which has both collision-one and the matching offered target hard. A consumed
+laden-return tail redraws around collision-marked convoy traffic instead of
+mistaking it for the clean cooperative mover which earned the original wait.
+For terrain harvest, a new resource order clears an unmatched stale owner; a
+collision-saturated full prefix returns through action 23, counts eight naked
+refusals, retains collision eight through the opened guide-route redraw, and
+advances that generation to nine when its repeated cached diagonal remains
+occupied. These rules use order provenance, route lifecycle, collision state,
+live footprints, and target relationships; they contain no map, fixture,
+coordinate, cycle, faction, or unit-ID branch.
+
+Proof delta: Orc 12 advances 319 -> 341, Orc 14 advances 370 -> 469, and
+expansion Human 12 advances 296 -> 324. On the last case, the offered-target
+controls at fixture 257 distinguish collision-plus-offer, collision-only, and
+offer-only moving chasers. Native slot 1512 consequently retains
+`NE,SE,SE,SE,...` through its fixture-323 collision. Peon 1385 independently
+starts its fresh construction generation at one on fixture 285, reaches eight
+on 292, merges `NE,NE,SE,S` and commits NE on 307 without clearing the packed
+counter, then retains the second NE and opens collision nine / Move 15 on 323.
+The native packet extends through the second paid band: fixture 338 retires
+that route into action 23 and fixture 341 begins its fresh east route. Ordinary
+cooperative routes, collision-only/offer-only chasers, free shared-wall
+detours, and unsaturated wood prefixes remain negative controls.
+
+Three new efficacy receipts prove the latest distinct mechanisms fail before
+and pass after the candidate:
+`.bne-test-efficacy/h323-offered-building-residual-axis-skirt/runs/9417965811941838f55319b74aef8dbfe769a2755b7b312cb3deb3e4048d8f26`,
+`.bne-test-efficacy/h323-offered-collision-formation-wall/runs/2374dea35728464d9d362afb4ca27ec0190eea535d71afdadd9496a8fdd409ec`,
+and
+`.bne-test-efficacy/h324-saturated-construction-redraw-route/runs/26a5b7077a5ee28ede982f53cf0f2fc75b740433695df0cca62e6da24b0f512e`.
+The eight changed/new focused real-data classes pass 55 tests. Both fixed
+52-case cycle-400 and cycle-1,800 gates pass, and the executable next-level
+gate exits zero after 209 Python checks and 95 focused engine/desktop checks;
+its command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. Strict SSH verification still
+rejects the changed `i9beef` host key, so remote AI discovery and the broader
+certification lanes remain intentionally incomplete.
+
+The new shared frontier is tied at fixture 300. Human 11 first differs when
+native slot 1498's critter remains MOVE while the paired Java unit is STILL;
+the accepted compiler routes this missing order transition to Branch Witness.
+Expansion Orc 11 first differs when native battleship slot 1511 has 105 HP and
+the paired Java unit has 117 HP; it is routed to the causal combat lab.
+Expansion Human 12's newly exposed blocker follows at fixture 325 on grunt
+slot 1520 (`y` 43 native versus 44 Java).
+
+## Prior release checkpoint — 2026-08-31 (cycle-296 blocked wood-order replacement)
 
 Accepted cycle-1,800 receipt `0196efcc` advances the shared clean horizon from
 295 to 296 (earliest divergence 297), preserves every campaign frontier, and

@@ -150,6 +150,42 @@ class BattleNetLadenReturnWakeRealDataTest {
         assertEquals(15, peon.battleNetAnimationTimer());
     }
 
+    @Test
+    @DisplayName("XHuman 12 redraws a consumed return tail around collided traffic")
+    void xhuman12RedrawsAConsumedReturnTailAroundCollidedTraffic() {
+        Mission mission = mission("campaigns/human-exp/levelx12h");
+        World world = mission.world();
+        Unit peon = unitById(world, 48);
+        Unit blocker = unitById(world, 39);
+        assertNotNull(peon,
+                "XHuman 12 has no native-slot-1552 return peon");
+        assertNotNull(blocker,
+                "XHuman 12 has no native-slot-1561 return peon");
+
+        advanceToFixture(mission, world, 302);
+        assertPosition(peon, 5, 25,
+                "the northwest residual settles behind the collided convoy");
+        assertEquals(0, peon.pathLength(),
+                "native parks the consumed north tail at route index twenty");
+        assertEquals(1, peon.battleNetCollisionCounter());
+        assertPosition(blocker, 5, 24,
+                "the collision-marked returner still owns the north square");
+        assertTrue(blocker.isMoving());
+        assertTrue(blocker.battleNetCollisionCounter() > 0
+                        || blocker.battleNetRefusals() > 0,
+                "Java must retain one projection of native unit+0x1d");
+
+        mission.tick();
+        assertEquals(303, fixtureCycle(world));
+        assertPosition(peon, 6, 24,
+                "the next resource visit redraws and commits northeast");
+        assertEquals(1, peon.pathLength(),
+                "northwest remains cached behind the committed northeast");
+        assertEquals(7, peon.peekHeading());
+        assertEquals(1, peon.battleNetCollisionCounter(),
+                "the accepted redraw retains native collision generation one");
+    }
+
     private static Mission mission(String map) {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,

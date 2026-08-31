@@ -104,6 +104,61 @@ class XHuman12WoodSaturatedRouteHoldRealDataTest {
                 "the accepted southeast step begins its pixel residual");
     }
 
+    @Test
+    @DisplayName("the action-23 wood handoff pays all eight collision visits before redraw")
+    void action23WoodHandoffPaysAllEightCollisionVisitsBeforeRedraw() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit peon = unitById(world, 215);
+        assertNotNull(peon,
+                "XHuman 12 has no Java unit 215 / native peon slot 1385");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        tickThrough(mission, world, 284);
+        assertPosition(peon, 12, 88);
+        assertEquals(0, peon.battleNetCollisionCounter());
+
+        for (int fixture = 285; fixture <= 292; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertPosition(peon, 12, 88);
+            assertEquals(fixture - 284,
+                    peon.battleNetCollisionCounter(),
+                    "native packed collision generation at fixture "
+                            + fixture);
+        }
+        assertEquals(15, peon.battleNetAnimationTimer());
+        assertEquals(14, peon.battleNetOrderDelay());
+
+        for (int fixture = 293; fixture <= 306; fixture++) {
+            mission.tick();
+            assertEquals(fixture, fixtureCycle(world));
+            assertPosition(peon, 12, 88);
+            assertEquals(306 - fixture,
+                    peon.battleNetOrderDelay(),
+                    "remaining quiet callbacks at fixture " + fixture);
+            assertEquals(307 - fixture,
+                    peon.battleNetAnimationTimer(),
+                    "native Move timer at fixture " + fixture);
+        }
+
+        mission.tick();
+        assertEquals(307, fixtureCycle(world));
+        assertPosition(peon, 13, 87);
+        assertEquals(Direction.fromDelta(1, -1), peon.lastStepHeading());
+        assertEquals(3, peon.pathLength(),
+                "NE,SE,S remain behind the committed northeast byte");
+    }
+
     private static void tickThrough(Mission mission, World world, int fixture) {
         while (fixtureCycle(world) < fixture) {
             mission.tick();

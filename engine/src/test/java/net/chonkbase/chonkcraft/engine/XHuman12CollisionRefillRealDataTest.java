@@ -587,6 +587,103 @@ class XHuman12CollisionRefillRealDataTest {
     }
 
     @Test
+    @DisplayName("a free shared-wall detour leaves the paid chase buffer empty")
+    void freeSharedWallDetourDoesNotBecomeAPaidFormationPrefix() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 110);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1490 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 295) {
+            mission.tick();
+        }
+        assertEquals(31, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(0, grunt.pathLength(),
+                "the spent west tail is parked before Attack construction");
+
+        for (int fixture = 296; fixture <= 298; fixture++) {
+            mission.tick();
+            assertEquals(world.idle.battleNetSequenceStart(
+                            grunt, BattleNetSequence.ATTACK_ANIMATION),
+                    grunt.battleNetSequenceOffset());
+            assertEquals(299 - fixture, grunt.battleNetAnimationTimer(),
+                    "the first active-order constructor drains 3,2,1");
+        }
+
+        mission.tick();
+        assertEquals(299, fixtureCycle(world));
+        assertEquals(31, grunt.tileX());
+        assertEquals(40, grunt.tileY(),
+                "a free south square is not a paid shared-wall silhouette");
+        assertFalse(grunt.isMoving());
+        assertEquals(0, grunt.pathLength(),
+                "both failed wall probes retain an empty native buffer");
+        assertEquals(world.idle.battleNetSequenceStart(
+                        grunt, BattleNetSequence.ATTACK_ANIMATION),
+                grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer(),
+                "the empty probe returns to the three-call constructor");
+    }
+
+    @Test
+    @DisplayName("a second-generation chase route keeps a collided mover solid")
+    void secondGenerationChaseRouteKeepsCollidedMoverSolid() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit router = unitById(world, 120);
+        Unit collidedMover = unitById(world, 110);
+        assertNotNull(router, "XHuman 12 has no native-slot-1480 grunt");
+        assertNotNull(collidedMover,
+                "XHuman 12 has no native-slot-1490 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 282) {
+            mission.tick();
+        }
+        assertEquals(31, router.tileX());
+        assertEquals(37, router.tileY());
+        assertEquals(3, router.pathLength(),
+                "the first replacement route remains through construction");
+
+        mission.tick();
+        assertEquals(283, fixtureCycle(world));
+        assertEquals(31, collidedMover.tileX());
+        assertEquals(40, collidedMover.tileY());
+        assertEquals(1, collidedMover.battleNetCollisionCounter(),
+                "native unit+0x1d keeps collision generation one in flight");
+        assertEquals(1, collidedMover.pathLength());
+        assertTrue(collidedMover.isMoving());
+        assertEquals(32, router.tileX());
+        assertEquals(38, router.tileY(),
+                "the replacement ray must take native's first southeast");
+        assertEquals(Direction.fromDelta(1, 1), router.lastStepHeading());
+        assertEquals(19, router.pathLength(),
+                "the first southeast leaves native's nineteen-byte tail");
+        assertEquals(Direction.fromDelta(1, 1), router.peekHeading(),
+                "the collided mover bends the route to a second southeast");
+    }
+
+    @Test
     @DisplayName("a hard-parked paid refill continues the retained wall face")
     void hardParkedPaidRefillContinuesRetainedWallFace() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -1217,6 +1314,67 @@ class XHuman12CollisionRefillRealDataTest {
                 "the parked replacement owns the complete Move 15..1 band");
         assertEquals(route.length, saturatedRetarget.pathLength(),
                 "the paid band must not spend its retained route early");
+    }
+
+    @Test
+    @DisplayName("a generation-three paid wake parks and refills on residual settle")
+    void generationThreePaidWakeParksAndRefillsOnResidualSettle() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+        Unit grunt = unitById(world, 104);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1496 grunt");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 286) {
+            mission.tick();
+        }
+        assertEquals(36, grunt.tileX());
+        assertEquals(39, grunt.tileY());
+        assertEquals(3, grunt.battleNetCollisionCounter());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                grunt.pathLength());
+
+        mission.tick();
+        assertEquals(287, fixtureCycle(world));
+        assertEquals(37, grunt.tileX());
+        assertEquals(40, grunt.tileY(),
+                "the paid southeast head commits at timer one");
+        assertEquals(3, grunt.battleNetCollisionCounter(),
+                "native retains raw collision 0x30 through the accepted stride");
+        assertTrue(grunt.battleNetFourStepPaidCollisionRefill());
+
+        while (fixtureCycle(world) < 303) {
+            mission.tick();
+        }
+        assertEquals(37, grunt.tileX());
+        assertEquals(40, grunt.tileY());
+        assertEquals(0, grunt.pathLength(),
+                "the blocked northeast tail parks at native route index twenty");
+        assertEquals(4, grunt.battleNetCollisionCounter(),
+                "residual settle advances raw collision 0x30 to 0x40");
+        assertEquals(4, grunt.battleNetRetargetResidualParkSteps());
+        assertTrue(grunt.battleNetFourStepPaidCollisionRefill());
+
+        mission.tick();
+        assertEquals(304, fixtureCycle(world));
+        assertEquals(37, grunt.tileX());
+        assertEquals(39, grunt.tileY(),
+                "the paid refill consumes north on the following Move visit");
+        assertEquals(Direction.fromDelta(0, -1), grunt.lastStepHeading());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 2,
+                grunt.pathLength());
+        assertFalse(grunt.battleNetFourStepPaidCollisionRefill());
+        assertEquals(0, grunt.battleNetCollisionCounter(),
+                "NewPath clears the paid collision generation after commit");
     }
 
     private static int fixtureCycle(World world) {
