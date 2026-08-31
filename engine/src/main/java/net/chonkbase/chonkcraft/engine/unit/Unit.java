@@ -4389,11 +4389,12 @@ public final class Unit {
      * replaces the logical quarry. Java sometimes has to redraw the actual
      * headings because its occupancy projection differs, but the consumed
      * prefix still decides whether the eventual arrival is a first-step hold
-     * or a multi-step residual open. Keep that cursor provenance without
-     * changing any remaining heading.
+     * or a multi-step residual open. The replacement may itself be consumed
+     * on the redraw visit, leaving no remaining heading but a live initial
+     * length. Keep that cursor provenance without changing any heading.
      */
     public void carryBattleNetPathStepsTaken(int consumedPrefix) {
-        if (consumedPrefix > 0 && pathLength > 0) {
+        if (consumedPrefix > 0 && battleNetPathInitialLength > 0) {
             battleNetPathInitialLength += consumedPrefix;
         }
     }

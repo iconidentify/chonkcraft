@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-301 unreachable Attack idle dispatch)
+## Current release checkpoint — 2026-08-31 (cycle-302 scout route-generation prefix)
+
+Accepted cycle-1,800 receipt `72c18a62` advances the shared clean horizon from
+fixture 301 through 302 and preserves or improves every campaign frontier. The
+fleet remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,497, an increase of one. The cycle-400 fleet remains 36
+clean / 16 divergent / 0 failed under receipt `e454b347`. The long receipt is
+retained at
+`.bne-artifacts/runs/72c18a62b7c76a07c655267cea69b0e5778f04be8c728fa30d9fc40c16da2e53`.
+It binds dirty engine-input identity `ee7794e1` at base revision `f62610f` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`1da34e9d97c601342ab213b74f8f893c870f4182f2d5ac15e90aeba610a92552`.
+
+Behavioral delta: a behavior-four aircraft's saturated cardinal route refill
+remains part of the same one-shot scout generation. Java may redraw the actual
+replacement headings after the old prefix is exhausted, but it now carries the
+already-consumed route-buffer prefix into that redraw. The eventual landing can
+therefore distinguish a multi-step generation, which reconstructs the native
+three-call Still head, from a genuine one-step detour, which reconstructs at
+timer one. The rule uses scout role, route saturation, cardinal geometry,
+movement completion, and route-cursor provenance; it contains no mission, map,
+coordinate, fixture, cycle, faction, or unit-ID branch. Ordinary one-step
+detours and behavior-two launched flyers retain their distinct seams.
+
+Proof delta: expansion Orc 8 gryphon-rider slot 1550 / Java 50 consumes the
+three-heading south prefix of its recurring scout ray, lands at `(2,16)`, and
+refills with the final west stride toward `(0,16)` on fixture 230. Native keeps
+that S,S,S -> W cursor as one generation and, when its pixels settle on fixture
+254, installs Still@2233/3. Java formerly treated west as a fresh one-heading
+route and installed Still@2233/1. Its entire later idle program was therefore
+two visits early: the fixture-299 air pass queued Patrol at the same point and
+with the same RNG pair, but Java promoted it at fixture 302 and moved northeast
+at 310; native remains Still@2252/2 at 302, promotes Patrol at 304, and moves at
+312. The corrected route provenance advances expansion Orc 8's exact prefix
+301 -> 302.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc8-scout-route-generation-prefix/runs/161f08476634d40521ac0938e95b938d36270114f85a1d9b903ba0b57d5e4a40`
+proves the fixture-254 timer assertion fails on `f62610f` and passes on the
+candidate. Eight armed-flyer real-data checks pass, as do 27 sea-occupancy and
+capital-patrol controls. `MeleeChaseReplanResidualTest` retains the same three
+pre-existing failures on baseline and candidate under audit receipt
+`.bne-test-efficacy/audit-xorc8-route-prefix-melee-controls/runs/cc740fbb41eccd0269acf3d282e12cea1e2e4fd91708328002e8276872ac6376`;
+it is not claimed as passing candidate coverage. Both fixed 52-case cycle-400
+and cycle-1,800 gates pass. The executable next-level gate exits zero after 209
+Python checks and 95 focused engine/desktop checks; its command worklist remains
+11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. Strict SSH verification still rejects the changed
+`i9beef` host key, so remote AI discovery and the broader certification lanes
+remain intentionally incomplete.
+
+The shared frontier is now tied at fixture 303. Expansion Human 7 juggernaught
+slot 1573 is at x 26 natively versus 24 in Java, while expansion Orc 8 human
+destroyer slot 1435 is at `(90,76)` natively versus `(92,78)` in Java. Both
+authenticated packets route first to cadence and temporal state-machine
+analysis under frontier compilation `92fe7172`.
+
+## Prior release checkpoint — 2026-08-31 (cycle-301 unreachable Attack idle dispatch)
 
 Accepted cycle-1,800 receipt `33feb0a0` advances the shared clean horizon from
 fixture 299 through 301 and preserves or improves every campaign frontier. The

@@ -223,6 +223,41 @@ class BattleNetFlyerPatrolRealDataTest {
                 "the literal-point stride remains Patrol while its pixels drain");
         assertEquals(0, rider.tileX());
         assertEquals(16, rider.tileY());
+
+        tickThrough(mission, 254);
+        assertEquals(Unit.Order.STILL, rider.order(),
+                "the refilled four-step scout generation stands down on landing");
+        assertEquals(0, rider.tileX());
+        assertEquals(16, rider.tileY());
+        assertEquals(2233, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer(),
+                "the saturated south prefix remains part of the generation");
+
+        tickThrough(mission, 299);
+        assertEquals(Unit.Order.STILL, rider.order());
+        assertEquals(true, rider.hasBattleNetPendingPatrol(),
+                "the recurring air pass leaves Patrol in next_order");
+        assertEquals(0, rider.battleNetPendingPatrolX());
+        assertEquals(2, rider.battleNetPendingPatrolY());
+        assertEquals(2252, rider.battleNetSequenceOffset());
+        assertEquals(5, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 302);
+        assertEquals(Unit.Order.STILL, rider.order(),
+                "native has not promoted the queued Patrol at the fleet frontier");
+        assertEquals(2252, rider.battleNetSequenceOffset());
+        assertEquals(2, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 304);
+        assertEquals(Unit.Order.PATROL, rider.order());
+        assertEquals(2233, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer(),
+                "the queued Patrol promotes on the completed Still marker");
+
+        tickThrough(mission, 312);
+        assertEquals(2, rider.tileX());
+        assertEquals(14, rider.tileY(),
+                "the corrected constructor releases the north-east stride");
     }
 
     @Test

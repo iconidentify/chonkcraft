@@ -15452,11 +15452,18 @@ public final class World {
                 && canEnter(unit,
                         unit.orderTargetX(), unit.orderTargetY());
         if (saturatedCardinalFlyerSkirt) {
+            int consumedScoutPrefix = unit.battleNetPathStepsTaken();
             unit.setRouteSpent(false);
             unit.setWaitCycles(0);
             unit.animation().clearCurrent();
             movement.walkTowards(
                     unit, unit.orderTargetX(), unit.orderTargetY());
+            // NewPath overwrites the Java headings, but retail keeps the
+            // route-buffer cursor in this one scout generation. XOrc 8 rider
+            // 1550 has consumed S,S,S before this west refill; its eventual
+            // landing is therefore a four-step completion and reconstructs
+            // Still@2233/3, not the one-step detour's Still@2233/1.
+            unit.carryBattleNetPathStepsTaken(consumedScoutPrefix);
             armBattleNetPatrolMoveBody(unit);
             return;
         }
