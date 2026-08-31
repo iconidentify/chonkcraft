@@ -94,6 +94,31 @@ final class BattleNetCombatSystem {
     }
 
     /**
+     * Whether a saturated settled retarget refused its fresh complete buffer.
+     *
+     * <p>No byte has been consumed from the mobile replacement route yet;
+     * collision generation one is the refusal which bought the Move band.
+     * The old residual's queued Attack therefore remains ahead of this buffer
+     * when that band finishes.</p>
+     */
+    private boolean retainedFullSaturatedRetargetBuffer(Unit unit) {
+        if (unit == null) {
+            return false;
+        }
+        Unit target = unit.target();
+        return unit.battleNetSaturatedRetargetRouteBand()
+                && unit.battleNetChaseReplanResidualHold()
+                && unit.battleNetPathInitialLength()
+                        == BattleNetPathFinder.MAX_PATH
+                && unit.pathLength() == BattleNetPathFinder.MAX_PATH
+                && unit.battleNetPathStepsTaken() == 0
+                && unit.battleNetCollisionCounter() == 1
+                && unit.battleNetRefusals() == 0
+                && target != null && target.isAlive() && target.isOnMap()
+                && target.type() != null && !target.type().building();
+    }
+
+    /**
      * Whether a building retarget retains a reusable route behind its first
      * cardinal stride.
      *
@@ -473,6 +498,7 @@ final class BattleNetCombatSystem {
             boolean retainedPaidConstruction = paidReplacementBand
                     && (saturatedRetainedRouteFace(unit)
                             || retainedPaidMobileFirstWallBuffer(unit)
+                            || retainedFullSaturatedRetargetBuffer(unit)
                             || retainedBuildingReplay
                             || (unit.battleNetAttackWrapDestArmPending()
                                     && (unit.pathLength() == 4
@@ -484,8 +510,10 @@ final class BattleNetCombatSystem {
                     retainedPaidConstruction && unit.pathLength() == 4;
             boolean saturatedRetainedPaidConstruction =
                     retainedPaidConstruction
-                            && unit.pathLength()
-                                    == BattleNetPathFinder.MAX_PATH - 1;
+                            && (unit.pathLength()
+                                    == BattleNetPathFinder.MAX_PATH - 1
+                                    || retainedFullSaturatedRetargetBuffer(
+                                            unit));
             int retainedBuildingHeading = retainedBuildingReplay
                     ? unit.peekHeading() : -1;
             int retainedBuildingStride = retainedBuildingReplay
@@ -6925,6 +6953,8 @@ final class BattleNetCombatSystem {
                 && unit.battleNetChaseReplanResidualHold();
         boolean saturatedRetargetBandWake = unit != null
                 && unit.battleNetSaturatedRetargetRouteBand();
+        boolean retainedFullSaturatedRetargetBuffer =
+                retainedFullSaturatedRetargetBuffer(unit);
         boolean paidEmptyReplacement = paidReplacementBand
                 && unit.pathLength() == 0;
         boolean saturatedPaidEmptyResidualConstruction =
@@ -6940,7 +6970,8 @@ final class BattleNetCombatSystem {
                 && !World.battleNetRangedChaseUnit(unit);
         if (world.battleNetSequence == null || unit == null
                 || retainedTailReachabilityProbe
-                || saturatedRetargetBandWake
+                || (saturatedRetargetBandWake
+                        && !retainedFullSaturatedRetargetBuffer)
                 || unit.type() == null || !unit.chasing() || unit.isMoving()
                 || !unit.stepDrained()
                 || (!paidReplacementBand && unit.pathLength() < 4)
@@ -6993,6 +7024,15 @@ final class BattleNetCombatSystem {
         }
         unit.setBattleNetSequenceOffset(attackStart);
         unit.setBattleNetAnimationTimer(3);
+        if (retainedFullSaturatedRetargetBuffer) {
+            // The refusal bought the completed Move band, but its collision
+            // generation belongs to the retired building route. Promotion of
+            // the queued Attack clears that generation while preserving the
+            // complete mobile replacement buffer, so timer one's handoff can
+            // consume its first byte. XHuman 12 slot 1492 changes raw 0x1f
+            // from 0x40 to zero at fixture 286, then takes E on fixture 289.
+            unit.setBattleNetCollisionCounter(0);
+        }
         if (saturatedPaidEmptyResidualConstruction) {
             // The paid residual has reached active-order Still before it
             // promotes the retained Attack. That callback owns the ordinary

@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -125,6 +126,63 @@ class XHuman12Grunt1492SaturatedBuildingRetargetRealDataTest {
         assertEquals("unit-knight", grunt.target().type().ident());
         assertEquals(30, grunt.target().tileX());
         assertEquals(43, grunt.target().tileY());
+    }
+
+    @Test
+    @DisplayName("XHuman 12 grunt 1492 promotes queued Attack after the saturated route band")
+    void grunt1492PromotesQueuedAttackAfterSaturatedRouteBand() {
+        Mission mission = mission("campaigns/human-exp/levelx12h");
+        Unit grunt = byId(mission.world(), 108);
+        assertNotNull(grunt, "XHuman 12 has no Java twin for native grunt 1492");
+
+        tickThrough(mission, 271);
+        assertEquals(28, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH,
+                grunt.battleNetPathInitialLength());
+        assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength());
+        assertEquals(0, grunt.battleNetPathStepsTaken());
+        assertEquals(1, grunt.battleNetCollisionCounter());
+        assertEquals(0, grunt.battleNetRefusals());
+        assertTrue(grunt.battleNetSaturatedRetargetRouteBand());
+        assertTrue(grunt.battleNetChaseReplanResidualHold());
+        assertNotNull(grunt.target());
+        assertFalse(grunt.target().type().building());
+
+        tickThrough(mission, 285);
+        assertEquals(28, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength());
+        assertEquals(2482, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer(),
+                "the refused replacement pays its complete Move band");
+        assertEquals(1, grunt.battleNetCollisionCounter());
+
+        tickThrough(mission, 286);
+        assertEquals(28, grunt.tileX(),
+                "the retained Attack runs before the replacement head");
+        assertEquals(37, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH, grunt.pathLength());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(3, grunt.battleNetAnimationTimer());
+        assertEquals(0, grunt.battleNetCollisionCounter(),
+                "Attack promotion retires the building-route collision");
+
+        tickThrough(mission, 288);
+        assertEquals(28, grunt.tileX());
+        assertEquals(37, grunt.tileY());
+        assertEquals(2539, grunt.battleNetSequenceOffset());
+        assertEquals(1, grunt.battleNetAnimationTimer());
+
+        tickThrough(mission, 289);
+        assertEquals(29, grunt.tileX(),
+                "the first east byte releases after the queued Attack");
+        assertEquals(37, grunt.tileY());
+        assertEquals(BattleNetPathFinder.MAX_PATH - 1,
+                grunt.pathLength());
+        assertEquals(1, grunt.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(1, 0), grunt.lastStepHeading());
+        assertTrue(grunt.isMoving());
     }
 
     private static Mission mission(String map) {

@@ -15,7 +15,56 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-285 paid mobile wall buffer)
+## Current release checkpoint — 2026-08-30 (cycle-286 saturated retarget queued Attack)
+
+Accepted cycle-1,800 receipt `277fb87f` advances the shared clean horizon from
+285 to 286 (earliest divergence 287), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,879, one more than the preceding accepted survey. The
+receipt is retained under
+`.bne-artifacts/runs/277fb87fb3bfea0fffb237ee4b9be6133359e9ebad06ce805b50057aed6a9e9e`.
+It binds dirty engine-input identity `955b827f` at base revision `7f14a7d` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`5a118c11039969c02b18d4228334bacf48844ef2abef5a8d89e943605ea121d7`.
+
+Behavioral delta: a settled saturated building-to-mobile chase retarget which
+refused the head of its fresh complete buffer has already paid that buffer's
+Move band while retaining the old residual's queued Attack. When the band
+finishes, Java now promotes the queued Attack before consuming the replacement
+head, clears the retired building-route collision generation, drains Attack
+timers `3,2,1`, and only then releases the complete mobile route. The positive
+predicate uses the saturated retarget lifecycle, residual ownership, fixed
+native buffer saturation, refusal generation, and a live on-map mobile quarry;
+it contains no map, fixture, coordinate, cycle, faction, or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt 1492 / Java 108 switches from the guard
+tower to a knight and refuses the east head of a fresh twenty-byte replacement
+at `(28,37)`. The replacement pays Move through timer one on fixture 285.
+Native then holds position and promotes Attack `2539/3` on fixture 286 while
+raw collision state clears, drains timers two and one on fixtures 287 and 288,
+and consumes east to `(29,37)` on fixture 289 with nineteen bytes retained.
+Java formerly consumed east immediately on fixture 286. The focused causal
+twin now matches that entire handoff through the fixture-289 move.
+
+Efficacy receipt
+`.bne-test-efficacy/full-saturated-retarget-queued-attack/runs/1b3f0e7292b2a1eb024c5571444354d4e27f5f4b2cca0fd3a1e57f495da155b2`
+proves the new lifecycle regression assertion fails on `7f14a7d` and passes on
+the candidate. The focused real-data test and all 30 `bne_java.py` tests pass.
+The 52-case cycle-400 survey reports 33 clean / 19 divergent / 0 failed, and
+both it and the cycle-1,800 survey pass their accepted regression gates. The
+executable next-level gate exits zero after 209 Python checks and 95 focused
+engine/desktop checks; its command worklist remains 11 comparable scenarios
+(6 exact / 5 divergent) without regression or infrastructure failure. The
+broader certification lanes remain intentionally incomplete.
+
+The newly exposed blocker remains expansion Human 12, now at fixture 287:
+native grunt 1503 is at x=42 while Java is at x=41. The accepted compiler
+retains a complete paired position frame and routes the blocker to cadence
+analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-285 paid mobile wall buffer)
 
 Accepted cycle-1,800 receipt `a39fb431` advances the shared clean horizon from
 284 to 285 (earliest divergence 286), preserves every campaign frontier, and
