@@ -15,7 +15,65 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-299 critter wander generations)
+## Current release checkpoint — 2026-08-31 (cycle-301 unreachable Attack idle dispatch)
+
+Accepted cycle-1,800 receipt `33feb0a0` advances the shared clean horizon from
+fixture 299 through 301 and preserves or improves every campaign frontier. The
+fleet remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,496, an increase of 37. The cycle-400 fleet remains 36 clean
+/ 16 divergent / 0 failed under receipt `19ba2559`. The long receipt is retained
+at
+`.bne-artifacts/runs/33feb0a0798d544cd9ed06f1115db62564481960f0d4e6e8b9427d5b65f352d2`.
+It binds dirty engine-input identity `335d5f94` at base revision `bde0cb3` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`70b703e178b81e00bec97abdd5703d59c978e6184b692843b0f01df8c895b5b4`.
+
+Behavioral delta: when a marked Attack target is unreachable by the attacker's
+terrain class, the native GiveOrder epilogue installs the fresh Still cursor
+and immediately pays that active-order Still callback on the same construction
+visit. The cursor remains at the fresh marker, so its first opcode executes on
+the following visit. Java formerly installed the right Still marker and timer
+but deferred its idle draw by one visit, assigning all subsequent asynchronous
+draws to the wrong semantic consumers. The rule uses terrain reachability,
+target validity, order construction, and the existing active-order dispatcher;
+it contains no mission, map, coordinate, fixture, cycle, faction, or unit-ID
+branch. Reachable compact routes do not enter the seam, and siege units retain
+their existing exclusion from land-idle random selection.
+
+Proof delta: expansion Orc 11 axethrower slot 1517 / Java 83 acquires its enemy
+row on fixture 248 and winds Attack@887 with timers 3,2,1 on fixtures 250..252.
+On fixture 253 native clears the unreachable target, installs Still@825/1,
+calls `0x0040AD58` with result 14829, and retains the fresh cursor; fixture 254
+then executes OP0 and installs Still@4983/1. Java formerly skipped slot 1517's
+same-visit draw, so the result was consumed by the next eligible unit instead.
+That semantic shift eventually gave the cycle-291 cannon shell from native
+slot 1493 / Java 107 different aim jitter and moved its impact from native
+fixture 300 to Java fixture 301. Paying the callback at the native boundary
+aligns the chain and advances expansion Orc 11's exact prefix 299 -> 336.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc11-unreachable-attack-idle-dispatch/runs/e93db43152130f817e1f65492e6472bbd4eeeda6f779e963554cf4237fca4368`
+proves the real-data fixture-253 seed assertion fails on `bde0cb3` and passes on
+the candidate. The new regression plus expansion Human 4 acquisition and
+expansion Orc 11 patrol/attack controls pass 15 tests. Both fixed 52-case
+cycle-400 and cycle-1,800 gates pass. The executable next-level gate exits zero
+after 209 Python checks and 95 focused engine/desktop checks; its command
+worklist remains 11 comparable scenarios (6 exact / 5 divergent) without
+regression or infrastructure failure. A broader synthetic idle-attack method,
+`rangedChaseRetargetHoldsThreeVisitsBeforeTheNextStep`, fails identically on
+the baseline and candidate and is therefore recorded as pre-existing test debt,
+not accepted as candidate coverage. Strict SSH verification still rejects the
+changed `i9beef` host key, so remote AI discovery and the broader certification
+lanes remain intentionally incomplete.
+
+The sole shared frontier blocker is now expansion Orc 8 at fixture 302: native
+gryphon-rider slot 1550 is Still while the paired Java unit is Patrol. The
+accepted frontier packet routes the split to cadence and state-machine evidence;
+expansion Human 7 follows at fixture 303.
+
+## Prior release checkpoint — 2026-08-31 (cycle-299 critter wander generations)
 
 Accepted cycle-1,800 receipt `3c80d2f0` preserves the shared clean horizon
 through fixture 299 while removing one of the two tied cycle-300 blockers. The

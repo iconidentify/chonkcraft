@@ -16,11 +16,13 @@ import org.junit.jupiter.api.Test;
  * <p>Axethrower 1517 (Java 83) stands in a shore compound whose land gate no
  * route crosses to the enemy archer row it acquires at fixture 248. Retail
  * winds the Attack construction 3,2,1 across fixtures 250..252 and on 253
- * clears the target and returns to Still@825/1 without a single step, then
- * dispatches OP0 to 4983/1 on 254 -- the GiveOrder epilogue at 0x00453097
- * proved by capture. This implementation used to promote the chase once the
- * order delay ran out and then loop the windup timer against the wall forever;
- * its first correction still rebuilt Still with a generic 3,2,1 delay.
+ * clears the target and returns to Still@825/1 without a single step. The
+ * active-order Still dispatcher pays 0x0040AD58 on that same visit while
+ * retaining the fresh cursor, then dispatches OP0 to 4983/1 on 254 -- the
+ * GiveOrder epilogue at 0x00453097 proved by capture. This implementation used
+ * to promote the chase once the order delay ran out and then loop the windup
+ * timer against the wall forever; its first correction rebuilt Still with the
+ * right cursor but deferred the dispatcher draw to the next visit.
  */
 class Xorc11UnreachableQuarryDropRealDataTest {
 
@@ -65,6 +67,8 @@ class Xorc11UnreachableQuarryDropRealDataTest {
                 "retail returns at the fresh Still marker on fixture 253");
         assertEquals(1, thrower.battleNetAnimationTimer(),
                 "GiveOrder leaves one tick before the first Still opcode");
+        assertEquals(0x780a03d4, world.battleNetRandomSeed(),
+                "the unreachable Attack epilogue pays its active-order Still draw");
 
         mission.tick();
         assertEquals(254, fixtureCycle(world));
