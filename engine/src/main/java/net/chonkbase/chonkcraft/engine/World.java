@@ -15270,9 +15270,8 @@ public final class World {
         // on 61 and left the assault standing through 75.
         boolean openingLandAssaultPatrol =
                 battleNetOpeningLandAssaultPatrol(unit);
-        if (openingLandAssaultPatrol) {
-            battleNetPatrolQueueAcquire(unit);
-        }
+        boolean queuedOpeningLandAttack = openingLandAssaultPatrol
+                && battleNetPatrolQueueAcquire(unit);
         boolean openingCapitalStride = standingPatrol
                 && !battleNetPatrolMoveBodyCursor(unit)
                 && unit.pathLength() == 0 && !unit.isMoving();
@@ -15555,10 +15554,16 @@ public final class World {
                 && unit.pathLength() == 0
                 && !unit.isMoving();
         if (!standingPatrol && !awaitingFirstPatrolStep
-                && !openingLandAssaultPatrol
+                && !queuedOpeningLandAttack
                 && !battleNetLandPatrolAttackHandoff(unit)
                 && unit.pendingAttack() == null
                 && combat.autoAttack(unit)) {
+            // The generic scan counter is only a presentation-layer surrogate
+            // for units whose native action marker found no target. Advancing
+            // that counter after an empty land-Patrol OP0 keeps its existing
+            // phase; suppressing it merely because OP0 ran shifted the next
+            // surrogate scan onto Orc 11 archer 1559's in-range crossing at
+            // fixture 294, fourteen visits before native banks the attack.
             // Sea double-step with multi-step leftover (typically residual-
             // settled): native rewrites the route to the hostile and holds
             // under Patrol for fifteen animation ticks (1542: timer 15 at
@@ -17214,14 +17219,19 @@ public final class World {
             return;
         }
         if (before == Unit.Order.STILL
-                || (before == Unit.Order.MOVE && landAssaultPatrol)) {
+                || (landAssaultPatrol
+                        && (before == Unit.Order.MOVE
+                                || before == Unit.Order.PATROL))) {
             // The ready callback is reached through Still's opcode zero. Its
             // tick leaves the Java cursor just after that marker (4983 for a
             // battleship), but native's Patrol constructor rewinds to the
             // Still sequence head and arms three calls there. Keeping 4983
             // enters WAIT 4 before the first stride: XOrc 7/8 then sit until
             // fixture cycle six instead of moving on two, and XOrc 11 sits
-            // until nine instead of moving on five.
+            // until nine instead of moving on five. A recurring behavior-two
+            // land replacement also arrives while Patrol is current: archer
+            // 1559 promotes its queued replacement as Still 1977/3 at fixture
+            // 305 and reaches the hostile scan on fixture 308.
             int still = idle.battleNetStillSequenceStart(unit);
             if (still >= 0) {
                 unit.setBattleNetSequenceOffset(still);

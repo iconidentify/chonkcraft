@@ -126,6 +126,59 @@ class Orc11RecurringLandPatrolPassRealDataTest {
         assertEquals(15, archer.battleNetAnimationTimer());
     }
 
+    @Test
+    @DisplayName("orc 11's queued archer attack settles on retail Move cadence")
+    void orc11QueuedArcherAttackSettlesOnRetailMoveCadence() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit archer = unitById(world, 41);
+        assertNotNull(archer,
+                "Orc 11 has no Java 41 / native slot 1559 archer");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 305) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, archer.order());
+        assertEquals(1977, archer.battleNetSequenceOffset(),
+                "the recurring replacement reconstructs the retail Still head");
+        assertEquals(3, archer.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 313) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, archer.order());
+        assertEquals(3831, archer.pixelX());
+        assertEquals(983, archer.pixelY(),
+                "the engines agree immediately before the cadence split");
+
+        mission.tick();
+        assertEquals(314, fixtureCycle(world));
+        assertEquals(3829, archer.pixelX(),
+                "script.bin moves two pixels on this Patrol body visit");
+        assertEquals(981, archer.pixelY());
+        assertEquals(Unit.Order.PATROL, archer.order());
+
+        while (fixtureCycle(world) < 324) {
+            mission.tick();
+        }
+        assertEquals(3808, archer.pixelX());
+        assertEquals(960, archer.pixelY());
+        assertEquals(Unit.Order.ATTACK, archer.order(),
+                "the queued direct Attack promotes as the final pixels settle");
+        assertNotNull(archer.target());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

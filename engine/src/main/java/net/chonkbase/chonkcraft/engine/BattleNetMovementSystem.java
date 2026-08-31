@@ -9142,9 +9142,20 @@ final class BattleNetMovementSystem {
         if (unit == null || unit.type() == null) {
             return false;
         }
+        boolean landPatrolAttackPace =
+                unit.type().moveType() == UnitType.Movement.LAND
+                && unit.battleNetAiBehavior() == 2
+                && unit.pendingAttack() != null
+                && unit.pendingAttackFrom() == Unit.Order.PATROL;
         return unit.battleNetDoubleStep()
                 || unit.battleNetRepairStride()
                 || unit.returningToDepot() && unit.carried() > 0
+                // A behavior-two land Patrol banks direct Attack at its first
+                // OP0, then the retail Move program owns every residual pixel
+                // until the pop. Orc 11 archer 1559 / Java 41 diverges from
+                // the presentation animation at fixture 314 and settles the
+                // northwest stride under Attack on fixture 324.
+                || landPatrolAttackPace
                 || "unit-critter".equals(unit.type().ident())
                 || "unit-skeleton".equals(unit.type().ident())
                 || siegeUsesScriptBinMovePace(unit);

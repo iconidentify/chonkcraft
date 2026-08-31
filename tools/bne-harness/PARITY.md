@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-320 live depot-tail authority)
+## Current release checkpoint — 2026-08-31 (cycle-324 recurring land-Patrol authority)
+
+Accepted cycle-1,800 receipt `16b36ca8` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,764, an increase of two. Orc 11 advances from fixture 324
+to 326. The cycle-400 fleet remains 37 clean / 15 divergent / 0 failed under
+receipt `07c0956c`. The long receipt is retained at
+`.bne-artifacts/runs/16b36ca83f59a6ba1c379e4bdca3b29f0d097e5310ae9db8285e664fefd77d99`.
+It binds dirty engine-input identity `b4e69e41` at base revision `341aab7` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`a33045c55f4b7bfe6ce82ec8b1cc2b7f3de09e1150740cd4463e02a690901b6e`.
+
+Behavioral delta: a recurring behavior-two land Patrol replacement can be
+promoted while Patrol is already current. Its native action constructor still
+rewinds to the unit's `script.bin` Still head for the three-count opening and
+scans on the first opcode zero. Java's generic periodic scan remains only as a
+fallback when that native marker finds no target; a successful marker banks a
+direct Attack behind the Patrol stride. The Move program then owns the
+committed residual's pixel cadence until the queued Attack pops. The rule uses
+movement class, AI behavior, current/promoted order, native sequence state and
+queued-order provenance; it contains no mission, map, coordinate, fixture,
+cycle, faction or unit-ID branch.
+
+Proof delta: Orc 11 archer slot 1559 / Java 41 receives the recurring Patrol
+replacement on fixture 299 while its previous north stride is still moving.
+The final pixels settle and promote the replacement as Still sequence 1977 /
+timer 3 on fixture 305; the constructor counts through 2 and 1 before its
+fixture-308 opcode zero selects the hostile, writes a northwest attack route,
+banks direct order 12 and still takes the first stride under Patrol. Native
+and Java remain pixel-exact at `(3831,983)` through fixture 313, take the
+script-owned two-pixel beat to `(3829,981)` on 314, and settle at `(3808,960)`
+under Attack on fixture 324. Java formerly kept sequence `-1`, used the
+presentation movement cadence, and exposed Attack on fixture 325. The next
+Orc 11 mismatch is independent archer slot 1560 / Java 40 at fixture 326,
+native y 30 versus Java y 31.
+
+Efficacy receipt
+`.bne-test-efficacy/c324-recurring-land-patrol-attack/runs/62113fcd4f212d4d7912e85ca8aaa94c839aa9660a83f66ce616c91a9f521664`
+proves the focused fixture-305/314/324 regression assertion-fails on
+`341aab7` and passes on the candidate. All Orc 11 recurring-patrol, XHuman 12
+moving-land-launch and worker-refusal controls pass. Both fixed 52-case gates
+pass. The ordinary executable next-level gate exits zero after 209 Python
+checks and 95 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java. Its route-publication family
+remains paused after the retained failed variants and requires a new static or
+native discriminator. The earliest unpaused fleet findings are expansion
+Human 5 destroyer slot 1553 at fixture 323, then expansion Human 12 and
+expansion Orc 10 at fixture 325; the same AI/combat lane continues locally at
+Orc 11 archer slot 1560 on fixture 326.
+
+## Prior release checkpoint — 2026-08-31 (cycle-320 live depot-tail authority)
 
 Accepted cycle-1,800 receipt `9dbeb3f7` preserves the shared clean horizon at
 fixture 311 and improves every campaign frontier. The fleet remains 10 clean /
