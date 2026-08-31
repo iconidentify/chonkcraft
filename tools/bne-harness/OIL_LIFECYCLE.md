@@ -59,6 +59,7 @@ measures entry and exit cycles rather than merely waiting for eventual oil.
 | Distant | Orc 14 tanker 1566 from 116,6 to the eastern platform | remain visible through the route, action 25 on cycles 101--103, enter on 104 |
 | Diagonal | tanker 1566, doubled sea grid | execute `NE, NE, SE`; raw route bytes `01 01 03` |
 | Congested | tanker 1576 stationary at 120,4 while 1566 plans | the stationary hull remains solid and causes the `NE, NE, SE` wall-follow |
+| Swept diagonal | Orc 8 loaded tanker 1478 between tanker 1483 and destroyer 1477 | refuse cached `NW` despite its free destination anchor, pay Move 15..1, then replan `N` |
 | Multiple tankers | the two Orc 14 platform lanes and `OilLifecycleGateTest` | no starvation; each tanker can board and bank a load |
 | Blocked boarding seat | `OilLifecycleGateTest.twoTankersSurviveOnePlatformLane` | the following tanker waits/reroutes and eventually boards rather than ending its order |
 | Opposite-parity 3x3 depot | `TankerRoundTripTest.aTankerLeavesAnEvenAnchorShipyardAfterBankingOil` | a contained tanker uses a fail-safe aligned exit instead of disappearing permanently |
@@ -75,6 +76,16 @@ This replaces two incorrect Java approximations: unconditional soft-clearing
 of fellow harvesting tankers and a narrow 3-by-2 half-grid route exception.
 The same rule also preserves the nearby 1576 route, which legitimately takes
 `NE` to 122,2 and enters on cycle 41.
+
+The doubled anchor is not the whole movement test for a loaded return route.
+Orc 8 tanker 1478 retains `NW,NE` after committing north into the platform
+queue. At fixture 289 the northwest destination anchor is free, but another
+returning tanker occupies its north side and a destroyer occupies its west
+side. Native treats that two-hull swept corner as a refusal: sticky generation
+eleven becomes twelve, the route cursor parks at twenty, Move counts 15..1,
+and the fresh route commits north on fixture 304 after the adjacent tanker has
+vacated. This is narrower than a general pathfinder corner rule; ordinary
+large-ship routes still use the proved anchor-grid traversal view.
 
 ## Platform builder and failures
 

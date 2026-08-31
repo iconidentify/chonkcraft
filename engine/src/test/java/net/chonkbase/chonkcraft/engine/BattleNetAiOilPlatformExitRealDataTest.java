@@ -255,6 +255,58 @@ class BattleNetAiOilPlatformExitRealDataTest {
                             + cycle);
             assertEquals(106, southTanker.tileY());
         }
+
+        mission.tick();
+        assertEquals(257, fixtureCycle(mission.world()));
+        assertEquals(84, southTanker.tileX());
+        assertEquals(104, southTanker.tileY(),
+                "the paid north head commits after its refusal band");
+        assertEquals(2, southTanker.pathLength());
+        assertEquals(Direction.fromDelta(-1, -1),
+                southTanker.peekHeading(),
+                "the retained route next aims northwest through the crowded corner");
+
+        while (fixtureCycle(mission.world()) < 288) {
+            mission.tick();
+        }
+        assertEquals(84, southTanker.tileX());
+        assertEquals(104, southTanker.tileY());
+        assertEquals(0, southTanker.offsetX());
+        assertEquals(2, southTanker.offsetY(),
+                "fixture 288 still owes the final north residual pixels");
+        assertEquals(11, southTanker.battleNetRefusals(),
+                "the prior occupied north head leaves its sticky refusal generation");
+        assertNotNull(at(mission.world(), "unit-human-destroyer", 82, 104),
+                "the west side of the doubled northwest corner is occupied");
+        assertNotNull(at(mission.world(), "unit-human-oil-tanker", 84, 102),
+                "the north side of the doubled northwest corner is occupied");
+
+        mission.tick();
+        assertEquals(289, fixtureCycle(mission.world()));
+        assertEquals(84, southTanker.tileX(),
+                "native refuses a diagonal squeezed between two allied hulls");
+        assertEquals(104, southTanker.tileY());
+        assertEquals(0, southTanker.offsetX());
+        assertEquals(0, southTanker.offsetY());
+        assertEquals(0, southTanker.pathLength(),
+                "FUN_004379e0 parks the stale northwest tail");
+        assertEquals(12, southTanker.battleNetRefusals());
+        assertEquals(14, southTanker.waitCycles(),
+                "the already-paid refusal generation owns a complete Move band");
+
+        while (fixtureCycle(mission.world()) < 303) {
+            mission.tick();
+        }
+        assertEquals(84, southTanker.tileX());
+        assertEquals(104, southTanker.tileY(),
+                "the corner refusal holds through timer one");
+        mission.tick();
+        assertEquals(304, fixtureCycle(mission.world()));
+        assertEquals(84, southTanker.tileX());
+        assertEquals(102, southTanker.tileY(),
+                "the fresh route takes north after the adjacent tanker vacates");
+        assertEquals(Direction.fromDelta(0, -1),
+                southTanker.lastStepHeading());
     }
 
     @Test

@@ -2738,6 +2738,15 @@ final class BattleNetMovementSystem {
         return blocker != null && blocker != unit && blocker.isAlive();
     }
 
+    /** Whether an occupied doubled-grid side belongs to a friendly sea hull. */
+    private boolean battleNetAlliedNavalHull(Unit unit, Unit blocker) {
+        return blocker != null && blocker != unit
+                && blocker.isAlive() && blocker.isOnMap()
+                && blocker.type() != null && blocker.type().seaUnit()
+                && !blocker.type().building()
+                && world.isAllied(unit.player(), blocker.player());
+    }
+
 
     void stepMove(Unit unit) {
         stepMove(unit, true);
@@ -4017,6 +4026,52 @@ final class BattleNetMovementSystem {
                                     ? world.canEnterBattleNetTransportAnchor(
                                             unit, nextX, nextY)
                             : world.canEnter(unit, nextX, nextY);
+            Unit loadedTankerHorizontalSide = null;
+            Unit loadedTankerVerticalSide = null;
+            if (canTakeStep
+                    && unit.type().gathering().containsKey(
+                            UnitType.Resource.OIL)
+                    && unit.returningToDepot() && unit.carried() > 0
+                    && unit.carrying() == UnitType.Resource.OIL
+                    && unit.battleNetDoubleStep()
+                    && unit.stepDrained() && !unit.isMoving()
+                    && unit.battleNetPathStepsTaken() > 0
+                    && Direction.isDiagonal(heading)) {
+                loadedTankerHorizontalSide = world.blockerOnLayer(unit,
+                        unit.tileX() + Direction.deltaX(heading) * stride,
+                        unit.tileY());
+                loadedTankerVerticalSide = world.blockerOnLayer(unit,
+                        unit.tileX(),
+                        unit.tileY() + Direction.deltaY(heading) * stride);
+            }
+            boolean loadedTankerSqueezedDiagonal =
+                    battleNetAlliedNavalHull(
+                            unit, loadedTankerHorizontalSide)
+                    && battleNetAlliedNavalHull(
+                            unit, loadedTankerVerticalSide)
+                    && loadedTankerHorizontalSide
+                            != loadedTankerVerticalSide;
+            if (loadedTankerSqueezedDiagonal) {
+                // A doubled action-24 hull cannot sweep diagonally between
+                // two occupied cardinal side anchors even when the diagonal
+                // anchor itself is free. Orc 8 tanker 1478 settles N at
+                // (84,104) with cached NW between the returning tanker at
+                // (84,102) and destroyer at (82,104). Native raises the
+                // sticky refusal 11 -> 12, parks the route, pays Move 15..1,
+                // then replans N after the tanker has vacated. Testing only
+                // the destination anchor committed NW on fixture 289.
+                battleNetRefuse(unit);
+                unit.setRouteSpent(false);
+                unit.setBattleNetOrderDelay(0);
+                world.causalTrace.event(world.cycle,
+                        "path.loaded-tanker-squeezed-diagonal", unit.id(),
+                        "heading", heading,
+                        "horizontal_blocker",
+                                loadedTankerHorizontalSide.id(),
+                        "vertical_blocker", loadedTankerVerticalSide.id(),
+                        "refusals", unit.battleNetRefusals());
+                return;
+            }
             if (!canTakeStep && depotDestArmGoal != null
                     && battleNetDrainingDepotEntryBlocker(
                             unit, depotDestArmGoal, nextX, nextY) != null) {

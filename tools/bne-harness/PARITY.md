@@ -15,7 +15,62 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-30 (cycle-288 collided long-tail building redraw)
+## Current release checkpoint — 2026-08-30 (cycle-289 loaded tanker swept-corner refusal)
+
+Accepted cycle-1,800 receipt `2272220f` advances the shared clean horizon from
+288 to 289 (earliest divergence 290), preserves every campaign frontier, and
+retains the fleet totals of 8 clean / 44 divergent / 0 failed. The 52 per-case
+exact prefixes sum to 35,957, seventy-five more than the preceding accepted
+survey because retail Orc 8 advances from fixture 289 to 364. The receipt is
+retained under
+`.bne-artifacts/runs/2272220fc03b97e1d2d9d5901d4a8a878830097d206b638dd42ffa609d656563`.
+It binds dirty engine-input identity `885fddd6` at base revision `6783fac` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`0d277721cf1007c7fe6c238a4ecd3bc98a740dcb0c729d309deb3ff99b9bba3c`.
+
+Behavioral delta: a loaded doubled tanker returning to an oil depot cannot
+commit a cached diagonal through two distinct occupied cardinal side anchors,
+even when the doubled-grid destination anchor itself is free. When both sides
+are friendly naval hulls, Java now enters the shared native refusal primitive:
+it increments the sticky refusal generation, parks the route, pays the
+appropriate Move band, and replans after the queue changes. Other large ships,
+fresh tanker routes, cardinal headings, and diagonals without the proved
+two-hull squeeze retain their existing anchor-grid behavior. The predicate
+uses resource state, route lifecycle, heading geometry, and live allied naval
+occupancy; it contains no map, fixture, coordinate, cycle, faction, or unit-ID
+branch.
+
+Proof delta: retail Orc 8 human tanker 1478 / Java 122 commits north from
+`(84,106)` to `(84,104)` on fixture 257, retaining `NW,NE` and sticky refusal
+eleven. Its north residual drains pixel-exactly through fixture 288. The cached
+northwest destination is free, but returning tanker 1483 / Java 117 occupies
+the north side `(84,102)` and destroyer 1477 / Java 123 occupies the west side
+`(82,104)`. Native therefore remains centered at `(84,104)` on fixture 289,
+raises refusal eleven to twelve, parks route index twenty, and pays Move
+`15..1` through fixture 303 before replanning and committing north on 304.
+Java formerly committed northwest to `(82,102)` on 289. The corrected sealed
+case remains exact through fixture 363.
+
+Efficacy receipt
+`.bne-test-efficacy/h289-loaded-tanker-squeezed-diagonal/runs/e8b5478e51ec321ec936dab47dc7234853d3472346497f333aead120054ebd68`
+proves the expanded Orc 8 regression fails on `6783fac` and passes on the
+candidate. The focused oil/tanker suite and all 30 `bne_java.py` tests pass.
+The 52-case cycle-400 survey reports 33 clean / 19 divergent / 0 failed, and
+both it and the cycle-1,800 survey pass their accepted regression gates. The
+executable next-level gate exits zero after 209 Python checks and 95 focused
+engine/desktop checks; its command worklist remains 11 comparable scenarios
+(6 exact / 5 divergent) without regression or infrastructure failure. The
+broader certification lanes remain intentionally incomplete.
+
+The newly exposed blocker returns to expansion Human 12 at fixture 290: native
+grunt 1441 has 34 HP versus Java 38, native footman 1449 has 47 versus Java 49,
+and native grunt 1495 has 28 versus Java 31. The accepted compiler retains the
+complete three-unit damage frame and routes the blocker to parity-lab causal
+analysis.
+
+## Prior release checkpoint — 2026-08-30 (cycle-288 collided long-tail building redraw)
 
 Accepted cycle-1,800 receipt `9392b251` advances the shared clean horizon from
 286 to 288 (earliest divergence 289), preserves every campaign frontier, and
