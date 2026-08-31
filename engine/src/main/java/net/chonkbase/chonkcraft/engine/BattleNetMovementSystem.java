@@ -4568,23 +4568,26 @@ final class BattleNetMovementSystem {
                     }
                     return;
                 }
-                boolean behaviorSixCapitalPatrolMovingHullRefusal =
+                int capitalPatrolCollision =
+                        unit.battleNetCollisionCounter();
+                boolean behaviorSixCapitalPatrolAlliedHullRefusal =
                         unit.battleNetBorrowedMoveForStep()
                         && unit.battleNetAiBehavior() == 6
                         && unit.patrolX() >= 0
                         && unit.type() != null
                         && World.isBattleNetCapitalShip(unit.type().ident())
                         && unit.battleNetPathStepsTaken() == 0
-                        && unit.battleNetCollisionCounter() == 0
+                        && capitalPatrolCollision < 14
                         && unit.battleNetRefusals() == 0
                         && stageSixBlocker != null
                         && stageSixBlocker != unit
-                        && stageSixBlocker.isMoving()
                         && stageSixBlocker.type() != null
                         && stageSixBlocker.type().seaUnit()
                         && world.isAllied(unit.player(),
-                                stageSixBlocker.player());
-                if (behaviorSixCapitalPatrolMovingHullRefusal) {
+                                stageSixBlocker.player())
+                        && (capitalPatrolCollision > 0
+                                || stageSixBlocker.isMoving());
+                if (behaviorSixCapitalPatrolAlliedHullRefusal) {
                     // The point writer has already drawn through the moving
                     // hull, but Move consumes that route under restored live
                     // occupancy. Retail retains the complete buffer and pays
@@ -4592,7 +4595,13 @@ final class BattleNetMovementSystem {
                     // slot 1573 therefore keeps seven headings toward the
                     // completed platform at fixture 258 instead of clearing
                     // them and drawing a northeast bypass on the next visit.
-                    unit.setBattleNetCollisionCounter(1);
+                    // Each later timer-one wake advances the same packed
+                    // generation while that retained head remains occupied;
+                    // the blocker need no longer be mid-stride once the live
+                    // route owns that provenance. Leave generation fifteen
+                    // to the ordinary saturation path below.
+                    unit.setBattleNetCollisionCounter(
+                            capitalPatrolCollision + 1);
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
                     unit.setBattleNetOrderDelay(14);
@@ -5390,7 +5399,9 @@ final class BattleNetMovementSystem {
                         // band and commits when that blocker leaves on 53.
                         boolean paidConsumedTail =
                                 unit.battleNetPathStepsTaken() == 1;
-                        int parkedHeading = paidConsumedTail
+                        boolean terminalPaidConsumedTail =
+                                paidConsumedTail && unit.pathLength() == 1;
+                        int parkedHeading = terminalPaidConsumedTail
                                 ? unit.peekHeading() : -1;
                         battleNetRefuse(unit);
                         unit.setRouteSpent(false);
@@ -5398,8 +5409,17 @@ final class BattleNetMovementSystem {
                         unit.setBattleNetOrderDelay(
                                 paidConsumedTail ? 14 : 0);
                         unit.setBattleNetNavalPaidParkedRoute(
-                                paidConsumedTail);
+                                terminalPaidConsumedTail);
                         if (paidConsumedTail) {
+                            // A terminal cached byte continues the wall face
+                            // which produced it: destroyer 1431's refused NW
+                            // therefore redraws SW on fixture 279. A longer
+                            // route exposes a newly blocked head after the
+                            // prior stride settles; native parks that route
+                            // but starts the paid redraw cold. Destroyer 1435
+                            // rejects E with six bytes left on fixture 303 and
+                            // the fixture-318 redraw begins SE, not the
+                            // opposite face produced by continuing from E.
                             unit.setBattleNetParkedRefusalHeading(
                                     parkedHeading);
                         }

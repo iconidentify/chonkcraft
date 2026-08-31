@@ -225,6 +225,45 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
         assertEquals(15, juggernaught.battleNetAnimationTimer());
         assertEquals(true, juggernaught.battleNetRefusalHold(),
                 "the first occupied route byte owns a complete Move refusal band");
+
+        for (int cycle = 259; cycle <= 272; cycle++) {
+            mission.tick();
+        }
+        assertEquals(7, juggernaught.pathLength(),
+                "the first paid band keeps the direct platform route live");
+        assertEquals(1, juggernaught.battleNetCollisionCounter());
+        assertEquals(1, juggernaught.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(7, juggernaught.pathLength(),
+                "the blocked timer-one wake reuses the same route buffer");
+        assertEquals(2, juggernaught.battleNetCollisionCounter(),
+                "the second occupied wake advances the packed generation");
+        assertEquals(0, juggernaught.battleNetRefusals(),
+                "the live capital route does not enter the parked-route ladder");
+        assertEquals(14, juggernaught.battleNetOrderDelay());
+        assertEquals(15, juggernaught.battleNetAnimationTimer());
+
+        for (int cycle = 274; cycle <= 287; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(7, juggernaught.pathLength());
+        assertEquals(3, juggernaught.battleNetCollisionCounter(),
+                "the third blocked wake owns one final complete Move band");
+        assertEquals(15, juggernaught.battleNetAnimationTimer());
+
+        for (int cycle = 289; cycle <= 302; cycle++) {
+            mission.tick();
+        }
+        mission.tick();
+        assertEquals(26, juggernaught.tileX(),
+                "fixture 303 consumes east when the retained route finally frees");
+        assertEquals(26, juggernaught.tileY());
+        assertEquals(6, juggernaught.pathLength());
+        assertEquals(1, juggernaught.battleNetPathStepsTaken());
+        assertEquals(3, juggernaught.battleNetCollisionCounter(),
+                "the successful probe keeps native generation-three provenance");
     }
 
     @Test

@@ -15846,7 +15846,8 @@ public final class World {
             int nextY = unit.tileY()
                     + Direction.deltaY(heading) * stride;
             paidSmallWarshipBlockedRouteWake =
-                    !canEnter(unit, nextX, nextY);
+                    !residualSettledThisVisit
+                    && !canEnter(unit, nextX, nextY);
             if (paidSmallWarshipBlockedRouteWake) {
                 // A complete cooperative band reuses its cached head when the
                 // square has opened (XOrc 8 destroyer 164 at fixture 106).
@@ -15858,6 +15859,11 @@ public final class World {
                 // remains, submarine 1432 still blocks it on fixture 264;
                 // that terminal cached heading is retained under the ordinary
                 // fifteen-count cooperative band instead of being replaced.
+                // This redraw belongs only to a hull that was already settled
+                // when its paid timer-one visit began. If the prior stride's
+                // residual settles on this visit, the newly exposed occupied
+                // route head owns another ordinary refusal first (destroyer
+                // 1435 at fixture 303), and its later timer-one wake redraws.
                 unit.clearPath();
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);
@@ -15931,15 +15937,18 @@ public final class World {
             // suppresses PF_WAIT for XHuman 7's one-byte stand-down and keeps
             // XOrc 11's combat patrols on their proved acquire cadence.
             armBattleNetPatrolMoveBody(unit);
-            boolean retainedCapitalPatrolRefusalBuffer =
+            boolean retainedCapitalPatrolCollisionBuffer =
                     unit.battleNetAiBehavior() == 6
                     && unit.type() != null
                     && isBattleNetCapitalShip(unit.type().ident())
-                    && unit.battleNetRefusalHold()
-                    && unit.battleNetCollisionCounter() == 1
-                    && unit.battleNetOrderDelay() == 14
+                    && unit.battleNetCollisionCounter() > 0
                     && unit.pathLength() > 0;
-            if (!retainedCapitalPatrolRefusalBuffer
+            // A behavior-six capital route carrying packed collision
+            // provenance stays authoritative both during each paid band and
+            // after its occupied head finally commits. XHuman 7 slot 1573
+            // retains all seven bytes through generations one, two and three,
+            // then keeps the six-byte tail after its fixture-303 east step.
+            if (!retainedCapitalPatrolCollisionBuffer
                     && (unit.battleNetAiBehavior() == 2
                             || unit.pathLength() == 0
                             || unit.battleNetPathInitialLength() < 20)) {

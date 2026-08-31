@@ -190,6 +190,48 @@ class BattleNetSmallWarshipPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 8's landing destroyer refuses its next occupied route head")
+    void xOrc8LandingDestroyerRefusesNextOccupiedRouteHead() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 165);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1435");
+
+        tickThrough(mission, 302);
+        assertEquals(90, destroyer.tileX());
+        assertEquals(76, destroyer.tileY());
+        assertTrue(destroyer.isMoving(),
+                "the first south-east stride still owes two pixels");
+        assertEquals(6, destroyer.pathLength());
+        assertEquals(9, destroyer.battleNetRefusals());
+
+        tickThrough(mission, 303);
+        assertEquals(90, destroyer.tileX(),
+                "the residual-settle visit refuses east instead of redrawing south-east");
+        assertEquals(76, destroyer.tileY());
+        assertTrue(!destroyer.isMoving());
+        assertEquals(0, destroyer.pathLength(),
+                "native parks the occupied cached route at index twenty");
+        assertEquals(10, destroyer.battleNetRefusals());
+        assertEquals(14, destroyer.battleNetOrderDelay());
+        assertEquals(15, destroyer.battleNetAnimationTimer());
+        assertTrue(!destroyer.battleNetNavalPaidParkedRoute(),
+                "a longer parked tail redraws from current occupancy, not a terminal face");
+
+        tickThrough(mission, 318);
+        assertEquals(92, destroyer.tileX(),
+                "timer-one redraw releases the native south-east stride");
+        assertEquals(78, destroyer.tileY());
+        assertTrue(destroyer.isMoving());
+        assertEquals(10, destroyer.battleNetRefusals(),
+                "a successful stride keeps the sticky native refusal nibble");
+    }
+
+    @Test
     @DisplayName("XOrc 8's paid destroyer route releases north on cycle 232")
     void xOrc8PaidDestroyerRouteReleasesNorthOnCycle232() {
         AssetSource assets = AssetSource.fromEnvironment();

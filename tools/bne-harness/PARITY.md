@@ -15,7 +15,64 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-302 scout route-generation prefix)
+## Current release checkpoint — 2026-08-31 (cycle-303 retained naval refusal routes)
+
+Accepted cycle-1,800 receipt `cf53f6d8` advances the shared clean horizon from
+fixture 302 through 303 and preserves or improves every campaign frontier. The
+fleet remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,590, an increase of 93. The cycle-400 fleet remains 36 clean
+/ 16 divergent / 0 failed under receipt `ce1644e3`. The long receipt is
+retained at
+`.bne-artifacts/runs/cf53f6d8d8417fea0230951643c496f5fa7d87e01580d45179d43c7bbb94ec03`.
+It binds dirty engine-input identity `4ca819bc` at base revision `fb319db` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`0b167e14722e60c5c88d67b37e4479b87823ca64a045278a7fe58bce077d589c`.
+
+Behavioral delta: behavior-six capital Patrol keeps a collision-marked route
+authoritative across repeated occupied timer-one wakes and after the head
+finally commits; each refused wake advances the common packed collision
+generation and rearms the complete Move band without parking the route.
+Separately, a small warship whose previous stride settles onto a newly exposed
+occupied cached head records the next ordinary naval refusal before the paid
+wake is allowed to redraw. Only a terminal one-byte paid tail preserves the
+pass-start hull view and continues its old wall face; a longer parked tail
+redraws cold after its band. These rules use order, movement phase, route
+cursor, collision/refusal provenance, unit class and live occupancy, with no
+mission, map, coordinate, fixture, cycle, faction or unit-ID branch.
+
+Proof delta: expansion Human 7 juggernaught slot 1573 / Java 27 retains
+`E,SE,E,SE,E,SE,E` at `(24,26)` while destroyer 1570 occupies its east head.
+Native advances packed collision generations one, two and three on fixtures
+258, 273 and 288, then commits east and retains the six-byte tail on fixture
+303; Java formerly parked the route on the second wake and did not move until
+324. Expansion Orc 8 destroyer slot 1435 / Java 165 settles its southeast
+residual at `(90,76)` on fixture 303 with cached east occupied, advances sticky
+refusal nine to ten and parks the route for Move 15..1, then cold-redraws and
+commits southeast on fixture 318. Java formerly redrew and committed southeast
+on the settle visit. The two cases now first diverge at fixtures 395 and 304
+respectively.
+
+Efficacy receipts
+`.bne-test-efficacy/c303-capital-retained-collision-route/runs/461280c9ad0ce625364c5f9c1e5937cb505cf4fbef7d9a3d71d4fb9478630c8e`
+and
+`.bne-test-efficacy/c303-small-warship-residual-head-refusal/runs/f2201f857c4703cd535ba59eba9bbc7b2a983e28782703cf94c67b493317d7af`
+prove both focused assertions fail on `fb319db` and pass on the candidate.
+All 35 focused capital, small-warship, sea-occupancy and residual controls
+pass, as do both fixed 52-case gates. The ordinary executable next-level gate
+exits zero after 209 Python checks and 95 engine/desktop checks; its command
+worklist remains 11 comparable scenarios (6 exact / 5 divergent) without
+regression or infrastructure failure. `--require-certified` still reports the
+documented broader evidence debt after those local checks pass: strict SSH
+verification rejects the changed `i9beef` host key, which was not modified.
+
+The shared frontier is now fixture 304. Expansion Orc 8 gryphon-rider slot
+1560 is natively Still at y 8 while Java is Patrol at y 6. Frontier compilation
+under `.bne-field-evidence/cycle303-frontier-compile` authenticates the frame
+and routes the position/movement mismatch to cadence next.
+
+## Prior release checkpoint — 2026-08-31 (cycle-302 scout route-generation prefix)
 
 Accepted cycle-1,800 receipt `72c18a62` advances the shared clean horizon from
 fixture 301 through 302 and preserves or improves every campaign frontier. The
