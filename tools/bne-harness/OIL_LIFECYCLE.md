@@ -60,6 +60,7 @@ measures entry and exit cycles rather than merely waiting for eventual oil.
 | Diagonal | tanker 1566, doubled sea grid | execute `NE, NE, SE`; raw route bytes `01 01 03` |
 | Congested | tanker 1576 stationary at 120,4 while 1566 plans | the stationary hull remains solid and causes the `NE, NE, SE` wall-follow |
 | Swept diagonal | Orc 8 loaded tanker 1478 between tanker 1483 and destroyer 1477 | refuse cached `NW` despite its free destination anchor, pay Move 15..1, then replan `N` |
+| Empty depot-ready | XHuman 5 tanker 1557 leaving shipyard 1559 for platform 1558 | hidden action 26 selects the platform before dropout; its goal owns east-face `(92,60)`, Still 25, then action 23 |
 | Multiple tankers | the two Orc 14 platform lanes and `OilLifecycleGateTest` | no starvation; each tanker can board and bank a load |
 | Blocked boarding seat | `OilLifecycleGateTest.twoTankersSurviveOnePlatformLane` | the following tanker waits/reroutes and eventually boards rather than ending its order |
 | Opposite-parity 3x3 depot | `TankerRoundTripTest.aTankerLeavesAnEvenAnchorShipyardAfterBankingOil` | a contained tanker uses a fail-safe aligned exit instead of disappearing permanently |
@@ -153,6 +154,14 @@ callback at `0x004512a0` tests the doubled-movement flag at `0x004512bb`, then
 Java therefore keeps the native absolute-even test and face-first search. Only
 after the face geometry proves that search can never intersect the required
 grid does it walk a parity-changing side ring for an aligned free square.
+Expansion Human 5 adds the empty-tanker order boundary. Tanker 1557 finishes
+its return without a remembered platform, but native action 26 invokes the
+ready callback while the tanker is still contained in shipyard 1559. The
+callback selects platform 1558 before dropout, so that goal owns the east-face
+absolute-even exit at `(92,60)` and queues action 23 behind the 25-cycle Still
+head. A generic depot-seeded resource lookup finds no candidate in this state,
+and waiting for the ordinary surfaced callback selects the platform one cycle
+too late.
 The captured player save adds the interrupted-command boundary: its tanker is
 at `(53,18)` with `IX=-36`, a Move goal of `(53,18)`, cargo 100 and action 24.
 Without another command it now finishes the owed pixels, centres on that tile
@@ -200,7 +209,7 @@ Focused behavior and persistence:
 ```sh
 mvn -q -pl engine \
   -Dchonkcraft.pack=/path/to/bne.chonkpack \
-  -Dtest='BattleNetResourceApproachTest#adjacentTankerUsesNativeApproachState+boardSeatTankerHoldsCoverBeforeEnter+distantTankerDoesNotEnterOnTheLandingCall,OilLifecycleGateTest,TankerRoundTripTest,OilPlatformTest#aTankerFoundsAPlatformOnAPatchAndPumpsIt,WorkerSpriteTest,SaveGameTest#tankerOilStateRoundTrips,BattleNetPathFinderTest#orcFourteenTankerRoutesAroundStationaryTanker' \
+  -Dtest='BattleNetAiOilPlatformExitRealDataTest,Human07OilTankerDepotExitRealDataTest,BattleNetAiMineExitReadyRealDataTest,BattleNetResourceApproachTest#adjacentTankerUsesNativeApproachState+boardSeatTankerHoldsCoverBeforeEnter+distantTankerDoesNotEnterOnTheLandingCall,OilLifecycleGateTest,TankerRoundTripTest,OilPlatformTest#aTankerFoundsAPlatformOnAPatchAndPumpsIt,WorkerSpriteTest,SaveGameTest#tankerOilStateRoundTrips,BattleNetPathFinderTest#orcFourteenTankerRoutesAroundStationaryTanker' \
   test
 ```
 

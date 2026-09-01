@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -19,6 +20,57 @@ import org.junit.jupiter.api.Test;
 class BattleNetAiOilPlatformExitRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("an XHuman 5 tanker chooses its platform before leaving the shipyard")
+    void anXHuman5TankerUsesTheHiddenReadyPlatformForItsDepotExit() {
+        Mission mission = loadMission("campaigns/human-exp/levelx05h");
+        World world = mission.world();
+        Unit tanker = unitById(world, 43);
+        Unit shipyard = unitById(world, 41);
+        Unit platform = unitById(world, 42);
+        assertNotNull(tanker,
+                "XHuman 5 has no Java tanker 43 / native slot 1557");
+        assertNotNull(shipyard, "XHuman 5 has no p4 shipyard at 89,59");
+        assertNotNull(platform, "XHuman 5 has no p4 platform at 99,63");
+
+        tickThrough(mission, 434);
+        assertTrue(tanker.removed(),
+                "fixture 434 must still contain the tanker in its shipyard");
+        assertSame(shipyard, tanker.worksite());
+        assertNull(tanker.resourceUnit(),
+                "the completed return order owns no remembered platform");
+
+        mission.tick();
+        assertEquals(435, fixtureCycle(world));
+        assertEquals(92, tanker.tileX(),
+                "the hidden ready callback selects the east shipyard face");
+        assertEquals(60, tanker.tileY(),
+                "the first legal east-face anchor is absolute-even");
+        assertEquals(Unit.Order.STILL, tanker.order());
+        assertTrue(tanker.battleNetDoubleStep());
+        assertSame(platform, tanker.resourceUnit(),
+                "native stores platform slot 1558 before the tanker surfaces");
+        assertEquals(25, tanker.battleNetOrderDelay(),
+                "raw action 23 remains behind the 25-cycle Still head");
+        assertEquals(1, tanker.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                tanker.queuedOrders().getFirst().kind());
+        assertSame(platform, tanker.queuedOrders().getFirst().target());
+
+        tickThrough(mission, 459);
+        assertEquals(Unit.Order.STILL, tanker.order());
+        assertEquals(92, tanker.tileX());
+        assertEquals(60, tanker.tileY());
+        mission.tick();
+        assertEquals(Unit.Order.HARVEST, tanker.order(),
+                "native promotes action 23 on fixture 460");
+        tickThrough(mission, 462);
+        mission.tick();
+        assertEquals(94, tanker.tileX(),
+                "native commits the first east stride on fixture 463");
+        assertEquals(60, tanker.tileY());
+    }
 
     @Test
     @DisplayName("an XOrc 7 loaded tanker pays the native first-refusal Move band")

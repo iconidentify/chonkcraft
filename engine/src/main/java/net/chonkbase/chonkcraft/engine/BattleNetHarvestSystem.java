@@ -3701,10 +3701,17 @@ final class BattleNetHarvestSystem {
      * existing platform overlays the chosen patch, so the subsequent
      * resource-order lookup resolves it to the platform unit. Human mission
      * 7 is the distinguishing case: the platform beside the tanker is not
-     * the one beside the refinery, and retail chooses the latter.</p>
+     * the one beside the refinery, and retail chooses the latter. The ready
+     * callback also runs while a live tanker is still contained in its depot;
+     * expansion Human mission 5 proves that the selected platform owns the
+     * exit face before the tanker is placed back on the map.</p>
      */
     Unit findBattleNetReadyOilPlatform(Unit tanker) {
-        if (tanker == null || !tanker.isAlive() || !tanker.isOnMap()) {
+        boolean liveContainedTanker = tanker != null
+                && world.battleNetDepotReadyDispatching()
+                && tanker.hitPoints() > 0 && tanker.order() != Unit.Order.DYING;
+        if (tanker == null || (!tanker.isAlive() && !liveContainedTanker)
+                || (!tanker.isOnMap() && !liveContainedTanker)) {
             return null;
         }
         boolean[] component = world.battleNetConnectivityCell(tanker);
@@ -4171,10 +4178,14 @@ final class BattleNetHarvestSystem {
         // resource goal or construction's no-resource west exit. XHuman 8
         // peon 1571 pays for its watch tower on fixture 420, leaves the Great
         // Hall at 20,8, and remains Still with Build queued through 444.
-        boolean landReadyBoundary = (info.resource() == UnitType.Resource.GOLD
-                || info.resource() == UnitType.Resource.WOOD)
+        // XHuman 5 tanker 1557 likewise selects platform 1558 while it is
+        // still inside the shipyard, so that point owns both its east-face
+        // absolute-even exit and the queued action 23.
+        boolean depotReadyBoundary = (info.resource() == UnitType.Resource.GOLD
+                || info.resource() == UnitType.Resource.WOOD
+                || info.resource() == UnitType.Resource.OIL)
                 && pauseComputerForReadyDispatch(worker);
-        boolean depotReadyAssigned = landReadyBoundary
+        boolean depotReadyAssigned = depotReadyBoundary
                 && world.battleNetDepotUnitReady(worker);
 
         // The callback may deliberately keep the current resource job. It is
@@ -4182,7 +4193,7 @@ final class BattleNetHarvestSystem {
         // XHuman 8 peon 1501 surfaces at fixture 440 with timer 25 even though
         // 0x439280 leaves its remembered mine unchanged.
         if (world.battleNetSequence != null
-                && landReadyBoundary && !depotReadyAssigned
+                && depotReadyBoundary && !depotReadyAssigned
                 && !worker.hasQueuedOrders() && mine != null) {
             queueDepotHarvestContinuation(worker, mine,
                     mine.tileX(), mine.tileY());
@@ -4259,7 +4270,7 @@ final class BattleNetHarvestSystem {
             if (wood != null) {
                 worker.setResourceTile(wood[0], wood[1]);
                 if (world.battleNetSequence != null
-                        && landReadyBoundary && !worker.hasQueuedOrders()) {
+                        && depotReadyBoundary && !worker.hasQueuedOrders()) {
                     queueDepotHarvestContinuation(worker, null,
                             wood[0], wood[1]);
                 }
@@ -4330,7 +4341,7 @@ final class BattleNetHarvestSystem {
             }
             return;
         }
-        if (landReadyBoundary) {
+        if (depotReadyBoundary) {
             return;
         }
         if (noWoodLeft

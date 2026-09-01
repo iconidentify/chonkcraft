@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (person HitUnit first-chase goal-axis ownership)
+## Current release checkpoint — 2026-09-01 (hidden tanker-ready depot exit ownership)
+
+Accepted cycle-1,800 receipt `613708b4` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,355, an increase of 51. Expansion Human 5 advances from
+fixture 435 to 486. The cycle-400 fleet remains 50 clean / 2 divergent / 0
+failed under receipt `8262cd77`. The long receipt is retained at
+`.bne-artifacts/runs/613708b4fff57c8c814810c89d54dc5d511f60d8275176651a6a2460fce46601`.
+Its manifest has SHA-256
+`614899f4254dbde38f9f1bb929560f9f31f91c395b96d850682e57629e69e83e`
+and binds dirty engine-input identity
+`494e4f6e852c0e682706a33196f0307f6d6a5af795002af36c6605477a4de062`
+at base revision `89f5111` to authenticated, replayable source capsule
+`a92cc2ff6c32e01cfca77707db0a01b94203e9d8b15c078f88355b88f9d76755`.
+
+Behavioral delta: BNE's depot-ready action-26 callback may select an oil
+platform while a live empty tanker is still contained in its shipyard. That
+selected platform owns both the face-first absolute-even depot exit and the
+queued action 23 behind the exit's 25-cycle Still head. The existing callback
+continues to use the proved refinery-weighted platform choice; ordinary land
+worker and construction-ready dispatch retain their established behavior.
+The implementation contains no mission, map, coordinate, fixture, exact-cycle,
+faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 5 tanker slot 1557 / Java unit 43 remains hidden
+in shipyard slot 1559 / Java unit 41 through fixture 434 after finishing its
+return with no remembered platform. Native invokes the ready callback before
+dropout and stores platform slot 1558 / Java unit 42. On fixture 435 it
+surfaces Still at the platform-owned east face `(92,60)`, keeps action 23
+queued behind delay 25, promotes the action on fixture 460, and commits east
+to `(94,60)` on fixture 463. Java formerly used the generic south exit at
+`(89,62)` and selected the platform only after surfacing. The corrected case
+is exact through fixture 485; its fixture-486 peon position finding is
+independent.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman5-c435-hidden-ready-platform/runs/112c19312940ce992a3dcfb2c458cd5b85fa9da7d7f2acd8e45a508e69e7d236`
+proves the focused assertion executes and fails on `89f5111`, then executes
+and passes on the candidate. The 53 selected oil-exit, resource-approach,
+lifecycle, save, sprite, and pathfinder checks record 50 passes and three
+asset-dependent skips. Both fixed 52-case gates pass. The long receipt's
+source capsule authenticates with zero sealed untracked inputs. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+98 engine/desktop checks, and 223 dual-adapter command scenarios. Its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now expansion Orc 11 at fixture 438,
+followed by Orc 8 at 442, expansion Orc 12 at 444, expansion Human 10 at 445,
+expansion Human 8 at 446, expansion Human 7 at 447, expansion Orc 5 at 449,
+Orc 5 at 454, Orc 11 at 459, expansion Human 3 at 463, Orc 9 at 464, Orc 12
+at 469, and Orc 14 and expansion Orc 10 at 470.
+
+## Prior release checkpoint — 2026-09-01 (person HitUnit first-chase goal-axis ownership)
 
 Accepted cycle-1,800 receipt `005859c9` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
