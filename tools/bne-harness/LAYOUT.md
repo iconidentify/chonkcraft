@@ -660,6 +660,31 @@ scan. The two rules together are what fix the cycle: 24 and 29 are scan cycles
 where the band hides the knight, 30 to 33 are not scan cycles, and 34 is the
 first scan cycle where the band shows it.
 
+## Armed-flyer Patrol queues direct Attack behind its committed stride
+
+The sealed expansion Orc 11 raw stream supplies the action boundary for
+gryphon rider slot 1589. Fixture 405 settles the prior doubled stride and
+reconstructs Patrol's Still cursor at sequence `2233`, timer 3, with current
+and next orders `4/60`. After the complete Still body, fixture 413 changes all
+of these fields in one unit visit:
+
+- tile `(18,32) -> (16,34)` while pixel position remains `(576,1024)`;
+- next order at `+0x2f`, `60 -> 12`, while current order at `+0x2e` stays 4;
+- order point at `+0x84/+0x86`, `(2,54) -> (10,40)`;
+- target pointer at `+0x88`, null to non-null;
+- route index at `+0x7e`, `20 -> 1`, with `[SW,SW,SW,SW]` at `+0x30`; and
+- Still sequence `2237/1 ->` Move sequence `2259/1`.
+
+Thus acquisition is part of Patrol's opcode-zero constructor visit, and the
+new direct Attack is queued behind the stride that same visit commits. Current
+order remains Patrol through fixture 436 while the southwest pixels drain.
+Fixture 437 moves pixels `(518,1082) -> (512,1088)`, promotes current/next
+orders `4/12 -> 12/60`, and opens the Attack cursor at `2313/3`. A generic
+periodic scan during the Move body is therefore observably wrong twice: it
+fires too early and produces weak position AttackMove instead of queued direct
+Attack. The fixture-cycle boundary corresponds to Java internal cycle plus two
+for this mission: fixture event `F` executes at Java internal cycle `F + 2`.
+
 ## Moving siege can surrender a player-clicked building to the free scan
 
 Authenticated UI captures close the player-control question for both siege

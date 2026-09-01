@@ -15,6 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (cycle-382 armed-flyer Patrol acquisition)
+
+Accepted cycle-1,800 receipt `4eee82d1` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,825, an increase of eleven. Expansion Orc 11 advances from
+fixture 371 to 382. The cycle-400 fleet remains 44 clean / 8 divergent / 0
+failed under receipt `e66435cc`. The long receipt is retained at
+`.bne-artifacts/runs/4eee82d1ccba202264b0e82d9b15a9d7261feee240c79cc0d23ee660039245df`.
+Its manifest has SHA-256
+`878f461f0bdd55a9a0a6b2db4715368830f60325dc9a637f7c6fdbbd996433a7`
+and binds dirty engine-input identity `ce46b39e` at base revision `594d316` to
+authenticated, replayable source capsule
+`0bf6286b1c88293fd96d8c4119070a45b772c0b73c9eaf5008bbc407ef66655d`.
+
+Behavioral delta: an armed doubled flyer's Patrol action scans for a hostile
+only on the Still constructor's opcode-zero visit. A successful scan writes a
+strong unit Attack as the queued order while Patrol authors and commits its
+next doubled stride. Patrol remains current for the complete committed Move
+body, then promotes direct Attack on the same visit its last pixels settle.
+The generic fifteen-cycle presentation auto-scan no longer interrupts armed-
+flyer Patrol bodies or substitutes weak position AttackMove. The rule contains
+no mission, map, coordinate, fixture, cycle, faction, route-length, or unit-ID
+branch.
+
+Proof delta: expansion Orc 11 gryphon native slot 1589 / Java unit 11 is exact
+through fixture 370 at `(20,30)` under Patrol; Java formerly promoted weak
+AttackMove at 371 while native continued its southwest flight. The measured
+fixture-to-Java offset is two internal cycles. Native first-steps southwest to
+`(18,32)` at fixture 381, reconstructs Patrol Still `2233/3` at 405, and
+reaches constructor opcode zero at 413. That visit changes raw next order
+`60 -> 12`, publishes hostile goal `(10,40)` and route `[SW,SW,SW,SW]`, and
+first-steps to `(16,34)` without changing current Patrol. Native remains Patrol
+through 436; fixture 437 settles the final pixels and changes current/next
+`4/12 -> 12/60` at Attack sequence `2313/3`. Java now reproduces those action
+boundaries. The new case frontier at fixture 382 is independent dead-body
+ownership: native slot 1525 is neutral player 15 while Java retains player 5.
+
+Efficacy receipt
+`.bne-test-efficacy/c371-xorc11-armed-flyer-patrol-op0/runs/7cb616f53bb28d2fbbe28bb252301503100d07285de2b2f8da0c75c52ea90b26`
+proves the focused assertion executes and fails on `594d316`, then executes
+and passes on the candidate. All 75 selected armed-flyer, land, capital-ship,
+small-warship, Patrol, and attack-move real-data controls pass. The broader
+synthetic `AttackMoveTest` remains independently red with the identical 24 of
+67 assertions failing on baseline and candidate, so it is not counted as
+green evidence. Both fixed 52-case gates pass. The ordinary executable next-
+level gate exits zero after 209 Python checks (four skipped) and 97
+engine/desktop checks; its command worklist remains 11 comparable scenarios
+(6 exact / 5 divergent) without regression or infrastructure failure.
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now expansion Orc
+12 at fixture 374, followed by expansion Human 10 at 375, expansion Orc 11 at
+382, Orc 12 at 383, Human 8 at 390, and expansion Human 7 at 395.
+
 ## Current release checkpoint — 2026-09-01 (cycle-442 parked direct-return byte)
 
 Accepted cycle-1,800 receipt `d7aceac1` preserves the shared clean horizon at

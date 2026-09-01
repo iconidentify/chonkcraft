@@ -315,6 +315,47 @@ class BattleNetFlyerPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 11's gryphon acquires only at Patrol opcode zero")
+    void xOrc11GryphonAcquiresOnlyAtPatrolOpcodeZero() {
+        Mission mission = mission("campaigns/orc-exp/levelx11o");
+        Unit rider = at(mission.world(), "unit-gryphon-rider", 42, 4);
+        assertNotNull(rider, "XOrc 11 has no native slot-1589 gryphon");
+
+        tickThrough(mission, 371);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "the live Move body must not run generic auto-acquisition");
+        assertEquals(20, rider.tileX());
+        assertEquals(30, rider.tileY());
+
+        tickThrough(mission, 413);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "Patrol OP0 banks Attack while taking its southwest stride");
+        assertEquals(16, rider.tileX());
+        assertEquals(34, rider.tileY());
+        assertNotNull(rider.pendingAttack(),
+                "the native opcode-zero scan writes Attack as next_order");
+        assertEquals(10, rider.pendingAttack().tileX());
+        assertEquals(40, rider.pendingAttack().tileY());
+        assertEquals(10, rider.orderTargetX());
+        assertEquals(40, rider.orderTargetY());
+
+        tickThrough(mission, 436);
+        assertEquals(Unit.Order.PATROL, rider.order(),
+                "the committed Patrol stride owns every pre-settle visit");
+
+        tickThrough(mission, 437);
+        assertEquals(Unit.Order.ATTACK, rider.order(),
+                "the settle visit promotes Patrol's strong unit attack");
+        assertEquals(16, rider.tileX());
+        assertEquals(34, rider.tileY());
+        assertNotNull(rider.target());
+        assertEquals(10, rider.target().tileX());
+        assertEquals(40, rider.target().tileY());
+        assertEquals(2313, rider.battleNetSequenceOffset());
+        assertEquals(3, rider.battleNetAnimationTimer());
+    }
+
+    @Test
     @DisplayName("XOrc 11's moving gryphon accepts the recurring air Patrol replacement")
     void xOrc11MovingGryphonAcceptsTheRecurringAirPatrolReplacement() {
         Mission mission = mission("campaigns/orc-exp/levelx11o");

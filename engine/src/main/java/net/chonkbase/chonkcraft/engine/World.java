@@ -15006,6 +15006,7 @@ public final class World {
         boolean capitalPatrol = battleNetStandingPatrolSequence(unit);
         boolean smallWarshipPatrol =
                 battleNetArmedSmallWarshipPatrol(unit);
+        boolean armedFlyerPatrol = battleNetArmedFlyerPatrol(unit);
         boolean landPatrolHandoff =
                 battleNetLandPatrolAttackHandoff(unit);
         if (capitalPatrol) {
@@ -15057,6 +15058,15 @@ public final class World {
             // steps southwest at fixture 136, remains Patrol through 167,
             // and exposes Attack at 168. Popping on the next Java turn made
             // the order thirty-one fixtures early and abandoned the stride.
+            return;
+        }
+        if (armedFlyerPatrol
+                && (unit.isMoving() || unit.residualX() != 0
+                        || unit.residualY() != 0)) {
+            // An armed flyer's Patrol OP0 can bank direct Attack while it
+            // commits the next doubled stride. Native XOrc 11 gryphon 1589
+            // stays Patrol from the fixture-413 southwest first step through
+            // fixture 436 and promotes only when those pixels settle at 437.
             return;
         }
         if (landPatrolHandoff && unit.isMoving()) {
@@ -15132,6 +15142,14 @@ public final class World {
                 }
                 rememberInterruptedOrder(unit, interrupted);
             }
+            return;
+        }
+        if (armedFlyerPatrol) {
+            // This is the strong unit goal written by Patrol OP0, not the
+            // presentation auto-scan's weak AttackMove position. The old
+            // Patrol body already settled before this same-visit pop, so the
+            // ordinary Attack constructor's timer three is authoritative.
+            orderAttack(unit, target, false, false);
             return;
         }
         if (capitalPatrol) {
@@ -15534,6 +15552,7 @@ public final class World {
         // free visit, not three visits later.
         boolean patrolOp0 = tickBattleNetPatrolSequence(unit);
         boolean standingPatrol = battleNetStandingPatrolSequence(unit);
+        boolean armedFlyerPatrol = battleNetArmedFlyerPatrol(unit);
         boolean constructingArmedPatrol =
                 battleNetConstructingArmedPatrol(unit);
         boolean armedPatrolOp0 = constructingArmedPatrol
@@ -15598,6 +15617,9 @@ public final class World {
                 && unit.pathLength() == 0 && !unit.isMoving();
         boolean queuedOpeningAttack = patrolOp0 && openingCapitalStride
                 && battleNetPatrolQueueAcquire(unit);
+        boolean queuedArmedFlyerAttack = armedPatrolOp0
+                && armedFlyerPatrol
+                && battleNetPatrolQueueAcquire(unit);
         boolean patrolResidualOwnsVisit = standingPatrol
                 && (unit.isMoving() || unit.walkHolding());
         if (patrolOp0 && !queuedOpeningAttack
@@ -15645,6 +15667,8 @@ public final class World {
                 && (unit.type().seaUnit()
                 || (unit.type().moveType() == UnitType.Movement.FLY
                         && (unit.pathLength() == 0
+                                || (armedFlyerPatrol
+                                        && unit.pendingAttack() != null)
                                 || behaviorFourOddDestEvenStop)))) {
             // Fly pathn-0 residual drain was limited to the self-patrol
             // endpoint (tile==orderTarget). Mid-journey balloons that spent
@@ -15677,13 +15701,14 @@ public final class World {
                 return;
             }
             if (!standingPatrol
-                    && battleNetArmedSmallWarshipPatrol(unit)
+                    && (battleNetArmedSmallWarshipPatrol(unit)
+                            || armedFlyerPatrol)
                     && pendingAttackAtResidualStart
                     && unit.pendingAttack() != null) {
                 // The queued order pops on the same native visit that drains
                 // the last committed Patrol pixel, not one scheduler turn
-                // later. beginPendingAttack sees a settled hull here and can
-                // perform the ordinary Attack construction safely.
+                // later. beginPendingAttack sees a settled hull or flyer here
+                // and can perform the ordinary Attack construction safely.
                 beginPendingAttack(unit, false);
                 return;
             }
@@ -15898,8 +15923,10 @@ public final class World {
                 && !unit.isMoving();
         if (!standingPatrol && !awaitingFirstPatrolStep
                 && !queuedOpeningLandAttack
+                && !queuedArmedFlyerAttack
                 && !landPatrolMoveBodyOp0
                 && !battleNetLandPatrolAttackHandoff(unit)
+                && !armedFlyerPatrol
                 && unit.pendingAttack() == null
                 && combat.autoAttack(unit)) {
             // The generic scan counter is only a presentation-layer surrogate
