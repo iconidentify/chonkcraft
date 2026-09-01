@@ -787,6 +787,98 @@ class Xorc11PatrolAttackRealDataTest {
         assertEquals(3, ship.battleNetAnimationTimer());
     }
 
+    @Test
+    @DisplayName("xorc 11's first corpse hold hands ownership to neutral")
+    void xorc11sFirstCorpseHoldHandsOwnershipToNeutral() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit body = unitById(world, 75);
+        assertNotNull(body, "native slot 1525's destroyer is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 281) {
+            mission.tick();
+        }
+        assertEquals("unit-orc-destroyer", body.type().ident(),
+                "the fixture-282 type transition is the lifecycle anchor");
+
+        mission.tick();
+        assertEquals("unit-human-dead-body", body.type().ident());
+        assertEquals(5, body.player(),
+                "installing the body must retain its living owner");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 381) {
+            mission.tick();
+        }
+        assertEquals(5, body.player(),
+                "the living owner remains through the complete first compact hold");
+
+        mission.tick();
+        assertEquals(World.NEUTRAL_PLAYER, body.player(),
+                "the first type-105 decay transition is native's owner handoff");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 481) {
+            mission.tick();
+        }
+        assertTrue(body.isOnMap(),
+                "the second compact hold must remain visible through fixture 481");
+
+        mission.tick();
+        assertTrue(!body.isOnMap(),
+                "the compact decay program invokes Die at fixture 482");
+    }
+
+    @Test
+    @DisplayName("xorc 11's later corpse repeats the two-hold lifecycle")
+    void xorc11sLaterCorpseRepeatsTheTwoHoldLifecycle() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit body = unitById(world, 94);
+        assertNotNull(body, "native slot 1506's destroyer is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 349) {
+            mission.tick();
+        }
+        assertEquals("unit-human-dead-body", body.type().ident());
+        assertEquals(5, body.player(),
+                "the held-out body must begin with the living owner");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 448) {
+            mission.tick();
+        }
+        assertEquals(5, body.player());
+        mission.tick();
+        assertEquals(World.NEUTRAL_PLAYER, body.player(),
+                "the independent first hold expires at fixture 449");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 548) {
+            mission.tick();
+        }
+        assertTrue(body.isOnMap());
+        mission.tick();
+        assertTrue(!body.isOnMap(),
+                "the independent second hold invokes Die at fixture 549");
+    }
+
     private static Missile constructedMissileFrom(World world, int sourceId) {
         for (Missile missile : world.missiles()) {
             if (missile.source() != null

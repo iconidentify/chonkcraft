@@ -313,6 +313,9 @@ public final class Unit {
     /** Current byte offset in retail BNE's {@code Rez\\script.bin}. */
     private int battleNetSequenceOffset = -1;
 
+    /** Whether that cursor is the compact decay program of an installed naval body. */
+    private boolean battleNetCorpseDecay;
+
     /** Number of BNE idle action markers this unit has crossed. */
     private int battleNetIdlePhase;
 
@@ -2473,6 +2476,14 @@ public final class Unit {
 
     public void setBattleNetSequenceOffset(int offset) {
         battleNetSequenceOffset = Math.max(-1, offset);
+    }
+
+    public boolean battleNetCorpseDecay() {
+        return battleNetCorpseDecay;
+    }
+
+    public void setBattleNetCorpseDecay(boolean decay) {
+        battleNetCorpseDecay = decay;
     }
 
     /**

@@ -47,7 +47,26 @@ final class BattleNetIdleSystem {
             return -1;
         }
         return world.battleNetSequence.sequenceStart(
-                PudUnitTypes.code(unit.type().ident()), animation);
+                battleNetSequenceTypeCode(unit.type()), animation);
+    }
+
+    /**
+     * Native type-table index, including scenery entries after the PUD range.
+     *
+     * <p>The map format stops at type 104. Runtime bodies do not: authenticated
+     * type transitions identify the shared mobile body as 105. It still owns
+     * an ordinary {@code script.bin} table even though no PUD can place it
+     * directly.</p>
+     */
+    private static int battleNetSequenceTypeCode(UnitType type) {
+        int pudCode = PudUnitTypes.code(type.ident());
+        if (pudCode >= 0) {
+            return pudCode;
+        }
+        return switch (type.ident()) {
+            case "unit-human-dead-body" -> 105;
+            default -> -1;
+        };
     }
 
 

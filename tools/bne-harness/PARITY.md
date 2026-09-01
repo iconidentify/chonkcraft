@@ -15,6 +15,70 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (naval body compact decay program)
+
+Accepted cycle-1,800 receipt `33574c41` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,925, an increase of fifteen. Expansion Orc 11 advances
+from fixture 382 to 397. The cycle-400 fleet remains 45 clean / 7 divergent /
+0 failed under receipt `d040a613`. The long receipt is retained at
+`.bne-artifacts/runs/33574c41bb1ca29a46f96df7343c1da8d6e64c37cf877f29f1e147eb859764c3`.
+Its manifest has SHA-256
+`3f8ac95a785385f0ec750819c81dbf2a9c6d914636959ed4312f5cff8de9650a`
+and binds dirty engine-input identity `f6d91c3a` at base revision `8966041` to
+authenticated, replayable source capsule
+`325f5cd7d8e03899c37c57f10adfd04e37af4fe97cd193f1e174f6e2b09bdcf7`.
+
+Behavioral delta: a vanishing mobile body installed from a sea unit runs the
+retail type-105 slot-three compact decay program. Its first 100-cycle hold
+retains the living owner, the next instruction boundary hands the body to
+neutral, and the second 100-cycle hold ends at the program's Die marker. The
+catalog presentation may continue advancing but does not own this naval-body
+lifetime. Land bodies, rubble, revealers, and types without corpses retain
+their existing lifecycle. The implementation contains no mission, map,
+coordinate, fixture, cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Orc 11 destroyer native slot 1525 / Java unit 75 is
+living at fixture 281, becomes a type-105 body owned by player 5 at fixture
+282, hands ownership to neutral at fixture 382, and leaves the map at fixture
+482. Independent destroyer native slot 1506 / Java unit 94 becomes a body at
+fixture 349, hands ownership to neutral at 449, and leaves the map at 549. The
+measured fixture-to-Java offset is two internal cycles. Authenticated
+`script.bin` decoding identifies type 105's slot-three starts at offset 3839:
+the opening tick selects 3843 with timer 100, the first boundary selects 3846
+with timer 100, and the next boundary reaches its terminal action marker.
+Applying that program to every vanishing body was rejected by the fixed
+cycle-400 fleet because it moved land-body or rubble ownership earlier in
+expansion Human 2, 4, 10, and 12. Restricting the rule to the destroyed unit's
+naval provenance retains all four negative witnesses. Expansion Orc 11 is now
+exact through fixture 396; its new fixture-397 finding is an independent
+battleship Patrol-versus-Attack order split.
+
+Efficacy receipt
+`.bne-test-efficacy/c382-xorc11-naval-compact-corpse-decay/runs/a51518ee155aa731c9bf40265adbbcdcafa2d7aadca21754d2afe2a44474ac7e`
+proves the first lifecycle assertion executes and fails on `8966041`, then
+executes and passes on the candidate. All 35 selected XOrc 11, corpse,
+container-death, death-vision, dying-tail, and type-path controls pass. A
+separate audit proves the unrelated
+`CorpseTest#aDieInstructionKeepsActionTableMutationOrder` failure exists on
+both the baseline and candidate. Both fixed 52-case gates pass, and the source
+capsule verifies with zero sealed untracked inputs. The ordinary executable
+next-level gate exits zero after 209 Python checks (four skipped) and 97
+engine/desktop checks; its command worklist remains 11 comparable scenarios
+(6 exact / 5 divergent) without regression or infrastructure failure.
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is Orc 12 at fixture
+383, followed by Human 8 and expansion Human 10 at 390, expansion Human 7 at
+395, and expansion Orc 11 at 397.
+
 ## Current release checkpoint — 2026-09-01 (cycle-390 paid-wrap first-collision refill)
 
 Accepted cycle-1,800 receipt `2a2969a2` preserves the shared clean horizon at

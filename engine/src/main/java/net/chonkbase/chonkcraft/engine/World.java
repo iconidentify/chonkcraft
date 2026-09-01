@@ -12840,6 +12840,8 @@ public final class World {
         // and this one's at 88, once per skeleton for the whole map.
         AnimationSet set = unit.type().animationSet();
         Animation death = set == null ? null : set.get(AnimationSet.State.DEATH);
+        int compactOffsetBefore = unit.battleNetSequenceOffset();
+        BattleNetSequence.Tick compactDecay = tickBattleNetCorpseDecay(unit);
         if (death != null) {
             unit.animation().switchTo(death);
             int frameBefore = unit.frame();
@@ -12853,14 +12855,33 @@ public final class World {
             // deaths do not.  The old owner is already absent from the unit
             // roster (LetUnitDie paid that before the body was installed), so
             // only the record owner changes here.
-            if (unit.frame() != frameBefore
+            if (compactDecay == null && unit.frame() != frameBefore
                     && unit.type().vanishes() && !unit.type().revealer()
                     && unit.player() != NEUTRAL_PLAYER) {
                 unit.setPlayer(NEUTRAL_PLAYER);
             }
-            if (unit.animation().unbreakable()) {
+            if (compactDecay == null && unit.animation().unbreakable()) {
                 return;
             }
+        }
+        if (compactDecay != null) {
+            // A newly installed body already consumed the opening call which
+            // selected its visible frame and first hold. The first later
+            // cursor transition is therefore the owner handoff; the second
+            // reaches opcode zero, which invokes Die for the body itself.
+            // XOrc 11 repeats this program at 282/382/482 and independently
+            // at 349/449/549. Presentation frames continue above, but their
+            // longer waits do not own BNE simulation lifetime.
+            if (!compactDecay.actionMarker()
+                    && compactDecay.offset() != compactOffsetBefore
+                    && unit.type().vanishes() && !unit.type().revealer()
+                    && unit.player() != NEUTRAL_PLAYER) {
+                unit.setPlayer(NEUTRAL_PLAYER);
+            }
+            if (!compactDecay.actionMarker()) {
+                return;
+            }
+            unit.setBattleNetCorpseDecay(false);
         }
         if (!becomeCorpse(unit)) {
             // A type that leaves nothing is Removed and Released in the same
@@ -12948,7 +12969,8 @@ public final class World {
      * @return whether there was a body to become
      */
     private boolean becomeCorpse(Unit unit) {
-        String ident = unit.type() == null ? null : unit.type().corpse();
+        UnitType livingType = unit.type();
+        String ident = livingType == null ? null : livingType.corpse();
         if (ident == null || ident.isEmpty() || unitTypes == null) {
             return false;
         }
@@ -12983,7 +13005,43 @@ public final class World {
             unit.animation().switchTo(corpseDeath);
             advance(unit);
         }
+        armBattleNetCorpseDecay(unit, livingType.seaUnit());
         return true;
+    }
+
+    /** Starts a naval body's compact program on its installation visit. */
+    private void armBattleNetCorpseDecay(Unit unit, boolean navalBody) {
+        unit.setBattleNetCorpseDecay(false);
+        if (!navalBody || battleNetSequence == null || unit.type() == null
+                || !unit.type().vanishes() || unit.type().revealer()) {
+            return;
+        }
+        int start = idle.battleNetSequenceStart(unit,
+                BattleNetSequence.CORPSE_DECAY_ANIMATION);
+        BattleNetSequence.Tick opening = battleNetSequence.tick(start, 1);
+        if (!opening.valid() || opening.actionMarker()
+                || opening.inlineActionMarker()) {
+            return;
+        }
+        unit.setBattleNetSequenceOffset(opening.offset());
+        unit.setBattleNetAnimationTimer(opening.timer());
+        unit.setBattleNetCorpseDecay(true);
+    }
+
+    /** Advances an installed body's native decay cursor, or uses presentation fallback. */
+    private BattleNetSequence.Tick tickBattleNetCorpseDecay(Unit unit) {
+        if (battleNetSequence == null || !unit.battleNetCorpseDecay()) {
+            return null;
+        }
+        BattleNetSequence.Tick next = battleNetSequence.tick(
+                unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer());
+        if (!next.valid()) {
+            unit.setBattleNetCorpseDecay(false);
+            return null;
+        }
+        unit.setBattleNetSequenceOffset(next.offset());
+        unit.setBattleNetAnimationTimer(next.timer());
+        return next;
     }
 
     /**

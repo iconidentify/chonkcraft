@@ -35,6 +35,17 @@ public final class BattleNetSequence {
     /** Attack is animation slot four in BNE's action-to-animation table. */
     public static final int ATTACK_ANIMATION = 4;
 
+    /**
+     * A naval body installed by {@code COrder_Die} begins decay in slot three.
+     *
+     * <p>This deliberately aliases Move rather than the living unit's slot-one
+     * Death fall. Type 105 changes animation {@code 1 -> 3} when the dying
+     * destroyer becomes scenery; its compact holds own the neutral handoff
+     * and final Die instruction even though the presentation catalog calls
+     * the body's parallel animation {@code Death}.</p>
+     */
+    public static final int CORPSE_DECAY_ANIMATION = MOVE_ANIMATION;
+
     private static final int MAX_INSTRUCTIONS_PER_TICK = 1024;
 
     private final byte[] program;
