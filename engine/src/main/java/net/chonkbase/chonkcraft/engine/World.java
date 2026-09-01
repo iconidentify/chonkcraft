@@ -15664,6 +15664,14 @@ public final class World {
             // Reached this end: swap the two and walk back.
             int backX = unit.patrolX();
             int backY = unit.patrolY();
+            // A doubled small warship can reach an odd point's one-tile
+            // skirt while the generated route still carries one overshoot
+            // byte. Native parks that byte at route index twenty before the
+            // endpoint exchange (XOrc 10 destroyer 1484 at fixture 325;
+            // XHuman 5 destroyer 1553 at fixture 419).
+            if (unit.pathLength() > 0) {
+                unit.clearPath();
+            }
             boolean selfPatrol = backX == unit.orderTargetX()
                     && backY == unit.orderTargetY();
             // Self-patrol combat flyers never leave the start tile under a
@@ -15978,6 +15986,9 @@ public final class World {
             int backX = unit.patrolX();
             int backY = unit.patrolY();
             if (backX != unit.orderTargetX() || backY != unit.orderTargetY()) {
+                if (unit.pathLength() > 0) {
+                    unit.clearPath();
+                }
                 unit.setPatrol(unit.orderTargetX(), unit.orderTargetY());
                 unit.setOrderTarget(backX, backY);
                 // BNE's patrol action returns after exchanging its two
@@ -16038,7 +16049,15 @@ public final class World {
 
     /** Whether Patrol has reached a literal or doubled-movement endpoint. */
     private boolean battleNetPatrolEndpointReached(Unit unit) {
-        if (unit.pathLength() != 0 || unit.isMoving()) {
+        if (unit.isMoving()) {
+            return false;
+        }
+        boolean smallWarshipOvershoot =
+                battleNetArmedSmallWarshipPatrol(unit)
+                && unit.pathLength() == 1
+                && unit.battleNetPathInitialLength() > 1
+                && unit.battleNetPathStepsTaken() > 0;
+        if (unit.pathLength() != 0 && !smallWarshipOvershoot) {
             return false;
         }
         if (unit.tileX() == unit.orderTargetX()
@@ -16051,6 +16070,13 @@ public final class World {
                 || Math.max(Math.abs(unit.tileX() - unit.orderTargetX()),
                         Math.abs(unit.tileY() - unit.orderTargetY())) > 1) {
             return false;
+        }
+        if (smallWarshipOvershoot) {
+            // The hull is already on the closest anchor of its doubled
+            // lattice. Any remaining two-tile heading can only stay one tile
+            // from the odd goal or move farther away, so action 5 completes
+            // the point instead of consuming the cached overshoot.
+            return true;
         }
         // A doubled ship stays on one parity lattice. Its requested point can
         // lie inside the hull at the last legal top-left even though the two

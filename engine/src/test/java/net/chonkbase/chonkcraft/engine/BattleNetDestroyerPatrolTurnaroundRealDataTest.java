@@ -55,6 +55,24 @@ class BattleNetDestroyerPatrolTurnaroundRealDataTest {
                 "native consumes northwest as the third cached heading");
         assertEquals(92, destroyer.tileY());
         assertEquals(Unit.Order.PATROL, destroyer.order());
+
+        for (int cycle = 324; cycle <= 418; cycle++) {
+            mission.tick();
+        }
+        assertEquals(100, destroyer.tileX());
+        assertEquals(88, destroyer.tileY());
+        assertEquals(1, destroyer.pathLength(),
+                "one north overshoot remains beside the odd platform edge");
+        mission.tick();
+        assertEquals(100, destroyer.tileX(),
+                "native parks the final north byte instead of overshooting");
+        assertEquals(88, destroyer.tileY());
+        assertEquals(102, destroyer.orderTargetX(),
+                "fixture 419 turns the Patrol back toward its near endpoint");
+        assertEquals(98, destroyer.orderTargetY());
+        assertEquals(0, destroyer.pathLength());
+        assertEquals(3129, destroyer.battleNetSequenceOffset());
+        assertEquals(3, destroyer.battleNetAnimationTimer());
     }
 
     @Test

@@ -15,7 +15,69 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-419 naval far-endpoint publication)
+## Current release checkpoint — 2026-08-31 (cycle-470 small-warship off-lattice endpoint completion)
+
+Accepted cycle-1,800 receipt `ffa9837a` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,113, an increase of 161. Expansion Orc 10 advances from
+fixture 325 to 470 and expansion Human 5 advances from fixture 419 to 435.
+The cycle-400 fleet improves from 39 clean / 13 divergent to 40 clean / 12
+divergent / 0 failed under receipt `fe6ff6e4`. The long receipt is retained at
+`.bne-artifacts/runs/ffa9837a385fadb3cd85998ac373b443614a8821b4034827c2f75eef5b91c051`.
+It binds dirty engine-input identity `19f8f00f` at base revision `7420ece` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`efd7c49219ae375438ad90afa9dd4acb29df1ecd493aa7c77458c95c9c166a61`.
+
+Behavioral delta: an armed non-capital small warship on BNE's doubled movement
+lattice can finish beside an odd Patrol endpoint with one generated heading
+still cached. When the hull is settled one Chebyshev tile from the goal after
+consuming at least one byte of a multi-heading route, native action 5 completes
+the endpoint and parks that final overshoot byte at route index twenty before
+exchanging the Patrol endpoints. Literal endpoint completion and the existing
+single-heading refusal path are unchanged, as are capital ships, flyers,
+ordinary land Patrol and non-BNE behavior. The rule uses movement class,
+small-warship armament/classification, settled motion, live endpoint distance
+and route-consumption state; it contains no mission, map, coordinate, fixture,
+cycle, faction or unit-ID branch.
+
+Proof delta: expansion Orc 10 destroyer slot 1484 / Java 116 reaches
+`(100,78)` beside odd goal `(99,79)` on fixture 324 after consuming ten bytes
+of its eleven-heading route. Native fixture 325 parks the final west byte,
+clears the route and turns toward `(120,72)`; Java formerly consumed it to
+`(98,78)`. Independently, expansion Human 5 destroyer slot 1553 / Java 47
+reaches `(100,88)` beside odd platform-edge goal `(101,87)` on fixture 418.
+Native fixture 419 parks its final north byte and turns toward `(102,98)`;
+Java formerly overshot to y 86. Expansion Orc 10 is now exact through fixture
+469, where an independent critter becomes first, and expansion Human 5 is exact
+through fixture 434, where an independent tanker position becomes first.
+Existing exact-endpoint, single-heading refusal, capital-ship, flyer and land
+Patrol cases remain negative witnesses.
+
+Efficacy receipt
+`.bne-test-efficacy/c325-small-warship-off-lattice-overshoot/runs/16819d43af80a8d50cee0df85529966a8c2ef09f31fdc14eb857417fc5c98d3c`
+proves the focused expansion Orc 10 fixture-324/325 regression
+assertion-fails on `7420ece` and passes on the candidate. All 50 focused naval
+Patrol, sea-occupancy, refusal, capital-ship and flyer tests pass, as do both
+fixed 52-case gates. The ordinary executable next-level gate exits zero after
+209 Python checks and 96 engine/desktop checks; its command worklist remains
+11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. The earliest unpaused fleet
+finding is expansion Human 12 grunt slot 1520 at fixture 325, native y 43
+versus Java y 44, followed by Human 8 at 328 and expansion Human 4 plus
+expansion Orc 11 at 337. Expansion Human 5's tanker split at 435, Orc 11's
+sapper split at 418 and expansion Orc 10's critter split at 470 remain
+available as independent later lanes.
+
+## Prior release checkpoint — 2026-08-31 (cycle-419 naval far-endpoint publication)
 
 Accepted cycle-1,800 receipt `c214e767` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
