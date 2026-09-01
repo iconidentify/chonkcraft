@@ -5767,6 +5767,33 @@ final class BattleNetMovementSystem {
                         // successful NW at c53, fresh-route refusals two through
                         // eight at c85..91, timer 15..1, then NW at c106.
                         int refusals = unit.battleNetRefusals() + 1;
+                        boolean oneStepNonTerminalRedraw =
+                                unit.type().canAttack()
+                                && !World.isBattleNetCapitalShip(
+                                        unit.type().ident())
+                                && unit.battleNetPathStepsTaken() == 1
+                                && unit.pathLength() > 1
+                                && refusals < 8;
+                        if (oneStepNonTerminalRedraw) {
+                            // The first consumed heading pays for this route
+                            // draw, but a blocked nonterminal head below the
+                            // saturated refusal generation is stale input.
+                            // Native parks it at RI20 and redraws on the next
+                            // visit: XOrc 8 destroyer 1468 raises generation
+                            // one while parking seven headings on fixture 327,
+                            // then commits the redraw's NE head on 328.
+                            // Submarine 1432 at fixture 225 is the held-out
+                            // multi-step control (three headings consumed),
+                            // and the terminal 1431 tail still retains its
+                            // complete cooperative band.
+                            unit.setBattleNetRefusals(refusals);
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            unit.setBattleNetRefusalHold(false);
+                            return;
+                        }
                         if (refusals >= 15) {
                             unit.setBattleNetRefusals(0);
                             unit.clearPath();

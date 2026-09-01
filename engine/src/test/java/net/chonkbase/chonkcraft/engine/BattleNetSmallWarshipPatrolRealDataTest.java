@@ -233,6 +233,49 @@ class BattleNetSmallWarshipPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 8's low-refusal destroyer redraws its nonterminal tail")
+    void xOrc8LowRefusalDestroyerRedrawsNonterminalTail() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 132);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1468");
+
+        tickThrough(mission, 327);
+        assertTrue(destroyer.type().canAttack(),
+                "the redraw witness must be an armed small warship");
+        Unit blocker = mission.world().blockerOnLayer(destroyer, 102, 60);
+        assertNotNull(blocker, "the stale east head must remain occupied");
+        assertEquals(127, blocker.id(),
+                "the route head must be blocked by native submarine 1473's twin");
+        assertEquals(0, blocker.battleNetCollisionCounter());
+        assertEquals(0, blocker.battleNetRefusals());
+        assertEquals(100, destroyer.tileX());
+        assertEquals(60, destroyer.tileY());
+        assertTrue(!destroyer.isMoving(),
+                "the first northeast stride settles on the refusal visit");
+        assertEquals(0, destroyer.pathLength(),
+                "native parks the seven-heading stale tail at route index twenty");
+        assertEquals(1, destroyer.battleNetRefusals(),
+                "the park raises the first sticky refusal generation");
+        assertEquals(0, destroyer.battleNetOrderDelay(),
+                "a nonterminal route below the paid threshold redraws next visit");
+
+        tickThrough(mission, 328);
+        assertEquals(102, destroyer.tileX(),
+                "the redraw consumes the native northeast route head");
+        assertEquals(58, destroyer.tileY());
+        assertEquals(6, destroyer.pathLength(),
+                "six headings remain from the native seven-heading redraw");
+        assertEquals(1, destroyer.battleNetPathStepsTaken());
+        assertEquals(1, destroyer.battleNetRefusals());
+        assertEquals(0, destroyer.battleNetOrderDelay());
+    }
+
+    @Test
     @DisplayName("XOrc 8's paid destroyer route releases north on cycle 232")
     void xOrc8PaidDestroyerRouteReleasesNorthOnCycle232() {
         AssetSource assets = AssetSource.fromEnvironment();
