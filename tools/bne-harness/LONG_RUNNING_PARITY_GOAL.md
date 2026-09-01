@@ -16,11 +16,12 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-01 is:
 
-- `master` at `eec4d78`, pushed to `origin/main` by explicit user request;
-- all 52 campaign fixtures exact through cycle 327;
-- expansion Orc 8 is the first shared-boundary divergence at cycle 328; and
+- accepted behavior commit `112559d` on `master`, pending the explicitly
+  requested push to `origin/main`;
+- all 52 campaign fixtures exact through cycle 332;
+- expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `faf9de07c77b62367939936d0fb4571dc5f4f522682919566a75907282cc0191`.
+  `f99e5862993e4f9437bd65c1f6b1c013b83183364c6f7eca66bdef926e370dc4`.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -103,8 +104,8 @@ not permission to fit a special case.
    lifecycle work rather than spending the run indefinitely on one uncertain
    unit.
 
-The next frontier investigation should normally start from expansion Orc 8
-cycle 328 unless a newer accepted checkpoint or a more upstream authenticated
+The next frontier investigation should normally start from expansion Human 12
+cycle 333 unless a newer accepted checkpoint or a more upstream authenticated
 finding supersedes it.
 
 ## Evidence and implementation loop
