@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-418 land-Patrol Move-body authority)
+## Current release checkpoint — 2026-08-31 (cycle-419 naval far-endpoint publication)
+
+Accepted cycle-1,800 receipt `c214e767` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 37,952, an increase of 96. Expansion Human 5 advances from
+fixture 323 to 419. The cycle-400 fleet improves from 38 clean / 14 divergent
+to 39 clean / 13 divergent / 0 failed under receipt `d60c0f66`. The long
+receipt is retained at
+`.bne-artifacts/runs/c214e767ee1dc45e01df9c74c8e1850ea828480090451a6aac9fba00bd88626f`.
+It binds dirty engine-input identity `ba8b1491` at base revision `a549084` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`3bf5b04abcfd4e6a3891e67ef79e1c8c60ab8680d875f9dc2df8447753293410`.
+
+Behavioral delta: retail publishes the naval action-5 footprint rewrite each
+time a stored endpoint becomes the live goal, not only when the ready pass
+promotes the opening point. A non-capital ship turning from its near endpoint
+toward a coast or building point now runs the established goal-to-hull ray and
+uses its last blocked square before open water. Capital ships retain authored
+endpoints and ordinary non-BNE Patrol is unchanged. The rule uses the BNE
+runtime profile, movement class, capital-ship classification, live terrain and
+endpoint-swap lifecycle; it contains no mission, map, coordinate, fixture,
+cycle, faction or unit-ID branch.
+
+Proof delta: expansion Human 5 destroyer slot 1553 / Java 47 reaches its near
+endpoint `(102,98)` and promotes the return Patrol on fixture 253. Its stored
+far point is oil-platform top-left `(101,85)`, but native publishes the south
+footprint edge `(101,87)` on fixture 256. That goal constructs the six-heading
+`N,N,NW,N,N,N` route on fixture 259, so the third heading lands northwest at
+`(100,92)` on fixture 323. Java formerly fed the stored top-left directly to
+NewPath, constructed `N,N,N,NW,N,N,N`, and remained at x 102. The corrected
+case is exact through fixture 418; its new fixture-419 split is the same hull's
+off-lattice endpoint completion, where native parks the final north byte at
+`(100,88)` and turns home while Java consumes it to y 86. XHuman 8's existing
+off-lattice destroyer turnaround, capital-ship endpoint swaps, blocked
+shipyard-footprint failure and small-warship refusal cases remain negative
+witnesses.
+
+Efficacy receipt
+`.bne-test-efficacy/c419-naval-far-endpoint-footprint/runs/97f9c12679b8d35f8b28988fcefb0b897a77fa5eb15f24a9c6b615da01e79c0c`
+proves the focused fixture-256/323 regression assertion-fails on `a549084`
+and passes on the candidate. All 38 destroyer-turnaround, sea-occupancy,
+small-warship, naval-refusal and capital-ship focused tests pass, as do both
+fixed 52-case gates. The ordinary executable next-level gate exits zero after
+209 Python checks and 96 engine/desktop checks; its command worklist remains
+11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. The earliest unpaused fleet
+findings are now expansion Human 12 and expansion Orc 10 at fixture 325, then
+Human 8 at 328. Expansion Human 5's new off-lattice naval completion at 419
+and Orc 11's independent sapper split at 418 remain available as later lanes.
+
+## Prior release checkpoint — 2026-08-31 (cycle-418 land-Patrol Move-body authority)
 
 Accepted cycle-1,800 receipt `cdbbab7f` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

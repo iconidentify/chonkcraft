@@ -16,6 +16,48 @@ class BattleNetDestroyerPatrolTurnaroundRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("an XHuman 5 destroyer rewrites its platform endpoint before the return leg")
+    void anXHuman5DestroyerRewritesItsPlatformEndpointBeforeTheReturnLeg() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx05h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        Unit destroyer = at(mission.world(),
+                "unit-orc-destroyer", 100, 88);
+        assertNotNull(destroyer,
+                "XHuman 5 has no startup destroyer at 100,88");
+        for (int cycle = 1; cycle <= 256; cycle++) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+        assertEquals(101, destroyer.orderTargetX(),
+                "native publishes the oil platform's west column");
+        assertEquals(87, destroyer.orderTargetY(),
+                "native rewrites platform top-left 101,85 to its south edge");
+        assertEquals(102, destroyer.patrolX());
+        assertEquals(98, destroyer.patrolY());
+
+        for (int cycle = 257; cycle <= 322; cycle++) {
+            mission.tick();
+        }
+        assertEquals(102, destroyer.tileX());
+        assertEquals(94, destroyer.tileY());
+        mission.tick();
+        assertEquals(100, destroyer.tileX(),
+                "native consumes northwest as the third cached heading");
+        assertEquals(92, destroyer.tileY());
+        assertEquals(Unit.Order.PATROL, destroyer.order());
+    }
+
+    @Test
     @DisplayName("an XHuman 8 destroyer turns around at its off-lattice far endpoint")
     void anXHuman8DestroyerTurnsAroundAtItsOffLatticeFarEndpoint() {
         AssetSource assets = AssetSource.fromEnvironment();

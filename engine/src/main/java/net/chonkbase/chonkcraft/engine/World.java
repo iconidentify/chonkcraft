@@ -15790,8 +15790,29 @@ public final class World {
                     return;
                 }
             } else {
+                int nextTargetX = backX;
+                int nextTargetY = backY;
+                // FUN_004513d0 rewrites each non-capital naval point when it
+                // becomes the live action-5 goal, not only the first point
+                // promoted by the ready pass. XHuman 5 destroyer 1553 stores
+                // oil-platform top-left (101,85) as its far Patrol endpoint;
+                // after reaching its near endpoint, native publishes the
+                // platform's south edge (101,87) and builds N,N,NW,N,N,N.
+                // Feeding the stored top-left directly to NewPath instead
+                // builds N,N,N,NW,N,N,N and first diverges at fixture 323.
+                // Capital ships retain their authored endpoints, as on the
+                // opening rewrite path in beginBattleNetPendingPatrol.
+                if (battleNetSequence != null && unit.type().seaUnit()
+                        && !isBattleNetCapitalShip(unit.type().ident())
+                        && !battleNetNavalRewriteOpenWater(
+                                nextTargetX, nextTargetY)) {
+                    int[] rewritten = battleNetNavalOrderPoint(
+                            unit, nextTargetX, nextTargetY);
+                    nextTargetX = rewritten[0];
+                    nextTargetY = rewritten[1];
+                }
                 unit.setPatrol(unit.orderTargetX(), unit.orderTargetY());
-                unit.setOrderTarget(backX, backY);
+                unit.setOrderTarget(nextTargetX, nextTargetY);
                 // BNE's patrol action returns after exchanging its two
                 // endpoints.  The following two action visits advance the
                 // new movement animation; only the third can take a logical
