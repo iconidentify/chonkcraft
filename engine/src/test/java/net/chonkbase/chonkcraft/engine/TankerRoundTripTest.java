@@ -464,8 +464,8 @@ class TankerRoundTripTest {
     }
 
     @Test
-    @DisplayName("an AI tanker with no mine searches around another depot first")
-    void aMineLessAiTankerUsesASuitableAlternativeDepotAsItsSearchCentre() {
+    @DisplayName("an AI tanker after a long trip searches around another depot first")
+    void aLongTripAiTankerUsesASuitableAlternativeDepotAsItsSearchCentre() {
         GameMap map = new GameMap(24, 24, new Tileset());
         for (int y = 0; y < 24; y++) {
             for (int x = 0; x < 24; x++) {
@@ -485,12 +485,13 @@ class TankerRoundTripTest {
         world.restoreHarvestState(boat, null, -1, -1, true, 0);
         boat.setCarrying(UnitType.Resource.OIL);
         boat.setResourceDepot(oldDepot);
+        boat.setResourceMoveCycles(501);
 
         world.tick();
 
         assertTrue(boat.isOnMap(), "the completed depot wait should drop the tanker out");
         assertSame(alternativeMine, boat.resourceUnit(),
-                "AiGetSuitableDepot considers the other depot before WaitInDepot's"
+                "the >500-cycle AiGetSuitableDepot trigger considers the other depot before WaitInDepot's"
                         + " ordinary search around the depot the tanker is inside");
         assertTrue(alternativeDepot.distanceTo(alternativeMine)
                         < oldDepot.distanceTo(alternativeMine),

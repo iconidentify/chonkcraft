@@ -76,6 +76,54 @@ class Human07OilTankerDepotExitRealDataTest {
                 "the first doubled return stride must continue southeast toward home");
     }
 
+    @Test
+    @DisplayName("Human 7's eastern tanker keeps its platform at an uncongested depot")
+    void easternTankerKeepsItsPlatformAtAnUncongestedDepot() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level07h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        World world = mission.world();
+        Unit tanker = unitById(world, 109);
+        Unit depot = unitById(world, 92);
+        Unit easternPlatform = unitById(world, 101);
+        assertNotNull(tanker, "Human 7 has no native-slot-1491 tanker");
+        assertNotNull(depot, "Human 7 has no refinery at 72,72");
+        assertNotNull(easternPlatform, "Human 7 has no platform at 79,77");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 404) {
+            mission.tick();
+        }
+
+        assertTrue(tanker.removed(),
+                "fixture 404 must still contain the tanker inside refinery 72,72");
+        assertSame(depot, tanker.worksite());
+        assertEquals(null, tanker.resourceUnit(),
+                "the fresh Return Goods order owns no remembered platform pointer");
+        assertTrue(tanker.resourceMoveCycles() <= 500,
+                "the first trip is not the exceptionally long reassignment case: "
+                        + tanker.resourceMoveCycles());
+        assertTrue(world.approximateUnitRefs(depot) <= 15,
+                "the first depot visit is not the congested reassignment case: "
+                        + world.approximateUnitRefs(depot));
+
+        mission.tick();
+        assertEquals(405, fixtureCycle(world));
+        assertEquals(76, tanker.tileX(),
+                "native drops east toward the platform selected from this depot");
+        assertEquals(74, tanker.tileY());
+        assertEquals(Unit.Order.STILL, tanker.order());
+        assertSame(easternPlatform, tanker.resourceUnit(),
+                "the queued action-23 continuation owns the eastern platform");
+    }
+
     private static Unit unitById(World world, int id) {
         return world.unitsSnapshot().stream()
                 .filter(unit -> unit.id() == id)

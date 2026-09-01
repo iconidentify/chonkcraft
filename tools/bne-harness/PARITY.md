@@ -15,7 +15,71 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (mobile-shot target residual exclusion)
+## Current release checkpoint — 2026-09-01 (resource-dropout fourth-leg turn)
+
+Accepted cycle-1,800 receipt `31d10f2c` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 39,909, an increase of 761. Human 7 advances from fixture 405
+to 493, Orc 3 from 625 to 1272, and expansion Human 9 from 489 to 515. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`74b795a0`. The long receipt is retained at
+`.bne-artifacts/runs/31d10f2c49ff0e1872734680d14c791b65552ab1ff2de881ab8dd5ab51524e6f`.
+Its manifest has SHA-256
+`dc4e6aa97ac7b25003f7614e6a9059dab3daf809254162b2b838faf486a4b9c1`
+and binds dirty engine-input identity
+`a83f6a0c13a1052f1e4adb362b022de4843f06dce055a22874fa68f1fc8a057e`
+at base revision `ee577b4` to authenticated, replayable source capsule
+`f2e74e0e26bca5a0d3a72016e80c19759146af4ad9be816c282ee979bef5d8ab`.
+
+Behavioral delta: BNE's `0x00443a40` perimeter walker applies its signed turn
+after every leg, including the fourth. It then backs out along that newly
+selected direction before enlarging both traversal dimensions for the next
+pass. Java omitted the fourth turn and backed out along the completed leg.
+That is not equivalent for an odd-sized container: native's restart can
+change both coordinates' parity, while Java repeatedly walked the wrong
+lattice. Separately, a fresh Return Goods order's empty mine pointer does not
+by itself invoke `AiGetSuitableDepot`; only the authenticated long-trip or
+depot-congestion triggers do. The ordinary resource search therefore remains
+centred on the current depot. The implementation contains no mission, map,
+coordinate, fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: Human 7 native tanker slot 1491 / Java unit 109 is contained in
+the 3x3 refinery at `(72,72)` through fixture 404. The visit is neither longer
+than 500 movement cycles nor congested above fifteen relevant references, and
+the fresh order has no remembered platform. Native selects eastern platform
+`(79,77)`. Every candidate in the first dropout perimeter fails the tanker's
+even/even movement-grid callback. After the east fourth leg, native turns
+north and restarts the second perimeter at `(76,76)`, rejects `(76,75)`, then
+accepts `(76,74)` at fixture 405. Java formerly searched from the alternative
+refinery, then backed out along the old east leg and ultimately surfaced west
+at `(70,72)`. The corrected case is exact through fixture 492; its new
+fixture-493 tanker-Y finding is independent. Orc 7's authenticated 3x3 exit is
+the held-out negative control and retains its fixture-596 `(52,34)` anchor.
+
+Efficacy receipt
+`.bne-test-efficacy/c405-human7-resource-spiral-restart/runs/42e115f98685e792632b2c090bd36356124286bb83ed756ece0631060f38e353`
+proves the focused assertion executes and fails on `ee577b4`, then executes
+and passes on the candidate. All 29 focused oil-lifecycle, tanker-round-trip,
+dropout, and Human 7 real-data checks pass. Both fixed 52-case gates pass, and
+the long receipt's source capsule verifies with zero sealed untracked inputs.
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 98 engine/desktop checks, and 223 dual-adapter command
+scenarios. Its 11 comparable scenarios remain 6 exact / 5 divergent with no
+regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is Human 14 at fixture 406, followed by
+expansion Human 7 at 414, Orc 11 at 418, Human 12 at 422, Human 8 at 427,
+expansion Human 10 at 430, expansion Human 5 at 435, and expansion Orc 11 at
+438.
+
+## Prior release checkpoint — 2026-09-01 (mobile-shot target residual exclusion)
 
 Accepted cycle-1,800 receipt `86eefab8` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

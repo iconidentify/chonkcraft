@@ -10583,12 +10583,12 @@ public final class World {
                         return new int[] {x, y};
                     }
                 }
-                if (leg + 1 < counts.length) {
-                    direction = Math.floorMod(direction + turn, 4);
-                }
+                direction = Math.floorMod(direction + turn, 4);
             }
-            // The fourth leg is one element longer. Native backs out its last
-            // direction before growing the next traversal rectangle.
+            // The fourth leg is one element longer. Native turns once more,
+            // then backs out that *next* direction before growing the next
+            // traversal rectangle (0x443c7b..0x443c9a). On an odd-sized
+            // rectangle this changes both coordinates' parity between passes.
             switch (direction) {
                 case 0 -> x--;
                 case 1 -> y--;

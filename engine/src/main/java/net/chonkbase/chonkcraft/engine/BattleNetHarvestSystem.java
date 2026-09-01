@@ -4115,17 +4115,18 @@ final class BattleNetHarvestSystem {
             worker.setResourceUnit(null);
             mine = null;
         }
-        // AI workers reconsider the layout after an exceptionally long trip,
-        // when the old mine vanished, or when too many order pointers refer
-        // to this depot. This happens before the ordinary mine fallback.
-        // level07h's tanker 75 exits the refinery at 72,72 on cycle 933 with
-        // no remembered platform; upstream first probes the refinery at
-        // 64,81 and is sent toward its platform at 57,73. Searching around
-        // the old depot instead picked 79,77 and put two tankers on visibly
-        // different squares in the same cycle.
+        // AI workers reconsider the layout after an exceptionally long trip
+        // or when too many order pointers refer to this depot. A fresh Return
+        // Goods order has no remembered mine by construction; that alone does
+        // not invoke AiGetSuitableDepot. Human 7 tanker 1491's first depot
+        // visit is uncongested, so its empty mine pointer falls through to
+        // UnitFindResource at refinery (72,72), retaining platform (79,77).
+        // Reassigning merely because the pointer was empty instead searched
+        // from refinery (64,81) and incorrectly selected platform (57,73).
+        // This happens before the ordinary mine fallback.
         boolean longWay = worker.resourceMoveCycles() > 500;
         if (!info.terrainHarvester() && world.ais.containsKey(worker.player())
-                && (longWay || mine == null || world.approximateUnitRefs(depot) > 15)) {
+                && (longWay || world.approximateUnitRefs(depot) > 15)) {
             BattleNetBuildingPlacement.SuitableDepot suitable =
                     world.placement.aiSuitableDepot(worker, depot, info);
             if (suitable != null) {

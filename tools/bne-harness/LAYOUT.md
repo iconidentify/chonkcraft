@@ -1054,6 +1054,26 @@ Note the flying angel, fire breeze, gryphon rider and dragon share one word
 exactly. No predicate over this table alone separates them, which is why
 behaviour 4 needs the owner's controller byte and the unit's marker as well.
 
+## Resource dropout turns before restarting its next perimeter
+
+The resource dropout writer at `0x004519d0` passes its packed scan dimensions
+and goal to the perimeter walker at `0x00443a40`.  After walking the fourth
+leg, the walker still applies the signed turn at `0x00443c7b`--`0x00443c81`.
+It then subtracts that newly selected direction at
+`0x00443c84`--`0x00443c9a` before adding two to both dimensions for the next
+pass.  The restart is therefore not a backstep along the fourth leg.  On an
+odd-sized rectangle it can change both coordinates' parity between passes.
+
+The placement callback at `0x004512bb`--`0x004512ca` independently rejects an
+anchor with either coordinate odd when the exiting type has the doubled-
+movement flag.  Human 7 is the direct combined witness: tanker slot 1491
+leaves the 3x3 refinery at `(72,72)` toward platform `(79,77)`.  Its first
+perimeter has no even/even candidate.  The native fourth-leg turn restarts the
+second perimeter at `(76,76)`, whose north leg tests `(76,75)` and then accepts
+`(76,74)` at fixture 405.  Backing out along the old east leg instead restarts
+at `(75,75)`, never reaches the native anchor, and eventually falls back to
+the west side.
+
 ## FindDeposit uses component-filtered native distance, not a route cost
 
 The pinned BNE executable's `FindDeposit` is `0x00438770`. Its first type test
