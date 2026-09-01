@@ -15,7 +15,74 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (fixed-cannon pool and direct-splash HitUnit cadence)
+## Current release checkpoint — 2026-09-01 (depot-ready Still heads own no idle draw)
+
+Accepted cycle-1,800 receipt `c9b852f7` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet moves
+from 10 clean / 42 divergent / 0 failed to 13 clean / 39 divergent / 0 failed,
+while the 52 per-case exact prefixes sum to 50,553, an increase of 9,030.
+Human 4, Orc 3, and expansion Orc 2 become clean through all 1,800 fixtures;
+seventeen more cases advance. Expansion Human 7 moves from fixture 447 to
+477. The complete movement in exact prefixes is Human 4 `545->1800`, Human 6
+`636->1009`, Human 11 `670->1296`, Human 14 `541->547`, Orc 3 `1271->1800`,
+Orc 4 `584->1322`, Orc 5 `453->1278`, Orc 7 `823->1229`, Orc 9 `463->1247`,
+Orc 10 `485->605`, Orc 12 `468->530`, Orc 14 `469->638`, expansion Human 3
+`462->536`, expansion Human 4 `473->818`, expansion Human 7 `446->476`,
+expansion Orc 2 `841->1800`, expansion Orc 3 `638->1291`, expansion Orc 5
+`448->1304`, expansion Orc 7 `701->740`, and expansion Orc 10 `469->650`.
+The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`4e100c12`. The long receipt is retained at
+`.bne-artifacts/runs/c9b852f7f812ac3f969eb8b3869b6417417ddfe75697a14b2be6b436d95d80e2`.
+Its manifest has SHA-256
+`8eeae9a17d851308699dd6e3ee5851504547029d9bf4c2853667093214714b25`
+and binds dirty engine-input identity
+`d76395cceea9c9472e504101fce1465b266e0794f4a0b728bc625b8b6a1660a0`
+at base revision `ba9fd55` to authenticated, replayable source capsule
+`e823e450fa7f9ddf847ed3247338b9f1023cae9ec953da713ffe93f75bb82cec`.
+
+Behavioral delta: the 25-count Still head exposed when action 26 returns a
+worker from a depot remains owned by the depot-ready continuation. It retains
+and counts the native Still sequence, but does not schedule generic
+`COrder_Still` and therefore cannot spend a land-idle random draw. The rule
+applies systemically to gatherers with queued Harvest, Return Goods, or Build
+continuations; directly issued ordinary Still queues retain their existing
+behavior. The implementation contains no mission, map, faction, coordinate,
+fixture, unit-ID, route-length, or exact-cycle branch.
+
+Proof delta: expansion Human 7 peasant slot 1543 surfaces empty at `(12,35)`
+on fixture 442 with raw action 2, next action 23, sequence 2595, and timer 25.
+It owns no native `0040AD58` visit on fixture 443. Java formerly spent that
+draw and stole the choice that native critter slot 1581 uses to wander
+south-west toward `(85,20)` on fixture 447. Expansion Orc 8 peasant slot 1531
+independently surfaces at `(55,21)` on fixture 604, counts sequence 2595 from
+timer 25 through one on fixtures 604--628 without an idle draw, promotes
+action 23 at sequence 2657/timer three on fixture 629, and first moves on
+fixture 632. This second witness also rejects a land-only or mission-specific
+exception despite changing the later already-divergent XOrc 8 world.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman7-c447-depot-ready-hold-final/runs/b7e41518f72ae27b3652c22a21ace79c397c088f9c75b8e39ce30c5e0bb27648`
+proves the focused assertion executes and fails on `ba9fd55`, then executes
+and passes on the candidate. Both focused real-data classes, the idle-targeting
+gate, both fixed 52-case gates, and the ordinary executable next-level gate
+pass. The long receipt's source capsule authenticates with zero sealed
+untracked inputs. The broader AI gate still reports the baseline-identical
+`AiCompetenceTest` error `not a single-tile step: 0,2`; baseline audit
+`.bne-test-efficacy/baseline-audit-ai-competence/runs/0574195428993a9575f11b39d2e0f29138147c4b3b194fc1688743ff3e0cc35f`
+confirms it is not introduced here. The XOrc 8 selector-one real-data check now
+tests its durable person-owned naval-objective contract instead of freezing a
+late exact coordinate after that mission has already diverged. Remote AI
+discovery still stops at strict SSH verification of the changed `i9beef` host
+key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now expansion Human 10 at fixture 449,
+followed by Orc 11 at 459, Human 8 at 473, Orc 8 at 475, expansion Human 7 at
+477, Human 7 at 493, and Human 13 at 494.
+
+## Prior release checkpoint — 2026-09-01 (fixed-cannon pool and direct-splash HitUnit cadence)
 
 Accepted cycle-1,800 receipt `f17c1f5a` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

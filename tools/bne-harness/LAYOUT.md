@@ -1150,6 +1150,18 @@ sequence at timer three. Fixtures 446 and 447 remain at `(20,8)` with timers
 two and one, and fixture 448 commits the first north step toward the watch
 tower site.
 
+The 25-count head is an action-26-owned timer, not a scheduled
+`COrder_Still` visit. Expansion Human 7 peasant slot 1543 surfaces empty at
+`(12,35)` on fixture 442 with raw action 2, next action 23, sequence 2595, and
+timer 25; no `0040AD58` idle draw belongs to it on fixture 443. Expansion Orc
+8 peasant slot 1531 independently surfaces at `(55,21)` on fixture 604 and
+counts sequence 2595 from timer 25 through one on fixtures 604--628 without a
+single `0040AD58` visit. It publishes action 23 at sequence 2657/timer three
+on fixture 629 and first moves on fixture 632. Thus the ready head owns its
+visual Still sequence and countdown without entering the generic land-idle
+random dispatcher, for an empty outbound gatherer as well as a loaded
+returner.
+
 The queue pop is therefore semantic order publication, not permission to
 enter the movement owner immediately. Gold action 23 uses its attack-sequence
 constructor while Build retains the Still sequence; both pay the same

@@ -1728,6 +1728,7 @@ final class BattleNetHarvestSystem {
             // This unit tick decrements the queue once after StopGathering,
             // leaving the authenticated timer 25 at the cycle boundary.
             worker.setBattleNetOrderDelay(26);
+            world.idle.armBattleNetDepotReadyHold(worker);
         }
         worker.setBattleNetOilAction(Unit.BattleNetOilAction.IDLE);
         worker.setBattleNetOilActionTicks(0);
@@ -1900,6 +1901,7 @@ final class BattleNetHarvestSystem {
         // The queue is visited once more at the bottom of this same unit
         // tick, so store 26 to leave the authenticated end-of-cycle 25.
         worker.setBattleNetOrderDelay(26);
+        world.idle.armBattleNetDepotReadyHold(worker);
         return true;
     }
 
@@ -4387,6 +4389,7 @@ final class BattleNetHarvestSystem {
         worker.setQueuedReplacementPending(true);
         // The queue is visited once at the bottom of this unit tick.
         worker.setBattleNetOrderDelay(26);
+        world.idle.armBattleNetDepotReadyHold(worker);
     }
 
 

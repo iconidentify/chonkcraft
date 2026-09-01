@@ -1090,18 +1090,25 @@ final class BattleNetIdleSystem {
             }
         } else {
             stepIdle(unit);
-            boolean resourceReadyHold = unit.queuedReplacementPending()
-                    && unit.returningToDepot()
-                    && unit.carried() > 0
-                    && unit.battleNetOrderDelay() > 0;
-            if (resourceReadyHold) {
-                // A worker surfaced from action 26 is sleeping behind the
-                // native 25-count ready head.  Its visible order is Still,
-                // but COrder_Still is not scheduled and therefore cannot
-                // enter the land-idle random dispatcher during this window.
-                // XHuman 12 peon 1491 surfaces at fixture 176 and owns no
-                // 0040AD58 draw at 177; Java's synthetic Still visit stole
-                // the immediately following melee-damage value.
+            if (battleNetDepotReadyHold(unit)) {
+                // A worker surfaced from action 26 behind the native
+                // 25-count ready head. Its visible order is Still, but
+                // COrder_Still is not scheduled: the retained Still cursor
+                // only counts down and cannot enter the idle dispatcher.
+                // This applies to both sides of the resource loop and to a
+                // ready-assigned Build. XHuman 7 peasant 1543 leaves its hall
+                // with Harvest queued on fixture 442; an ordinary Java Still
+                // visit at 443 stole the choice with which critter 1581 must
+                // wander on fixture 447. XOrc 8 peasant 1531 independently
+                // counts 2595/25..1 on fixtures 604..628 without one
+                // 0040AD58 visit.
+                int stillStart = battleNetStillSequenceStart(unit);
+                if (stillStart >= 0
+                        && unit.battleNetSequenceOffset() == stillStart
+                        && unit.battleNetAnimationTimer() > 1) {
+                    unit.setBattleNetAnimationTimer(
+                            unit.battleNetAnimationTimer() - 1);
+                }
                 return;
             }
             stepBattleNetIdle(unit);
@@ -1116,6 +1123,34 @@ final class BattleNetIdleSystem {
             // acquisition will likewise belong there when its later cadence
             // is modeled.
         }
+    }
+
+
+    /** Marks action 26's queued worker continuation as a timed Still head. */
+    void armBattleNetDepotReadyHold(Unit unit) {
+        if (unit == null || world.battleNetSequence == null) {
+            return;
+        }
+        int stillStart = battleNetStillSequenceStart(unit);
+        if (stillStart >= 0) {
+            unit.setBattleNetSequenceOffset(stillStart);
+            unit.setBattleNetAnimationTimer(25);
+        }
+    }
+
+
+    /** Whether action 26, rather than COrder_Still, owns this worker visit. */
+    private boolean battleNetDepotReadyHold(Unit unit) {
+        if (unit == null || unit.type() == null || !unit.type().canGather()
+                || !unit.queuedReplacementPending()
+                || unit.battleNetOrderDelay() <= 0
+                || unit.queuedOrders().isEmpty()) {
+            return false;
+        }
+        Unit.QueuedOrderKind next = unit.queuedOrders().getFirst().kind();
+        return next == Unit.QueuedOrderKind.HARVEST
+                || next == Unit.QueuedOrderKind.RETURN_GOODS
+                || next == Unit.QueuedOrderKind.BUILD;
     }
 
 

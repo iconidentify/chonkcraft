@@ -482,6 +482,44 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 7 depot-ready harvest head owns no Still idle draw")
+    void anXHuman7DepotReadyHarvestHeadOwnsNoStillIdleDraw() {
+        Mission mission = mission("campaigns/human-exp/levelx07h");
+        World world = mission.world();
+        Unit peasant = byId(world, 57);
+        Unit critter = byId(world, 19);
+        assertNotNull(peasant,
+                "native slot 1543 must remain paired with Java peasant 57");
+        assertNotNull(critter,
+                "native slot 1581 must remain paired with Java critter 19");
+
+        while (fixtureCycle(world) < 442) {
+            mission.tick();
+        }
+        assertEquals(12, peasant.tileX());
+        assertEquals(35, peasant.tileY());
+        assertEquals(Unit.Order.STILL, peasant.order());
+        assertEquals(0, peasant.carried());
+        assertEquals(25, peasant.battleNetOrderDelay(),
+                "the hall exit owns the complete depot-ready Still head");
+        assertEquals(1, peasant.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                peasant.queuedOrders().getFirst().kind());
+
+        while (fixtureCycle(world) < 447) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, critter.order(),
+                "the depot-ready worker must not steal the critter's wander choice");
+        assertEquals(85, critter.orderTargetX());
+        assertEquals(20, critter.orderTargetY());
+        assertEquals(2595, peasant.battleNetSequenceOffset(),
+                "the timed head retains the worker Still sequence");
+        assertEquals(20, peasant.battleNetAnimationTimer(),
+                "the native ready timer counts without scheduling COrder_Still");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 laden peasant stops its cached route on the keep skirt")
     void anXOrc12LadenPeasantStopsItsCachedRouteOnTheKeepSkirt() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

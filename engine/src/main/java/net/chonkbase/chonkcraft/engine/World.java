@@ -19386,6 +19386,7 @@ public final class World {
         if (assigned && unit.hasQueuedOrders()) {
             unit.setActionBeforeQueued(null);
             unit.setBattleNetOrderDelay(26);
+            idle.armBattleNetDepotReadyHold(unit);
         }
         return assigned;
     }
