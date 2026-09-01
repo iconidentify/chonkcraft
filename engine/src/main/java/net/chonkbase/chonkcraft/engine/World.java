@@ -9248,6 +9248,12 @@ public final class World {
             if (unit.pendingAttack() == referenced) {
                 refs++;
             }
+            if (unit.battleNetPendingNavalGuardTarget() == referenced) {
+                refs++;
+            }
+            if (unit.battleNetNavalGuardTarget() == referenced) {
+                refs++;
+            }
             if (unit.worksite() == referenced) {
                 refs++;
             }
@@ -11413,6 +11419,7 @@ public final class World {
         unit.clearQueuedOrders();
         unit.setSavedOrder(null);
         unit.clearBattleNetPendingPatrol();
+        unit.setBattleNetNavalGuardTarget(null);
         unit.setBattleNetScoutPatrol(false);
         construction.abandonPendingBuild(unit);
         if (unit.type() != null
@@ -12066,6 +12073,7 @@ public final class World {
                                 + " worksite=%d returning=%d carried=%d"
                                 + " delay=%d queued=%d replacement=%d"
                                 + " target=%d offered=%d route-offer=%d ai=%d home=%d,%d"
+                                + " naval-guard=%d"
                                 + " patrol=%d,%d goal=%d,%d%n",
                         cycle, unit.id(), unit.order(), unit.currentAction(),
                         unit.waitCycles(), unit.animation().unbreakable() ? 1 : 0,
@@ -12104,6 +12112,8 @@ public final class World {
                                 : unit.battleNetRouteOffer().id(),
                         unit.battleNetAiBehavior(),
                         unit.battleNetAiHomeX(), unit.battleNetAiHomeY(),
+                        unit.battleNetNavalGuardTarget() == null ? -1
+                                : unit.battleNetNavalGuardTarget().id(),
                         unit.patrolX(), unit.patrolY(),
                         unit.orderTargetX(), unit.orderTargetY());
             }
@@ -12904,6 +12914,12 @@ public final class World {
                     if (holder.target() == unit) reasons.append(" target");
                     if (holder.offeredTarget() == unit) reasons.append(" offered");
                     if (holder.pendingAttack() == unit) reasons.append(" pending-attack");
+                    if (holder.battleNetPendingNavalGuardTarget() == unit) {
+                        reasons.append(" pending-naval-guard");
+                    }
+                    if (holder.battleNetNavalGuardTarget() == unit) {
+                        reasons.append(" naval-guard");
+                    }
                     if (holder.resourceDepot() == unit) reasons.append(" resource-depot");
                     if (holder.returnDepotGoal() == unit) reasons.append(" return-depot");
                     if (holder.worksite() == unit) reasons.append(" worksite");
@@ -15615,6 +15631,9 @@ public final class World {
                 battleNetConstructingArmedPatrol(unit);
         boolean armedPatrolOp0 = constructingArmedPatrol
                 && tickBattleNetArmedPatrolSequence(unit);
+        if (armedPatrolOp0 && unit.battleNetNavalGuardReturnArming()) {
+            unit.setBattleNetNavalGuardReturnArming(false);
+        }
         // The periodic profile-18 land pass queues a replacement Patrol even
         // while the old one is active. Native waits for the old movement body
         // and committed pixels to finish, then promotes next_order at OP0:
@@ -15755,6 +15774,9 @@ public final class World {
                 unit.setWaitCycles(0);
             }
             residualSettledThisVisit = true;
+            if (finishBattleNetNavalGuardRendezvous(unit)) {
+                return;
+            }
             if (movement.finishLeftoverReplacement(unit)) {
                 return;
             }
@@ -17652,6 +17674,10 @@ public final class World {
             }
         }
         unit.clearPath();
+        // A fresh position Patrol owns no guard CUnitPtr. The pending naval
+        // help promotion restores its saved pointer immediately after this
+        // constructor succeeds.
+        unit.setBattleNetNavalGuardTarget(null);
         unit.setPatrol(unit.tileX(), unit.tileY());
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);
@@ -17827,7 +17853,8 @@ public final class World {
                 || battleNetArmedSmallWarshipPatrol(unit))
                 || unit.isMoving()
                 || !(unit.battleNetFlyerScoutExhausted()
-                        || unit.battleNetAiBehavior() == 2)) {
+                        || unit.battleNetAiBehavior() == 2
+                        || unit.battleNetNavalGuardReturnArming())) {
             return false;
         }
         int stillStart = idle.battleNetStillSequenceStart(unit);
@@ -17858,6 +17885,47 @@ public final class World {
             unit.setBattleNetSequenceOffset(still);
             unit.setBattleNetAnimationTimer(3);
         }
+    }
+
+    /** Releases a behavior-six unit-position order at its Move boundary. */
+    private boolean finishBattleNetNavalGuardRendezvous(Unit unit) {
+        Unit guard = unit.battleNetNavalGuardTarget();
+        if (guard == null || unit.order() != Unit.Order.PATROL
+                || unit.battleNetAiBehavior() != 6
+                || !battleNetArmedSmallWarshipPatrol(unit)
+                || (guard.isAlive() && guard.isOnMap()
+                        && !guard.isDying())) {
+            return false;
+        }
+        unit.setBattleNetNavalGuardTarget(null);
+        if (!unit.hasBattleNetNavalPatrolOrigin()
+                || !unit.hasBattleNetAiHome()) {
+            return false;
+        }
+
+        // COrder_MoveToUnit retains its guard CUnitPtr through the target's
+        // Die action and through pixels already committed by the helper. At
+        // the next action boundary FUN_00427a10 restores action five: the
+        // map-authored role point becomes the reverse endpoint, while the
+        // service-base home is run through the ordinary coast/footprint
+        // rewrite from the helper's settled hull. XHuman 7 submarine 1511
+        // therefore changes 86,120 -> 24,42 on fixture 395 and keeps 18,54
+        // as the return point instead of consuming its cached south byte.
+        int goalX = unit.battleNetAiHomeX();
+        int goalY = unit.battleNetAiHomeY();
+        if (!battleNetNavalRewriteOpenWater(goalX, goalY)) {
+            int[] rewritten = battleNetNavalOrderPoint(unit, goalX, goalY);
+            goalX = rewritten[0];
+            goalY = rewritten[1];
+        }
+        unit.clearPath();
+        unit.setPatrol(unit.battleNetNavalPatrolOriginX(),
+                unit.battleNetNavalPatrolOriginY());
+        unit.setOrderTarget(goalX, goalY);
+        unit.setBattleNetOrderDelay(2);
+        unit.setBattleNetNavalGuardReturnArming(true);
+        restartBattleNetArmedPatrol(unit);
+        return true;
     }
 
     /** Completes one behavior-four aircraft point without a return Patrol. */
@@ -19193,6 +19261,7 @@ public final class World {
         boolean hasBack = unit.hasBattleNetPendingPatrolBack();
         int backX = unit.battleNetPendingPatrolBackX();
         int backY = unit.battleNetPendingPatrolBackY();
+        Unit navalGuardTarget = unit.battleNetPendingNavalGuardTarget();
         unit.clearBattleNetPendingPatrol();
         // FUN_004513d0 / FUN_00438320 rewrites naval order goals before the
         // action constructor runs. A destroyer's shore-base top-left becomes
@@ -19218,6 +19287,7 @@ public final class World {
             y = rewritten[1];
         }
         if (orderPatrol(unit, x, y)) {
+            unit.setBattleNetNavalGuardTarget(navalGuardTarget);
             if (hasBack) {
                 unit.setPatrol(backX, backY);
             }

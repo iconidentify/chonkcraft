@@ -807,6 +807,15 @@ final class BattleNetIdleSystem {
                     unit.setBattleNetAiBehavior(6);
                     unit.setBattleNetAiHome(target.targetX(),
                             target.targetY());
+                    // Native keeps the map-authored role point separately
+                    // from both the live Patrol endpoint and the service-base
+                    // home. XHuman 7 submarine 1511 retains (18,54) here
+                    // while its opening coast rewrite moves it to (18,52),
+                    // then restores that role point after guard 1420 dies.
+                    if (!unit.hasBattleNetNavalPatrolOrigin()) {
+                        unit.setBattleNetNavalPatrolOrigin(
+                                unit.tileX(), unit.tileY());
+                    }
                 }
                 unit.setBattleNetPendingPatrol(target.targetX(), target.targetY(),
                         target.backX(), target.backY());

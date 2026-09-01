@@ -703,6 +703,34 @@ public final class LoadGame {
             unit.setBattleNetAiHome(integer(state.rawGet("aiHomeX")),
                     integer(state.rawGet("aiHomeY")));
         }
+        if (state.rawGet("navalPatrolOriginX") != null) {
+            unit.setBattleNetNavalPatrolOrigin(
+                    integer(state.rawGet("navalPatrolOriginX")),
+                    integer(state.rawGet("navalPatrolOriginY")));
+        }
+        if (state.rawGet("pendingPatrolX") != null) {
+            int pendingX = integer(state.rawGet("pendingPatrolX"));
+            int pendingY = integer(state.rawGet("pendingPatrolY"));
+            if (state.rawGet("pendingPatrolBackX") != null) {
+                unit.setBattleNetPendingPatrol(pendingX, pendingY,
+                        integer(state.rawGet("pendingPatrolBackX")),
+                        integer(state.rawGet("pendingPatrolBackY")));
+            } else {
+                unit.setBattleNetPendingPatrol(pendingX, pendingY);
+            }
+        }
+        if (state.rawGet("pendingNavalGuardTarget") != null) {
+            unit.setBattleNetPendingNavalGuardTarget(byId.get(integer(
+                    state.rawGet("pendingNavalGuardTarget"))));
+        }
+        if (state.rawGet("navalGuardTarget") != null) {
+            unit.setBattleNetNavalGuardTarget(byId.get(integer(
+                    state.rawGet("navalGuardTarget"))));
+        }
+        if (state.rawGet("navalGuardReturnArming") != null) {
+            unit.setBattleNetNavalGuardReturnArming(
+                    truthy(state.rawGet("navalGuardReturnArming")));
+        }
         if (state.rawGet("carrying") != null) {
             UnitType.Resource carrying = resourceOf(string(state.rawGet("carrying")));
             if (carrying != null) {

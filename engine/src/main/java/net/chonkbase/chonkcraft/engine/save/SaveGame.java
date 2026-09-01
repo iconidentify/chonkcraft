@@ -616,6 +616,36 @@ public final class SaveGame {
             state.append(" aiHomeX = ").append(unit.battleNetAiHomeX()).append(",");
             state.append(" aiHomeY = ").append(unit.battleNetAiHomeY()).append(",");
         }
+        if (unit.hasBattleNetNavalPatrolOrigin()) {
+            state.append(" navalPatrolOriginX = ")
+                    .append(unit.battleNetNavalPatrolOriginX()).append(",");
+            state.append(" navalPatrolOriginY = ")
+                    .append(unit.battleNetNavalPatrolOriginY()).append(",");
+        }
+        if (unit.hasBattleNetPendingPatrol()) {
+            state.append(" pendingPatrolX = ")
+                    .append(unit.battleNetPendingPatrolX()).append(",");
+            state.append(" pendingPatrolY = ")
+                    .append(unit.battleNetPendingPatrolY()).append(",");
+            if (unit.hasBattleNetPendingPatrolBack()) {
+                state.append(" pendingPatrolBackX = ")
+                        .append(unit.battleNetPendingPatrolBackX()).append(",");
+                state.append(" pendingPatrolBackY = ")
+                        .append(unit.battleNetPendingPatrolBackY()).append(",");
+            }
+        }
+        if (unit.battleNetPendingNavalGuardTarget() != null) {
+            state.append(" pendingNavalGuardTarget = ")
+                    .append(unit.battleNetPendingNavalGuardTarget().id())
+                    .append(",");
+        }
+        if (unit.battleNetNavalGuardTarget() != null) {
+            state.append(" navalGuardTarget = ")
+                    .append(unit.battleNetNavalGuardTarget().id()).append(",");
+        }
+        if (unit.battleNetNavalGuardReturnArming()) {
+            state.append(" navalGuardReturnArming = true,");
+        }
         if (unit.carrying() != null) {
             state.append(" carrying = ")
                     .append(quote(unit.carrying().name())).append(",");
