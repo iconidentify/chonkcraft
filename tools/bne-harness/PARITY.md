@@ -15,7 +15,75 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-361 naval HitUnit arrival rescan)
+## Current release checkpoint — 2026-08-31 (cycle-383 saturated depot-tail route retirement)
+
+Accepted cycle-1,800 receipt `6b34baa6` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,218, an increase of forty-one. Orc 12 advances from fixture
+342 to 383. The cycle-400 fleet remains 40 clean / 12 divergent / 0 failed
+under receipt `d30c534a`. The long receipt is retained at
+`.bne-artifacts/runs/6b34baa61d29fdcbdbd4ee32787af48f5a96a98f9392db9baac6db3982bfc955`.
+It binds dirty engine-input identity `639d51c0` at base revision `004a72c` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`d14ec230e2a68ab69dbced1cb758832127ed83d4ee488ef133b4298a1e1dd31b`.
+
+Behavioral delta: `FUN_004379e0` increments the packed collision/refusal high
+nibble before testing its saturation boundary. A laden land return on the
+depot skirt may therefore restore a cached nonduplicate route only while the
+post-increment generation remains below eight. At generation eight and above,
+retail parks route index twenty and pays the complete refusal band; the wake
+must query a fresh route instead of reinstalling the rejected suffix. A direct
+ray may redraw the same visible heading, but the route ownership is still new.
+Farther depot returns, unsaturated near returns, consumed duplicate-cardinal
+tails, non-laden movement, sea movement, and unrelated refusal callers retain
+their established handling. The rule uses return state, carried resources,
+movement class, depot distance, route state, and the native refusal generation;
+it contains no mission, map, coordinate, fixture, cycle, faction, unit-ID, or
+route-length branch.
+
+Proof delta: Orc 12 peon slot 1507 / Java 93 settles at `(58,49)` on fixture
+326 after consuming four elements of its five-heading return route, leaving
+south at the head with refusal eight. On fixture 327 native advances the raw
+high nibble `0x80` to `0x90`, parks the cursor at index twenty, and leaves no
+logical route while the full band runs through fixture 341. Java formerly
+restored south on that visit and consumed it on fixture 342, reaching
+`(58,50)`. Native's wake sees the parked cursor, writes `[SE,E]`, and commits
+southeast through the common movement writer at `0x0043798b`, reaching
+`(59,50)` with east retained. Static analysis anchors the increment at
+`0x00437a0d`, the post-increment comparison with `0x8000` at `0x00437ab4`,
+and the route park through `0x00450ad0`; the authenticated Branch Witness
+localizes the visible fixture-342 write. The corrected case is exact through
+fixture 382; its new fixture-383 split is an independent peon slot 1502 Y
+position mismatch, native 51 versus Java 50.
+
+Efficacy receipt
+`.bne-test-efficacy/c383-orc12-saturated-depot-tail/runs/d62a36784a391c74829a31775aab4d572c8e1ae05cc15717a5a62d711d64359b`
+proves the focused fixture-326..342 regression assertion-fails on `004a72c`
+and passes on the candidate. All 74 broader real-data loaded-return and refusal
+tests pass. The 36-test synthetic `BattleNetResourceApproachTest` has the same
+29 passes and seven known failures on both `004a72c` and the candidate, so it
+is recorded as baseline-equivalent evidence rather than a green acceptance
+claim. Both fixed 52-case gates pass. The ordinary executable next-level gate
+exits zero after 209 Python checks (four skipped) and 96 engine/desktop checks;
+its command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is expansion Human 6
+at fixture 344, followed by Human 8 at 347, expansion Human 4 at 350,
+expansion Human 2 at 352, expansion Orc 11 at 361, Orc 8 at 364, expansion
+Orc 12 at 374, expansion Human 10 at 375, and Orc 12 at 383.
+
+## Prior release checkpoint — 2026-08-31 (cycle-361 naval HitUnit arrival rescan)
 
 Accepted cycle-1,800 receipt `380e37dc` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

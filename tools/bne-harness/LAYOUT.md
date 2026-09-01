@@ -173,6 +173,16 @@ records show that high nibble matches the collision counter (1→`0x10`,
 flag `0x8000` is the pathfinder goal mark written by `0x4508f0` (not the
 LegacyEngine `BUILDING` occupancy bit).
 
+The collision/refuse high nibble also owns route retirement in
+`FUN_004379e0`. The function increments `word[unit+0x1c]` by `0x1000` at
+`0x00437a0d`, copies the post-increment high nibble to `bp`, writes animation
+timer fifteen, and compares `bp` with `0x8000` at `0x00437ab4`. Values below
+eight continue the cached route; eight and above call `0x00450ad0`, which
+parks route index twenty. Orc 12 peon slot 1507 is the authenticated saturated
+witness: fixture 327 advances `0x80` to `0x90` and parks its stale south tail;
+fixture 342 queries the parked route, redraws `[SE,E]`, and the common movement
+writer at `0x0043798b` commits southeast.
+
 The coarse order byte is not sufficient to identify that Move action state.
 In the sealed expansion Human 12 fixture-204 branch witness, map occupant
 (12,87) resolves through `0x45019b` to slot 1358. Its order byte is 3 (Move),

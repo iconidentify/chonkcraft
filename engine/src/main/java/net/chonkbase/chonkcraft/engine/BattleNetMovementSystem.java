@@ -8360,8 +8360,9 @@ final class BattleNetMovementSystem {
                 // cooperative handling to the moving-blocker arm above. A
                 // laden land return therefore has three authenticated forms.
                 // On the depot skirt it revisits the cached byte at Move/1
-                // until refusal eight buys the complete band (XHuman 8 peon
-                // 1575, fixtures 228..250). Farther out, a clean moving blocker
+                // through refusal seven; refusal eight parks that byte while
+                // buying the complete band (XHuman 8 peon 1575, fixtures
+                // 228..250). Farther out, a clean moving blocker
                 // retains the bytes under Move/15 (XHuman 10 peon 1588 at
                 // fixture 270). A blocker already carrying a collision
                 // generation is hard: peon 1584 parks S at fixture 290 under
@@ -8439,14 +8440,21 @@ final class BattleNetMovementSystem {
                     // the old tail makes Java retry after the blocker has
                     // vacated and miss the native diagonal. Fresh/direct
                     // two-byte routes, one-byte depot rays, and nonduplicate
-                    // tails retain the established refusal ladder.
+                    // tails retain the established refusal ladder only below
+                    // its saturated route-park boundary.
                 }
                 if (paidAttackTailGenerationPark(unit)) {
                     parkPaidAttackTailGeneration(unit, heading);
                     return;
                 }
                 int refusals = battleNetRefuse(unit);
-                if (ladenReturnRoute != null && refusals < 15) {
+                // FUN_004379e0 increments the packed high nibble before
+                // comparing it with 0x8000 at 0x00437ab4. Generations one
+                // through seven may therefore revisit this cached depot-skirt
+                // route, but generation eight and above leave route index 20
+                // for the wake to redraw. Orc 12 peon 1507 reaches nine with
+                // a stale S tail at fixture 327 and redraws SE,E on 342.
+                if (ladenReturnRoute != null && refusals < 8) {
                     unit.setPath(ladenReturnRoute);
                 }
                 return;

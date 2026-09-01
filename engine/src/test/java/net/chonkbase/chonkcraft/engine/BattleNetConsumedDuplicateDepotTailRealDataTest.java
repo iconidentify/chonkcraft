@@ -116,6 +116,54 @@ class BattleNetConsumedDuplicateDepotTailRealDataTest {
     }
 
     @Test
+    @DisplayName("Orc 12 redraws its saturated one-byte depot tail through SE")
+    void orc12RedrawsItsSaturatedOneByteDepotTailThroughSoutheast() {
+        Mission mission = mission("campaigns/orc/level12o");
+        Unit peon = byId(mission.world(), 93);
+        assertNotNull(peon,
+                "native slot 1507 must remain paired with Java peon 93");
+
+        advanceToFixture(mission, 326);
+        assertEquals(100, peon.carried());
+        assertTrue(peon.returningToDepot());
+        assertEquals(58, peon.tileX());
+        assertEquals(49, peon.tileY());
+        assertEquals(1, peon.pathLength(),
+                "the five-byte return route retains its final south byte");
+        assertEquals(5, peon.battleNetPathInitialLength());
+        assertEquals(4, peon.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(0, 1), peon.peekHeading());
+        assertEquals(1, peon.battleNetCollisionCounter());
+        assertEquals(8, peon.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(327, fixtureCycle(mission.world()));
+        assertEquals(58, peon.tileX());
+        assertEquals(49, peon.tileY());
+        assertEquals(0, peon.pathLength(),
+                "refusal nine parks the saturated south tail instead of restoring it");
+        assertEquals(9, peon.battleNetRefusals());
+        assertEquals(14, peon.waitCycles());
+
+        advanceToFixture(mission, 341);
+        assertEquals(58, peon.tileX());
+        assertEquals(49, peon.tileY());
+        assertEquals(0, peon.pathLength(),
+                "the parked tail stays empty through the complete refusal band");
+        assertEquals(0, peon.waitCycles());
+
+        mission.tick();
+        assertEquals(342, fixtureCycle(mission.world()));
+        assertEquals(59, peon.tileX());
+        assertEquals(50, peon.tileY(),
+                "retail redraws and commits southeast when the paid band wakes");
+        assertEquals(Direction.fromDelta(1, 1), peon.lastStepHeading());
+        assertEquals(1, peon.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), peon.peekHeading(),
+                "the redraw retains its east suffix");
+    }
+
+    @Test
     @DisplayName("fresh, one-byte, nonduplicate, and diagonal tails stay outside the rule")
     void onlyAConsumedDuplicateCardinalTwoByteTailQualifies() {
         UnitType type = new UnitType("unit-peon");
