@@ -4292,42 +4292,9 @@ public final class World {
      * responder merely because it is twelve tiles from the aggressor.
      */
     void battleNetSpatialHitHelp(Unit attacker, Unit defender) {
-        if (attacker == null || defender == null
-                || !defender.isAlive() || !attacker.isAlive()
-                || !defender.isOnMap() || defender.isDying()
-                || defender.type() == null) {
+        if (!battleNetOfferHitSource(attacker, defender)) {
             return;
         }
-        // FUN_0040a9d0 installs the aggressor in the struck unit's +0x54
-        // offer even for person defenders. Human 13 knight 1500 is Still when
-        // axethrower 1506 hits it at c20; the offer seeds its c22 Still scan
-        // into chase action 12. Returning immediately for every person left
-        // the HP loss without the offer.
-        Unit standing = defender.offeredTarget();
-        if (standing != null) {
-            // Some older Java route seams still project paid-tail provenance
-            // through offeredTarget. They are migrated individually as raw
-            // +0x54 witnesses become available; do not let those projections
-            // block the next native hit-owned offer. Ordinary live offers do
-            // retain first-owner priority.
-            boolean paidTailProjection = standing == defender.target()
-                    && defender.battleNetAttackWrapDestArmPending()
-                    && defender.battleNetTailWrapRouteTarget() == null;
-            if (standing.isAlive() && standing.isOnMap()
-                    && !standing.isDying() && !paidTailProjection) {
-                return;
-            }
-            if (!paidTailProjection) {
-                defender.setOfferedTarget(null);
-            }
-        }
-        if (!isEnemyPlayer(defender.player(), attacker.player())
-                || !targets.canTarget(defender, attacker)
-                || isPerson(defender.player()) && attacker.type() != null
-                        && attacker.type().building()) {
-            return;
-        }
-        defender.setOfferedTarget(attacker);
         // Controller zero (person) starts FUN_0040a9d0's selection band at
         // two and raises it to four only when the struck type carries native
         // movement flag 0x08 (swims). Controller one (computer) uses thirteen.
@@ -4390,6 +4357,47 @@ public final class World {
                         brother.type().reactRange(false));
             }
         }
+    }
+
+    /** Installs HitUnit's source offer without recruiting nearby brothers. */
+    boolean battleNetOfferHitSource(Unit attacker, Unit defender) {
+        if (attacker == null || defender == null
+                || !defender.isAlive() || !attacker.isAlive()
+                || !defender.isOnMap() || defender.isDying()
+                || defender.type() == null) {
+            return false;
+        }
+        // FUN_0040a9d0 installs the aggressor in the struck unit's +0x54
+        // offer even for person defenders. Human 13 knight 1500 is Still when
+        // axethrower 1506 hits it at c20; the offer seeds its c22 Still scan
+        // into chase action 12. Returning immediately for every person left
+        // the HP loss without the offer.
+        Unit standing = defender.offeredTarget();
+        if (standing != null) {
+            // Some older Java route seams still project paid-tail provenance
+            // through offeredTarget. They are migrated individually as raw
+            // +0x54 witnesses become available; do not let those projections
+            // block the next native hit-owned offer. Ordinary live offers do
+            // retain first-owner priority.
+            boolean paidTailProjection = standing == defender.target()
+                    && defender.battleNetAttackWrapDestArmPending()
+                    && defender.battleNetTailWrapRouteTarget() == null;
+            if (standing.isAlive() && standing.isOnMap()
+                    && !standing.isDying() && !paidTailProjection) {
+                return false;
+            }
+            if (!paidTailProjection) {
+                defender.setOfferedTarget(null);
+            }
+        }
+        if (!isEnemyPlayer(defender.player(), attacker.player())
+                || !targets.canTarget(defender, attacker)
+                || isPerson(defender.player()) && attacker.type() != null
+                        && attacker.type().building()) {
+            return false;
+        }
+        defender.setOfferedTarget(attacker);
+        return true;
     }
 
     /**

@@ -1017,6 +1017,17 @@ final class BattleNetProjectileSystem {
                 }
                 world.kill(candidate, source);
             } else {
+                if (person && !personNavalHit && source != null
+                        && (candidate.type() == null
+                                || !candidate.type().wall())) {
+                    // A surviving person land unit still receives HitUnit's
+                    // local +0x54 source offer; only the surrounding melee-
+                    // brother recruitment is lethal-only. XHuman 10 knight
+                    // 1480 banks the catapult which splashes it on fixture
+                    // 431 and promotes Attack on its next Still marker, while
+                    // neighbouring knight 1485 remains uninvolved.
+                    world.battleNetOfferHitSource(source, candidate);
+                }
                 candidate.setHitPoints(before - damage);
                 // Splash never calls applyDamage; OP0-damage bulk hold still
                 // needs the marker (Human 13 knight 1490 catapult splash).

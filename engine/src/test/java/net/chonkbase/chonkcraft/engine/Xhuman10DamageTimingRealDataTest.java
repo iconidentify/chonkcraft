@@ -920,6 +920,58 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's struck knight answers a nonlethal catapult splash")
+    void xhuman10StruckKnightAnswersNonlethalCatapultSplash() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1480 / Java 120 takes eight nonlethal
+        // catapult splash damage on fixture 431. HitUnit banks the source for
+        // the struck unit, which promotes action 12 on its fixture-432 Still
+        // marker. This is local offer ownership, not person melee help:
+        // neighbouring knight 1485 / Java 115 remains uninvolved.
+        Unit struck = unitById(world, 120);
+        Unit neighbour = unitById(world, 115);
+        Unit catapult = unitById(world, 113);
+        assertNotNull(struck, "XHuman 10 has no native-slot-1480 knight");
+        assertNotNull(neighbour, "XHuman 10 has no native-slot-1485 knight");
+        assertNotNull(catapult, "XHuman 10 has no native-slot-1487 catapult");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 430) {
+            mission.tick();
+        }
+        assertEquals(52, struck.hitPoints());
+        assertEquals(Unit.Order.STILL, struck.order());
+        assertNull(struck.offeredTarget());
+
+        mission.tick();
+        assertEquals(431, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(44, struck.hitPoints());
+        assertEquals(Unit.Order.STILL, struck.order(),
+                "the projectile lands after this unit's action visit");
+        assertSame(catapult, struck.offeredTarget(),
+                "positive splash banks its source for the struck unit");
+        assertNull(neighbour.battleNetPendingHelpAttack(),
+                "nonlethal person splash does not recruit melee brothers");
+
+        mission.tick();
+        assertEquals(432, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, struck.order());
+        assertSame(catapult, struck.target());
+        assertEquals(1922, struck.battleNetSequenceOffset());
+        assertEquals(3, struck.battleNetAnimationTimer());
+        assertEquals(Unit.Order.STILL, neighbour.order());
+    }
+
+    @Test
     @DisplayName("xhuman 10's paid first-collision chase refills as its residual settles")
     void xhuman10PaidFirstCollisionChaseRefillsOnResidualSettle() {
         AssetSource assets = AssetSource.fromEnvironment();
