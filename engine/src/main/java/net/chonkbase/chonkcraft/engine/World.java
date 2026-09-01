@@ -4189,6 +4189,7 @@ public final class World {
         unit.setFighting(false);
         unit.setSwingAtAir(false);
         unit.setBattleNetPersonHelpFirstChase(false);
+        unit.setBattleNetPersonHitOfferFullChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
@@ -4398,6 +4399,23 @@ public final class World {
             return false;
         }
         defender.setOfferedTarget(attacker);
+        if (isPerson(defender.player())
+                && defender.type().moveType() == UnitType.Movement.LAND
+                && defender.battleNetPendingCloseHitHelp()
+                && defender.order() == Unit.Order.STILL
+                && defender.currentAction() == Unit.Order.STILL
+                && !defender.isMoving()) {
+            // A standing close brother already queued by HitUnit is reset
+            // when the same splash walk reaches it directly. XHuman 10 knight
+            // 1480 carries unit+0x1d == 0x20 before the fixture-431 catapult
+            // splash; its local offer writes zero while Still and preserves
+            // the banked Attack as next_order. Its later blocked northwest
+            // chase tail therefore enters generation one and keeps the byte
+            // under Move 15..1. The center victim has no pending close offer
+            // and retains its own collision ownership, as does any live
+            // incumbent offer returned above.
+            defender.setBattleNetCollisionCounter(0);
+        }
         if (isPerson(defender.player())
                 && defender.type().moveType() == UnitType.Movement.LAND) {
             // HitUnit's own +0x54 offer enters the same first-chase writer as
@@ -6665,6 +6683,107 @@ public final class World {
         }
         return new PathFinder.Path(path.result(),
                 new int[] {heads[n - 2], heads[n - 1]});
+    }
+
+    /**
+     * Builds the complete open skirt ray for an uncontested person HitUnit offer.
+     *
+     * <p>A standing offered acquisition normally publishes two dest-arm bytes
+     * because the following free scan is allowed to name another quarry.
+     * When that scan has no different winner and the offered movable quarry is
+     * stationary, BNE instead keeps the complete goal-axis ray to the far side
+     * of the melee skirt. XHuman 10 center knight 1493 writes
+     * {@code SW,SW,SW,W,W} from {@code (79,87)} toward the catapult on
+     * {@code (74,89)}; close knight 1485 independently writes
+     * {@code SW,SW,W,W,W} from the next row. Human 13 knight 1490 is the
+     * negative control: its reaction scan prefers the intervening ogre, so its
+     * offered-axe route remains the two-byte dest-arm leftover.</p>
+     *
+     * <p>The rewrite is only an open-ray form. If the ordinary target writer
+     * already had to wall-follow, or any square on the grouped diagonal/cardinal
+     * ray is occupied, its captured route remains authoritative.</p>
+     *
+     * @return a replacement route, or {@code null} when this is not that form
+     */
+    private PathFinder.Path battleNetUncontestedPersonOfferSkirtRay(
+            Unit unit, Unit target, PathFinder.Path path) {
+        if (unit == null || target == null || path == null
+                || path.result() != PathFinder.Result.FOUND
+                || path.length() <= 2
+                || !unit.battleNetPersonHelpFirstChase()
+                || !unit.battleNetPersonHitOfferFullChase()
+                || !isPerson(unit.player())
+                || unit.type() == null || target.type() == null
+                || unit.type().moveType() != UnitType.Movement.LAND
+                || unit.type().maxAttackRange() != 1
+                || target.type().building() || target.isMoving()
+                || target.type().tileWidth() != 1
+                || target.type().tileHeight() != 1) {
+            return null;
+        }
+
+        // Only replace a clean route whose complete endpoint is the live
+        // quarry. A wall prefix (including XHuman 10 knight 1480's SW,NW)
+        // owns native buffer state that this open-ray rule cannot recreate.
+        int stride = battleNetMovementStride(unit);
+        int endX = unit.tileX();
+        int endY = unit.tileY();
+        for (int index = path.length() - 1; index >= 0; index--) {
+            int heading = path.headings()[index];
+            endX += Direction.deltaX(heading) * stride;
+            endY += Direction.deltaY(heading) * stride;
+        }
+        if (endX != target.tileX() || endY != target.tileY()) {
+            return null;
+        }
+
+        int react = Math.max(unit.type().reactRange(true),
+                unit.type().maxAttackRange());
+        Unit natural = targets.findBattleNetHostile(unit, react, null);
+        if (natural != null && natural != target) {
+            return null;
+        }
+
+        int targetDx = target.tileX() - unit.tileX();
+        int targetDy = target.tileY() - unit.tileY();
+        int absDx = Math.abs(targetDx);
+        int absDy = Math.abs(targetDy);
+        if (targetDx == 0 || targetDy == 0 || absDx == absDy) {
+            return null;
+        }
+        int skirtX = target.tileX();
+        int skirtY = target.tileY();
+        if (absDx > absDy) {
+            skirtY += Integer.signum(targetDy);
+        } else {
+            skirtX += Integer.signum(targetDx);
+        }
+        if (!map.contains(skirtX, skirtY)) {
+            return null;
+        }
+
+        java.util.List<Integer> forward = new ArrayList<>();
+        int x = unit.tileX();
+        int y = unit.tileY();
+        while (x != skirtX || y != skirtY) {
+            int stepDx = Integer.signum(skirtX - x);
+            int stepDy = Integer.signum(skirtY - y);
+            int heading = Direction.fromDelta(stepDx, stepDy);
+            x += Direction.deltaX(heading) * stride;
+            y += Direction.deltaY(heading) * stride;
+            if (!map.contains(x, y) || !canEnter(unit, x, y)) {
+                return null;
+            }
+            forward.add(heading);
+            if (forward.size() > 28) {
+                return null;
+            }
+        }
+        int[] stored = new int[forward.size()];
+        for (int index = 0; index < forward.size(); index++) {
+            stored[forward.size() - 1 - index] = forward.get(index);
+        }
+        return new PathFinder.Path(PathFinder.Result.FOUND, stored);
     }
 
     /**
@@ -11509,6 +11628,7 @@ public final class World {
         unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setBattleNetAttackWrapDestArmPending(false);
         unit.setBattleNetPersonHelpFirstChase(false);
+        unit.setBattleNetPersonHitOfferFullChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
@@ -12628,6 +12748,7 @@ public final class World {
         unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setBattleNetAttackWrapDestArmPending(false);
         unit.setBattleNetPersonHelpFirstChase(false);
+        unit.setBattleNetPersonHitOfferFullChase(false);
         unit.setBattleNetPersonSplashHelpAttack(false);
         unit.setBattleNetPersonHelpRetargetHandoff(false);
         unit.setBattleNetPersonHitHelpAutoSelectHandoff(false);
@@ -13824,6 +13945,12 @@ public final class World {
         boolean liveOfferedRoute = unit.offeredTarget() == target;
         boolean paidTailRoute = unit.battleNetTailWrapRouteTarget() == target;
         boolean targetOwnsRoute = liveOfferedRoute || paidTailRoute;
+        PathFinder.Path uncontestedPersonOfferSkirt = liveOfferedRoute
+                && !unit.battleNetAttackWrapDestArmPending()
+                && !unit.chasing()
+                ? battleNetUncontestedPersonOfferSkirtRay(
+                        unit, target, path)
+                : null;
         if (path.length() == 0 && targetOwnsRoute
                 && unit.battleNetAttackWrapDestArmPending()
                 && unit.type() != null && target.type() != null
@@ -13941,6 +14068,13 @@ public final class World {
                             PathFinder.Result.FOUND, headings);
                 }
             }
+            if (uncontestedPersonOfferSkirt != null) {
+                // This branch owns the whole open ray, including its first
+                // goal-axis diagonal. It therefore supersedes the ordinary
+                // face preference above as well as the two-byte dest-arm
+                // truncation below.
+                path = uncontestedPersonOfferSkirt;
+            }
             // Dest-arm leftover from a standing offered acquire is dest-arm
             // plus one more heading. Human 13 knight 1490 dest-arms SE,S
             // (pathi 1) onto 125,31. A full pathfind leftover (S,S after the
@@ -13953,6 +14087,7 @@ public final class World {
             if (liveOfferedRoute
                     && !unit.battleNetAttackWrapDestArmPending()
                     && !unit.chasing() && path.length() > 2
+                    && uncontestedPersonOfferSkirt == null
                     && target.type() != null
                     && !target.type().building()) {
                 // The two-byte dest-arm leftover is the mobile-quarry form.
@@ -13970,6 +14105,7 @@ public final class World {
             // goal-axis diagonal, including onto a lead mid-Move brother.
             path = preferBattleNetGoalAxisFirstHeading(unit, path, target);
             unit.setBattleNetPersonHelpFirstChase(false);
+            unit.setBattleNetPersonHitOfferFullChase(false);
         }
         if (path.length() > 0
                 && unit.battleNetRangedCloseHitHelpWallFace()) {
@@ -19242,6 +19378,15 @@ public final class World {
                 // inherit the offer's first-route rule.
                 if (personHitOfferFirstChase) {
                     unit.setBattleNetPersonHelpFirstChase(true);
+                    unit.setBattleNetPersonHitOfferFullChase(true);
+                    // A standing person's own HitUnit offer retains the old
+                    // collision generation until the Still marker accepts it.
+                    // NewActionAttack then clears unit+0x1d together with the
+                    // replaced Still action. XHuman 10 center knight 1493 is
+                    // raw 0x10 through fixture 434 and zero on its fixture-435
+                    // Attack promotion. Close brothers whose own direct offer
+                    // already cleared the generation remain zero here.
+                    unit.setBattleNetCollisionCounter(0);
                 }
                 // Action 16 (stationary) for person idle scans and for any
                 // auto-scan onto air (Human 9 destroyers vs balloon). Computer

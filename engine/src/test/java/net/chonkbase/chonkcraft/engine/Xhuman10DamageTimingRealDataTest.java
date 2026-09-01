@@ -1017,6 +1017,177 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's center splash victim publishes its full skirt chase")
+    void xhuman10CenterSplashVictimPublishesItsFullSkirtChase() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1493 / Java 107 is the center victim of the fixture-431
+        // catapult splash. HitUnit leaves collision generation one while the
+        // offer is pending, then NewActionAttack clears it on fixture 435.
+        // The first chase writes SW,SW,SW,W,W toward the stationary mobile
+        // quarry's south skirt and consumes its first SW on fixture 438.
+        Unit knight = unitById(world, 107);
+        Unit catapult = unitById(world, 113);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1493 knight");
+        assertNotNull(catapult, "XHuman 10 has no native-slot-1487 catapult");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 434) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, knight.order());
+        assertSame(catapult, knight.offeredTarget());
+        assertEquals(1, knight.battleNetCollisionCounter(),
+                "the center offer retains collision until Attack promotes");
+
+        mission.tick();
+        assertEquals(435, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, knight.order());
+        assertSame(catapult, knight.target());
+        assertEquals(0, knight.battleNetCollisionCounter(),
+                "NewActionAttack clears the promoted offer's collision owner");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 438) {
+            mission.tick();
+        }
+        assertEquals(78, knight.tileX());
+        assertEquals(88, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, 1), knight.lastStepHeading());
+        assertEquals(4, knight.pathLength(),
+                "the first SW leaves SW,SW,W,W in the native route buffer");
+        assertEquals(Direction.fromDelta(-1, 1),
+                knight.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(-1, 1),
+                knight.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(-1, 0),
+                knight.peekHeadingAtDepth(2));
+        assertEquals(Direction.fromDelta(-1, 0),
+                knight.peekHeadingAtDepth(3));
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 449) {
+            mission.tick();
+        }
+        assertEquals(78, knight.tileX());
+        assertEquals(88, knight.tileY(),
+                "the second cached southwest remains residual through fixture 449");
+
+        mission.tick();
+        assertEquals(450, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(77, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, 1), knight.lastStepHeading(),
+                "the second cached heading is southwest, not west");
+        assertEquals(3, knight.pathLength());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's splash offer clears stale collision before the blocked chase tail")
+    void xhuman10SplashOfferClearsCollisionBeforeBlockedChaseTail() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1480 / Java 120 carries an old collision generation
+        // while idle. Its fixture-431 direct HitUnit offer clears unit+0x1d
+        // before queued Attack promotes. After the first southwest chase
+        // stride settles, the retained northwest byte is occupied by allied
+        // knight 1493. That is a fresh first refusal: native keeps the byte
+        // and pays Move 15..1, then consumes northwest on fixture 462.
+        Unit knight = unitById(world, 120);
+        Unit catapult = unitById(world, 113);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1480 knight");
+        assertNotNull(catapult, "XHuman 10 has no native-slot-1487 catapult");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 430) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, knight.order());
+        assertTrue(knight.battleNetCollisionCounter() > 0,
+                "the idle unit begins with a stale prior collision generation");
+
+        mission.tick();
+        assertEquals(431, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertSame(catapult, knight.offeredTarget());
+        assertEquals(0, knight.battleNetCollisionCounter(),
+                "the fresh HitUnit offer clears native unit+0x1d");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 446) {
+            mission.tick();
+        }
+        assertEquals(79, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(2531, knight.pixelX());
+        assertEquals(2845, knight.pixelY());
+        assertEquals(1, knight.pathLength());
+        assertEquals(Direction.fromDelta(-1, -1), knight.peekHeading());
+        assertEquals(0, knight.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(447, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(79, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(2528, knight.pixelX());
+        assertEquals(2848, knight.pixelY());
+        assertEquals(1, knight.pathLength(),
+                "the first refusal retains the occupied northwest byte");
+        assertEquals(Direction.fromDelta(-1, -1), knight.peekHeading());
+        assertEquals(1, knight.battleNetCollisionCounter());
+        assertEquals(1874, knight.battleNetSequenceOffset());
+        assertEquals(15, knight.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(448, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(14, knight.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(449, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(79, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(13, knight.battleNetAnimationTimer());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 461) {
+            mission.tick();
+        }
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(1, knight.pathLength());
+
+        mission.tick();
+        assertEquals(462, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(78, knight.tileX());
+        assertEquals(88, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, -1), knight.lastStepHeading());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 473) {
+            mission.tick();
+        }
+        assertEquals(78, knight.tileX());
+        assertEquals(88, knight.tileY());
+
+        mission.tick();
+        assertEquals(474, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(77, knight.tileX(),
+                "the exhausted collision-owned chase redraws on its settle OP0");
+        assertEquals(88, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, 0), knight.lastStepHeading());
+        assertEquals(3, knight.pathLength(),
+                "the consumed west leaves southwest,west,southwest");
+    }
+
+    @Test
     @DisplayName("xhuman 10's paid first-collision chase refills as its residual settles")
     void xhuman10PaidFirstCollisionChaseRefillsOnResidualSettle() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -1904,6 +2075,60 @@ class Xhuman10DamageTimingRealDataTest {
                 "the paid wake consumes the native north-east route head");
         assertEquals(8, peon.battleNetCollisionCounter(),
                 "the route keeps the collision generation which paid its wait");
+    }
+
+    @Test
+    @DisplayName("xhuman 10's long gold corridor redraws north at its paid wake")
+    void xhuman10LongGoldCorridorRedrawsNorthAtItsPaidWake() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1438 / Java 162 consumes north-east on fixture 430,
+        // then its remaining north-led return ray meets the crowded depot
+        // corridor. The settled route is parked at native index twenty on
+        // fixture 452 while collision generation nine pays Move 15..1.
+        // Timer one's following callback redraws N,NW,N and consumes north
+        // on fixture 467. Retaining the stale diagonal ray instead waits a
+        // second full band and moves north-east only on fixture 482.
+        Unit peon = unitById(world, 162);
+        assertNotNull(peon, "XHuman 10 has no native-slot-1438 gold peon");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 452) {
+            mission.tick();
+        }
+        assertEquals(15, peon.tileX());
+        assertEquals(115, peon.tileY());
+        assertTrue(peon.returningToDepot());
+        assertEquals(100, peon.carried());
+        assertEquals(0, peon.pathLength(),
+                "fixture 452 projects native route index twenty");
+        assertEquals(9, peon.battleNetCollisionCounter());
+        assertEquals(2600, peon.battleNetSequenceOffset());
+        assertEquals(15, peon.battleNetAnimationTimer());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 466) {
+            mission.tick();
+        }
+        assertEquals(15, peon.tileX());
+        assertEquals(115, peon.tileY());
+        assertEquals(1, peon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(467, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(15, peon.tileX());
+        assertEquals(114, peon.tileY(),
+                "the paid wake redraws and consumes north in one visit");
+        assertEquals(Direction.fromDelta(0, -1), peon.lastStepHeading());
+        assertEquals(2, peon.pathLength(),
+                "the consumed north leaves northwest,north in the new ray");
     }
 
     @Test

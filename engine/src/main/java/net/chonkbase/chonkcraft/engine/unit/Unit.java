@@ -3313,6 +3313,21 @@ public final class Unit {
     private boolean battleNetPersonHelpFirstChase;
 
     /**
+     * The person's ordinary Still scanner accepted this unit's own HitUnit
+     * offer, rather than a separately queued close-help order. The first
+     * uncontested route may retain the full stationary-quarry skirt ray.
+     */
+    public boolean battleNetPersonHitOfferFullChase() {
+        return battleNetPersonHitOfferFullChase;
+    }
+
+    public void setBattleNetPersonHitOfferFullChase(boolean fullChase) {
+        battleNetPersonHitOfferFullChase = fullChase;
+    }
+
+    private boolean battleNetPersonHitOfferFullChase;
+
+    /**
      * This attack was promoted from a person's lethal-splash help offer.
      * Retained through the first chase so its later command-to-auto handoff
      * can pay native's Attack construction delay exactly once. After a person

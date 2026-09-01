@@ -6269,6 +6269,20 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetOrderDelay(0);
                             return;
                         }
+                        boolean collisionOwnedResidualLadenReturnPark =
+                                unit.battleNetBorrowedMoveForStep()
+                                && unit.returningToDepot()
+                                && unit.carried() > 0
+                                && unit.type() != null
+                                && unit.type().moveType()
+                                        == UnitType.Movement.LAND
+                                && unit.battleNetCollisionCounter() >= 8
+                                && unit.battleNetCollisionCounter() < 14
+                                && unit.battleNetPathStepsTaken() > 0
+                                && unit.stepDrained() && !unit.isMoving()
+                                && unit.pathLength() > 0
+                                && world.battleNetCooperativeBlocker(
+                                        unit, movingBlocker);
                         boolean saturatedFreshLadenReturnPark =
                                 unit.battleNetBorrowedMoveForStep()
                                 && unit.returningToDepot()
@@ -6285,7 +6299,8 @@ final class BattleNetMovementSystem {
                         int counter = unit.battleNetCollisionCounter() + 1;
                         unit.setBattleNetCollisionCounter(
                                 counter > 14 ? 0 : counter);
-                        if (saturatedFreshLadenReturnPark) {
+                        if (saturatedFreshLadenReturnPark
+                                || collisionOwnedResidualLadenReturnPark) {
                             // Once a laden land return has completed the
                             // eight-refusal ladder, an occupied first byte of
                             // its fresh replacement is parked even when the
@@ -6295,8 +6310,14 @@ final class BattleNetMovementSystem {
                             // parks west- and north-led replacements; XHuman
                             // 12 peon 1550 supplies an independent member of
                             // the same saturated fresh-route rule. A route
-                            // with a consumed prefix remains live, as witnessed
-                            // by XHuman 10 peon 1588 and Human 14 peon 1539.
+                            // with a consumed prefix remains live while its
+                            // packed collision generation is below eight, as
+                            // witnessed by XHuman 10 peon 1588 and Human 14
+                            // peon 1539. Once that packed owner has already
+                            // paid, a residual-settle refusal parks too:
+                            // XHuman 10 peon 1438 changes collision eight to
+                            // nine and RI1 to RI20 on fixture 452, pays Move
+                            // 15..1, then redraws north on fixture 467.
                             battleNetRefuse(unit);
                             unit.setRouteSpent(false);
                             unit.setWaitCycles(0);
@@ -6697,16 +6718,29 @@ final class BattleNetMovementSystem {
                                 if (moveStart >= 0) {
                                     unit.setBattleNetSequenceOffset(moveStart);
                                     unit.setBattleNetAnimationTimer(15);
-                                    // stepBattleNetAttackSequence advances the
-                                    // restarted Move cursor before the logical
-                                    // order-delay arm runs on the next visit.
-                                    // Retain that visit in the Java countdown
-                                    // so the exposed native timer falls 15→14,
-                                    // not 15→13.
+                                    // A stationary-quarry band is latched
+                                    // below, so its fourteen quiet visits map
+                                    // directly to the remaining 14..1 timer.
+                                    // A moving quarry remains free-wake
+                                    // eligible and keeps the ordinary quiet
+                                    // count for its sticky OP0 bridge.
                                     unit.setBattleNetOrderDelay(
                                             unit.battleNetMovingQuarryResidual()
-                                                    ? quiet : 15);
+                                                    ? quiet : 14);
                                     unit.setBattleNetChaseStepReady(false);
+                                }
+                                if (!unit.battleNetMovingQuarryResidual()) {
+                                    // A stationary quarry's retained progress
+                                    // byte owns the complete paid Move band.
+                                    // The cooperative blocker may vacate while
+                                    // that timer runs, but the ordinary one-
+                                    // heading free-wake must not consume the
+                                    // byte early. XHuman 10 knight 1480 keeps
+                                    // NW through fixtures 447..461 even after
+                                    // knight 1493 leaves the square at 450.
+                                    // Moving-quarry residuals use their sticky
+                                    // OP0 bridge and remain free-wake eligible.
+                                    unit.setBattleNetRefusalHold(true);
                                 }
                             }
                             if ((unit.order() == Unit.Order.PATROL
@@ -8234,6 +8268,42 @@ final class BattleNetMovementSystem {
                                     + Direction.deltaY(heading) * strideDetour;
                             canTakeStep = true;
                         }
+                    }
+                    boolean retainedStationaryQuarryHardResidual =
+                            allyHard
+                            && world.actionMoveWalked
+                            && unit.battleNetCollisionCounter() == 0
+                            && unit.battleNetPathStepsTaken() == 1
+                            && unit.target().isOnMap()
+                            && !unit.target().isMoving()
+                            && battleNetHasStrictlyCloserFreeNeighbour(
+                                    unit, unit.target());
+                    if (!canTakeStep
+                            && retainedStationaryQuarryHardResidual) {
+                        // A collision-solid ally does not make every
+                        // one-byte residual a no-progress park. When the
+                        // quarry is stationary and another free compass cell
+                        // still closes on it, native keeps the cached blocked
+                        // byte and pays a complete Move band. XHuman 10 knight
+                        // 1480 settles SW with NW blocked by collided knight
+                        // 1493 on fixture 447: unit+0x1d becomes 0x10, route
+                        // index remains one, and Move counts 15..1 before NW
+                        // commits on fixture 462. Moving quarries and residuals
+                        // with no progressive free cell retain the RI20/replan
+                        // path below.
+                        unit.setBattleNetCollisionCounter(1);
+                        unit.setBattleNetRefusals(0);
+                        unit.setWaitCycles(0);
+                        unit.setBattleNetOrderDelay(14);
+                        unit.setBattleNetRefusalHold(true);
+                        int moveStart = world.idle.battleNetSequenceStart(unit,
+                                BattleNetSequence.MOVE_ANIMATION);
+                        if (moveStart >= 0) {
+                            unit.setBattleNetSequenceOffset(moveStart);
+                            unit.setBattleNetAnimationTimer(15);
+                            unit.setBattleNetChaseStepReady(false);
+                        }
+                        return;
                     }
                     // Residual-settled pathn1 against a standing ally while
                     // chasing a mobile quarry is always a cursor park. A free

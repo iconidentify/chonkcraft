@@ -2918,12 +2918,15 @@ final class BattleNetCombatSystem {
             // one callback.  The missed boundary left Java parked until 108.
             boolean settledSpentMovingQuarryBoundary =
                     battleNetSettledSpentMovingQuarryDecisionDue(unit);
+            boolean settledSpentCollisionChaseBoundary =
+                    battleNetSettledSpentCollisionChaseDecisionDue(unit);
             boolean settledPaidTailHostileBoundary =
                     battleNetSettledPaidTailHostileDecisionDue(unit);
             boolean atChaseBoundary = (!unit.isMoving()
                     && world.movement.atMoveBoundary(unit))
                     || unit.battleNetChaseStepReady()
                     || settledSpentMovingQuarryBoundary
+                    || settledSpentCollisionChaseBoundary
                     || settledPaidTailHostileBoundary;
             if (chased != null && atChaseBoundary) {
                 // In-range leftovers are discarded before any further heading
@@ -6142,6 +6145,11 @@ final class BattleNetCombatSystem {
                             // fixture 55 and refills on 56.
                             && !paidWrapFirstCollisionImmediateRefill
                             && !unit.battleNetLandPatrolAttackRoutePending()
+                            // A completely consumed stationary-quarry route
+                            // reaches NewPath on this same OP0. Its collision
+                            // owner participates in the refill instead of
+                            // manufacturing a route-index-twenty park.
+                            && !settledSpentCollisionChaseBoundary
                             && !unit.battleNetChaseEmptyRouteReplan()) {
                         unit.setRouteSpent(false);
                         unit.clearPath();
@@ -10685,6 +10693,34 @@ final class BattleNetCombatSystem {
                 unit.battleNetSequenceOffset(),
                 unit.battleNetAnimationTimer());
         return next.valid() && next.actionMarker();
+    }
+
+
+    /** Whether a paid stationary-quarry chase exhausts on this Move OP0. */
+    private boolean battleNetSettledSpentCollisionChaseDecisionDue(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || !unit.chasing() || unit.isMoving()
+                || !world.actionMoveWalked || !unit.stepDrained()
+                || unit.offsetX() != 0 || unit.offsetY() != 0
+                || unit.pathLength() != 0 || !unit.routeSpent()
+                || unit.battleNetCollisionCounter() <= 0
+                || unit.battleNetRefusals() != 0
+                || unit.battleNetPathInitialLength() <= 0
+                || unit.battleNetPathStepsTaken()
+                        < unit.battleNetPathInitialLength()
+                || unit.target() == null || unit.target().isMoving()
+                || unit.target().type() == null
+                || unit.target().type().building()
+                || !onBattleNetChaseMoveBody(unit)) {
+            return false;
+        }
+        // A route retained through a paid cooperative band keeps its packed
+        // collision owner after the successful wake. When the final heading's
+        // pixels land on Move OP0, retail asks NewPath and can consume the new
+        // head in that same callback. XHuman 10 knight 1480 exhausts NW and
+        // first-steps west on fixture 474; treating the centered residual as
+        // an ordinary empty route delays every new heading by one visit.
+        return true;
     }
 
 

@@ -15,7 +15,76 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (depot-ready Still heads own no idle draw)
+## Current release checkpoint — 2026-09-01 (person-offer chase and paid residual wakes)
+
+Accepted cycle-1,800 receipt `92a5b8aa` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 50,616, an increase of 63. Expansion Human 10 advances from
+fixture 448 to 511. The cycle-400 fleet remains 50 clean / 2 divergent / 0
+failed under receipt `19b0b09d`. The long receipt is retained at
+`.bne-artifacts/runs/92a5b8aaa7340fa5e8918894e909120412673aebf3c13b9685a201cf529c1748`.
+Its manifest has SHA-256
+`fda977d78e27dcef104016f62efde55b7ff9e890bd0b8a809ace963848198e6b`
+and binds dirty engine-input identity
+`afe4664cc1fd06c0b0aa057500a3b025e5ff9623a3560e2d436399c669ca5768`
+at base revision `0b8b201` to authenticated, replayable source capsule
+`55dc4d59757bee635fafd8cfe3bc1d23b3b1f6f882491e87e4b8d2268b29929a`.
+
+Behavioral delta: when a standing person accepts its own direct-splash
+HitUnit offer, Attack promotion clears the stale collision generation and an
+uncontested first chase may retain the complete open skirt ray to a stationary
+mobile quarry. A consumed chase residual blocked by a cooperative person owns
+one complete refusal band; after its last retained step settles, the paid
+collision owner can redraw and consume the new route head on the same Move
+OP0. Likewise, a laden land returner whose consumed residual is blocked after
+collision generation eight parks the route, pays the band, and redraws at its
+wake. Moving quarries, contested offers, buildings, unladen movement, and
+lower collision generations retain their established behavior. The
+implementation contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 10 center knight slot 1493 accepts its own
+fixture-431 splash offer, clears collision on fixture 435, publishes
+`SW,SW,SW,W,W`, consumes southwest on fixture 438, and consumes the second
+southwest on fixture 450. Close knight slot 1480 clears its prior collision on
+the fixture-431 direct offer, settles southwest with northwest occupied on
+fixture 447, retains northwest through Move timers 15--1, consumes it on
+fixture 462, and redraws `W,SW,W,SW` while consuming west on fixture 474.
+Independently, laden gold peon slot 1438 parks its consumed depot-return
+residual at collision generation nine on fixture 452, pays through fixture
+466, then redraws `N,NW,N` and consumes north on fixture 467.
+
+Efficacy receipts
+`.bne-test-efficacy/xhuman10-center-splash/runs/881bf9837d5a01ed04ee356cd61a731df3c5f59e1f3e42de375d8a955db49a87`,
+`.bne-test-efficacy/xhuman10-splash-blocked-tail/runs/ba3f2cb88df5de6574a1e981f214191a6d070f3167ed6cc3c4213bfc3214c3fd`,
+and
+`.bne-test-efficacy/xhuman10-long-gold-wake/runs/9b75e7163992bddfd8aa195d84fe83f9ebd84ee20f345d82fc76392397dc1175`
+prove each focused assertion executes and fails on `0b8b201`, then executes
+and passes on the candidate. All 63 selected expansion Human 10 and Human 13
+real-data checks, the idle-targeting gate, both fixed 52-case gates, and the
+ordinary executable next-level gate pass. That last gate retains 209 passing
+Python checks with four skips, 99 passing engine/desktop checks, and 223
+dual-adapter scenarios; its certification scorecard remains explicitly open
+at 6/240 exact and 11/240 comparable. The resource-approach family remains at
+its baseline-identical 36 checks / 7 failures under efficacy receipt
+`.bne-test-efficacy/resource-approach-preexisting/runs/b8c979e8fa0561df89a34dc2f2ccdf72c6c4d8bb4b92c92bcdb6384addad41e9`, and the
+movement gate's naval-patrol family remains at its baseline-identical 3 checks
+/ 1 failure under
+`.bne-test-efficacy/naval-patrol-gate-preexisting/runs/2edbee00b198646d1b39dd1672319865d13150671b2459806c5bfc66f01439a4`;
+neither is claimed green. The long receipt's source capsule authenticates with
+zero sealed untracked inputs. Remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now Orc 11 at fixture 459, followed by
+Human 8 at 473, Orc 8 at 475, expansion Human 7 at 477, Human 7 at 493, Human
+13 at 494, expansion Orc 11 at 506, expansion Human 11 at 509, and expansion
+Human 2 and expansion Human 10 at 512.
+
+## Prior release checkpoint — 2026-09-01 (depot-ready Still heads own no idle draw)
 
 Accepted cycle-1,800 receipt `c9b852f7` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet moves
