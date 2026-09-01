@@ -223,4 +223,42 @@ class NavalPatrolCoastGoalRealDataTest {
         assertEquals(committedY - 2, sub.tileY());
         assertEquals(Direction.fromDelta(-1, -1), sub.lastStepHeading());
     }
+
+    @Test
+    @DisplayName("a post-death repeat hit does not enlist a second naval helper")
+    void postDeathRepeatHitDoesNotEnlistASecondNavalHelper() {
+        GameData data = load();
+        String map = "campaigns/human-exp/levelx07h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "levelx07h did not load");
+        mission.tick();
+        mission.tick();
+        Unit guard = mission.world().units().stream()
+                .filter(u -> u.id() == 180)
+                .findFirst().orElseThrow();
+        Unit primaryHelper = mission.world().units().stream()
+                .filter(u -> u.type() != null
+                        && "unit-orc-submarine".equals(u.type().ident())
+                        && u.player() == 6
+                        && u.tileX() >= 16 && u.tileX() <= 22
+                        && u.tileY() >= 50 && u.tileY() <= 56)
+                .findFirst().orElseThrow();
+
+        while (mission.world().cycle() - 2 < 355) {
+            mission.tick();
+        }
+        assertTrue(guard.isDying(),
+                "the authenticated naval guard enters Die before the repeat hit");
+        assertTrue(primaryHelper.battleNetNavalGuardTarget() == guard,
+                "the first helper retains the live guard pointer into Die");
+        for (Unit candidate : mission.world().units()) {
+            if (candidate == primaryHelper) {
+                continue;
+            }
+            assertFalse(candidate.battleNetPendingNavalGuardTarget() == guard
+                            || candidate.battleNetNavalGuardTarget() == guard,
+                    "the post-death repeat hit must not enlist a second helper");
+        }
+    }
 }

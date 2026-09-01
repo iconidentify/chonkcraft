@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (laden-return timer-one wake)
+## Current release checkpoint — 2026-09-01 (single-owner naval guard help)
+
+Accepted cycle-1,800 receipt `bcefea2b` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,078, an increase of 33. Expansion Human 7 advances from
+fixture 414 to 447. The cycle-400 fleet remains 50 clean / 2 divergent / 0
+failed under receipt `f743dab4`. The long receipt is retained at
+`.bne-artifacts/runs/bcefea2b5e23c2c0252d27ff3ce1b246fc5fb7f67c6375c93ff3ef92e05ebf1a`.
+Its manifest has SHA-256
+`9e550627034bb9193e395006e5d604ba7e3bbf2efe5db9f2bf95568fdf12fb53`
+and binds dirty engine-input identity
+`9449c5cc832cb822317ea8a0c6affd5337596c118ac6a86d1bcb48c8432e9582`
+at base revision `71fcdd9` to authenticated, replayable source capsule
+`5bd9f3bf003b804584af0352fc6a05b9326c779d0dd7faad77d2bf48fdca17bc`.
+
+Behavioral delta: the hidden-attacker naval-help pass selects the closest
+eligible roaming hull before deciding whether the rendezvous is new. When that
+winner already owns the struck guard through an active pointer, a pending
+pointer, or the identical position order, the request is a no-op. Filtering
+the assigned winner before distance ranking incorrectly enlists the
+next-nearest ship. The implementation contains no mission, map, coordinate,
+fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 7 submarine slot 1511 / Java unit 89 already owns
+the live rendezvous pointer to guarded destroyer slot 1420 / Java unit 180.
+The guard enters Die at fixture 355, where another hit by the hidden attacker
+reaches `AiHelpMe`. Native reselects slot 1511 and performs no new handoff.
+Java formerly excluded it, selected roaming destroyer slot 1562 / Java unit
+38, cleared that ship's valid `[E,SE,E,E,SE,E]` Patrol tail, and replaced its
+goal. Native retains route index four through the fixture-384 refusal and
+fixture-399 collision band, then consumes the southeast byte at fixture 414;
+Java's replacement route formerly made that stride at 417. The corrected case
+is exact through fixture 446; its fixture-447 critter-order finding is
+independent.
+
+Efficacy receipt
+`.bne-test-efficacy/c414-xhuman7-single-naval-helper/runs/28f97cd8289cb916a432baee4b374302388ff22cc4d7c7ff3fd5279fa2f76ce7`
+proves the focused assertion executes and fails on `71fcdd9`, then executes
+and passes on the candidate. The new post-death repeat-hit assertion and 17
+focused naval patrol, coast-goal, small-warship, capital-ship, and juggernaut
+checks pass. Both fixed 52-case gates pass, and the long receipt's source
+capsule verifies with zero sealed untracked inputs. The ordinary executable
+next-level gate exits zero after 209 Python checks (four skipped), 98
+engine/desktop checks, and 223 dual-adapter command scenarios. Its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure.
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now Orc 11 at fixture 418, followed by
+Human 12 at 422, Human 8 at 427, expansion Human 10 at 430, expansion Human 5
+at 435, expansion Orc 11 at 438, Orc 8 at 442, expansion Orc 12 at 444,
+expansion Human 8 at 446, and expansion Human 7 at 447.
+
+## Prior release checkpoint — 2026-09-01 (laden-return timer-one wake)
 
 Accepted cycle-1,800 receipt `9270ffac` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

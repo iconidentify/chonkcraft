@@ -5210,15 +5210,6 @@ public final class AiPlayer {
                     || candidate.order() != Unit.Order.PATROL
                     || !candidate.isMoving()
                     || candidate.hasBattleNetPendingPatrol()
-                    // A later blow from the same hidden attacker does not
-                    // enqueue the same guard rendezvous again. The first hit
-                    // sends XHuman 7 submarine 1511 toward destroyer 1420;
-                    // the second, at fixture 155, leaves its live twenty-byte
-                    // route and route index intact so its next SE byte lands
-                    // on fixture 180. Reissuing the identical position order
-                    // parked that route and added three action visits.
-                    || (candidate.orderTargetX() == defender.tileX()
-                            && candidate.orderTargetY() == defender.tileY())
                     || !canTargetType(candidate, attacker)) {
                 continue;
             }
@@ -5229,6 +5220,22 @@ public final class AiPlayer {
             }
         }
         if (helper == null) {
+            return;
+        }
+        // Select the closest roaming hull before deciding whether the order
+        // is new. A later blow from the same hidden attacker therefore finds
+        // the already-assigned helper and does nothing; filtering that hull
+        // out of the candidate set incorrectly enlisted the next-nearest
+        // ship. XHuman 7 submarine 1511 retains its live twenty-byte route on
+        // the repeated fixture-155 hit. More decisively, it still owns dying
+        // guard 1420 when another hit arrives at fixture 355: native leaves
+        // destroyer 1562's Patrol tail intact, while the fallback Java helper
+        // used to clear that tail and delayed its fixture-414 stride by three
+        // action visits.
+        if (helper.battleNetNavalGuardTarget() == defender
+                || helper.battleNetPendingNavalGuardTarget() == defender
+                || (helper.orderTargetX() == defender.tileX()
+                        && helper.orderTargetY() == defender.tileY())) {
             return;
         }
         // NewActionMove(unit*) keeps the current Move action alive, discards

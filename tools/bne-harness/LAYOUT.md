@@ -177,6 +177,18 @@ slot 1485 at `(8,50)` is not; around slot 1493 at `(12,44)`, the south edge is
 the two hull footprints as inside incorrectly banks Attack at fixture 360 and
 promotes it at 361.
 
+`AiHelpMe`'s hidden-attacker naval handoff ranks the eligible roaming warships
+before testing whether the winning hull already owns the guard rendezvous. An
+identical live order is a no-op; it does not remove that nearest hull and offer
+the same guard to the next-nearest candidate. Expansion Human 7 seals both
+forms of the rule. Submarine slot 1511 keeps its pointer to destroyer slot 1420
+after the repeated fixture-155 hit, and still owns that pointer when the guard
+is already dying at fixture 355. The latter hit therefore leaves roaming
+destroyer slot 1562's route `[E,SE,E,E,SE,E]` intact. Filtering the assigned
+submarine before the distance reduction incorrectly selected slot 1562,
+cleared its route tail, and delayed its southeast stride from fixture 414 to
+417.
+
 Animation slot **3** is Move and **4** is Attack (BNE action-to-animation
 table). Wall-follow soft-clear at `0x4500f0` (`0x4501bc`–`0x4501d3`) clears
 map occupancy bit `0x100` only when the type tables allow and either the
