@@ -429,6 +429,14 @@ the two coordinate offsets at `0x0040fbf7` and `0x0040fc06`. In the Human 13
 fixture, fixed/max-damage catapult rocks therefore consume only the two offset
 draws, while an axe consumes one damage draw followed by the same two offsets.
 
+The mobile constructor's target-point helper at `0x0040fd50` reads the target
+unit's pixel words directly from offsets `+0x00` and `+0x02`, then adds the
+type-center table. It does not add the unit's retained residual movement bank.
+Expansion Orc 11 fixture 393 is the authenticated witness: target slot 1512 is
+at `(320,1280)` with residual `(-1,+1)`, and the following native jitter draws
+`(+1,-1)` produce aim `(337,1295)`. Adding the residual a second time instead
+produces Java's former `(336,1296)` aim and delays the hit past fixture 402.
+
 The point-motion action at `0x004101f0` consumes one asynchronous RNG draw at
 `0x0041025a` on each update return. The parabolic action at `0x00410260`
 consumes draws at `0x004102cd` and `0x00410316`. The speed table at

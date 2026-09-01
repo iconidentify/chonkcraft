@@ -245,10 +245,18 @@ final class BattleNetProjectileSystem {
                                 + World.battleNetCentreOffset(attacker.type(), false));
             }
             if (target != null && target.isAlive() && target.isOnMap()) {
+                // FUN_0040fd50 reads the target record's IX/IY words once,
+                // then adds the type-centre table.  Java's pixel position is
+                // the authenticated counterpart of those words; residual is
+                // an invisible overshoot/wiggle bank and is not a second
+                // target-position component.  Reapplying it cancelled both
+                // constructor jitters for XOrc 11's fixture-393 destroyer ->
+                // juggernaught shell: target residual (-1,+1), native draws
+                // (+1,-1), native aim (337,1295), Java aim (336,1296).
                 shot.setBattleNetAim(
-                        target.pixelX() + target.residualX()
+                        target.pixelX()
                                 + World.battleNetCentreOffset(target.type(), true),
-                        target.pixelY() + target.residualY()
+                        target.pixelY()
                                 + World.battleNetCentreOffset(target.type(), false));
             }
             int offsetX = (world.battleNetRand() & 7) - 3;

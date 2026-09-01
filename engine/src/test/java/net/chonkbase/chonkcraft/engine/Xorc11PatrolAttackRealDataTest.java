@@ -855,6 +855,54 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
+    @DisplayName("xorc 11's fixture-393 cannon keeps its native aim jitter")
+    void xorc11sFixture393CannonKeepsItsNativeAimJitter() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit shooter = unitById(world, 69);
+        Unit target = unitById(world, 88);
+        assertNotNull(shooter, "native slot 1531's destroyer is absent");
+        assertNotNull(target, "native slot 1512's juggernaught is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 393) {
+            mission.tick();
+        }
+
+        Missile shell = constructedMissileFrom(world, shooter.id());
+        assertSame(target, shell.target());
+        assertEquals(3, shell.battleNetPoolSlot());
+        assertEquals(-1, target.residualX(),
+                "the target's invisible X bank is the double-application witness");
+        assertEquals(1, target.residualY(),
+                "the target's invisible Y bank is the double-application witness");
+        assertEquals(337, (int) shell.toX(),
+                "native target IX plus centre and the +1 draw");
+        assertEquals(1295, (int) shell.toY(),
+                "native target IY plus centre and the -1 draw");
+        assertEquals(127, shell.battleNetRemaining(),
+                "the 127-pixel major axis must impact on fixture 402");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 401) {
+            mission.tick();
+        }
+        assertEquals(150, target.hitPoints(),
+                "the shell remains live through fixture 401");
+        mission.tick();
+        assertEquals(131, target.hitPoints(),
+                "fixture 402 applies native's nineteen-point cannon splash");
+    }
+
+    @Test
     @DisplayName("xorc 11's first corpse hold hands ownership to neutral")
     void xorc11sFirstCorpseHoldHandsOwnershipToNeutral() {
         AssetSource assets = AssetSource.fromEnvironment();
