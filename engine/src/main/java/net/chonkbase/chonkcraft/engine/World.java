@@ -4133,6 +4133,7 @@ public final class World {
         // when the animation released, the unit finished the new order and
         // went Still even though the commanded target was alive.
         unit.setSavedOrder(null);
+        unit.setBattleNetCapitalPatrolRestoreArming(false);
         if (unit.animation().unbreakable()) {
             unit.clearQueuedOrders();
             unit.setPendingAttack(null, null, -1, -1);
@@ -11420,6 +11421,7 @@ public final class World {
         unit.setSavedOrder(null);
         unit.clearBattleNetPendingPatrol();
         unit.setBattleNetNavalGuardTarget(null);
+        unit.setBattleNetCapitalPatrolRestoreArming(false);
         unit.setBattleNetScoutPatrol(false);
         construction.abandonPendingBuild(unit);
         if (unit.type() != null
@@ -12542,6 +12544,7 @@ public final class World {
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetCapitalPatrolRestoreArming(false);
         unit.setBattleNetRetargetResidualParkRefill(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
         // EndActionAttack destroys that order whether it restores a saved
@@ -15689,17 +15692,24 @@ public final class World {
         }
         boolean queuedOpeningLandAttack = openingLandAssaultPatrol
                 && battleNetPatrolQueueAcquire(unit);
+        boolean restoredCapitalPatrolOp0 = patrolOp0
+                && unit.battleNetCapitalPatrolRestoreArming();
+        if (restoredCapitalPatrolOp0) {
+            unit.setBattleNetCapitalPatrolRestoreArming(false);
+        }
         boolean openingCapitalStride = standingPatrol
                 && !battleNetPatrolMoveBodyCursor(unit)
                 && unit.pathLength() == 0 && !unit.isMoving();
         boolean queuedOpeningAttack = patrolOp0 && openingCapitalStride
+                && !restoredCapitalPatrolOp0
                 && battleNetPatrolQueueAcquire(unit);
         boolean queuedArmedFlyerAttack = armedPatrolOp0
                 && armedFlyerPatrol
                 && battleNetPatrolQueueAcquire(unit);
         boolean patrolResidualOwnsVisit = standingPatrol
                 && (unit.isMoving() || unit.walkHolding());
-        if (patrolOp0 && !queuedOpeningAttack
+        if (patrolOp0 && !restoredCapitalPatrolOp0
+                && !queuedOpeningAttack
                 && !patrolResidualOwnsVisit
                 && battleNetPatrolAcquire(unit)) {
             return;
@@ -17678,6 +17688,7 @@ public final class World {
         // help promotion restores its saved pointer immediately after this
         // constructor succeeds.
         unit.setBattleNetNavalGuardTarget(null);
+        unit.setBattleNetCapitalPatrolRestoreArming(false);
         unit.setPatrol(unit.tileX(), unit.tileY());
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);

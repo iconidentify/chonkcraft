@@ -646,6 +646,9 @@ public final class SaveGame {
         if (unit.battleNetNavalGuardReturnArming()) {
             state.append(" navalGuardReturnArming = true,");
         }
+        if (unit.battleNetCapitalPatrolRestoreArming()) {
+            state.append(" capitalPatrolRestoreArming = true,");
+        }
         if (unit.carrying() != null) {
             state.append(" carrying = ")
                     .append(quote(unit.carrying().name())).append(",");

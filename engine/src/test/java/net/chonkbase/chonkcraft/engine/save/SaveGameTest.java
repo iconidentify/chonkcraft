@@ -872,6 +872,7 @@ class SaveGameTest {
         active.setOrderTarget(36, 36);
         active.setBattleNetNavalGuardTarget(guard);
         active.setBattleNetNavalGuardReturnArming(true);
+        active.setBattleNetCapitalPatrolRestoreArming(true);
 
         World loadedWorld = reload(bench);
         Unit loadedGuard = loadedWorld.units().stream()
@@ -891,6 +892,7 @@ class SaveGameTest {
         assertEquals(12, loadedActive.battleNetNavalPatrolOriginX());
         assertEquals(8, loadedActive.battleNetNavalPatrolOriginY());
         assertTrue(loadedActive.battleNetNavalGuardReturnArming());
+        assertTrue(loadedActive.battleNetCapitalPatrolRestoreArming());
     }
 
     @Test

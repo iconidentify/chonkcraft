@@ -428,6 +428,9 @@ public final class Unit {
     /** Fresh Still constructor installed by a released guard rendezvous. */
     private boolean battleNetNavalGuardReturnArming;
 
+    /** First Patrol OP0 restored after a capital ship's Attack ends. */
+    private boolean battleNetCapitalPatrolRestoreArming;
+
     /** Hall-side regroup queued by a retail BNE campaign AI profile. */
     private int battleNetPendingMoveX = -1;
     private int battleNetPendingMoveY = -1;
@@ -3946,6 +3949,14 @@ public final class Unit {
 
     public void setBattleNetNavalGuardReturnArming(boolean arming) {
         battleNetNavalGuardReturnArming = arming;
+    }
+
+    public boolean battleNetCapitalPatrolRestoreArming() {
+        return battleNetCapitalPatrolRestoreArming;
+    }
+
+    public void setBattleNetCapitalPatrolRestoreArming(boolean arming) {
+        battleNetCapitalPatrolRestoreArming = arming;
     }
 
     public boolean hasBattleNetPendingMove() {

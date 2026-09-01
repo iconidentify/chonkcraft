@@ -788,6 +788,73 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
+    @DisplayName("xorc 11's battleship restores patrol after its quarry becomes neutral")
+    void xorc11sBattleshipRestoresPatrolAfterItsQuarryBecomesNeutral() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit ship = unitById(world, 61);
+        Unit body = unitById(world, 75);
+        assertNotNull(ship, "native slot 1539's battleship is absent");
+        assertNotNull(body, "native slot 1525's destroyer is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 381) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, ship.order());
+        assertSame(body, ship.target(),
+                "the paid Attack body retains its dying quarry pointer");
+        assertEquals(5, body.player());
+        assertEquals(Unit.Order.PATROL, ship.savedOrder(),
+                "the temporary fight must retain its interrupted patrol");
+
+        mission.tick();
+        assertEquals(World.NEUTRAL_PLAYER, body.player(),
+                "the corpse handoff is the target-invalidating event");
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 396) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, ship.order(),
+                "retail finishes the already-paid Attack tail");
+        assertSame(body, ship.target());
+        assertEquals(3101, ship.battleNetSequenceOffset());
+        assertEquals(1, ship.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, ship.order(),
+                "a neutralized quarry restores the saved patrol before free scan");
+        assertNull(ship.target());
+        assertNull(ship.savedOrder());
+        assertEquals(21, ship.orderTargetX());
+        assertEquals(34, ship.orderTargetY(),
+                "behavior six returns toward its map-authored service point");
+        assertEquals(2955, ship.battleNetSequenceOffset());
+        assertEquals(3, ship.battleNetAnimationTimer());
+        assertEquals(8, ship.tileX());
+        assertEquals(30, ship.tileY());
+
+        mission.tick();
+        mission.tick();
+        assertEquals(8, ship.tileX(),
+                "the reconstructed Patrol owns its two remaining quiet visits");
+        assertEquals(30, ship.tileY());
+        mission.tick();
+        assertEquals(10, ship.tileX(),
+                "the restored Patrol first-steps north-east after construction");
+        assertEquals(28, ship.tileY());
+        assertEquals(Unit.Order.PATROL, ship.order());
+    }
+
+    @Test
     @DisplayName("xorc 11's first corpse hold hands ownership to neutral")
     void xorc11sFirstCorpseHoldHandsOwnershipToNeutral() {
         AssetSource assets = AssetSource.fromEnvironment();
