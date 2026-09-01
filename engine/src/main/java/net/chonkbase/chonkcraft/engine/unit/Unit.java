@@ -415,6 +415,19 @@ public final class Unit {
     private int battleNetPendingPatrolBackX = -1;
     private int battleNetPendingPatrolBackY = -1;
 
+    /** Unit-position order carried by a pending naval-guard rendezvous. */
+    private Unit battleNetPendingNavalGuardTarget;
+
+    /** Native CUnitPtr retained while a roaming warship answers that guard. */
+    private Unit battleNetNavalGuardTarget;
+
+    /** Map-authored origin restored when a behavior-six rendezvous ends. */
+    private int battleNetNavalPatrolOriginX = -1;
+    private int battleNetNavalPatrolOriginY = -1;
+
+    /** Fresh Still constructor installed by a released guard rendezvous. */
+    private boolean battleNetNavalGuardReturnArming;
+
     /** Hall-side regroup queued by a retail BNE campaign AI profile. */
     private int battleNetPendingMoveX = -1;
     private int battleNetPendingMoveY = -1;
@@ -3890,6 +3903,49 @@ public final class Unit {
         battleNetPendingPatrolY = -1;
         battleNetPendingPatrolBackX = -1;
         battleNetPendingPatrolBackY = -1;
+        battleNetPendingNavalGuardTarget = null;
+    }
+
+    public Unit battleNetPendingNavalGuardTarget() {
+        return battleNetPendingNavalGuardTarget;
+    }
+
+    public void setBattleNetPendingNavalGuardTarget(Unit target) {
+        battleNetPendingNavalGuardTarget = target;
+    }
+
+    public Unit battleNetNavalGuardTarget() {
+        return battleNetNavalGuardTarget;
+    }
+
+    public void setBattleNetNavalGuardTarget(Unit target) {
+        battleNetNavalGuardTarget = target;
+    }
+
+    public boolean hasBattleNetNavalPatrolOrigin() {
+        return battleNetNavalPatrolOriginX >= 0
+                && battleNetNavalPatrolOriginY >= 0;
+    }
+
+    public int battleNetNavalPatrolOriginX() {
+        return battleNetNavalPatrolOriginX;
+    }
+
+    public int battleNetNavalPatrolOriginY() {
+        return battleNetNavalPatrolOriginY;
+    }
+
+    public void setBattleNetNavalPatrolOrigin(int x, int y) {
+        battleNetNavalPatrolOriginX = x;
+        battleNetNavalPatrolOriginY = y;
+    }
+
+    public boolean battleNetNavalGuardReturnArming() {
+        return battleNetNavalGuardReturnArming;
+    }
+
+    public void setBattleNetNavalGuardReturnArming(boolean arming) {
+        battleNetNavalGuardReturnArming = arming;
     }
 
     public boolean hasBattleNetPendingMove() {

@@ -171,5 +171,56 @@ class NavalPatrolCoastGoalRealDataTest {
                 "native spends the cached south heading on fixture 266");
         assertEquals(Direction.fromDelta(0, 1), sub.lastStepHeading());
         assertEquals(15, sub.pathLength());
+
+        // The defended destroyer eventually enters its death action. Unit 89
+        // runs before unit 180, so the killing visit cannot retroactively
+        // interrupt the submarine: the live rendezvous remains until its next
+        // residual-settle action boundary.
+        while (!guard.isDying()) {
+            mission.tick();
+        }
+        assertTrue(guard.isDying(),
+                "the guarded destroyer has entered its native death action");
+        assertEquals(86, sub.orderTargetX(),
+                "a dying guard remains the rendezvous through the Move body");
+        assertEquals(120, sub.orderTargetY());
+        int committedX = sub.tileX();
+        int committedY = sub.tileY();
+
+        // On that boundary native releases the dead rendezvous, restores
+        // behavior six's authored origin as the reverse endpoint, and
+        // coast-rewrites the service-base home. The bounded loop follows the
+        // event instead of baking in the two-visit phase difference between
+        // direct Mission ticks and the sealed headless fixture runner.
+        long releaseDeadline = mission.world().cycle() + 64;
+        while (sub.orderTargetX() == 86
+                && sub.orderTargetY() == 120
+                && mission.world().cycle() < releaseDeadline) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, sub.order());
+        assertEquals(committedX, sub.tileX(),
+                "release settles the live stride before replacing its route");
+        assertEquals(committedY, sub.tileY(),
+                "release must not consume another cached south byte");
+        assertEquals(24, sub.orderTargetX());
+        assertEquals(42, sub.orderTargetY(),
+                "the blocked service-base home is rewritten toward the hull");
+        assertEquals(18, sub.patrolX());
+        assertEquals(54, sub.patrolY(),
+                "native restores the behavior-six patrol origin");
+        assertEquals(2, sub.battleNetOrderDelay(),
+                "the reconstructed patrol holds for the next two visits");
+
+        mission.tick();
+        mission.tick();
+        assertEquals(committedX, sub.tileX(),
+                "the reconstructed Still owns its two quiet visits");
+        assertEquals(committedY, sub.tileY());
+        mission.tick();
+        assertEquals(committedX - 2, sub.tileX(),
+                "the returning patrol first-steps northwest after the hold");
+        assertEquals(committedY - 2, sub.tileY());
+        assertEquals(Direction.fromDelta(-1, -1), sub.lastStepHeading());
     }
 }

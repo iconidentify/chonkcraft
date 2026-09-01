@@ -5233,10 +5233,12 @@ public final class AiPlayer {
         }
         // NewActionMove(unit*) keeps the current Move action alive, discards
         // the unused route tail, and exposes order 4 only after the committed
-        // pixels settle. PendingPatrol is Java's equivalent unit-position
-        // replacement and auto-targeting will engage threats on arrival.
+        // pixels settle. PendingPatrol carries the replacement coordinates;
+        // retain the CUnitPtr separately because native releases a dying
+        // rendezvous only at the replacement action's next boundary.
         helper.clearPath();
         helper.setBattleNetPendingPatrol(defender.tileX(), defender.tileY());
+        helper.setBattleNetPendingNavalGuardTarget(defender);
     }
 
     private static boolean canTargetType(Unit unit, Unit target) {

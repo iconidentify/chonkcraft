@@ -852,6 +852,48 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a naval guard rendezvous survives save and resume")
+    void aNavalGuardRendezvousSurvivesSaveAndResume() throws IOException {
+        Bench bench = bench(TileFlag.WATER_ALLOWED);
+        UnitType submarine = bench.types().get("unit-orc-submarine");
+        UnitType destroyer = bench.types().get("unit-orc-destroyer");
+        Unit guard = bench.world().createUnit(destroyer, 1, 36, 36);
+        Unit pending = bench.world().createUnit(submarine, 1, 8, 8);
+        Unit active = bench.world().createUnit(submarine, 1, 12, 8);
+
+        pending.setBattleNetNavalPatrolOrigin(8, 8);
+        pending.setBattleNetPendingPatrol(36, 36, 8, 8);
+        pending.setBattleNetPendingNavalGuardTarget(guard);
+        active.setOrder(Unit.Order.PATROL);
+        active.setBattleNetAiBehavior(6);
+        active.setBattleNetAiHome(20, 20);
+        active.setBattleNetNavalPatrolOrigin(12, 8);
+        active.setPatrol(12, 8);
+        active.setOrderTarget(36, 36);
+        active.setBattleNetNavalGuardTarget(guard);
+        active.setBattleNetNavalGuardReturnArming(true);
+
+        World loadedWorld = reload(bench);
+        Unit loadedGuard = loadedWorld.units().stream()
+                .filter(unit -> unit.id() == guard.id()).findFirst().orElseThrow();
+        Unit loadedPending = loadedWorld.units().stream()
+                .filter(unit -> unit.id() == pending.id()).findFirst().orElseThrow();
+        Unit loadedActive = loadedWorld.units().stream()
+                .filter(unit -> unit.id() == active.id()).findFirst().orElseThrow();
+
+        assertEquals(36, loadedPending.battleNetPendingPatrolX());
+        assertEquals(36, loadedPending.battleNetPendingPatrolY());
+        assertEquals(8, loadedPending.battleNetPendingPatrolBackX());
+        assertEquals(8, loadedPending.battleNetPendingPatrolBackY());
+        assertEquals(loadedGuard,
+                loadedPending.battleNetPendingNavalGuardTarget());
+        assertEquals(loadedGuard, loadedActive.battleNetNavalGuardTarget());
+        assertEquals(12, loadedActive.battleNetNavalPatrolOriginX());
+        assertEquals(8, loadedActive.battleNetNavalPatrolOriginY());
+        assertTrue(loadedActive.battleNetNavalGuardReturnArming());
+    }
+
+    @Test
     @DisplayName("a legacy AI patrol aimed at a hostile resumes as an assault")
     void aLegacyAiAssaultPatrolRecoversItsMissingBehavior() throws IOException {
         Bench bench = bench();

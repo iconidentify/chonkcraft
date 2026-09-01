@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (moving-quarry cold-retry retirement)
+## Current release checkpoint — 2026-09-01 (dying naval-guard rendezvous release)
+
+Accepted cycle-1,800 receipt `8491182d` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 39,107, an increase of nineteen. Expansion Human 7 advances
+from fixture 395 to 414. The cycle-400 fleet improves from 48 clean / 4
+divergent to 49 clean / 3 divergent / 0 failed under receipt `d1ee8abc`.
+The long receipt is retained at
+`.bne-artifacts/runs/8491182d8738c88ff68abb68abc5b2d69f71a9a9bca7267fb39221d71b26c3b7`.
+Its manifest has SHA-256
+`123bae69164f26dc3e2f7eb44cd3dc957ebfd36df3176ca3938f198a8ee9f941`
+and binds dirty engine-input identity
+`84a710d12d2ad9fc6314a1d1542af08568a26cd812a1630f342f59a2833798a9`
+at base revision `0ac8605` to authenticated, replayable source capsule
+`fd54582ec8f377591af4e0ff80716b124b0fb923d5a5356818953aa685cdd559`.
+
+Behavioral delta: a behavior-six small warship answering a unit-position naval
+help order retains the guarded unit pointer separately from its position
+Patrol and retains the map-authored patrol origin separately from its rewritten
+service-base home. A guard entering its death action does not immediately
+cancel pixels already committed by the helper. At the helper's next residual
+action boundary retail releases the pointer, restores action five and the
+authored reverse endpoint, coast-rewrites the home from the settled hull, and
+restarts the armed Patrol constructor. The implementation contains no mission,
+map, coordinate, fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 7 native submarine slot 1511 / Java unit 89
+answers friendly destroyer slot 1420 / Java unit 180 at `(86,120)`. The help
+order is issued at fixture 55, promotes at 91, and first moves south-east at
+94. The destroyer enters its death action at fixture 355, but retail retains
+the unit pointer and live route through the submarine's residual movement. At
+fixture 394 the helper remains on order four with goal `(86,120)` and pixels
+`(832,2110)`. At fixture 395 it settles at `(26,66)`, clears the pointer,
+restores action five with patrol origin `(18,54)`, rewrites the blocked home to
+goal `(24,42)`, and starts Still sequence 3464 at timer three without consuming
+the cached south byte. Its first returning step is north-west at fixture 398.
+A repeated hit at fixture 155 does not requeue help or replace the live route,
+and the ordinary small-warship Patrol family remains the held-out control.
+
+Efficacy receipt
+`.bne-test-efficacy/c395-xhuman7-dying-guard-rendezvous-release/runs/5f6edea5b324bc78c8867c1e9b62ca32008f8e2a1cb3446bd4f451ca05346bb1`
+proves the focused assertion executes and fails on `0ac8605`, then executes
+and passes on the candidate. All 77 focused naval-patrol, small-warship,
+sea-occupancy, and save/resume tests pass. Both fixed 52-case gates pass, and
+the source capsule verifies with zero sealed untracked inputs. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+98 engine/desktop checks, and 223 dual-adapter command scenarios. Its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is expansion Orc 11 at fixture 397,
+followed by Human 7 at 405, Human 14 at 406, expansion Human 7 at 414, Orc 11
+at 418, Human 12 at 422, Human 8 at 427, and expansion Human 10 at 430.
+
+## Prior release checkpoint — 2026-09-01 (moving-quarry cold-retry retirement)
 
 Accepted cycle-1,800 receipt `eb51b8f4` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
