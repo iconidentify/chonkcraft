@@ -83,6 +83,42 @@ class Xhuman02OgreRouteRefillRealDataTest {
                 "native's fourth cached chase byte is west, not south-west");
     }
 
+    @Test
+    @DisplayName("xhuman 2's east ogre takes the fresh southwest route head at cycle 352")
+    void xhuman2EastOgreTakesFreshSouthwestRouteHeadAtCycle352() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx02h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 2 is not in the pack");
+        World world = mission.world();
+        Unit ogre = unitById(world, 51);
+        assertNotNull(ogre, "XHuman 2 has no Java twin for native ogre 1549");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 351) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(60, ogre.tileX());
+        assertEquals(66, ogre.tileY());
+        assertEquals(0, ogre.pathLength(),
+                "the nine-byte offered-target route is exhausted before refill");
+
+        mission.tick();
+        assertEquals(Unit.Order.ATTACK, ogre.order());
+        assertEquals(59, ogre.tileX());
+        assertEquals(67, ogre.tileY(),
+                "native consumes the fresh southwest head, not the old west face");
+        assertEquals(2, ogre.pathLength(),
+                "the fresh SW,SW,S route retains its final two headings");
+    }
+
     private static Unit unitById(World world, int id) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.id() == id) {

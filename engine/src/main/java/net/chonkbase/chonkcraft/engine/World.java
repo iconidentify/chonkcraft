@@ -13702,7 +13702,16 @@ public final class World {
             boolean navalHitOffer = liveOfferedRoute && unit.type() != null
                     && unit.type().moveType() == UnitType.Movement.NAVAL;
             if (!unit.battleNetAttackWrapDestArmPending()
-                    && !navalHitOffer) {
+                    && !navalHitOffer
+                    && !unit.chasing()) {
+                // Current-face ownership belongs to the standing offered-hit
+                // acquisition or queued-Attack promotion which opens this
+                // chase. Once MoveToTarget is already active, an exhausted
+                // route's NewPath output owns its fresh first byte. XHuman 2
+                // ogre 1549 is the clean route-boundary witness: from 60,66
+                // toward the offered guard tower, native writes SW,SW,S and
+                // consumes SW on fixture 352. Reusing its old west combat
+                // face is equal-distance but belongs to the spent route.
                 path = preferBattleNetFaceFirstHeading(unit, path, target);
             }
             // An old attack-back offer may remain as the incumbent for target

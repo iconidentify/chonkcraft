@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-474 paid Attack-tail hostile settle)
+## Current release checkpoint — 2026-08-31 (cycle-512 active-chase fresh route ownership)
+
+Accepted cycle-1,800 receipt `76b22cee` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,694, an increase of 160. Expansion Human 2 advances from
+fixture 352 to 512. The cycle-400 fleet improves from 42 clean / 10 divergent
+to 43 clean / 9 divergent / 0 failed under receipt `49ae8c95`. The long
+receipt is retained at
+`.bne-artifacts/runs/76b22ceec21fcb6a1230578f3c75aeb12d51aff65ae5cfbcf88e61c08038c028`.
+Its manifest has SHA-256
+`5a2c2155be7ae6a13cd959ae3fac0f4ce65fbe75c2148f975eeb5743675abbd3`
+and binds dirty engine-input identity `50160af7` at base revision `5b33f3c` to
+replayable source capsule
+`8b2c0ab2cbb8292329979d25399071c1911040170f9797345906969af04f8ed4`.
+
+Behavioral delta: the equal-cost current-face preference belongs to standing
+offered-hit acquisition and queued-Attack promotion. When a unit is already
+chasing the same live offered target and its prior route is exhausted, native
+`NewPath` owns the first byte of the fresh route; the spent combat face does
+not overwrite it merely because it has equal Chebyshev cost. Destination-arm,
+naval-hit, standing acquisition, queued-promotion, cached-tail, and
+collision-refusal behavior retain their established paths. The implementation
+contains no mission, map, coordinate, fixture, cycle, faction, unit-ID, or
+route-length branch.
+
+Proof delta: expansion Human 2 ogre native slot 1549 / Java unit 51 exhausts
+its nine-byte offered-target route at `(60,66)` before fixture 352. Native
+publishes `SW,SW,S` toward the guard tower and consumes south-west, reaching
+`(59,67)`; Java formerly replaced that fresh head with the old west combat
+face because both headings have equal tile-distance cost. Retained Java path,
+movement, and causal traces prove the planner returned `SW,SW,S` immediately
+before the face helper changed the committed heading. The corrected case is
+exact through fixture 511; its new fixture-512 split is an independent death
+knight slot 1557 raw Attack natively versus Still in Java.
+
+Efficacy receipt
+`.bne-test-efficacy/c352-xhuman2-fresh-route-head/runs/d7f7d7b982a76c86a2fe34bd0e977b590f0054dbabd6fecfebfc4816298d482e`
+proves the focused assertion fails on `5b33f3c` and passes on the candidate.
+All 28 selected route-refill, face-ownership, destination-arm, tail-wrap, and
+real-data controls pass. Four exploratory chase-residual assertions fail with
+identical expected/actual values on baseline and candidate and are therefore
+baseline-equivalent, not green evidence. Both fixed 52-case gates pass. The
+ordinary executable next-level gate exits zero after 209 Python checks (four
+skipped) and 96 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now Human 8 at
+fixture 358, followed by expansion Orc 11 at 361, Orc 8 at 364, expansion Orc
+12 at 374, expansion Human 10 at 375, Orc 12 at 383, and expansion Human 7 at
+395. Expansion Human 2's new finding is death knight slot 1557 raw Attack
+natively versus Still in Java at fixture 512.
+
+## Prior release checkpoint — 2026-08-31 (cycle-474 paid Attack-tail hostile settle)
 
 Accepted cycle-1,800 receipt `a097f059` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
