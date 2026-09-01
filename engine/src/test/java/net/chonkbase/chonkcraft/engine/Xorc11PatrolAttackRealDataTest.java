@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,6 +26,45 @@ import org.junit.jupiter.api.Test;
 class Xorc11PatrolAttackRealDataTest {
 
     private static final int BNE_INITIALIZATION_TICKS = 2;
+
+    @Test
+    @DisplayName("xorc 11's naval hit-help rectangle excludes its south edge")
+    void xorc11sNavalHitHelpRectangleExcludesItsSouthEdge() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit struck = nearest(world, "unit-orc-destroyer", 10, 46);
+        Unit outside = nearest(world, "unit-orc-destroyer", 8, 50);
+        Unit attacker = nearest(world, "unit-human-destroyer", 22, 38);
+        assertNotNull(struck);
+        assertNotNull(outside);
+        assertNotNull(attacker);
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 359) {
+            mission.tick();
+        }
+        assertEquals(100, struck.hitPoints());
+        assertEquals(Unit.Order.STILL, outside.order());
+
+        mission.tick();
+        assertEquals(77, struck.hitPoints(),
+                "the fixture-360 cannon impact is the selection anchor");
+        assertNull(outside.battleNetPendingHelpAttack(),
+                "native's lower rectangle edge ends at y=49");
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, outside.order(),
+                "slot 1485 remains Still at the fixture-361 boundary");
+    }
 
     @Test
     @DisplayName("xorc 11 cannon source effects preserve the native pool order")

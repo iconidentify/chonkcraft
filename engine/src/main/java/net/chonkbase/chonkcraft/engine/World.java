@@ -4418,7 +4418,8 @@ public final class World {
                     || brother.target() != null
                     || brother.offeredTarget() != null
                     || brother.battleNetPendingHelpAttack() != null
-                    || battleNetHitHelpDistance(brother, defender) > band
+                    || !battleNetNavalHitHelpSelectionContains(
+                            brother, defender, band)
                     || !targets.canTarget(brother, attacker)
                     || !isEnemyPlayer(brother.player(), attacker.player())) {
                 continue;
@@ -4434,6 +4435,30 @@ public final class World {
             // the staggered person-melee helper scheduler.
             brother.setBattleNetSpatialHitHelpHandoff(true);
         }
+    }
+
+    /**
+     * Whether BNE's unit-cache rectangle returns a person naval helper.
+     *
+     * <p>{@code FUN_0040a9d0} constructs the inclusive rectangle from the
+     * struck hull's top-left coordinate, type width/height, and the four-tile
+     * naval band. Its {@code FUN_0040a2b0} cache lookup then lowers the north
+     * search edge by three rows, but leaves the south edge unchanged. The
+     * candidate comparison uses the candidate's top-left coordinate rather
+     * than footprint distance. Thus a destroyer at y=36 is selected around a
+     * hull at y=42, while a destroyer at y=50 lies just beyond a hull at y=44:
+     * the latter rectangle ends at y=49.</p>
+     */
+    private boolean battleNetNavalHitHelpSelectionContains(
+            Unit candidate, Unit defender, int band) {
+        int left = Math.max(0, defender.tileX() - band);
+        int top = Math.max(0, defender.tileY() - band - 3);
+        int right = defender.tileX()
+                + Math.max(1, defender.type().tileWidth()) - 1 + band;
+        int bottom = defender.tileY()
+                + Math.max(1, defender.type().tileHeight()) - 1 + band;
+        return candidate.tileX() >= left && candidate.tileX() <= right
+                && candidate.tileY() >= top && candidate.tileY() <= bottom;
     }
 
     /** Geometry used by HitUnit's marker-two four-tile gate. */

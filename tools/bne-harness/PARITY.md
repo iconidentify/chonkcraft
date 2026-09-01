@@ -15,7 +15,65 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (cycle-390 resource-hit restore idle ownership)
+## Current release checkpoint — 2026-09-01 (cycle-371 naval HitUnit south edge)
+
+Accepted cycle-1,800 receipt `fcd13a5c` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,736, an increase of ten. Expansion Orc 11 advances from
+fixture 361 to 371. The cycle-400 fleet remains 43 clean / 9 divergent / 0
+failed under receipt `a10e7ab1`. The long receipt is retained at
+`.bne-artifacts/runs/fcd13a5ca5656fbfcaec1d038687e1c8eb292e183d620563291e2eebb7215ae9`.
+Its manifest has SHA-256
+`d17d32c63840ada7f090d8fb8aa360797026cec9e88198a90fbaf07e71ce28f6`
+and binds dirty engine-input identity `1a709626` at base revision `63a493b` to
+replayable source capsule
+`f429f9eef19b12be7b17557cdf745302355d2cbd543a3fdbb5cfd40d947bbba7`.
+
+Behavioral delta: a person naval `HitUnit` response selects idle brothers with
+the native unit-cache rectangle, not symmetric distance between ship
+footprints. The struck hull's top-left coordinate and type dimensions form an
+inclusive four-tile rectangle. The cache lookup extends its north search edge
+by three rows but does not extend the south edge, and candidate top-left
+coordinates determine membership. The rule contains no mission, map,
+coordinate, fixture, cycle, faction, or unit-ID branch.
+
+Proof delta: on expansion Orc 11 fixture 360, human destroyer slot 1519 / Java
+81 shells orc destroyer slot 1493 / Java 107 at `(12,44)`, reducing it from 100
+to 77 HP. The native helper rectangle spans y=37..49, so idle destroyer slot
+1485 / Java 115 at `(8,50)` receives no next Attack and remains raw Still
+`2/60` through its fixture-361 action marker. Java formerly priced four empty
+tiles between hull footprints, banked Java 81, and promoted Attack at 361.
+Disassembly of pinned executable SHA-256 `b0e914a9` anchors rectangle formation
+at `0x0040aaa2`--`0x0040aaef`, the north-only cache extension at `0x0040a2b4`,
+and candidate-X filtering at `0x0040ab73`--`0x0040ab8e`. The earlier fixture-132
+impact supplies both held-out controls: slot 1525 at `(6,36)` is selected around
+struck slot 1506 at `(10,42)`, while slot 1485 at `(8,50)` remains outside.
+
+Efficacy receipt
+`.bne-test-efficacy/c361-xorc11-naval-hit-south-edge/runs/5bd28304d4e1b4293043a4e8b609804c436cd3f2b5430824da1b79b0ea46d7bb`
+proves the focused assertion executes and fails on `63a493b`, then executes and
+passes on the candidate. All 93 selected direct-hit, help-response, naval, and
+real-data controls pass. One exploratory ranged-retarget test is independently
+red on both baseline and candidate and is not green evidence. Both fixed
+52-case gates pass. The ordinary executable next-level gate exits zero after
+209 Python checks (four skipped) and 96 engine/desktop checks; its command
+worklist remains 11 comparable scenarios (6 exact / 5 divergent) without
+regression or infrastructure failure. `--require-certified` remains incomplete
+on the documented producer lanes, and remote AI discovery still stops at
+strict SSH verification of the changed `i9beef` host key, which was not
+modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now Orc 8 at fixture
+364, followed by expansion Orc 11 at 371, expansion Orc 12 at 374, expansion
+Human 10 at 375, Orc 12 at 383, and Human 8 at 390. Expansion Orc 11's new
+finding is gryphon rider slot 1589 raw Patrol natively versus Attack in Java.
+
+## Prior release checkpoint — 2026-09-01 (cycle-390 resource-hit restore idle ownership)
 
 Accepted cycle-1,800 receipt `d253a1b7` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

@@ -163,6 +163,20 @@ slots remain and receive the trace's `removed` marker. Type bytes use the PUD
 unit enumeration already represented by Java's `PudUnitTypes`; BNE order bytes
 are reduced to the same coarse action vocabulary used by the parity differ.
 
+`FUN_0040a9d0`'s person `HitUnit` helper selection uses an inclusive unit-cache
+rectangle, not symmetric footprint distance. The naval type flag changes the
+band from two to four at `0x0040aa89`--`0x0040aaa2`; the struck unit's top-left
+coordinate and type width/height form the four rectangle edges through
+`0x0040aaef`. The cache lookup at `FUN_0040a2b0` subtracts three only from the
+north search edge (`0x0040a2b4`) and leaves the south edge unchanged. Its
+returned rows are filtered by the candidate's top-left X at
+`0x0040ab73`--`0x0040ab8e`. Expansion Orc 11 supplies both orientations: around
+struck destroyer slot 1506 at `(10,42)`, slot 1525 at `(6,36)` is selected while
+slot 1485 at `(8,50)` is not; around slot 1493 at `(12,44)`, the south edge is
+49, so slot 1485 at y=50 is again excluded. Treating four empty tiles between
+the two hull footprints as inside incorrectly banks Attack at fixture 360 and
+promotes it at 361.
+
 Animation slot **3** is Move and **4** is Attack (BNE action-to-animation
 table). Wall-follow soft-clear at `0x4500f0` (`0x4501bc`–`0x4501d3`) clears
 map occupancy bit `0x100` only when the type tables allow and either the
