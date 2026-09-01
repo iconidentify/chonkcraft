@@ -7410,7 +7410,8 @@ public final class World {
                             && unit.battleNetCollisionCounter() >= 5);
             boolean reverseWallFace = saturatedResidualFace
                     || rangedCloseHitWallFace
-                    || cleanParkedMeleeRetargetWallFace;
+                    || cleanParkedMeleeRetargetWallFace
+                    || alignOfferedBuildingResidualAxisSkirt;
             PathFinder.Path path = BattleNetPathFinder.find(
                     unit.tileX(), unit.tileY(), goalX, goalY,
                     battleNetMovementStride(unit), traversalPassability,
@@ -7438,7 +7439,12 @@ public final class World {
                                     || (y >= targetTop && y <= targetBottom)),
                     true, false, false, preferMarkedWallOnTie,
                     sharedSaturatedWall, reverseWallFace,
-                    retainPaidBandWallFace || rangedCloseHitWallFace);
+                    retainPaidBandWallFace || rangedCloseHitWallFace,
+                    alignOfferedBuildingResidualAxisSkirt);
+            if (alignOfferedBuildingResidualAxisSkirt) {
+                path = battleNetRetainOfferedAxisRay(
+                        unit, path, goalX, goalY, optimizationPassability);
+            }
             if (continueSaturatedRetargetWallFace) {
                 int continuedHeading = battleNetFirstBresenhamHeading(
                         unit.tileX(), unit.tileY(), goalX, goalY);
@@ -7646,6 +7652,69 @@ public final class World {
                 setMovementFieldFlags(candidate, true);
             }
         }
+    }
+
+    /** Retains the direct axial tail after an offered-building wall rejoin. */
+    private PathFinder.Path battleNetRetainOfferedAxisRay(
+            Unit unit, PathFinder.Path path, int goalX, int goalY,
+            BattleNetPathFinder.Passability directPassability) {
+        if (unit == null || path == null
+                || path.result() != PathFinder.Result.FOUND
+                || path.length() == 0
+                || path.length() >= BattleNetPathFinder.MAX_PATH) {
+            return path;
+        }
+        int stride = battleNetMovementStride(unit);
+        int endX = unit.tileX();
+        int endY = unit.tileY();
+        for (int index = path.length() - 1; index >= 0; index--) {
+            int heading = path.headings()[index];
+            endX += Direction.deltaX(heading) * stride;
+            endY += Direction.deltaY(heading) * stride;
+        }
+        int heading;
+        int distance;
+        if (unit.tileY() == goalY && endY == goalY
+                && Integer.signum(goalX - endX)
+                        == Integer.signum(goalX - unit.tileX())) {
+            heading = Direction.fromDelta(Integer.signum(goalX - endX), 0);
+            distance = Math.abs(goalX - endX);
+        } else if (unit.tileX() == goalX && endX == goalX
+                && Integer.signum(goalY - endY)
+                        == Integer.signum(goalY - unit.tileY())) {
+            heading = Direction.fromDelta(0, Integer.signum(goalY - endY));
+            distance = Math.abs(goalY - endY);
+        } else {
+            return path;
+        }
+        if (heading < 0 || distance == 0 || distance % stride != 0) {
+            return path;
+        }
+        int steps = distance / stride;
+        int appended = Math.min(steps,
+                BattleNetPathFinder.MAX_PATH - path.length());
+        int checkX = endX;
+        int checkY = endY;
+        for (int step = 0; step < appended; step++) {
+            checkX += Direction.deltaX(heading) * stride;
+            checkY += Direction.deltaY(heading) * stride;
+            if (!directPassability.canEnter(checkX, checkY)) {
+                return path;
+            }
+        }
+        int[] headings = new int[path.length() + appended];
+        for (int step = 0; step < appended; step++) {
+            headings[step] = heading;
+        }
+        System.arraycopy(path.headings(), 0,
+                headings, appended, path.length());
+        // The building-owned offered pointer selects a hard direct writer and
+        // the opposite soft wall face. Once that face rejoins the old ray,
+        // native leaves its remaining bytes in the same route buffer. XHuman
+        // 12 grunt 1520 therefore stores NW,W,W,SW,W,W at fixture 325. Its
+        // unobstructed sibling 1508 already reaches the axis goal directly,
+        // so there is no suffix to add.
+        return new PathFinder.Path(PathFinder.Result.FOUND, headings);
     }
 
     /**

@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-470 small-warship off-lattice endpoint completion)
+## Current release checkpoint — 2026-08-31 (cycle-327 offered-building wall rejoin)
+
+Accepted cycle-1,800 receipt `b98ba023` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,115, an increase of two. Expansion Human 12 advances from
+fixture 325 to 327. The cycle-400 fleet remains 40 clean / 12 divergent / 0
+failed under receipt `a02b0016`. The long receipt is retained at
+`.bne-artifacts/runs/b98ba023fe82def529739a4055afa68dca90cb956343d6f44e4755e0f5dbf704`.
+It binds dirty engine-input identity `12455dc3` at base revision `c1935f4` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`746c6fb598f492bf9303ba1454de1f11a9021f18cb107ce5902fc668b0c708d1`.
+
+Behavioral delta: a settled melee replacement whose old building remains in
+COrder_Attack's offered slot retains the already-reached axis of its new
+mobile target's skirt. On that route family, the direct writer keeps moving
+allies hard while the opposite wall face may cross them softly. When the wall
+face rejoins the axis, the remaining headings of the original direct ray stay
+in the same native route buffer instead of ending the route at the join. A
+free direct ray already reaches its goal and gains no suffix. Other target,
+point, resource and non-BNE routes retain their existing occupancy and wall-
+face conventions. The rule uses offered-target provenance, old/new target
+class, settled residual state, axis geometry, live occupancy and the bounded
+route buffer; it contains no mission, map, coordinate, fixture, cycle, faction
+or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt slot 1520 / Java 80 settles its old west
+residual at `(38,44)` while replacing a building quarry with the footman at
+`(32,43)`. The offered-building seam preserves skirt row 44 as the path goal.
+Moving allied grunt 1508 / Java 92 at `(35,44)` blocks the direct writer but is
+soft to wall-follow, so native fixture 325 stores and consumes
+`NW,W,W,SW,W,W`, landing first at `(37,43)`. Java formerly softened the ally
+for the direct writer too, stored six west bytes and landed at `(37,44)`. The
+corrected route is byte-exact, and the case is exact through fixture 326; its
+new fixture-327 split is independent grunt slot 1489, native x 37 versus Java
+x 38. Grunt 1508's earlier unobstructed offered-axis replacement at fixture
+287 remains the negative witness: it retains its six-west direct ray without
+inventing a detour or suffix.
+
+Efficacy receipt
+`.bne-test-efficacy/c327-offered-axis-wall-rejoin/runs/15ccbe467e76770f17ee85740b14ae4756a8d6c21c7f120965282beafe1610b2`
+proves the focused fixture-324/325 regression assertion-fails on `c1935f4`
+and passes on the candidate. All 46 focused BNE pathfinder, behavior-one
+retarget, offered-collision and residual-traffic tests pass, as do both fixed
+52-case gates. The ordinary executable next-level gate exits zero after 209
+Python checks and 96 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. The earliest unpaused fleet
+finding is now expansion Human 12 grunt slot 1489 at fixture 327, native x 37
+versus Java x 38, followed by Human 8 at 328 and expansion Human 4 plus
+expansion Orc 11 at 337.
+
+## Prior release checkpoint — 2026-08-31 (cycle-470 small-warship off-lattice endpoint completion)
 
 Accepted cycle-1,800 receipt `ffa9837a` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

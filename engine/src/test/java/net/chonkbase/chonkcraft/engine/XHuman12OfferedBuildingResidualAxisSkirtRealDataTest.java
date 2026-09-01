@@ -82,6 +82,54 @@ class XHuman12OfferedBuildingResidualAxisSkirtRealDataTest {
         assertEquals(3, grunt.pathLength());
     }
 
+    @Test
+    @DisplayName("an offered-building wall rejoin retains the remaining axis ray")
+    void offeredBuildingWallRejoinRetainsTheRemainingAxisRay() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit grunt = unitById(world, 80);
+        Unit footman = unitById(world, 123);
+        assertNotNull(grunt, "XHuman 12 has no native-slot-1520 grunt");
+        assertNotNull(footman, "XHuman 12 has no replacement footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 324) {
+            mission.tick();
+        }
+        assertEquals(38, grunt.tileX());
+        assertEquals(44, grunt.tileY());
+        assertEquals(2, grunt.pathLength(),
+                "the old west residual and its cached tail remain live");
+
+        mission.tick();
+        assertEquals(325, fixtureCycle(world));
+        assertEquals(37, grunt.tileX());
+        assertEquals(43, grunt.tileY(),
+                "native opens northwest around the moving axis blocker");
+        assertEquals(footman, grunt.target());
+        assertEquals(32, grunt.pathGoalX());
+        assertEquals(43, grunt.pathGoalY(),
+                "orderXY publishes the replacement's real point");
+        int west = Direction.fromDelta(-1, 0);
+        int southwest = Direction.fromDelta(-1, 1);
+        int[] remaining = {west, west, southwest, west, west};
+        assertEquals(remaining.length, grunt.pathLength());
+        for (int depth = 0; depth < remaining.length; depth++) {
+            assertEquals(remaining[depth], grunt.peekHeadingAtDepth(depth),
+                    "native fixture-325 route byte at depth " + depth);
+        }
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }
