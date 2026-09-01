@@ -11600,10 +11600,18 @@ public final class World {
                         && unit.resourceUnit() != null
                         && !harvest.battleNetOilTankerReachedApproach(
                                 unit, unit.resourceUnit());
+                boolean queuedGoldHarvestOpening =
+                        queued.kind() == Unit.QueuedOrderKind.HARVEST
+                        && unit.carrying() == UnitType.Resource.GOLD
+                        && unit.resourceUnit() != null
+                        && !harvest.atBattleNetResourceApproach(
+                                unit, unit.resourceUnit());
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
                         || queued.kind() == Unit.QueuedOrderKind.PATROL
                         || queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
                         || queuedTankerHarvestOpening
+                        || queuedGoldHarvestOpening
+                        || queued.kind() == Unit.QueuedOrderKind.BUILD
                         || (queued.kind() == Unit.QueuedOrderKind.MOVE
                                 && unit.destPathOpeningHold())
                         || (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
@@ -11621,6 +11629,29 @@ public final class World {
                                 movement.playerCommandWaits(unit)[0] - 1);
                     }
                     unit.setBattleNetOrderDelay(popDelay);
+                    if (queuedGoldHarvestOpening
+                            && battleNetSequence != null) {
+                        // A depot-ready land continuation opens action 23 on
+                        // its three-call 2657 body before it may ask NewPath.
+                        // XOrc 12 slot 1396 promotes on fixture 443 at
+                        // 2657/3, counts 2,1, then first-steps NE on 446.
+                        int gatherStart = idle.battleNetSequenceStart(
+                                unit, BattleNetSequence.ATTACK_ANIMATION);
+                        if (gatherStart >= 0) {
+                            unit.setBattleNetSequenceOffset(gatherStart);
+                            unit.setBattleNetAnimationTimer(3);
+                        }
+                    } else if (queued.kind()
+                            == Unit.QueuedOrderKind.BUILD) {
+                        // The queued Build retains its Still sequence while
+                        // exposing the same 3,2,1 constructor. XHuman 8 slot
+                        // 1571 promotes on fixture 445 and first-steps on 448.
+                        int stillStart = idle.battleNetStillSequenceStart(unit);
+                        if (stillStart >= 0) {
+                            unit.setBattleNetSequenceOffset(stillStart);
+                            unit.setBattleNetAnimationTimer(3);
+                        }
+                    }
                 }
                 if (queued.kind() == Unit.QueuedOrderKind.MOVE
                         && unit.destPathOpeningHold()) {

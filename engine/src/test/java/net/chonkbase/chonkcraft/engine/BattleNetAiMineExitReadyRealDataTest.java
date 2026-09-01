@@ -227,8 +227,15 @@ class BattleNetAiMineExitReadyRealDataTest {
                 "native promotes Build on fixture cycle 445");
         assertEquals(Unit.Order.BUILD, peon.currentAction(),
                 "the queued Build is semantically current on its promotion cycle");
+        assertEquals(2, peon.battleNetOrderDelay());
+        assertEquals(3, peon.battleNetAnimationTimer(),
+                "the promoted Build opens on the three-call Still body");
         for (int cycle = 446; cycle < 448; cycle++) {
             mission.tick();
+            assertEquals(20, peon.tileX());
+            assertEquals(8, peon.tileY(),
+                    "the queued Build constructor holds through fixture " + cycle);
+            assertEquals(448 - cycle, peon.battleNetAnimationTimer());
         }
         mission.tick();
         assertEquals(20, peon.tileX());
@@ -428,6 +435,50 @@ class BattleNetAiMineExitReadyRealDataTest {
         assertEquals(30, peasant.tileX());
         assertEquals(76, peasant.tileY(),
                 "native's second stored heading stays south-west toward the castle skirt");
+    }
+
+    @Test
+    @DisplayName("an XOrc 12 depot continuation pays action 23's constructor")
+    void anXOrc12DepotContinuationPaysAction23sConstructor() {
+        Mission mission = mission("campaigns/orc-exp/levelx12o");
+        World world = mission.world();
+        Unit peasant = byId(world, 204);
+        assertNotNull(peasant,
+                "native slot 1396 must remain paired with Java peasant 204");
+
+        while (fixtureCycle(world) < 418) {
+            mission.tick();
+        }
+        assertEquals(30, peasant.tileX());
+        assertEquals(75, peasant.tileY());
+        assertEquals(Unit.Order.STILL, peasant.order());
+        assertEquals(25, peasant.battleNetOrderDelay(),
+                "the castle exit owns the complete depot-ready Still head");
+        assertEquals(1, peasant.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                peasant.queuedOrders().get(0).kind());
+
+        while (fixtureCycle(world) < 443) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.HARVEST, peasant.order(),
+                "native promotes raw action 23 on fixture 443");
+        assertEquals(2, peasant.battleNetOrderDelay());
+        assertEquals(2657, peasant.battleNetSequenceOffset());
+        assertEquals(3, peasant.battleNetAnimationTimer());
+
+        for (int cycle = 444; cycle <= 445; cycle++) {
+            mission.tick();
+            assertEquals(30, peasant.tileX());
+            assertEquals(75, peasant.tileY(),
+                    "action 23's constructor holds through fixture " + cycle);
+            assertEquals(446 - cycle, peasant.battleNetAnimationTimer());
+        }
+        mission.tick();
+        assertEquals(446, fixtureCycle(world));
+        assertEquals(31, peasant.tileX());
+        assertEquals(74, peasant.tileY(),
+                "native first-steps north-east after the timer-one visit");
     }
 
     @Test

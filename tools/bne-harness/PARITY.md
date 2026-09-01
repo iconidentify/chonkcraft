@@ -15,7 +15,71 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (final-approach tanker queue handoff)
+## Current release checkpoint — 2026-09-01 (depot-ready queued action constructors)
+
+Accepted cycle-1,800 receipt `2d197a6e` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 41,519, an increase of 1,063. Expansion Human 5 advances from
+fixture 486 to 530, expansion Human 6 from 525 to 674, expansion Human 8 from
+446 to 536, expansion Human 9 from 515 to 579, expansion Human 11 from 484 to
+509, expansion Orc 6 from 521 to 603, expansion Orc 7 from 542 to 702, and
+expansion Orc 12 from 444 to 893. The cycle-400 fleet remains 50 clean / 2
+divergent / 0 failed under receipt `27ac2fd8`. The long receipt is retained at
+`.bne-artifacts/runs/2d197a6e11d6aab2ae8a9359524bedb75e39c421aa8fe04a4db17acdfc5cfd0b`.
+Its manifest has SHA-256
+`6ff50a00aacfe0660a57e5634877b6653e0357439ad220e32e99f7098f358411`
+and binds dirty engine-input identity
+`af4d450179a6b9c2f87146fd6a42ca116d15132658d91b7d1c50efacdf14ca4d`
+at base revision `cfb148d` to authenticated, replayable source capsule
+`90450505966f641845ffe287ec48c7e0f99a3b34c62c46a60ca33a800c5fd81c`.
+
+Behavioral delta: a depot-ready Still head makes its queued action current on
+the promotion visit, but the promoted action retains ownership of a
+three-visit constructor before it can request or spend a route. A gold worker
+outside its mine approach exposes the action-23 attack sequence at timer
+three, then counts two and one on its quiet visits. A queued Build retains its
+Still sequence across the same three, two, one body. The already-proved tanker
+continuation follows the same promotion timing. Directly issued work and gold
+workers already standing on their resource approach retain their established
+paths. The implementation contains no mission, map, coordinate, fixture,
+exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Orc 12 peon slot 1396 / Java unit 204 exits its castle
+at `(30,75)` on fixture 418, pays the complete 25-count Still head, and keeps
+gold Harvest queued. Native promotes action 23 on fixture 443 at sequence
+`2657/3`, holds the tile at `2657/2,1` through fixtures 444 and 445, and first
+steps north-east to `(31,74)` on fixture 446. Java formerly moved on fixture
+444. Expansion Human 8 peasant slot 1571 / Java unit 29 independently seals
+the Build arm: after its hall exit, native promotes queued Build at `(20,8)`
+on fixture 445 with Still timer three, holds for timers two and one, and first
+steps north on fixture 448. Java formerly moved on fixture 446.
+
+Efficacy receipts
+`.bne-test-efficacy/xorc12-c444-queued-gold-constructor/runs/52fbab6977cbe1e29c0b25f6daaa52bf1e189ff7ae6d7ab9bbcb8606b4ddf4bd`
+and
+`.bne-test-efficacy/xhuman8-c446-queued-build-constructor/runs/8ba2ba004eba2c27cf77f4e3f9f9e32a0e1512c994da3ab4278fb7e0c3a0522f`
+prove both focused assertions execute and fail on `cfb148d`, then execute and
+pass on the candidate. The selected mine-exit, construction, oil-exit, tanker,
+and resource-approach controls pass, as do both fixed 52-case gates. The long
+receipt's source capsule authenticates with zero sealed untracked inputs.
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios. Its 11 comparable scenarios remain 6 exact / 5 divergent with no
+regression or infrastructure failure. Remote AI discovery still stops at
+strict SSH verification of the changed `i9beef` host key, which was not
+modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now expansion Human 10 at fixture 445,
+followed by expansion Human 7 at 447, expansion Orc 5 at 449, Orc 5 at 454,
+Orc 11 at 459, expansion Human 3 at 463, Orc 9 at 464, Orc 12 at 469, Orc 14
+and expansion Orc 10 at 470, Human 8 at 473, expansion Human 4 at 474, and Orc
+8 at 475.
+
+## Prior release checkpoint — 2026-09-01 (final-approach tanker queue handoff)
 
 Accepted cycle-1,800 receipt `ec9ee0b3` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

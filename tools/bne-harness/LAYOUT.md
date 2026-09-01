@@ -1132,6 +1132,31 @@ second perimeter at `(76,76)`, whose north leg tests `(76,75)` and then accepts
 at `(75,75)`, never reaches the native anchor, and eventually falls back to
 the west side.
 
+## Depot-ready queue pops retain their action constructors
+
+The depot-ready Still callback exposes a queued order before that order may
+request or spend a route. Expansion Orc 12 peon slot 1396 leaves its castle at
+`(30,75)` on fixture 418 with raw action 2, next action 23, sequence 2595,
+timer 25, and a queued mine at `(33,72)`. The Still head counts through timer
+one on fixture 442. Fixture 443 changes the visible action to 23 and next
+action to 60, but starts sequence 2657 at timer three without moving. Fixtures
+444 and 445 retain `(30,75)` at timers two and one; fixture 446 publishes
+`[NE,NE]` and commits the first north-east stride.
+
+Expansion Human 8 peasant slot 1571 seals the construction arm independently.
+It exits its hall at `(20,8)` on fixture 420 with Build queued behind a
+25-count Still head. Fixture 445 makes Build current while retaining the Still
+sequence at timer three. Fixtures 446 and 447 remain at `(20,8)` with timers
+two and one, and fixture 448 commits the first north step toward the watch
+tower site.
+
+The queue pop is therefore semantic order publication, not permission to
+enter the movement owner immediately. Gold action 23 uses its attack-sequence
+constructor while Build retains the Still sequence; both pay the same
+three-visit body. This rule is limited to depot-ready queued continuations:
+direct commands and workers already on their exact resource approach keep
+their established timing.
+
 ## Final-depot tanker queues hand off on the leader's entry pass
 
 The sealed Orc 8 stream establishes the raw transition for a laden tanker

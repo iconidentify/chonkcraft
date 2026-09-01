@@ -450,6 +450,26 @@ final class BattleNetHarvestSystem {
                                 worker.battleNetAnimationTimer() - 1);
                     }
                 }
+                // A building-resource continuation popped from a depot-ready
+                // Still head owns the same action-23 construction body.
+                // Its route is still empty and the mine approach is not yet
+                // underfoot; count 2657/3,2,1 while the two quiet visits run.
+                if (info != null
+                        && info.resource() == UnitType.Resource.GOLD
+                        && worker.resourceUnit() != null
+                        && !worker.returningToDepot()
+                        && worker.pathLength() == 0
+                        && !atBattleNetResourceApproach(
+                                worker, worker.resourceUnit())
+                        && world.battleNetSequence != null) {
+                    int gatherStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.ATTACK_ANIMATION);
+                    if (worker.battleNetSequenceOffset() == gatherStart
+                            && worker.battleNetAnimationTimer() > 1) {
+                        worker.setBattleNetAnimationTimer(
+                                worker.battleNetAnimationTimer() - 1);
+                    }
+                }
                 // Retained terrain-wall refusals are not part of the empty
                 // action-23 construction body above. They own Move 15..1
                 // instead. XHuman 12 peon 1385 keeps SE,NE at collision four

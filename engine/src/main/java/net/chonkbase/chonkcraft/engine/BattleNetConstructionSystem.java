@@ -1610,6 +1610,13 @@ final class BattleNetConstructionSystem {
     void stepWalkToSite(Unit worker) {
         if (worker.battleNetOrderDelay() > 0) {
             worker.setBattleNetOrderDelay(worker.battleNetOrderDelay() - 1);
+            int stillStart = world.idle.battleNetStillSequenceStart(worker);
+            if (stillStart >= 0
+                    && worker.battleNetSequenceOffset() == stillStart
+                    && worker.battleNetAnimationTimer() > 1) {
+                worker.setBattleNetAnimationTimer(
+                        worker.battleNetAnimationTimer() - 1);
+            }
             return;
         }
         // The give-up latch: a build that failed last cycle kept its label
