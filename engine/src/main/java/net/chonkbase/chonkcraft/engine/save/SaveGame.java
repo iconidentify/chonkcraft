@@ -718,6 +718,9 @@ public final class SaveGame {
             state.append(" battleNetRefusals = ")
                     .append(unit.battleNetRefusals()).append(",");
         }
+        if (unit.battleNetEmptyDepotDirectReturnRoute()) {
+            state.append(" emptyDepotDirectReturnRoute = true,");
+        }
         if (unit.battleNetAttackRefusalRecoveryStage() != 0) {
             state.append(" attackRefusalRecoveryStage = ")
                     .append(unit.battleNetAttackRefusalRecoveryStage())

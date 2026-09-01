@@ -2008,8 +2008,9 @@ final class BattleNetMovementSystem {
                 return true;
             }
             if (!depotDestArm) {
-            PathFinder.Path path = world.construction.findBattleNetBuildingPath(
-                    worker, building, goldFreePrefixReplan);
+                worker.setBattleNetEmptyDepotDirectReturnRoute(false);
+                PathFinder.Path path = world.construction.findBattleNetBuildingPath(
+                        worker, building, goldFreePrefixReplan);
             if (path.result() == PathFinder.Result.UNREACHABLE
                     && worker.order() == Unit.Order.HARVEST) {
                 // DoActionMove reports the obstruction to the AI before the
@@ -2100,6 +2101,7 @@ final class BattleNetMovementSystem {
                         && world.isAllied(worker.player(), blocker.player())) {
                     path = new PathFinder.Path(
                             PathFinder.Result.FOUND, new int[] {heading});
+                    worker.setBattleNetEmptyDepotDirectReturnRoute(true);
                 }
             }
             if (world.harvest.beginBattleNetEmptyDepotRouteIdleBand(
@@ -8431,6 +8433,19 @@ final class BattleNetMovementSystem {
                     boolean directReturnRefusalBand = refusals >= 8
                             && (directReturnRay || queuedReturnHead
                                     || saturatedFreshReturnRoute);
+                    if (directReturnRefusalBand && directReturnRay
+                            && unit.battleNetEmptyDepotDirectReturnRoute()) {
+                        // FUN_004379e0 parks the logical cursor at index twenty,
+                        // but does not erase the direct byte already stored in
+                        // the route buffer. Orc 8 peasant 1494 keeps its south
+                        // byte throughout Move 15..1 at fixtures 305..319 and
+                        // consumes that byte on the timer-one wake at 320. A
+                        // fresh occupancy-aware draw also begins south there,
+                        // but its following south-west byte changes the third
+                        // visible step at fixture 364. Keep the parked byte out
+                        // of Java's live path until the resource action wakes.
+                        unit.setBattleNetParkedRefusalHeading(heading);
+                    }
                     unit.setBattleNetOrderDelay(
                             directReturnRefusalBand ? 14 : 0);
                     unit.setBattleNetRefusalHold(false);

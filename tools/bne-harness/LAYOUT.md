@@ -197,6 +197,15 @@ witness: fixture 327 advances `0x80` to `0x90` and parks its stale south tail;
 fixture 342 queries the parked route, redraws `[SE,E]`, and the common movement
 writer at `0x0043798b` commits southeast.
 
+Route-index twenty is a logical cursor park, not an erasure of the twenty-byte
+buffer. Orc 8 peasant slot 1494 is the direct-ray witness: its sole south byte
+remains at `unit+0x30` while the cursor stays twenty throughout fixtures
+304..319 and the eighth-generation Move 15..1 band. Fixture 320 changes only
+the cursor, twenty to one, while committing south; there is no route-byte write.
+The wake therefore reopens that stored direct byte before any fresh route ask.
+This is distinct from the saturated multi-byte stale tail above, whose wake
+does query and overwrite the buffer with `[SE,E]`.
+
 The coarse order byte is not sufficient to identify that Move action state.
 In the sealed expansion Human 12 fixture-204 branch witness, map occupant
 (12,87) resolves through `0x45019b` to slot 1358. Its order byte is 3 (Move),

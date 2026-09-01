@@ -815,6 +815,10 @@ public final class LoadGame {
             unit.setBattleNetRefusals(
                     integer(state.rawGet("battleNetRefusals")));
         }
+        if (state.rawGet("emptyDepotDirectReturnRoute") != null) {
+            unit.setBattleNetEmptyDepotDirectReturnRoute(
+                    truthy(state.rawGet("emptyDepotDirectReturnRoute")));
+        }
         if (state.rawGet("attackRefusalRecoveryStage") != null) {
             unit.setBattleNetAttackRefusalRecoveryStage(
                     integer(state.rawGet("attackRefusalRecoveryStage")));

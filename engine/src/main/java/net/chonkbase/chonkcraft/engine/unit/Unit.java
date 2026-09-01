@@ -1692,6 +1692,17 @@ public final class Unit {
 
     private int battleNetRefusals;
 
+    /** The live one-byte return route came from an occupied empty depot ask. */
+    public boolean battleNetEmptyDepotDirectReturnRoute() {
+        return battleNetEmptyDepotDirectReturnRoute;
+    }
+
+    public void setBattleNetEmptyDepotDirectReturnRoute(boolean direct) {
+        battleNetEmptyDepotDirectReturnRoute = direct;
+    }
+
+    private boolean battleNetEmptyDepotDirectReturnRoute;
+
     public void setWaitCycles(int wait) {
         this.wait = wait;
     }

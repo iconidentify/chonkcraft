@@ -15,6 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (cycle-442 parked direct-return byte)
+
+Accepted cycle-1,800 receipt `d7aceac1` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,814, an increase of 78. Orc 8 advances from fixture 364 to
+442. The cycle-400 fleet improves from 43 clean / 9 divergent to 44 clean / 8
+divergent / 0 failed under receipt `09a8d4c2`. The long receipt is retained at
+`.bne-artifacts/runs/d7aceac16f6cc966c7cf297bc1d06c8598009b06eb52204649fd5493794498a2`.
+Its manifest has SHA-256
+`0bd438ce37f52b6bb5d4b366a316e1f193318b1def8825cc96e13f5225c7b0c1`
+and binds dirty engine-input identity `dec13868` at base revision `8750318` to
+replayable source capsule
+`6b3a865a82d777a03cb27b77457834f78fb5da6bc088dc11fc25e8d6dd00c99a`.
+
+Behavioral delta: when an allied worker occupies a laden land hauler's direct
+next square, native can retain the synthesized direct return byte beneath
+logical route index twenty. The eighth refusal parks the cursor without
+erasing that byte, serves its complete fourteen-visit Move band, and reopens
+the stored byte on the timer-one resource-action wake before asking for a new
+route. Java now carries explicit, serialized provenance only for that
+occupied-empty-depot fallback. Ordinary pathfinder-authored direct routes still
+park and redraw normally. The rule contains no mission, map, coordinate,
+fixture, cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: Orc 8 peasant native slot 1494 / Java 106 is laden at `(123,86)`
+with depot goal `(123,97)`. Native route index twenty retains south byte `04`
+at `unit+0x30` from fixtures 304 through 319 while refusal generation eight
+counts Move 15..1. Fixture 320 changes the cursor from twenty to one and
+commits south without any route-buffer write. Only after that byte settles
+does fixture 342 publish fresh `[SW,S,S,SE]`; the visible positions are
+`(123,87)`, `(122,88)`, and `(122,89)`. Java formerly replanned
+`[S,SW,SW,SE,E]` at the wake and reached x 121 on the third step, producing the
+fixture-364 mismatch. Orc 12 is the held-out discriminator: its ordinary
+pathfinder-authored one-byte return route must redraw after the refusal band;
+gating preserves that case's accepted fixture-383 frontier.
+
+Efficacy receipt
+`.bne-test-efficacy/c364-orc8-direct-return-parked-byte/runs/167697a075477f51b65bac4aa3b12c6a8bf1e608d2422fa8cfae766f9e8d971d`
+proves the focused assertion executes and fails on `8750318`, then executes
+and passes on the candidate. All 84 selected mine-exit, resource-return,
+convoy, tanker, and route-tail controls pass, as do all 47 `SaveGameTest`
+checks. Both fixed 52-case gates pass. The ordinary executable next-level gate
+exits zero after 209 Python checks (four skipped) and 97 engine/desktop checks;
+its command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now expansion Orc
+11 at fixture 371, followed by expansion Orc 12 at 374, expansion Human 10 at
+375, Orc 12 at 383, Human 8 at 390, and expansion Human 7 at 395. Orc 8's new
+fixture-442 finding is human oil tanker slot 1479 at `(82,88)` natively versus
+`(84,90)` in Java.
+
 ## Current release checkpoint — 2026-09-01 (cycle-371 naval HitUnit south edge)
 
 Accepted cycle-1,800 receipt `fcd13a5c` preserves the shared clean horizon at

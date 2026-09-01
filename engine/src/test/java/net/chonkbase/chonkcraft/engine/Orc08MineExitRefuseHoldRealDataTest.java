@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -86,6 +87,63 @@ class Orc08MineExitRefuseHoldRealDataTest {
                 "the hauler takes the exit square on the expiry visit, fixture 255");
         assertEquals(87, hauler.tileY(),
                 "the hauler takes the exit square on the expiry visit, fixture 255");
+    }
+
+    @Test
+    @DisplayName("a saturated direct return consumes its parked byte before redrawing")
+    void aSaturatedDirectReturnConsumesItsParkedByteBeforeRedrawing() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level08o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 8 is not in the pack");
+        World world = mission.world();
+        Unit hauler = unitById(world, 106);
+        assertNotNull(hauler,
+                "Orc 8 has no Java unit 106 / native peasant 1494");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 306) {
+            mission.tick();
+        }
+        int south = Direction.fromDelta(0, 1);
+        assertEquals(123, hauler.tileX());
+        assertEquals(86, hauler.tileY());
+        assertEquals(8, hauler.battleNetRefusals());
+        assertEquals(13, hauler.battleNetOrderDelay(),
+                "fixture 306 has thirteen quiet callbacks left in the complete Move band");
+        assertEquals(0, hauler.pathLength(),
+                "native route index twenty remains logically empty");
+        assertEquals(south, hauler.battleNetParkedRefusalHeading(),
+                "the south byte remains stored beneath the parked cursor");
+
+        while (fixtureCycle(world) < 321) {
+            mission.tick();
+        }
+        assertEquals(123, hauler.tileX());
+        assertEquals(87, hauler.tileY(),
+                "the timer-one wake consumes the parked south byte");
+
+        while (fixtureCycle(world) < 343) {
+            mission.tick();
+        }
+        assertEquals(122, hauler.tileX());
+        assertEquals(88, hauler.tileY(),
+                "only after the retained byte settles does native redraw south-west");
+
+        while (fixtureCycle(world) < 365) {
+            mission.tick();
+        }
+        assertEquals(122, hauler.tileX(),
+                "the third step must be the new route's south, not Java's former south-west");
+        assertEquals(89, hauler.tileY());
+        assertEquals(south, hauler.peekHeading(),
+                "the native south-east tail still has one south byte at its head");
     }
 
     private static int fixtureCycle(World world) {

@@ -25,6 +25,7 @@ import net.chonkbase.chonkcraft.engine.ai.BattleNetAiBytecode;
 import net.chonkbase.chonkcraft.engine.ai.AiForce;
 import net.chonkbase.chonkcraft.engine.animation.Animation;
 import net.chonkbase.chonkcraft.engine.animation.AnimationSet;
+import net.chonkbase.chonkcraft.engine.map.Direction;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
@@ -952,6 +953,35 @@ class SaveGameTest {
                 "reload must preserve the parked soft-corner face");
         assertEquals(2, loaded.battleNetWoodCornerRefusalVisits(),
                 "reload must preserve the parked soft-corner visit count");
+    }
+
+    @Test
+    @DisplayName("an empty-depot direct return keeps its parked route byte")
+    void emptyDepotDirectReturnRouteRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit worker = bench.world().createUnit(
+                bench.types().get("unit-peasant"), 0, 10, 10);
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setCarrying(UnitType.Resource.GOLD);
+        worker.setHeldResource(UnitType.Resource.GOLD);
+        worker.setCarried(100);
+        worker.setReturningToDepot(true);
+        worker.setBattleNetRefusals(8);
+        worker.setBattleNetOrderDelay(7);
+        worker.setBattleNetParkedRefusalHeading(Direction.fromDelta(0, 1));
+        worker.setBattleNetEmptyDepotDirectReturnRoute(true);
+
+        Unit loaded = find(reload(bench), "unit-peasant");
+
+        assertEquals(Unit.Order.HARVEST, loaded.order());
+        assertEquals(UnitType.Resource.GOLD, loaded.carrying());
+        assertTrue(loaded.returningToDepot());
+        assertEquals(8, loaded.battleNetRefusals());
+        assertEquals(7, loaded.battleNetOrderDelay());
+        assertEquals(Direction.fromDelta(0, 1), loaded.battleNetParkedRefusalHeading(),
+                "reload must preserve the parked direct-return route byte");
+        assertTrue(loaded.battleNetEmptyDepotDirectReturnRoute(),
+                "reload must preserve the provenance that permits the parked byte to resume");
     }
 
     @Test

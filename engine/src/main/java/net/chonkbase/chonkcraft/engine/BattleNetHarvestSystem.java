@@ -562,6 +562,32 @@ final class BattleNetHarvestSystem {
                 }
             }
         }
+        int parkedReturnHeading = worker.battleNetParkedRefusalHeading();
+        Unit parkedReturnDepot = worker.returnDepotGoal();
+        if (worker.returningToDepot() && worker.carried() > 0
+                && parkedReturnDepot != null
+                && worker.distanceTo(parkedReturnDepot) > 2
+                && worker.pathLength() == 0
+                && worker.battleNetOrderDelay() == 0
+                && worker.battleNetRefusals() >= 8
+                && worker.battleNetEmptyDepotDirectReturnRoute()
+                && parkedReturnHeading >= 0
+                && parkedReturnHeading < Direction.COUNT) {
+            // Java exposes native route-index twenty as an empty path. The
+            // direct byte beneath that parked cursor is nevertheless the byte
+            // NextPathElement consumes on the complete refusal band's wake.
+            // Reconstitute it only on that action visit, after all fourteen
+            // quiet callbacks, so neither pathfinding nor an earlier movement
+            // visit can replace it. setPath normally clears a first-generation
+            // collision for a one-byte route; this is generation eight, whose
+            // separate collision projection must survive the reconstruction.
+            int collision = worker.battleNetCollisionCounter();
+            worker.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
+                    new int[] {parkedReturnHeading}));
+            worker.setBattleNetCollisionCounter(collision);
+            worker.setBattleNetParkedRefusalHeading(-1);
+            worker.setBattleNetEmptyDepotDirectReturnRoute(false);
+        }
         // An empty action-24 depot route does not become a synthetic Still
         // order and it does not poll the pathfinder every visit.  Its active
         // resource order owns the rest of the same three-call Still body;
