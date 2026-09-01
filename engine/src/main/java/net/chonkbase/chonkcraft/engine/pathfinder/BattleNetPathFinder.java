@@ -739,7 +739,14 @@ public final class BattleNetPathFinder {
             // Equal-gain major preference is intentionally not used: it
             // steals XOrc 11 battleship west detours and Orc 3 tanker
             // approaches even when the pure major corridor looks open.
-            if (stride == 2) {
+            // The free-major-axis correction is authenticated for a ray
+            // which already stored multiple free headings (XOrc 10's two
+            // west strides). It is not a native post-wall selection rule.
+            // With only one free ray heading, XOrc 8 submarine 1432's first
+            // wall face succeeds with the exact native W,W,W,NW,N,N,NE,SE
+            // route and the opposite face fails; replacing that result with
+            // another north heading produced Java's incorrect N,N route.
+            if (stride == 2 && prefix.size() > 1) {
                 int wallFirst = best.headings().get(0);
                 int wallGain = chebyshev(startX, startY, toX, toY)
                         - chebyshev(

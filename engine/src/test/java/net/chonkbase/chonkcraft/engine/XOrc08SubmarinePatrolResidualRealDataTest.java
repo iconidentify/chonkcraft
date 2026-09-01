@@ -67,6 +67,39 @@ class XOrc08SubmarinePatrolResidualRealDataTest {
         assertRedrawAroundCollisionPressuredAlliedHulls(mission);
     }
 
+    @Test
+    @DisplayName("XOrc 8 low-refusal submarine redraw keeps the native west wall")
+    void xOrc8LowRefusalSubmarineRedrawsWestOnCycle312() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        Mission mission = mission(new GameData(assets));
+        Unit submarine = unitById(mission.world(), 168);
+        assertNotNull(submarine,
+                "XOrc 8 has no Java twin for native submarine 1432");
+
+        tickThrough(mission, 311);
+        assertEquals(90, submarine.tileX());
+        assertEquals(80, submarine.tileY());
+        assertFalse(submarine.isMoving(),
+                "the paid west residual settles on the refusal visit");
+        assertEquals(0, submarine.pathLength(),
+                "the nonterminal blocked tail is parked before redraw");
+        assertEquals(5, submarine.battleNetRefusals());
+        assertEquals(0, submarine.battleNetOrderDelay(),
+                "low refusal keeps the following redraw visit live");
+
+        tickThrough(mission, 312);
+        assertEquals(88, submarine.tileX(),
+                "the low-refusal redraw consumes the native west wall head");
+        assertEquals(80, submarine.tileY());
+        assertEquals(7, submarine.pathLength(),
+                "seven headings remain from W,W,W,NW,N,N,NE,SE");
+        assertEquals(1, submarine.battleNetPathStepsTaken());
+        assertEquals(5, submarine.battleNetRefusals());
+        assertEquals(0, submarine.battleNetOrderDelay());
+    }
+
     private static void assertRedrawAroundCollisionPressuredAlliedHulls(
             Mission mission) {
         Unit westSubmarine = unitById(mission.world(), 168);

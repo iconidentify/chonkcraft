@@ -5603,13 +5603,23 @@ final class BattleNetMovementSystem {
                                 unit.battleNetPathStepsTaken() == 1;
                         boolean terminalPaidConsumedTail =
                                 paidConsumedTail && unit.pathLength() == 1;
+                        boolean nonTerminalSubmarineRedraw =
+                                paidConsumedTail
+                                && !terminalPaidConsumedTail
+                                && unit.type() != null
+                                && ("unit-human-submarine".equals(
+                                        unit.type().ident())
+                                    || "unit-orc-submarine".equals(
+                                            unit.type().ident()));
                         int parkedHeading = terminalPaidConsumedTail
                                 ? unit.peekHeading() : -1;
                         battleNetRefuse(unit);
                         unit.setRouteSpent(false);
                         unit.setWaitCycles(0);
                         unit.setBattleNetOrderDelay(
-                                paidConsumedTail ? 14 : 0);
+                                paidConsumedTail
+                                        && !nonTerminalSubmarineRedraw
+                                                ? 14 : 0);
                         unit.setBattleNetNavalPaidParkedRoute(
                                 terminalPaidConsumedTail);
                         if (paidConsumedTail) {
@@ -5626,6 +5636,7 @@ final class BattleNetMovementSystem {
                                     parkedHeading);
                         }
                         if (paidConsumedTail
+                                && !nonTerminalSubmarineRedraw
                                 && world.battleNetSequence != null
                                 && world.battleNetMoveAnimation(unit)) {
                             int moveStart = world.idle
