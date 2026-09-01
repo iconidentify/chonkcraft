@@ -12697,6 +12697,18 @@ final class BattleNetCombatSystem {
                 // the next Attack constructor on fixture 300. Java's empty-
                 // route scan accepted a non-progressing free square, breaking
                 // both position and the asynchronous stream.
+                //
+                // A moving replacement owns only this one extra cold
+                // constructor. Human 8 slot 1526 changes from dying peasant
+                // 1533 to moving returner 1536 at fixture 384, pays the next
+                // Attack 3,2,1, then releases its SE,NE,N wall route on 390.
+                // Keeping the cold latch made it buy constructors forever.
+                // The stationary XHuman 12 footman 1477 remains the negative
+                // control and continues reopening the cold constructor.
+                if (unit.battleNetColdNoProgressRefusalLoop()
+                        && boxedTarget.isMoving()) {
+                    unit.setBattleNetColdNoProgressRefusalLoop(false);
+                }
                 return rearmBattleNetHardRefusalAttack(unit);
             }
             unit.setBattleNetColdNoProgressRefusalLoop(false);

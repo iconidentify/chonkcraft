@@ -677,6 +677,71 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aMovingReplacementConsumesOneColdRetryBeforeItsWallDetour() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 74);
+        Unit movingReplacement = unitById(world, 64);
+        Unit dyingQuarry = unitById(world, 67);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1526");
+        assertNotNull(movingReplacement,
+                "Human 8 has no Java twin for native returner 1536");
+        assertNotNull(dyingQuarry,
+                "Human 8 has no Java twin for native dying quarry 1533");
+
+        while (fixtureCycle(world) < 384) {
+            mission.tick();
+        }
+        assertSame(movingReplacement, attacker.target(),
+                "the timer-one scan replaces the dying quarry");
+        assertSame(dyingQuarry, attacker.offeredTarget(),
+                "the cold retry retains the quarry which owned the offer");
+        assertTrue(movingReplacement.isMoving(),
+                "the replacement is still draining its return residual");
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+        assertTrue(attacker.battleNetColdNoProgressRefusalLoop(),
+                "the replacement starts one fresh cold constructor");
+
+        while (fixtureCycle(world) < 387) {
+            mission.tick();
+        }
+        assertEquals(77, attacker.tileX());
+        assertEquals(62, attacker.tileY());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the moving quarry owns one additional Attack constructor");
+        assertFalse(attacker.battleNetColdNoProgressRefusalLoop(),
+                "that paid retry consumes the moving-replacement cold latch");
+
+        while (fixtureCycle(world) < 389) {
+            mission.tick();
+        }
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(390, fixtureCycle(world));
+        assertChaser(attacker, 78, 63, -32, -32, true);
+        assertEquals(Direction.fromDelta(1, 1), attacker.lastStepHeading(),
+                "retail releases the non-progressing southeast wall face");
+        assertEquals(2, attacker.pathLength());
+        assertEquals(Direction.fromDelta(1, -1), attacker.peekHeading(),
+                "the committed step retains northeast next");
+        assertEquals(Direction.fromDelta(0, -1),
+                attacker.peekHeadingAtDepth(1),
+                "the native three-byte wall route ends north");
+    }
+
+    @Test
     void anExpiredMovingQuarryPaysTwoBandsBeforeOneFreshStep() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
