@@ -25,6 +25,47 @@ class XHuman10Ogre1543GuardTowerRetargetRealDataTest {
     private static final int BNE_INITIALIZATION_TICKS = 2;
 
     @Test
+    @DisplayName("xhuman 10 keeps projectile and HitUnit RNG consumers aligned")
+    void xhuman10KeepsProjectileAndHitUnitRngConsumersAligned() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+        Unit tower = unitById(world, 63);
+        assertNotNull(tower, "XHuman 10 has no native-slot-1537 guard tower");
+
+        // The authenticated native pool opens with type-24 cannon shell 3,
+        // arrow 4, rock 5 and arrow 6; the fixed cannon owns no naval type-25
+        // source flash. Much later, the center victim's fixture-431 HitUnit
+        // response queues both close brothers. Their direct splash offers
+        // promote without idle draws on fixtures 432/433, while the center
+        // victim keeps its ordinary fixture-435 draw. Together those rules
+        // preserve the native stream through the tower blows below.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 438) {
+            mission.tick();
+        }
+        assertEquals(59, tower.hitPoints());
+
+        mission.tick();
+        assertEquals(57, tower.hitPoints(),
+                "fixture 439 owns the preceding two-point ogre blow");
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 444) {
+            mission.tick();
+        }
+        assertEquals(57, tower.hitPoints());
+
+        mission.tick();
+        assertEquals(54, tower.hitPoints(),
+                "fixture 445 must receive native's three-point melee roll");
+    }
+
+    @Test
     @DisplayName("xhuman 10's struck guard tower recruits footman 1529 on its idle boundary")
     void xhuman10StruckGuardTowerRecruitsFootman1529OnItsIdleBoundary() {
         AssetSource assets = AssetSource.fromEnvironment();

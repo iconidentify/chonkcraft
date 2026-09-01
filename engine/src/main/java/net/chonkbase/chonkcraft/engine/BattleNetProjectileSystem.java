@@ -211,12 +211,13 @@ final class BattleNetProjectileSystem {
         if (shot.battleNetPoolSlot() < 0) {
             shot.setBattleNetPoolSlot(world.allocateBattleNetProjectileSlot());
         }
-        if (usesBattleNetCannonSourceEffect(shot.type())) {
-            // BNE creates a source-less type-25 cannon flash immediately
-            // after each real shell. It owns the next low pool slot for 24
-            // fixture cycles even though Java draws the flash as part of the
-            // weapon presentation. Omitting that record reorders later live
-            // shells in the fixed-pool timed pass.
+        if (mobileShot && usesBattleNetMobileCannonSourceEffect(shot.type())) {
+            // BNE's mobile cannon constructor creates a source-less type-25
+            // flash after each real shell. It owns the next low pool slot for
+            // 24 fixture cycles even though Java folds the flash into weapon
+            // presentation. The fixed constructor does not: XHuman 10's
+            // cannon tower opens shell 3, arrow 4, rock 5, arrow 6, while
+            // XOrc 11's destroyers open shell/effect pairs 9/10 and 11/12.
             world.reserveBattleNetProjectileAuxiliarySlot(world.cycle + 24);
         }
         Unit attacker = shot.source();
@@ -705,7 +706,7 @@ final class BattleNetProjectileSystem {
         world.missileSnapshot = List.copyOf(world.missiles);
     }
 
-    private static boolean usesBattleNetCannonSourceEffect(MissileType type) {
+    private static boolean usesBattleNetMobileCannonSourceEffect(MissileType type) {
         if (type == null || type.ident() == null) {
             return false;
         }
@@ -1020,13 +1021,18 @@ final class BattleNetProjectileSystem {
                 if (person && !personNavalHit && source != null
                         && (candidate.type() == null
                                 || !candidate.type().wall())) {
-                    // A surviving person land unit still receives HitUnit's
-                    // local +0x54 source offer; only the surrounding melee-
-                    // brother recruitment is lethal-only. XHuman 10 knight
-                    // 1480 banks the catapult which splashes it on fixture
-                    // 431 and promotes Attack on its next Still marker, while
-                    // neighbouring knight 1485 remains uninvolved.
-                    world.battleNetOfferHitSource(source, candidate);
+                    // The center victim crosses ordinary HitUnit, including
+                    // its close-brother selection, before the outer splash
+                    // walk. XHuman 10's center knight 1493 therefore banks
+                    // catapult 1487 locally and queues close knights 1485 and
+                    // 1480; their later outer hits add their own +0x54 offers.
+                    // Running spatial help for every outer victim recruits a
+                    // second ring which native never selected.
+                    if (candidate == missile.target()) {
+                        world.battleNetSpatialHitHelp(source, candidate);
+                    } else {
+                        world.battleNetOfferHitSource(source, candidate);
+                    }
                 }
                 candidate.setHitPoints(before - damage);
                 // Splash never calls applyDamage; OP0-damage bulk hold still

@@ -931,12 +931,12 @@ class Xhuman10DamageTimingRealDataTest {
         Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
         World world = mission.world();
 
-        // Authenticated native slot 1480 / Java 120 takes eight nonlethal
-        // catapult splash damage on fixture 431. HitUnit banks the source for
-        // the struck unit, which promotes action 12 on its fixture-432 Still
-        // marker. Neighbouring knight 1485 / Java 115 is independently inside
-        // the splash and receives its own local offer; it is not recruited as
-        // a person melee helper.
+        // Authenticated center slot 1493 / Java 107 takes nonlethal catapult
+        // splash damage on fixture 431. Its ordinary HitUnit response banks
+        // the source and recruits close brothers 1480 / Java 120 and 1485 /
+        // Java 115. The outer splash walk then gives those brothers their own
+        // local offers. Both provenances make 1480 promote action 12 on its
+        // fixture-432 Still marker without paying an idle-random draw.
         Unit struck = unitById(world, 120);
         Unit neighbour = unitById(world, 115);
         Unit upper = unitById(world, 107);
@@ -969,8 +969,8 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(10, upper.hitPoints());
         assertSame(catapult, upper.offeredTarget(),
                 "the upper directly splashed knight owns its own source offer");
-        assertNull(neighbour.battleNetPendingHelpAttack(),
-                "nonlethal person splash does not recruit melee brothers");
+        assertSame(catapult, neighbour.battleNetPendingHelpAttack(),
+                "the center victim's HitUnit response queues its close brother");
 
         mission.tick();
         assertEquals(432, world.cycle() - BNE_INITIALIZATION_TICKS);
@@ -978,6 +978,8 @@ class Xhuman10DamageTimingRealDataTest {
         assertSame(catapult, struck.target());
         assertEquals(1922, struck.battleNetSequenceOffset());
         assertEquals(3, struck.battleNetAnimationTimer());
+        assertEquals(0x1da1ab2d, world.battleNetRandomSeed(),
+                "direct HitUnit promotion owns no Still idle-random draw");
         assertEquals(Unit.Order.STILL, neighbour.order());
 
         mission.tick();

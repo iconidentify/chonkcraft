@@ -59,6 +59,13 @@ class BattleNetProjectilePoolOrderTest {
                 null, 0);
     }
 
+    private static MissileType smallCannon() {
+        return new MissileType("missile-small-cannon", null,
+                MissileClass.PARABOLIC, 16, 16, 20, 9, 16, 1, 2, 4, 50,
+                "missile-cannon-tower-explosion", null, false, 0, 0, false,
+                null, 0);
+    }
+
     private static MissileType cannonExplosion() {
         return new MissileType("missile-cannon-tower-explosion", null,
                 MissileClass.STAY, 32, 32, 4, 1, 16, 2, 1, 1, 50, null, null,
@@ -193,6 +200,35 @@ class BattleNetProjectilePoolOrderTest {
                 "the second real cannon shell follows the first source effect");
         assertTrue(world.battleNetProjectileSlots[6],
                 "the second cannon source effect reserves its own pool entry");
+    }
+
+    @Test
+    @DisplayName("a BNE fixed small-cannon constructor has no type-25 companion")
+    void fixedSmallCannonConstructorLeavesTheFollowingNativePoolEntryFree() {
+        World world = new World(grass(16));
+        MissileType cannon = smallCannon();
+        world.setMissileTypes(Map.of(
+                "missile-small-cannon", cannon,
+                "missile-cannon-tower-explosion", cannonExplosion()));
+        world.restoreRandom(1, 0);
+        Unit cannonAttacker = world.createUnit(catapult(), 0, 2, 2);
+        Unit axeAttacker = world.createUnit(thrower(), 0, 2, 4);
+        Unit target = world.createUnit(footman(), 1, 8, 2);
+        assertTrue(cannonAttacker != null && axeAttacker != null
+                && target != null, "units place");
+
+        Missile shell = world.projectiles.launch(cannonAttacker, target, cannon);
+        world.projectiles.queuePendingAttack(cannonAttacker, shell, 3);
+        world.prepareBattleNetProjectile(shell, false);
+        Missile following = world.projectiles.launch(axeAttacker, target, axe());
+        world.prepareBattleNetProjectile(following, true);
+
+        assertEquals(3, shell.battleNetPoolSlot(),
+                "native XHuman 10's fixed type-24 shell opens in slot 3");
+        assertEquals(4, following.battleNetPoolSlot(),
+                "fixed cannon must not reserve a type-25 companion slot");
+        assertTrue(!world.battleNetProjectileSlots[5],
+                "only the two real projectiles should occupy the fixed pool");
     }
 
     @Test

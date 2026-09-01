@@ -12033,13 +12033,24 @@ public final class World {
                         boolean liveHelpTarget = helpTarget.isAlive()
                                 && !helpTarget.isDying()
                                 && helpTarget.isOnMap();
+                        boolean directlyStruckSplashBrother = closeHitHelp
+                                && unit.battleNetPersonHelpFirstChase();
                         if (liveHelpTarget && activeOrderStillBoundary) {
                             // This transient Still still owns the prior Move
                             // action marker. Native runs FUN_0040ad30 before
                             // next_order promotes Attack. Ordinary helpers on
                             // the shared 4985 Still body have already paid
                             // their idle dispatcher and do not enter here.
-                            idle.advanceBattleNetActiveOrderIdleRandom(unit);
+                            // A close brother which the primary splash queued
+                            // and then directly struck is different: its own
+                            // +0x54 offer accompanies the already-written
+                            // next_order, so 0x452ef0 promotes without OP0.
+                            // XHuman 10 slots 1480/1485 carry both provenances;
+                            // primary 1493 carries only the offer and keeps its
+                            // ordinary fixture-435 idle draw.
+                            if (!directlyStruckSplashBrother) {
+                                idle.advanceBattleNetActiveOrderIdleRandom(unit);
+                            }
                         }
                         if (liveHelpTarget && orderAttack(unit, helpTarget)) {
                             if (isPerson(owner) && !closeHitHelp
@@ -12099,6 +12110,7 @@ public final class World {
                             // clockwise wall face (XHuman 12 footman 1477).
                             boolean rangedCloseHitWallFace = personLandHelp
                                     && closeHitHelp
+                                    && !directlyStruckSplashBrother
                                     && activeOrderStillBoundary
                                     && unit.type() != null
                                     && unit.type().maxAttackRange() <= 1
@@ -12107,6 +12119,12 @@ public final class World {
                             unit.setBattleNetRangedCloseHitHelpWallFace(
                                     rangedCloseHitWallFace);
                             unit.setBattleNetOrderDelay(3);
+                            if (directlyStruckSplashBrother) {
+                                // NewActionAttack clears direct-offer state;
+                                // retain that independently proved first-route
+                                // ownership across this queued promotion.
+                                unit.setBattleNetPersonHelpFirstChase(true);
+                            }
                             // First chase path after person help may prefer
                             // an equal-cost goal-axis diagonal onto a lead
                             // brother (XHuman 10 knight 1493 SW onto 1489).
