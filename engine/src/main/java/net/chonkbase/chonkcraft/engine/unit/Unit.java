@@ -3648,6 +3648,17 @@ public final class Unit {
 
     private boolean battleNetChaseEmptyRouteReplan;
 
+    /** A blocked diagonal residual had no cardinal component toward its quarry. */
+    public boolean battleNetNonProgressDiagonalResidualPark() {
+        return battleNetNonProgressDiagonalResidualPark;
+    }
+
+    public void setBattleNetNonProgressDiagonalResidualPark(boolean parked) {
+        battleNetNonProgressDiagonalResidualPark = parked;
+    }
+
+    private boolean battleNetNonProgressDiagonalResidualPark;
+
     /** A paid long chase residual parked for its next-callback wall refill. */
     public boolean battleNetPaidLongResidualRefill() {
         return battleNetPaidLongResidualRefill;

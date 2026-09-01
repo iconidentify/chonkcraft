@@ -519,6 +519,15 @@ class at `+0x1c`, scales each delta by four tiles, and consumes asynchronous
 RNG at `0x0040a750` and `0x0040a77f`. It adds `(random & 7) - 2` on each axis,
 clamps the point to the map, and calls `GiveOrder` at `0x0040a80c`.
 
+This is also Still's armed non-combatant hit response, not a resource-order-only
+path. Still's shared handler `0x0040b010` calls the idle callback `0x0040ad30`
+and then `0x0040a5e0`. The latter tests type flags `0x06000300` together with
+the armed/mobile bit `0x00080000` before entering `0x0040a670`. Sappers and
+dwarven demolition squads have flags `0x0a080001` and take this arm; ordinary
+fighters with flags `0x08080001` do not. Orc 11 sapper slot 1573 seals the
+standing form: its fixture-417 hit is converted to the constructor's temporary
+Move at fixture 418, while untouched sapper slot 1575 remains Still.
+
 When a temporary resource-hit Move settles with a second hit retained, the
 worker first visits the common active-order idle callback `0x0040ad30`; its
 draw at `0x0040ad53` belongs before the re-entry above. Human 8 peasant native

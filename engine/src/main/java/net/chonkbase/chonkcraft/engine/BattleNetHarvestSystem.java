@@ -4695,6 +4695,30 @@ final class BattleNetHarvestSystem {
             // the empty-route caller owns before the first reaction.
             world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
         }
+        if (!retainingSavedResourceOrder) {
+            worker.setSavedOrder(Unit.Order.HARVEST);
+        }
+        return authorBattleNetHitFlee(worker, aggressor);
+    }
+
+
+    /** Lets a standing native special unit consume its hit-owned offer. */
+    boolean beginBattleNetStandingHitFlee(Unit unit) {
+        Unit aggressor = unit == null ? null : unit.offeredTarget();
+        if (unit == null || aggressor == null
+                || !aggressor.isAlive() || aggressor.isDying()
+                || !aggressor.isOnMap() || unit.order() != Unit.Order.STILL
+                || unit.savedOrder() != null
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        unit.setSavedOrder(Unit.Order.STILL);
+        return authorBattleNetHitFlee(unit, aggressor);
+    }
+
+
+    /** Ports the shared native escape-point constructor at 0x0040a670. */
+    private boolean authorBattleNetHitFlee(Unit worker, Unit aggressor) {
         int face = aggressor.heading();
         int x = worker.tileX() + Direction.deltaX(face) * 4
                 + (world.battleNetRand() & 7) - 2;
@@ -4708,9 +4732,6 @@ final class BattleNetHarvestSystem {
         x = normalized[0];
         y = normalized[1];
 
-        if (!retainingSavedResourceOrder) {
-            worker.setSavedOrder(Unit.Order.HARVEST);
-        }
         worker.clearPath();
         worker.setRouteSpent(false);
         // The constructor band preserves the authored point here until its
@@ -4727,6 +4748,39 @@ final class BattleNetHarvestSystem {
                 world.idle.battleNetStillSequenceStart(worker));
         worker.setBattleNetAnimationTimer(3);
         return true;
+    }
+
+
+    /** Counts down a standing hit-flee constructor before normal Move. */
+    boolean stepBattleNetStandingHitFlee(Unit unit) {
+        if (unit == null || unit.order() != Unit.Order.MOVE
+                || unit.savedOrder() != Unit.Order.STILL
+                || unit.isMoving() || unit.pathLength() != 0
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(unit);
+        if (stillStart < 0
+                || unit.battleNetSequenceOffset() != stillStart
+                || unit.battleNetAnimationTimer() <= 0) {
+            return false;
+        }
+        if (unit.battleNetAnimationTimer() > 1) {
+            unit.setBattleNetAnimationTimer(
+                    unit.battleNetAnimationTimer() - 1);
+            return true;
+        }
+
+        int moveStart = world.idle.battleNetSequenceStart(
+                unit, BattleNetSequence.MOVE_ANIMATION);
+        if (moveStart >= 0) {
+            BattleNetSequence.Tick open =
+                    world.battleNetSequence.tick(moveStart, 1);
+            unit.setBattleNetSequenceOffset(
+                    open.valid() ? open.offset() : moveStart);
+            unit.setBattleNetAnimationTimer(open.valid() ? open.timer() : 1);
+        }
+        return false;
     }
 
 

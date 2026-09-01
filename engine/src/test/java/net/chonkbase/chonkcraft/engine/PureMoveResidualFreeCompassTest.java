@@ -146,16 +146,19 @@ class PureMoveResidualFreeCompassTest {
         axe.setPath(new PathFinder.Path(PathFinder.Result.FOUND,
                 new int[] {E, E, E, E}));
         axe.setBattleNetCollisionCounter(0);
+        axe.setBattleNetRefusals(1);
         assertTrue(axe.pathLength() >= 3, "multi leftover");
         assertTrue(world.targets.inAttackRange(axe, quarry),
                 "axe stands in weapon range of the quarry");
 
         axe.setOffset(16, 0);
-        assertTrue(world.movement.battleNetSoftClearMoveAlly(axe),
+        assertTrue(world.movement
+                        .battleNetSoftClearLiveRouteRefusalAlly(axe),
                 "early residual (large debt) still soft-clears");
 
         axe.setOffset(7, -7);
-        assertFalse(world.movement.battleNetSoftClearMoveAlly(axe),
+        assertFalse(world.movement
+                        .battleNetSoftClearLiveRouteRefusalAlly(axe),
                 "nearly settled residual keeps occupancy for wall-follow");
     }
 

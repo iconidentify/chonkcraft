@@ -978,6 +978,9 @@ final class BattleNetMovementSystem {
         resetDisplacement(unit);
         unit.clearPath();
         unit.setBattleNetPlayerCommandMove(false);
+        if (unit.savedOrder() == Unit.Order.STILL) {
+            unit.takeSavedOrder();
+        }
         world.finishOrder(unit);
         unit.setActionBeforeQueued(null);
         unit.setOrderTarget(unit.tileX(), unit.tileY());
@@ -1017,6 +1020,9 @@ final class BattleNetMovementSystem {
         // authors (89,60), and remains raw Move for that three-call body.
         if (world.harvest.restartBattleNetStrandedResourceHitFlee(unit)) {
             return;
+        }
+        if (unit.savedOrder() == Unit.Order.STILL) {
+            unit.takeSavedOrder();
         }
         unit.setOfferedTarget(null);
         world.finishOrder(unit);
@@ -1123,6 +1129,9 @@ final class BattleNetMovementSystem {
      * draw and hands slot 1585 the wrong wander choice on cycle five.</p>
      */
     void stepMoveOrderWithBattleNetCritter(Unit unit) {
+        if (world.harvest.stepBattleNetStandingHitFlee(unit)) {
+            return;
+        }
         if (world.harvest.stepBattleNetStrandedResourceHitFlee(unit)) {
             return;
         }
@@ -1359,8 +1368,13 @@ final class BattleNetMovementSystem {
         // weapon range: native free-scan 1516 face-two nibble-refuses soft-
         // clear on axe 76@31,39 (pathn3 residual of SW land-in-range). Early
         // residual (large pixel debt) still soft-clears so free-scans before
-        // the residual drains do not REG @40. Pixel debt uses max(|ox|,|oy|).
-        if (candidate.pathLength() >= 3
+        // the residual drains do not REG @40. This compensates only when the
+        // ignored Java refusal proxy actually exists. Orc 11 archer 1559 is
+        // equally close to settling but carries native nibble zero, so knight
+        // 1558's fixture-392 route passes straight through it as NW x6. Pixel
+        // debt uses max(|ox|,|oy|).
+        if (candidate.battleNetRefusals() > 0
+                && candidate.pathLength() >= 3
                 && World.battleNetRangedChaseUnit(candidate)
                 && candidate.target() != null
                 && candidate.target().isAlive()
@@ -3020,6 +3034,14 @@ final class BattleNetMovementSystem {
         boolean refusedOnActionMarker = unit.battleNetChaseStepReady()
                 && (World.battleNetRangedChaseUnit(unit)
                         || unit.battleNetMovingQuarryResidual());
+        // A route written immediately after an RI-20 park is also a fresh
+        // refusal transaction even though Java has already entered Move's
+        // first body opcode. Native rewinds that replacement to Move start
+        // when its first byte meets a cooperative mover. Orc 11 knight 1558
+        // parks its six-NW tail on fixture 407, writes W,NW on 408, and owns
+        // Move-start/15 through fixture 422 before consuming W.
+        boolean freshParkedRouteReplacement =
+                unit.battleNetNonProgressDiagonalResidualPark();
         // An ordinary refusal inside an unfinished Move body keeps its live
         // cursor. A refusal on the OP0 visit is different: the interpreter
         // has already exposed ChaseStepReady and advanced past Move start,
@@ -3054,6 +3076,7 @@ final class BattleNetMovementSystem {
         boolean postRetargetParkRefill =
                 unit.battleNetRetargetResidualParkRefill();
         if (executingMove && !refusedOnActionMarker
+                && !freshParkedRouteReplacement
                 && !settledMultiResidual
                 && !postRetargetParkRefill) {
             return;
@@ -6363,6 +6386,12 @@ final class BattleNetMovementSystem {
                         // xhuman-04 @39.
                         boolean multiResidualSecondRefuse = counter > 1
                                 && !postRetargetParkRefill
+                                // A replacement just written after an RI-20
+                                // park has inherited collision history but
+                                // has not paid a cooperative band on this
+                                // route. Orc 11 knight 1558 must retain W,NW
+                                // under Move 15 instead of free-compassing N.
+                                && !unit.battleNetNonProgressDiagonalResidualPark()
                                 && unit.pathLength() > 1
                                 && unit.pathLength() < 6
                                 && !Direction.isDiagonal(unit.peekHeading())
@@ -6669,6 +6698,8 @@ final class BattleNetMovementSystem {
                                 unit.setBattleNetRefusalHold(true);
                             }
                             unit.setBattleNetRetargetResidualParkRefill(false);
+                            unit.setBattleNetNonProgressDiagonalResidualPark(
+                                    false);
                             if (immediateReplacementRefusal) {
                                 // The replacement ray was refused on the same
                                 // callback which installed it. Retail starts
@@ -6885,6 +6916,14 @@ final class BattleNetMovementSystem {
                                     world.battleNetMovementStride(unit);
                             int peekDx = Direction.deltaX(heading);
                             int peekDy = Direction.deltaY(heading);
+                            int currentQuarryDistance = Math.max(
+                                    Math.abs(unit.target().tileX()
+                                            - unit.tileX()),
+                                    Math.abs(unit.target().tileY()
+                                            - unit.tileY()));
+                            boolean recurringAssaultChase =
+                                    unit.battleNetAiBehavior() == 2
+                                    && unit.hasBattleNetAiHome();
                             int freeHeading = -1;
                             boolean reverseComponents =
                                     unit.battleNetCollisionCounter() >= 3;
@@ -6905,7 +6944,22 @@ final class BattleNetMovementSystem {
                                         + stepDx * strideDetour;
                                 int freeY = unit.tileY()
                                         + stepDy * strideDetour;
-                                if (world.canEnter(unit, freeX, freeY)) {
+                                int freeQuarryDistance = Math.max(
+                                        Math.abs(unit.target().tileX()
+                                                - freeX),
+                                        Math.abs(unit.target().tileY()
+                                                - freeY));
+                                // Behaviour-one formation chases have sealed
+                                // sideways component witnesses. Behaviour-two
+                                // recurring Patrol attacks instead keep only
+                                // a component which actually closes on their
+                                // quarry; Orc 11 knight 1558 parks NW rather
+                                // than spending its free but sideways N arm.
+                                if ((!recurringAssaultChase
+                                                || freeQuarryDistance
+                                                        < currentQuarryDistance)
+                                        && world.canEnter(
+                                                unit, freeX, freeY)) {
                                     freeHeading = dir;
                                     break;
                                 }
@@ -6929,6 +6983,17 @@ final class BattleNetMovementSystem {
                                         break;
                                     }
                                 }
+                            }
+                            if (freeHeading < 0) {
+                                // The refused diagonal has no free cardinal
+                                // component which closes on the quarry. Its
+                                // ensuing hard park owns the next replacement
+                                // route's first cooperative refusal. Preserve
+                                // that causal edge explicitly instead of
+                                // inferring it from collision counts shared by
+                                // unrelated Human 12 formation generations.
+                                unit.setBattleNetNonProgressDiagonalResidualPark(
+                                        true);
                             }
                             if (freeHeading >= 0) {
                                 // One quiet refuse after residual settle
@@ -8575,6 +8640,7 @@ final class BattleNetMovementSystem {
             // The way was clear, so the patience resets: upstream's
             // "if (result != PF_WAIT) output.Fast = 0".
             unit.setPathWaitBudget(0);
+            unit.setBattleNetNonProgressDiagonalResidualPark(false);
             // FUN_004379e0's collision nibble survives the complete refusal
             // band and its timer-one wake.  A successful probe clears an
             // ordinary paid collision, but not the saturated formation band:

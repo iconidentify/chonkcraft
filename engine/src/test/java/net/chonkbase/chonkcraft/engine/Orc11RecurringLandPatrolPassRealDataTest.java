@@ -289,6 +289,148 @@ class Orc11RecurringLandPatrolPassRealDataTest {
                 "the queued Attack pops when the second north stride settles");
     }
 
+    @Test
+    @DisplayName("orc 11's settled knight chase stages its cooperative refusal")
+    void orc11sSettledKnightChaseStagesItsCooperativeRefusal() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit knight = unitById(world, 42);
+        assertNotNull(knight,
+                "Orc 11 has no Java 42 / native knight 1558");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 406) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, knight.order());
+        assertEquals(117, knight.tileX());
+        assertEquals(27, knight.tileY());
+        assertEquals(1922, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer());
+        assertEquals(0, knight.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(407, fixtureCycle(world));
+        assertEquals(1874, knight.battleNetSequenceOffset());
+        assertEquals(1, knight.battleNetAnimationTimer(),
+                "the settled route parks for one native Move visit first");
+        assertEquals(1, knight.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(408, fixtureCycle(world));
+        assertEquals(1874, knight.battleNetSequenceOffset());
+        assertEquals(15, knight.battleNetAnimationTimer(),
+                "the second occupied probe owns the complete refusal band");
+        assertEquals(2, knight.battleNetCollisionCounter());
+
+        while (fixtureCycle(world) < 422) {
+            mission.tick();
+        }
+        assertEquals(117, knight.tileX(),
+                "the complete refusal band still owns fixture 422");
+        assertEquals(27, knight.tileY());
+
+        mission.tick();
+        assertEquals(423, fixtureCycle(world));
+        assertEquals(116, knight.tileX(),
+                "the retained west heading commits on the native wake");
+        assertEquals(27, knight.tileY());
+    }
+
+    @Test
+    @DisplayName("orc 11's struck sapper takes the native one-tile escape")
+    void orc11sStruckSapperTakesTheNativeOneTileEscape() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated campaign-1800 pairing: Java 27 is native slot 1573;
+        // Java 25 is the untouched slot-1575 control. Archer 41's arrow lands
+        // on fixture 417. Still's next OP0 runs FUN_0040ad30 and then
+        // FUN_0040a5e0, whose native 0x06000300 type-flag arm sends demolition
+        // units through the already-measured FUN_0040a670 escape constructor.
+        Unit struck = unitById(world, 27);
+        Unit untouched = unitById(world, 25);
+        Unit northernHelper = unitById(world, 19);
+        assertNotNull(struck, "Orc 11 has no Java 27 / native sapper 1573");
+        assertNotNull(untouched, "Orc 11 has no Java 25 / native sapper 1575");
+        assertNotNull(northernHelper,
+                "Orc 11 has no Java 19 / native ogre 1581");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 416) {
+            mission.tick();
+        }
+        assertEquals(40, struck.hitPoints());
+        assertEquals(Unit.Order.STILL, struck.order());
+        assertEquals(112, struck.tileX());
+        assertEquals(22, struck.tileY());
+
+        mission.tick();
+        assertEquals(417, fixtureCycle(world));
+        assertEquals(32, struck.hitPoints(),
+                "the sealed arrow impact is the causal anchor");
+        assertEquals(Unit.Order.STILL, struck.order(),
+                "the hit only installs the offered attacker on fixture 417");
+        Unit attacker = struck.offeredTarget();
+        assertNotNull(attacker);
+        assertEquals(attacker,
+                northernHelper.battleNetPendingHelpAttack(),
+                "the two-tile hit-help cache extends three extra rows north");
+
+        mission.tick();
+        assertEquals(418, fixtureCycle(world));
+        assertEquals(Unit.Order.MOVE, struck.order(),
+                "the sapper's next Still marker constructs native action 3");
+        assertEquals(111, struck.orderTargetX());
+        assertEquals(21, struck.orderTargetY());
+        assertEquals(3, struck.battleNetAnimationTimer());
+        assertEquals(Unit.Order.STILL, untouched.order(),
+                "the native type arm still requires a live hit-owned offer");
+
+        while (fixtureCycle(world) < 421) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, struck.order());
+        assertEquals(111, struck.tileX(),
+                "fixture 421 cold-commits the one-tile northwest route");
+        assertEquals(21, struck.tileY());
+        assertEquals(Unit.Order.STILL, northernHelper.order(),
+                "the helper's next_order waits for its own Still boundary");
+
+        mission.tick();
+        assertEquals(422, fixtureCycle(world));
+        assertEquals(Unit.Order.ATTACK, northernHelper.order(),
+                "the north-skirt helper promotes on its sealed idle boundary");
+        assertEquals(attacker, northernHelper.target());
+
+        while (fixtureCycle(world) < 435) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, struck.order(),
+                "the temporary escape restores the interrupted Still order");
+        assertEquals(111, struck.tileX());
+        assertEquals(21, struck.tileY());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

@@ -4419,7 +4419,7 @@ public final class World {
                     || brother.target() != null
                     || brother.offeredTarget() != null
                     || brother.battleNetPendingHelpAttack() != null
-                    || !battleNetNavalHitHelpSelectionContains(
+                    || !battleNetHitHelpSelectionContains(
                             brother, defender, band)
                     || !targets.canTarget(brother, attacker)
                     || !isEnemyPlayer(brother.player(), attacker.player())) {
@@ -4450,7 +4450,7 @@ public final class World {
      * hull at y=42, while a destroyer at y=50 lies just beyond a hull at y=44:
      * the latter rectangle ends at y=49.</p>
      */
-    private boolean battleNetNavalHitHelpSelectionContains(
+    private boolean battleNetHitHelpSelectionContains(
             Unit candidate, Unit defender, int band) {
         int left = Math.max(0, defender.tileX() - band);
         int top = Math.max(0, defender.tileY() - band - 3);
@@ -4490,7 +4490,7 @@ public final class World {
         return Math.max(dx, dy);
     }
 
-    /** Banks action 12 for person combatants within two tiles of a non-naval ally hit. */
+    /** Banks action 12 inside a person non-naval hit-help cache rectangle. */
     private void battleNetPersonCloseHitHelp(Unit attacker, Unit defender) {
         if (defender.type().moveType() == UnitType.Movement.NAVAL) {
             return;
@@ -4507,7 +4507,14 @@ public final class World {
                     || brother.battleNetPendingHelpAttack() != null
                     || !targets.canTarget(brother, attacker)
                     || !isEnemyPlayer(brother.player(), attacker.player())
-                    || battleNetHitHelpDistance(brother, defender) > 2) {
+                    // FUN_0040a9d0 authors a nominal two-tile rectangle, then
+                    // its shared cache lookup at FUN_0040a2b0 subtracts three
+                    // more rows from the north edge. Orc 11 ogre 1581 at
+                    // 110,18 is the sealed non-naval witness around the
+                    // struck sapper at 112,22: it receives next_order 12 on
+                    // fixture 417 and promotes at 422.
+                    || !battleNetHitHelpSelectionContains(
+                            brother, defender, 2)) {
                 continue;
             }
             boolean standingRecruit = brother.order() == Unit.Order.STILL
@@ -19078,13 +19085,27 @@ public final class World {
         // while native stayed Still until cycle 15. Permanent-cloak combat
         // (XHuman 7 sub) keeps the ordinary reaction-range scan.
         if (unit.order() != Unit.Order.STILL || !unit.type().canAttack()
-                || !unit.isAggressive()
                 || unit.isDying() || !unit.isOnMap()
                 || isBattleNetArmedTower(unit)) {
             // Armed towers acquire only through action 14. A neighbour's
             // step used to call this scanner and orderAttack, which parked
             // the emplacement on the presentation Attack wait-59 and pushed
             // XHuman 2's second volley past fixture 82.
+            return;
+        }
+        // Still's shared handler calls FUN_0040ad30 before FUN_0040a5e0.
+        // The latter tests native type flags 0x06000300 together with the
+        // armed/mobile 0x00080000 bit and sends workers, spellcasters and
+        // demolition units through FUN_0040a670 instead of AutoAttack. The
+        // ten-type routing mask above is the same table test; oil tankers are
+        // its only unarmed members. Orc 11 sapper 1573 / Java 27 is the
+        // standing witness: its fixture-417 offer becomes a one-tile escape
+        // on its fixture-418 marker.
+        if (BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())
+                && harvest.beginBattleNetStandingHitFlee(unit)) {
+            return;
+        }
+        if (!unit.isAggressive()) {
             return;
         }
         boolean person = isPerson(unit.player());
