@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -933,13 +934,16 @@ class Xhuman10DamageTimingRealDataTest {
         // Authenticated native slot 1480 / Java 120 takes eight nonlethal
         // catapult splash damage on fixture 431. HitUnit banks the source for
         // the struck unit, which promotes action 12 on its fixture-432 Still
-        // marker. This is local offer ownership, not person melee help:
-        // neighbouring knight 1485 / Java 115 remains uninvolved.
+        // marker. Neighbouring knight 1485 / Java 115 is independently inside
+        // the splash and receives its own local offer; it is not recruited as
+        // a person melee helper.
         Unit struck = unitById(world, 120);
         Unit neighbour = unitById(world, 115);
+        Unit upper = unitById(world, 107);
         Unit catapult = unitById(world, 113);
         assertNotNull(struck, "XHuman 10 has no native-slot-1480 knight");
         assertNotNull(neighbour, "XHuman 10 has no native-slot-1485 knight");
+        assertNotNull(upper, "XHuman 10 has no native-slot-1493 knight");
         assertNotNull(catapult, "XHuman 10 has no native-slot-1487 catapult");
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
@@ -959,6 +963,12 @@ class Xhuman10DamageTimingRealDataTest {
                 "the projectile lands after this unit's action visit");
         assertSame(catapult, struck.offeredTarget(),
                 "positive splash banks its source for the struck unit");
+        assertEquals(74, neighbour.hitPoints());
+        assertSame(catapult, neighbour.offeredTarget(),
+                "the second directly splashed knight owns its own source offer");
+        assertEquals(10, upper.hitPoints());
+        assertSame(catapult, upper.offeredTarget(),
+                "the upper directly splashed knight owns its own source offer");
         assertNull(neighbour.battleNetPendingHelpAttack(),
                 "nonlethal person splash does not recruit melee brothers");
 
@@ -969,6 +979,39 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(1922, struck.battleNetSequenceOffset());
         assertEquals(3, struck.battleNetAnimationTimer());
         assertEquals(Unit.Order.STILL, neighbour.order());
+
+        mission.tick();
+        assertEquals(433, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, neighbour.order());
+        assertSame(catapult, neighbour.target());
+        assertTrue(neighbour.battleNetPersonHelpFirstChase(),
+                "the directly struck person's HitUnit offer owns its first chase");
+
+        mission.tick();
+        mission.tick();
+        assertEquals(435, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(79, neighbour.tileX());
+        assertEquals(88, neighbour.tileY());
+
+        mission.tick();
+        assertEquals(436, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(78, neighbour.tileX());
+        assertEquals(89, neighbour.tileY(),
+                "equal-cost first chase opens southwest, not due west");
+        assertFalse(neighbour.battleNetPersonHelpFirstChase(),
+                "the provenance clears after its opening route is installed");
+
+        mission.tick();
+        assertEquals(437, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, upper.order());
+        assertTrue(upper.battleNetPersonHelpFirstChase());
+
+        mission.tick();
+        assertEquals(438, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(78, upper.tileX());
+        assertEquals(88, upper.tileY(),
+                "goal-axis southwest replaces the stale northwest face");
+        assertFalse(upper.battleNetPersonHelpFirstChase());
     }
 
     @Test

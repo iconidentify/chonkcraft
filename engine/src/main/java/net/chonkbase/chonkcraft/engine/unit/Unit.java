@@ -3297,9 +3297,10 @@ public final class Unit {
     private boolean battleNetStationaryRecoveryHeld;
 
     /**
-     * Person spatial-help just promoted this unit; the first chase path may
-     * prefer an equal-cost goal-axis diagonal onto a lead mid-Move brother
-     * (XHuman 10 knight 1493). Cleared when that first path is installed.
+     * Person HitUnit offer or spatial-help just promoted this unit; the first
+     * chase path may prefer an equal-cost goal-axis diagonal over its cold or
+     * stale-face heading, including onto a lead mid-Move brother (XHuman 10
+     * knights 1485/1493). Cleared when that first path is installed.
      */
     public boolean battleNetPersonHelpFirstChase() {
         return battleNetPersonHelpFirstChase;

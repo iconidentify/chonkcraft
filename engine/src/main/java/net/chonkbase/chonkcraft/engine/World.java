@@ -4397,6 +4397,16 @@ public final class World {
             return false;
         }
         defender.setOfferedTarget(attacker);
+        if (isPerson(defender.player())
+                && defender.type().moveType() == UnitType.Movement.LAND) {
+            // HitUnit's own +0x54 offer enters the same first-chase writer as
+            // the nearby person helpers it recruits. XHuman 10 knight 1485
+            // is splashed directly, promotes the catapult offer while Still,
+            // then prefers the equal-cost south-west goal-axis opening over
+            // the cold router's west head. Naval offers keep their separately
+            // captured doubled-compass handoff.
+            defender.setBattleNetPersonHelpFirstChase(true);
+        }
         return true;
     }
 
@@ -6836,13 +6846,14 @@ public final class World {
 
     /**
      * Prefers an equal-cost diagonal first step that reduces the secondary
-     * goal axis when a lead mid-Move brother occupies that diagonal.
+     * goal axis, including when a lead mid-Move brother occupies it.
      *
      * <p>Only consulted for {@link Unit#battleNetPersonHelpFirstChase()} so
      * ordinary combat opens keep Bresenham (XHuman 10 grunt 1486 @6). XHuman
-     * 10 knights 1493/1485 stand one row off the catapult's y; pure-west
-     * steps free at fixture 48 while native stores SW/NW onto lead brother
-     * 1489 and holds Move timer 15 through fixture 67.</p>
+     * 10 knights 1493/1485 stand off the catapult's y; native replaces either
+     * a pure-west ray or a stale north-west combat face with south-west. The
+     * earlier fixture-48 witness takes the same goal-axis diagonal onto lead
+     * brother 1489 and holds Move timer 15 through fixture 67.</p>
      */
     private PathFinder.Path preferBattleNetGoalAxisFirstHeading(Unit unit,
             PathFinder.Path path, Unit target) {
@@ -6851,7 +6862,7 @@ public final class World {
             return path;
         }
         int planned = path.headings()[path.length() - 1];
-        if (Direction.isDiagonal(planned)) {
+        if (planned < 0 || planned >= Direction.COUNT) {
             return path;
         }
         int goalX = target.tileX();
@@ -6882,10 +6893,11 @@ public final class World {
         if (diagDist > planDist || diagDist >= cur) {
             return path;
         }
-        // Free equal-cost diagonal: take it (XHuman 10 knight 1480 NW onto
-        // 83,90 while pure-W would keep y=91). Occupied diagonal: only when
-        // a lead marching brother sits there so soft-wait holds (1493 SW onto
-        // 1489). Terrain/enemy blocks keep Bresenham.
+        // Free equal-cost diagonal: take it (XHuman 10 knight 1485 SW instead
+        // of pure W; knight 1493 SW instead of its stale NW face). Occupied
+        // diagonal: only when a lead marching brother sits there so soft-wait
+        // holds (the earlier 1493 SW onto 1489). Terrain/enemy blocks keep the
+        // planned heading.
         if (canEnter(unit, diagX, diagY)) {
             int[] freeHeadings = path.headings().clone();
             freeHeadings[freeHeadings.length - 1] = diag;
@@ -13902,8 +13914,8 @@ public final class World {
             }
         }
         if (path.length() > 0 && unit.battleNetPersonHelpFirstChase()) {
-            // Person-help first chase only: equal-cost diagonal onto a lead
-            // mid-Move brother (XHuman 10 knight 1493 SW onto 1489).
+            // Person HitUnit/help first chase only: prefer the equal-cost
+            // goal-axis diagonal, including onto a lead mid-Move brother.
             path = preferBattleNetGoalAxisFirstHeading(unit, path, target);
             unit.setBattleNetPersonHelpFirstChase(false);
         }
@@ -19159,7 +19171,17 @@ public final class World {
                     && !targets.inAttackRange(unit, target)) {
                 return;
             }
+            boolean personHitOfferFirstChase = person
+                    && target == offered
+                    && unit.battleNetPersonHelpFirstChase();
             if (orderAttack(unit, target, false, false)) {
+                // NewActionAttack clears state owned by the order it replaces.
+                // Restore only the authenticated HitUnit provenance captured
+                // before that boundary; an unrelated idle-scan target must not
+                // inherit the offer's first-route rule.
+                if (personHitOfferFirstChase) {
+                    unit.setBattleNetPersonHelpFirstChase(true);
+                }
                 // Action 16 (stationary) for person idle scans and for any
                 // auto-scan onto air (Human 9 destroyers vs balloon). Computer
                 // land-vs-land idle acquisition is action 12 and chases
