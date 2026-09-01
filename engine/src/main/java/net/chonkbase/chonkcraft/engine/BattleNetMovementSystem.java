@@ -8539,9 +8539,8 @@ final class BattleNetMovementSystem {
                         && returnDepot != null && unit.pathLength() > 0;
                 if (ladenLandReturn && unit.distanceTo(returnDepot) > 2) {
                     boolean directReturnRay = unit.pathLength() == 1;
-                    boolean saturatedFreshReturnRoute =
-                            unit.battleNetRefusals() >= 8
-                            && unit.battleNetPathStepsTaken() == 0;
+                    boolean freshReturnRoute =
+                            unit.battleNetPathStepsTaken() == 0;
                     Unit queuedReturnBlocker = world.blockerOnLayer(
                             unit, nextX, nextY);
                     boolean queuedReturnHead =
@@ -8558,6 +8557,17 @@ final class BattleNetMovementSystem {
                             collision > 14 ? 0 : collision);
                     unit.setRouteSpent(false);
                     unit.setWaitCycles(0);
+                    // Native's packed collision generation owns this band.
+                    // Java's refusal projection can trail it: XHuman 10 peon
+                    // 1438 reaches collision eight/refusal seven on fixture
+                    // 415 and immediately pays Move 15..1. Collision fifteen
+                    // is the wrap visit, so it must not start another band.
+                    boolean nativePaidReturnGeneration =
+                            collision >= 8 && collision < 15;
+                    boolean paidReturnGeneration = refusals >= 8
+                            || nativePaidReturnGeneration;
+                    boolean saturatedFreshReturnRoute =
+                            paidReturnGeneration && freshReturnRoute;
                     // A standing body on a one-heading direct return ray, or
                     // a queued loaded sibling on the direct head, raises all
                     // eight native refusal generations and then the eighth
@@ -8567,7 +8577,7 @@ final class BattleNetMovementSystem {
                     // queued peon 1557 on (6,28); native pays one complete
                     // band and first-steps north exactly as that sibling
                     // vacates. Other multi-heading hard blockers still redraw.
-                    boolean directReturnRefusalBand = refusals >= 8
+                    boolean directReturnRefusalBand = paidReturnGeneration
                             && (directReturnRay || queuedReturnHead
                                     || saturatedFreshReturnRoute);
                     if (directReturnRefusalBand && directReturnRay

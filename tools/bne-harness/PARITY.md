@@ -15,7 +15,60 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (cold paid-wrap quarry handoff)
+## Current release checkpoint — 2026-09-01 (collision-owned laden-return paid band)
+
+Accepted cycle-1,800 receipt `4ecfe28d` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,291, an increase of 2. Expansion Human 10 advances from
+fixture 430 to 432. The cycle-400 fleet remains 50 clean / 2 divergent / 0
+failed under receipt `944c706b`. The long receipt is retained at
+`.bne-artifacts/runs/4ecfe28d4c13b88041707a1d0c487372afc8315d04c68db3998b1eef000f8c91`.
+Its manifest has SHA-256
+`bfe73142bcadca452ba9a48d5ec7983f68b0ceb4f9a07f5ff7744c4e9906122e`
+and binds dirty engine-input identity
+`aef23d0218e53041cf4ede5efb4a245dcf6b624088dfcd26031ebf03261b01b9`
+at base revision `b8f060b` to authenticated, replayable source capsule
+`47fc2c78490d38bacc38e5fdcd2dbc513b030100d8effbf411223d42790e27d9`.
+
+Behavioral delta: a laden land return farther than the depot skirt takes its
+paid refusal band from native's packed collision generation as well as Java's
+separate refusal projection. Generations eight through fourteen own Move
+15..1; generation fifteen remains the wrap visit. This lets a fresh
+multi-heading return route pay on collision eight when the refusal projection
+trails by one, while aligned direct and queued-return ladders retain their
+established behavior. The implementation contains no mission, map,
+coordinate, fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 10 peon slot 1438 / Java unit 162 is carrying
+gold back to its depot with the cached route `NE,NE,NW,W`. Native and Java are
+both at collision seven / Move timer one on fixture 414. On fixture 415 native
+advances the packed generation to eight while Java's refusal projection is
+still seven, and immediately buys Move 15..1. The corrected Java path does the
+same. Both sides retain the identical route until its timer-one wake and
+consume north-east onto `(15,115)` on fixture 430. The new fixture-432 knight
+order finding is independent.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman10-c430-collision-owned-laden-return/runs/0e9c076cb28e2b48925ccdd13c3cb7057a900189dc4ad84b249614358a71c739`
+proves the focused assertion executes and fails on `b8f060b`, then executes
+and passes on the candidate. All 42 selected expansion Human 10 and laden-
+return controls pass, as do both fixed 52-case gates. The long receipt's source
+capsule authenticates with zero sealed untracked inputs. The previously
+accepted executable next-level gate remains the current milestone proof;
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now expansion Human 10 at fixture 432,
+followed by expansion Human 5 at 435, expansion Orc 11 at 438, Orc 8 at 442,
+expansion Orc 12 at 444, expansion Human 8 at 446, expansion Human 7 at 447,
+expansion Orc 5 at 449, Orc 5 at 454, and Orc 11 at 459.
+
+## Prior release checkpoint — 2026-09-01 (cold paid-wrap quarry handoff)
 
 Accepted cycle-1,800 receipt `feea635e` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

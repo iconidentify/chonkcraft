@@ -1786,6 +1786,27 @@ class Xhuman10DamageTimingRealDataTest {
                 "native wakes after the bounded band and replans south");
         assertEquals(8, peon.battleNetCollisionCounter(),
                 "the paid refusal generation remains attached to the route");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 414) {
+            mission.tick();
+        }
+        assertEquals(7, peon.battleNetCollisionCounter());
+        assertEquals(1, peon.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(8, peon.battleNetCollisionCounter(),
+                "the eighth native collision generation owns the paid band");
+        assertEquals(15, peon.battleNetAnimationTimer(),
+                "the generation-eight visit arms Move 15 on fixture 415");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 430) {
+            mission.tick();
+        }
+        assertEquals(15, peon.tileX());
+        assertEquals(115, peon.tileY(),
+                "the paid wake consumes the native north-east route head");
+        assertEquals(8, peon.battleNetCollisionCounter(),
+                "the route keeps the collision generation which paid its wait");
     }
 
     @Test
