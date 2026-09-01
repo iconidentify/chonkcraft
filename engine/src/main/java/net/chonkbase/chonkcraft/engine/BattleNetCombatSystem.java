@@ -935,16 +935,32 @@ final class BattleNetCombatSystem {
                 return;
             }
             // Route bytes live on CUnit and survive the Patrol -> Attack pop,
-            // but native moves their cursor to 20 on the timer-one handoff.
-            // This is a park, not a hard path refusal: retain no high-nibble
-            // refusal and let the following Move-start/1 visit lay and spend
-            // the chase route immediately.
+            // and a free retained head transfers directly to Move on the
+            // timer-one handoff. Orc 11 archer 1559 keeps N behind its opening
+            // northwest Patrol stride, completes Attack 3,2,1 and consumes N
+            // on fixture 327. An absent or refused head instead parks at route
+            // index twenty and returns; XHuman 12 ogre 1356 exposes Move-1 on
+            // fixture 75 and writes its northeast refill on fixture 76.
+            boolean retainedFreeHead = false;
+            if (unit.pathLength() > 0) {
+                int heading = unit.peekHeading();
+                int stride = world.battleNetMovementStride(unit);
+                retainedFreeHead = world.canEnter(unit,
+                        unit.tileX() + Direction.deltaX(heading) * stride,
+                        unit.tileY() + Direction.deltaY(heading) * stride);
+            }
             unit.setBattleNetLandPatrolAttackConstruction(false);
-            unit.setBattleNetLandPatrolAttackRoutePending(true);
-            unit.clearPath();
-            unit.setRouteSpent(false);
-            unit.setBattleNetCollisionCounter(
-                    unit.battleNetCollisionCounter() + 1);
+            // Only a newly written post-park route is the one-probe handoff
+            // tracked by LandPatrolAttackRoutePending. A transferred Patrol
+            // byte remains ordinary cached Move authority after it lands.
+            unit.setBattleNetLandPatrolAttackRoutePending(
+                    !retainedFreeHead);
+            if (!retainedFreeHead) {
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setBattleNetCollisionCounter(
+                        unit.battleNetCollisionCounter() + 1);
+            }
             unit.setChasing(true);
             int moveStart = world.battleNetSequence == null ? -1
                     : world.idle.battleNetSequenceStart(unit,
@@ -960,7 +976,9 @@ final class BattleNetCombatSystem {
             if (move != null && unit.animation().current() != move) {
                 unit.animation().switchTo(move);
             }
-            return;
+            if (!retainedFreeHead) {
+                return;
+            }
         }
         if (unit.battleNetLandPatrolAttackRoutePending()
                 && unit.battleNetRefusalHold()
@@ -2199,7 +2217,8 @@ final class BattleNetCombatSystem {
                     if (!retainedReplanConstruction) {
                         unit.setBattleNetChaseReplanResidualHold(false);
                     }
-                    if (replanResidualHold) {
+                    if (replanResidualHold
+                            && !unit.battleNetLandPatrolMoveBody()) {
                         // The hold ends the first pixel leg of a route laid by
                         // a melee retarget. Retail keeps that provenance for
                         // the following Move decision: if the cached next
@@ -2208,6 +2227,9 @@ final class BattleNetCombatSystem {
                         // XHuman 12 grunt 1492 settles at fixture 38, pays the
                         // Attack-four tail, parks the stale E route at 41, and
                         // only then plans the blocked SW detour at 42.
+                        // A direct land-Patrol Attack is different: its Move
+                        // body owns the retained route across the constructor,
+                        // including archer 1559's free NW byte on fixture 362.
                         unit.setBattleNetRetargetResidualRoutePark(true);
                     }
                     if (replanResidualHold
@@ -2311,7 +2333,8 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetBlockedChaseAttackConstruction(true);
                         unit.setBattleNetAttackRefusalRecoveryStage(0);
-                    } else if (spentSingleReplanConstruction
+                    } else if (unit.battleNetLandPatrolMoveBody()
+                            || spentSingleReplanConstruction
                             || paidTailWrapConstruction
                             || navalReplanConstruction) {
                         // A spent one-byte replacement has no live Move tail
@@ -2321,13 +2344,16 @@ final class BattleNetCombatSystem {
                         // 3,2,1. Naval refreshed-goal routes likewise retain
                         // their tail while the real Attack cursor drains
                         // (XOrc 11 destroyer 1519, fixtures 159..162). In all
-                        // three cases construction is already
+                        // cases construction is already
                         // exposed, so drain it directly and let timer one
                         // return ownership to Move. XHuman 12 slot 1476 does
                         // this with an empty tail at fixtures 124..127;
                         // XHuman 10 slot 1497 keeps SE,SE,NE through fixtures
-                        // 90..92 and spends SE on 93. A surrogate order delay
-                        // leaves the visible Attack cursor frozen at three.
+                        // 90..92 and spends SE on 93. A direct land-Patrol
+                        // Attack carries the same real constructor: Orc 11
+                        // archer 1559 exposes 2039/3,2,1 on fixtures 359..361
+                        // and spends NW on 362. A surrogate order delay leaves
+                        // the visible Attack cursor frozen at three.
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetAttackRefusalRecoveryStage(2);
                     } else {
@@ -7383,7 +7409,15 @@ final class BattleNetCombatSystem {
         int savedTimer = unit.battleNetAnimationTimer();
         boolean savedStepReady = unit.battleNetChaseStepReady();
         boolean savedBorrowedMove = unit.battleNetBorrowedMoveForStep();
+        boolean savedLandPatrolMoveBody = saved == Unit.Order.ATTACK
+                && unit.battleNetLandPatrolMoveBody();
         unit.setOrder(Unit.Order.MOVE);
+        if (savedLandPatrolMoveBody) {
+            // MOVE is only the Java call-seam label below. Preserve the native
+            // action provenance both for the Move cadence used by stepMove
+            // and for the Attack constructor reached when its pixels settle.
+            unit.setBattleNetLandPatrolMoveBody(true);
+        }
         unit.setBattleNetSequenceOffset(savedOffset);
         unit.setBattleNetAnimationTimer(savedTimer);
         unit.setBattleNetChaseStepReady(savedStepReady);
@@ -7412,6 +7446,9 @@ final class BattleNetCombatSystem {
                 || (saved == Unit.Order.ATTACK
                         && unit.order() == Unit.Order.ATTACK_GROUND)) {
             unit.setOrder(saved);
+            if (savedLandPatrolMoveBody) {
+                unit.setBattleNetLandPatrolMoveBody(true);
+            }
         }
         unit.setBattleNetSequenceOffset(offsetAfter);
         unit.setBattleNetAnimationTimer(timerAfter);

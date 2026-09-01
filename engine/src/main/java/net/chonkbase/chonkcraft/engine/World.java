@@ -14773,6 +14773,11 @@ public final class World {
         Unit.Order interrupted = unit.order();
         if (landPatrolHandoff) {
             if (orderAttack(unit, target, false, false)) {
+                // Direct Attack is the continuation of this Patrol-owned Move
+                // program. Keep script.bin pixel pacing across its chase;
+                // Orc 11 archer 1559's northwest residual otherwise settles
+                // on fixture 360 instead of native fixture 359.
+                unit.setBattleNetLandPatrolMoveBody(true);
                 // The land action pop already seeds Attack at timer three.
                 // Mark who owns those quiet calls; unlike the naval seam,
                 // promotion did not share a visit with the first countdown
@@ -15270,6 +15275,9 @@ public final class World {
         // on 61 and left the assault standing through 75.
         boolean openingLandAssaultPatrol =
                 battleNetOpeningLandAssaultPatrol(unit);
+        if (openingLandAssaultPatrol) {
+            unit.setBattleNetLandPatrolMoveBody(true);
+        }
         boolean queuedOpeningLandAttack = openingLandAssaultPatrol
                 && battleNetPatrolQueueAcquire(unit);
         boolean openingCapitalStride = standingPatrol
@@ -15283,6 +15291,28 @@ public final class World {
                 && !patrolResidualOwnsVisit
                 && battleNetPatrolAcquire(unit)) {
             return;
+        }
+        // A freshly constructed behavior-two land Patrol lends its first
+        // committed stride to Move. Generic presentation autoAttack must not
+        // intercept the interior visits. When that one body reaches OP0,
+        // settle it, scan once, then let Patrol consume the next cached byte.
+        // Orc 11 archer 1560 first-steps north at fixture 310, settles and
+        // banks direct Attack while taking the second north byte at 326, then
+        // promotes Attack when those pixels land at 342. The provenance gate
+        // excludes knight 1558's ordinary multi-heading Patrol at fixture 242.
+        boolean landPatrolMoveBodyOp0 = false;
+        if (unit.battleNetLandPatrolMoveBody()
+                && unit.order() == Unit.Order.PATROL
+                && unit.pendingAttack() == null
+                && unit.isMoving()) {
+            movement.walkPixels(unit);
+            if (unit.isMoving()) {
+                return;
+            }
+            landPatrolMoveBodyOp0 = true;
+            if (!battleNetPatrolQueueAcquire(unit)) {
+                unit.setBattleNetLandPatrolMoveBody(false);
+            }
         }
         // Drain residual before acquisition and leftover free-consume. A
         // double-step sea patrol used to walk residual only inside walkTowards
@@ -15555,6 +15585,7 @@ public final class World {
                 && !unit.isMoving();
         if (!standingPatrol && !awaitingFirstPatrolStep
                 && !queuedOpeningLandAttack
+                && !landPatrolMoveBodyOp0
                 && !battleNetLandPatrolAttackHandoff(unit)
                 && unit.pendingAttack() == null
                 && combat.autoAttack(unit)) {

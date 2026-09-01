@@ -996,6 +996,22 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("a land-Patrol Attack keeps its native Move-body ownership")
+    void landPatrolAttackMoveBodyRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-archer"), 0, 10, 10);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setBattleNetLandPatrolMoveBody(true);
+
+        Unit loaded = find(reload(bench), "unit-archer");
+
+        assertEquals(Unit.Order.ATTACK, loaded.order());
+        assertTrue(loaded.battleNetLandPatrolMoveBody(),
+                "reload must not replace the Patrol-owned Move cadence");
+    }
+
+    @Test
     @DisplayName("a hard attack refusal recovery keeps its native handoff stage")
     void attackRefusalRecoveryStageRoundTrips() throws IOException {
         Bench bench = bench();

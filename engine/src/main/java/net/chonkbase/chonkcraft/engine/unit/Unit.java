@@ -390,6 +390,16 @@ public final class Unit {
     private int battleNetMovePaceTimer;
 
     /**
+     * A freshly constructed behavior-two land Patrol owns its first Move body.
+     *
+     * <p>The marker survives the borrowed {@link Order#MOVE} used to commit
+     * the opening stride and, when that body banks direct Attack, continues
+     * to select the same native Move cadence for its chase. It clears when
+     * the first body finds no target or the resulting order is replaced.</p>
+     */
+    private boolean battleNetLandPatrolMoveBody;
+
+    /**
      * Patrol queued by retail BNE's game-creation ready pass.
      *
      * <p>This cannot use the ordinary command queue: the Java order loop pops
@@ -1686,6 +1696,9 @@ public final class Unit {
         boolean borrowedPatrolMove = order == Order.MOVE
                 && battleNetBorrowedMoveForStep
                 && previous == Order.PATROL;
+        if (order != Order.PATROL && !borrowedPatrolMove) {
+            battleNetLandPatrolMoveBody = false;
+        }
         if (order != Order.PATROL && !borrowedPatrolMove) {
             battleNetNavalPaidParkedRoute = false;
         }
@@ -3749,6 +3762,14 @@ public final class Unit {
 
     public void setBattleNetMovePaceTimer(int timer) {
         battleNetMovePaceTimer = Math.max(0, timer);
+    }
+
+    public boolean battleNetLandPatrolMoveBody() {
+        return battleNetLandPatrolMoveBody;
+    }
+
+    public void setBattleNetLandPatrolMoveBody(boolean active) {
+        battleNetLandPatrolMoveBody = active;
     }
 
     public boolean hasBattleNetPendingPatrol() {

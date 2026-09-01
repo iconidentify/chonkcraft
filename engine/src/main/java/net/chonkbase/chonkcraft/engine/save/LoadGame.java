@@ -978,6 +978,10 @@ public final class LoadGame {
             unit.setBattleNetLandPatrolAttackRoutePending(
                     truthy(state.rawGet("landPatrolAttackRoutePending")));
         }
+        if (state.rawGet("landPatrolMoveBody") != null) {
+            unit.setBattleNetLandPatrolMoveBody(
+                    truthy(state.rawGet("landPatrolMoveBody")));
+        }
         if (state.rawGet("residualEmptyApproachIdlePending") != null) {
             unit.setBattleNetResidualEmptyApproachIdlePending(truthy(
                     state.rawGet("residualEmptyApproachIdlePending")));

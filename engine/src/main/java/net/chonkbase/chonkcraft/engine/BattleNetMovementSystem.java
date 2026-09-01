@@ -9150,11 +9150,11 @@ final class BattleNetMovementSystem {
         return unit.battleNetDoubleStep()
                 || unit.battleNetRepairStride()
                 || unit.returningToDepot() && unit.carried() > 0
-                // A behavior-two land Patrol banks direct Attack at its first
-                // OP0, then the retail Move program owns every residual pixel
-                // until the pop. Orc 11 archer 1559 / Java 41 diverges from
-                // the presentation animation at fixture 314 and settles the
-                // northwest stride under Attack on fixture 324.
+                // A fresh behavior-two land Patrol enters the retail Move
+                // program before its first scan. If that OP0 banks direct
+                // Attack, the program keeps owning residual pixels until the
+                // pop. Orc 11 archers 1560 and 1559 prove the two phases.
+                || unit.battleNetLandPatrolMoveBody()
                 || landPatrolAttackPace
                 || "unit-critter".equals(unit.type().ident())
                 || "unit-skeleton".equals(unit.type().ident())

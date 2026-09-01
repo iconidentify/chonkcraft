@@ -177,6 +177,116 @@ class Orc11RecurringLandPatrolPassRealDataTest {
         assertEquals(Unit.Order.ATTACK, archer.order(),
                 "the queued direct Attack promotes as the final pixels settle");
         assertNotNull(archer.target());
+
+        while (fixtureCycle(world) < 327) {
+            mission.tick();
+        }
+        assertEquals(119, archer.tileX());
+        assertEquals(29, archer.tileY(),
+                "Attack's timer-one handoff spends its first chase byte");
+        assertEquals(3808, archer.pixelX());
+        assertEquals(960, archer.pixelY(),
+                "the logical north step opens cold on its commit visit");
+        assertEquals(Unit.Order.ATTACK, archer.order());
+
+        while (fixtureCycle(world) < 343) {
+            mission.tick();
+        }
+        assertEquals(118, archer.tileX());
+        assertEquals(28, archer.tileY(),
+                "the transferred Patrol byte has no one-probe route park");
+        assertEquals(3808, archer.pixelX());
+        assertEquals(928, archer.pixelY());
+
+        while (fixtureCycle(world) < 359) {
+            mission.tick();
+        }
+        assertEquals(3776, archer.pixelX());
+        assertEquals(896, archer.pixelY(),
+                "direct Attack retains the Patrol-owned Move cadence");
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(3, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(360, fixtureCycle(world));
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(2, archer.battleNetAnimationTimer(),
+                "the direct Attack constructor counts down immediately");
+
+        mission.tick();
+        assertEquals(361, fixtureCycle(world));
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(362, fixtureCycle(world));
+        assertEquals(117, archer.tileX());
+        assertEquals(27, archer.tileY(),
+                "Attack consumes the next chase byte after its 3,2,1 body");
+    }
+
+    @Test
+    @DisplayName("orc 11's unqueued archer patrol keeps the retail Move body")
+    void orc11UnqueuedArcherPatrolKeepsRetailMoveBody() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit archer = unitById(world, 40);
+        assertNotNull(archer,
+                "Orc 11 has no Java 40 / native slot 1560 archer");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 307) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, archer.order());
+        assertEquals(2, archer.battleNetAiBehavior());
+        assertEquals(1977, archer.battleNetSequenceOffset());
+        assertEquals(3, archer.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 310) {
+            mission.tick();
+        }
+        assertEquals(120, archer.tileX());
+        assertEquals(31, archer.tileY());
+        assertEquals(1024, archer.pixelY(),
+                "the logical north step opens cold on its commit visit");
+        assertTrue(archer.battleNetMovePaceOffset() >= 0,
+                "the Patrol stride arms the native Move pace at cold commit");
+        assertNull(archer.pendingAttack(),
+                "this Patrol OP0 has not banked an attack yet");
+
+        mission.tick();
+        assertEquals(311, fixtureCycle(world));
+        assertEquals(1021, archer.pixelY(),
+                "script.bin spends three northbound pixels after cold commit");
+
+        while (fixtureCycle(world) < 326) {
+            mission.tick();
+        }
+        assertEquals(120, archer.tileX());
+        assertEquals(30, archer.tileY());
+        assertEquals(992, archer.pixelY());
+        assertEquals(Unit.Order.PATROL, archer.order(),
+                "the Move-body OP0 banks Attack behind one more Patrol stride");
+        assertNotNull(archer.pendingAttack());
+
+        while (fixtureCycle(world) < 342) {
+            mission.tick();
+        }
+        assertEquals(3840, archer.pixelX());
+        assertEquals(960, archer.pixelY());
+        assertEquals(Unit.Order.ATTACK, archer.order(),
+                "the queued Attack pops when the second north stride settles");
     }
 
     private static int fixtureCycle(World world) {

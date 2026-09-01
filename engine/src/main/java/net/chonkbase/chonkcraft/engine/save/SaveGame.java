@@ -826,6 +826,9 @@ public final class SaveGame {
         if (unit.battleNetLandPatrolAttackRoutePending()) {
             state.append(" landPatrolAttackRoutePending = true,");
         }
+        if (unit.battleNetLandPatrolMoveBody()) {
+            state.append(" landPatrolMoveBody = true,");
+        }
         if (unit.battleNetResidualEmptyApproachIdlePending()) {
             state.append(" residualEmptyApproachIdlePending = true,");
         }
