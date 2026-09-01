@@ -15,7 +15,53 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (person-offer chase and paid residual wakes)
+## Current release checkpoint — 2026-09-01 (recurring land-patrol ranged tail handoff)
+
+Accepted cycle-1,800 receipt `f9b86fd5` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,660 to 50,662. Retail Orc 11 is the only changed case,
+advancing from exact through fixture 458 to exact through fixture 460. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`97126937`. The long receipt is retained at
+`.bne-artifacts/runs/f9b86fd5d79d694bf8283f911e39971ae14b1a5c442c27dd9ea0df3ac4501584`.
+Its manifest has SHA-256
+`b69ce01dd35f4c33d3e59d9c8470104f9ad62aad8840d4a4e143c3cd4724b3d3`
+and binds dirty engine-input identity
+`70f230fe7ebd8911a277744ac49d64537cc347a8c2096c6cf3816cb78f7260a7`
+at base revision `6d42a1b` to authenticated, replayable source capsule
+`c1295b562b776bd7ecab9e1312a113faaca32cab0e62ca273e9df7583e0b743c`.
+
+Behavioral delta: a completed mobile-ranged Attack body that is still owned by
+a behavior-two land-assault Patrol Move body hands an out-of-range replacement
+quarry directly to Move. It does not pay a second Attack constructor delay.
+Retail Orc 11 archer slot 1559 / Java 41 is the positive witness: after its
+fixture-458 completed body, the fixture-459 scan replaces the sapper with the
+moving ogre, publishes `NW,N,NW,NW,N,NW`, and consumes northwest on that same
+visit. The same archer's initial Patrol-to-Attack handoff at fixtures 359--362
+and ordinary non-assault ranged retargets remain constructor-paying controls.
+The implementation contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/7a61b87a3e339dbee4db3a40ffcdc572938175434cdc32dc9cd5594a66137db3`
+proves the focused assertion executes and fails on `6d42a1b`, then executes
+and passes on the candidate. All 44 selected land-patrol, ranged-retarget,
+behavior-one, worker-refusal, and expansion Orc 11 controls pass with zero
+skips. Both fixed 52-case gates pass. An additional unfiltered reactor run was
+not used as an acceptance gate: it encountered the repository's existing red
+research contracts in AI build/shove/harvest, command-plan, and adjacent open
+families and was stopped after those failures; it is not claimed green.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier. The earliest unpaused fleet finding is now retail Orc 11 fixture
+461: native critter slot 1532 remains Still while Java 68 enters Move. The
+baseline and accepted candidate have identical asynchronous draw sequences
+across fixtures 456--464, so this is a newly exposed pre-existing idle-choice
+disagreement rather than an RNG regression from the ranged-tail fix. Continue
+from the retained c461 field packet and causal ledgers before editing behavior.
+
+## Prior release checkpoint — 2026-09-01 (person-offer chase and paid residual wakes)
 
 Accepted cycle-1,800 receipt `92a5b8aa` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

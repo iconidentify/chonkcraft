@@ -226,6 +226,54 @@ class Orc11RecurringLandPatrolPassRealDataTest {
     }
 
     @Test
+    @DisplayName("orc 11's recurring archer tail hands its retarget directly to Move")
+    void orc11RecurringArcherTailHandsItsRetargetDirectlyToMove() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        Unit archer = unitById(world, 41);
+        assertNotNull(archer,
+                "Orc 11 has no Java 41 / native slot 1559 archer");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 458) {
+            mission.tick();
+        }
+
+        assertEquals(Unit.Order.ATTACK, archer.order());
+        assertTrue(archer.battleNetLandPatrolMoveBody(),
+                "the recurring direct Attack retains its Patrol Move-body owner");
+        assertEquals(116, archer.tileX());
+        assertEquals(26, archer.tileY());
+        assertEquals(2054, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer(),
+                "fixture 458 is the completed ranged-tail callback");
+
+        mission.tick();
+        assertEquals(459, fixtureCycle(world));
+        assertNotNull(archer.target());
+        assertEquals(19, archer.target().id(),
+                "the tail scan replaces the live sapper with the moving ogre");
+        assertEquals(115, archer.tileX(),
+                "the paid recurring tail consumes northwest on the scan visit");
+        assertEquals(25, archer.tileY());
+        assertEquals(3712, archer.pixelX(),
+                "logical route commit precedes the first pixel debit");
+        assertEquals(832, archer.pixelY());
+        assertEquals(1985, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer());
+    }
+
+    @Test
     @DisplayName("orc 11's unqueued archer patrol keeps the retail Move body")
     void orc11UnqueuedArcherPatrolKeepsRetailMoveBody() {
         AssetSource assets = AssetSource.fromEnvironment();

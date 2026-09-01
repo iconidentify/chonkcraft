@@ -11792,6 +11792,11 @@ final class BattleNetCombatSystem {
                         && world.targets.inAttackRange(unit, candidate);
                 boolean mobileRangedChase = rangedOp0
                         && !unit.battleNetStationaryAttack();
+                boolean recurringLandPatrolRangedTailChase =
+                        mobileRangedChase
+                        && unit.type().moveType() == UnitType.Movement.LAND
+                        && unit.battleNetAiBehavior() == 2
+                        && unit.battleNetLandPatrolMoveBody();
                 boolean takeOutOfRange = candidate != null
                         && candidate.isAlive()
                         && !inRange
@@ -11853,7 +11858,9 @@ final class BattleNetCombatSystem {
                         world.debitBattleNetAttackLoopSyncRand(unit);
                     }
                     unit.setBattleNetSequenceOffset(attackStart);
-                    unit.setBattleNetAnimationTimer(3);
+                    unit.setBattleNetAnimationTimer(
+                            recurringLandPatrolRangedTailChase && !inRange
+                                    ? 1 : 3);
                     // Tail -> OP0 replacement creates a fresh Attack body.
                     // The previous body's recovery and landed bits are target
                     // scoped. Carrying either through the replacement can end
@@ -11915,7 +11922,8 @@ final class BattleNetCombatSystem {
                     unit.setBattleNetTailWrapRouteTarget(candidate);
                     unit.setFighting(false);
                     unit.setChasing(false);
-                    unit.setBattleNetAttackWrapDestArmPending(true);
+                    unit.setBattleNetAttackWrapDestArmPending(
+                            !recurringLandPatrolRangedTailChase);
                     if (!rangedOp0 && sequenceTarget != null
                             && sequenceTarget.removed()
                             && !sequenceTarget.isDying()
@@ -11950,6 +11958,20 @@ final class BattleNetCombatSystem {
                                 sequenceTarget == null ? -1
                                         : sequenceTarget.id(),
                                 candidate.id());
+                    }
+                    if (recurringLandPatrolRangedTailChase) {
+                        // A behavior-two land assault retains the Patrol
+                        // Move-body owner after its queued direct Attack has
+                        // become current. When a completed ranged body
+                        // replaces an out-of-range quarry, that already-paid
+                        // owner hands the fresh route straight to Move; it
+                        // does not construct another Attack 3,2,1. Orc 11
+                        // archer 1559 changes sapper to ogre and consumes the
+                        // northwest route head on fixture 459. Its initial
+                        // Patrol -> Attack handoff at fixtures 359..362 is the
+                        // held-out constructor-paying boundary.
+                        unit.animation().clearCurrent();
+                        return false;
                     }
                     return true;
                 }
