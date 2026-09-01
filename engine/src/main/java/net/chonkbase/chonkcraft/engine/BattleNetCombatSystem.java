@@ -11361,6 +11361,42 @@ final class BattleNetCombatSystem {
             unit.setBattleNetSequenceOffset(-1);
             return false;
         }
+        if (tick.actionMarker()
+                && attackStart >= 0
+                && offset != attackStart
+                && sequenceTarget != null
+                && !world.isEnemyPlayer(
+                        unit.player(), sequenceTarget.player())
+                && unit.savedOrder() == Unit.Order.PATROL
+                && unit.battleNetAiBehavior() == 6
+                && unit.hasBattleNetAiHome()
+                && unit.type() != null && unit.type().seaUnit()
+                && World.isBattleNetCapitalShip(unit.type().ident())) {
+            // A saved capital Patrol owns the epilogue when its retained
+            // CUnitPtr stops naming an enemy during the already-paid Attack
+            // body. The target may remain a live Die/corpse object, but its
+            // ownership handoff has invalidated the order before the tail's
+            // ordinary spatial free scan. XOrc 11 battleship 1539 retains
+            // corpse 1525 through its player-five -> neutral handoff and the
+            // final Attack wait, then restores behavior six toward (21,34)
+            // on fixture 397 instead of selecting destroyer 1521.
+            world.finishAttackOrder(unit);
+            unit.setOrderTarget(
+                    unit.battleNetAiHomeX(), unit.battleNetAiHomeY());
+            unit.setBattleNetCapitalPatrolRestoreArming(true);
+            int stillStart = world.idle.battleNetStillSequenceStart(unit);
+            if (stillStart >= 0) {
+                unit.setBattleNetSequenceOffset(stillStart);
+                unit.setBattleNetAnimationTimer(3);
+            }
+            AnimationSet set = unit.type().animationSet();
+            Animation still = set == null ? null
+                    : set.getOrStill(AnimationSet.State.STILL);
+            if (still != null && unit.animation().current() != still) {
+                unit.animation().switchTo(still);
+            }
+            return true;
+        }
         // This cursor is already the authority for the swing and its OP10
         // damage boundary, so it must also own the sprite frame selected on
         // the same visit.  Leaving frames to the independent presentation

@@ -731,6 +731,10 @@ public final class LoadGame {
             unit.setBattleNetNavalGuardReturnArming(
                     truthy(state.rawGet("navalGuardReturnArming")));
         }
+        if (state.rawGet("capitalPatrolRestoreArming") != null) {
+            unit.setBattleNetCapitalPatrolRestoreArming(
+                    truthy(state.rawGet("capitalPatrolRestoreArming")));
+        }
         if (state.rawGet("carrying") != null) {
             UnitType.Resource carrying = resourceOf(string(state.rawGet("carrying")));
             if (carrying != null) {
