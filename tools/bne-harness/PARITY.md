@@ -15,7 +15,69 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-525 component-distance FindDeposit)
+## Current release checkpoint — 2026-08-31 (cycle-358 retained resource-hit Move restart)
+
+Accepted cycle-1,800 receipt `c46fb992` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,410, an increase of 11. Human 8 advances from fixture 347
+to 358. The cycle-400 fleet remains 41 clean / 11 divergent / 0 failed under
+receipt `534a1ed9`. The long receipt is retained at
+`.bne-artifacts/runs/c46fb992f7b86d019b5c2fab7fa605a541533ee27dd4726148a79bf6085e9e57`.
+Its manifest has SHA-256
+`927a50b258d31f4839ff6b0dc3a624c4ed30f5f18393c464ef3485dcbe1d44fc`
+and binds dirty engine-input identity `7dc7d69b` at base revision `e5db4fc` to
+replayable source capsule
+`6128005dcf59c8fbaca9f5ca09f2d5c86272783e10e6cafd30f2cdf6a835fa20`.
+
+Behavioral delta: when a non-aggressive resource worker's temporary hit-flee
+Move reaches its point while another live offered hit remains, the saved
+Harvest order still owns the reaction. Native runs that worker's common
+active-order idle callback, then re-enters the resource-hit constructor rather
+than clearing the offer and restoring Harvest immediately. The restart keeps
+raw Move, consumes the callback draw plus the two escape-point draws, and
+restores the saved order after the new three-call animation body. Ordinary
+Move completion and the first resource-hit reaction retain their existing
+paths. The implementation contains no mission, map, coordinate, fixture,
+cycle, faction, or unit-ID branch.
+
+Proof delta: Human 8 peasant native slot 1536 / Java 64 retains the fixture-331
+blow while its first escape stride drains. At fixture 346 it is Move with a
+saved Harvest order and a live offered attacker. Native fixture 347 remains
+Move, authors point `(89,60)`, opens Still sequence 2595 with timer 3, and
+restores Harvest at fixture 350; Java formerly took generic Move completion
+and became Still. Static analysis anchors the active-order callback draw at
+`0x0040ad53`, restart call at `0x0040a61f`, point draws at `0x0040a750` and
+`0x0040a77f`, and `GiveOrder` at `0x0040a80c`. Two authenticated local Branch
+Witness captures prove the callback returns `0x3290`, the constructor then
+draws `0x6ddf` / `0x6d76`, and writer `0x0045140e` stores the resulting point.
+The earlier Java path was exactly one asynchronous draw behind and authored
+`(82,61)`.
+
+Efficacy receipt
+`.bne-test-efficacy/c347-human8-retained-hit-restart/runs/6508a673ec1dee554c560d163b940343bc5c5888059c419db5e7730a548a33ec`
+proves the focused assertion fails on `e5db4fc` and passes on the candidate.
+All 32 resource-hit and moving-quarry family tests pass. The Human 1
+stand-and-fight control fails identically on baseline and candidate and is
+therefore baseline-equivalent, not green evidence. Both fixed 52-case gates
+pass. The ordinary executable next-level gate exits zero after 209 Python
+checks (four skipped) and 96 engine/desktop checks; its command worklist
+remains 11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now expansion Human
+4 at fixture 350, followed by expansion Human 2 at 352, Human 8 at 358,
+expansion Orc 11 at 361, Orc 8 at 364, expansion Orc 12 at 374, expansion
+Human 10 at 375, Orc 12 at 383, and expansion Human 6 at 525. Human 8's new
+finding is critter slot 1492 raw Move natively versus Still in Java.
+
+## Prior release checkpoint — 2026-08-31 (cycle-525 component-distance FindDeposit)
 
 Accepted cycle-1,800 receipt `102fc793` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

@@ -4601,13 +4601,35 @@ final class BattleNetHarvestSystem {
      * wander on fixture 298.</p>
      */
     private void beginBattleNetStrandedResourceHitFlee(Unit worker) {
+        beginBattleNetStrandedResourceHitFlee(worker, false);
+    }
+
+
+    /** Restarts a temporary resource-hit Move for a blow retained in flight. */
+    boolean restartBattleNetStrandedResourceHitFlee(Unit worker) {
+        return beginBattleNetStrandedResourceHitFlee(worker, true);
+    }
+
+
+    private boolean beginBattleNetStrandedResourceHitFlee(Unit worker,
+            boolean retainingSavedResourceOrder) {
         Unit aggressor = worker == null ? null : worker.offeredTarget();
         if (worker == null || aggressor == null
                 || !aggressor.isAlive() || aggressor.isDying()
                 || !aggressor.isOnMap() || worker.isAggressive()
-                || worker.savedOrder() != null
+                || (retainingSavedResourceOrder
+                        ? worker.savedOrder() != Unit.Order.HARVEST
+                        : worker.savedOrder() != null)
                 || world.battleNetSequence == null) {
-            return;
+            return false;
+        }
+        if (retainingSavedResourceOrder) {
+            // The settle visit runs FUN_0040ad30 for this worker before
+            // FUN_0040a5e0 re-enters the flee constructor. Human 8's second
+            // reaction consumes 0x3290 there, leaving 0x6ddf/0x6d76 for the
+            // native point (89,60). This is the same active-order idle draw
+            // the empty-route caller owns before the first reaction.
+            world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
         }
         int face = aggressor.heading();
         int x = worker.tileX() + Direction.deltaX(face) * 4
@@ -4622,7 +4644,9 @@ final class BattleNetHarvestSystem {
         x = normalized[0];
         y = normalized[1];
 
-        worker.setSavedOrder(Unit.Order.HARVEST);
+        if (!retainingSavedResourceOrder) {
+            worker.setSavedOrder(Unit.Order.HARVEST);
+        }
         worker.clearPath();
         worker.setRouteSpent(false);
         // The constructor band preserves the authored point here until its
@@ -4638,6 +4662,7 @@ final class BattleNetHarvestSystem {
         worker.setBattleNetSequenceOffset(
                 world.idle.battleNetStillSequenceStart(worker));
         worker.setBattleNetAnimationTimer(3);
+        return true;
     }
 
 

@@ -450,6 +450,26 @@ from `(3872,1152)` toward `(3920,1080)` at speed 12 with remaining 72, and
 detonates on the seventh step. Java's BNE profile now ports that model behind
 `Missile.enableBattleNetMotion`; ordinary ChonkCraft Euclidean flight is unchanged.
 
+### Resource-hit escape restart and RNG ownership
+
+Read statically and confirmed with two local Branch Witness captures against
+the pinned executable SHA-256
+`b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807`.
+The resource-hit handler `0x0040a5e0` calls the escape-point constructor
+`0x0040a670` at `0x0040a61f`. The constructor reads the retained attacker's
+direction byte at `+0x0a`, indexes direction deltas using the worker's movement
+class at `+0x1c`, scales each delta by four tiles, and consumes asynchronous
+RNG at `0x0040a750` and `0x0040a77f`. It adds `(random & 7) - 2` on each axis,
+clamps the point to the map, and calls `GiveOrder` at `0x0040a80c`.
+
+When a temporary resource-hit Move settles with a second hit retained, the
+worker first visits the common active-order idle callback `0x0040ad30`; its
+draw at `0x0040ad53` belongs before the re-entry above. Human 8 peasant native
+slot 1536 demonstrates the sequence: the callback returns `0x3290`, the point
+constructor returns `0x6ddf` then `0x6d76`, and the order-point writer at
+`0x0045140e` stores `(89,60)`. Omitting the callback draw shifts constructor
+ownership and instead produces `(82,61)`.
+
 ## Order dispatch and order attributes
 
 Read statically from the pinned target while diagnosing Human 13's ogre in

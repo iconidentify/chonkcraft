@@ -326,6 +326,42 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("a Human 8 resource-hit Move chains the hit retained on its stride")
+    void anHuman8ResourceHitMoveChainsTheHitRetainedOnItsStride() {
+        Mission mission = mission("campaigns/human/level08h");
+        World world = mission.world();
+        Unit peasant = byId(world, 64);
+        assertNotNull(peasant,
+                "native slot 1536 must remain paired with Java peasant 64");
+
+        while (fixtureCycle(world) < 346) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, peasant.order());
+        assertEquals(Unit.Order.HARVEST, peasant.savedOrder());
+        assertNotNull(peasant.offeredTarget(),
+                "the fixture-331 blow remains offered while the stride drains");
+
+        mission.tick();
+        assertEquals(347, fixtureCycle(world));
+        assertEquals(Unit.Order.MOVE, peasant.order(),
+                "native keeps raw action 3 for the chained hit-reaction body");
+        assertEquals(89, peasant.orderTargetX(),
+                "the retained hit authors native's second escape point");
+        assertEquals(60, peasant.orderTargetY());
+        assertEquals(2595, peasant.battleNetSequenceOffset(),
+                "the second reaction opens on the peasant Still sequence");
+        assertEquals(3, peasant.battleNetAnimationTimer());
+
+        mission.tick();
+        mission.tick();
+        mission.tick();
+        assertEquals(350, fixtureCycle(world));
+        assertEquals(Unit.Order.HARVEST, peasant.order(),
+                "the free second escape point restores the saved resource order");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

@@ -1010,7 +1010,14 @@ final class BattleNetMovementSystem {
         // post-settle Still OP0 chased (Human 1 1598 Attack@396 dest-arm@399
         // onto 25,27) instead of staying Still. Native 396 is 4983 Still
         // with 1591 at dist 2; Attack in place only when that grunt
-        // dest-arms adjacent at 401.
+        // dest-arms adjacent at 401. A temporary resource-hit Move is the
+        // exception: its saved resource order owns the reaction, and another
+        // hit retained while the stride drains starts a second reaction body
+        // before RestoreOrder. Human 8 peasant 1536 lands on fixture 347,
+        // authors (89,60), and remains raw Move for that three-call body.
+        if (world.harvest.restartBattleNetStrandedResourceHitFlee(unit)) {
+            return;
+        }
         unit.setOfferedTarget(null);
         world.finishOrder(unit);
         unit.setActionBeforeQueued(null);
