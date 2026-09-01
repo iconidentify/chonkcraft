@@ -740,6 +740,17 @@ fires too early and produces weak position AttackMove instead of queued direct
 Attack. The fixture-cycle boundary corresponds to Java internal cycle plus two
 for this mission: fixture event `F` executes at Java internal cycle `F + 2`.
 
+The same stream closes the promoted Attack's next ownership boundary. The
+gryphon remains at `(16,34)` with its three retained southwest bytes while
+Attack counts `2313/3,2,1` through fixture 439. Fixture 440's opening OP0
+enters the body on the same callback and exposes `2317/6`; the body then pays
+four six-visit waits at `2317`, `2321`, `2325`, and `2329`. Fixture 463 still
+records Attack at `2329/1`. Only the fixture-464 tail goto reaches the next
+OP0, releases the retained Patrol route, commits southwest to `(14,36)`, and
+exposes Move `2259/1` with two route bytes left. Thus the first out-of-range
+Attack selected by an armed-flyer Patrol owns the complete compact Attack body,
+not just its three-call constructor, before chase can spend CUnit's route.
+
 ## Moving siege can surrender a player-clicked building to the free scan
 
 Authenticated UI captures close the player-control question for both siege

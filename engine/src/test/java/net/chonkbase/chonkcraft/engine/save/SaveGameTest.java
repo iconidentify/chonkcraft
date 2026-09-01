@@ -1086,6 +1086,22 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("an armed-flyer Patrol Attack keeps compact-body ownership")
+    void flyerPatrolAttackBodyRoundTrips() throws IOException {
+        Bench bench = bench();
+        Unit attacker = bench.world().createUnit(
+                bench.types().get("unit-gryphon-rider"), 0, 10, 10);
+        attacker.setOrder(Unit.Order.ATTACK);
+        attacker.setBattleNetFlyerPatrolAttackBody(true);
+
+        Unit loaded = find(reload(bench), "unit-gryphon-rider");
+
+        assertEquals(Unit.Order.ATTACK, loaded.order());
+        assertTrue(loaded.battleNetFlyerPatrolAttackBody(),
+                "reload must not release the retained Patrol route early");
+    }
+
+    @Test
     @DisplayName("a hard attack refusal recovery keeps its native handoff stage")
     void attackRefusalRecoveryStageRoundTrips() throws IOException {
         Bench bench = bench();

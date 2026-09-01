@@ -1014,6 +1014,10 @@ public final class LoadGame {
             unit.setBattleNetRangedCloseHitHelpWallFace(
                     truthy(state.rawGet("rangedCloseHitHelpWallFace")));
         }
+        if (state.rawGet("flyerPatrolAttackBody") != null) {
+            unit.setBattleNetFlyerPatrolAttackBody(
+                    truthy(state.rawGet("flyerPatrolAttackBody")));
+        }
         if (state.rawGet("landPatrolAttackRoutePending") != null) {
             unit.setBattleNetLandPatrolAttackRoutePending(
                     truthy(state.rawGet("landPatrolAttackRoutePending")));

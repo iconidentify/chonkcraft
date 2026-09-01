@@ -3417,6 +3417,20 @@ public final class Unit {
     private boolean battleNetNavalPatrolAttackTimerOneReady;
 
     /**
+     * An armed flyer's Patrol-selected direct Attack still owns the compact
+     * Attack body before its retained route may become a chase.
+     */
+    public boolean battleNetFlyerPatrolAttackBody() {
+        return battleNetFlyerPatrolAttackBody;
+    }
+
+    public void setBattleNetFlyerPatrolAttackBody(boolean active) {
+        battleNetFlyerPatrolAttackBody = active;
+    }
+
+    private boolean battleNetFlyerPatrolAttackBody;
+
+    /**
      * A behavior-two land Patrol has handed its committed opening stride to
      * a queued direct Attack. Retail lets Attack own the residual-settle
      * visit, pays its 3,2,1 constructor, then parks the Patrol route at index

@@ -862,6 +862,9 @@ public final class SaveGame {
         if (unit.battleNetRangedCloseHitHelpWallFace()) {
             state.append(" rangedCloseHitHelpWallFace = true,");
         }
+        if (unit.battleNetFlyerPatrolAttackBody()) {
+            state.append(" flyerPatrolAttackBody = true,");
+        }
         if (unit.battleNetLandPatrolAttackRoutePending()) {
             state.append(" landPatrolAttackRoutePending = true,");
         }

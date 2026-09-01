@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (hidden tanker-ready depot exit ownership)
+## Current release checkpoint — 2026-09-01 (armed-flyer Patrol Attack-body ownership)
+
+Accepted cycle-1,800 receipt `f75271c1` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,423, an increase of 68. Expansion Orc 11 advances from
+fixture 438 to 506. The cycle-400 fleet remains 50 clean / 2 divergent / 0
+failed under receipt `3d6edc68`. The long receipt is retained at
+`.bne-artifacts/runs/f75271c1456090202be5c08d8e636efdfef300897d90148aa72f47b3a56dcff7`.
+Its manifest has SHA-256
+`8ce646f7c55a899351df78c7cbf0e12601e6673468c11fcdf4a6387b77a4f384`
+and binds dirty engine-input identity
+`6e9e9fa89e1c4e638ecc7c20d3b4432c7d78e91993dd7db02d7bfc829e96f92a`
+at base revision `8279185` to authenticated, replayable source capsule
+`fbfdc9496535164b72bc0d160846f3361c653df27ea2e0c1276b87ff94ee171a`.
+
+Behavioral delta: an out-of-range direct Attack selected at an armed flyer's
+Patrol opcode-zero marker retains the Patrol route but does not chase as soon
+as its ordinary three-call Attack constructor expires. BNE gives the complete
+compact Attack body callback ownership, including the same-visit entrance
+behind the opening OP0, and releases the retained route only at the body-tail
+OP0. If the quarry enters range during the body, the ordinary sequence owner
+resumes so OP10 and projectile state remain authoritative. The transient
+ownership is save/resume state and clears at every attack/order replacement.
+The implementation contains no mission, map, coordinate, fixture, exact-cycle,
+faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Orc 11 gryphon slot 1589 / Java unit 11 promotes its
+queued direct Attack on fixture 437 at `(16,34)`, Attack `2313/3`, with three
+southwest route bytes retained. Native holds that tile and route through
+Attack `2313/2,1`, enters body `2317/6` on fixture 440, pays the four six-visit
+waits through `2329/1` on fixture 463, and only then commits southwest to
+`(14,36)` on fixture 464 at Move `2259/1`. Java formerly began chase on
+fixture 438. The corrected case is exact through fixture 505; its fixture-506
+battleship Patrol/order-position finding is a different mechanism.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc11-c438-armed-flyer-attack-body/runs/2e8f070bc305a52ca6067a47dc7d432b8b184df6b98b2672c193a2f57d763a4c`
+proves the focused assertion executes and fails on `8279185`, then executes
+and passes on the candidate. All 92 selected armed-flyer, naval/land Patrol,
+expansion Orc 11 combat, and save/resume checks pass. Both fixed 52-case gates
+pass, and the long receipt's source capsule authenticates with zero sealed
+untracked inputs. The ordinary executable next-level gate exits zero after 209
+Python checks (four skipped), 99 engine/desktop checks, and 223 dual-adapter
+command scenarios. Its 11 comparable scenarios remain 6 exact / 5 divergent
+with no regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now Orc 8 at fixture 442, followed by
+expansion Orc 12 at 444, expansion Human 10 at 445, expansion Human 8 at 446,
+expansion Human 7 at 447, expansion Orc 5 at 449, Orc 5 at 454, Orc 11 at 459,
+expansion Human 3 at 463, Orc 9 at 464, Orc 12 at 469, and Orc 14 and
+expansion Orc 10 at 470.
+
+## Prior release checkpoint — 2026-09-01 (hidden tanker-ready depot exit ownership)
 
 Accepted cycle-1,800 receipt `613708b4` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

@@ -381,6 +381,42 @@ class BattleNetFlyerPatrolRealDataTest {
         assertEquals(40, rider.target().tileY());
         assertEquals(2313, rider.battleNetSequenceOffset());
         assertEquals(3, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 438);
+        assertEquals(Unit.Order.ATTACK, rider.order());
+        assertEquals(16, rider.tileX(),
+                "the promoted Attack body owns the callback before chase");
+        assertEquals(34, rider.tileY());
+        assertEquals(3, rider.pathLength(),
+                "the retained Patrol route stays parked through Attack");
+        assertEquals(2313, rider.battleNetSequenceOffset());
+        assertEquals(2, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 440);
+        assertEquals(16, rider.tileX());
+        assertEquals(34, rider.tileY());
+        assertEquals(3, rider.pathLength());
+        assertEquals(2317, rider.battleNetSequenceOffset(),
+                "Attack OP0 enters the native gryphon body before chase");
+        assertEquals(6, rider.battleNetAnimationTimer());
+
+        tickThrough(mission, 463);
+        assertEquals(Unit.Order.ATTACK, rider.order());
+        assertEquals(16, rider.tileX());
+        assertEquals(34, rider.tileY());
+        assertEquals(3, rider.pathLength());
+        assertEquals(2329, rider.battleNetSequenceOffset());
+        assertEquals(1, rider.battleNetAnimationTimer(),
+                "the final Attack-body wait still owns fixture 463");
+
+        tickThrough(mission, 464);
+        assertEquals(Unit.Order.ATTACK, rider.order());
+        assertEquals(14, rider.tileX(),
+                "the body-tail marker releases the retained southwest byte");
+        assertEquals(36, rider.tileY());
+        assertEquals(2, rider.pathLength());
+        assertEquals(2259, rider.battleNetSequenceOffset());
+        assertEquals(1, rider.battleNetAnimationTimer());
     }
 
     @Test

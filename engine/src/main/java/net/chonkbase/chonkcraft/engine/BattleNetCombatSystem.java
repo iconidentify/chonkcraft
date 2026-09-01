@@ -439,6 +439,69 @@ final class BattleNetCombatSystem {
 
 
     /**
+     * Runs the Attack body owned by an armed-flyer Patrol acquisition.
+     *
+     * <p>The opening opcode-zero is both the order callback and the entrance
+     * to this already-selected dry Attack body, so native reaches the first
+     * body wait on that same visit. The later tail marker releases the old
+     * Patrol route to the ordinary chase on its own visit.</p>
+     */
+    private boolean stepBattleNetFlyerPatrolAttackBody(Unit unit) {
+        if (!unit.battleNetFlyerPatrolAttackBody()) {
+            return false;
+        }
+        if (world.battleNetSequence == null || world.idle == null) {
+            unit.setBattleNetFlyerPatrolAttackBody(false);
+            return false;
+        }
+        Unit target = unit.target();
+        if (target != null && target.isAlive()
+                && world.targets.inAttackRange(unit, target)) {
+            // Once the quarry enters range, the ordinary sequence owner must
+            // serve OP10 and projectile/damage state from the live cursor.
+            unit.setBattleNetFlyerPatrolAttackBody(false);
+            return false;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        int offset = unit.battleNetSequenceOffset();
+        if (attackStart < 0 || offset < 0) {
+            unit.setBattleNetFlyerPatrolAttackBody(false);
+            return false;
+        }
+        BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+                offset, unit.battleNetAnimationTimer());
+        if (!tick.valid()) {
+            unit.setBattleNetFlyerPatrolAttackBody(false);
+            return false;
+        }
+        if (tick.actionMarker() && offset != attackStart) {
+            // The body-tail goto has reached its next OP0. Do not store that
+            // intermediate cursor: the ordinary out-of-range chase consumes
+            // the retained route and installs Move on this same callback.
+            unit.setBattleNetFlyerPatrolAttackBody(false);
+            return false;
+        }
+        if (tick.actionMarker()) {
+            // Construction's opening OP0 invokes Attack, which elects to run
+            // this committed body before chasing. Native immediately calls
+            // the compact animator again and exposes the body's first wait.
+            tick = world.battleNetSequence.tick(
+                    tick.offset(), tick.timer());
+            if (!tick.valid() || tick.actionMarker()) {
+                unit.setBattleNetFlyerPatrolAttackBody(false);
+                return false;
+            }
+        }
+        unit.setBattleNetSequenceOffset(tick.offset());
+        unit.setBattleNetAnimationTimer(tick.timer());
+        if (tick.frame() >= 0) {
+            unit.setFrame(tick.frame());
+        }
+        return true;
+    }
+
+    /**
      * Advances a unit that is fighting.
      *
      * <p>Out of range it walks closer; in range it runs its attack animation,
@@ -454,6 +517,9 @@ final class BattleNetCombatSystem {
         if (unit.battleNetRangedAttackCadenceRemaining() > 0) {
             unit.setBattleNetRangedAttackCadenceRemaining(
                     unit.battleNetRangedAttackCadenceRemaining() - 1);
+        }
+        if (stepBattleNetFlyerPatrolAttackBody(unit)) {
+            return;
         }
         if (unit.battleNetResidualEmptyApproachIdlePending()) {
             unit.setBattleNetResidualEmptyApproachIdlePending(false);
@@ -9173,6 +9239,7 @@ final class BattleNetCombatSystem {
         unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetFlyerPatrolAttackBody(false);
         unit.setBattleNetLandPatrolAttackConstruction(false);
         unit.setBattleNetRetargetResidualParkRefill(false);
         return true;

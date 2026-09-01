@@ -4199,6 +4199,7 @@ public final class World {
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetFlyerPatrolAttackBody(false);
         unit.setBattleNetLandPatrolAttackConstruction(false);
         unit.setBattleNetLandPatrolAttackRoutePending(false);
         unit.setBattleNetResidualEmptyApproachIdlePending(false);
@@ -11518,6 +11519,7 @@ public final class World {
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetFlyerPatrolAttackBody(false);
         unit.setBattleNetLandPatrolAttackConstruction(false);
         unit.setBattleNetLandPatrolAttackRoutePending(false);
         unit.setBattleNetResidualEmptyApproachIdlePending(false);
@@ -12587,6 +12589,7 @@ public final class World {
         unit.setBattleNetDirectRefusalRecoveryProbe(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetFlyerPatrolAttackBody(false);
         unit.setBattleNetCapitalPatrolRestoreArming(false);
         unit.setBattleNetRetargetResidualParkRefill(false);
         // offeredTarget is a CUnitPtr owned by COrder_Attack, not by CUnit.
@@ -15269,7 +15272,16 @@ public final class World {
             // presentation auto-scan's weak AttackMove position. The old
             // Patrol body already settled before this same-visit pop, so the
             // ordinary Attack constructor's timer three is authoritative.
-            orderAttack(unit, target, false, false);
+            if (orderAttack(unit, target, false, false)
+                    && !targets.inAttackRange(unit, target)) {
+                // An out-of-range armed flyer does not hand this first
+                // Attack callback straight to Move. Retail runs the complete
+                // compact Attack body, then lets its tail OP0 release the
+                // Patrol route. XOrc 11 gryphon 1589 therefore keeps three
+                // southwest bytes at (16,34) through fixtures 438..463 and
+                // spends the first one only on fixture 464.
+                unit.setBattleNetFlyerPatrolAttackBody(true);
+            }
             return;
         }
         if (capitalPatrol) {
@@ -19770,6 +19782,7 @@ public final class World {
         unit.setBattleNetAttackGroundMove(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
+        unit.setBattleNetFlyerPatrolAttackBody(false);
         unit.setBattleNetLandPatrolAttackConstruction(false);
         unit.setBattleNetLandPatrolAttackRoutePending(false);
         unit.setBattleNetResidualEmptyApproachIdlePending(false);
