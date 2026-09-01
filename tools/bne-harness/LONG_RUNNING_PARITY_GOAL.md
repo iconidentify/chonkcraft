@@ -14,15 +14,13 @@ not regress already accepted behavior. Continue across goal turns and context
 compactions until the completion conditions below are genuinely satisfied or
 progress is genuinely blocked under the blocking rules below.
 
-The immediate inherited frontier at the time this goal was created is:
+The latest durable handoff frontier as of 2026-09-01 is:
 
-- clean `master` at `ba4c10d`, matching `origin/master`;
-- all 52 campaign fixtures exact through cycle 267;
-- expansion Human 12 is the first shared-boundary divergence at cycle 268;
-- Human 13 and expansion Human 4 follow at 281, Orc 8 at 289, and Human 11
-  and expansion Orc 11 at 300; and
-- the latest accepted cycle-400 and cycle-1,800 receipts are identified in the
-  topmost current release checkpoint in `tools/bne-harness/PARITY.md`.
+- `master` at `eec4d78`, pushed to `origin/main` by explicit user request;
+- all 52 campaign fixtures exact through cycle 327;
+- expansion Orc 8 is the first shared-boundary divergence at cycle 328; and
+- the accepted 52-case receipt is
+  `faf9de07c77b62367939936d0fb4571dc5f4f522682919566a75907282cc0191`.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -72,15 +70,16 @@ At the start of each fresh goal turn or after compaction:
 6. State the current acceptance floor, chosen disagreement family, hypothesis,
    discriminating witnesses, and pass/fail bar before editing behavior.
 
-Machine-local facts discovered during transfer:
+Machine-local facts confirmed after transfer:
 
+- Codex is running directly on `i9beef`; this machine is the native-oracle
+  host, so local native capture does not require SSH;
 - the authenticated asset pack is available under
   `/home/chrisk/.chonkcraft/packs/`;
 - the local oracle tree and 52-fixture corpus are under
   `/home/chrisk/.local/share/wargus-bne-oracle`;
 - the pinned BNE executable and both local Docker oracle images are present;
-- local static analysis and local Branch Witness are usable; and
-- the optional `i9beef` remote currently presents a changed SSH host key.
+- local static analysis, native capture, and local Branch Witness are usable.
 
 Rediscover these facts through the doctor rather than assuming paths remain
 valid. An unavailable remote does not block offline fixture comparison.
@@ -104,8 +103,8 @@ not permission to fit a special case.
    lifecycle work rather than spending the run indefinitely on one uncertain
    unit.
 
-The first investigation should normally start from expansion Human 12 cycle
-268 unless a newer accepted checkpoint or a more upstream authenticated
+The next frontier investigation should normally start from expansion Orc 8
+cycle 328 unless a newer accepted checkpoint or a more upstream authenticated
 finding supersedes it.
 
 ## Evidence and implementation loop
@@ -186,7 +185,9 @@ Make the work durable as it progresses:
   repository workflow requires it.
 - Review the diff and commit coherent accepted source, tests, and handoff
   documentation locally. Follow the repository's existing concise commit style.
-- Never push, publish, open a PR, rewrite public history, or alter remotes.
+- Do not push, publish, open a PR, rewrite public history, or alter remotes by
+  default. A push is allowed only when the user explicitly requests that exact
+  external action; verify the destination and preserve unrelated work first.
 - Do not amend an existing commit unless the user explicitly requests it.
 - Leave unrelated dirty work untouched and out of goal commits.
 
@@ -202,12 +203,13 @@ movement and its fixed denominator.
 - Native binary inspection and diagnostic execution must remain read-only or
   use the documented guarded harness. Validate the pinned executable hash.
 - Do not modify `~/.ssh/known_hosts`, disable strict host-key checking, or
-  accept the changed `i9beef` key. The user must verify it out of band.
+  accept changed remote keys without explicit user verification. Native-oracle
+  work on local `i9beef` does not require SSH.
 - Do not install system packages, change machine-wide configuration, publish
   artifacts, or perform destructive Git/filesystem operations without explicit
   user authority.
-- Use local static analysis, local Docker/Branch Witness, and the sealed local
-  corpus while the remote is unavailable.
+- Use local native capture, static analysis, Docker/Branch Witness, and the
+  sealed local corpus on `i9beef`.
 
 ## Persistence and blocking
 
@@ -220,8 +222,8 @@ or verification work that advances the objective.
 Only mark the persistent goal blocked when the same external condition has
 prevented all meaningful in-scope progress for at least three consecutive goal
 turns and no safe alternative remains. Record the exact attempted commands,
-evidence, and the smallest user action needed. Do not repeatedly ask about the
-known `i9beef` host-key mismatch while offline work remains.
+evidence, and the smallest user action needed. Do not invent an SSH dependency
+for native evidence that is already available locally on `i9beef`.
 
 ## Completion conditions
 
@@ -238,9 +240,9 @@ following on the then-current committed tree:
    milestone gates required by the repository pass;
 4. efficacy tests and durable evidence explain the systemic rules that closed
    the remaining divergences; and
-5. the top checkpoint, status documentation, and local commits form a clean,
-   reproducible handoff, with no proprietary evidence committed and nothing
-   pushed.
+5. the top checkpoint, status documentation, and commits form a clean,
+   reproducible handoff, with no proprietary evidence committed and external
+   publishing performed only when explicitly requested by the user.
 
 If the user explicitly changes the target or stops the run, follow that newer
 instruction. Otherwise, continue advancing measured parity.
