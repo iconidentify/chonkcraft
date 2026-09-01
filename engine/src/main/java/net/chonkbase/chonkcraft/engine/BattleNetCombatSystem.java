@@ -670,8 +670,31 @@ final class BattleNetCombatSystem {
             }
             unit.setBattleNetBlockedChaseAttackConstruction(false);
             unit.setBattleNetSaturatedCardinalRetryLoop(false);
+            boolean paidFirstGenerationMobileReplacement =
+                    paidReplacementBand
+                    && unit.battleNetAiBehavior() == 0
+                    && unit.battleNetPathStepsTaken() == 0
+                    && unit.pathLength() > 0
+                    && unit.battleNetCollisionCounter() == 1
+                    && unit.battleNetRefusals() == 0
+                    && completedQuarryLeg != null
+                    && completedQuarryLeg.isAlive()
+                    && completedQuarryLeg.type() != null
+                    && !completedQuarryLeg.type().building()
+                    && !World.battleNetRangedChaseUnit(unit);
             unit.setBattleNetChaseReplanResidualHold(false);
             unit.setBattleNetRetargetResidualRoutePark(true);
+            if (paidFirstGenerationMobileReplacement) {
+                // A behavior-zero mobile replacement pays for the route
+                // generation, not merely for its refused cached byte. Carry
+                // that constructor across the route park/refill so an in-range
+                // arrival enters the Attack body after OP0. Human 8 attack-
+                // peasant 1520 pays 2657/3,2,1 on fixtures 421..423, probes
+                // east on 425, and enters 2660 on 441 before landing OP10 on
+                // 451. Behavior-one formation guards own a distinct refill
+                // transaction and are the held-out negative class.
+                unit.setBattleNetAttackWrapDestArmPending(true);
+            }
             int moveStart = world.battleNetSequence == null ? -1
                     : world.idle.battleNetSequenceStart(unit,
                             BattleNetSequence.MOVE_ANIMATION);
@@ -1094,6 +1117,14 @@ final class BattleNetCombatSystem {
                 && completedRefusalConstructorGoal != null
                 && !world.targets.validAttackTarget(
                         unit, completedRefusalConstructorGoal);
+        boolean coldPaidWrapCompletedDyingProbe =
+                dyingQuarryCompletedRefusalConstructor
+                && unit.battleNetColdPaidWrapBodyHoldProbe()
+                && unit.battleNetTailWrapRouteTarget()
+                        == completedRefusalConstructorGoal;
+        if (coldPaidWrapCompletedDyingProbe) {
+            unit.setBattleNetColdPaidWrapBodyHoldProbe(false);
+        }
         if (stepBattleNetAttackRefusalRecovery(unit)) {
             return;
         }
@@ -1132,6 +1163,45 @@ final class BattleNetCombatSystem {
             // and damage roll.
             return;
         }
+        // A cold refusal whose live harvesting quarry moved away keeps the
+        // paid-wrap token while native parks its stale route.  When that
+        // park exposes an empty route and timer one, the final logical wait
+        // and the fresh target scan share this callback. Human 8 attack-
+        // peasant 1513 is the witness: its in-range replacement is installed
+        // on fixture 415, not one quiet visit later.
+        boolean coldPaidWrapEmptyWakeBase =
+                unit.battleNetOrderDelay() == 1
+                && unit.chasing() && !unit.isMoving()
+                && unit.stepDrained() && unit.pathLength() == 0
+                && unit.battleNetCollisionCounter() == 1
+                && unit.battleNetRefusals() == 0
+                && unit.battleNetAttackWrapDestArmPending()
+                && unit.target() != null
+                && unit.battleNetRouteOffer() == unit.target()
+                && unit.offeredTarget() == null
+                && unit.target().order() == Unit.Order.HARVEST
+                && unit.type() != null
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.type().maxAttackRange() <= 1
+                && !World.battleNetRangedChaseUnit(unit)
+                && onBattleNetChaseMoveBody(unit)
+                && unit.battleNetAnimationTimer() == 1;
+        Unit coldPaidWrapReplacement = null;
+        if (coldPaidWrapEmptyWakeBase) {
+            int coldReactRange = Math.max(
+                    unit.type().reactRange(world.isPerson(unit.player())),
+                    Math.max(1, unit.type().maxAttackRange()));
+            Unit preview = world.targets.findBattleNetHostile(
+                    unit, coldReactRange, null);
+            if (preview != null && preview != unit.target()
+                    && preview.isAlive() && !preview.isDying()
+                    && preview.type() != null && !preview.type().building()
+                    && !world.targets.inAttackRange(unit, unit.target())
+                    && world.targets.inAttackRange(unit, preview)) {
+                coldPaidWrapReplacement = preview;
+            }
+        }
+        boolean coldPaidWrapEmptyWake = coldPaidWrapReplacement != null;
         if (unit.battleNetOrderDelay() > 0) {
             world.movement.syncBattleNetAttackRefusalTimer(unit);
             if (unit.battleNetWrappedCollisionRetryPark()) {
@@ -1540,7 +1610,7 @@ final class BattleNetCombatSystem {
                 if (refusalWake) {
                     unit.setBattleNetRefusalHold(true);
                 }
-                if (!paidWakeHeadFree) {
+                if (!paidWakeHeadFree && !coldPaidWrapEmptyWake) {
                     return;
                 }
                 // A complete refusal band ends on timer one, not on a
@@ -4478,6 +4548,18 @@ final class BattleNetCombatSystem {
                             && world.targets.inAttackRange(unit, candidate)
                             && oldReplacementBlocker == candidate
                             && world.battleNetSequence != null;
+                    boolean coldPaidWrapInRangeRetargetConstruction =
+                            coldPaidWrapEmptyWake
+                            && candidate == coldPaidWrapReplacement
+                            && previous.isAlive() && !previous.isDying()
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.isAlive() && !candidate.isDying()
+                            && candidate.type() != null
+                            && !candidate.type().building()
+                            && !world.targets.inAttackRange(unit, previous)
+                            && world.targets.inAttackRange(unit, candidate)
+                            && world.battleNetSequence != null;
                     boolean replacementThroughCollidedMover =
                             settledMeleeResidualRetarget
                             && keepPathn == 2
@@ -4619,6 +4701,54 @@ final class BattleNetCombatSystem {
                         setAutoTarget(unit, candidate);
                         chased = candidate;
                         unit.setRouteSpent(false);
+                        if (coldPaidWrapInRangeRetargetConstruction) {
+                            // The old quarry's constructor paid for the
+                            // refusal band, not for a swing at this freshly
+                            // selected adjacent unit. Native parks the two
+                            // stale route bytes at index twenty, clears the
+                            // first collision generation, pays Attack 3,2,1,
+                            // and then enters the ordinary melee-resume body
+                            // hold. Treating the wrap token as already paid
+                            // walked straight into OP10 and hit the Human 8
+                            // returner on fixture 427; the hold lets it leave
+                            // range before that opcode can land.
+                            int retargetAttackStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.ATTACK_ANIMATION);
+                            if (retargetAttackStart >= 0) {
+                                unit.clearPath();
+                                unit.setRouteSpent(false);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(0);
+                                unit.setBattleNetCollisionCounter(0);
+                                unit.setBattleNetRefusals(0);
+                                unit.setBattleNetRefusalHold(false);
+                                unit.setBattleNetChaseStepReady(false);
+                                unit.setBattleNetChaseEmptyRouteReplan(false);
+                                unit.setChasing(false);
+                                unit.setFighting(true);
+                                unit.setBattleNetAttackWrapDestArmPending(false);
+                                unit.setBattleNetAttackResumeFromMove(true);
+                                unit.setBattleNetAttackOp0OutOfRange(true);
+                                unit.setBattleNetSequenceMeleeLanded(false);
+                                unit.setBattleNetSequenceOffset(
+                                        retargetAttackStart);
+                                unit.setBattleNetAnimationTimer(3);
+                                AnimationSet set = unit.type().animationSet();
+                                Animation attack = set == null ? null
+                                        : set.get(AnimationSet.State.ATTACK);
+                                if (attack != null
+                                        && unit.animation().current() != attack) {
+                                    unit.animation().switchTo(attack);
+                                }
+                                world.turnToTarget(unit, candidate, 0, 0);
+                                world.causalTrace.event(world.cycle,
+                                        "combat.cold-paid-wrap-retarget",
+                                        unit.id(), "from", previous.id(),
+                                        "to", candidate.id());
+                                return;
+                            }
+                        }
                         if (settledPaidTailHostileBoundary) {
                             // The paid residual has landed, and its only cached
                             // heading is the square occupied by the preferred
@@ -4658,6 +4788,35 @@ final class BattleNetCombatSystem {
                                 && candidate.isAlive() && !candidate.isDying()
                                 && !world.targets.inAttackRange(
                                         unit, candidate)) {
+                            boolean releaseColdPaidWrapProbe =
+                                    coldPaidWrapCompletedDyingProbe
+                                    && candidate.type() != null
+                                    && !candidate.type().building()
+                                    && world.movement
+                                            .battleNetHasStrictlyCloserFreeNeighbour(
+                                                    unit, candidate);
+                            if (releaseColdPaidWrapProbe) {
+                                // This stage-five constructor belongs to the
+                                // cold paid-wrap probe itself. If its quarry
+                                // dies exactly as a progress square opens,
+                                // AutoSelectTarget runs, but active-order Still
+                                // does not: the replacement inherits the
+                                // already-paid stage-six Move probe without
+                                // another asynchronous draw. Human 8
+                                // attack-peasant 1513 retargets 1536 -> 1519
+                                // and takes SE on fixture 468. Re-entering
+                                // Attack 3,2,1 delayed that step to 471. Keep
+                                // falling through so the common chase path
+                                // publishes and spends the route this visit.
+                                unit.setPathGoal(
+                                        candidate.tileX(), candidate.tileY());
+                                unit.setChasing(true);
+                                unit.setFighting(false);
+                                world.causalTrace.event(world.cycle,
+                                        "combat.cold-paid-wrap-dying-release",
+                                        unit.id(), "from", previous.id(),
+                                        "to", candidate.id());
+                            } else {
                             // Stage five finished against a quarry which
                             // entered Die before its timer-one Move probe.
                             // AutoSelectTarget still publishes the replacement
@@ -4700,6 +4859,7 @@ final class BattleNetCombatSystem {
                                 }
                             }
                             return;
+                            }
                         }
                         if (saturatedFirstStepBuildingRetargetPark) {
                             // A target switch after the first committed byte
@@ -11112,6 +11272,69 @@ final class BattleNetCombatSystem {
                     && (sequenceTarget == null
                             || !sequenceTarget.isAlive()
                             || sequenceTarget.isDying());
+            boolean completedColdPaidWrapBodyHoldProbe = candidate != null
+                    && candidate != sequenceTarget
+                    && candidate.isAlive() && !candidate.isDying()
+                    && candidate.type() != null
+                    && !candidate.type().building()
+                    && !world.targets.inAttackRange(unit, candidate)
+                    && !rangedOp0
+                    && unit.type().maxAttackRange() <= 1
+                    && !unit.battleNetStationaryAttack()
+                    && unit.autoTargeting()
+                    && attackStartHold
+                    && unit.battleNetAnimationTimer() == 1
+                    && sequenceTarget.isAlive()
+                    && !sequenceTarget.isDying()
+                    && !world.targets.inAttackRange(unit, sequenceTarget)
+                    && unit.pathLength() == 0
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetRefusals() == 0
+                    && unit.battleNetRouteOffer() == candidate;
+            if (completedColdPaidWrapBodyHoldProbe) {
+                // The adjacent quarry selected by a cold paid-wrap wake can
+                // leave during its committed OP0 hold.  On timer one native
+                // returns to the still-live route offer, parks RI20, and
+                // probes that boxed target with repeated Attack 3,2,1
+                // constructors until a strictly closer compass square frees.
+                // Human 8 attack-peasant 1513 selects peasant 1536 on fixture
+                // 441, repeats the constructor through fixture 467, and first
+                // steps south-east on 468.  Letting the expired hold dest-arm
+                // the temporary quarry moved on fixture 441 instead.
+                Unit previous = sequenceTarget;
+                setAutoTarget(unit, candidate);
+                // This is a fresh cold active-order handoff, not a promotion
+                // retained behind the completed OP0 body. Retail therefore
+                // runs the common land-idle arm before it publishes Attack
+                // 3. Human 8 slot 1513 owns that asynchronous ordinal on
+                // fixture 441; leaving it for the following pool slot sends
+                // critter 1542 to Move on the same fixture.
+                world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(0);
+                unit.setPathGoal(candidate.tileX(), candidate.tileY());
+                unit.setBattleNetAttackResumeHoldActive(false);
+                unit.setBattleNetStationaryRecoveryHeld(false);
+                unit.setBattleNetSequenceOffset(attackStart);
+                unit.setBattleNetAnimationTimer(3);
+                unit.setBattleNetSequenceMeleeLanded(false);
+                unit.setBattleNetAttackWrapDestArmPending(false);
+                unit.setBattleNetChaseStepReady(false);
+                unit.setBattleNetChaseEmptyRouteReplan(true);
+                unit.setBattleNetColdNoProgressRefusalLoop(true);
+                unit.setBattleNetColdPaidWrapBodyHoldProbe(true);
+                unit.setBattleNetAttackRefusalRecoveryStage(5);
+                unit.setBattleNetTailWrapRouteTarget(candidate);
+                unit.setChasing(true);
+                unit.setFighting(false);
+                world.turnToTarget(unit, candidate, 0, 0);
+                world.causalTrace.event(world.cycle,
+                        "combat.cold-paid-wrap-hold-probe", unit.id(),
+                        "from", previous.id(), "to", candidate.id());
+                return true;
+            }
             if (candidateOutOfRange) {
                 // AutoSelectTarget is also allowed to replace a gone melee
                 // quarry from an automatically owned OP0 which is already

@@ -742,6 +742,80 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aColdPaidWrapRetargetOwnsFreshConstructionAndBodyHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 87);
+        Unit escapingReturner = unitById(world, 81);
+        Unit oldQuarry = unitById(world, 64);
+        Unit asynchronousControl = unitById(world, 56);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1513");
+        assertNotNull(escapingReturner,
+                "Human 8 has no Java twin for native peasant 1519");
+        assertNotNull(oldQuarry,
+                "Human 8 has no Java twin for native peasant 1536");
+        assertNotNull(asynchronousControl,
+                "Human 8 has no Java twin for native critter 1544");
+
+        while (fixtureCycle(world) < 414) {
+            mission.tick();
+        }
+        assertSame(oldQuarry, attacker.target());
+        assertEquals(2600, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertEquals(25, escapingReturner.hitPoints());
+
+        mission.tick();
+        assertEquals(415, fixtureCycle(world));
+        assertSame(escapingReturner, attacker.target(),
+                "timer-one wake installs the fresh adjacent quarry");
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the replacement owns a fresh Attack constructor");
+        assertEquals(0, attacker.battleNetCollisionCounter(),
+                "parking the stale route retires its collision generation");
+
+        while (fixtureCycle(world) < 418) {
+            mission.tick();
+        }
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(23, attacker.battleNetAnimationTimer(),
+                "the completed constructor opens the committed body hold");
+
+        while (fixtureCycle(world) < 427) {
+            mission.tick();
+        }
+        assertEquals(25, escapingReturner.hitPoints(),
+                "the returner leaves before the held swing can land");
+        assertEquals(78, attacker.tileX());
+        assertEquals(62, attacker.tileY());
+
+        while (fixtureCycle(world) < 468) {
+            mission.tick();
+        }
+        assertEquals(79, attacker.tileX());
+        assertEquals(63, attacker.tileY(),
+                "the later replacement chase releases on the native fixture");
+
+        while (fixtureCycle(world) < 470) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, asynchronousControl.order(),
+                "the paid probe must not steal the critter's async ordinal");
+    }
+
+    @Test
     void anExpiredMovingQuarryPaysTwoBandsBeforeOneFreshStep() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,

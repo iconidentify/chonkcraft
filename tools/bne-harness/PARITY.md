@@ -15,7 +15,68 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (movement-layer flyer direct ray)
+## Current release checkpoint — 2026-09-01 (cold paid-wrap quarry handoff)
+
+Accepted cycle-1,800 receipt `feea635e` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,289, an increase of 46. Human 8 advances from fixture 427
+to 473. The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under
+receipt `2bc650e8`. The long receipt is retained at
+`.bne-artifacts/runs/feea635e293de73d0151dcf8d49e6e36058d1dade36ae610e6cc5df47105d066`.
+Its manifest has SHA-256
+`088cf6e01e1fabf35d264683d72a9cf375f11ca3c0328ad0ed6580d26c3a5b78`
+and binds dirty engine-input identity
+`0e23719d659ddbcb7f7fbff99bfe23e2776075c512032de7a9e8bf2c7cf8c410`
+at base revision `02242ce` to authenticated, replayable source capsule
+`24473d0e8d54d416194bbfea0059a258f366310f6edc0b2a051e99421997680d`.
+
+Behavioral delta: a behavior-zero mobile replacement owns the first paid
+Attack-wrap constructor across the route park/refill which follows its refused
+cached byte; behavior-one formation guards remain on their distinct refill
+transaction. A cold paid-wrap wake which finds a fresh adjacent mobile quarry
+parks the stale route and constructs a new Attack body instead of spending the
+old wrap token on an immediate hit. If that held quarry moves away and the
+repeated boxed constructor's target then dies as a strictly closer free square
+opens, the replacement inherits the paid stage-six Move probe without another
+asynchronous draw. The implementation contains no mission, map, coordinate,
+fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: Human 8 attack-peasant slot 1520 / Java unit 80 pays Attack
+3,2,1 on fixtures 421..423, probes east on 425, and enters the Attack body on
+441 before reaching OP10 on 451. Attack-peasant slot 1513 / Java unit 87 parks
+its old quarry route and selects adjacent returner slot 1519 / Java unit 81 on
+fixture 415, constructs a fresh Attack body, and does not damage the departing
+returner on fixture 427. It returns to boxed peasant slot 1536 / Java unit 64,
+repeats the constructor until that quarry dies, then inherits the open
+south-east progress square on fixture 468. Native and Java are both at
+`(79,63)`, while critter slot 1544 / Java unit 56 retains the fixture-470 Move
+which proves the handoff did not steal its asynchronous ordinal. Human 8 is
+exact through fixture 472; its fixture-473 peasant-position finding is
+independent.
+
+Efficacy receipt
+`.bne-test-efficacy/c468-human8-cold-paid-wrap-dying-release-final/runs/857cf2ff708895109a985cc168e5f52964c85504112438a59d3eebd77895b2f0`
+proves the focused assertion executes and fails on `02242ce`, then executes
+and passes on the candidate. All 113 selected moving-quarry, refusal, and
+behavior-one controls pass, as do both fixed 52-case gates. The long receipt's
+source capsule authenticates with zero sealed untracked inputs. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+98 engine/desktop checks, and 223 dual-adapter command scenarios. Its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now expansion Human 10 at fixture 430,
+followed by expansion Human 5 at 435, expansion Orc 11 at 438, Orc 8 at 442,
+expansion Orc 12 at 444, expansion Human 8 at 446, expansion Human 7 at 447,
+expansion Orc 5 at 449, Orc 5 at 454, and Orc 11 at 459.
+
+## Prior release checkpoint — 2026-09-01 (movement-layer flyer direct ray)
 
 Accepted cycle-1,800 receipt `d9e971a7` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

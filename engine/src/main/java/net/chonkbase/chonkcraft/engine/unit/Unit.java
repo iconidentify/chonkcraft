@@ -2406,6 +2406,7 @@ public final class Unit {
             battleNetSaturatedCardinalRetryLoop = false;
             battleNetRangedCloseHitHelpWallFace = false;
             battleNetColdNoProgressRefusalLoop = false;
+            battleNetColdPaidWrapBodyHoldProbe = false;
             battleNetPaidLongResidualRefill = false;
             battleNetFourStepPaidCollisionRefill = false;
             battleNetFirstSaturatedResidualProgressiveRefill = false;
@@ -3714,6 +3715,17 @@ public final class Unit {
     }
 
     private boolean battleNetColdNoProgressRefusalLoop;
+
+    /** A cold paid-wrap OP0 body hold owns its repeated boxed constructors. */
+    public boolean battleNetColdPaidWrapBodyHoldProbe() {
+        return battleNetColdPaidWrapBodyHoldProbe;
+    }
+
+    public void setBattleNetColdPaidWrapBodyHoldProbe(boolean probe) {
+        battleNetColdPaidWrapBodyHoldProbe = probe;
+    }
+
+    private boolean battleNetColdPaidWrapBodyHoldProbe;
 
     public int battleNetIdlePhase() {
         return battleNetIdlePhase;
