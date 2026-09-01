@@ -5842,6 +5842,21 @@ final class BattleNetCombatSystem {
                             && unit.battleNetCollisionCounter() == 4
                             && unit.battleNetRefusals() == 0)
                             || paidCollisionFourDeferredRefill;
+                    boolean paidWrapFirstCollisionImmediateRefill =
+                            world.actionMoveWalked
+                            && unit.stepDrained() && !unit.isMoving()
+                            && unit.routeSpent()
+                            && unit.battleNetAttackWrapDestArmPending()
+                            && unit.battleNetCollisionCounter() == 1
+                            && unit.battleNetRefusals() == 0
+                            && unit.target() != null
+                            && unit.target().isAlive()
+                            && unit.target().type() != null
+                            && !unit.target().type().building()
+                            && unit.type() != null
+                            && unit.type().maxAttackRange() <= 1
+                            && !World.battleNetRangedChaseUnit(unit)
+                            && !unit.battleNetChaseEmptyRouteReplan();
                     if (world.actionMoveWalked
                             && unit.stepDrained()
                             && !unit.isMoving()
@@ -5890,6 +5905,16 @@ final class BattleNetCombatSystem {
                             // the park above. XHuman 12 slot 1482 commits NE
                             // on fixture 127 instead of waiting and taking N.
                             && !paidCollisionFourImmediateRefill
+                            // A first collision carried through an already-
+                            // paid Attack wrap owns NewPath on this callback,
+                            // just as the paid generation-four form above.
+                            // XHuman 10 knight 1493 drains the final north
+                            // pixels at fixture 375, writes W,W and commits W
+                            // without exposing a separate RI20 park. Its
+                            // collision-one control without paid-wrap
+                            // ownership (XHuman 12 grunt 1503) still parks at
+                            // fixture 55 and refills on 56.
+                            && !paidWrapFirstCollisionImmediateRefill
                             && !unit.battleNetLandPatrolAttackRoutePending()
                             && !unit.battleNetChaseEmptyRouteReplan()) {
                         unit.setRouteSpent(false);
@@ -5905,7 +5930,8 @@ final class BattleNetCombatSystem {
                     // refusal machine instead of being routed around them.
                     boolean collidedResidualRefill =
                             (unit.battleNetChaseEmptyRouteReplan()
-                                    || paidCollisionFourImmediateRefill)
+                                    || paidCollisionFourImmediateRefill
+                                    || paidWrapFirstCollisionImmediateRefill)
                             && unit.battleNetCollisionCounter() > 0;
                     unit.setRouteSpent(false);
                     unit.clearPath();

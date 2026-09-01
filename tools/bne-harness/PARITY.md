@@ -15,6 +15,65 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (cycle-390 paid-wrap first-collision refill)
+
+Accepted cycle-1,800 receipt `2a2969a2` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,910, an increase of fifteen. Expansion Human 10 advances
+from fixture 375 to 390. The cycle-400 fleet remains 45 clean / 7 divergent /
+0 failed under receipt `d474b1e3`. The long receipt is retained at
+`.bne-artifacts/runs/2a2969a2cbea88a05b0bf9f928e4436c16994cce3eeb37fcf7e646a192a6d065`.
+Its manifest has SHA-256
+`5f00bfce9e6147e13676f96792c03828cfedb6ddae5988551d4cdc531275e227`
+and binds dirty engine-input identity `7bb776e4` at base revision `fc14a4d` to
+authenticated, replayable source capsule
+`4d5704eeb3661bfce7653f303e0577253360d88806b4a335ed816c3703b9ff5e`.
+
+Behavioral delta: a first collision generation carried through already-paid
+melee Attack-wrap ownership does not expose a separate route-index-twenty park
+when its clean final pixels settle. That callback writes the replacement route
+in the same cooperative collision view and may commit its free head
+immediately. A collision-one route without paid-wrap ownership retains the
+established one-visit park, as do hard-refusal generations and saturated or
+later collision bands. The implementation contains no mission, map,
+coordinate, fixture, cycle, faction, initial-route-length, or unit-ID branch.
+
+Proof delta: expansion Human 10 knight native slot 1493 / Java unit 107 chases
+axethrower slot 1496 / Java 104 at `(78,87)`. The measured fixture-to-Java
+offset is two internal cycles. Its paid `[SW,NW,N]` route retains collision one
+and zero hard refusals; the last north byte commits at fixture 363 and its
+pixels drain through fixture 374. On fixture 375 native settles at `(80,87)`,
+writes `[W,W]`, and first-steps west to `(79,87)` in the same action visit.
+Java formerly parked the exhausted route and performed that identical writer
+and step one callback later. Expansion Human 12 grunt native slot 1503 / Java
+97 is the negative witness: its collision-one route has no paid-wrap owner,
+parks on fixture 55, and only refills its occupied south head on fixture 56.
+Expansion Human 10 is now exact through fixture 389; its new fixture-390
+finding is an independent peon position split for native slot 1588.
+
+Efficacy receipt
+`.bne-test-efficacy/c375-xhuman10-paid-wrap-first-collision/runs/37b030e4206a0b498633617195ad476429c878771e1387b02cfbaf9b9ae95a5f`
+proves the focused assertion executes and fails on `fc14a4d`, then executes
+and passes on the candidate. All 79 selected Human 10 damage/cadence,
+collision-refill, retarget, wrap-destination-arm, and dying-tail real-data
+controls pass. Both fixed 52-case gates pass, and the source capsule verifies
+with zero sealed untracked inputs. The ordinary executable next-level gate
+exits zero after 209 Python checks (four skipped) and 97 engine/desktop checks;
+its command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is expansion Orc 11 at
+fixture 382, followed by Orc 12 at 383, Human 8 and expansion Human 10 at 390,
+and expansion Human 7 at 395.
+
 ## Current release checkpoint — 2026-09-01 (cycle-444 fresh depot queue-head redraw)
 
 Accepted cycle-1,800 receipt `8a0cde67` preserves the shared clean horizon at

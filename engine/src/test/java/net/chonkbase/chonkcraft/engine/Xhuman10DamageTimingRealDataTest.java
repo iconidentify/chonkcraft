@@ -920,6 +920,59 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's paid first-collision chase refills as its residual settles")
+    void xhuman10PaidFirstCollisionChaseRefillsOnResidualSettle() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated native slot 1493 / Java 107 carries collision one
+        // through an already-paid three-step Attack chase. Its last north
+        // heading has been consumed while the pixels still drain on fixture
+        // 374. Native's residual-settle callback writes W,W and consumes the
+        // first west heading on fixture 375; deferring NewPath to the next
+        // callback leaves Java one tile east at the accepted fleet frontier.
+        Unit knight = unitById(world, 107);
+        Unit axe = unitById(world, 104);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1493 knight");
+        assertNotNull(axe, "XHuman 10 has no native-slot-1496 axethrower");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 374) {
+            mission.tick();
+        }
+        assertSame(axe, knight.target());
+        assertEquals(80, knight.tileX());
+        assertEquals(87, knight.tileY());
+        assertTrue(knight.isMoving(),
+                "fixture 374 still owes the last three northbound pixels");
+        assertEquals(0, knight.pathLength(),
+                "the paid route has consumed every cached heading");
+        assertEquals(1, knight.battleNetCollisionCounter(),
+                "the route retains native's first collision generation");
+        assertEquals(0, knight.battleNetRefusals(),
+                "no hard-refusal generation owns this clean residual");
+        assertTrue(knight.battleNetAttackWrapDestArmPending(),
+                "Attack construction remains paid through the route wrap");
+
+        mission.tick();
+        assertEquals(375, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(79, knight.tileX(),
+                "the settle visit must consume the fresh west heading");
+        assertEquals(87, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, 0), knight.lastStepHeading());
+        assertTrue(knight.isMoving());
+        assertEquals(1, knight.pathLength(),
+                "one west byte remains behind the committed route head");
+    }
+
+    @Test
     @DisplayName("xhuman 10's grunt resumes past OP0 after its paid chase")
     void xhuman10GruntResumesPastOp0AfterItsPaidChase() {
         AssetSource assets = AssetSource.fromEnvironment();
