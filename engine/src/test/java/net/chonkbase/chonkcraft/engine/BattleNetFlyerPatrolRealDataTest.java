@@ -55,6 +55,34 @@ class BattleNetFlyerPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("Human 12's unarmed zeppelin routes around a moving air peer")
+    void human12UnarmedZeppelinKeepsMovingAirOccupancyInItsDirectRay() {
+        Mission mission = mission("campaigns/human/level12h");
+        Unit zeppelin = at(mission.world(), "unit-zeppelin", 60, 50);
+        assertNotNull(zeppelin, "Human 12 has no native slot-1503 zeppelin");
+
+        // At fixture 402 native slot 1570 is still draining its doubled
+        // northwest stride from (24,6). Slot 1503's direct ray toward (16,0)
+        // would cross that 2x2 air body, so native wall-writes
+        // NW,NW,NW,W,W,W,W,NW while continuing to ignore ground peons.
+        tickThrough(mission, 402);
+        assertEquals(Unit.Order.PATROL, zeppelin.order());
+        assertEquals(36, zeppelin.tileX());
+        assertEquals(12, zeppelin.tileY());
+        assertEquals(7, zeppelin.pathLength(),
+                "the first northwest stride leaves seven native route bytes");
+        assertEquals(Direction.fromDelta(-1, -1), zeppelin.peekHeading());
+
+        tickThrough(mission, 422);
+        assertEquals(34, zeppelin.tileX());
+        assertEquals(10, zeppelin.tileY(),
+                "the second route byte is northwest, not the open-ray west");
+        assertEquals(6, zeppelin.pathLength());
+        assertEquals(Direction.fromDelta(-1, -1), zeppelin.peekHeading(),
+                "the third northwest byte remains at the native boundary");
+    }
+
+    @Test
     @DisplayName("XOrc 7's balloon keeps its cached north heading near the scout point")
     void xOrc7BalloonDoesNotInheritTheNavalFreeCloserRewrite() {
         Mission mission = mission("campaigns/orc-exp/levelx07o");

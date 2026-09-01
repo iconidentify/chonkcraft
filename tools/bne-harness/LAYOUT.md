@@ -199,6 +199,18 @@ records show that high nibble matches the collision counter (1→`0x10`,
 flag `0x8000` is the pathfinder goal mark written by `0x4508f0` (not the
 LegacyEngine `BUILDING` occupancy bit).
 
+The direct route writer and its shortcut view remain movement-layer specific
+when that soft-clear applies. Human 12 supplies the positive and negative
+witnesses in one mission. At fixture 402, unarmed zeppelin slot 1503 draws
+toward `(16,0)` while moving zeppelin slot 1570 occupies the direct ray at
+`(24,6)`. Native rejects that air body and wall-writes
+`[NW,NW,NW,W,W,W,W,NW]`; treating it as absent writes the open
+`[NW,W,NW,NW,W,NW,W,NW,NW,W,NW]` ray and exposes west instead of northwest at
+fixture 422. At fixture 2, slot 1559's doubled west ray overlaps moving ground
+peons but remains `[W,NW,W,NW,W]`. Re-hardening every softened unit therefore
+mistakes cross-layer ground occupancy for an air wall; retaining only softened
+occupants on the flyer's own movement layer satisfies both boundaries.
+
 The collision/refuse high nibble also owns route retirement in
 `FUN_004379e0`. The function increments `word[unit+0x1c]` by `0x1000` at
 `0x00437a0d`, copies the post-increment high nibble to `bp`, writes animation

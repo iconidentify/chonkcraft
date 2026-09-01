@@ -6374,10 +6374,20 @@ public final class World {
                             return baseTraversalPassability.isOutOfBounds(x, y);
                         }
                     };
+            // The route buffer's geometric shortcut view is still movement-
+            // layer specific. Human 12's unarmed zeppelin must retain the
+            // moving zeppelin on its direct ray at fixture 402 while ignoring
+            // the peons overlapping its fixture-2 flight footprint.
+            java.util.List<Unit> sameLayerOptimizerBlockers =
+                    optimizerBlockers.stream()
+                            .filter(candidate -> candidate.type() != null
+                                    && candidate.type().moveType()
+                                            == unit.type().moveType())
+                            .toList();
             BattleNetPathFinder.Passability optimizationPassability =
                     (x, y) -> traversalPassability.canEnter(x, y)
                             && !battleNetUnitOccupies(
-                                    optimizerBlockers, x, y);
+                                    sameLayerOptimizerBlockers, x, y);
             // Critter one-tile wanders must not invent a fallbackEscape side
             // step when the goal is under a building: XOrc 2's 1580 aims at
             // 29,21 (hall), native keeps an all-0xff route and returns to
@@ -6413,10 +6423,16 @@ public final class World {
             // occupancy, while the following 0x4500f0 wall trace may soften
             // that same ally. XOrc 8 gryphon 1550 therefore rejects the
             // direct S,SW,S ray to occupied (0,16) and stores the adjacent
-            // S,S,S wall route. Other route families remain on their sealed
-            // traversal view: making every direct ray hard regresses the
-            // same map's destroyer 1426 at fixture 39.
-            boolean doubledAirPatrolHardDirect = doubledPatrolWallOnTie
+            // S,S,S wall route. Human 12's unarmed zeppelin 1503 likewise
+            // rejects its moving peer at (24,6) and stores
+            // NW,NW,NW,W,W,W,W,NW. Cross-layer peons remain transparent.
+            // Other route families remain on their sealed traversal view:
+            // making every direct ray hard regresses XOrc 8 destroyer 1426
+            // at fixture 39.
+            boolean doubledAirPatrolHardDirect = unit.order()
+                    == Unit.Order.PATROL
+                    && battleNetMovementStride(unit) == 2
+                    && unit.type() != null
                     && unit.type().airUnit();
             PathFinder.Path path = BattleNetPathFinder.find(
                     unit.tileX(), unit.tileY(), toX, toY,

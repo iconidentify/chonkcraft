@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (standing-hit escape and recurring chase refusal)
+## Current release checkpoint — 2026-09-01 (movement-layer flyer direct ray)
+
+Accepted cycle-1,800 receipt `d9e971a7` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,243, an increase of 124. Human 12 advances from fixture 422
+to 546. The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under
+receipt `fb3e845e`. The long receipt is retained at
+`.bne-artifacts/runs/d9e971a71936ad3ac20cdd473a8f3473e5423516afe159efc8782206d9732f2e`.
+Its manifest has SHA-256
+`969b368514db141113940fabefdfcbef7304d57ceb58bf05f83c24743cf9ff57`
+and binds dirty engine-input identity
+`4f51d439a7e99b3fdcf7f8cdf8e40aa2d8293625f4a343efee57fa6ac1d190a1`
+at base revision `e2606c9` to authenticated, replayable source capsule
+`c2e5ccaec520320c7eaa1a0ccdafc2fdebacb19851b936fcc5bbc47f5d61c0ff`.
+
+Behavioral delta: the temporary soft-clear view used to choose a direct route
+or shortcut is movement-layer specific. A doubled air Patrol direct ray keeps
+moving air bodies as geometric blockers regardless of attack capability;
+later wall tracing may still soften those bodies under its established rules.
+Ground movers remain transparent to the air route view, just as air movers
+remain transparent to ground routing. The implementation contains no mission,
+map, coordinate, fixture, exact-cycle, faction, route-length, or unit-ID
+branch.
+
+Proof delta: Human 12 zeppelin slot 1503 / Java unit 97 routes toward `(16,0)`
+while allied moving zeppelin slot 1570 / Java unit 30 occupies its direct ray
+at `(24,6)`. Native publishes `[NW,NW,NW,W,W,W,W,NW]`: fixture 402 consumes
+the first northwest step to `(36,12)`, and fixture 422 consumes the second to
+`(34,10)`. Java formerly selected the open
+`[NW,W,NW,NW,W,NW,W,NW,NW,W,NW]` ray and moved west at fixture 422. As a
+cross-layer control, Human 12 unarmed zeppelin slot 1559 / Java unit 41 has a
+west ray through moving ground peons at fixture 2 and still moves west while
+remaining at y 14. The corrected case is exact through fixture 545; its
+fixture-546 tanker population/identity finding is independent.
+
+Efficacy receipt
+`.bne-test-efficacy/c422-human12-layered-air-direct-ray/runs/83179f05dfb80f2437c8355fec882b8d78d82167b9bcfb551239677f1abe1d54`
+proves the new assertion executes and fails on `e2606c9`, then executes and
+passes on the candidate. All 77 focused pathfinder, flyer, movement, and sea
+occupancy checks pass, as do all 30 `bne_java.py` adapter tests and both fixed
+52-case gates. The long receipt's source capsule authenticates with zero
+sealed untracked inputs. The ordinary executable next-level gate exits zero
+after 209 Python checks (four skipped), 98 engine/desktop checks, and 223
+dual-adapter command scenarios. Its 11 comparable scenarios remain 6 exact /
+5 divergent with no regression or infrastructure failure.
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is now Human 8 at fixture 427, followed
+by expansion Human 10 at 430, expansion Human 5 at 435, expansion Orc 11 at
+438, Orc 8 at 442, expansion Orc 12 at 444, expansion Human 8 at 446,
+expansion Human 7 at 447, expansion Orc 5 at 449, Orc 5 at 454, and Orc 11 at
+459.
+
+## Prior release checkpoint — 2026-09-01 (standing-hit escape and recurring chase refusal)
 
 Accepted cycle-1,800 receipt `c26baeac` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
