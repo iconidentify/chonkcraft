@@ -547,6 +547,80 @@ final class BattleNetCombatSystem {
                 return;
             }
             Unit completedQuarryLeg = unit.target();
+            int occupiedTailHeading = unit.pathLength() == 1
+                    ? unit.peekHeading() : -1;
+            int occupiedTailStride = occupiedTailHeading >= 0
+                    && occupiedTailHeading < Direction.COUNT
+                            ? world.battleNetMovementStride(unit) : 0;
+            Unit occupiedTailUnit = occupiedTailStride > 0
+                    ? world.unitAt(
+                            unit.tileX()
+                                    + Direction.deltaX(occupiedTailHeading)
+                                            * occupiedTailStride,
+                            unit.tileY()
+                                    + Direction.deltaY(occupiedTailHeading)
+                                            * occupiedTailStride)
+                    : null;
+            boolean firstCollisionOccupiedTailHandoff = attackStart >= 0
+                    && unit.battleNetSequenceOffset() == attackStart
+                    && unit.battleNetAnimationTimer() == 1
+                    && unit.battleNetCollisionCounter() == 1
+                    && unit.battleNetRefusals() == 0
+                    && unit.battleNetPathStepsTaken() > 0
+                    && completedQuarryLeg != null
+                    && completedQuarryLeg.isAlive()
+                    && completedQuarryLeg.type() != null
+                    && !completedQuarryLeg.type().building()
+                    && !world.targets.inAttackRange(unit, completedQuarryLeg)
+                    && occupiedTailUnit != null
+                    && occupiedTailUnit != completedQuarryLeg
+                    && occupiedTailUnit.isAlive()
+                    && !occupiedTailUnit.isDying()
+                    && occupiedTailUnit.type() != null
+                    && !occupiedTailUnit.type().building()
+                    && world.targets.validAttackTarget(unit, occupiedTailUnit)
+                    && world.targets.inAttackRange(unit, occupiedTailUnit);
+            if (firstCollisionOccupiedTailHandoff) {
+                int reactRange = Math.max(
+                        unit.type().reactRange(world.isPerson(unit.player())),
+                        Math.max(1, unit.type().maxAttackRange()));
+                Unit replacement = world.targets.findBattleNetHostile(
+                        unit, reactRange, null);
+                if (replacement == occupiedTailUnit) {
+                    unit.setBattleNetBlockedChaseAttackConstruction(false);
+                    unit.setBattleNetSaturatedCardinalRetryLoop(false);
+                    unit.setBattleNetChaseReplanResidualHold(false);
+                    setAutoTarget(unit, replacement);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(0);
+                    unit.setBattleNetCollisionCounter(0);
+                    unit.setBattleNetRefusals(0);
+                    unit.setBattleNetChaseStepReady(false);
+                    unit.setChasing(false);
+                    unit.setFighting(true);
+                    unit.setBattleNetAttackResumeFromMove(true);
+                    unit.setBattleNetAttackOp0OutOfRange(true);
+                    unit.setBattleNetSequenceMeleeLanded(false);
+                    unit.setBattleNetSequenceOffset(attackStart);
+                    unit.setBattleNetAnimationTimer(3);
+                    AnimationSet set = unit.type().animationSet();
+                    Animation attack = set == null ? null
+                            : set.get(AnimationSet.State.ATTACK);
+                    if (attack != null
+                            && unit.animation().current() != attack) {
+                        unit.animation().switchTo(attack);
+                    }
+                    world.turnToTarget(unit, replacement, 0, 0);
+                    world.causalTrace.event(world.cycle,
+                            "combat.first-collision-occupied-tail-handoff",
+                            unit.id(), "from", completedQuarryLeg.id(),
+                            "to", replacement.id(), "heading",
+                            occupiedTailHeading);
+                    return;
+                }
+            }
             boolean recurringMovingQuarryRetarget =
                     unit.battleNetRetargetResidualRoutePark()
                     && unit.battleNetAttackWrapDestArmPending()
@@ -4278,6 +4352,38 @@ final class BattleNetCombatSystem {
                     Unit oldReplacementBlocker = keepPathn > 0
                             ? world.unitAt(oldReplacementX, oldReplacementY)
                             : null;
+                    // A progressed first-collision chase tail whose final
+                    // cached heading is now occupied by the preferred mobile
+                    // quarry does not replace its still-live incumbent on the
+                    // settlement callback. Retail prices that terminal heading
+                    // by retaining the old quarry and route through Attack
+                    // construction 3,2,1; timer-one OP0 then performs the free
+                    // spatial scan, parks the heading and starts the adjacent
+                    // replacement's own constructor. Human 8 attack-peasant
+                    // 1513 is the sealed witness: it keeps peasant 1533 and NE
+                    // on fixtures 292..294, then installs peasant 1536 on 295.
+                    // Its earlier fixture-188 open march is collision-free and
+                    // therefore keeps consuming its cached heading immediately.
+                    boolean firstCollisionOccupiedTailConstruction =
+                            !World.battleNetRangedChaseUnit(unit)
+                            && unit.type() != null
+                            && unit.type().moveType() == UnitType.Movement.LAND
+                            && unit.type().maxAttackRange() <= 1
+                            && world.actionMoveWalked
+                            && unit.stepDrained() && !unit.isMoving()
+                            && keepPathn == 1
+                            && unit.battleNetPathStepsTaken() > 0
+                            && unit.battleNetCollisionCounter() == 1
+                            && unit.battleNetRefusals() == 0
+                            && previous.isAlive()
+                            && previous.type() != null
+                            && !previous.type().building()
+                            && candidate.type() != null
+                            && !candidate.type().building()
+                            && !world.targets.inAttackRange(unit, previous)
+                            && world.targets.inAttackRange(unit, candidate)
+                            && oldReplacementBlocker == candidate
+                            && world.battleNetSequence != null;
                     boolean replacementThroughCollidedMover =
                             settledMeleeResidualRetarget
                             && keepPathn == 2
@@ -4372,6 +4478,31 @@ final class BattleNetCombatSystem {
                                     keepPrevScore, keepCandScore,
                                     keepPrefix ? 1 : 0,
                                     unit.tileX(), unit.tileY());
+                        }
+                    }
+                    if (firstCollisionOccupiedTailConstruction) {
+                        int retargetAttackStart = world.idle
+                                .battleNetSequenceStart(unit,
+                                        BattleNetSequence.ATTACK_ANIMATION);
+                        if (retargetAttackStart >= 0) {
+                            unit.setBattleNetSequenceOffset(retargetAttackStart);
+                            unit.setBattleNetAnimationTimer(3);
+                            unit.setBattleNetBlockedChaseAttackConstruction(true);
+                            unit.setBattleNetChaseStepReady(false);
+                            AnimationSet set = unit.type().animationSet();
+                            Animation attack = set == null ? null
+                                    : set.get(AnimationSet.State.ATTACK);
+                            if (attack != null
+                                    && unit.animation().current() != attack) {
+                                unit.animation().switchTo(attack);
+                            }
+                            world.causalTrace.event(world.cycle,
+                                    "combat.first-collision-occupied-tail",
+                                    unit.id(), "target", previous.id(),
+                                    "candidate", candidate.id(), "heading",
+                                    oldReplacementHeading, "collision",
+                                    unit.battleNetCollisionCounter());
+                            return;
                         }
                     }
                     if (keepPrefix) {

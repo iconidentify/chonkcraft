@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-333 offered-building front-rank ownership)
+## Current release checkpoint — 2026-08-31 (cycle-331 first-collision occupied-tail construction)
+
+Accepted cycle-1,800 receipt `b17f5029` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,140, an increase of nineteen. Human 8 advances from fixture
+328 to 347. The cycle-400 fleet remains 40 clean / 12 divergent / 0 failed
+under receipt `a539fb59`. The long receipt is retained at
+`.bne-artifacts/runs/b17f502905e27ad54a2652ff8a3431588f15b538fe923ba75b6396deeb3bcda8`.
+It binds dirty engine-input identity `b57c1bda` at base revision `fb4b1bd` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`df4fae70aac3861ac4110c6b821466e2c3ff872d8d6ba0f110cfa9a38ce48cba`.
+
+Behavioral delta: a progressed melee land chase retains its live old quarry
+through one Attack constructor when its one-heading residual route owns
+exactly one collision, no refusals, and the preferred adjacent replacement is
+standing on that cached heading. At timer one the ordinary hostile scan must
+still select that occupant; only then does the engine park the residual route,
+install the replacement and start its own Attack constructor. Collision-free
+tails continue consuming their cached heading immediately, and unrelated
+collision generations, ranged chases, buildings, dead targets and
+non-occupying replacements retain their existing behavior. The rule uses
+movement/combat class, route progress, collision/refusal generation, live
+target state, attack range, occupancy and normal target ranking; it contains
+no mission, map, coordinate, fixture, cycle, faction or unit-ID branch.
+
+Proof delta: Human 8 attack-peasant slot 1513 / Java 87 is at `(78,62)` on
+fixture 291, still targeting peasant Java 67 with a cached northeast heading,
+one collision and no refusals. Peasant Java 64 is adjacent on that heading and
+is now the preferred quarry. Native fixtures 292..294 keep Java 67 plus the
+northeast route through Attack construction 3,2,1. Fixture 295 installs Java
+64, parks the route and opens that replacement's Attack constructor; fixture
+298 enters the committed body hold and the blow lands on fixture 331. Java
+formerly replaced the quarry on fixture 292 and landed on fixture 328. The
+corrected case is exact through fixture 346. The same attack-peasant's earlier
+fixture-188 march is the negative witness: with no collision it consumes its
+cached head immediately. The new fixture-347 split is independent peasant slot
+1536 / Java 64, native order Move versus Java Still.
+
+Efficacy receipt
+`.bne-test-efficacy/c331-first-collision-occupied-tail/runs/43c565cd8f6fe088baac73588482a92fc1a41775c0f8ebba6880789b3ca0c693`
+proves the focused fixture-291..331 regression assertion-fails on `fb4b1bd`
+and passes on the candidate. All 17 moving-quarry regressions pass, as do both
+fixed 52-case gates. The ordinary executable next-level gate exits zero after
+209 Python checks and 96 engine/desktop checks; its command worklist remains
+11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. The earliest unpaused fleet
+finding is now expansion Human 12 peon slot 1364 at fixture 333, followed by
+expansion Human 4 and expansion Orc 11 at 337, Orc 12 at 342, expansion Human
+6 at 344, and Human 8 at 347.
+
+## Prior release checkpoint — 2026-08-31 (cycle-333 offered-building front-rank ownership)
 
 Accepted cycle-1,800 receipt `0775cabe` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

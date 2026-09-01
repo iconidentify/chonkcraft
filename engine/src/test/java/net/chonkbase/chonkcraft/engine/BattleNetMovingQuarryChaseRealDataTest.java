@@ -779,6 +779,92 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aFirstCollisionTailKeepsItsQuarryThroughRetargetConstruction() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 87);
+        Unit oldQuarry = unitById(world, 67);
+        Unit replacement = unitById(world, 64);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1513");
+        assertNotNull(oldQuarry,
+                "Human 8 has no Java twin for native peasant 1533");
+        assertNotNull(replacement,
+                "Human 8 has no Java twin for native peasant 1536");
+
+        while (fixtureCycle(world) < 291) {
+            mission.tick();
+        }
+        assertChaser(attacker, 78, 62, -2, 0, true);
+        assertSame(oldQuarry, attacker.target());
+        assertEquals(1, attacker.pathLength());
+        assertEquals(Direction.fromDelta(1, -1), attacker.peekHeading());
+        assertEquals(1, attacker.battleNetCollisionCounter(),
+                "the settled tail still owns its first collision generation");
+        assertEquals(0, attacker.battleNetRefusals());
+        assertEquals(2652, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(292, fixtureCycle(world));
+        assertChaser(attacker, 78, 62, 0, 0, false);
+        assertSame(oldQuarry, attacker.target(),
+                "native prices the cached north-east tail before replacement");
+        assertEquals(1, attacker.pathLength(),
+                "the final cached heading survives the first constructor");
+        assertEquals(Direction.fromDelta(1, -1), attacker.peekHeading());
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertSame(oldQuarry, attacker.target());
+        assertEquals(2, attacker.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(294, fixtureCycle(world));
+        assertSame(oldQuarry, attacker.target());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(295, fixtureCycle(world));
+        assertSame(replacement, attacker.target(),
+                "timer one owns the fresh adjacent-target scan");
+        assertEquals(0, attacker.pathLength(),
+                "the replacement scan parks the old terminal heading");
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer(),
+                "the replacement starts its own Attack constructor");
+
+        while (fixtureCycle(world) < 298) {
+            mission.tick();
+        }
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(23, attacker.battleNetAnimationTimer(),
+                "the replacement constructor enters the committed body hold");
+
+        while (fixtureCycle(world) < 328) {
+            mission.tick();
+        }
+        assertEquals(23, replacement.hitPoints(),
+                "the delayed replacement must not strike on fixture 328");
+
+        while (fixtureCycle(world) < 331) {
+            mission.tick();
+        }
+        assertEquals(18, replacement.hitPoints(),
+                "native attack-peasant 1513 lands its blow on fixture 331");
+    }
+
+    @Test
     void aMovingQuarryResidualReopensAttackBeforeTheCachedEastStep() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
