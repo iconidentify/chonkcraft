@@ -7004,13 +7004,48 @@ public final class World {
                         && candidate.battleNetCollisionCounter() > 0
                         && candidate.battleNetRefusals() > 0
                         && allyDistance < routerDistance;
-                if (stickyMobileQuarryFormationWall) {
+                boolean offeredBuildingReplacementFrontRankWall =
+                        target.type() != null
+                        && !target.type().building()
+                        && unit.offeredTarget() != null
+                        && unit.offeredTarget() != target
+                        && unit.offeredTarget().type() != null
+                        && unit.offeredTarget().type().building()
+                        && unit.battleNetCollisionCounter() == 1
+                        && unit.battleNetRefusals() == 1
+                        && candidate.target() == target
+                        && candidate.offeredTarget() == null
+                        && candidate.type() != null
+                        && candidate.type().moveType()
+                                == UnitType.Movement.LAND
+                        && candidate.type().maxAttackRange() <= 1
+                        && candidate.isMoving()
+                        && candidate.pathLength() >= 16
+                        && candidate.battleNetPathStepsTaken() >= 1
+                        && candidate.battleNetCollisionCounter() == 0
+                        && candidate.battleNetRefusals() == 0
+                        && allyDistance < routerDistance
+                        && directHeading >= 0
+                        && candidate.tileX() == unit.tileX()
+                                + Direction.deltaX(directHeading)
+                                        * directStride
+                        && candidate.tileY() == unit.tileY()
+                                + Direction.deltaY(directHeading)
+                                        * directStride;
+                if (stickyMobileQuarryFormationWall
+                        || offeredBuildingReplacementFrontRankWall) {
                     // Native keeps a collision-marked front-rank chaser in
                     // the wall view while a rear unit draws its first route
                     // to the same mobile quarry. XHuman 12 slot 1501 is one
                     // step into a saturated pressure route when slot 1489
                     // retargets the knight at fixture 192; preserving that
                     // body writes the second SE byte consumed at fixture 243.
+                    // The same front-rank ownership also survives a clean
+                    // long route when the rear unit's first collision/refusal
+                    // refill still carries its prior building offer. At
+                    // fixture 327 slot 1501 occupies slot 1489's direct SW
+                    // opening toward their shared footman; preserving it
+                    // writes native S,SW instead of the long SE wall face.
                     continue;
                 }
                 boolean saturatedFormationWall = keepSaturatedAlliesHard

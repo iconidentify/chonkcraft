@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
@@ -128,6 +129,73 @@ class XHuman12OfferedBuildingResidualAxisSkirtRealDataTest {
             assertEquals(remaining[depth], grunt.peekHeadingAtDepth(depth),
                     "native fixture-325 route byte at depth " + depth);
         }
+    }
+
+    @Test
+    @DisplayName("an offered-building refill keeps the shared-quarry front rank solid")
+    void offeredBuildingRefillKeepsTheSharedQuarryFrontRankSolid() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human-exp/levelx12h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 12 is not in the pack");
+        World world = mission.world();
+
+        Unit router = unitById(world, 111);
+        Unit frontRank = unitById(world, 99);
+        Unit rearRank = unitById(world, 104);
+        Unit oldTower = unitById(world, 117);
+        Unit footman = unitById(world, 123);
+        assertNotNull(router, "XHuman 12 has no native-slot-1489 grunt");
+        assertNotNull(frontRank, "XHuman 12 has no native-slot-1501 grunt");
+        assertNotNull(rearRank, "XHuman 12 has no rear-rank held-out grunt");
+        assertNotNull(oldTower, "XHuman 12 has no old offered guard tower");
+        assertNotNull(footman, "XHuman 12 has no shared replacement footman");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 326) {
+            mission.tick();
+        }
+
+        assertEquals(37, router.tileX());
+        assertEquals(38, router.tileY());
+        assertEquals(0, router.pathLength());
+        assertEquals(1, router.battleNetCollisionCounter());
+        assertEquals(1, router.battleNetRefusals());
+        assertEquals(footman, router.target());
+        assertEquals(oldTower, router.offeredTarget(),
+                "the emptied route still carries its prior building offer");
+
+        assertEquals(36, frontRank.tileX());
+        assertEquals(39, frontRank.tileY(),
+                "the advancing brother owns the direct southwest opening");
+        assertEquals(footman, frontRank.target());
+        assertNull(frontRank.offeredTarget());
+        assertEquals(19, frontRank.pathLength());
+        assertEquals(1, frontRank.battleNetPathStepsTaken());
+        assertEquals(0, frontRank.battleNetCollisionCounter());
+        assertEquals(0, frontRank.battleNetRefusals());
+
+        assertEquals(38, rearRank.tileX());
+        assertEquals(38, rearRank.tileY(),
+                "the equally long held-out brother is behind, not front rank");
+        assertEquals(footman, rearRank.target());
+        assertEquals(17, rearRank.pathLength());
+
+        mission.tick();
+        assertEquals(327, fixtureCycle(world));
+        assertEquals(37, router.tileX());
+        assertEquals(39, router.tileY(),
+                "the hard front rank makes native open south, not southeast");
+        assertEquals(1, router.pathLength());
+        assertEquals(Direction.fromDelta(-1, 1),
+                router.peekHeadingAtDepth(0),
+                "native leaves southwest after consuming the south head");
     }
 
     private static int fixtureCycle(World world) {

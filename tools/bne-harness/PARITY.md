@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-327 offered-building wall rejoin)
+## Current release checkpoint — 2026-08-31 (cycle-333 offered-building front-rank ownership)
+
+Accepted cycle-1,800 receipt `0775cabe` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,121, an increase of six. Expansion Human 12 advances from
+fixture 327 to 333. The cycle-400 fleet remains 40 clean / 12 divergent / 0
+failed under receipt `559e3ee8`. The long receipt is retained at
+`.bne-artifacts/runs/0775cabebe7b3497a87bd5e423eb9710035b87fa47310c7f2d9d50e993082724`.
+It binds dirty engine-input identity `cca00827` at base revision `80d1a35` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`b3589687fd435cd75ad363bde5a778e48d55c2ee320fa83138b6d8f84947f32a`.
+
+Behavioral delta: a first-generation collision/refusal refill which still
+carries its prior building in COrder_Attack's offered slot keeps the clean
+advancing front rank of its new mobile quarry hard. The retained ally must be
+a collision-free melee land chaser already consuming a long route to that
+same quarry, closer to it than the router and standing on the router's first
+direct-ray square. Same-target allies behind the router, short-route allies,
+unrelated quarries, non-building offers and ordinary target routes retain
+their existing soft-clear behavior. The rule uses offered-target provenance,
+collision/refusal generation, target identity, movement/combat class, live
+route progress and relative geometry; it contains no mission, map, coordinate,
+fixture, cycle, faction or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt slot 1489 / Java 111 empties its route at
+`(37,38)` on fixture 326 while chasing footman Java 123 and retaining its old
+guard-tower offer. It owns collision/refusal generation one. Front-rank grunt
+1501 / Java 99 is already one step into a collision-free nineteen-heading
+route to the same footman and occupies the direct southwest opening at
+`(36,39)`. Native keeps that body in the wall view and fixture 327 publishes
+and consumes `S,SW`, landing at `(37,39)` with southwest cached. Java formerly
+soft-cleared it, published a long wall beginning southeast and landed at
+`(38,39)`. The corrected route is byte-exact and the case is exact through
+fixture 332. The equally long same-target grunt Java 104 is behind the router,
+and the other nearer same-target brothers have short residual routes; they
+remain held-out soft-clear witnesses. The new fixture-333 split is independent
+peon slot 1364 / Java 236, native `(12,88)` versus Java `(11,89)`.
+
+Efficacy receipt
+`.bne-test-efficacy/c333-offered-building-front-rank-wall/runs/59d7302b19e48b712ebef20dda359798450342ed939656844e834ff22aa4b728`
+proves the focused fixture-326/327 regression assertion-fails on `80d1a35`
+and passes on the candidate. All 47 focused BNE pathfinder, behavior-one
+retarget, offered-collision and residual-traffic tests pass, as do both fixed
+52-case gates. The ordinary executable next-level gate exits zero after 209
+Python checks and 96 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. The earliest unpaused fleet
+finding is now Human 8 at fixture 328, followed by expansion Human 12 at 333
+and expansion Human 4 plus expansion Orc 11 at 337. Expansion Human 12's next
+finding is the peon slot 1364 harvest-route split described above.
+
+## Prior release checkpoint — 2026-08-31 (cycle-327 offered-building wall rejoin)
 
 Accepted cycle-1,800 receipt `b98ba023` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
