@@ -15,6 +15,69 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (paid-generation return-tail park)
+
+Accepted cycle-1,800 receipt `501c20cc` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 39,051, an increase of forty. Expansion Human 10 advances
+from fixture 390 to 430. The cycle-400 fleet improves from 46 clean / 6
+divergent to 47 clean / 5 divergent / 0 failed under receipt `ca6e7c74`.
+The long receipt is retained at
+`.bne-artifacts/runs/501c20cc59295ef18c679f9caee6073287668433b7dcebd2eb64a47dfbdcc974`.
+Its manifest has SHA-256
+`d0e45e6e0f7965b999bc1002e8ed48e7c5cbfdd2f5353fe15d80ac46df76f919`
+and binds dirty engine-input identity `416faae5` at base revision `5444da0`
+to authenticated, replayable source capsule
+`9b3cf53b28221208a120caf2e6f4d2849385f0d9dc0ed230924975837fbca03b`.
+
+Behavioral delta: after a laden returner has paid collision generations and
+consumed a cached return tail, retail can park that tail behind a moving,
+collision-marked allied returner for the same depot. Parking advances the
+mover's existing collision generation, clears the consumed route, and lets
+the next resource action redraw around the convoy body. It does not reset an
+already-paid mover to generation one. Exact same-depot, carried-resource,
+moving-blocker, refusal/collision-projection, path-progress, and allied-unit
+predicates keep the exception inside laden convoy return traffic. A clean
+convoy without that projection still retains its full refusal band, and
+saturated fresh-route and unrelated movement controls keep their prior
+behavior. The implementation contains no mission, map, coordinate, fixture,
+cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 10 native slot 1588 / Java unit 12 reaches
+`(56,6)` behind native slot 1584 / Java unit 16 at `(55,7)`. At fixture 389
+the mover's consumed south-west tail changes from route index one to twenty
+and raw `unit+0x1d` from `0x30` to `0x40`; the blocker remains a moving,
+collision-one laden returner for the same depot. At fixture 390 retail redraws
+`S,SW`, commits south to `(56,7)`, and retains generation four. Previously
+Java kept the stale south-west tail and paid another complete refusal band.
+Expansion Human 12 slots 1552/1561 at fixtures 302/303 independently prove
+the generation-zero form of the same transaction. Expansion Human 10's clean
+convoy, Human 14's clean convoy, and saturated fresh returns remain negative
+controls. Expansion Human 10 is now exact through fixture 429; its new
+fixture-430 finding is an independent peon y-position split, native 115 versus
+Java 116.
+
+Efficacy receipt
+`.bne-test-efficacy/c389-xhuman10-paid-generation-return-tail-park/runs/3714ad3aceac42e6f8122bd910dfc3b9a0761a7ec9cdcf0412cef6832b0e4931`
+proves the focused assertion executes and fails on `5444da0`, then executes
+and passes on the candidate. All seven focused laden-return wake tests and all
+68 relevant movement controls pass. Both fixed 52-case gates pass, and the
+source capsule verifies with zero sealed untracked inputs. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+97 engine/desktop checks, and 223 dual-adapter command scenarios. Its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is Human 8 at fixture 390, followed by
+expansion Human 7 at 395, expansion Orc 11 at 397, Human 7 at 405, Human 14
+at 406, Orc 11 at 418, Human 12 at 422, and expansion Human 10 at 430.
+
 ## Current release checkpoint — 2026-09-01 (refusal-marked depot entry overlap)
 
 Accepted cycle-1,800 receipt `cddd8842` preserves the shared clean horizon at

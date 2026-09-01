@@ -3517,8 +3517,7 @@ final class BattleNetMovementSystem {
                 return;
             }
             boolean pressuredLadenConvoyTail =
-                    unit.battleNetCollisionCounter() == 0
-                    && unit.battleNetPathStepsTaken() > 0
+                    unit.battleNetPathStepsTaken() > 0
                     && returnBlocker != null && returnBlocker != unit
                     && returnBlocker.isMoving()
                     && returnBlocker.returningToDepot()
@@ -3541,8 +3540,15 @@ final class BattleNetMovementSystem {
                 // slot 1552 drains its NW residual at fixture 302 while raw
                 // collision-one slot 1561 occupies the cached north square;
                 // native writes RI20/collision one, then redraws NE,NW and
-                // commits NE on fixture 303.
-                unit.setBattleNetCollisionCounter(1);
+                // commits NE on fixture 303. The same transaction retains an
+                // existing mover generation: XHuman 10 slot 1588 drains its
+                // south residual behind collision-one slot 1584, changes raw
+                // unit+0x1d from 0x30 to 0x40 and RI1 to RI20 on fixture 389,
+                // then redraws around that body. This is an increment, not a
+                // reset to the first generation.
+                int collision = unit.battleNetCollisionCounter() + 1;
+                unit.setBattleNetCollisionCounter(
+                        collision > 14 ? 0 : collision);
                 unit.clearPath();
                 unit.setRouteSpent(false);
                 unit.setWaitCycles(0);

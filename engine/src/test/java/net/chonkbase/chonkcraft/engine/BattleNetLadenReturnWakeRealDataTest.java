@@ -186,6 +186,41 @@ class BattleNetLadenReturnWakeRealDataTest {
                 "the accepted redraw retains native collision generation one");
     }
 
+    @Test
+    @DisplayName("XHuman 10 preserves a paid generation while parking a consumed return tail")
+    void xhuman10PreservesAPaidGenerationWhileParkingAConsumedReturnTail() {
+        Mission mission = mission("campaigns/human-exp/levelx10h");
+        World world = mission.world();
+        Unit peon = unitById(world, 12);
+        Unit blocker = unitById(world, 16);
+        assertNotNull(peon,
+                "XHuman 10 has no native-slot-1588 return peon");
+        assertNotNull(blocker,
+                "XHuman 10 has no native-slot-1584 return peon");
+
+        advanceToFixture(mission, world, 389);
+        assertPosition(peon, 56, 6,
+                "the south residual settles behind the collided convoy");
+        assertEquals(0, peon.pathLength(),
+                "native parks the consumed southwest tail at route index twenty");
+        assertEquals(4, peon.battleNetCollisionCounter(),
+                "the route park advances the paid generation from three to four");
+        assertPosition(blocker, 55, 7,
+                "the collision-marked returner still owns the southwest square");
+        assertTrue(blocker.isMoving());
+        assertEquals(1, blocker.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(390, fixtureCycle(world));
+        assertPosition(peon, 56, 7,
+                "the next resource visit redraws and commits south");
+        assertEquals(1, peon.pathLength(),
+                "southwest remains cached behind the committed south head");
+        assertEquals(5, peon.peekHeading());
+        assertEquals(4, peon.battleNetCollisionCounter(),
+                "the replacement route retains generation four");
+    }
+
     private static Mission mission(String map) {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
