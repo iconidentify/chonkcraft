@@ -3851,66 +3851,53 @@ final class BattleNetHarvestSystem {
 
 
     /**
-     * The depot a harvester assignment measures against, nearest by the
-     * walked route rather than the straight line.
+     * The depot selected by BNE's {@code FindDeposit} at {@code 0x438770}.
      *
-     * <p>{@code FindDeposit} and {@code BestDepotFinder<false>}
-     * The game every finished depot of the
-     * player's that stores the resource, ordered by
-     * {@code UnitReachable(worker, dest, 1)} -- the length of a real route --
-     * with anything unreachable excluded outright. The straight-line distance
-     * is kept only as the skip: a depot whose straight line is already no
-     * shorter than the best walked route found cannot beat it, "Use Circle,
-     * not square", and is never searched.
+     * <p>The candidate must share the worker's fixed terrain component. Sea
+     * workers use {@code 0x416980}, which accepts any square of the depot's
+     * footprint; land workers compare the component word at the depot's
+     * origin. Among those candidates, both native arms call {@code 0x416b10}
+     * and keep the later owner-roster entry on equality. That distance is the
+     * footprint-aware Chebyshev measure, not the length of a route and not
+     * ChonkCraft's Euclidean {@link Unit#distanceTo(Unit)}.
      *
-     * <p>The exclusion is the part that turned out to be load-bearing.
-     * {@code maps/demo/demo02} ships a refinery at 2,24 whose water the
-     * tanker at 14,20 cannot sail to, and a straight-line pick hands the
-     * finder that refinery as its seed -- whose lagoon holds the very
-     * platform the flood must not reach. Probed from the real binary, the
-     * cycle-38 ask is {@code depot=shipyard mine=none}; with the straight
-     * line it was refinery and the platform, and the map's first divergence
-     * walked back from cycle 879 to 39.
+     * <p>This distinction is visible between two loaded tankers. XOrc 8's
+     * refinery is genuinely nearer than its shipyard under {@code 0x416b10},
+     * while XHuman 6's south-west shipyard is nearer than its refinery. A
+     * route-cost refinement selected the refinery in both missions and sent
+     * the latter tanker north on fixture 344 instead of north-west.</p>
      */
     Unit bestDepotByTravel(Unit worker, UnitType.Resource resource, int range) {
-        // "simple distance" is measured from GetFirstContainer(worker): a
-        // tanker inside its platform is as far from the shore as the
-        // platform is, not as far as the corner square its bookkeeping
-        // stands on.
+        // FindDeposit reads the contained worker at its container's recorded
+        // tile. Using the worksite also preserves that contract for restored
+        // Java state whose hidden worker anchor has not yet been repaired.
         Unit measureFrom = !worker.isOnMap() && worker.worksite() != null
                 ? worker.worksite() : worker;
-        int stride = world.battleNetMovementStride(worker);
+        // The hidden tanker keeps its sea type while its recorded x/y name
+        // the platform. Seeding from the platform object would instead apply
+        // a building's land mask and reject every reachable naval depot.
+        boolean[] component = world.battleNetConnectivityCell(worker);
+        boolean seaWorker = worker.type() != null && worker.type().seaUnit();
         Unit best = null;
         int bestDistance = Integer.MAX_VALUE;
-        for (Unit candidate : world.units) {
+        for (Unit candidate : world.playerUnits(worker.player())) {
             if (!candidate.isAlive() || !candidate.isOnMap()
-                    || candidate.player() != worker.player()
                     || !candidate.type().storesResource(resource)
                     || candidate.order() == Unit.Order.UNDER_CONSTRUCTION) {
                 continue;
             }
-            int straight = measureFrom.distanceTo(candidate);
-            // A doubled tanker evaluates the first refinery even when a
-            // shipyard has already supplied the raw-distance skip. XOrc 8's
-            // shipyard is seen first at straight/travel 33/22; its refinery
-            // is 31/18 and native selects it. Once a refinery is incumbent,
-            // retain the ordinary skip: Human 7 must keep eastern refinery
-            // 105 rather than Java's apparently shorter southern 113.
-            boolean doubledRefineryAfterShipyard = stride > 1
-                    && best != null && best.type() != null
-                    && World.isBattleNetShipyard(best.type().ident())
-                    && World.isBattleNetRefinery(candidate.type().ident());
-            if (straight > range
-                    || (!doubledRefineryAfterShipyard
-                            && (straight > bestDistance
-                                    || (straight == bestDistance
-                                            && stride == 1)))) {
+            boolean sameComponent = seaWorker
+                    ? world.battleNetFootprintTouchesComponent(
+                            candidate, component)
+                    : component[candidate.tileX()
+                            + candidate.tileY() * world.map.width()];
+            if (!sameComponent) {
                 continue;
             }
-            int travel = world.unitReachableTravel(worker, candidate, 1);
-            if (travel > 0 && travel < bestDistance) {
+            int distance = world.battleNetDistance(measureFrom, candidate);
+            if (distance <= range && distance <= bestDistance) {
                 best = candidate;
-                bestDistance = travel;
+                bestDistance = distance;
             }
         }
         return best;

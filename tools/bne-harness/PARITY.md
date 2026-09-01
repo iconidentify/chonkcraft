@@ -15,6 +15,74 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-08-31 (cycle-525 component-distance FindDeposit)
+
+Accepted cycle-1,800 receipt `102fc793` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,399, an increase of 181. Expansion Human 6 advances from
+fixture 344 to 525. The cycle-400 fleet improves from 40 clean / 12 divergent
+to 41 clean / 11 divergent / 0 failed under receipt `c3ab85cd`. The long
+receipt is retained at
+`.bne-artifacts/runs/102fc79317201ae5da6fb6ff51b2957b14d026483f696d2b2c0b5ce92637ffe2`.
+It binds dirty engine-input identity `d1534b11` at base revision `dcc1a95` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`f8b84ad1f2c7c6f14c8253dc0c89ea60a7333042712230c1934b25a26e752153`.
+
+Behavioral delta: `FindDeposit` at `0x00438770` filters completed friendly
+depots by the worker's fixed terrain component, then walks the owner's unit
+roster and minimizes native footprint-aware Chebyshev distance
+`0x00416b10`, replacing the incumbent on equality. A tanker takes the naval
+type-flag arm at `0x0043877d`; candidate footprint/component membership is
+tested by `0x00416980`. The selector does not call `UnitReachable`, compare A*
+route length, or use ChonkCraft's Euclidean footprint distance. Land workers
+use the same native distance after comparing component words at the worker and
+depot origins. The implementation uses ownership, resource storage,
+construction/alive state, movement class, fixed terrain connectivity, native
+distance, and owner-roster order; it contains no mission, map, coordinate,
+fixture, cycle, faction, unit-ID, or route-length branch.
+
+Proof delta: expansion Human 6 tanker slot 1516 / Java 84 finishes its first
+load inside oil platform `(49,67)`. Native selects shipyard slot 1519 at
+`(40,51)` rather than refinery slot 1522 at `(49,47)`, carries that weak goal
+through the synchronized ready window, and commits north-west from `(48,68)`
+to `(46,66)` on fixture 344. Java formerly refined by walked route cost,
+selected refinery Java 78, and committed north to `(48,66)`. Static analysis
+anchors the naval roster walk at `0x004387c2`, component-footprint call at
+`0x004387eb`, distance calls at `0x00438803` / `0x0043880d`, and strict-
+incumbent comparison at `0x00438815`. Expansion Orc 8 remains the positive
+refinery control because its refinery is genuinely nearer under
+`0x00416b10`; Human 7 independently retains its eastern refinery. The
+corrected case is exact through fixture 524; its new fixture-525 split is an
+independent peon slot 1568 position mismatch, native `(20,15)` versus Java
+`(19,14)`.
+
+Efficacy receipt
+`.bne-test-efficacy/c525-xhuman6-native-find-deposit/runs/ef876c9009910c759ca5177737b1bcc982f68f955bb100993b6d50f14f383479`
+proves the focused platform-exit regression assertion-fails on `dcc1a95` and
+passes on the candidate. All 56 in-scope depot, return-goods, harvest, oil,
+and save-boundary family tests pass. An exploratory broader selection found
+two unrelated `DropOutTest` failures which reproduce identically on
+`dcc1a95`; they are baseline-equivalent, not accepted as green evidence. Both
+fixed 52-case gates pass. The ordinary executable next-level gate exits zero
+after 209 Python checks (four skipped) and 96 engine/desktop checks; its
+command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now Human 8 at
+fixture 347, followed by expansion Human 4 at 350, expansion Human 2 at 352,
+expansion Orc 11 at 361, Orc 8 at 364, expansion Orc 12 at 374, expansion
+Human 10 at 375, Orc 12 at 383, and expansion Human 6 at 525.
+
 ## Current release checkpoint — 2026-08-31 (cycle-383 saturated depot-tail route retirement)
 
 Accepted cycle-1,800 receipt `6b34baa6` preserves the shared clean horizon at

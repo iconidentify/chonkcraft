@@ -109,6 +109,26 @@ The lifecycle gate also proves:
 - empty and laden tanker artwork follows actual cargo state; and
 - the raw oil state and cadence survive save/load.
 
+## Return-depot selection
+
+`FindDeposit` at `0x00438770` filters a tanker's friendly shipyards and
+refineries by the fixed water-component word, then compares them with native
+footprint-aware Chebyshev distance `0x00416b10`. It does not refine that choice
+with `UnitReachable` or a route length, and a later owner-roster entry replaces
+the incumbent on equal distance. Component filtering is still load-bearing:
+the helper at `0x00416980` checks every square of a naval depot's footprint,
+so a base in another lagoon remains ineligible even when its corner is near.
+
+Expansion Human 6 is the positive shipyard witness. Tanker slot 1516 / Java
+84 exits platform `(49,67)` with a full load; native stores shipyard slot 1519
+at `(40,51)` and commits north-west on fixture 344, while the former Java
+route-cost refinement stored refinery Java 78 at `(49,47)` and committed
+north. The corrected case is exact through fixture 524. Expansion Orc 8 is
+the refinery control: its refinery remains genuinely nearer under
+`0x00416b10`. Human 7 independently retains its eastern refinery, and the
+destroyed-depot lifecycle fixture still reroutes a full tanker to the
+surviving component-matched depot.
+
 ## Return-order and save boundary
 
 Raw action 24 (`TO_DEPOT`) is the authoritative retail state for a laden

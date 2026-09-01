@@ -969,6 +969,36 @@ Note the flying angel, fire breeze, gryphon rider and dragon share one word
 exactly. No predicate over this table alone separates them, which is why
 behaviour 4 needs the owner's controller byte and the unit's marker as well.
 
+## FindDeposit uses component-filtered native distance, not a route cost
+
+The pinned BNE executable's `FindDeposit` is `0x00438770`. Its first type test
+at `0x0043877d` selects the naval arm when the worker carries type flag
+`0x00000008`; both oil tankers carry `0x00000208`. That arm reads the fixed map
+component at the tanker's recorded tile, walks the owner's unit roster from
+`0x004be264 + player * 4`, admits naval bases through type flag `0x01000000`,
+and calls `0x00416980` to require at least one square of the candidate
+footprint to carry the tanker's component word. The linked-list successor is
+unit offset `0x68`.
+
+Candidate ordering is not `UnitReachable` or an A* route length. At
+`0x00438803` and `0x0043880d`, the naval arm calls `0x00416b10` for the
+incumbent and current candidate. The comparison at `0x00438815` keeps the
+incumbent only when it is strictly nearer, so an equal-distance candidate
+later in the owner roster replaces it. The land arm at `0x00438839` first
+compares the component words at the worker and depot origins, then makes the
+same two distance calls at `0x004388da` and `0x004388e9`; its branch at
+`0x004388fb` also replaces on equality.
+
+`0x00416b10` is the existing footprint-aware Chebyshev distance: buildings
+project their nearest footprint coordinate toward the worker, while movable
+targets remain points. This is the discriminator between the accepted oil
+controls. Expansion Orc 8's refinery is nearer than its shipyard under that
+measure and remains selected. Expansion Human 6's tanker slot 1516 is hidden
+at platform `(49,67)` when it selects shipyard slot 1519 at `(40,51)`, not
+refinery slot 1522 at `(49,47)`; its stored return route therefore opens
+north-west on fixture 344. A dynamic route-cost refinement reverses that
+second choice even though both depots share the water component.
+
 ## Everything that draws from the asynchronous stream
 
 Swept from the retained captures by grouping every `async-random` event by its

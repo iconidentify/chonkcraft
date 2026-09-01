@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -427,8 +428,8 @@ class TankerRoundTripTest {
     }
 
     @Test
-    @DisplayName("a tanker over an oil patch rejects the depot but can sail away")
-    void aMooredTankersReachabilityAndMovementSeeDifferentFieldFlags() {
+    @DisplayName("a tanker over an oil patch uses fixed-component depot lookup")
+    void aMooredTankerUsesNativeComponentDepotLookupAndCanSailAway() {
         GameMap map = new GameMap(32, 32, new Tileset());
         for (int y = 0; y < 32; y++) {
             for (int x = 0; x < 32; x++) {
@@ -444,12 +445,13 @@ class TankerRoundTripTest {
         rig.setResourcesHeld(25_000);
         Unit boat = world.createUnit(tanker(), 0, 12, 14);
 
-        assertSame(rig, world.findResourceUnit(boat, UnitType.Resource.OIL, 8),
-                "UnitReachable must leave the tanker's SeaUnit flag marked: the"
-                        + " first same-movement cache entry is then the oil patch, so"
-                        + " the nearby depot is rejected and the resource flood starts"
-                        + " at the tanker. Starting at the depot cannot see this rig"
-                        + " inside the eight-square bound");
+        assertSame(depot, world.harvest.bestDepotByTravel(
+                boat, UnitType.Resource.OIL, 1000),
+                "FindDeposit uses the fixed water component, so transient oil-patch"
+                        + " occupancy cannot reject a component-matched refinery");
+        assertNull(world.findResourceUnit(boat, UnitType.Resource.OIL, 8),
+                "the resource census starts from FindDeposit's refinery; this rig is"
+                        + " deliberately outside its eight-square bound");
         assertTrue(world.orderHarvest(boat, rig.tileX(), rig.tileY()));
         world.tick();
 

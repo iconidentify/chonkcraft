@@ -167,8 +167,8 @@ class OilLifecycleGateTest {
     @DisplayName("destroying the selected refinery reroutes a laden tanker")
     void destroyedDepotReroutesTheLadenLeg() {
         World world = new World(sea());
-        Unit doomed = world.createUnit(refinery(), 0, 8, 16);
-        Unit replacement = world.createUnit(refinery(), 0, 23, 16);
+        Unit doomed = world.createUnit(refinery(), 0, 23, 16);
+        Unit replacement = world.createUnit(refinery(), 0, 8, 16);
         Unit rig = world.createUnit(platform(), 15, 17, 16);
         rig.setResourcesHeld(25_000);
         world.recalculateSupply();

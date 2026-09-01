@@ -192,6 +192,39 @@ class BattleNetAiOilPlatformExitRealDataTest {
     }
 
     @Test
+    @DisplayName("an XHuman 6 loaded tanker chooses the nearer shipyard")
+    void anXHuman6LoadedTankerChoosesTheNativeShipyard() {
+        Mission mission = loadMission("campaigns/human-exp/levelx06h");
+        World world = mission.world();
+        Unit tanker = unitById(world, 84);
+        Unit refinery = unitById(world, 78);
+        Unit shipyard = unitById(world, 81);
+        assertNotNull(tanker,
+                "XHuman 6 has no Java unit 84 / native tanker 1516");
+        assertNotNull(refinery, "XHuman 6 has no orc refinery at 49,47");
+        assertNotNull(shipyard, "XHuman 6 has no orc shipyard at 40,51");
+
+        tickThrough(mission, 316);
+
+        assertEquals(48, tanker.tileX());
+        assertEquals(68, tanker.tileY());
+        assertEquals(100, tanker.carried());
+        assertTrue(tanker.returningToDepot());
+        assertSame(shipyard, tanker.returnDepotGoal(),
+                "native slot 1516 stores shipyard slot 1519 before its timed Still head; "
+                        + "Java selected refinery " + refinery.id());
+
+        tickThrough(mission, 343);
+        assertEquals(48, tanker.tileX());
+        assertEquals(68, tanker.tileY());
+        mission.tick();
+        assertEquals(344, fixtureCycle(world));
+        assertEquals(46, tanker.tileX(),
+                "the native shipyard route opens with a north-west doubled stride");
+        assertEquals(66, tanker.tileY());
+    }
+
+    @Test
     @DisplayName("an Orc 8 tanker tests the exit anchor instead of its drawn hull")
     void anOrc8TankerUsesTheNativeOverlappingWestAnchor() {
         AssetSource assets = AssetSource.fromEnvironment();
