@@ -1910,6 +1910,39 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(57, returner.tileY());
         assertEquals(1, returner.pathLength());
         assertEquals(14, returner.battleNetAnimationTimer());
+
+        while (human14World.cycle() - BNE_INITIALIZATION_TICKS < 405) {
+            human14.tick();
+        }
+        assertEquals(56, returner.tileX());
+        assertEquals(57, returner.tileY());
+        assertEquals(1, returner.pathLength(),
+                "Move timer one retains the consumed south tail for this visit");
+        assertEquals(2, returner.battleNetCollisionCounter());
+        assertEquals(2600, returner.battleNetSequenceOffset());
+        assertEquals(1, returner.battleNetAnimationTimer());
+
+        human14.tick();
+        assertEquals(406,
+                human14World.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(56, returner.tileX(),
+                "the timer-one action parks the newly blocked south tail");
+        assertEquals(57, returner.tileY());
+        assertEquals(0, returner.pathLength(),
+                "native route index twenty exposes no live Java headings");
+        assertEquals(3, returner.battleNetCollisionCounter());
+        assertEquals(2600, returner.battleNetSequenceOffset());
+        assertEquals(1, returner.battleNetAnimationTimer());
+
+        human14.tick();
+        assertEquals(407,
+                human14World.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(57, returner.tileX(),
+                "the following resource visit redraws southeast around traffic");
+        assertEquals(58, returner.tileY());
+        assertTrue(returner.isMoving());
+        assertEquals(3, returner.battleNetCollisionCounter(),
+                "the redrawn route retains collision generation three");
     }
 
     @Test

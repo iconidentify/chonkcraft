@@ -382,6 +382,7 @@ final class BattleNetHarvestSystem {
                         && worker.battleNetCollisionCounter() >= 8;
                 int left = worker.battleNetOrderDelay() - 1;
                 worker.setBattleNetOrderDelay(left);
+                boolean parkedReturnMoveTimerStillCounting = false;
                 // A queued mine-exit Return Goods promotion starts action
                 // 24 on the worker's three-call Still body.  Java projects
                 // that action onto HARVEST after the promotion visit, but
@@ -413,7 +414,23 @@ final class BattleNetHarvestSystem {
                             && worker.battleNetAnimationTimer() > 1) {
                         worker.setBattleNetAnimationTimer(
                                 worker.battleNetAnimationTimer() - 1);
+                        parkedReturnMoveTimerStillCounting =
+                                parkCooperativeReturn && left == 0;
                     }
+                }
+                if (parkedReturnMoveTimerStillCounting) {
+                    // The logical delay cannot execute the route wake on the
+                    // callback which merely changes Move timer two to one.
+                    // Native exposes that timer-one state for the whole visit;
+                    // the following action callback owns either the retained
+                    // step or the route-index-twenty park. Human 14 peon 1539
+                    // is still RI5/collision two at fixture 405, then parks the
+                    // occupied south tail as RI20/collision three at 406. Free
+                    // wake controls already enter this block at timer one and
+                    // continue to act immediately (XHuman 7 / Orc 5).
+                    worker.setBattleNetOrderDelay(1);
+                    worker.setBattleNetRefusalHold(true);
+                    return;
                 }
                 // A terrain resource whose exhausted route could not yet be
                 // rebuilt stays in action 23's three-call construction body.

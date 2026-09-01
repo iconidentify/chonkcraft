@@ -15,7 +15,69 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (resource-dropout fourth-leg turn)
+## Current release checkpoint — 2026-09-01 (laden-return timer-one wake)
+
+Accepted cycle-1,800 receipt `9270ffac` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 40,045, an increase of 136. Human 14 advances from fixture 406
+to 542. The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under
+receipt `caf222b2`. The long receipt is retained at
+`.bne-artifacts/runs/9270ffacf746d53d58378d9f6f5f681b145fc5d7e13d6fc7576e54f2fe367fa3`.
+Its manifest has SHA-256
+`70c0ebfee3f8ddb97a36dc83d062d1078476455cb8acd61c09078a624eef54c5`
+and binds dirty engine-input identity
+`21c40353007b273ebac7f5e2fef2f8531418f60ed682988d41e4f28a08786e9c`
+at base revision `b5dd271` to authenticated, replayable source capsule
+`9c38af13d18ac71d27b13ca1492820caa93c3381ca589248e3cd5284533ae0c6`.
+
+Behavioral delta: a retained laden-return route's Move timer one is an exposed
+action state. A callback which changes timer two to one does not also execute
+the route wake; the following action callback owns the cached step or
+`FUN_004379e0` route park. Java's surrogate order delay could expire while it
+was decrementing Move two to one and incorrectly perform both operations in
+one visit. The corrected bridge retains one logical callback only when the
+parked return's native Move timer is still above one. A wake which enters with
+timer one already exposed remains immediate. The implementation contains no
+mission, map, coordinate, fixture, exact-cycle, faction, route-length, or
+unit-ID branch.
+
+Proof delta: Human 14 native laden peon slot 1539 / Java unit 61 retains its
+consumed south tail behind a clean convoy and advances collision generation
+one to two at fixture 391, opening Move `2600/15`. Native still carries route
+index five, collision `0x20`, and the south byte at fixture 405 while Move is
+`2600/1`. Fixture 406 refuses that head, advances collision to `0x30`, and
+parks route index twenty without moving. Fixture 407 redraws `[SE,S]`, commits
+southeast to `(57,58)`, and leaves route index one. Java formerly parked the
+tail on fixture 405 and therefore redrew and moved a cycle early at 406. The
+corrected case is exact through fixture 541; its fixture-542 critter-order
+finding is independent. Expansion Human 7 slot 1451 and Orc 5 slot 1529 are
+held-out free-head controls: both enter their wake with timer one already
+exposed and retain their fixture-286 northeast and fixture-289 southeast
+steps.
+
+Efficacy receipt
+`.bne-test-efficacy/c406-human14-return-timer-one-park/runs/f43738c512d41f65d47388c0f15e1f962efc5af80680a62c877e46becfae3516`
+proves the focused assertion executes and fails on `b5dd271`, then executes
+and passes on the candidate. All 48 focused laden-return, convoy-route,
+mine-exit, tanker-return, and real-data timing checks pass. Both fixed 52-case
+gates pass, and the long receipt's source capsule verifies with zero sealed
+untracked inputs. The ordinary executable next-level gate exits zero after
+209 Python checks (four skipped), 98 engine/desktop checks, and 223
+dual-adapter command scenarios. Its 11 comparable scenarios remain 6 exact /
+5 divergent with no regression or infrastructure failure.
+`--require-certified` remains incomplete on the documented producer lanes,
+and remote AI discovery still stops at strict SSH verification of the changed
+`i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is expansion Human 7 at fixture 414,
+followed by Orc 11 at 418, Human 12 at 422, Human 8 at 427, expansion Human 10
+at 430, expansion Human 5 at 435, and expansion Orc 11 at 438.
+
+## Prior release checkpoint — 2026-09-01 (resource-dropout fourth-leg turn)
 
 Accepted cycle-1,800 receipt `31d10f2c` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

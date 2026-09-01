@@ -206,6 +206,20 @@ The wake therefore reopens that stored direct byte before any fresh route ask.
 This is distinct from the saturated multi-byte stale tail above, whose wake
 does query and overwrite the buffer with `[SE,E]`.
 
+Move timer one is itself an exposed action state, not permission to run the
+route wake on the callback which decrements timer two to one. Human 14 laden
+peon slot 1539 retains route index five, collision byte `0x20`, and its final
+south byte through fixtures 404 and 405 while Move changes `2600/2` to
+`2600/1`. Fixture 406 is the next action callback: the south square is now
+occupied by a collision-bearing returner, so `FUN_004379e0` advances the byte
+to `0x30` and parks the cursor at twenty without moving. Fixture 407 draws
+`[SE,S]`, commits southeast, and leaves route index one. Free-head controls
+enter their callback with timer one already exposed and therefore do act on
+that callback: expansion Human 7 slot 1451 consumes northeast at fixture 286,
+and Orc 5 slot 1529 consumes southeast at fixture 289. The discriminant is the
+Move timer at callback entry, not whether the cached head will be retained or
+parked.
+
 The coarse order byte is not sufficient to identify that Move action state.
 In the sealed expansion Human 12 fixture-204 branch witness, map occupant
 (12,87) resolves through `0x45019b` to slot 1358. Its order byte is 3 (Move),
