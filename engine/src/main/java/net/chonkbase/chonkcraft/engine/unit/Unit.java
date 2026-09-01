@@ -519,6 +519,14 @@ public final class Unit {
     /** Whether action 25 must replace a tail inherited from action 23. */
     private boolean battleNetResourceApproachRedirect;
 
+    /**
+     * The active action-24 empty-route cursor was installed by the last call
+     * of a temporary resource-hit Move. That restore has already paid the
+     * common idle marker and owns later empty-route callbacks without first
+     * constructing an allied-refusal route.
+     */
+    private boolean battleNetResourceHitRestoreIdle;
+
     /** Hall queued as a transport's retail BNE startup destination. */
     private Unit battleNetPendingTransportTarget;
 
@@ -4004,6 +4012,14 @@ public final class Unit {
 
     public void setBattleNetResourceApproachRedirect(boolean redirect) {
         battleNetResourceApproachRedirect = redirect;
+    }
+
+    public boolean battleNetResourceHitRestoreIdle() {
+        return battleNetResourceHitRestoreIdle;
+    }
+
+    public void setBattleNetResourceHitRestoreIdle(boolean restoreIdle) {
+        battleNetResourceHitRestoreIdle = restoreIdle;
     }
 
     public Unit battleNetPendingTransportTarget() {

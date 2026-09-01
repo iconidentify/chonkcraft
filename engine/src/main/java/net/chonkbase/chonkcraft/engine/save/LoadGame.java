@@ -789,6 +789,10 @@ public final class LoadGame {
             unit.setBattleNetOrderDelay(
                     integer(state.rawGet("battleNetOrderDelay")));
         }
+        if (state.rawGet("resourceHitRestoreIdle") != null) {
+            unit.setBattleNetResourceHitRestoreIdle(
+                    truthy(state.rawGet("resourceHitRestoreIdle")));
+        }
         if (state.rawGet("woodReadyPathRequired") != null) {
             unit.setBattleNetWoodReadyPathRequired(
                     truthy(state.rawGet("woodReadyPathRequired")));

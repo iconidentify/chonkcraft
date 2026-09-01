@@ -362,6 +362,53 @@ class BattleNetAiMineExitReadyRealDataTest {
     }
 
     @Test
+    @DisplayName("a Human 8 resource-hit restore owns its final idle marker")
+    void anHuman8ResourceHitRestoreOwnsItsFinalIdleMarker() {
+        Mission mission = mission("campaigns/human/level08h");
+        World world = mission.world();
+        Unit peasant = byId(world, 64);
+        Unit critter = byId(world, 108);
+        assertNotNull(peasant,
+                "native slot 1536 must remain paired with Java peasant 64");
+        assertNotNull(critter,
+                "native slot 1492 must remain paired with Java critter 108");
+
+        while (fixtureCycle(world) < 301) {
+            mission.tick();
+        }
+        assertEquals(0x535014dc, world.battleNetRandomSeed(),
+                "the first free hit-flee restore must pay exactly one idle draw");
+
+        while (fixtureCycle(world) < 316) {
+            mission.tick();
+        }
+        assertEquals(0xa9ecb6ac, world.battleNetRandomSeed(),
+                "an empty resumed route must not pay the restore marker twice");
+
+        while (fixtureCycle(world) < 350) {
+            mission.tick();
+        }
+        assertEquals(0xaf6d1719, world.battleNetRandomSeed(),
+                "the final retained-hit body owns its marker before route restoration");
+        assertEquals(2595, peasant.battleNetSequenceOffset(),
+                "the restored resource action keeps the native Still cursor");
+        assertEquals(3, peasant.battleNetAnimationTimer(),
+                "the empty restored route opens one three-call idle band");
+        assertEquals(0, peasant.battleNetRefusals(),
+                "a restored empty route has not entered a refusal generation");
+
+        while (fixtureCycle(world) < 358) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, critter.order(),
+                "the critter must consume its native choice and east direction");
+        assertEquals(38, critter.orderTargetX());
+        assertEquals(84, critter.orderTargetY());
+        assertEquals(0x45df3775, world.battleNetRandomSeed(),
+                "the complete fixture-358 asynchronous ledger must stay aligned");
+    }
+
+    @Test
     @DisplayName("an XOrc 12 AI peasant surfaces Still before walking gold home")
     void anXOrc12AiPeasantSurfacesStillBeforeWalkingGoldHome() {
         Mission mission = mission("campaigns/orc-exp/levelx12o");

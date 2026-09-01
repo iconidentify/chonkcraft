@@ -690,6 +690,9 @@ public final class SaveGame {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
         }
+        if (unit.battleNetResourceHitRestoreIdle()) {
+            state.append(" resourceHitRestoreIdle = true,");
+        }
         if (unit.battleNetWoodReadyPathRequired()) {
             state.append(" woodReadyPathRequired = true,");
         }

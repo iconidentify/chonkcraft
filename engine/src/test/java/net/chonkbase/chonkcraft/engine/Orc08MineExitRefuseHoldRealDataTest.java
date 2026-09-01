@@ -59,6 +59,8 @@ class Orc08MineExitRefuseHoldRealDataTest {
                 "the ally still holds the only south square at fixture 252");
         assertEquals(87, blocker.tileY(),
                 "the ally still holds the only south square at fixture 252");
+        assertEquals(false, hauler.battleNetResourceHitRestoreIdle(),
+                "an ordinary mine queue must not inherit resource-hit provenance");
 
         mission.tick();
         assertEquals(253, fixtureCycle(world));

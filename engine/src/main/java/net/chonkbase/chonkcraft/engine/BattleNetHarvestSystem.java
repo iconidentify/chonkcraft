@@ -248,6 +248,7 @@ final class BattleNetHarvestSystem {
 
 
     boolean beginHarvest(Unit worker, ResourceInfo info, Unit building, int tileX, int tileY) {
+        worker.setBattleNetResourceHitRestoreIdle(false);
         worker.setGatherClockStarted(false);
         worker.setBattleNetWoodReadyPathRequired(false);
         worker.setBattleNetSaturatedWoodCornerLadder(false);
@@ -328,6 +329,12 @@ final class BattleNetHarvestSystem {
      * timing is what makes the distance between a hall and its mine matter.
      */
     void stepHarvest(Unit worker) {
+        stepHarvest(worker, false);
+    }
+
+
+    private void stepHarvest(Unit worker,
+            boolean activeOrderIdleRandomAlreadyPaid) {
         ResourceInfo info = worker.type().gathering().get(worker.carrying());
         // Raw retail action 24 is the authoritative homeward oil state. Older
         // schema-2 saves persisted that action but not this navigation
@@ -743,7 +750,8 @@ final class BattleNetHarvestSystem {
                 // ring tile lies a step further sails that step and serves
                 // the spent route before it banks. level10h's tanker banked
                 // at 774 from mid-route where upstream's docks after 790.
-                boolean pathWait = world.movement.walkTowards(worker, depot);
+                boolean pathWait = world.movement.walkTowards(
+                        worker, depot, activeOrderIdleRandomAlreadyPaid);
                 // Every wait the walk answered climbs the shove ladder --
                 // MoveToDepot's PF_WAIT arm.
                 if (pathWait && worker.order() == Unit.Order.HARVEST
@@ -788,7 +796,8 @@ final class BattleNetHarvestSystem {
             // need the ordinary one-tile arm onto 0x41f430.
             if (!doubledDepotSkirtArrived
                     && world.movement.depotRingDestArm(worker, depot)) {
-                boolean pathWait = world.movement.walkTowards(worker, depot);
+                boolean pathWait = world.movement.walkTowards(
+                        worker, depot, activeOrderIdleRandomAlreadyPaid);
                 if (pathWait && worker.order() == Unit.Order.HARVEST
                         && worker.waitCycles() > 0) {
                     resourceWalkWaited(worker, depot.tileX(), depot.tileY(),
@@ -836,6 +845,7 @@ final class BattleNetHarvestSystem {
             world.players[worker.player()].add(info.resource(),
                     worker.carried() * world.players[worker.player()].income(info.resource()) / 100);
             worker.setCarried(0);
+            worker.setBattleNetResourceHitRestoreIdle(false);
             // Both halves of the load go: "unit.ResourcesHeld = 0;
             // unit.CurrentResource = 0", so
             // the next gathering start is a fresh one whatever it is for.
@@ -4560,6 +4570,14 @@ final class BattleNetHarvestSystem {
      */
     boolean beginBattleNetEmptyDepotRouteIdleBand(Unit worker, Unit depot,
             PathFinder.Path emptyPath) {
+        return beginBattleNetEmptyDepotRouteIdleBand(
+                worker, depot, emptyPath, false);
+    }
+
+
+    boolean beginBattleNetEmptyDepotRouteIdleBand(Unit worker, Unit depot,
+            PathFinder.Path emptyPath,
+            boolean activeOrderIdleRandomAlreadyPaid) {
         if (worker == null || depot == null || emptyPath == null
                 || emptyPath.result() != PathFinder.Result.FOUND
                 || emptyPath.length() != 0
@@ -4579,7 +4597,9 @@ final class BattleNetHarvestSystem {
         worker.setPathGoal(-1, -1);
         worker.setBattleNetSequenceOffset(stillStart);
         worker.setBattleNetAnimationTimer(3);
-        world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
+        if (!activeOrderIdleRandomAlreadyPaid) {
+            world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
+        }
         beginBattleNetStrandedResourceHitFlee(worker);
         return true;
     }
@@ -4697,6 +4717,7 @@ final class BattleNetHarvestSystem {
                 != worker.orderTargetX()
                 || worker.pathGoalY() != worker.orderTargetY();
         if (spreadApproachEdge) {
+            worker.setBattleNetResourceHitRestoreIdle(false);
             worker.setPathGoal(worker.orderTargetX(), worker.orderTargetY());
             int moveStart = world.idle.battleNetSequenceStart(
                     worker, BattleNetSequence.MOVE_ANIMATION);
@@ -4711,19 +4732,28 @@ final class BattleNetHarvestSystem {
             return false;
         }
 
+        // The last call of the temporary Move body still owns FUN_0040ad30.
+        // Pay its marker before RestoreOrder, regardless of whether the
+        // resumed resource route is empty. If that route is empty, pass the
+        // ownership through the synchronous retry so it does not pay the same
+        // marker again. Human 8 peasants 1536/1533 retain one draw on their
+        // fixture-301/316 controls, while 1536 gains the missing fixture-350
+        // draw before critter 1492's fixture-358 wander.
+        world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
         worker.takeSavedOrder();
         worker.setOrder(Unit.Order.HARVEST);
         worker.setOrderTarget(-1, -1);
         worker.setPathGoal(-1, -1);
         worker.setBattleNetSequenceOffset(stillStart);
         worker.setBattleNetAnimationTimer(1);
-        stepHarvest(worker);
+        worker.setBattleNetResourceHitRestoreIdle(true);
+        stepHarvest(worker, true);
         return true;
     }
 
 
     /** Whether this laden return is serving action 24's empty-route cursor. */
-    private boolean isBattleNetEmptyDepotRouteIdleCursor(Unit worker) {
+    boolean isBattleNetEmptyDepotRouteIdleCursor(Unit worker) {
         if (worker == null || !worker.returningToDepot()
                 || worker.carried() <= 0 || !worker.type().landUnit()
                 || world.battleNetMovementStride(worker) != 1

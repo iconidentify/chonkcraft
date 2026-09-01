@@ -470,6 +470,15 @@ constructor returns `0x6ddf` then `0x6d76`, and the order-point writer at
 `0x0045140e` stores `(89,60)`. Omitting the callback draw shifts constructor
 ownership and instead produces `(82,61)`.
 
+The same callback belongs to the final call of a free temporary Move before
+`RestoreOrder`, not only to a retained-hit restart. Human 8 slot 1536 consumes
+30517 on fixture 350 before action 24 is restored. If the resumed depot route
+is empty, that synchronous retry must not charge the callback again; action
+24 then owns the ordinary repeating callbacks at fixtures 353, 356, and 359.
+The free-restore controls end at asynchronous seeds `0x535014dc` on fixture
+301 and `0xa9ecb6ac` on 316, while the final restore leaves critter slot 1492
+its native choice/direction pair on fixture 358 and ends at `0x45df3775`.
+
 ## Order dispatch and order attributes
 
 Read statically from the pinned target while diagnosing Human 13's ogre in

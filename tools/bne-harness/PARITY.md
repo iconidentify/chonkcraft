@@ -15,7 +15,69 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-512 active-chase fresh route ownership)
+## Current release checkpoint — 2026-09-01 (cycle-390 resource-hit restore idle ownership)
+
+Accepted cycle-1,800 receipt `d253a1b7` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,726, an increase of 32. Human 8 advances from fixture 358
+to 390. The cycle-400 fleet remains 43 clean / 9 divergent / 0 failed under
+receipt `893ad4b8`. The long receipt is retained at
+`.bne-artifacts/runs/d253a1b768d95f41829379a13c9b67e5a1d96d07baaf42f0c4d12ecf532c11e3`.
+Its manifest has SHA-256
+`6ec39180537a4492a5351851ca2400df283e8dc5d02300c567a2eddcbcb1b49f`
+and binds dirty engine-input identity `6810afb8` at base revision `edd866d` to
+replayable source capsule
+`c6898527e789353806e51cef5c441ee259ab1a052d7ede897307755472ba3a50`.
+
+Behavioral delta: the last call of a temporary resource-hit Move still owns
+the common active-order idle callback before `RestoreOrder`. It pays that
+worker's asynchronous idle draw before restoring the saved resource action,
+whether the resumed depot route will be empty or nonempty. A synchronous
+empty-route retry receives that paid ownership and does not draw twice. The
+restored empty action-24 cursor retains explicit, serialized provenance while
+it repeats its three-call idle band; that provenance keeps it out of the
+ordinary allied-blocker refusal constructor until a route succeeds. Fresh
+empty return routes still construct and serve their normal refusal ladder.
+The rule contains no mission, map, coordinate, fixture, cycle, faction, or
+unit-ID branch.
+
+Proof delta: Human 8 peasant native slot 1536 / Java unit 64 finishes the
+retained resource-hit body on fixture 350. Native's final common-idle callback
+consumes result 30517 from asynchronous seed `0x026dfd01`, after which the
+restored action 24 repeats its empty-route idle callback on fixtures 353, 356,
+and 359. Java formerly restored first and handed 30517 to unit 55. With the
+callback attributed to slot 1536, fixture 358 exactly matches native's seven
+unit-owned draws: critter slot 1492 / Java 108 consumes choice 30247 and
+direction 14474, authors `(38,84)`, and the stream ends at seed `0x45df3775`.
+Independent free-restore controls preserve native end seeds `0x535014dc` at
+fixture 301 and `0xa9ecb6ac` at 316, proving the resumed empty route is not
+double charged. The ordinary Orc 8 peasant-1504 mine queue remains the
+negative control and serves its paid refusal hold through fixture 254.
+
+Efficacy receipt
+`.bne-test-efficacy/c350-human8-resource-hit-restore-marker/runs/57353c70cbe2caf59f83d340a67682aa54c0288c8174d6f065011ac501b6e292`
+proves the focused assertion executes and fails on `edd866d`, then executes
+and passes on the candidate. All 39 selected resource-hit, return-route,
+movement, and mine-queue controls pass. Both fixed 52-case gates pass. The
+ordinary executable next-level gate exits zero after 209 Python checks (four
+skipped) and 96 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is now expansion Orc
+11 at fixture 361, followed by Orc 8 at 364, expansion Orc 12 at 374,
+expansion Human 10 at 375, Orc 12 at 383, and Human 8 at 390. Human 8's new
+finding is attack peasant slot 1526 at `(78,63)` natively versus `(77,62)` in
+Java.
+
+## Prior release checkpoint — 2026-08-31 (cycle-512 active-chase fresh route ownership)
 
 Accepted cycle-1,800 receipt `76b22cee` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

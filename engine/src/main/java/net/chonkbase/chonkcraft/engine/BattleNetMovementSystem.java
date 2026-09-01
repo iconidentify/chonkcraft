@@ -1667,6 +1667,12 @@ final class BattleNetMovementSystem {
      *         separate state ladder
      */
     boolean walkTowards(Unit worker, Unit building) {
+        return walkTowards(worker, building, false);
+    }
+
+
+    boolean walkTowards(Unit worker, Unit building,
+            boolean activeOrderIdleRandomAlreadyPaid) {
         boolean depotDestArm = false;
         if (worker.order() == Unit.Order.HARVEST) {
             // DoActionMove increments PathFinderOutput::Cycles on every call,
@@ -2059,6 +2065,7 @@ final class BattleNetMovementSystem {
                     && worker.type().landUnit()
                     && world.battleNetMovementStride(worker) == 1
                     && !worker.isMoving()
+                    && !worker.battleNetResourceHitRestoreIdle()
                     && worker.distanceTo(building) > 1) {
                 // A laden hauler whose whole plan came back empty because an
                 // ally parks on the direct next square used to install that
@@ -2072,6 +2079,14 @@ final class BattleNetMovementSystem {
                 // fixture 253 only on 255. Handing the attempt a one-heading
                 // route routes the outcome through that same ladder instead
                 // of bypassing it.
+                //
+                // A Still cursor restored by the last call of a temporary
+                // resource-hit Move is different. Human 8 peasant 1536 owns
+                // action 24's empty-route idle callback there; turning it
+                // into refusal generation one stole the following draw from
+                // critter 1492. Explicit restore provenance distinguishes
+                // that transaction from an ordinary first empty route, whose
+                // counters and cursor are otherwise identical here.
                 int faceX = Integer.signum(
                         worker.orderTargetX() - worker.tileX());
                 int faceY = Integer.signum(
@@ -2088,9 +2103,11 @@ final class BattleNetMovementSystem {
                 }
             }
             if (world.harvest.beginBattleNetEmptyDepotRouteIdleBand(
-                    worker, building, path)) {
+                    worker, building, path,
+                    activeOrderIdleRandomAlreadyPaid)) {
                 return true;
             }
+            worker.setBattleNetResourceHitRestoreIdle(false);
             boolean preserveCardinalTailCollision =
                     worker.battleNetGoldCardinalTailRefusal();
             int cardinalTailCollision = worker.battleNetCollisionCounter();
