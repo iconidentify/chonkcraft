@@ -1289,7 +1289,7 @@ final class BattleNetCombatSystem {
                     // native bytes and woke fourteen visits early. The timer-
                     // one target refresh parks that stale ray on 241 and
                     // redraws the quarry's new north-east approach on 242.
-                    && !(unit.offeredTarget() == unit.target()
+                    && !(unit.battleNetRouteOffer() == unit.target()
                             && unit.target().order() == Unit.Order.HARVEST)
                     && (!unit.battleNetRetargetResidualRoutePark()
                             || world.targets.validAttackTarget(
@@ -1416,7 +1416,7 @@ final class BattleNetCombatSystem {
                         // attacker, hands the paid refusal to Attack
                         // construction instead (the held-out XHuman 10 and
                         // XHuman 12 witnesses).
-                        && unit.offeredTarget() == unit.target()
+                        && unit.battleNetRouteOffer() == unit.target()
                         && !World.battleNetRangedChaseUnit(unit);
                 boolean coldChaseHeadFree = false;
                 if (coldChaseRefusalPark) {
@@ -1659,7 +1659,7 @@ final class BattleNetCombatSystem {
                 && unit.pathLength() == 0 && unit.stepDrained()
                 && unit.battleNetAttackWrapDestArmPending()
                 && unit.battleNetCollisionCounter() > 0
-                && unit.offeredTarget() == parkedWeakGoal
+                && unit.battleNetRouteOffer() == parkedWeakGoal
                 && parkedMoveStart >= 0
                 && unit.battleNetSequenceOffset() == parkedMoveStart
                 && unit.battleNetAnimationTimer() == 1) {
@@ -1687,7 +1687,9 @@ final class BattleNetCombatSystem {
             return;
         }
         // Free-scan retarget on the first cold path after the order-delay
-        // window while a live offer remains (native 0x409ff0 null seed).
+        // window while a live offer remains, or dest-arm a target selected by
+        // a completed Attack tail. The latter is order phase, not an offer:
+        // native keeps COrder_Attack+0x54 null while +0x88 owns the target.
         // Dest-arm leftover is planned to the acquired quarry first. Human 13
         // knight 1490 dest-arms SE around the ogre on axe 1486's column, then
         // the scan names that ogre; retargeting first dest-armed due south
@@ -1696,7 +1698,7 @@ final class BattleNetCombatSystem {
         // preference keeps 119,25.
         if (!unit.chasing() && !unit.fighting() && unit.pathLength() == 0
                 && unit.target() != null && !unit.battleNetStationaryAttack()
-                && unit.offeredTarget() != null
+                && unit.battleNetRouteOffer() != null
                 && (unit.type().maxAttackRange() <= 1
                         || unit.battleNetAttackWrapDestArmPending())) {
             Unit acquired = unit.target();
@@ -1742,7 +1744,25 @@ final class BattleNetCombatSystem {
                 }
             }
             Unit offered = unit.offeredTarget();
-            if (!offered.isAlive() || offered.isDying() || !offered.isOnMap()) {
+            if (offered == null) {
+                // A paid tail selected the ordinary target without writing
+                // native +0x54. The follow-up AutoSelectTarget still runs;
+                // it simply enters FUN_00409ff0 with a null offer seed.
+                int reactRange = Math.max(
+                        unit.type().reactRange(world.isPerson(unit.player())),
+                        Math.max(1, unit.type().maxAttackRange()));
+                Unit candidate = world.targets.findBattleNetHostile(
+                        unit, reactRange, null);
+                if (candidate != null && candidate != unit.target()) {
+                    boolean keepLeftover = unit.pathLength() > 0;
+                    setAutoTarget(unit, candidate, keepLeftover);
+                    if (keepLeftover) {
+                        unit.setPathGoal(candidate.tileX(), candidate.tileY());
+                        world.refineBattleNetDestArmLeftover(unit, candidate);
+                    }
+                }
+            } else if (!offered.isAlive() || offered.isDying()
+                    || !offered.isOnMap()) {
                 unit.setOfferedTarget(null);
             } else {
                 int reactRange = Math.max(
@@ -1950,6 +1970,26 @@ final class BattleNetCombatSystem {
                         && onBattleNetChaseMoveBody(unit)
                         && unit.type() != null
                         && unit.type().maxAttackRange() <= 1;
+                boolean parkedPaidTailSuffix = unit.pathLength() == 1
+                        && unit.battleNetTailWrapRouteTarget()
+                                == unit.target()
+                        && unit.offeredTarget() != null
+                        && unit.offeredTarget() != unit.target()
+                        && unit.offeredTarget().isAlive()
+                        && !unit.offeredTarget().isDying()
+                        && unit.offeredTarget().isOnMap()
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.battleNetRefusals() == 0
+                        && unit.type() != null
+                        && unit.type().maxAttackRange() <= 1;
+                if (parkedPaidTailSuffix) {
+                    // COrder_Attack parks RI20 without erasing the route
+                    // bytes. Preserve the one unspent suffix which Java's
+                    // logical clear would otherwise lose; a later tail
+                    // retarget may reuse it in the same route transaction.
+                    unit.setBattleNetParkedAttackRouteHeading(
+                            unit.peekHeading());
+                }
                 unit.clearPath();
                 unit.setRouteSpent(false);
                 unit.setChasing(false);
@@ -3456,6 +3496,9 @@ final class BattleNetCombatSystem {
                         Unit pathn1Quarry = unit.target();
                         Unit pathn1Blocker = world.blockerOnLayer(
                                 unit, pathn1X, pathn1Y);
+                        boolean paidTailSuffixOwnsRefusal =
+                                unit.battleNetTailWrapRouteTarget()
+                                        == pathn1Quarry;
                         boolean retainedDirectDestinationArmRefusal =
                                 unit.battleNetAttackWrapDestArmPending()
                                 && !unit.battleNetChaseEmptyRouteReplan()
@@ -3467,8 +3510,19 @@ final class BattleNetCombatSystem {
                                 && pathn1Quarry.isAlive()
                                 && pathn1Quarry.type() != null
                                 && !pathn1Quarry.type().building()
-                                && unit.tileX() != pathn1Quarry.tileX()
-                                && unit.tileY() != pathn1Quarry.tileY()
+                                // A direct dest-arm proves this lifecycle from
+                                // its off-axis skirt. A paid Attack-tail route
+                                // proves the same ownership explicitly: its
+                                // cached suffix remains one route transaction
+                                // even if the live quarry has since become
+                                // axis-aligned. XHuman 4 slot 1518 retains NE
+                                // beside the same-row axethrower through the
+                                // full Move 15..1 band.
+                                && (paidTailSuffixOwnsRefusal
+                                        || (unit.tileX()
+                                                    != pathn1Quarry.tileX()
+                                                && unit.tileY()
+                                                    != pathn1Quarry.tileY()))
                                 && pathn1Blocker != null
                                 && pathn1Blocker != unit
                                 && pathn1Blocker.isOnMap()
@@ -3504,7 +3558,8 @@ final class BattleNetCombatSystem {
                                     && pathn1Quarry.isOnMap()
                                     && world.targets.validAttackTarget(
                                             unit, pathn1Quarry)
-                                    && unit.offeredTarget() == pathn1Quarry;
+                                    && unit.battleNetRouteOffer()
+                                            == pathn1Quarry;
                             if (movingHarvestQuarryEntrance) {
                                 // The quarry is still a valid mobile target
                                 // when this band is purchased. Human 8
@@ -5879,8 +5934,61 @@ final class BattleNetCombatSystem {
                             // collision ownership selects native's retained
                             // clockwise face. XHuman 12 slot 1517 writes the
                             // southeast-led full buffer on fixture 280.
-                            world.planTowardsAfterPaidWrapPark(
-                                    unit, chased);
+                            int direct = World
+                                    .battleNetFirstBresenhamHeading(
+                                            unit.tileX(), unit.tileY(),
+                                            chased.tileX(), chased.tileY());
+                            int stride = world
+                                    .battleNetMovementStride(unit);
+                            int directX = direct >= 0
+                                    && direct < Direction.COUNT
+                                    ? unit.tileX()
+                                            + Direction.deltaX(direct)
+                                                    * stride
+                                    : unit.tileX();
+                            int directY = direct >= 0
+                                    && direct < Direction.COUNT
+                                    ? unit.tileY()
+                                            + Direction.deltaY(direct)
+                                                    * stride
+                                    : unit.tileY();
+                            int directRange = Math.max(
+                                    Math.abs(chased.tileX() - directX),
+                                    Math.abs(chased.tileY() - directY));
+                            boolean coldLaterGenerationRangeProbe =
+                                    unit.battleNetTailWrapRouteTarget()
+                                            == chased
+                                    && unit.battleNetCollisionCounter() >= 3
+                                    && parkedRefusalHeading < 0
+                                    && direct >= 0
+                                    && direct < Direction.COUNT
+                                    && unit.type() != null
+                                    && directRange >= unit.type()
+                                            .minAttackRange()
+                                    && directRange <= Math.max(1,
+                                            unit.type().maxAttackRange())
+                                    && world.canEnter(
+                                            unit, directX, directY);
+                            if (coldLaterGenerationRangeProbe) {
+                                // Once a later paid generation has exhausted
+                                // the retained wall face, its cold direct ray
+                                // ends at the first square that restores weapon
+                                // range. It does not cache a target-tile suffix.
+                                // XHuman 4 slot 1518 writes only SE from
+                                // (74,60), consumes it on fixture 330, and is
+                                // then adjacent to its same-row quarry. A first
+                                // generation still carries a parked face and
+                                // takes the wall continuation above; a farther
+                                // cold probe retains the ordinary full writer.
+                                unit.setPath(new PathFinder.Path(
+                                        PathFinder.Result.FOUND,
+                                        new int[] {direct}));
+                                unit.setPathGoal(
+                                        chased.tileX(), chased.tileY());
+                            } else {
+                                world.planTowardsAfterPaidWrapPark(
+                                        unit, chased);
+                            }
                         } else {
                             world.planTowardsAfterRetargetPark(unit, chased);
                         }
@@ -6059,6 +6167,7 @@ final class BattleNetCombatSystem {
                     }
                     if (paidWrapRouteRedraw
                             && unit.battleNetAttackWrapDestArmPending()
+                            && unit.battleNetCollisionCounter() >= 4
                             && chased.type() != null
                             && !chased.type().building()
                             && unit.type() != null
@@ -10852,7 +10961,13 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetSequenceOffset(attackStart);
                 unit.setBattleNetAnimationTimer(3);
                 unit.setBattleNetSequenceMeleeLanded(false);
-                unit.setOfferedTarget(candidate);
+                if (unit.offeredTarget() != null
+                        && (!unit.offeredTarget().isAlive()
+                                || unit.offeredTarget().isDying()
+                                || !unit.offeredTarget().isOnMap())) {
+                    unit.setOfferedTarget(null);
+                }
+                unit.setBattleNetTailWrapRouteTarget(candidate);
                 unit.setFighting(false);
                 unit.setChasing(false);
                 unit.setBattleNetAttackWrapDestArmPending(true);
@@ -11259,7 +11374,13 @@ final class BattleNetCombatSystem {
                     // at the stale knight and left the thrower visibly parked.
                     // Stationary action 16 remains excluded: a stand-ground
                     // defender may retarget in range but must never chase.
-                    unit.setOfferedTarget(candidate);
+                    if (unit.offeredTarget() != null
+                            && (!unit.offeredTarget().isAlive()
+                                    || unit.offeredTarget().isDying()
+                                    || !unit.offeredTarget().isOnMap())) {
+                        unit.setOfferedTarget(null);
+                    }
+                    unit.setBattleNetTailWrapRouteTarget(candidate);
                     unit.setFighting(false);
                     unit.setChasing(false);
                     unit.setBattleNetAttackWrapDestArmPending(true);

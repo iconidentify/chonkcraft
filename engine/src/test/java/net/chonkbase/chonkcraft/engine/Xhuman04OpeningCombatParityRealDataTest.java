@@ -3,6 +3,7 @@ package net.chonkbase.chonkcraft.engine;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -88,11 +89,21 @@ class Xhuman04OpeningCombatParityRealDataTest {
         World world = mission.world();
 
         Unit footman = unitAt(world, "unit-footman", 72, 60);
+        Unit offeredAxe = unitAt(world, "unit-axethrower", 78, 61);
         assertNotNull(footman, "XHuman 4 has no native-slot-1518 footman");
+        assertNotNull(offeredAxe, "XHuman 4 has no native-slot-1506 axethrower");
 
         for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
+        while (world.cycle() - INITIALIZATION_TICKS < 252) {
+            mission.tick();
+        }
+        assertEquals(1, footman.pathLength(),
+                "the first paid chase still carries its second route byte");
+        assertEquals(Direction.fromDelta(1, -1), footman.peekHeading(),
+                "the route buffer's retained second byte is northeast");
+
         while (world.cycle() - INITIALIZATION_TICKS < 280) {
             mission.tick();
         }
@@ -102,6 +113,10 @@ class Xhuman04OpeningCombatParityRealDataTest {
         assertEquals(2539, footman.battleNetSequenceOffset());
         assertEquals(1, footman.battleNetAnimationTimer(),
                 "the replacement quarry reaches Attack OP0 on fixture 281");
+        assertSame(offeredAxe, footman.target(),
+                "native +0x88 retains the same-row axethrower");
+        assertSame(offeredAxe, footman.offeredTarget(),
+                "native +0x54 still owns the same live attacker");
 
         mission.tick();
         assertEquals(281, world.cycle() - INITIALIZATION_TICKS);
@@ -114,6 +129,68 @@ class Xhuman04OpeningCombatParityRealDataTest {
         assertEquals(Direction.fromDelta(1, -1), footman.peekHeading());
         assertEquals(2485, footman.battleNetSequenceOffset());
         assertEquals(1, footman.battleNetAnimationTimer());
+
+        while (world.cycle() - INITIALIZATION_TICKS < 312) {
+            mission.tick();
+        }
+        assertEquals(74, footman.tileX());
+        assertEquals(61, footman.tileY());
+        assertEquals(0, footman.pathLength(),
+                "the completed paid Move band parks the cached suffix at RI20");
+
+        mission.tick();
+        assertEquals(313, world.cycle() - INITIALIZATION_TICKS);
+        assertEquals(74, footman.tileX(),
+                "the paid RI20 wake redraws before consuming north");
+        assertEquals(60, footman.tileY(),
+                "the paid RI20 wake consumes its fresh first byte immediately");
+        assertEquals(Direction.fromDelta(0, -1), footman.lastStepHeading());
+        assertEquals(5, footman.pathLength(),
+                "the wake retains native's five-byte wall tail after consuming N");
+        assertEquals(Direction.fromDelta(1, -1),
+                footman.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, 0),
+                footman.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(1, 0),
+                footman.peekHeadingAtDepth(2));
+        assertEquals(Direction.fromDelta(1, 1),
+                footman.peekHeadingAtDepth(3));
+        assertEquals(Direction.fromDelta(-1, 1),
+                footman.peekHeadingAtDepth(4));
+        assertEquals(2, footman.battleNetCollisionCounter(),
+                "the generation-two owner survives the successful first step");
+        assertTrue(footman.isMoving());
+
+        while (world.cycle() - INITIALIZATION_TICKS < 328) {
+            mission.tick();
+        }
+        assertEquals(74, footman.tileX());
+        assertEquals(60, footman.tileY());
+        assertEquals(5, footman.pathLength(),
+                "the generation-two wall tail remains intact while N settles");
+        assertEquals(Direction.fromDelta(1, -1), footman.peekHeading());
+        assertEquals(2, footman.battleNetCollisionCounter());
+
+        mission.tick();
+        assertEquals(329, world.cycle() - INITIALIZATION_TICKS);
+        assertEquals(74, footman.tileX(),
+                "the next blocked diagonal parks instead of spending free N");
+        assertEquals(60, footman.tileY());
+        assertEquals(0, footman.pathLength(),
+                "the later paid generation parks at RI20");
+        assertEquals(3, footman.battleNetCollisionCounter());
+        assertEquals(0, footman.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(330, world.cycle() - INITIALIZATION_TICKS);
+        assertEquals(75, footman.tileX(),
+                "the later paid generation cold-redraws southeast");
+        assertEquals(61, footman.tileY());
+        assertEquals(Direction.fromDelta(1, 1), footman.lastStepHeading());
+        assertEquals(0, footman.pathLength(),
+                "native's one-byte southeast redraw is consumed immediately");
+        assertEquals(3, footman.battleNetCollisionCounter());
+        assertTrue(footman.isMoving());
     }
 
     @Test
@@ -301,6 +378,66 @@ class Xhuman04OpeningCombatParityRealDataTest {
                 "the dead helper offer must fall through to a live target scan");
         assertTrue(footman.target().isAlive());
         assertTrue(!footman.target().isDying());
+    }
+
+    @Test
+    @DisplayName("xhuman 4's paid tail leaves the next hit free to own the offer")
+    void xhuman4PaidTailLeavesTheNextHitFreeToOwnTheOffer() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1497 / Java 103 starts at 71,61. Its completed paid
+        // tails select slots 1521 and 1506 as ordinary targets on fixtures
+        // 223 and 283, but authenticated raw records keep COrder_Attack's
+        // +0x54 offered pointer null. Axe 1506 then hits on fixture 314 and
+        // becomes the first live offer. FUN_00409ff0 prices that offer on the
+        // fixture-327 Attack callback and replaces the equally scored,
+        // earlier-screen-Y axe 1521. Projecting either paid-tail target into
+        // +0x54 blocks this hit-owned transition and causes the wrong axe to
+        // take eight damage on fixture 337.
+        Unit footman = unitAt(world, "unit-footman", 71, 61);
+        Unit earlierAxe = unitAt(world, "unit-axethrower", 78, 59);
+        Unit offeredAxe = unitAt(world, "unit-axethrower", 78, 61);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1497 footman");
+        assertNotNull(earlierAxe, "XHuman 4 has no native-slot-1521 axethrower");
+        assertNotNull(offeredAxe, "XHuman 4 has no native-slot-1506 axethrower");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 283) {
+            mission.tick();
+        }
+        assertSame(earlierAxe, footman.target(),
+                "fixture 283 installs the spatially selected north axe");
+        assertNull(footman.offeredTarget(),
+                "a paid target-wrap route must not synthesize native +0x54");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 314) {
+            mission.tick();
+        }
+        assertSame(earlierAxe, footman.target(),
+                "the incoming hit does not immediately replace the active target");
+        assertSame(offeredAxe, footman.offeredTarget(),
+                "the first live hit owns native +0x54");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 327) {
+            mission.tick();
+        }
+        assertSame(offeredAxe, footman.target(),
+                "the Attack callback must price the hit-owned equal-score offer first");
+
+        while (world.cycle() - INITIALIZATION_TICKS < 337) {
+            mission.tick();
+        }
+        assertEquals(15, earlierAxe.hitPoints(),
+                "the replaced north axe must not take Java's former fixture-337 hit");
     }
 
     @Test

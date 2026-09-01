@@ -2868,6 +2868,55 @@ final class BattleNetMovementSystem {
         return refusals;
     }
 
+    /** Whether a settled blocked suffix still belongs to one paid Attack tail. */
+    private boolean paidAttackTailGenerationPark(Unit unit) {
+        return unit.battleNetAttackWrapDestArmPending()
+                && unit.battleNetTailWrapRouteTarget() == unit.target()
+                && unit.battleNetCollisionCounter() > 0
+                && unit.battleNetRefusals() == 0
+                && unit.battleNetPathStepsTaken() > 0
+                && unit.stepDrained() && !unit.isMoving()
+                && unit.target() != null
+                && unit.target().isAlive()
+                && unit.target().type() != null
+                && !unit.target().type().building()
+                && !World.battleNetRangedChaseUnit(unit);
+    }
+
+    /** Parks one completed collision generation of a retained Attack tail. */
+    private void parkPaidAttackTailGeneration(Unit unit, int heading) {
+        // The cached suffix remains part of the paid Attack-tail route after
+        // each complete collision band. A blocked wake advances the packed
+        // collision generation and parks the cursor at RI20 instead of
+        // spending a free cardinal component of the refused diagonal. The
+        // first generation retains its blocked face for the same wall
+        // transaction; later generations have already consumed that wall and
+        // hand the next Move OP0 a cold route buffer. XHuman 4 slot 1518 is
+        // 0x10/RI1 at fixture 311, 0x20/RI20 at 312, then redraws
+        // N,NE,E,E,SE,SW on 313. Its next blocked NE advances 0x20 to 0x30 at
+        // fixture 329 without stepping N, then cold-redraws and consumes SE on
+        // fixture 330.
+        int previousCollision = unit.battleNetCollisionCounter();
+        int collision = previousCollision + 1;
+        int parkedHeading = previousCollision == 1 ? heading : -1;
+        int parkedSteps = unit.battleNetPathStepsTaken();
+        battleNetRefuse(unit);
+        unit.setBattleNetCollisionCounter(collision > 14 ? 0 : collision);
+        unit.setBattleNetRefusals(0);
+        unit.setRouteSpent(false);
+        unit.setWaitCycles(0);
+        unit.setBattleNetOrderDelay(0);
+        unit.setBattleNetChaseEmptyRouteReplan(true);
+        unit.setBattleNetRetargetResidualParkRefill(true);
+        unit.setBattleNetRetargetResidualParkSteps(parkedSteps);
+        unit.setBattleNetParkedRefusalHeading(parkedHeading);
+        unit.markBattleNetLongPaidWrapParkedRoute();
+        world.causalTrace.event(world.cycle,
+                "path.paid-attack-tail-generation-park",
+                unit.id(), "target", unit.target().id(),
+                "collision", unit.battleNetCollisionCounter());
+    }
+
     /**
      * Applies the native refusal ladder to a behavior-six small-warship map
      * Patrol through its terminal ninth-refusal band.
@@ -4825,7 +4874,7 @@ final class BattleNetMovementSystem {
                         && cleanDestinationArmTarget.isAlive()
                         && cleanDestinationArmTarget.type() != null
                         && !cleanDestinationArmTarget.type().building()
-                        && unit.offeredTarget()
+                        && unit.battleNetRouteOffer()
                                 == cleanDestinationArmTarget
                         && unit.tileX()
                                 != cleanDestinationArmTarget.tileX()
@@ -6599,6 +6648,10 @@ final class BattleNetMovementSystem {
                         && (unit.order() == Unit.Order.ATTACK
                                 || unit.order() == Unit.Order.ATTACK_MOVE
                                 || unit.chasing())) {
+                    if (paidAttackTailGenerationPark(unit)) {
+                        parkPaidAttackTailGeneration(unit, heading);
+                        return;
+                    }
                     boolean completedCardinalPressureBand =
                             unit.stepDrained() && !unit.isMoving()
                             && unit.pathLength() >= 16
@@ -8388,6 +8441,10 @@ final class BattleNetMovementSystem {
                     // two-byte routes, one-byte depot rays, and nonduplicate
                     // tails retain the established refusal ladder.
                 }
+                if (paidAttackTailGenerationPark(unit)) {
+                    parkPaidAttackTailGeneration(unit, heading);
+                    return;
+                }
                 int refusals = battleNetRefuse(unit);
                 if (ladenReturnRoute != null && refusals < 15) {
                     unit.setPath(ladenReturnRoute);
@@ -8417,7 +8474,7 @@ final class BattleNetMovementSystem {
                 boolean offeredCollisionOneWake =
                         unit.battleNetCollisionCounter() == 1
                         && unit.target() != null
-                        && unit.offeredTarget() == unit.target();
+                        && unit.battleNetRouteOffer() == unit.target();
                 boolean retainedGenerationThreePaidWake =
                         unit.battleNetCollisionCounter() == 3
                         && unit.battleNetRefusals() == 1

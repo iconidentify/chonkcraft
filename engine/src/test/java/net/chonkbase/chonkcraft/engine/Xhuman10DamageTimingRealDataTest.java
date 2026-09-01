@@ -877,6 +877,49 @@ class Xhuman10DamageTimingRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 10's paid chase wake redraws and steps on one visit")
+    void xhuman10PaidChaseWakeRedrawsAndStepsOnOneVisit() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1480 / Java 120 selects axe 1496 in its paid Attack
+        // tail, writes W,NW on fixture 332 and holds that buffer through the
+        // complete Move band. Fixture 347 parks the cursor at twenty. The
+        // following Move OP0 writes SW,NW,N,... and consumes SW in the same
+        // visit; an extra Java route-plan visit leaves the knight one tile
+        // behind from fixture 348 onward.
+        Unit knight = unitById(world, 120);
+        Unit axe = unitById(world, 104);
+        assertNotNull(knight, "XHuman 10 has no native-slot-1480 knight");
+        assertNotNull(axe, "XHuman 10 has no native-slot-1496 axethrower");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 347) {
+            mission.tick();
+        }
+        assertSame(axe, knight.target());
+        assertEquals(82, knight.tileX());
+        assertEquals(89, knight.tileY());
+        assertEquals(0, knight.pathLength(),
+                "the paid Move band parks its old route at RI20");
+
+        mission.tick();
+        assertEquals(348, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(81, knight.tileX(),
+                "the RI20 wake must consume the fresh southwest heading");
+        assertEquals(90, knight.tileY());
+        assertEquals(Direction.fromDelta(-1, 1), knight.lastStepHeading());
+        assertTrue(knight.isMoving());
+    }
+
+    @Test
     @DisplayName("xhuman 10's grunt resumes past OP0 after its paid chase")
     void xhuman10GruntResumesPastOp0AfterItsPaidChase() {
         AssetSource assets = AssetSource.fromEnvironment();

@@ -4304,17 +4304,14 @@ public final class World {
         // the HP loss without the offer.
         Unit standing = defender.offeredTarget();
         if (standing != null) {
-            // Java currently projects a paid melee tail's selected quarry
-            // through offeredTarget so the following dest-arm callback can
-            // retain its native route timing. Retail does not write +0x54 at
-            // that seam: XHuman 10 knight 1493 has +0x54 null after its
-            // fixture-129 tail selects grunt 1477 in +0x88. Consequently the
-            // grunt's fixture-176 blow is a fresh offer and FUN_0040a9d0 may
-            // recruit adjacent knight 1489. Treat only that proved projection
-            // as absent here; an ordinary live attack-back offer still blocks
-            // duplicate help exactly as before.
+            // Some older Java route seams still project paid-tail provenance
+            // through offeredTarget. They are migrated individually as raw
+            // +0x54 witnesses become available; do not let those projections
+            // block the next native hit-owned offer. Ordinary live offers do
+            // retain first-owner priority.
             boolean paidTailProjection = standing == defender.target()
-                    && defender.battleNetAttackWrapDestArmPending();
+                    && defender.battleNetAttackWrapDestArmPending()
+                    && defender.battleNetTailWrapRouteTarget() == null;
             if (standing.isAlive() && standing.isOnMap()
                     && !standing.isDying() && !paidTailProjection) {
                 return;
@@ -6603,6 +6600,110 @@ public final class World {
     }
 
     /**
+     * Keeps the second byte written by a clean two-step melee dest-arm on the
+     * target skirt instead of letting the free ray end inside the quarry.
+     *
+     * <p>XHuman 4 slot 1518 plans from {@code (72,60)} to the mobile target
+     * on {@code (74,61)}. The free Java ray is {@code SE,E}; authenticated
+     * native bytes are {@code SE,NE}. The first diagonal already enters
+     * weapon range, so the route writer reflects the final cardinal across
+     * that approach and leaves a skirt byte for the route buffer. The byte is
+     * invisible until a later Attack-tail retarget reuses the parked buffer.</p>
+     */
+    private PathFinder.Path retainBattleNetCleanDestArmSkirtTail(
+            Unit unit, Unit target, PathFinder.Path path) {
+        if (path == null || path.result() != PathFinder.Result.FOUND
+                || path.length() != 2 || unit == null || target == null
+                || unit.type() == null || target.type() == null
+                || unit.type().maxAttackRange() > 1
+                || target.type().building()
+                || unit.battleNetTailWrapRouteTarget() != target
+                || unit.offeredTarget() == null
+                || unit.offeredTarget() == target
+                || target.type().tileWidth() != 1
+                || target.type().tileHeight() != 1) {
+            return path;
+        }
+        int[] headings = path.headings().clone();
+        int first = headings[1];
+        int tail = headings[0];
+        if (!Direction.isDiagonal(first) || Direction.isDiagonal(tail)) {
+            return path;
+        }
+        int stride = battleNetMovementStride(unit);
+        int firstX = unit.tileX() + Direction.deltaX(first) * stride;
+        int firstY = unit.tileY() + Direction.deltaY(first) * stride;
+        int tailX = firstX + Direction.deltaX(tail) * stride;
+        int tailY = firstY + Direction.deltaY(tail) * stride;
+        if (tailX != target.tileX() || tailY != target.tileY()) {
+            return path;
+        }
+        int alternate = Direction.deltaX(tail) != 0
+                ? Direction.fromDelta(
+                        Direction.deltaX(tail), -Direction.deltaY(first))
+                : Direction.fromDelta(
+                        -Direction.deltaX(first), Direction.deltaY(tail));
+        if (alternate < 0 || alternate >= Direction.COUNT
+                || !Direction.isDiagonal(alternate)) {
+            return path;
+        }
+        int alternateX = firstX + Direction.deltaX(alternate) * stride;
+        int alternateY = firstY + Direction.deltaY(alternate) * stride;
+        if (!map.contains(alternateX, alternateY)
+                || !canEnter(unit, alternateX, alternateY)) {
+            return path;
+        }
+        headings[0] = alternate;
+        return new PathFinder.Path(path.result(), headings);
+    }
+
+    /**
+     * Reattaches the progressive second byte of a route which Attack parked
+     * at cursor twenty before a tail retarget changed the quarry.
+     *
+     * <p>The new writer owns its first heading; the old buffer owns only the
+     * cached suffix. XHuman 4 slots 1518 and 1510 are paired native witnesses:
+     * their buffers remain {@code SE,NE} and {@code SE,SE} through the swing,
+     * then become {@code E,NE} and {@code NE,SE} on the new chase.</p>
+     */
+    private PathFinder.Path retainBattleNetParkedAttackRouteSuffix(
+            Unit unit, Unit target, PathFinder.Path path) {
+        int retained = unit.battleNetParkedAttackRouteHeading();
+        if (path == null || path.result() != PathFinder.Result.FOUND
+                || path.length() == 0 || target == null
+                || target.type() == null || target.type().building()
+                || retained < 0 || retained >= Direction.COUNT) {
+            return path;
+        }
+        int planned = path.headings()[path.length() - 1];
+        if (planned < 0 || planned >= Direction.COUNT) {
+            return path;
+        }
+        int stride = battleNetMovementStride(unit);
+        int firstX = unit.tileX() + Direction.deltaX(planned) * stride;
+        int firstY = unit.tileY() + Direction.deltaY(planned) * stride;
+        int retainedX = firstX + Direction.deltaX(retained) * stride;
+        int retainedY = firstY + Direction.deltaY(retained) * stride;
+        if (!map.contains(retainedX, retainedY)
+                || !canEnter(unit, retainedX, retainedY)) {
+            return path;
+        }
+        int firstDistance = Math.max(
+                Math.abs(firstX - target.tileX()),
+                Math.abs(firstY - target.tileY()));
+        int retainedDistance = Math.max(
+                Math.abs(retainedX - target.tileX()),
+                Math.abs(retainedY - target.tileY()));
+        if (retainedDistance >= firstDistance
+                || retainedDistance > Math.max(
+                        1, unit.type().maxAttackRange())) {
+            return path;
+        }
+        return new PathFinder.Path(path.result(),
+                new int[] {retained, planned});
+    }
+
+    /**
      * Prefers the free equal-cost diagonal that skirts a hostile sitting two
      * tiles along a cardinal leftover.
      *
@@ -7327,7 +7428,8 @@ public final class World {
                     && Math.max(
                             Math.abs(unit.tileX() - target.tileX()),
                             Math.abs(unit.tileY() - target.tileY())) <= 2
-                    && unit.offeredTarget() == target;
+                    && (unit.offeredTarget() == target
+                            || unit.battleNetTailWrapRouteTarget() == target);
             boolean cleanWrapResidualRefill =
                     actionMoveWalked
                     && unit.battleNetChaseEmptyRouteReplan()
@@ -7352,7 +7454,8 @@ public final class World {
                     && unit.type() != null
                     && unit.type().maxAttackRange() <= 1
                     && movableTarget
-                    && unit.offeredTarget() == target
+                    && (unit.offeredTarget() == target
+                            || unit.battleNetTailWrapRouteTarget() == target)
                     && unit.tileX() != target.tileX()
                     && unit.tileY() != target.tileY()
                     && Math.max(
@@ -7476,6 +7579,10 @@ public final class World {
                     sharedSaturatedWall, reverseWallFace,
                     retainPaidBandWallFace || rangedCloseHitWallFace,
                     alignOfferedBuildingResidualAxisSkirt);
+            if (cleanOutOfRangeDestArm) {
+                path = retainBattleNetCleanDestArmSkirtTail(
+                        unit, target, path);
+            }
             if (alignOfferedBuildingResidualAxisSkirt) {
                 path = battleNetRetainOfferedAxisRay(
                         unit, path, goalX, goalY, optimizationPassability);
@@ -7516,6 +7623,60 @@ public final class World {
                         && continued.length() > 0) {
                     path = continued;
                 }
+            }
+            boolean paidAttackTailGenerationContinuation =
+                    unit.battleNetAttackWrapDestArmPending()
+                    && unit.battleNetTailWrapRouteTarget() == target
+                    && unit.battleNetRetargetResidualParkRefill()
+                    && unit.hasBattleNetLongPaidWrapParkedRoute()
+                    && unit.battleNetParkedRefusalHeading() >= 0
+                    && unit.battleNetParkedRefusalHeading() < Direction.COUNT;
+            if (paidAttackTailGenerationContinuation) {
+                // FUN_004379e0 parked the rejected cached suffix at RI20 and
+                // advanced its collision generation. NewPath resumes the same
+                // counter-clockwise wall face instead of drawing a cold direct
+                // ray. XHuman 4 slot 1518 therefore continues around blocked NE
+                // as N,NE,E,E,SE,SW while its live goal remains the same-row
+                // axethrower; shifting that goal north only reproduced the first
+                // byte and contradicted the authenticated +0x88 coordinates.
+                BattleNetPathFinder.Passability continuedPassability =
+                        new BattleNetPathFinder.Passability() {
+                            @Override
+                            public boolean canEnter(int x, int y) {
+                                return traversalPassability.canEnter(x, y)
+                                        && !battleNetUnitOccupies(
+                                                softBlockers, x, y);
+                            }
+
+                            @Override
+                            public boolean canEnterIgnoringMobileOccupancy(
+                                    int x, int y) {
+                                // This is a retained collision face, not a cold
+                                // target-skirt scan. Bodies present in the paid
+                                // wall view remain walls even on a marked cell.
+                                return canEnter(x, y);
+                            }
+
+                            @Override
+                            public boolean isOutOfBounds(int x, int y) {
+                                return traversalPassability.isOutOfBounds(x, y);
+                            }
+                        };
+                PathFinder.Path continued = BattleNetPathFinder
+                        .continueWallFace(
+                                unit.tileX(), unit.tileY(), goalX, goalY,
+                                unit.battleNetParkedRefusalHeading(), -1,
+                                battleNetMovementStride(unit),
+                                continuedPassability, continuedPassability,
+                                (x, y) -> x >= targetLeft - goalPadding
+                                        && x <= targetRight + goalPadding
+                                        && y >= targetTop - goalPadding
+                                        && y <= targetBottom + goalPadding);
+                if (continued.result() == PathFinder.Result.FOUND
+                        && continued.length() > 0) {
+                    path = continued;
+                }
+                unit.setBattleNetParkedRefusalHeading(-1);
             }
             String tracedVariants = System.getenv(
                     "CHONKCRAFT_TRACE_BNE_PATH_VARIANTS");
@@ -11872,14 +12033,14 @@ public final class World {
                                 + " wait=%d unbreak=%d anim=%d await=%d moving=%d"
                                 + " bna-seq=%d bna-timer=%d"
                                 + " chasing=%d fighting=%d in-range=%d"
-                                + " wrap-pending=%d resume-move=%d"
+                                + " wrap-pending=%d cold=%d resume-move=%d"
                                 + " help-handoff=%d replan-hold=%d"
                                 + " path=%d steps=%d spent=%d collision=%d refusals=%d refusal-hold=%d retarget-park=%d park-refill=%d park-steps=%d"
                                 + " pos=%d,%d ix=%d iy=%d"
                                 + " residual=%d,%d resource=%d depot=%d"
                                 + " worksite=%d returning=%d carried=%d"
                                 + " delay=%d queued=%d replacement=%d"
-                                + " target=%d offered=%d ai=%d home=%d,%d"
+                                + " target=%d offered=%d route-offer=%d ai=%d home=%d,%d"
                                 + " patrol=%d,%d goal=%d,%d%n",
                         cycle, unit.id(), unit.order(), unit.currentAction(),
                         unit.waitCycles(), unit.animation().unbreakable() ? 1 : 0,
@@ -11891,6 +12052,7 @@ public final class World {
                         unit.target() != null
                                 && targets.inAttackRange(unit, unit.target()) ? 1 : 0,
                         unit.battleNetAttackWrapDestArmPending() ? 1 : 0,
+                        unit.battleNetChaseLegOpensCold() ? 1 : 0,
                         unit.battleNetAttackResumeFromMove() ? 1 : 0,
                         unit.battleNetPersonHelpRetargetHandoff() ? 1 : 0,
                         unit.battleNetChaseReplanResidualHold() ? 1 : 0,
@@ -11913,6 +12075,8 @@ public final class World {
                         unit.queuedReplacementPending() ? 1 : 0,
                         unit.target() == null ? -1 : unit.target().id(),
                         unit.offeredTarget() == null ? -1 : unit.offeredTarget().id(),
+                        unit.battleNetRouteOffer() == null ? -1
+                                : unit.battleNetRouteOffer().id(),
                         unit.battleNetAiBehavior(),
                         unit.battleNetAiHomeX(), unit.battleNetAiHomeY(),
                         unit.patrolX(), unit.patrolY(),
@@ -13461,7 +13625,9 @@ public final class World {
             return path.result();
         }
         boolean liveOfferedRoute = unit.offeredTarget() == target;
-        if (path.length() == 0 && liveOfferedRoute
+        boolean paidTailRoute = unit.battleNetTailWrapRouteTarget() == target;
+        boolean targetOwnsRoute = liveOfferedRoute || paidTailRoute;
+        if (path.length() == 0 && targetOwnsRoute
                 && unit.battleNetAttackWrapDestArmPending()
                 && unit.type() != null && target.type() != null
                 && unit.type().maxAttackRange() <= 1
@@ -13502,7 +13668,7 @@ public final class World {
                 }
             }
         }
-        if (path.length() > 0 && (liveOfferedRoute
+        if (path.length() > 0 && (targetOwnsRoute
                 || (unit.battleNetRetargetResidualRoutePark()
                         // Collision-free queued-Attack promotion retains its
                         // approved face (XHuman 4 slot 1520 NW). A paid route
@@ -13544,7 +13710,7 @@ public final class World {
             // longer owns the replacement route: XHuman 12 grunt 1468 changes
             // from the guard tower offer to a footman at fixture 84 and takes
             // the freshly planned SE, not its stale south-facing heading.
-            if (liveOfferedRoute) {
+            if (targetOwnsRoute) {
                 path = preferBattleNetSkirtDiagonalFirstHeading(
                         unit, path, target);
             }
@@ -13602,6 +13768,15 @@ public final class World {
         if (path.length() > 0
                 && unit.battleNetRangedCloseHitHelpWallFace()) {
             unit.setBattleNetRangedCloseHitHelpWallFace(false);
+        }
+        if (paidTailRoute && unit.battleNetAttackWrapDestArmPending()
+                && unit.offeredTarget() == target
+                && unit.battleNetParkedAttackRouteHeading() >= 0) {
+            path = retainBattleNetParkedAttackRouteSuffix(
+                    unit, target, path);
+            // NewPath owns the route buffer after this attempt whether or not
+            // the retained byte remained a legal progressive suffix.
+            unit.setBattleNetParkedAttackRouteHeading(-1);
         }
         unit.setPath(path);
         if (path.length() == 0) {

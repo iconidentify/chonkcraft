@@ -15,7 +15,74 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-331 first-collision occupied-tail construction)
+## Current release checkpoint — 2026-08-31 (cycle-350 paid Attack-tail collision generations)
+
+Accepted cycle-1,800 receipt `4f674ca5` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,153, an increase of thirteen. Expansion Human 4 advances
+from fixture 337 to 350. The cycle-400 fleet remains 40 clean / 12 divergent /
+0 failed under receipt `fc92b70a`. The long receipt is retained at
+`.bne-artifacts/runs/4f674ca50648a1322e2fbd7280a6056c3f25a7f761983945b6bac4b71f420cd2`.
+It binds dirty engine-input identity `68bad264` at base revision `995b0cf` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`5952f0c5bbc162aa25a701ff291074d9404a00342fecc449550ddd82b5cab114`.
+
+Behavioral delta: a melee Attack tail now keeps its route-selected quarry in
+explicit route provenance instead of projecting it through COrder_Attack's
+offered-target slot. A cached suffix which completes its first collision band
+advances the packed collision generation, parks at route index twenty, and
+continues the rejected wall face with every hostile formation body still hard.
+After that continued wall commits its first heading, a newly blocked suffix
+advances the next generation and parks again without spending the diagonal's
+free cardinal component. That later generation has exhausted the retained
+wall face, so its next cold direct writer stops at the first free square which
+restores weapon range instead of retaining a target-tile suffix. Ordinary live
+offers, first-generation wall continuations, farther cold probes, ranged
+chasers, buildings, and unrelated target routes retain their established
+behavior. The rule uses Attack-tail provenance, target identity, collision and
+refusal generation, route progress, movement/combat class, occupancy, and
+weapon range; it contains no mission, map, coordinate, fixture, cycle, faction,
+unit-ID, or route-length branch.
+
+Proof delta: expansion Human 4 footman slot 1518 / Java 82 retains its paid
+north-east byte after committing east onto `(74,61)` on fixture 281. Native
+holds that byte through the complete Move 15..1 band, advances collision one
+to two, and parks route index twenty on fixture 312. Fixture 313 keeps the real
+quarry point `(76,61)`, writes exact route `N,NE,E,E,SE,SW`, and consumes north
+onto `(74,60)`; the hard hostile-body wall view, not a shifted goal, is what
+produces all six bytes. After the north stride settles, fixture 329 advances
+collision two to three and parks the blocked north-east suffix without moving.
+Fixture 330 writes only south-east, consumes it onto `(75,61)`, and leaves no
+logical suffix. Java formerly stepped north on fixture 329. The corrected case
+is exact through fixture 349; its new fixture-350 split is an independent
+synchronized-RNG draw mismatch. Expansion Human 10's paid wake, all expansion
+Human 12 collision-refill witnesses, and Human 13's offered-target/dying-tail
+witnesses are held-out negatives.
+
+Efficacy receipt
+`.bne-test-efficacy/c350-paid-tail-generation-park/runs/db8797bee717a0d6ac92177fe8d611de5c19f072591a9ce54a0838a546a6d9eb`
+proves the focused fixture-281..330 regression assertion-fails on `995b0cf`
+and passes on the candidate. All 39 broader moving-quarry and paid-tail family
+tests pass, as do both fixed 52-case gates. The ordinary executable next-level
+gate exits zero after 209 Python checks and 96 engine/desktop checks; its
+command worklist remains 11 comparable scenarios (6 exact / 5 divergent)
+without regression or infrastructure failure. `--require-certified` remains
+incomplete on the documented producer lanes, and remote AI discovery still
+stops at strict SSH verification of the changed `i9beef` host key, which was
+not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is expansion Orc 11
+at fixture 337, followed by Orc 12 at 342, expansion Human 6 at 344, Human 8
+at 347, expansion Human 4 at 350, and expansion Human 2 at 352.
+
+## Prior release checkpoint — 2026-08-31 (cycle-331 first-collision occupied-tail construction)
 
 Accepted cycle-1,800 receipt `b17f5029` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

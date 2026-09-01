@@ -1480,6 +1480,8 @@ public final class Unit {
 
     public void setOfferedTarget(Unit offered) {
         this.offeredTarget = offered;
+        battleNetTailWrapRouteTarget = null;
+        battleNetParkedAttackRouteHeading = -1;
     }
 
     private Unit offeredTarget;
@@ -3188,6 +3190,50 @@ public final class Unit {
     }
 
     private boolean battleNetAttackWrapDestArmPending;
+
+    /**
+     * Ordinary target whose paid Attack-tail route still owns destination-arm
+     * behavior without occupying COrder_Attack's offered-target pointer.
+     *
+     * <p>Retail stores the selected quarry at {@code +0x88} while keeping
+     * {@code +0x54} available for the next aggressor. Java formerly projected
+     * this route provenance through {@code offeredTarget}; keeping it separate
+     * preserves routing without changing target-selection ownership.</p>
+     */
+    public Unit battleNetTailWrapRouteTarget() {
+        return battleNetTailWrapRouteTarget;
+    }
+
+    public void setBattleNetTailWrapRouteTarget(Unit target) {
+        battleNetTailWrapRouteTarget = target;
+    }
+
+    /** Internal route/scheduler view of the former overloaded Java field. */
+    public Unit battleNetRouteOffer() {
+        return offeredTarget != null ? offeredTarget
+                : battleNetTailWrapRouteTarget;
+    }
+
+    private Unit battleNetTailWrapRouteTarget;
+
+    /**
+     * Unspent second byte of a paid melee route parked by Attack at cursor 20.
+     *
+     * <p>Retail leaves the route buffer at {@code +0x30} intact when an
+     * arrival enters the swing body. A later tail retarget overwrites the
+     * first byte for its new chase but may still consume this cached suffix.
+     * Java clears the logical path on arrival, so it carries that one proved
+     * byte separately until the next paid-tail route transaction.</p>
+     */
+    public int battleNetParkedAttackRouteHeading() {
+        return battleNetParkedAttackRouteHeading;
+    }
+
+    public void setBattleNetParkedAttackRouteHeading(int heading) {
+        battleNetParkedAttackRouteHeading = heading;
+    }
+
+    private int battleNetParkedAttackRouteHeading = -1;
 
     /**
      * Action-16 out-of-range recovery already spent its one-visit hold
