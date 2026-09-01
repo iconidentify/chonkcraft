@@ -116,6 +116,64 @@ class BattleNetConsumedDuplicateDepotTailRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 12 redraws a consumed depot tail behind a settling queue head")
+    void xorc12RedrawsConsumedTailBehindSettlingDepotQueueHead() {
+        Mission mission = mission("campaigns/orc-exp/levelx12o");
+        World world = mission.world();
+        Unit follower = byId(world, 258);
+        Unit leader = byId(world, 263);
+        assertNotNull(follower,
+                "native slot 1342 must remain paired with Java peasant 258");
+        assertNotNull(leader,
+                "native slot 1337 must remain paired with Java peasant 263");
+
+        advanceToFixture(mission, 372);
+        assertEquals(59, follower.tileX());
+        assertEquals(104, follower.tileY());
+        assertEquals(1, follower.pathLength(),
+                "the consumed six-byte route retains its final north byte");
+        assertTrue(follower.battleNetPathStepsTaken() > 0);
+        assertEquals(Direction.fromDelta(0, -1), follower.peekHeading());
+        assertTrue(follower.isMoving(),
+                "the follower still owes the final pixels of its northwest stride");
+        assertEquals(59, leader.tileX());
+        assertEquals(103, leader.tileY());
+        assertEquals(0, leader.pathLength());
+        assertTrue(leader.routeSpent());
+        assertTrue(leader.isMoving(),
+                "the lower native slot will settle onto the depot ring first");
+        assertEquals(follower.returnDepotGoal(), leader.returnDepotGoal());
+        assertEquals(leader, world.blockerOnLayer(follower, 59, 103));
+        assertFalse(leader.battleNetResourceApproachStaged());
+        assertEquals(0, leader.battleNetCollisionCounter());
+        assertEquals(0, leader.battleNetRefusals());
+        assertEquals(1, leader.distanceTo(follower.returnDepotGoal()));
+        int[] refreshedEdge = world.battleNetDepotEntryPoint(
+                follower, follower.returnDepotGoal());
+        assertEquals(59, refreshedEdge[0]);
+        assertEquals(102, refreshedEdge[1]);
+        assertEquals(60, follower.orderTargetX());
+        assertEquals(102, follower.orderTargetY());
+
+        mission.tick();
+        assertEquals(373, fixtureCycle(world));
+        assertEquals(0, follower.pathLength(),
+                "retail parks the blocked consumed tail at cursor twenty");
+        assertEquals(1, follower.battleNetCollisionCounter());
+        assertEquals(59, follower.orderTargetX(),
+                "the native settle visit refreshes the nearest depot edge");
+        assertEquals(102, follower.orderTargetY());
+
+        mission.tick();
+        assertEquals(374, fixtureCycle(world));
+        assertEquals(58, follower.tileX());
+        assertEquals(103, follower.tileY(),
+                "the redraw bypasses the action-25 queue head through northwest");
+        assertEquals(Direction.fromDelta(-1, -1),
+                follower.lastStepHeading());
+    }
+
+    @Test
     @DisplayName("Orc 12 redraws its saturated one-byte depot tail through SE")
     void orc12RedrawsItsSaturatedOneByteDepotTailThroughSoutheast() {
         Mission mission = mission("campaigns/orc/level12o");

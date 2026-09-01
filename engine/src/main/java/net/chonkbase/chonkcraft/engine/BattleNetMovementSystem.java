@@ -3452,6 +3452,66 @@ final class BattleNetMovementSystem {
                     + Direction.deltaY(returnHeading) * returnStride;
             Unit returnBlocker = world.blockerOnLayer(
                     unit, returnX, returnY);
+            int returnDeltaX = Direction.deltaX(returnHeading);
+            int returnDeltaY = Direction.deltaY(returnHeading);
+            boolean shiftedDepotEdge =
+                    (refreshedDepotEdge[0] != unit.orderTargetX()
+                            || refreshedDepotEdge[1] != unit.orderTargetY())
+                    && Math.max(
+                            Math.abs(refreshedDepotEdge[0]
+                                    - unit.orderTargetX()),
+                            Math.abs(refreshedDepotEdge[1]
+                                    - unit.orderTargetY())) == 1;
+            boolean freshDepotQueueHead =
+                    unit.battleNetCollisionCounter() == 0
+                    && unit.pathLength() == 1
+                    && unit.battleNetPathStepsTaken() > 0
+                    && !Direction.isDiagonal(returnHeading)
+                    && shiftedDepotEdge
+                    && refreshedDepotEdge[0] == returnX + returnDeltaX
+                    && refreshedDepotEdge[1] == returnY + returnDeltaY
+                    && returnBlocker != null && returnBlocker != unit
+                    && returnBlocker.order() == Unit.Order.HARVEST
+                    && returnBlocker.returningToDepot()
+                    && returnBlocker.carried() > 0
+                    && returnBlocker.returnDepotGoal()
+                            == unit.returnDepotGoal()
+                    && returnBlocker.battleNetResourceApproachStaged()
+                    && !returnBlocker.isMoving()
+                    && returnBlocker.pathLength() == 0
+                    && !returnBlocker.routeSpent()
+                    && returnBlocker.battleNetOrderDelay() == 2
+                    && returnBlocker.battleNetCollisionCounter() == 0
+                    && returnBlocker.battleNetRefusals() == 0
+                    && returnBlocker.distanceTo(unit.returnDepotGoal()) <= 1
+                    && world.isAllied(
+                            unit.player(), returnBlocker.player());
+            if (freshDepotQueueHead) {
+                // The lower pool slot has just drained its spent route into
+                // action 25. When this follower tests the last cached ray in
+                // the same pass, retail refreshes the edge, parks the
+                // consumed byte with collision one, and redraws around that
+                // newly staged leader on the following visit (XOrc 12 slots
+                // 1337/1342, fixtures 373..374). Match only the fresh
+                // two-delay, zero-collision queue head one cell outside the
+                // refreshed edge; ordinary one-byte depot rays retain their
+                // refusal ladder below.
+                unit.setOrderTarget(
+                        refreshedDepotEdge[0], refreshedDepotEdge[1]);
+                unit.setBattleNetCollisionCounter(1);
+                unit.clearPath();
+                unit.setRouteSpent(false);
+                unit.setWaitCycles(0);
+                unit.setBattleNetOrderDelay(0);
+                int moveStart = world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                    unit.setBattleNetChaseStepReady(false);
+                }
+                return;
+            }
             boolean pressuredLadenConvoyTail =
                     unit.battleNetCollisionCounter() == 0
                     && unit.battleNetPathStepsTaken() > 0

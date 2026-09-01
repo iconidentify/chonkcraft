@@ -15,6 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (cycle-444 fresh depot queue-head redraw)
+
+Accepted cycle-1,800 receipt `8a0cde67` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,895, an increase of seventy. Expansion Orc 12 advances from
+fixture 374 to 444. The cycle-400 fleet improves from 44 clean / 8 divergent
+to 45 clean / 7 divergent / 0 failed under receipt `40ecaff4`. The long receipt
+is retained at
+`.bne-artifacts/runs/8a0cde678d1c39574041fb3b5a69508d696d6dcea85d433556c69496d2779779`.
+Its manifest has SHA-256
+`f8725c6d09b132a2664c9451f17a0799164b0c4e2739703c2ebdff9fdce70807`
+and binds dirty engine-input identity `83fd8588` at base revision `53adece` to
+authenticated, replayable source capsule
+`4847ac38c0f692b9c0d846b5c16f59abc50c7b3ca9ece44dbc5da647f5ec15ef`.
+
+Behavioral delta: when a laden land returner drains a consumed route with one
+cardinal byte aimed through a newly shifted depot edge, an allied loaded
+worker for the same depot can have entered fresh action 25 on that pass. If
+that zero-collision queue head owns the exact intermediate cell and its native
+two-visit staging delay, the follower refreshes its depot edge, parks the
+consumed byte with collision one, and redraws around the leader on its next
+visit. Ordinary one-byte depot rays, duplicate tails, saturated refusal bands,
+and final-entry overlaps retain their established rules. The implementation
+contains no mission, map, coordinate, fixture, cycle, faction, initial-route-
+length, or unit-ID branch.
+
+Proof delta: expansion Orc 12 peasant native slot 1342 / Java unit 258 is laden
+at `(59,104)` with the last north byte of a consumed six-step return route.
+Native lower slot 1337 / Java unit 263 is directly ahead at `(59,103)` with a
+spent route still draining toward the same castle. The measured fixture-to-
+Java offset is two internal cycles. On fixture 373 the leader enters action 25
+before the follower's decision; native changes the follower's depot edge from
+`(60,102)` to `(59,102)`, writes route index twenty and collision one, then on
+fixture 374 redraws north-west and first-steps to `(58,103)`. Java formerly
+restored the cached north byte through the near-depot refusal path and waited
+for the leader to vacate. The case is now exact through fixture 443; its new
+fixture-444 finding is an independent peasant position split for native slot
+1396.
+
+Efficacy receipt
+`.bne-test-efficacy/c374-xorc12-fresh-depot-queue-head/runs/0cf23b7cacf459f555994182dd924553b0a9cb3e5fb294c348811d191eee5652`
+proves the focused assertion executes and fails on `53adece`, then executes
+and passes on the candidate. All 34 selected depot-tail, depot-entry,
+mine-exit, movement-loop, and approach-damage controls pass. Both fixed
+52-case gates pass. The ordinary executable next-level gate exits zero after
+209 Python checks (four skipped) and 97 engine/desktop checks; its command
+worklist remains 11 comparable scenarios (6 exact / 5 divergent) without
+regression or infrastructure failure. `--require-certified` remains incomplete
+on the documented producer lanes, and remote AI discovery still stops at
+strict SSH verification of the changed `i9beef` host key, which was not
+modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is expansion Human 10
+at fixture 375, followed by expansion Orc 11 at 382, Orc 12 at 383, Human 8 at
+390, and expansion Human 7 at 395.
+
 ## Current release checkpoint — 2026-09-01 (cycle-382 armed-flyer Patrol acquisition)
 
 Accepted cycle-1,800 receipt `4eee82d1` preserves the shared clean horizon at
