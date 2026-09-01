@@ -40,6 +40,48 @@ class BattleNetDepotEntryOverlapRealDataTest {
     }
 
     @Test
+    @DisplayName("Orc 12's staged returner enters an occupied hall point")
+    void orc12StagedReturnerEntersAnOccupiedHallPoint() {
+        Mission mission = mission("campaigns/orc/level12o");
+        World world = mission.world();
+        Unit mover = byId(world, 98);
+        Unit blocker = byId(world, 93);
+        assertNotNull(mover, "native slot 1502 must remain paired with Java 98");
+        assertNotNull(blocker, "native slot 1507 must remain paired with Java 93");
+
+        advanceToFixture(mission, 382);
+        assertEquals(58, mover.tileX());
+        assertEquals(50, mover.tileY());
+        assertEquals(58, blocker.tileX());
+        assertEquals(51, blocker.tileY());
+        assertTrue(mover.returningToDepot());
+        assertTrue(blocker.returningToDepot());
+        assertEquals(100, mover.carried());
+        assertEquals(100, blocker.carried());
+        assertTrue(mover.battleNetResourceApproachStaged());
+        assertTrue(blocker.battleNetResourceApproachStaged());
+        assertTrue(blocker.isMoving());
+        assertEquals(0, mover.pathLength());
+        assertEquals(0, blocker.pathLength());
+        assertTrue(blocker.routeSpent());
+        assertEquals(0, blocker.battleNetCollisionCounter());
+        assertEquals(9, blocker.battleNetRefusals(),
+                "native slot 1507 carries 0x90 at unit+0x1d");
+        assertEquals(false, world.movement.battleNetSoftClearMoveAlly(blocker),
+                "ordinary Move occupancy keeps a refusal-marked body solid");
+        assertEquals(mover.returnDepotGoal(), blocker.returnDepotGoal());
+
+        mission.tick();
+        assertEquals(383, fixtureCycle(world));
+        assertEquals(58, mover.tileX());
+        assertEquals(51, mover.tileY(),
+                "native slot 1502 dest-arms south on cycle 383");
+        assertEquals(blocker.tileX(), mover.tileX(),
+                "the first entry pixel may overlap the draining queue head");
+        assertEquals(blocker.tileY(), mover.tileY());
+    }
+
+    @Test
     @DisplayName("XHuman 7's staged returner enters behind a draining depot mate")
     void xhuman7StagedReturnerEntersBehindADrainingDepotMate() {
         Mission mission = mission("campaigns/human-exp/levelx07h");

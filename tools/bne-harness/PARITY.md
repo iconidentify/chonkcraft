@@ -15,6 +15,71 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
+## Current release checkpoint — 2026-09-01 (refusal-marked depot entry overlap)
+
+Accepted cycle-1,800 receipt `cddd8842` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 39,011, an increase of eighty-six. Orc 12 advances from
+fixture 382 to 468. The cycle-400 fleet improves from 45 clean / 7 divergent
+to 46 clean / 6 divergent / 0 failed under receipt `3148d56f`. The long
+receipt is retained at
+`.bne-artifacts/runs/cddd8842698ef2749806d3f080915322f3806ff8055f5bd1639c340c204b8889`.
+Its manifest has SHA-256
+`b054a781f572b1f2d258229e1e0c613cb92a79d0ef64b2215ffbff5803b5bb28`
+and binds dirty engine-input identity `c792af4c` at base revision `a9758ba` to
+authenticated, replayable source capsule
+`ced019c3bd868aea67e3b5c6e4a77b2e01cf9a9e8feac2990d531ef26b4104af`.
+
+Behavioral delta: the resource order's final action-25 dest-arm may commit
+onto a depot entry point already occupied by an allied laden returner whose
+own staged final-entry route is spent but whose pixels are still draining.
+That transaction is distinct from ordinary Move-body soft-clear: the draining
+returner remains eligible when its native refusal-generation nibble is
+nonzero. Exact same-depot, HARVEST, carried-resource, staged-approach,
+spent-route, moving-residual, land-footprint, and alliance predicates keep the
+exception inside the final depot-entry transaction. Pre-stage returners,
+stationary entrants, ordinary movers, collision-elevated Java bodies, and
+unrelated occupancy retain their existing behavior. The implementation
+contains no mission, map, coordinate, fixture, cycle, faction, route-length,
+or unit-ID branch.
+
+Proof delta: Orc 12 peon native slot 1502 / Java unit 98 is staged south of
+the town hall at fixture 382 while peon slot 1507 / Java unit 93 still drains
+its spent action-25 pixels across the same entry point. The blocker is laden,
+returning to the same depot, moving with route index twenty, and carries raw
+`unit+0x1d == 0x90` (refusal generation nine) from fixtures 378 through 384.
+Retail nevertheless dest-arms slot 1502 south onto `(58,51)` at fixture 383,
+briefly giving both peons the same logical tile. Ordinary Java soft-clear
+correctly rejects unit 93; only the strict final-entry transaction admits the
+overlap. Independent expansion Orc 12 slots 1394/1396 at fixture 264 and
+expansion Human 7 slots 1458/1446 at fixture 330 remain positive controls.
+Expansion Human 8's unstaged queue and a forced stationary entry body remain
+negative controls. Orc 12 is now exact through fixture 468; its new fixture-469
+finding is an independent critter Still-versus-Move split on slot 1530.
+
+Efficacy receipt
+`.bne-test-efficacy/c383-orc12-refusal-marked-depot-entry/runs/831af84a45b15b4219d5aac3a29443f200309841fc87bef9df1f6e234c703324`
+proves the focused Orc 12 assertion executes and fails on `a9758ba`, then
+executes and passes on the candidate. All five depot-entry overlap tests pass,
+the focused case is exact through fixture 463, both fixed 52-case gates pass,
+and the source capsule verifies with zero sealed untracked inputs. The
+ordinary executable next-level gate exits zero after 209 Python checks (four
+skipped) and 97 engine/desktop checks. Its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent), with 223 dual-adapter scenarios
+executed and no regression or infrastructure failure. `--require-certified`
+remains incomplete on the documented producer lanes, and remote AI discovery
+still stops at strict SSH verification of the changed `i9beef` host key, which
+was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet findings are Human 8 and
+expansion Human 10 at fixture 390, followed by expansion Human 7 at 395,
+expansion Orc 11 at 397, and Human 7 at 405.
+
 ## Current release checkpoint — 2026-09-01 (naval body compact decay program)
 
 Accepted cycle-1,800 receipt `33574c41` preserves the shared clean horizon at

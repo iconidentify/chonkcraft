@@ -2583,11 +2583,15 @@ final class BattleNetMovementSystem {
                     || !blocker.isMoving() || blocker.pathLength() != 0
                     || !blocker.routeSpent()
                     || blocker.battleNetCollisionCounter() != 0
-                    || blocker.battleNetRefusals() != 0
-                    || !world.isAllied(worker.player(), blocker.player())
-                    || !battleNetSoftClearMoveAlly(blocker)) {
+                    || !world.isAllied(worker.player(), blocker.player())) {
                 continue;
             }
+            // This is action 25's entry transaction, not ordinary Move-body
+            // soft-clear. Orc 12 slot 1507 keeps refusal generation nine
+            // (unit+0x1d == 0x90) while its spent final-entry pixels drain,
+            // yet slot 1502 commits onto the same hall point at fixture 383.
+            // The strict resource/depot/stage predicates above identify that
+            // body without making refusal-marked allies generally passable.
             return blocker;
         }
         return null;
@@ -4268,10 +4272,12 @@ final class BattleNetMovementSystem {
                             unit, depotDestArmGoal, nextX, nextY) != null) {
                 // The resource order's final dest-arm owns a different
                 // occupancy decision from ordinary action 24. Retail lets it
-                // commit behind a zero-collision worker whose own action-25
-                // entry pixels are still draining, briefly stacking both
-                // workers on the depot point. XOrc 12 slots 1394/1396 do this
-                // at fixture 264; XHuman 7 slots 1458/1446 repeat it at 330.
+                // commit behind a worker whose own action-25 entry pixels are
+                // still draining, briefly stacking both workers on the depot
+                // point. XOrc 12 slots 1394/1396 do this at fixture 264;
+                // XHuman 7 slots 1458/1446 repeat it at 330; Orc 12 slots
+                // 1502/1507 prove that a retained refusal generation does not
+                // change this final-entry transaction at fixture 383.
                 canTakeStep = true;
             }
             boolean paidParkedRouteReplay =
