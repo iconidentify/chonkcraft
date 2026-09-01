@@ -60,6 +60,7 @@ measures entry and exit cycles rather than merely waiting for eventual oil.
 | Diagonal | tanker 1566, doubled sea grid | execute `NE, NE, SE`; raw route bytes `01 01 03` |
 | Congested | tanker 1576 stationary at 120,4 while 1566 plans | the stationary hull remains solid and causes the `NE, NE, SE` wall-follow |
 | Swept diagonal | Orc 8 loaded tanker 1478 between tanker 1483 and destroyer 1477 | refuse cached `NW` despite its free destination anchor, pay Move 15..1, then replan `N` |
+| Final-depot queue | Orc 8 loaded tanker 1479 behind final-approach tanker 1482 | park the occupied `N` tail with collision one; after 1482 enters, redraw `NW,W` and commit `NW` on the next visit without a 15-count band |
 | Empty depot-ready | XHuman 5 tanker 1557 leaving shipyard 1559 for platform 1558 | hidden action 26 selects the platform before dropout; its goal owns east-face `(92,60)`, Still 25, then action 23 |
 | Multiple tankers | the two Orc 14 platform lanes and `OilLifecycleGateTest` | no starvation; each tanker can board and bank a load |
 | Blocked boarding seat | `OilLifecycleGateTest.twoTankersSurviveOnePlatformLane` | the following tanker waits/reroutes and eventually boards rather than ending its order |
@@ -87,6 +88,19 @@ eleven becomes twelve, the route cursor parks at twenty, Move counts 15..1,
 and the fresh route commits north on fixture 304 after the adjacent tanker has
 vacated. This is narrower than a general pathfinder corner rule; ordinary
 large-ship routes still use the proved anchor-grid traversal view.
+
+The final-depot queue has a distinct one-pass handoff. Orc 8 loaded tanker
+1479 follows loaded tanker 1482 to the same refinery. The follower consumes
+its north return-route byte through fixture 440, reaches the leader's occupied
+tail on fixture 441, parks route index twenty, and changes the raw collision
+byte from `00` to `10` while remaining at Move timer one. The leader is
+already stationary in final approach with no route, collision, or refusal
+pressure. On fixture 442 native visits the higher pool-slot leader first and
+removes it into the depot as action 26; the follower then redraws `[NW,W]`
+around the vacated hull and commits north-west immediately. This is not the
+ordinary cached-naval refusal: a loaded returner behind a moving loaded
+returner, a freshly surfaced inert tanker, and the two-side-hull swept
+diagonal above all retain their established fifteen-count behavior.
 
 ## Platform builder and failures
 
@@ -209,7 +223,7 @@ Focused behavior and persistence:
 ```sh
 mvn -q -pl engine \
   -Dchonkcraft.pack=/path/to/bne.chonkpack \
-  -Dtest='BattleNetAiOilPlatformExitRealDataTest,Human07OilTankerDepotExitRealDataTest,BattleNetAiMineExitReadyRealDataTest,BattleNetResourceApproachTest#adjacentTankerUsesNativeApproachState+boardSeatTankerHoldsCoverBeforeEnter+distantTankerDoesNotEnterOnTheLandingCall,OilLifecycleGateTest,TankerRoundTripTest,OilPlatformTest#aTankerFoundsAPlatformOnAPatchAndPumpsIt,WorkerSpriteTest,SaveGameTest#tankerOilStateRoundTrips,BattleNetPathFinderTest#orcFourteenTankerRoutesAroundStationaryTanker' \
+  -Dtest='BattleNetAiOilPlatformExitRealDataTest,Human07OilTankerDepotExitRealDataTest,BattleNetAiMineExitReadyRealDataTest,BattleNetResourceApproachTest#adjacentTankerUsesNativeApproachState+boardSeatTankerHoldsCoverBeforeEnter+distantTankerDoesNotEnterOnTheLandingCall,OilLifecycleGateTest,TankerRoundTripTest,OilPlatformTest#aTankerFoundsAPlatformOnAPatchAndPumpsIt,WorkerSpriteTest,SaveGameTest#tankerOilStateRoundTrips,BattleNetPathFinderTest#orcFourteenTankerRoutesAroundStationaryTanker,Orc10LoadedTankerReturnRouteRealDataTest,Human07OilTankerDepotRingRealDataTest' \
   test
 ```
 

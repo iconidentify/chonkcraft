@@ -395,6 +395,62 @@ class BattleNetAiOilPlatformExitRealDataTest {
     }
 
     @Test
+    @DisplayName("an Orc 8 tanker redraws behind a final-approach depot leader")
+    void anOrc8TankerRedrawsBehindAFinalApproachDepotLeader() {
+        Mission mission = loadMission("campaigns/orc/level08o");
+        World world = mission.world();
+        Unit follower = unitById(world, 121);
+        Unit leader = unitById(world, 118);
+        assertNotNull(follower,
+                "Orc 8 has no Java unit 121 / native tanker 1479");
+        assertNotNull(leader,
+                "Orc 8 has no Java unit 118 / native tanker 1482");
+
+        tickThrough(mission, 440);
+        assertEquals(84, follower.tileX());
+        assertEquals(90, follower.tileY());
+        assertEquals(2, follower.pathLength(),
+                "the follower must retain the consumed N,N return tail");
+        assertTrue(follower.returningToDepot());
+        assertEquals(100, follower.carried());
+        assertTrue(leader.battleNetResourceApproachStaged());
+        assertEquals(1, leader.battleNetOrderDelay(),
+                "fixture 440 is action 25's middle quiet visit");
+
+        mission.tick();
+        assertEquals(441, fixtureCycle(world));
+        assertEquals(84, follower.tileX());
+        assertEquals(90, follower.tileY());
+        assertEquals(0, follower.pathLength(),
+                "native parks the occupied north tail at route index twenty");
+        assertEquals(1, follower.battleNetCollisionCounter(),
+                "the queue park writes collision generation one");
+        assertEquals(0, follower.battleNetRefusals(),
+                "the generic cached-naval refusal ladder does not own this park");
+        assertEquals(0, follower.battleNetOrderDelay(),
+                "the final-approach leader must not buy a fifteen-count band");
+        assertEquals(1, follower.battleNetAnimationTimer(),
+                "the parked route remains on Move timer one");
+        assertEquals(0, leader.battleNetOrderDelay(),
+                "the leader is due to enter on the following scheduler pass");
+
+        mission.tick();
+        assertEquals(442, fixtureCycle(world));
+        assertFalse(leader.isOnMap(),
+                "the action-25 leader enters before the follower replans");
+        assertEquals(82, follower.tileX(),
+                "native redraws and commits northwest on fixture 442");
+        assertEquals(88, follower.tileY());
+        assertEquals(Direction.fromDelta(-1, -1),
+                follower.lastStepHeading());
+        assertEquals(1, follower.pathLength(),
+                "the published NW,W route retains west after the commit");
+        assertEquals(Direction.fromDelta(-1, 0), follower.peekHeading());
+        assertEquals(1, follower.battleNetCollisionCounter(),
+                "the successful redraw retains the native collision byte");
+    }
+
+    @Test
     @DisplayName("an XOrc 11 tanker uses BNE's unrounded east platform face")
     void anXOrc11TankerUsesTheUnroundedEastPlatformFace() {
         AssetSource assets = AssetSource.fromEnvironment();

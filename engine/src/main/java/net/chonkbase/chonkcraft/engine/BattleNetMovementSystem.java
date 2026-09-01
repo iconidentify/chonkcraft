@@ -2791,6 +2791,30 @@ final class BattleNetMovementSystem {
                 && world.isAllied(unit.player(), blocker.player());
     }
 
+    /** A same-depot tanker whose projected action-25 visit enters next pass. */
+    private boolean battleNetFinalDepotQueueHead(Unit follower, Unit blocker) {
+        return follower != null && blocker != null && blocker != follower
+                && follower.type() != null && blocker.type() != null
+                && follower.type().gathering().containsKey(UnitType.Resource.OIL)
+                && blocker.type().gathering().containsKey(UnitType.Resource.OIL)
+                && follower.returningToDepot() && follower.carried() > 0
+                && follower.carrying() == UnitType.Resource.OIL
+                && follower.battleNetPathStepsTaken() > 0
+                && blocker.isAlive() && blocker.isOnMap() && !blocker.isDying()
+                && blocker.order() == Unit.Order.HARVEST
+                && blocker.returningToDepot() && blocker.carried() > 0
+                && blocker.carrying() == UnitType.Resource.OIL
+                && blocker.returnDepotGoal() == follower.returnDepotGoal()
+                && blocker.battleNetResourceApproachStaged()
+                && !blocker.isMoving() && blocker.pathLength() == 0
+                // Java visits this follower before the lower Java-id leader;
+                // delay one becomes zero later in the same fixture tick.
+                && blocker.battleNetOrderDelay() <= 1
+                && blocker.battleNetCollisionCounter() == 0
+                && blocker.battleNetRefusals() == 0
+                && world.isAllied(follower.player(), blocker.player());
+    }
+
 
     void stepMove(Unit unit) {
         stepMove(unit, true);
@@ -5621,6 +5645,47 @@ final class BattleNetMovementSystem {
                     if (temporaryBody && unit.target() == null
                             && !unit.isMoving()
                             && unit.pathLength() > 0) {
+                        if (battleNetFinalDepotQueueHead(unit, blocker)) {
+                            // A consumed action-24 tail does not buy the
+                            // generic cached-naval fifteen-count when its
+                            // blocker has reached action 25's timer-one
+                            // visit. The higher native slot enters the shared
+                            // depot on the following scheduler pass, so the
+                            // follower parks at RI20 with collision one and
+                            // immediately redraws around the vacated hull.
+                            // Orc 8 slots 1479/1482 are the paired witness:
+                            // park N at fixture 441, then publish NW,W and
+                            // commit NW at 442. Moving returners, unstaged
+                            // hulls, and pressured queue heads retain their
+                            // established full refusal bands below.
+                            int collision =
+                                    unit.battleNetCollisionCounter() + 1;
+                            unit.setBattleNetCollisionCounter(
+                                    collision > 14 ? 0 : collision);
+                            unit.setBattleNetRefusals(0);
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            unit.setBattleNetRefusalHold(false);
+                            pickUpMoveAnimation(unit);
+                            if (world.battleNetSequence != null) {
+                                int moveStart = world.idle
+                                        .battleNetSequenceStart(unit,
+                                                BattleNetSequence.MOVE_ANIMATION);
+                                if (moveStart >= 0) {
+                                    unit.setBattleNetSequenceOffset(moveStart);
+                                    unit.setBattleNetAnimationTimer(1);
+                                    unit.setBattleNetChaseStepReady(false);
+                                }
+                            }
+                            world.causalTrace.event(world.cycle,
+                                    "path.tanker-final-depot-queue-park",
+                                    unit.id(), "blocker", blocker.id(),
+                                    "collision",
+                                            unit.battleNetCollisionCounter());
+                            return;
+                        }
                         boolean loadedTankerReturn =
                                 unit.type().gathering().containsKey(
                                         UnitType.Resource.OIL)

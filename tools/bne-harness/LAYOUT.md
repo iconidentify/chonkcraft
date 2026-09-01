@@ -1132,6 +1132,31 @@ second perimeter at `(76,76)`, whose north leg tests `(76,75)` and then accepts
 at `(75,75)`, never reaches the native anchor, and eventually falls back to
 the west side.
 
+## Final-depot tanker queues hand off on the leader's entry pass
+
+The sealed Orc 8 stream establishes the raw transition for a laden tanker
+queue at one refinery. Follower slot 1479 is action 24 with the cached route
+`NW,N,NE,N,N,N,N,N,N`; leader slot 1482 is the same-depot loaded returner.
+The follower's logical north byte settles from pixel `(2688,2882)` to
+`(2688,2880)` through fixture 441. The leader is then stationary in action 25
+with an empty route, raw collision zero, and Move timer one.
+
+The fixture-441 follower visit does not install the ordinary cached-naval
+Move 15..1 band. It parks route index `20`, changes the packed collision byte
+at unit offset `+0x1d` from `00` to `10`, leaves the refusal nibble zero, and
+keeps Move timer one. On fixture 442 the higher native pool slot is visited
+first: leader 1482 changes from action 25 to removed action 26. Follower 1479
+then queries the route writer, stores `[NW,W]`, consumes `NW` to logical
+anchor `(82,88)`, and retains route index one and the collision byte `10`.
+
+This ordering is the discriminator, not generic tanker adjacency. Orc 7 and
+Orc 10 loaded followers behind moving loaded returners keep the full
+fifteen-count refusal band. Orc 8 slot 1478 freshly surfaced without a route
+keeps the ordinary naked route generations, and the same tanker between two
+side hulls keeps the proved swept-diagonal paid refusal. The one-pass park is
+therefore owned by a stationary, unpressured same-depot queue head on its last
+final-approach visit.
+
 ## FindDeposit uses component-filtered native distance, not a route cost
 
 The pinned BNE executable's `FindDeposit` is `0x00438770`. Its first type test
