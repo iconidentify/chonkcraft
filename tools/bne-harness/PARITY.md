@@ -15,7 +15,70 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (paid-generation return-tail park)
+## Current release checkpoint — 2026-09-01 (moving-quarry cold-retry retirement)
+
+Accepted cycle-1,800 receipt `eb51b8f4` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 39,088, an increase of thirty-seven. Human 8 advances from
+fixture 390 to 427. The cycle-400 fleet improves from 47 clean / 5 divergent
+to 48 clean / 4 divergent / 0 failed under receipt `7956abd2`. The long
+receipt is retained at
+`.bne-artifacts/runs/eb51b8f44c5233d8218c753abad230e1b6f0d2167aacd224619d3b87230c3eb7`.
+Its manifest has SHA-256
+`862707bb7189f91063490f496a561bc0d731bd5fc44b18b900365a195eb14f3a`
+and binds dirty engine-input identity
+`3c9364351812d1763cf8845d112ae2464ef0801479c6503af235d0878ff6e51b`
+at base revision `c68f1e2` to authenticated, replayable source capsule
+`14b9346ce07b83d480e89140b1611d3843074c578bbf2ed14fa068966f330a51`.
+
+Behavioral delta: when a boxed melee attacker replaces its dead quarry with a
+moving target, retail gives the replacement one additional paid cold Attack
+constructor, then consumes the cold-loop latch and releases the wall detour.
+Java previously kept the latch and bought constructors forever. A stationary
+replacement continues reopening the cold constructor, so the rule is about
+the replacement's movement state rather than a particular unit or scenario.
+The implementation contains no mission, map, coordinate, fixture, cycle,
+faction, route-length, or unit-ID branch.
+
+Proof delta: Human 8 native peasant slot 1526 / Java unit 74 attacks from
+`(77,62)`. At fixture 384 the dying quarry, native slot 1533 / Java unit 67,
+is replaced by the moving returner slot 1536 / Java unit 64 at `(79,60)`.
+Retail pays one more Attack 3,2,1 sequence and at fixture 390 commits the
+non-progressing south-east wall face to `(78,63)`, retaining north-east and
+north from raw route `03 01 00`. Java's permanently latched cold loop formerly
+rearmed Attack at that boundary. The Java observations occur at internal
+cycles 386 and 392, preserving the measured two-cycle fixture offset.
+Expansion Human 12's stationary footman slot 1477 / Java unit 151 at `(26,59)`
+is the held-out negative control: it continues reopening the cold constructor
+and that case remains exact through fixture 252. Human 8 is now exact through
+fixture 426; its fixture-427 finding is an independent peasant hit-point split,
+native 25 versus Java 20.
+
+Efficacy receipt
+`.bne-test-efficacy/c390-human8-moving-replacement-cold-retry/runs/fd711d8cf5dee04d3cd2d80fef7096b68aad0bb10ddc7620f2aaacff3b2f2f86`
+proves the focused assertion executes and fails on `c68f1e2`, then executes
+and passes on the candidate. All 64 focused moving-quarry, stationary-control,
+collision-refill, and attack-resume tests pass. A broader audit also exercised
+five known-red assertions in the in-place-first-take and residual-replan
+classes; each fails identically on `c68f1e2` and the candidate. Both fixed
+52-case gates pass, and the source capsule verifies with zero sealed untracked
+inputs. The ordinary executable next-level gate exits zero after 209 Python
+checks (four skipped), 97 engine/desktop checks, and 223 dual-adapter command
+scenarios. Its 11 comparable scenarios remain 6 exact / 5 divergent with no
+regression or infrastructure failure. `--require-certified` remains incomplete
+on the documented producer lanes, and remote AI discovery still stops at
+strict SSH verification of the changed `i9beef` host key, which was not
+modified.
+
+The shared frontier remains fixture 312: expansion Orc 8's submarine route
+publication family is paused pending a new discriminator. Expansion Human
+12's fixture-333 wood route is independently paused on global route-buffer
+state. The earliest unpaused finding is expansion Human 7 at fixture 395,
+followed by expansion Orc 11 at 397, Human 7 at 405, Human 14 at 406, Orc 11
+at 418, Human 12 at 422, Human 8 at 427, and expansion Human 10 at 430.
+
+## Prior release checkpoint — 2026-09-01 (paid-generation return-tail park)
 
 Accepted cycle-1,800 receipt `501c20cc` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet
