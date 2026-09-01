@@ -15,7 +15,70 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-350 paid Attack-tail collision generations)
+## Current release checkpoint — 2026-08-31 (cycle-361 naval HitUnit arrival rescan)
+
+Accepted cycle-1,800 receipt `380e37dc` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,177, an increase of twenty-four. Expansion Orc 11 advances
+from fixture 337 to 361. The cycle-400 fleet remains 40 clean / 12 divergent /
+0 failed under receipt `74576ae6`. The long receipt is retained at
+`.bne-artifacts/runs/380e37dc59147106f19ca84fa4ac4e3631f448c29fd1b52c0d567f5f0bbeeb93`.
+It binds dirty engine-input identity `d66cbdba` at base revision `0431081` to
+the 220,273,648-byte pack with SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`
+and replayable source capsule
+`a446643a67b789124abd5ac57a67c1261ba1d9af3445f0338986cf83543c8457`.
+
+Behavioral delta: a person-controlled naval `HitUnit` response retains its
+offered source while its committed route remains outside weapon range. When
+the final residual settles in range, retail performs a fresh, null-seeded
+hostile scan before installing the cold Attack constructor; equal-score ships
+therefore resolve by persistent screen-Y order instead of incumbent ownership.
+Damage which lands while an Attack OP0 resume hold is already active does not
+arm another hold, so the paid broadside period expires normally. Ordinary
+land responses, non-person naval units, out-of-range arrivals, cold attacks
+without `HitUnit` provenance, and damage before the first committed OP0 hold
+retain their established behavior. The implementation uses response
+provenance, movement and missile class, person ownership, ordinary hostile
+ranking, live range, and active hold state; it contains no mission, map,
+coordinate, fixture, cycle, faction, or unit-ID branch.
+
+Proof delta: expansion Orc 11 destroyer slot 1521 / Java 79 keeps its offered
+destroyer slot 1542 / Java 58 through the final Move residual on fixture 205.
+On fixture 206 at `(8,34)`, native rescans two equal-score destroyers at
+`(6,30)` and `(10,30)`, chooses slot 1558 / Java 42 first in screen-Y order,
+and opens Attack 3266 with construction timers 3,2,1. Its 118-count OP0 hold
+begins on fixture 209. A crossing cannon pulse reduces the responder to 86 HP
+on fixture 248 but does not extend that already-paid hold; windup follows on
+fixture 327, the responder constructs its broadside on 328, and the shot lands
+for twenty-six damage on Java 42 at fixture 337. Java formerly retained Java
+58 until a late fixture-327 scan and produced no shot. The corrected case is
+exact through fixture 360; its new fixture-361 split is an independent
+destroyer order mismatch, native Still versus Java Attack.
+
+Efficacy receipt
+`.bne-test-efficacy/c361-naval-hit-arrival-rescan/runs/01fecf17bb6bd6c1533b22e660ed8806e30fe72eaa1ecc847f487374f1c9c039`
+proves the focused fixture-205..337 regression assertion-fails on `0431081`
+and passes on the candidate. All 35 broader naval response, ranged hold,
+moving-quarry, and melee synchronization family tests pass, as do both fixed
+52-case gates. The ordinary executable next-level gate exits zero after 209
+Python checks and 96 engine/desktop checks; its command worklist remains 11
+comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is Orc 12 at fixture
+342, followed by expansion Human 6 at 344, Human 8 at 347, expansion Human 4
+at 350, expansion Human 2 at 352, expansion Orc 11 at 361, Orc 8 at 364, and
+expansion Orc 12 at 374.
+
+## Prior release checkpoint — 2026-08-31 (cycle-350 paid Attack-tail collision generations)
 
 Accepted cycle-1,800 receipt `4f674ca5` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

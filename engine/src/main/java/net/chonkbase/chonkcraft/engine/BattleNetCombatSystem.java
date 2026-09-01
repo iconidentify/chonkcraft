@@ -3082,6 +3082,41 @@ final class BattleNetCombatSystem {
                     boolean coldNavalRangedArrival =
                             retainedPersonNavalHitRoute
                             && unit.type().firesMissile();
+                    if (coldNavalRangedArrival) {
+                        // A person naval HitUnit response keeps its offered
+                        // source while the committed route is still outside
+                        // weapon range.  Once the final residual settles in
+                        // range, MoveToTarget returns through AutoSelectTarget
+                        // before the cold Attack constructor is installed.
+                        // The scan is fresh rather than incumbent-seeded:
+                        // XOrc 11 destroyer 1521 reaches 8,34 on fixture 206
+                        // with destroyer 1542 at 6,30 and destroyer 1558 at
+                        // 10,30.  Both have score 0x2003d; native selects 1558,
+                        // which appears first in persistent screen-Y order,
+                        // then opens Attack 3266/3 and creates the broadside
+                        // on fixture 328.  Retaining the HitUnit source delays
+                        // this scan until fixture 327 and misses that shot.
+                        int reactRange = Math.max(
+                                unit.type().reactRange(
+                                        world.isPerson(unit.player())),
+                                Math.max(1, unit.type().maxAttackRange()));
+                        Unit arrivalTarget = world.targets
+                                .findBattleNetHostile(unit, reactRange, null);
+                        if (arrivalTarget != null
+                                && arrivalTarget != unit.target()
+                                && arrivalTarget.isAlive()
+                                && world.targets.inAttackRange(
+                                        unit, arrivalTarget)) {
+                            Unit previous = unit.target();
+                            setAutoTarget(unit, arrivalTarget, true);
+                            world.turnToTarget(unit, arrivalTarget, 0, 0);
+                            world.causalTrace.event(world.cycle,
+                                    "combat.naval-hit-arrival-retarget",
+                                    unit.id(), "from",
+                                    previous == null ? -1 : previous.id(),
+                                    "to", arrivalTarget.id());
+                        }
+                    }
                     unit.clearPath();
                     unit.setRouteSpent(false);
                     unit.setChasing(false);
@@ -8169,7 +8204,15 @@ final class BattleNetCombatSystem {
      */
     void noteBattleNetAttackOp0Damage(Unit victim) {
         if (victim == null || !victim.canMove() || world.battleNetSequence == null
-                || world.idle == null) {
+                || world.idle == null
+                || victim.battleNetAttackResumeHoldActive()) {
+            // Damage can replace construction with the first committed OP0
+            // hold, but it cannot extend a hold which is already being paid.
+            // XOrc 11 destroyer 1521 takes a cannon pulse on fixture 248
+            // during its 118-count broadside hold. Native lets that hold
+            // expire into windup on fixture 327 and fires on 328; arming a
+            // second damage hold keeps the destroyer parked for another full
+            // broadside period.
             return;
         }
         int attackStart = world.idle.battleNetSequenceStart(victim,

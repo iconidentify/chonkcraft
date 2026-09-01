@@ -338,7 +338,7 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
-    @DisplayName("xorc 11's responding destroyer pays cold Attack construction after its final chase stride")
+    @DisplayName("xorc 11's responding destroyer rescans before its cold broadside")
     void xorc11sRespondingDestroyerPaysColdAttackConstructionAfterItsFinalChaseStride() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -351,30 +351,39 @@ class Xorc11PatrolAttackRealDataTest {
         World world = mission.world();
         Unit responder = unitById(world, 79);
         Unit quarry = unitById(world, 58);
+        Unit replacement = unitById(world, 42);
         assertNotNull(responder,
                 "XOrc 11 has no native-slot-1521 responding destroyer");
         assertNotNull(quarry,
                 "XOrc 11 has no native-slot-1542 human destroyer");
+        assertNotNull(replacement,
+                "XOrc 11 has no native-slot-1558 human destroyer");
         assertEquals(79, responder.id());
         assertEquals(58, quarry.id());
+        assertEquals(42, replacement.id());
 
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
-        while (world.cycle() - BNE_INITIALIZATION_TICKS < 217) {
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 337) {
             mission.tick();
             int fixture = (int) world.cycle() - BNE_INITIALIZATION_TICKS;
             if (fixture == 205) {
                 assertEquals(3261, responder.battleNetSequenceOffset(),
                         "the final two pixels still belong to the Move body");
                 assertEquals(1, responder.battleNetAnimationTimer());
+                assertSame(quarry, responder.target(),
+                        "the old HitUnit source owns the committed residual");
             } else if (fixture >= 206 && fixture <= 208) {
                 assertEquals(3266, responder.battleNetSequenceOffset(),
                         "the settled naval residual opens Attack start");
                 assertEquals(209 - fixture,
                         responder.battleNetAnimationTimer(),
                         "native naval Attack construction counts 3,2,1");
-            } else if (fixture >= 209) {
+                assertSame(replacement, responder.target(),
+                        "the in-range residual rescan selects the first "
+                                + "equal-score ship in native screen-Y order");
+            } else if (fixture >= 209 && fixture <= 326) {
                 assertEquals(3266, responder.battleNetSequenceOffset(),
                         "the broadside cadence remains parked at OP0");
                 assertEquals(327 - fixture,
@@ -383,7 +392,24 @@ class Xorc11PatrolAttackRealDataTest {
             }
             if (fixture == 217) {
                 assertEquals(54, quarry.hitPoints(),
-                        "the retained HitUnit target must not take the phantom cannon splash");
+                        "the released HitUnit source must not take a phantom cannon splash");
+            } else if (fixture == 248) {
+                assertEquals(86, responder.hitPoints(),
+                        "the crossing cannon pulse still damages the responder");
+                assertTrue(!responder.battleNetAttackOp0Damaged(),
+                        "damage cannot re-arm a broadside hold already in progress");
+            } else if (fixture == 328) {
+                assertSame(replacement, responder.target(),
+                        "the completed cadence still owns the arrival-scan winner");
+                assertSame(responder,
+                        constructedMissileFrom(world, responder.id()).source(),
+                        "the first broadside constructs from the responding destroyer");
+            } else if (fixture == 336) {
+                assertEquals(98, replacement.hitPoints(),
+                        "the cannon remains in flight through fixture 336");
+            } else if (fixture == 337) {
+                assertEquals(72, replacement.hitPoints(),
+                        "the authenticated broadside lands for twenty-six damage");
             }
         }
     }
