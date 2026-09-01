@@ -441,6 +441,62 @@ class Xhuman04OpeningCombatParityRealDataTest {
     }
 
     @Test
+    @DisplayName("xhuman 4 retargets an enemy occupying its paid tail on settle")
+    void xhuman4RetargetsAnEnemyOccupyingItsPaidTailOnSettle() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(
+                "campaigns/human-exp/levelx04h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 4 is not in the pack");
+        World world = mission.world();
+
+        // Native slot 1484 / Java 116 carries the paid two-heading SE,NE
+        // Attack tail. Its SE residual settles at (75,62) on fixture 350
+        // while the preferred live axethrower occupies the retained NE cell
+        // (76,61). Retail runs the hostile scan on that same callback, parks
+        // the cached tail at route index twenty, installs the adjacent axe,
+        // opens Attack 2539/3 and calls FUN_004234b0. Java formerly replanned
+        // toward the old north axe first and delayed that synchronized draw
+        // until fixture 352.
+        Unit footman = unitAt(world, "unit-footman", 71, 62);
+        Unit northAxe = unitAt(world, "unit-axethrower", 78, 59);
+        Unit southAxe = unitAt(world, "unit-axethrower", 78, 61);
+        assertNotNull(footman, "XHuman 4 has no native-slot-1484 footman");
+        assertNotNull(northAxe, "XHuman 4 has no native-slot-1505 north axe");
+        assertNotNull(southAxe, "XHuman 4 has no native-slot-1506 south axe");
+
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - INITIALIZATION_TICKS < 349) {
+            mission.tick();
+        }
+        assertSame(northAxe, footman.target(),
+                "fixture 349 still owns the old ranged quarry");
+        assertEquals(75, footman.tileX());
+        assertEquals(62, footman.tileY());
+        assertEquals(1, footman.pathLength(),
+                "the final paid NE heading must remain cached before settle");
+        assertEquals(2534, footman.battleNetSequenceOffset());
+        assertEquals(1, footman.battleNetAnimationTimer());
+        assertEquals(0x8f3615c1, world.randomSeed());
+
+        mission.tick();
+
+        assertSame(southAxe, footman.target(),
+                "the hostile occupying the cached heading owns the settle scan");
+        assertEquals(0, footman.pathLength(),
+                "retail parks the retained route instead of replanning at the old axe");
+        assertEquals(2539, footman.battleNetSequenceOffset());
+        assertEquals(3, footman.battleNetAnimationTimer(),
+                "the adjacent replacement opens fresh Attack construction");
+        assertEquals(0x48ee4166, world.randomSeed(),
+                "the replacement's melee-sync draw belongs to fixture 350");
+    }
+
+    @Test
     @DisplayName("xhuman 4's blocked attackers keep native combat cadence")
     void xhuman4BlockedAttackersKeepNativeCombatCadence() {
         AssetSource assets = AssetSource.fromEnvironment();

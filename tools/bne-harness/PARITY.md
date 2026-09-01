@@ -15,7 +15,65 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-08-31 (cycle-358 retained resource-hit Move restart)
+## Current release checkpoint — 2026-08-31 (cycle-474 paid Attack-tail hostile settle)
+
+Accepted cycle-1,800 receipt `a097f059` preserves the shared clean horizon at
+fixture 311 and improves or preserves every campaign frontier. The fleet
+remains 10 clean / 42 divergent / 0 failed, while the 52 per-case exact
+prefixes sum to 38,534, an increase of 124. Expansion Human 4 advances from
+fixture 350 to 474. The cycle-400 fleet improves from 41 clean / 11 divergent
+to 42 clean / 10 divergent / 0 failed under receipt `f6a6d84e`. The long
+receipt is retained at
+`.bne-artifacts/runs/a097f05940162f58d555eeec31159750dbf11d0abe4163f0b70b3ccbe0df6ec8`.
+Its manifest has SHA-256
+`acfc16dd356ab366702e0ee52e6e4f3172b454faf0f36399a5304cc446b3cf65`
+and binds dirty engine-input identity `95fa8856` at base revision `320bd98` to
+replayable source capsule
+`2ab6e7dc719673c4cddc87b2c3e5ce513280501b63370be9ed69ee6249f782b6`.
+
+Behavioral delta: when a paid land-melee Attack residual settles with one
+cached heading left, the old mobile quarry remains out of range, and the
+preferred adjacent hostile occupies that blocked heading, the callback belongs
+to the hostile target decision rather than generic old-goal replanning. The
+engine parks the consumed route, installs the adjacent replacement, opens its
+fresh Attack constructor, and charges exactly one synchronized table-0x27
+debit. Collision-owned, building, ranged, allied-blocker, and unoccupied tails
+retain their existing paths. The implementation contains no mission, map,
+coordinate, fixture, cycle, faction, unit-ID, or original-route-length branch.
+
+Proof delta: expansion Human 4 footman native slot 1484 / Java unit 116 owns
+the retained `SE,NE` tail. Its south-east residual lands on fixture 350 while
+the preferred south axethrower occupies the cached north-east cell. Native
+changes the order target, parks route index twenty, exposes Attack `2539/3`,
+and advances synchronized seed `8f3615c1 -> 48ee4166` in that callback; Java
+formerly kept the north axethrower, replanned `NE,N`, and paid the same draw
+two fixtures later. Authenticated local Branch Witness capture
+`5afefad9fb2e75fe665ec3251ad4c401f5308ae04e6fa144b6c0e5d86f6e9a96`
+binds the slot-1484 state byte to writer `0x004234db`, with register probes
+proving the watched unit base and caller `FUN_004234b0`'s draw attribution.
+
+Efficacy receipt
+`.bne-test-efficacy/c350-xhuman4-paid-tail-hostile-settle/runs/0a4f0956b3565d9d63c8e0310bf9676019933576b81f17886f621ec4b05c072f`
+proves the focused assertion fails on `320bd98` and passes on the candidate.
+The complete expansion-Human-4 real-data and melee-sync-loop test families
+pass. The ordinary executable next-level gate exits zero after 209 Python
+checks (four skipped) and 96 engine/desktop checks; its command worklist
+remains 11 comparable scenarios (6 exact / 5 divergent) without regression or
+infrastructure failure. `--require-certified` remains incomplete on the
+documented producer lanes, and remote AI discovery still stops at strict SSH
+verification of the changed `i9beef` host key, which was not modified.
+
+The shared frontier remains fixture 312: expansion Orc 8 human submarine slot
+1432 is at x 88 natively versus x 90 in Java, and its route-publication family
+remains paused pending a new discriminator. Expansion Human 12's fixture-333
+wood route is independently paused pending a discriminator for its global
+route-buffer state. The earliest unpaused fleet finding is expansion Human 2
+at fixture 352, followed by Human 8 at 358, expansion Orc 11 at 361, Orc 8 at
+364, expansion Orc 12 at 374, expansion Human 10 at 375, and expansion Human 6
+at 525. Expansion Human 4's next finding is critter slot 1593 raw Move natively
+versus Still in Java at fixture 474.
+
+## Prior release checkpoint — 2026-08-31 (cycle-358 retained resource-hit Move restart)
 
 Accepted cycle-1,800 receipt `c46fb992` preserves the shared clean horizon at
 fixture 311 and improves or preserves every campaign frontier. The fleet

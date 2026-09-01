@@ -2782,10 +2782,13 @@ final class BattleNetCombatSystem {
             // one callback.  The missed boundary left Java parked until 108.
             boolean settledSpentMovingQuarryBoundary =
                     battleNetSettledSpentMovingQuarryDecisionDue(unit);
+            boolean settledPaidTailHostileBoundary =
+                    battleNetSettledPaidTailHostileDecisionDue(unit);
             boolean atChaseBoundary = (!unit.isMoving()
                     && world.movement.atMoveBoundary(unit))
                     || unit.battleNetChaseStepReady()
-                    || settledSpentMovingQuarryBoundary;
+                    || settledSpentMovingQuarryBoundary
+                    || settledPaidTailHostileBoundary;
             if (chased != null && atChaseBoundary) {
                 // In-range leftovers are discarded before any further heading
                 // is consumed. XHuman 12 axethrower 1473 reaches 21,44 in
@@ -3686,7 +3689,8 @@ final class BattleNetCombatSystem {
                                 && pathn1Candidate != pathn1Quarry
                                 && pathn1Quarry.type() != null
                                 && ((!pathn1Quarry.type().building()
-                                        && unit.battleNetCollisionCounter() > 0)
+                                        && (unit.battleNetCollisionCounter() > 0
+                                                || settledPaidTailHostileBoundary))
                                     || saturatedPaidBuildingTailTargetChange);
                         residualPathOneSaturatedPaidBuildingTarget =
                                 saturatedPaidBuildingTailTargetChange;
@@ -4615,6 +4619,40 @@ final class BattleNetCombatSystem {
                         setAutoTarget(unit, candidate);
                         chased = candidate;
                         unit.setRouteSpent(false);
+                        if (settledPaidTailHostileBoundary) {
+                            // The paid residual has landed, and its only cached
+                            // heading is the square occupied by the preferred
+                            // adjacent hostile. Retail parks that route and
+                            // enters the replacement's fresh Attack constructor
+                            // on this callback. The synchronized table-0x27 arm
+                            // can reach this seam either as the expiring loop
+                            // debit or as an unpaid first debit; charge exactly
+                            // one of them. XHuman 4 footman 1484 seals both the
+                            // route-index-20 write and FUN_004234b0 attribution
+                            // at fixture 350.
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            unit.setBattleNetChaseEmptyRouteReplan(false);
+                            unit.setBattleNetChaseStepReady(false);
+                            unit.setChasing(false);
+                            unit.setFighting(true);
+                            world.armBattleNetAttackStart(unit);
+                            if (!unit.battleNetPendingMeleeSyncRand()
+                                    && unit.battleNetMeleeSyncRemaining() == 1) {
+                                world.tickBattleNetMeleeSyncLoop(unit);
+                            }
+                            world.consumeBattleNetPendingMeleeSyncRand(unit);
+                            finishBattleNetPaidWrapRetargetArrival(unit);
+                            world.turnToTarget(unit, candidate, 0, 0);
+                            world.causalTrace.event(world.cycle,
+                                    "combat.paid-tail-hostile-settle",
+                                    unit.id(), "target", previous.id(),
+                                    "candidate", candidate.id(), "heading",
+                                    oldReplacementHeading);
+                            return;
+                        }
                         if (dyingQuarryCompletedRefusalConstructor
                                 && previous == completedRefusalConstructorGoal
                                 && candidate.isAlive() && !candidate.isDying()
@@ -10394,6 +10432,69 @@ final class BattleNetCombatSystem {
                 unit.battleNetSequenceOffset(),
                 unit.battleNetAnimationTimer());
         return next.valid() && next.actionMarker();
+    }
+
+
+    /**
+     * Whether a paid Attack tail settles with its preferred hostile occupying
+     * the final cached heading.
+     *
+     * <p>The accepted residual has completed, so the occupied tail belongs to
+     * COrder_Attack's target decision rather than generic old-goal replanning.
+     * Retail parks the retained route, installs the adjacent replacement,
+     * opens fresh Attack construction and charges table 0x27 on that callback.
+     * XHuman 4 slot 1484 is the sealed witness: its SE residual lands at
+     * fixture 350 while the preferred axethrower occupies cached NE; native
+     * changes targets and calls {@code FUN_004234b0} immediately. Java used to
+     * replan toward the old axe and reach the same draw two fixtures later.
+     * Collision-owned and allied-blocker tails retain their separate refusal
+     * and construction paths.</p>
+     */
+    private boolean battleNetSettledPaidTailHostileDecisionDue(Unit unit) {
+        if (unit == null || !world.actionMoveWalked || unit.isMoving()
+                || !unit.stepDrained() || !unit.chasing()
+                || unit.type() == null
+                || unit.type().moveType() != UnitType.Movement.LAND
+                || unit.type().maxAttackRange() > 1
+                || World.battleNetRangedChaseUnit(unit)
+                || !unit.battleNetAttackWrapDestArmPending()
+                || unit.pathLength() != 1
+                || unit.battleNetPathStepsTaken() <= 0
+                || unit.battleNetCollisionCounter() != 0) {
+            return false;
+        }
+        Unit previous = unit.target();
+        if (previous == null || !previous.isAlive() || previous.isDying()
+                || previous.type() == null || previous.type().building()
+                || world.targets.inAttackRange(unit, previous)) {
+            return false;
+        }
+        int heading = unit.peekHeading();
+        if (heading < 0 || heading >= Direction.COUNT) {
+            return false;
+        }
+        int stride = world.battleNetMovementStride(unit);
+        int nextX = unit.tileX() + Direction.deltaX(heading) * stride;
+        int nextY = unit.tileY() + Direction.deltaY(heading) * stride;
+        if (world.canEnter(unit, nextX, nextY)) {
+            return false;
+        }
+        int reactRange = Math.max(
+                unit.type().reactRange(world.isPerson(unit.player())),
+                Math.max(1, unit.type().maxAttackRange()));
+        Unit candidate = world.targets.findBattleNetHostile(
+                unit, reactRange, null);
+        return candidate != null && candidate != previous
+                && candidate.isAlive() && !candidate.isDying()
+                && candidate.type() != null && !candidate.type().building()
+                && world.targets.validAttackTarget(unit, candidate)
+                && world.targets.inAttackRange(unit, candidate)
+                && nextX >= candidate.tileX()
+                && nextX < candidate.tileX()
+                        + Math.max(1, candidate.type().tileWidth())
+                && nextY >= candidate.tileY()
+                && nextY < candidate.tileY()
+                        + Math.max(1, candidate.type().tileHeight());
     }
 
 
