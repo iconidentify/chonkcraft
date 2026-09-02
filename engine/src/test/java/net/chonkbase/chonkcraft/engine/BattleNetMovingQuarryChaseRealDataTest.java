@@ -1276,6 +1276,61 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void anOrdinaryMovingQuarryAttackTailHandsDirectlyToItsFreshRoute() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 74);
+        Unit quarry = unitById(world, 81);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1526");
+        assertNotNull(quarry,
+                "Human 8 has no Java twin for native peasant 1519");
+
+        while (fixtureCycle(world) < 513) {
+            mission.tick();
+        }
+        assertChaser(attacker, 78, 65, 0, 0, false);
+        assertSame(quarry, attacker.target());
+        assertEquals(78, attacker.pathGoalX());
+        assertEquals(66, attacker.pathGoalY());
+        assertEquals(2686, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertEquals(0, attacker.pathLength(),
+                "native route index twenty exposes no executable byte");
+        assertFalse(attacker.battleNetAttackWrapDestArmPending(),
+                "the completed body has consumed its destination arm");
+        assertFalse(attacker.battleNetRetargetResidualParkRefill(),
+                "the completed body has consumed its route-park provenance");
+        assertEquals(0, attacker.battleNetCollisionCounter(),
+                "this tail has consumed its collision generation");
+        assertEquals(0, attacker.battleNetRefusals());
+
+        mission.tick();
+        assertEquals(514, fixtureCycle(world));
+        assertChaser(attacker, 79, 66, -32, -32, true);
+        assertSame(quarry, attacker.target(),
+                "the completed tail keeps its live moving harvesting quarry");
+        assertEquals(78, attacker.pathGoalX());
+        assertEquals(67, attacker.pathGoalY(),
+                "the OP0 visit refreshes the quarry before pathing");
+        assertEquals(0, attacker.pathLength(),
+                "the fresh southeast route is consumed on the same visit");
+        assertEquals(Direction.fromDelta(1, 1), attacker.lastStepHeading());
+        assertEquals(2603, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+    }
+
+    @Test
     void aPaidWrapArrivalEntersTheAttackBodyOnItsSettlementVisit() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,

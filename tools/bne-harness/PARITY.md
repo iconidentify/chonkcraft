@@ -15,7 +15,76 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (coward casters scan only vulnerable idle targets)
+## Current release checkpoint — 2026-09-02 (ordinary moving-quarry tails release a lagging renderer wait)
+
+Accepted cycle-1,800 receipt `8b9f364b` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,160 to 52,173. Retail Human 8 is the only changed case,
+advancing from exact through fixture 513 to exact through fixture 526. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`f7a7fd41`. The long receipt is retained at
+`.bne-artifacts/runs/8b9f364b41e7253e0bee8f0e81b9ebb8228e3f17da36de37586457ae38811ffd`.
+Its manifest has SHA-256
+`970091b7007522c736358bfccb85f067e2fbdb23494cdc91960fb8247ebf1515`
+and binds dirty engine-input identity
+`a6d8981302912d0d2e8309c9b191fadf5dcbb624d0c49c852f4ef17aeefde6e6`
+at base revision `e9dbd9a` to authenticated, replayable source capsule
+`fd42bb4f1ce878a87fa70924cefd5794d02c7fea36abc2f96aa3d964415724cd`.
+
+Behavioral delta: an ordinary completed land-melee Attack body against a live,
+moving harvesting quarry may reach its authoritative OP0 after its paid-wrap,
+residual-refill, and collision provenance has already been consumed while
+Java's presentation cursor still owes a positive wait. The Attack body owns
+that callback: it releases the lagging renderer, refreshes the quarry goal,
+writes the new route, and consumes the first route byte immediately. The
+existing paid moving-quarry rule remains gated by its explicit
+wrap/refill/collision provenance. A presentation already at wait zero follows
+ordinary `finishSwing`; hard refusals, live route buffers, in-range or invalid
+goals, stationary/non-harvesting targets, ranged/naval units, and non-Attack
+markers retain their established paths. The implementation contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: Human 8 attack-peasant slot 1526 / Java unit 74 agrees at
+`(78,65)` through fixture 513 with Attack tail `2686/1`, no executable route
+byte, zero collision/refusals, and consumed wrap/refill state. Native fixture
+514 refreshes the moving quarry goal from `(78,66)` to `(78,67)`, publishes a
+south-east byte, exposes Move `2603/1`, and logically steps to `(79,66)` in the
+same callback. Java formerly left the renderer in charge until fixture 515;
+it now makes the native transition on 514 and remains exact until the
+independent critter slot-1495 Still-versus-Move finding at fixture 527. The
+same attack-peasant's earlier fixture-456 presentation is the negative
+witness: it has already reached wait zero, ordinary `finishSwing` releases it,
+and the established fixture-457 south-east step and later fixture-513 timer
+remain unchanged.
+
+Efficacy receipt
+`.bne-test-efficacy/human8-c514-ordinary-moving-quarry-tail/runs/877eabb004aab951619e96f822f6c4a59023f91761541f3d938259f952dde8f6`
+proves the c514 assertion executes and fails on `e9dbd9a`, then executes and
+passes on the candidate. All 51 selected moving-quarry, refusal, retarget,
+behavior-one, and presentation controls pass. The legacy 21-test
+`MeleeChaseReplanResidualTest` diagnostic retains the identical three
+pre-existing failures on baseline and candidate under
+`.bne-test-efficacy/human8-c514-melee-residual-baseline-control/runs/edd9ba71b2d847334de182df2cac44de0eb5fd730aad6f42644be916881ba973`.
+Both fixed 52-case gates pass. The long receipt's source capsule authenticates
+and replays its engine identity exactly with zero sealed untracked inputs.
+
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its comparable set remains 6 exact / 5 divergent with no regression
+or infrastructure failure. Optional remote AI discovery retains the documented
+strict SSH host-key debt for `i9beef`; no host key was modified, and local
+native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 10 fixture 519, followed by Human 13 at 523, Human 8 at 527, expansion
+Human 5 at 530, Orc 12 at 531, expansion Human 2 at 533, Human 5 and expansion
+Human 8 at 536, and expansion Human 3 at 537.
+
+## Prior release checkpoint — 2026-09-01 (coward casters scan only vulnerable idle targets)
 
 Accepted cycle-1,800 receipt `764340e4` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

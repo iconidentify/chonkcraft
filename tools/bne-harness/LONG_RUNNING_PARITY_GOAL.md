@@ -14,42 +14,30 @@ not regress already accepted behavior. Continue across goal turns and context
 compactions until the completion conditions below are genuinely satisfied or
 progress is genuinely blocked under the blocking rules below.
 
-The latest durable handoff frontier as of 2026-09-01 is:
+The latest durable handoff frontier as of 2026-09-02 is:
 
-- the accepted candidate is based on commit `de1cc1d` and is authenticated by
+- the accepted candidate is based on commit `e9dbd9a` and is authenticated by
   replayable dirty-source capsule
-  `502ed7160bdc274d9473ae35ba6644b38ca57d39303ec408d8eafda95eb1fbdd`;
+  `fd42bb4f1ce878a87fa70924cefd5794d02c7fea36abc2f96aa3d964415724cd`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `b78ed5434538dbbf052559516e10b2da5445304db9d3c3ea6346cf6a6ebaf54b`.
+  `8b9f364b41e7253e0bee8f0e81b9ebb8228e3f17da36de37586457ae38811ffd`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
 that the replacement route is emitted by ordinary `NewPath` global scratch
 and copied into the unit route buffer at `0x004505ed`; it has not yet exposed a
 safe systemic discriminator. Resume that family only with new evidence about
-the global route-scratch lifecycle or path decision. Expansion Orc 8's cycle-
-356 submarine route-publication family is independently paused. Retail Orc 11
-is accepted through cycle 502 after the settled stage-three ranged-retarget
-constructor and fresh cadence removed its fixture-459 phantom arrow and the
-downstream cycle-461 critter disagreement. Retail Human 7 is accepted through
-cycle 1250 after its doubled platform approach retained the equal-gain
-marked-wall route and consumed southwest on fixture 493. Retail Human 8 is
-accepted through cycle 513 after its paid moving-quarry Attack tail released
-the stale renderer, refreshed the live quarry goal, and spent the new
-south-east route byte on fixture 491. Retail Orc 8
-is accepted through cycle 594 after a paid laden-return residual honored its
-moving same-depot sibling's full refusal band. Expansion Human 7 is accepted
-through cycle 572 after a capital Patrol residual retained its tail for one
-paid Move band behind a moving allied tanker. Retail Human 13 is accepted
-through cycle 522 after a fresh zero-step gold constructor fell through to an
-adjacent claimed-face wood start in the same visit. Orc 11 cycle 503 is now
-the earliest unpaused fleet finding; its next finding is sapper slot 1573's
-Still-versus-Attack split, while Human 8's next finding is
-attack-peasant slot 1526's position split at cycle 514, Orc 8's next finding
-is peasant slot 1505's position split at cycle 595, and Human 7's next finding
-is peon slot 1582's Still-versus-Build split at cycle 1251.
+the global route-scratch lifecycle or path decision. Expansion Orc 8's
+cycle-356 submarine route-publication family is independently paused. The
+fleet remains 13 clean / 39 divergent / 0 failed through cycle 1,800, with a
+52-case exact-prefix sum of 52,173. Retail Human 8 is accepted through cycle
+526 after an ordinary completed moving-quarry Attack body released a lagging
+renderer wait and consumed its fresh south-east route on fixture 514. The
+earliest unpaused fleet finding is expansion Human 10 cycle 519, followed by
+Human 13 at 523, Human 8 at 527, expansion Human 5 at 530, Orc 12 at 531, and
+expansion Human 2 at 533.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -133,8 +121,8 @@ not permission to fit a special case.
    unit.
 
 The next work selection should normally start from the earliest unpaused fleet
-finding, currently retail Orc 11 cycle 503, while retaining expansion Human
-12 cycle 333 as the shared-boundary frontier. Return to either paused
+finding, currently expansion Human 10 cycle 519, while retaining expansion
+Human 12 cycle 333 as the shared-boundary frontier. Return to either paused
 route family only when a new native discriminator or a more upstream
 authenticated finding can price a systemic hypothesis.
 

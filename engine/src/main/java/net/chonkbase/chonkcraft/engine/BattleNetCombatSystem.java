@@ -1990,13 +1990,10 @@ final class BattleNetCombatSystem {
                                 && !world.targets.validAttackTarget(
                                         unit, sequenceBoundaryGoal))
                         || (sequenceBoundaryGoal == null && unit.fighting()));
-        boolean paidMovingQuarryTailBoundary = world.battleNetSequence != null
+        boolean movingQuarryTailCommon = world.battleNetSequence != null
                 && world.battleNetAttackMarkers.contains(unit)
                 && unit.battleNetAttackOp0OutOfRange()
-                && unit.battleNetAttackWrapDestArmPending()
-                && unit.battleNetRetargetResidualParkRefill()
                 && unit.stepDrained() && unit.pathLength() == 0
-                && unit.battleNetCollisionCounter() > 0
                 && unit.battleNetRefusals() == 0
                 && unit.type() != null
                 && unit.type().moveType() == UnitType.Movement.LAND
@@ -2006,18 +2003,31 @@ final class BattleNetCombatSystem {
                 && sequenceBoundaryGoal.isMoving()
                 && sequenceBoundaryGoal.order() == Unit.Order.HARVEST
                 && !world.targets.inAttackRange(unit, sequenceBoundaryGoal);
-        if (paidMovingQuarryTailBoundary) {
+        boolean paidMovingQuarryTail =
+                unit.battleNetAttackWrapDestArmPending()
+                        && unit.battleNetRetargetResidualParkRefill()
+                        && unit.battleNetCollisionCounter() > 0;
+        boolean laggingMovingQuarryPresentation =
+                !unit.battleNetAttackWrapDestArmPending()
+                        && !unit.battleNetRetargetResidualParkRefill()
+                        && unit.battleNetCollisionCounter() == 0
+                        && unit.animation().waitCycles() > 0;
+        boolean movingQuarryTailBoundary = movingQuarryTailCommon
+                && (paidMovingQuarryTail
+                        || laggingMovingQuarryPresentation);
+        if (movingQuarryTailBoundary) {
             // The completed Attack body, not Java's parallel presentation
-            // cursor, owns this callback. A paid moving-quarry route can finish
-            // its replacement swing with the renderer still on an unbreakable
-            // tail frame. Retail nevertheless refreshes the quarry goal, writes
-            // the next route and consumes its first byte immediately. Human 8
-            // attack-peasant 1520 reaches Attack tail 2686/1 at fixture 490 and
-            // first-steps southeast on 491; waiting for finishSwing left the
-            // authoritative OP0 parked at 2660/1 until fixture 492.
+            // cursor, owns this callback. The paid route at Human 8 fixture
+            // 491 retains its explicit wrap/refill/collision provenance. The
+            // ordinary completed body at fixture 514 has consumed that state,
+            // but its renderer still owes a wait while native refreshes the
+            // quarry goal, writes the route and consumes its first byte. An
+            // earlier visit by the same unit is the negative witness: its
+            // presentation is already at wait zero, so ordinary finishSwing
+            // releases it without perturbing the following visual program.
             unit.animation().clearCurrent();
         }
-        if (!battleNetDeadGoalBoundary && !paidMovingQuarryTailBoundary
+        if (!battleNetDeadGoalBoundary && !movingQuarryTailBoundary
                 && !unit.chasing() && unit.fighting()) {
             // ATTACK_TARGET animates before it validates or scans. This is
             // observable on the first cycle after a chase reaches its goal:
