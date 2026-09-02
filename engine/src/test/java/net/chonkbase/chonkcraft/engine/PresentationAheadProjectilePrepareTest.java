@@ -27,8 +27,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Mobile projectile constructor draws belong on the presentation impact frame
- * when the Attack wait still has more than one tick before opcode ten.
+ * Mobile projectile constructor draws may belong on the presentation impact
+ * frame when the native cursor is already parked on opcode ten and its wait
+ * still has more than one tick.
  *
  * <p>XHuman 12's axe fired on internal cycle 33 while the Attack sequence
  * sat mid-wait (timer 3 before OP10). Without presentation-ahead prepare the
@@ -310,8 +311,8 @@ class PresentationAheadProjectilePrepareTest {
     }
 
     @Test
-    @DisplayName("a mid-wait presentation axe runs its constructor draws before OP10")
-    void aMidWaitPresentationAxeRunsConstructorDrawsBeforeOpcodeTen()
+    @DisplayName("an OP10-wait presentation axe runs its constructor draws immediately")
+    void anOpcodeTenWaitPresentationAxeRunsConstructorDrawsImmediately()
             throws Exception {
         // The sealed XHuman 12 gap: presentation impact with Attack timer 3
         // must debit the three FUN_0040fb10 draws now, not three waits later.
@@ -339,14 +340,22 @@ class PresentationAheadProjectilePrepareTest {
         thrower.setFighting(true);
         thrower.setAutoTargeting(false);
 
-        int attackStart = new BattleNetSequence(script).sequenceStart(
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
                 net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(
                         thrower.type().ident()),
                 BattleNetSequence.ATTACK_ANIMATION);
         assumeTrue(attackStart >= 0, "axethrower Attack sequence must exist");
-        // Mid-wait before OP10: timer 3 is the sealed Attack wait that
-        // presentation reaches while OP10 is still three ticks away.
-        thrower.setBattleNetSequenceOffset(attackStart);
+        int op10 = -1;
+        for (int off = attackStart; off < attackStart + 64; off++) {
+            if (sequence.opcodeAt(off) == 10) {
+                op10 = off;
+                break;
+            }
+        }
+        assumeTrue(op10 >= 0, "axethrower Attack must contain opcode ten");
+        // The cursor is already on OP10, but its native timer has not expired.
+        thrower.setBattleNetSequenceOffset(op10);
         thrower.setBattleNetAnimationTimer(3);
 
         int asyncBefore = world.battleNetRandomSeed();
@@ -420,12 +429,21 @@ class PresentationAheadProjectilePrepareTest {
         thrower.setChasing(false);
         thrower.setFighting(true);
         thrower.setAutoTargeting(false);
-        int attackStart = new BattleNetSequence(script).sequenceStart(
+        BattleNetSequence sequence = new BattleNetSequence(script);
+        int attackStart = sequence.sequenceStart(
                 net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(
                         thrower.type().ident()),
                 BattleNetSequence.ATTACK_ANIMATION);
         assumeTrue(attackStart >= 0, "axethrower Attack sequence must exist");
-        thrower.setBattleNetSequenceOffset(attackStart);
+        int op10 = -1;
+        for (int off = attackStart; off < attackStart + 64; off++) {
+            if (sequence.opcodeAt(off) == 10) {
+                op10 = off;
+                break;
+            }
+        }
+        assumeTrue(op10 >= 0, "axethrower Attack must contain opcode ten");
+        thrower.setBattleNetSequenceOffset(op10);
         thrower.setBattleNetAnimationTimer(3);
 
         int asyncBefore = world.battleNetRandomSeed();

@@ -8288,9 +8288,10 @@ final class BattleNetCombatSystem {
                 world.projectiles.queuePendingAttack(attacker, shot, world.cycle);
                 world.logBattleNetPend("pend-put", attacker, target, shot,
                         "presentation-hit", -1);
-                // Mobile weapons: presentation can sit mid-wait before
-                // OP10. Building targets spend the three constructor draws
-                // (damage + two aim jitters) on this unit's visit so the
+                // Mobile weapons: presentation can sit on OP10 while its
+                // native wait still has time left. Building targets spend
+                // the three constructor draws (damage + two aim jitters) on
+                // this unit's visit so the
                 // asynchronous stream matches native pool order: reverse
                 // creation walks high id first, so axe 127 fires before
                 // lower-id Still OP0s (knight 125, footman 122, …), just as
@@ -8302,8 +8303,17 @@ final class BattleNetCombatSystem {
                 // Flight still waits for OP10 -- arming motion here was what
                 // reordered Human 13 critter 1576 (still vs MOVE at fixture
                 // 34), not the constructor draws themselves.
+                // The cursor itself is the discriminator. XHuman 10 axe 51
+                // reaches presentation impact at offset 892, the frame-30
+                // prelude before OP10 at 900; native leaves that shot pending
+                // until fixture 524. Treating every positive timer as
+                // "past OP10" debited its constructor at fixture 516 and
+                // shifted knight 1485's later melee damage. Human 5's proved
+                // building callback is already parked on opcode ten.
                 if (attacker.canMove()
-                        && attacker.battleNetSequenceOffset() >= 0
+                        && world.battleNetSequence != null
+                        && world.battleNetSequence.opcodeAt(
+                                attacker.battleNetSequenceOffset()) == 10
                         && attacker.battleNetAnimationTimer() > 1
                         && target.type() != null
                         && target.type().building()) {

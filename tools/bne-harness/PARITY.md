@@ -15,7 +15,81 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (ordinary moving-quarry tails release a lagging renderer wait)
+## Current release checkpoint — 2026-09-02 (pre-opcode-ten tower shots retain their constructor)
+
+Accepted cycle-1,800 receipt `7ae9bc42` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,173 to 52,216. Expansion Human 10 advances from exact
+through fixture 518 to exact through fixture 561. The cycle-400 fleet remains
+50 clean / 2 divergent / 0 failed under receipt `234256f3`; its cycle-540
+lookahead improves from 40 clean / 12 divergent to 41 clean / 11 divergent.
+The long receipt is retained at
+`.bne-artifacts/runs/7ae9bc42f488f4ddaaf09c893e9de27eecd3d56803d3f173f8d5498b16116150`.
+Its manifest has SHA-256
+`5d436a886d9d0d52a33729d6d6bda56edd721fe14d11d04d7aa7a0cf0cfcb209`
+and binds dirty engine-input identity
+`5ad448ab2a3e712da6e921f4899eb0987eff54c23ea73f740aa553613e2a805a`
+at base revision `8313977` to authenticated, replayable source capsule
+`a7c99dbce218ace043c33cb022dda342acebec7f7d2763a7b0aa502c513bed15`.
+
+Behavioral delta: a mobile ranged weapon's presentation impact may precede
+its authoritative Attack opcode ten. The established building-target shortcut
+may spend the projectile constructor's damage and two aim draws early only
+when the sequence cursor is already parked on opcode ten with a positive wait;
+a cursor on a preceding frame opcode retains the pending projectile and lets
+the ordinary sequence reach opcode ten. This is a script-state discriminator,
+not a timing or mission exception. The implementation contains no mission,
+map, faction, coordinate, fixture, exact-cycle, route-length, or unit-ID
+branch.
+
+Proof delta: expansion Human 10 axethrower slot 1549 / Java unit 51 reaches its
+guard-tower presentation impact at frame-30 offset 892 with timer three.
+Native fixture 516 leaves the cursor at 892, decrements the timer to two, and
+does not run the projectile constructor; fixture 524 reaches opcode ten at
+offset 900 and spends constructor results 19837, 29071, and 25367. Java
+formerly spent three results on fixture 516 and collapsed the wait, shifting
+later per-unit asynchronous ownership even though the RNG stream remained
+continuous. Knight slot 1485 consequently rolled seven rather than native
+eight damage against catapult slot 1487 / Java unit 113 at fixture 519,
+leaving 85 rather than 84 HP. The opcode discriminator restores both native
+boundaries and agreement through fixture 561. The newly exposed fixture-562
+finding is that catapult's synchronized-RNG and `(74,89)` versus `(73,90)`
+position split.
+
+The fixed-fleet inventory found only four executions of the old broad
+building shortcut through cycle 540. The rejected expansion Human 10 event was
+the sole pre-opcode-ten cursor at offset 892. Expansion Human 12 unit 127 and
+the two established Human 5 building callbacks were already parked on opcode
+ten at offset 900; their behavior is retained. Human 5 remains at fixture 536,
+expansion Human 12 remains at its paused fixture-333 route frontier, and no
+accepted case moves earlier.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/711fbabdbcde38761517a1e1d907cb17ef8a7f061b2e87b7735207344b032c88`
+proves the real-data constructor-timing assertion executes and fails on
+`8313977`, then executes and passes on the candidate. All 55 focused
+presentation-ahead and expansion-Human-10 real-data checks pass. Both fixed
+52-case gates pass. The projectile lifecycle referee passes 64 flight, impact,
+persistent-effect, and click-feedback checks. The long receipt's source
+capsule authenticates and replays its engine identity with zero sealed
+untracked inputs.
+
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its comparable set remains 6 exact / 5 divergent with no regression
+or infrastructure failure. Optional remote AI discovery retains the documented
+strict SSH host-key debt for `i9beef`; no host key was modified, and local
+native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Human 13
+fixture 523, followed by Human 8 at 527, expansion Human 5 at 530, Orc 12 at
+531, expansion Human 2 at 533, expansion Human 8 and Human 5 at 536, expansion
+Human 3 at 537, and expansion Human 10's newly exposed split at 562.
+
+## Prior release checkpoint — 2026-09-02 (ordinary moving-quarry tails release a lagging renderer wait)
 
 Accepted cycle-1,800 receipt `8b9f364b` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

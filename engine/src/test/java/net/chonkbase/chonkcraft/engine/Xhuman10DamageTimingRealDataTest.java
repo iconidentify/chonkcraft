@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -2462,6 +2463,64 @@ class Xhuman10DamageTimingRealDataTest {
         assertEquals(79, peon.buildTileY());
         assertEquals(40, peon.buildGoalX());
         assertEquals(79, peon.buildGoalY());
+    }
+
+    @Test
+    @DisplayName("xhuman 10's pre-OP10 tower shot waits for its native constructor")
+    void xhuman10PreOpcodeTenTowerShotWaitsForItsNativeConstructor() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx10h", 1, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 10 is not in the pack");
+        World world = mission.world();
+        Unit thrower = unitById(world, 51);
+        Unit catapult = unitById(world, 113);
+        assertNotNull(thrower, "XHuman 10 has no native-slot-1549 axethrower");
+        assertNotNull(catapult, "XHuman 10 has no native-slot-1487 catapult");
+
+        // Native slot 1549's presentation reaches the tower impact while its
+        // script cursor is still at frame-30 offset 892. Retail fixture 516
+        // merely decrements that wait from three to two. Its projectile
+        // constructor remains unpaid until opcode ten runs on fixture 524.
+        // Debiting and collapsing at presentation time steals three ordinary
+        // idle draws; knight 1485 then rolls seven rather than native eight
+        // damage against this catapult at fixture 519.
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 515) {
+            mission.tick();
+        }
+        assertEquals(892, thrower.battleNetSequenceOffset());
+        assertEquals(3, thrower.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(516, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(892, thrower.battleNetSequenceOffset(),
+                "presentation cannot jump the pre-OP10 frame wait");
+        assertEquals(2, thrower.battleNetAnimationTimer());
+        Missile pending = world.battleNetPendingProjectileShots.get(thrower);
+        assertNotNull(pending, "presentation must retain one pending axe");
+        assertFalse(pending.battleNetConstructorDrawn(),
+                "pre-OP10 presentation cannot spend constructor RNG");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 519) {
+            mission.tick();
+        }
+        assertEquals(84, catapult.hitPoints(),
+                "knight 1485 must retain native fixture-519 damage");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 524) {
+            mission.tick();
+        }
+        assertEquals(906, thrower.battleNetSequenceOffset());
+        assertEquals(3, thrower.battleNetAnimationTimer());
+        assertTrue(pending.battleNetConstructorDrawn(),
+                "native OP10 owns the delayed projectile constructor");
+        assertTrue(pending.battleNetMotion(),
+                "OP10 arms the retained presentation projectile");
     }
 
     private static Unit unitAt(World world, String ident, int x, int y) {
