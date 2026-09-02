@@ -8619,7 +8619,7 @@ public final class World {
      * router, and multi-step Attack walks, still soft-clear so early
      * formation paths keep their free crossings.</p>
      */
-    private static boolean battleNetApproachCorridorHardAlly(
+    private boolean battleNetApproachCorridorHardAlly(
             Unit router, Unit candidate, int goalX, int goalY) {
         if (candidate == null || router == null) {
             return false;
@@ -8640,9 +8640,18 @@ public final class World {
                 Math.abs(candidate.tileY() - goalY));
         int routerDist = Math.max(Math.abs(router.tileX() - goalX),
                 Math.abs(router.tileY() - goalY));
-        if (routerDist < 5 || allyDist >= routerDist) {
+        if (routerDist < 5 || allyDist >= routerDist
+                || allyDist <= battleNetMovementStride(router)) {
             return false;
         }
+        // 0x4508f0 has marked this innermost target skirt before 0x4500f0
+        // follows either wall face. A zero-collision Move body on that skirt
+        // remains eligible for 0x4501d3's occupancy clear, so the wall may
+        // finish on its square. Human 8 slot 1526 occupies (78,65) one tile
+        // above quarry 1519; slot 1505 therefore stores S,S,SE,SW rather than
+        // routing around the ally as S,S,SE,S. The older corridor
+        // compensation still keeps one-heading allies hard farther up the
+        // approach (XHuman 12's 30,40 witness is four tiles from its goal).
         // On a pure approach axis of the goal (same column or row). Grunt 95
         // at 30,40 toward 30,44 shares the goal's x; early formation soft-
         // clears off-axis pathLength-1 allies without REG (XHuman 4 @6).

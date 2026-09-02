@@ -915,6 +915,65 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aMovingFormationMateOnTheMarkedQuarrySkirtStaysSoft() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 95);
+        Unit skirtAlly = unitById(world, 74);
+        Unit quarry = unitById(world, 81);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1505");
+        assertNotNull(skirtAlly,
+                "Human 8 has no Java twin for native attack-peasant 1526");
+        assertNotNull(quarry,
+                "Human 8 has no Java twin for native peasant 1519");
+
+        while (fixtureCycle(world) < 481) {
+            mission.tick();
+        }
+        assertSame(quarry, attacker.target());
+        assertEquals(78, attacker.tileX());
+        assertEquals(61, attacker.tileY());
+        assertEquals(78, skirtAlly.tileX());
+        assertEquals(65, skirtAlly.tileY());
+        assertTrue(skirtAlly.isMoving());
+        assertEquals(1, skirtAlly.pathLength());
+        assertEquals(0, skirtAlly.battleNetCollisionCounter(),
+                "native 0x4501bc soft-clears only a zero-collision Move body");
+
+        mission.tick();
+        assertEquals(482, fixtureCycle(world));
+        assertEquals(78, attacker.tileX());
+        assertEquals(62, attacker.tileY());
+        assertEquals(3, attacker.pathLength(),
+                "the first south byte has been consumed from native S,S,SE,SW");
+        assertEquals(Direction.fromDelta(0, 1),
+                attacker.peekHeadingAtDepth(0));
+        assertEquals(Direction.fromDelta(1, 1),
+                attacker.peekHeadingAtDepth(1));
+        assertEquals(Direction.fromDelta(-1, 1),
+                attacker.peekHeadingAtDepth(2),
+                "the wall writer may end southwest on the occupied marked skirt");
+
+        while (fixtureCycle(world) < 530) {
+            mission.tick();
+        }
+        assertEquals(78, attacker.tileX(),
+                "the marked-skirt southwest tail owns the cycle-530 x position");
+        assertEquals(65, attacker.tileY());
+    }
+
+    @Test
     void aPaidMovingQuarryResidualRetainsRoutePressureBeforeRearmingAttack() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,

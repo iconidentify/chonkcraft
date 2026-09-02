@@ -220,6 +220,14 @@ records show that high nibble matches the collision counter (1→`0x10`,
 flag `0x8000` is the pathfinder goal mark written by `0x4508f0` (not the
 LegacyEngine `BUILDING` occupancy bit).
 
+That goal mark does not cancel the soft-clear. Human 8 seals the overlap:
+attack-peasant slot 1526 is a zero-collision Move body at `(78,65)`, one tile
+above quarry slot 1519 at `(78,66)`, while slot 1505 routes from `(78,61)`.
+After `0x4508f0` marks the quarry skirt, `0x4500f0` still clears slot 1526's
+occupancy and may end the wall route on its marked square. Native therefore
+stores `[S,S,SE,SW]`; re-hardening the moving ally stores `[S,S,SE,S]` and
+causes the first state mismatch at fixture 530.
+
 The direct route writer and its shortcut view remain movement-layer specific
 when that soft-clear applies. Human 12 supplies the positive and negative
 witnesses in one mission. At fixture 402, unarmed zeppelin slot 1503 draws
