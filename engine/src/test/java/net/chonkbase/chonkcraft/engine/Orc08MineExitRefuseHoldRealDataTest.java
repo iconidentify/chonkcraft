@@ -146,6 +146,62 @@ class Orc08MineExitRefuseHoldRealDataTest {
                 "the native south-east tail still has one south byte at its head");
     }
 
+    @Test
+    @DisplayName("a paid residual return parks before redrawing around a moving sibling")
+    void aPaidResidualReturnParksBeforeRedrawingAroundAMovingSibling() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level08o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 8 is not in the pack");
+        World world = mission.world();
+        Unit hauler = unitById(world, 106);
+        Unit blocker = unitById(world, 103);
+        assertNotNull(hauler,
+                "Orc 8 has no Java unit 106 / native peasant 1494");
+        assertNotNull(blocker,
+                "Orc 8 has no Java unit 103 / native peasant 1497");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 474) {
+            mission.tick();
+        }
+        assertEquals(123, hauler.tileX());
+        assertEquals(93, hauler.tileY());
+        assertEquals(123, blocker.tileX());
+        assertEquals(94, blocker.tileY(),
+                "the moving sibling occupies the cached south heading");
+        assertEquals(9, hauler.battleNetRefusals(),
+                "the refusal visit advances the paid generation");
+        assertEquals(14, hauler.battleNetOrderDelay(),
+                "the paid residual owns fourteen quiet callbacks after Move/15");
+        assertEquals(0, hauler.pathLength(),
+                "native parks the consumed route at index twenty");
+        assertEquals(15, hauler.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 488) {
+            mission.tick();
+        }
+        assertEquals(123, hauler.tileX(),
+                "the returner serves the complete refusal band");
+        assertEquals(93, hauler.tileY());
+        assertEquals(1, hauler.battleNetAnimationTimer(),
+                "fixture 488 exposes the timer-one wake");
+
+        mission.tick();
+        assertEquals(489, fixtureCycle(world));
+        assertEquals(124, hauler.tileX());
+        assertEquals(94, hauler.tileY(),
+                "the wake redraws southeast around the moving sibling");
+        assertEquals(Direction.fromDelta(0, 1), hauler.peekHeading(),
+                "the fresh southeast,south,south route retains south next");
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

@@ -6093,6 +6093,33 @@ final class BattleNetMovementSystem {
                         && unit.resourceUnit().type() != null
                         && unit.resourceUnit().type().givesResource()
                                 == UnitType.Resource.GOLD;
+                boolean paidResidualReturnGeneration =
+                        (unit.battleNetCollisionCounter() >= 8
+                                && unit.battleNetCollisionCounter() < 14)
+                        || (unit.battleNetRefusals() >= 8
+                                && unit.battleNetRefusals() < 15);
+                boolean paidResidualLadenReturn =
+                        unit.battleNetBorrowedMoveForStep()
+                        && unit.returningToDepot() && unit.carried() > 0
+                        && unit.type() != null
+                        && unit.type().moveType() == UnitType.Movement.LAND
+                        && paidResidualReturnGeneration
+                        && unit.battleNetPathStepsTaken() > 0
+                        && unit.stepDrained() && !unit.isMoving()
+                        && unit.pathLength() > 0;
+                boolean movingLadenReturnSibling =
+                        movingBlocker != null && movingBlocker != unit
+                        && movingBlocker.type() != null
+                        && !movingBlocker.type().building()
+                        && movingBlocker.type().moveType()
+                                == UnitType.Movement.LAND
+                        && movingBlocker.isMoving()
+                        && movingBlocker.returningToDepot()
+                        && movingBlocker.carried() > 0
+                        && movingBlocker.returnDepotGoal()
+                                == unit.returnDepotGoal()
+                        && world.isAllied(
+                                unit.player(), movingBlocker.player());
                 if (firstPaidFullRouteResidualPark
                         && world.battleNetCooperativeBlocker(
                                 unit, movingBlocker)) {
@@ -6128,7 +6155,9 @@ final class BattleNetMovementSystem {
                         && !settledOneStepLongResidualPark
                         && (world.battleNetCooperativeBlocker(
                                         unit, movingBlocker)
-                                || settledReplacementBlocker)) {
+                                || settledReplacementBlocker
+                                || (paidResidualLadenReturn
+                                        && movingLadenReturnSibling))) {
                     // Empty-route residual rebuild whose first heading lands
                     // on a soft-cleared ally: take the first free compass
                     // neighbour now (native N for XHuman 12 grunt 1507 at
@@ -6308,19 +6337,10 @@ final class BattleNetMovementSystem {
                             return;
                         }
                         boolean collisionOwnedResidualLadenReturnPark =
-                                unit.battleNetBorrowedMoveForStep()
-                                && unit.returningToDepot()
-                                && unit.carried() > 0
-                                && unit.type() != null
-                                && unit.type().moveType()
-                                        == UnitType.Movement.LAND
-                                && unit.battleNetCollisionCounter() >= 8
-                                && unit.battleNetCollisionCounter() < 14
-                                && unit.battleNetPathStepsTaken() > 0
-                                && unit.stepDrained() && !unit.isMoving()
-                                && unit.pathLength() > 0
-                                && world.battleNetCooperativeBlocker(
-                                        unit, movingBlocker);
+                                paidResidualLadenReturn
+                                && (world.battleNetCooperativeBlocker(
+                                                unit, movingBlocker)
+                                        || movingLadenReturnSibling);
                         boolean saturatedFreshLadenReturnPark =
                                 unit.battleNetBorrowedMoveForStep()
                                 && unit.returningToDepot()
@@ -6355,7 +6375,12 @@ final class BattleNetMovementSystem {
                             // paid, a residual-settle refusal parks too:
                             // XHuman 10 peon 1438 changes collision eight to
                             // nine and RI1 to RI20 on fixture 452, pays Move
-                            // 15..1, then redraws north on fixture 467.
+                            // 15..1, then redraws north on fixture 467. The
+                            // sticky refusal projection can be the saturated
+                            // owner while Java's collision projection trails:
+                            // Orc 8 peasant 1494 reaches refusal eight with
+                            // collision one, parks its consumed south tail on
+                            // fixture 474, and redraws southeast on 489.
                             battleNetRefuse(unit);
                             unit.setRouteSpent(false);
                             unit.setWaitCycles(0);

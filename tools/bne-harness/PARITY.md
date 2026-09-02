@@ -15,7 +15,58 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (completed cold-retry body retires refusal ownership)
+## Current release checkpoint — 2026-09-01 (paid residual return honors a moving sibling)
+
+Accepted cycle-1,800 receipt `d5dcc1da` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,715 to 50,835. Retail Orc 8 is the only changed case,
+advancing from exact through fixture 474 to exact through fixture 594. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`01893f41`. The long receipt is retained at
+`.bne-artifacts/runs/d5dcc1da11a6548ffff7962304edf3d5d869d3931b0b8e5989f66007574979f4`.
+Its manifest has SHA-256
+`315b69b55a518b9b64ffaae9e1007ad1073f9406c0196f9b83c66e06c4923161`
+and binds dirty engine-input identity
+`649b51e9758bf27bff93d8f75750e2dc399485f8e5f33b5e86ccfbdf17dc1b30`
+at base revision `b292b3f` to authenticated, replayable source capsule
+`99877434eadf840cd915c0f22388fe5d1996e3e896a85a4d0ee5334f292456db`.
+
+Behavioral delta: a laden land returner whose borrowed Move residual has
+already spent a step can own a paid refusal band through the sticky refusal
+projection even while Java's collision projection trails. A moving allied
+laden returner headed to the same depot remains the cooperative carrier while
+it drains its sub-tile stride, even after its own route bytes are spent.
+Retail Orc 8 peasant slot 1494 / Java 106 is the positive witness: its residual
+south head meets moving sibling slot 1497 at `(123,94)` on fixture 474, advances
+the native packed refusal owner from `0x80` to `0x90`, parks at route index 20,
+and serves Move `15..1` before publishing `SE,S,S` and spending southeast on
+fixture 489. Java formerly replanned and spent that southeast step on fixture
+475. Ordinary unpaid residuals, fresh laden returns, non-land movers,
+different-depot/alliance blockers, and settled cooperative bodies retain their
+existing paths. The implementation contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Efficacy receipt
+`.bne-test-efficacy/orc8-c475-paid-residual-return-sibling/runs/e8d9948fa586b73a1bae0fc3cc9682c494b47fd1945b579c4284fe25c54eb292`
+proves the focused assertion executes and fails on `b292b3f`, then executes
+and passes on the candidate. All 46 selected mine-exit, depot-overlap,
+laden-return, refusal-sleep, convoy-route, and adjacent real-data controls pass
+with zero skips. `BattleNetResourceApproachTest` is not claimed green: its
+seven failures are the same seven assertions on both `b292b3f` and the
+candidate, as retained under
+`.bne-test-efficacy/orc8-c475-resource-approach-baseline-control`. Both fixed
+52-case gates pass, and the long receipt's source capsule authenticates and
+replays its engine identity exactly with zero sealed untracked inputs.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 7 fixture 477, followed by retail Human 8 at 484, Human 7 at 493, Human
+13 at 494, and Orc 11 at 503. Retail Orc 8's newly exposed fixture-595 finding
+is peasant slot 1505 at native `(123,96)` versus Java `(122,97)`.
+
+## Prior release checkpoint — 2026-09-01 (completed cold-retry body retires refusal ownership)
 
 Accepted cycle-1,800 receipt `e8737b1a` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
