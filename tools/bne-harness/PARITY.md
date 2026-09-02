@@ -15,7 +15,68 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (contained depot-ready workers select gold before dropout)
+## Current release checkpoint — 2026-09-02 (paid moving-quarry residuals retain collision pressure)
+
+Accepted cycle-1,800 receipt `95972c68` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,240 to 52,243. Human 8 advances from exact through
+fixture 526 to exact through fixture 529. The cycle-400 fleet remains 50 clean
+/ 2 divergent / 0 failed under receipt `69c2568a`; its cycle-540 lookahead
+remains 42 clean / 10 divergent under receipt `7ea78126`. The long receipt is
+retained at
+`.bne-artifacts/runs/95972c689a94d1faa4ad036769460d4e181d6b5f74ec453210f2526a45f87824`.
+Its manifest has SHA-256
+`d77b61c1512dff67307938735b83b7fbe39bf779574207934e7be2e0f9cf6d43`
+and binds dirty engine-input identity
+`49123f22bf926b74be9e7ff2edbfca7ebddae821ce670b96e4f5c89f5f9a86db`
+at base revision `32b5508` to authenticated, replayable source capsule
+`17a5aa4698c7072da015db15b97795bf48e4eabfb2a95b111e6c4805c90b7ab5`.
+
+Behavioral delta: after a paid Attack refusal-recovery ray grants its first
+heading, a blocked residual tail against a live moving non-building quarry
+does not immediately return to the active-order Still callback. Native parks
+the remaining route bytes, advances the packed collision generation, and
+retains Move pressure: generations two through seven are one-count probes and
+generation eight opens the full Move 15..1 band. Java now carries that
+transaction with the existing moving-quarry residual provenance. Static
+targets retain the prior active-order callback, which is the held-out
+expansion Human 12 control. The implementation contains no mission, map,
+faction, coordinate, fixture, exact-cycle, exact-route-length, or unit-ID
+branch.
+
+Proof delta: Human 8 native attack-peasant slot 1513 / Java unit 87 owns a paid
+south-east probe with a two-byte tail on fixture 518. Native settles at
+`(80,65)` on fixture 519 with collision generation one, remains in Move without
+an asynchronous idle draw through generations two to seven, and opens
+generation eight with timer 15 on fixture 526. Java formerly rearmed Attack on
+fixtures 520, 523, and 526; those extra idle draws made critter slot 1495 /
+Java unit 105 wander ten fixtures early at 527. The retained pressure restores
+the native RNG seeds, leaves the critter Still at 527, and moves its wander to
+fixture 537. The newly exposed Human 8 fixture-530 finding is attack-peasant
+slot 1505's x position, native 78 versus Java 79.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/f5778ce1a3b14526401692c8c6bba9e5344bd28c391e488f44ed670987fd3a39`
+proves the focused residual-pressure assertion executes and fails on
+`32b5508`, then executes and passes on the candidate. All 30 selected
+moving-quarry and paid-refusal real-data checks pass. The cycle-400,
+cycle-540, and cycle-1,800 fixed 52-case gates pass. The ordinary executable
+next-level gate also exits zero after 209 Python checks (four skipped), 99
+engine/desktop checks, and 223 dual-adapter command scenarios; its comparable
+set remains 6 exact / 5 divergent with no regression or infrastructure
+failure. Optional SSH AI discovery retains its documented strict host-key
+debt, while the corpus and native-oracle evidence used here remain local to
+`i9beef`.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet findings are now tied at
+fixture 530: Human 8 and expansion Human 5. They are followed by Orc 12 at 531,
+expansion Human 2 at 533, Human 5 and expansion Human 8 at 536, expansion Human
+3 at 537, expansion Orc 11 at 539, and Human 13 at 547.
+
+## Prior release checkpoint — 2026-09-02 (contained depot-ready workers select gold before dropout)
 
 Accepted cycle-1,800 receipt `2b72bca2` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

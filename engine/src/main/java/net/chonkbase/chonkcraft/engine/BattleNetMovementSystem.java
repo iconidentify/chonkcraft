@@ -4755,6 +4755,55 @@ final class BattleNetMovementSystem {
                 Unit stageSixBlocker = world.unitAt(nextX, nextY);
                 Unit saturatedWoodBlocker = world.blockerOnLayer(
                         unit, nextX, nextY);
+                boolean paidMovingQuarryResidualPressure =
+                        unit.battleNetMovingQuarryResidual()
+                        && unit.battleNetAttackWrapDestArmPending()
+                        && unit.battleNetChaseEmptyRouteReplan()
+                        && unit.battleNetPathStepsTaken() == 0
+                        && unit.pathLength() > 1
+                        && unit.battleNetCollisionCounter() > 0
+                        && unit.battleNetCollisionCounter() < 15
+                        && unit.target() != null
+                        && unit.target().isAlive()
+                        && unit.target().isMoving()
+                        && unit.target().type() != null
+                        && !unit.target().type().building()
+                        && !world.targets.inAttackRange(
+                                unit, unit.target())
+                        && !World.battleNetRangedChaseUnit(unit);
+                if (paidMovingQuarryResidualPressure) {
+                    // A three-byte refusal-recovery ray has already paid its
+                    // Attack constructor and committed one heading. If its
+                    // parked two-byte suffix is redrawn against the same moving
+                    // quarry, native advances the packed collision generation
+                    // without entering active-order Still. Generations two
+                    // through seven are one-count Move probes; generation eight
+                    // opens the complete Move 15..1 band. Human 8 attack-peasant
+                    // 1513 is the authenticated witness at fixtures 520..526.
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    unit.setBattleNetCollisionCounter(
+                            collision > 14 ? 0 : collision);
+                    unit.setBattleNetRefusals(0);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    boolean fullBand = collision >= 8 && collision < 15;
+                    unit.setBattleNetOrderDelay(fullBand ? 14 : 0);
+                    unit.setBattleNetRefusalHold(fullBand);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    if (moveStart >= 0) {
+                        unit.setBattleNetSequenceOffset(moveStart);
+                        unit.setBattleNetAnimationTimer(fullBand ? 15 : 1);
+                        unit.setBattleNetChaseStepReady(false);
+                    }
+                    world.causalTrace.event(world.cycle,
+                            "path.paid-moving-quarry-residual-pressure",
+                            unit.id(), "target", unit.target().id(),
+                            "collision", unit.battleNetCollisionCounter(),
+                            "full_band", fullBand);
+                    return;
+                }
                 boolean saturatedWoodConstructionRefusal =
                         unit.battleNetSaturatedWoodConstructionRoute()
                         && (unit.order() == Unit.Order.HARVEST
@@ -5022,10 +5071,11 @@ final class BattleNetMovementSystem {
                     // Attack construction granted the route's first heading
                     // as its single Move probe. If the residual settles onto
                     // a blocked cached tail, native parks the remaining bytes
-                    // at route index twenty on this visit and enters the
-                    // active-order callback on the next one. Trying the tail
-                    // immediately converts that callback into ordinary path
-                    // refusals and drops its asynchronous idle draw.
+                    // at route index twenty and advances the collision
+                    // generation. A live moving quarry keeps this transaction
+                    // in Move: subsequent empty-route visits regenerate the
+                    // pressure without entering active-order Still or paying
+                    // its asynchronous idle draw.
                     world.causalTrace.event(world.cycle,
                             "path.paid-recovery-residual-tail-park", unit.id(),
                             "path_length", unit.pathLength(),
@@ -5038,8 +5088,20 @@ final class BattleNetMovementSystem {
                     unit.setWaitCycles(0);
                     unit.setBattleNetOrderDelay(0);
                     unit.setBattleNetChaseEmptyRouteReplan(true);
+                    boolean movingQuarry = unit.target().isMoving()
+                            && unit.target().type() != null
+                            && !unit.target().type().building();
+                    if (movingQuarry) {
+                        unit.setBattleNetMovingQuarryResidual(true);
+                    }
                     unit.setBattleNetPaidRefusalRecoveryApproach(false);
-                    unit.setBattleNetResidualEmptyApproachIdlePending(true);
+                    if (movingQuarry) {
+                        int collision = unit.battleNetCollisionCounter() + 1;
+                        unit.setBattleNetCollisionCounter(
+                                collision > 14 ? 0 : collision);
+                    } else {
+                        unit.setBattleNetResidualEmptyApproachIdlePending(true);
+                    }
                     int moveStart = world.idle.battleNetSequenceStart(unit,
                             BattleNetSequence.MOVE_ANIMATION);
                     if (moveStart >= 0) {

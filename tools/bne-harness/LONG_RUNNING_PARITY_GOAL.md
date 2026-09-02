@@ -16,13 +16,13 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-02 is:
 
-- the accepted candidate is based on commit `0293e02` and is authenticated by
+- the accepted candidate is based on commit `32b5508` and is authenticated by
   replayable dirty-source capsule
-  `e2ad9e23e6c84980ac16145cddb35d28859fe1763d38ab4666ea0ae2d47a0db3`;
+  `17a5aa4698c7072da015db15b97795bf48e4eabfb2a95b111e6c4805c90b7ab5`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `2b72bca24c2a47e0aed503ae951eafab9743d82f6aff92fe821e6150d4c58915`.
+  `95972c689a94d1faa4ad036769460d4e181d6b5f74ec453210f2526a45f87824`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
@@ -32,14 +32,16 @@ safe systemic discriminator. Resume that family only with new evidence about
 the global route-scratch lifecycle or path decision. Expansion Orc 8's
 cycle-356 submarine route-publication family is independently paused. The
 fleet remains 13 clean / 39 divergent / 0 failed through cycle 1,800, with a
-52-case exact-prefix sum of 52,240. Human 13 is accepted through cycle 546
+52-case exact-prefix sum of 52,243. Human 13 is accepted through cycle 546
 after the ready-gold finder admitted a healthy worker still contained by its
 depot: hidden action 26 now assigns the mine and authors the dropout face before
-the worker surfaces. The earliest unpaused fleet finding is Human 8 cycle 527,
-followed by expansion Human 5 at 530, Orc 12 at 531, expansion Human 2 at 533,
-expansion Human 8 and Human 5 at 536, and expansion Human 3 at 537. Human 13's
-newly exposed tanker-population split is at 547, while expansion Human 10
-remains accepted through 561.
+the worker surfaces. Human 8 is accepted through cycle 529 after a paid moving-
+quarry residual retained collision pressure without stealing asynchronous idle
+draws. The earliest unpaused fleet findings are now Human 8 and expansion Human
+5 at cycle 530, followed by Orc 12 at 531, expansion Human 2 at 533, expansion
+Human 8 and Human 5 at 536, and expansion Human 3 at 537. Human 13's newly
+exposed tanker-population split is at 547, while expansion Human 10 remains
+accepted through 561.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -122,11 +124,11 @@ not permission to fit a special case.
    lifecycle work rather than spending the run indefinitely on one uncertain
    unit.
 
-The next work selection should normally start from the earliest unpaused fleet
-finding, currently Human 8 cycle 527, while retaining expansion Human 12
-cycle 333 as the shared-boundary frontier. Return to either paused route family
-only when a new native discriminator or a more upstream authenticated finding
-can price a systemic hypothesis.
+The next work selection should normally start from the tied earliest unpaused
+fleet findings, currently Human 8 and expansion Human 5 at cycle 530, while
+retaining expansion Human 12 cycle 333 as the shared-boundary frontier. Return
+to either paused route family only when a new native discriminator or a more
+upstream authenticated finding can price a systemic hypothesis.
 
 ## Evidence and implementation loop
 

@@ -915,6 +915,82 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aPaidMovingQuarryResidualRetainsRoutePressureBeforeRearmingAttack() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 87);
+        Unit quarry = unitById(world, 81);
+        Unit critter = unitById(world, 105);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1513");
+        assertNotNull(quarry,
+                "Human 8 has no Java twin for native peasant 1519");
+        assertNotNull(critter,
+                "Human 8 has no Java twin for native critter 1495");
+
+        while (fixtureCycle(world) < 518) {
+            mission.tick();
+        }
+        assertSame(quarry, attacker.target());
+        assertChaser(attacker, 80, 65, -2, -2, true);
+        assertEquals(2652, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertEquals(2, attacker.pathLength(),
+                "the granted southeast probe retains a two-byte tail");
+        assertEquals(Direction.fromDelta(1, 1),
+                attacker.lastStepHeading());
+        assertEquals(Direction.fromDelta(-1, 1), attacker.peekHeading());
+        assertTrue(attacker.battleNetPaidRefusalRecoveryApproach());
+
+        mission.tick();
+        assertEquals(519, fixtureCycle(world));
+        assertChaser(attacker, 80, 65, 0, 0, false);
+        assertSame(quarry, attacker.target());
+        assertEquals(2600, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertEquals(1, attacker.battleNetCollisionCounter(),
+                "retail parks the paid residual as collision generation one");
+
+        while (fixtureCycle(world) < 526) {
+            mission.tick();
+        }
+        assertChaser(attacker, 80, 65, 0, 0, false);
+        assertSame(quarry, attacker.target());
+        assertEquals(2600, attacker.battleNetSequenceOffset());
+        assertEquals(8, attacker.battleNetCollisionCounter(),
+                "each empty-route visit advances the retained pressure");
+        assertEquals(0, attacker.battleNetRefusals(),
+                "the paid tail does not start a separate hard-refusal ladder");
+        assertEquals(15, attacker.battleNetAnimationTimer());
+        assertEquals(0x95b043b5, world.battleNetRandomSeed(),
+                "the pressure loop owns no active-order idle draw");
+
+        mission.tick();
+        assertEquals(527, fixtureCycle(world));
+        assertEquals(Unit.Order.STILL, critter.order(),
+                "the pursuer must not steal the critter's no-wander draw");
+        assertEquals(0x44155061, world.battleNetRandomSeed());
+
+        while (fixtureCycle(world) < 537) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.MOVE, critter.order(),
+                "the critter wanders on retail's later draw");
+        assertEquals(80, critter.orderTargetX());
+        assertEquals(82, critter.orderTargetY());
+    }
+
+    @Test
     void anExpiredMovingQuarryPaysTwoBandsBeforeOneFreshStep() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
