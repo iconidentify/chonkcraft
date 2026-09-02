@@ -15,7 +15,56 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (settled ranged-retarget construction and cadence)
+## Current release checkpoint — 2026-09-01 (completed cold-retry body retires refusal ownership)
+
+Accepted cycle-1,800 receipt `e8737b1a` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,704 to 50,715. Retail Human 8 is the only changed case,
+advancing from exact through fixture 472 to exact through fixture 483. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`524b488a`. The long receipt is retained at
+`.bne-artifacts/runs/e8737b1a84b18dc1dc6751743457d15cb5b485771750087cbf188339dcdf2b74`.
+Its manifest has SHA-256
+`2444b2a46b000f2628775167c8e88bd7536d5b504ad451e8e0009991f8d49142`
+and binds dirty engine-input identity
+`e8e83a496739182c8f6e37d8a77d8c027dcc4749fdbbce238b786c9321f2c2b3`
+at base revision `93fbb78` to authenticated, replayable source capsule
+`54e8d5a34cac4c27df27b7b1b3567e4fe1d6ce28a988dce02bf1d93be1d9e07c`.
+
+Behavioral delta: when a behavior-zero melee chaser reaches a committed OP0
+body hold against a replacement while a distinct retired or dying quarry
+remains offered, that body consumes both the queued retarget Attack owner and
+its direct-refusal generation. A later chase of the replacement is therefore
+an ordinary continuation of the open body, not another first residual of the
+old cold retry. Retail Human 8 attack-peasant slot 1526 / Java 74 is the
+positive witness: dying peasant slot 1533 remains offered while returner slot
+1519 enters the body hold, the pursuer spends southeast on fixture 457, then
+publishes `SW,S` and spends southwest as soon as that stride settles on
+fixture 473. Java formerly retained the two retired owners, bought an extra
+Attack `2657/3,2,1`, and delayed the identical route to fixture 476. The
+corrected handoff consumes no synchronized RNG draw. Constructor-paying cold
+retry legs before a body is committed, live/same offers, behavior-one
+formations, and ordinary queued replan residuals remain negative controls.
+The implementation contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Efficacy receipt
+`.bne-test-efficacy/human8-c473-paid-body-continuation/runs/41de90c2485e93c23c4f4e55de64a07412d2da8622a5831beaa8274853585e5f`
+proves the focused assertion executes and fails on `93fbb78`, then executes
+and passes on the candidate. All 95 selected moving-quarry, paid-wrap,
+replan-arrival, collision-refill, and damage-timing checks pass with zero
+skips. Both fixed 52-case gates pass, and the long receipt's source capsule
+authenticates with zero sealed untracked inputs.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now retail
+Orc 8 fixture 475, followed by expansion Human 7 at 477 and retail Human 8 at
+484. Human 8's new finding is attack-peasant slot 1513's one-row position
+split.
+
+## Prior release checkpoint — 2026-09-01 (settled ranged-retarget construction and cadence)
 
 Accepted cycle-1,800 receipt `e6e6b2b5` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

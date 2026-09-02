@@ -742,6 +742,75 @@ class BattleNetMovingQuarryChaseRealDataTest {
     }
 
     @Test
+    void aPaidMovingReplacementContinuesWhenItsFirstChaseStrideSettles() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No BNE asset pack/install is configured");
+        GameData data = new GameData(assets);
+        String map = "campaigns/human/level08h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 is unavailable");
+        for (int tick = 0; tick < INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        World world = mission.world();
+        Unit attacker = unitById(world, 74);
+        Unit movingReplacement = unitById(world, 81);
+        Unit oldQuarry = unitById(world, 67);
+        assertNotNull(attacker,
+                "Human 8 has no Java twin for native attack-peasant 1526");
+        assertNotNull(movingReplacement,
+                "Human 8 has no Java twin for native returner 1519");
+        assertNotNull(oldQuarry,
+                "Human 8 has no Java twin for native peasant 1533");
+
+        while (fixtureCycle(world) < 409) {
+            mission.tick();
+        }
+        assertFalse(attacker.battleNetChaseReplanResidualHold(),
+                "the completed replacement constructor consumes its queued Attack owner");
+
+        while (fixtureCycle(world) < 456) {
+            mission.tick();
+        }
+        assertFalse(attacker.battleNetChaseReplanResidualHold(),
+                "the open body stays consumed until the quarry runs");
+        mission.tick();
+        assertEquals(457, fixtureCycle(world));
+        assertFalse(attacker.battleNetChaseReplanResidualHold(),
+                "the first stride of a later ordinary chase is not a retarget residual");
+
+        while (fixtureCycle(world) < 472) {
+            mission.tick();
+        }
+        assertChaser(attacker, 79, 64, -2, -2, true);
+        assertSame(movingReplacement, attacker.target());
+        assertSame(oldQuarry, attacker.offeredTarget());
+        assertTrue(movingReplacement.isMoving(),
+                "the quarry still owns its southbound return residual");
+        assertEquals(0xde652f78, world.randomSeed());
+
+        mission.tick();
+        assertEquals(473, fixtureCycle(world));
+        assertEquals(0, attacker.battleNetAttackRefusalRecoveryStage(),
+                "the already-paid body must not buy another Attack constructor");
+        assertEquals(2603, attacker.battleNetSequenceOffset());
+        assertChaser(attacker, 78, 65, 32, -32, true);
+        assertEquals(Direction.fromDelta(-1, 1),
+                attacker.lastStepHeading(),
+                "retail immediately spends southwest toward the moving quarry");
+        assertEquals(1, attacker.pathLength());
+        assertEquals(Direction.fromDelta(0, 1), attacker.peekHeading(),
+                "the fresh two-byte route retains south");
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertFalse(attacker.battleNetRetargetResidualRoutePark(),
+                "the consumed replacement handoff no longer owns a route park");
+        assertEquals(0xde652f78, world.randomSeed(),
+                "the immediate chase continuation owns no synchronized draw");
+    }
+
+    @Test
     void aColdPaidWrapRetargetOwnsFreshConstructionAndBodyHold() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,

@@ -12197,6 +12197,29 @@ final class BattleNetCombatSystem {
                 if (hold > 0) {
                     unit.setBattleNetAttackResumeFromMove(false);
                     unit.setBattleNetAttackOp0OutOfRange(false);
+                    Unit retiredOffer = unit.offeredTarget();
+                    boolean completedColdRetryReplacementBody =
+                            unit.battleNetAiBehavior() == 0
+                            && retiredOffer != null && retiredOffer != tgt
+                            && (!retiredOffer.isAlive()
+                                    || retiredOffer.isDying()
+                                    || !retiredOffer.isOnMap());
+                    if (completedColdRetryReplacementBody) {
+                        // A cold retry's queued Attack and direct-refusal
+                        // generation are consumed once a replacement reaches
+                        // this in-range OP0 body hold. If that replacement later
+                        // leaves range, its next chase route belongs to the
+                        // already-open body; it is not another first residual of
+                        // the retired offer. Human 8 attack-peasant 1526 keeps
+                        // dying peasant 1533 as the offer while returner 1519
+                        // enters this hold, later spends SE on fixture 457, and
+                        // must spend fresh SW as that stride settles on fixture
+                        // 473. Retaining either owner bought another Attack
+                        // 3,2,1 and delayed the identical route until fixture 476.
+                        unit.setBattleNetChaseReplanResidualHold(false);
+                        unit.setBattleNetDirectRecoveryGeneration(0);
+                        unit.setBattleNetDirectRefusalRecoveryProbe(false);
+                    }
                     // The completed 3,2,1 constructor now owns an
                     // unbreakable OP0 body hold. Keep spatial free-scans out
                     // until timer one; XHuman 4 grunt 1505 otherwise replaces
