@@ -15,7 +15,61 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (paid residual return honors a moving sibling)
+## Current release checkpoint — 2026-09-01 (capital Patrol residual serves one paid Move band)
+
+Accepted cycle-1,800 receipt `ae57ea9c` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,835 to 50,931. Expansion Human 7 is the only changed
+case, advancing from exact through fixture 476 to exact through fixture 572.
+The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`c7ba02b1`. The long receipt is retained at
+`.bne-artifacts/runs/ae57ea9c8195b8dc610a9fd582d886eede6c5c54a8aca6e0e3e319328092958d`.
+Its manifest has SHA-256
+`869eb982cdc4026df1f785ddd2461d03ab8dd56a43798c081db6439d2ba1416e`
+and binds dirty engine-input identity
+`2cacb07f84a34f192ea480a4e6b5e3697fa1020e854a7eacc9bfd101bbd0e330`
+at base revision `263f208` to authenticated, replayable source capsule
+`20e2280fbda11de3ea33d3c9e8037bae26a5f4a2aed8e5de2032d06136a454ca`.
+
+Behavioral delta: a behavior-six capital ship whose cached Patrol route has
+already spent a step may advance its packed collision generation and retain
+the remaining tail for one complete Move refusal band when the next anchor is
+still carried by a moving allied sea hull. Its timer-one visit returns through
+the native next-path-element boundary; it does not wait for the much longer
+sprite movement loop to wrap. Expansion Human 7 juggernaught slot 1573 / Java
+27 is the positive witness: on fixture 462 it holds `(30,28)`, retains
+`SE,E,SE,E` behind moving tanker slot 1571 / Java 29, advances raw collision
+generation three to four, and exposes Move `15..1` through fixture 476. The
+tanker has logically vacated `(32,30)` by then, so the fixture-477 wake spends
+southeast to `(32,30)` with generation four retained. Java formerly projected
+this as generic refusal one and waited for its sprite body until fixture 519.
+Fresh capital-Patrol probes retain their established collision rule; settled
+or hostile hulls, non-capital ships, land and air movers, and live combat
+targets do not acquire this residual carrier rule. The implementation contains
+no mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman7-c477-capital-patrol-residual-band/runs/5ac754af9a6721637b30156ac207df5dc568550c0d3aceafeaa68b7146d18c21`
+proves the focused assertion executes and fails on `263f208`, then executes
+and passes on the candidate. Thirty-nine of 40 selected capital-ship, map-
+patrol, sea-occupancy, coast-goal, and naval-residual checks pass. The remaining
+`NavalPatrolCoastGoalRealDataTest` submarine assertion is not claimed green: it
+fails identically on baseline and candidate, as retained under
+`.bne-test-efficacy/xhuman7-c477-naval-coast-baseline-control`. Both fixed
+52-case gates pass, and the long receipt's source capsule authenticates and
+replays its engine identity exactly with zero sealed untracked inputs.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now retail
+Human 8 fixture 484, followed by Human 7 at 493, Human 13 at 494, Orc 11 at
+503, expansion Orc 11 at 506, and expansion Human 11 at 509. Expansion Human
+7's newly exposed fixture-573 finding is peon slot 1446 at native x=109 versus
+Java x=110.
+
+## Prior release checkpoint — 2026-09-01 (paid residual return honors a moving sibling)
 
 Accepted cycle-1,800 receipt `d5dcc1da` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

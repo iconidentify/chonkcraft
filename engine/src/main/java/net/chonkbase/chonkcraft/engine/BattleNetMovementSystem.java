@@ -3315,6 +3315,16 @@ final class BattleNetMovementSystem {
         if (arriveMeleeLeftoverOnOccupiedQuarry(unit)) {
             return;
         }
+        if (battleNetCapitalPatrolResidualRefusalHold(unit)
+                && unit.battleNetOrderDelay() == 0) {
+            // A capital ship's paid residual Patrol refusal returns through
+            // NextPathElement when its native Move count reaches one. The
+            // sprite's full movement body is much longer, so expose that
+            // action boundary rather than waiting for the presentation loop
+            // to wrap. XHuman 7 juggernaught 1573 serves Move 15..1 on
+            // fixtures 462..476 and consumes its cached southeast on 477.
+            unit.animation().clearCurrent();
+        }
         // Nothing is asked of the route while the move animation is still
         // running. DoActionMove reaches NextPathElement only when
         //
@@ -4772,13 +4782,24 @@ final class BattleNetMovementSystem {
                 }
                 int capitalPatrolCollision =
                         unit.battleNetCollisionCounter();
+                int capitalPatrolSteps =
+                        unit.battleNetPathStepsTaken();
+                boolean firstCapitalPatrolBody =
+                        capitalPatrolSteps == 0
+                        && (capitalPatrolCollision > 0
+                                || stageSixBlocker != null
+                                        && stageSixBlocker.isMoving());
+                boolean residualCapitalPatrolBody =
+                        capitalPatrolSteps > 0
+                        && unit.stepDrained() && !unit.isMoving()
+                        && stageSixBlocker != null
+                        && stageSixBlocker.isMoving();
                 boolean behaviorSixCapitalPatrolAlliedHullRefusal =
                         unit.battleNetBorrowedMoveForStep()
                         && unit.battleNetAiBehavior() == 6
                         && unit.patrolX() >= 0
                         && unit.type() != null
                         && World.isBattleNetCapitalShip(unit.type().ident())
-                        && unit.battleNetPathStepsTaken() == 0
                         && capitalPatrolCollision < 14
                         && unit.battleNetRefusals() == 0
                         && stageSixBlocker != null
@@ -4787,8 +4808,8 @@ final class BattleNetMovementSystem {
                         && stageSixBlocker.type().seaUnit()
                         && world.isAllied(unit.player(),
                                 stageSixBlocker.player())
-                        && (capitalPatrolCollision > 0
-                                || stageSixBlocker.isMoving());
+                        && (firstCapitalPatrolBody
+                                || residualCapitalPatrolBody);
                 if (behaviorSixCapitalPatrolAlliedHullRefusal) {
                     // The point writer has already drawn through the moving
                     // hull, but Move consumes that route under restored live
@@ -4797,11 +4818,14 @@ final class BattleNetMovementSystem {
                     // slot 1573 therefore keeps seven headings toward the
                     // completed platform at fixture 258 instead of clearing
                     // them and drawing a northeast bypass on the next visit.
-                    // Each later timer-one wake advances the same packed
-                    // generation while that retained head remains occupied;
-                    // the blocker need no longer be mid-stride once the live
-                    // route owns that provenance. Leave generation fifteen
-                    // to the ordinary saturation path below.
+                    // Each later first-leg timer-one wake advances the same
+                    // packed generation while that retained head remains
+                    // occupied; the blocker need no longer be mid-stride once
+                    // the live route owns that provenance. A residual body
+                    // may buy the same band only from a still-moving allied
+                    // carrier: at fixture 462 slot 1573 retains SE,E,SE,E
+                    // behind tanker 1571 and advances generation three to
+                    // four. Leave generation fifteen to ordinary saturation.
                     unit.setBattleNetCollisionCounter(
                             capitalPatrolCollision + 1);
                     unit.setRouteSpent(false);
@@ -9472,6 +9496,20 @@ final class BattleNetMovementSystem {
                 unit.setBattleNetAnimationTimer(3);
             }
         }
+    }
+
+    /** Live capital-ship Patrol tail serving its paid refusal band. */
+    private boolean battleNetCapitalPatrolResidualRefusalHold(Unit unit) {
+        return unit != null && unit.type() != null
+                && World.isBattleNetCapitalShip(unit.type().ident())
+                && unit.order() == Unit.Order.MOVE
+                && unit.battleNetBorrowedMoveForStep()
+                && unit.patrolX() >= 0 && unit.patrolY() >= 0
+                && unit.target() == null
+                && unit.battleNetRefusalHold()
+                && unit.battleNetPathStepsTaken() > 0
+                && unit.pathLength() > 0
+                && unit.stepDrained() && !unit.isMoving();
     }
 
 
