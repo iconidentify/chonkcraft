@@ -876,12 +876,42 @@ class BattleNetMovingQuarryChaseRealDataTest {
         assertEquals(79, attacker.tileX());
         assertEquals(63, attacker.tileY(),
                 "the later replacement chase releases on the native fixture");
+        assertSame(escapingReturner, attacker.target());
+        assertEquals(1, attacker.pathLength(),
+                "the paid southeast probe retains its south tail");
+        assertEquals(Direction.fromDelta(0, 1), attacker.peekHeading());
+        assertTrue(attacker.battleNetChaseReplanResidualHold(),
+                "the replacement Attack stays queued behind its first residual");
 
         while (fixtureCycle(world) < 470) {
             mission.tick();
         }
         assertEquals(Unit.Order.MOVE, asynchronousControl.order(),
                 "the paid probe must not steal the critter's async ordinal");
+
+        while (fixtureCycle(world) < 484) {
+            mission.tick();
+        }
+        assertEquals(79, attacker.tileX());
+        assertEquals(63, attacker.tileY(),
+                "residual settlement promotes Attack before the cached south byte");
+        assertEquals(1, attacker.pathLength(),
+                "Attack construction preserves the replacement route tail");
+        assertEquals(Direction.fromDelta(0, 1), attacker.peekHeading());
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(3, attacker.battleNetAnimationTimer());
+
+        while (fixtureCycle(world) < 486) {
+            mission.tick();
+        }
+        assertEquals(2657, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(487, fixtureCycle(world));
+        assertEquals(79, attacker.tileX());
+        assertEquals(64, attacker.tileY(),
+                "timer one returns ownership to the cached south byte");
     }
 
     @Test

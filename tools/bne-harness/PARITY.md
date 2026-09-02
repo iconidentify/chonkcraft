@@ -15,7 +15,71 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (capital Patrol residual serves one paid Move band)
+## Current release checkpoint — 2026-09-01 (paid-wrap replacement residual promotes its queued Attack)
+
+Accepted cycle-1,800 receipt `c09dfb93` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,931 to 50,938. Retail Human 8 is the only changed case,
+advancing from exact through fixture 483 to exact through fixture 490. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`acb106da`. The long receipt is retained at
+`.bne-artifacts/runs/c09dfb9373959ab4a71d9a106dd6b806085c809577cfcd04ec71cbb48f92d029`.
+Its manifest has SHA-256
+`787d7f457b6c170300f36b090b5997ea74913bff494d7abdea16aef1473a3dd1`
+and binds dirty engine-input identity
+`285af1ab5a24c07f818f3e088f2292eb57ecc7d942dc5836ce7ec9c83598cd94`
+at base revision `b417245` to authenticated, replayable source capsule
+`a4f1bb259f2416c4eb09d019d40c633105135df5f3401162616ab009757dca56`.
+
+Behavioral delta: when a completed cold paid-wrap constructor replaces its
+dying quarry exactly as a progress square opens, the replacement still
+inherits the already-paid Move probe on that callback, but it also owns a
+queued Attack behind the first replacement residual. The old route offer and
+the distinct live target preserve that ownership while the first step drains.
+On settlement, retail exposes a real Attack constructor `3,2,1`, keeps the
+cached replacement tail executable, and consumes the prior moving-quarry
+timer-one latch before returning ownership to Move. Ordinary retarget
+residuals still park their stale route, while direct paid tails, patrol bodies,
+naval routes, buildings, ranged units, and same-offer chases retain their
+existing construction paths. The implementation contains no mission, map,
+faction, coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Human 8 attack-peasant slot 1513 / Java unit 87 still changes
+from dying peasant slot 1536 / Java 64 to returner slot 1519 / Java 81 and
+spends south-east on fixture 468 without stealing critter slot 1544's
+asynchronous fixture-470 Move. It retains south behind that stride and carries
+the replacement's queued Attack owner while the pixels drain. Native and Java
+then both hold `(79,63)` on Attack `2657/3,2,1` through fixtures 484..486 and
+spend the cached south byte to `(79,64)` on fixture 487. Java formerly spent
+south on fixture 484 and lost the position frontier there. The newly exposed
+fixture-491 finding belongs to a different attack-peasant, slot 1520, at
+native `(79,65)` versus Java `(78,64)`.
+
+Efficacy receipt
+`.bne-test-efficacy/human8-c484-cold-paid-wrap-residual-construction/runs/a55eecf53854803b5f922ce4a6c09406f10bc624102031494d186227693a99fd`
+proves the focused assertion executes and fails on `b417245`, then executes
+and passes on the candidate. All 20 moving-quarry real-data tests pass. The
+selected moving-quarry, retarget-residual, refusal, and behavior-one control
+set is 57/60 green; the three remaining `MeleeChaseReplanResidualTest`
+assertions fail identically on baseline and candidate and are not claimed
+green, as retained under
+`.bne-test-efficacy/human8-c484-melee-residual-baseline-control`. Both fixed
+52-case gates pass, and the long receipt's source capsule authenticates and
+replays its engine identity exactly with zero sealed untracked inputs. The
+ordinary executable next-level gate exits zero after 209 Python checks (four
+skipped), 99 engine/desktop checks, and 223 dual-adapter command scenarios;
+its 11 comparable scenarios remain 6 exact / 5 divergent with no regression
+or infrastructure failure. Remote AI discovery retains the documented strict
+SSH host-key debt for `i9beef`; no host key was modified.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now retail
+Human 8 fixture 491, followed by Human 7 at 493, Human 13 at 494, Orc 11 at
+503, expansion Orc 11 at 506, and expansion Human 11 at 509.
+
+## Prior release checkpoint — 2026-09-01 (capital Patrol residual serves one paid Move band)
 
 Accepted cycle-1,800 receipt `ae57ea9c` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

@@ -16,13 +16,13 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-01 is:
 
-- the accepted candidate is based on commit `263f208` and is authenticated by
+- the accepted candidate is based on commit `b417245` and is authenticated by
   replayable dirty-source capsule
-  `20e2280fbda11de3ea33d3c9e8037bae26a5f4a2aed8e5de2032d06136a454ca`;
+  `a4f1bb259f2416c4eb09d019d40c633105135df5f3401162616ab009757dca56`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `ae57ea9c8195b8dc610a9fd582d886eede6c5c54a8aca6e0e3e319328092958d`.
+  `c09dfb9373959ab4a71d9a106dd6b806085c809577cfcd04ec71cbb48f92d029`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
@@ -34,12 +34,13 @@ the global route-scratch lifecycle or path decision. Expansion Orc 8's cycle-
 is accepted through cycle 502 after the settled stage-three ranged-retarget
 constructor and fresh cadence removed its fixture-459 phantom arrow and the
 downstream cycle-461 critter disagreement. Retail Human 8 is accepted through
-cycle 483 after a completed cold-retry replacement body retired both stale
-refusal owners and released the fixture-473 chase continuation. Retail Orc 8
+cycle 490 after its cold paid-wrap replacement retained the queued Attack
+behind the first residual, exposed construction on fixtures 484..486, and
+spent its cached south byte on fixture 487. Retail Orc 8
 is accepted through cycle 594 after a paid laden-return residual honored its
 moving same-depot sibling's full refusal band. Expansion Human 7 is accepted
 through cycle 572 after a capital Patrol residual retained its tail for one
-paid Move band behind a moving allied tanker. Retail Human 8 cycle 484 is now
+paid Move band behind a moving allied tanker. Retail Human 8 cycle 491 is now
 the earliest unpaused fleet finding; Orc 11's next finding is sapper slot
 1573's Still-versus-Attack split at cycle 503, and Orc 8's next finding is
 peasant slot 1505's position split at cycle 595.
@@ -126,7 +127,7 @@ not permission to fit a special case.
    unit.
 
 The next work selection should normally start from the earliest unpaused fleet
-finding, currently retail Human 8 cycle 484, while retaining expansion Human
+finding, currently retail Human 8 cycle 491, while retaining expansion Human
 12 cycle 333 as the shared-boundary frontier. Return to either paused
 route family only when a new native discriminator or a more upstream
 authenticated finding can price a systemic hypothesis.

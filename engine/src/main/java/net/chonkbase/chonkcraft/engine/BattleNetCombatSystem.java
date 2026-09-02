@@ -2386,6 +2386,20 @@ final class BattleNetCombatSystem {
                     && unit.target().type() != null
                     && unit.target().type().building()
                     && world.battleNetSequence != null;
+            boolean coldPaidWrapReplacementConstruction =
+                    replanResidualHold
+                    && unit.battleNetRouteOffer() != null
+                    && unit.battleNetRouteOffer() != unit.target()
+                    && unit.battleNetPathStepsTaken() == 1
+                    && unit.pathLength() == 1
+                    && unit.battleNetCollisionCounter() == 0
+                    && unit.battleNetRefusals() == 0
+                    && unit.type() != null
+                    && unit.type().maxAttackRange() <= 1
+                    && unit.target() != null
+                    && unit.target().type() != null
+                    && !unit.target().type().building()
+                    && world.battleNetSequence != null;
             boolean navalReplanConstruction = replanResidualHold
                     && unit.type() != null
                     && unit.type().moveType() == UnitType.Movement.NAVAL;
@@ -2468,7 +2482,8 @@ final class BattleNetCombatSystem {
                         unit.setBattleNetChaseReplanResidualHold(false);
                     }
                     if (replanResidualHold
-                            && !unit.battleNetLandPatrolMoveBody()) {
+                            && !unit.battleNetLandPatrolMoveBody()
+                            && !coldPaidWrapReplacementConstruction) {
                         // The hold ends the first pixel leg of a route laid by
                         // a melee retarget. Retail keeps that provenance for
                         // the following Move decision: if the cached next
@@ -2477,6 +2492,10 @@ final class BattleNetCombatSystem {
                         // XHuman 12 grunt 1492 settles at fixture 38, pays the
                         // Attack-four tail, parks the stale E route at 41, and
                         // only then plans the blocked SW detour at 42.
+                        // A cold paid-wrap release is complementary: the old
+                        // offer owns the constructor, but the replacement's
+                        // cached tail is already the native route and remains
+                        // executable on Attack timer one.
                         // A direct land-Patrol Attack is different: its Move
                         // body owns the retained route across the constructor,
                         // including archer 1559's free NW byte on fixture 362.
@@ -2586,6 +2605,7 @@ final class BattleNetCombatSystem {
                     } else if (unit.battleNetLandPatrolMoveBody()
                             || spentSingleReplanConstruction
                             || paidTailWrapConstruction
+                            || coldPaidWrapReplacementConstruction
                             || navalReplanConstruction) {
                         // A spent one-byte replacement has no live Move tail
                         // for a surrogate order delay to protect. A paid
@@ -2602,10 +2622,22 @@ final class BattleNetCombatSystem {
                         // 90..92 and spends SE on 93. A direct land-Patrol
                         // Attack carries the same real constructor: Orc 11
                         // archer 1559 exposes 2039/3,2,1 on fixtures 359..361
-                        // and spends NW on 362. A surrogate order delay leaves
-                        // the visible Attack cursor frozen at three.
+                        // and spends NW on 362. A cold paid-wrap replacement
+                        // carries the old route offer as complementary proof:
+                        // Human 8 slot 1513 exposes 2657/3,2,1 on fixtures
+                        // 484..486 and spends its retained S on 487. A
+                        // surrogate order delay leaves the visible Attack
+                        // cursor frozen at three.
                         unit.setBattleNetOrderDelay(0);
                         unit.setBattleNetAttackRefusalRecoveryStage(2);
+                        if (coldPaidWrapReplacementConstruction) {
+                            // The moving-quarry timer-one latch belonged to
+                            // the SE residual which just settled. Attack
+                            // construction has now consumed that boundary;
+                            // carrying the latch into stage three inserts a
+                            // second Move-one visit before the retained S.
+                            unit.setBattleNetMovingQuarryResidual(false);
+                        }
                     } else {
                         unit.setBattleNetOrderDelay(2);
                     }
@@ -4876,11 +4908,17 @@ final class BattleNetCombatSystem {
                                 // and takes SE on fixture 468. Re-entering
                                 // Attack 3,2,1 delayed that step to 471. Keep
                                 // falling through so the common chase path
-                                // publishes and spends the route this visit.
+                                // publishes and spends the route this visit,
+                                // but retain the replacement's queued Attack
+                                // owner. Native carries next_order Attack
+                                // behind that first SE residual, promotes it
+                                // to 3,2,1 on fixtures 484..486, then spends
+                                // the cached S byte on 487.
                                 unit.setPathGoal(
                                         candidate.tileX(), candidate.tileY());
                                 unit.setChasing(true);
                                 unit.setFighting(false);
+                                unit.setBattleNetChaseReplanResidualHold(true);
                                 world.causalTrace.event(world.cycle,
                                         "combat.cold-paid-wrap-dying-release",
                                         unit.id(), "from", previous.id(),
