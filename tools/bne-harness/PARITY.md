@@ -15,7 +15,67 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (paid moving-quarry tail releases renderer ownership)
+## Current release checkpoint — 2026-09-01 (doubled platform approach keeps the marked-wall tie)
+
+Accepted cycle-1,800 receipt `5e908c4c` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,961 to 51,719. Retail Human 7 is the only changed case,
+advancing from exact through fixture 492 to exact through fixture 1250. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`0ca29b20`. The long receipt is retained at
+`.bne-artifacts/runs/5e908c4c57370c3a8aab6c02128c8b879e6375e2764a5e2eefdadfd6ad0aacf5`.
+Its manifest has SHA-256
+`5ad3812b87c42970008c966717a061374bea9a57286cd43d9d32b3c98c12d19e`
+and binds dirty engine-input identity
+`734df56b619f66deffbe5a8e6c41864f628ba4c5bb84fccc5b39989200e8a048`
+at base revision `d7536c8` to authenticated, replayable source capsule
+`9a62edfad2741149e160431abbb8c6bdc9d04a410e18697af8463e1cbe3e968e`.
+
+Behavioral delta: a doubled mover approaching a marked resource-building
+skirt keeps the wall follower's route when its first heading makes the same
+progress as the direct free prefix. Human 7's empty tanker therefore retains
+`W,SW,W,W` around the rounded, blocked platform point instead of replacing it
+with `W,W,W`. One-tile gold workers retain their independently authenticated
+free-prefix convention, and refinery/depot returns stay on their separate
+target router. The implementation contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Human 7 tanker slot 1502 / Java unit 98 asks for platform slot
+1494 / Java unit 106 from `(60,82)` toward order point `(53,82)`. Native
+`0x450350` publishes raw route `06 05 06 06`, consumes west on fixture 461,
+and retains `SW,W,W`. Java's pathfinder already derived that wall route but
+formerly selected its equal-gain `W,W,W` free prefix. Native consumes the
+second southwest heading on fixture 493 and lands `(56,84)`; Java formerly
+landed `(56,82)`. The marked-wall tie now matches that callback and remains
+exact until the independent fixture-1251 peon slot 1582 Still-versus-Build
+finding.
+
+Efficacy receipt
+`.bne-test-efficacy/human7-c493-marked-platform-wall-tie/runs/34a1f6620bf671bae5d265ff6053415a03c3a99dc6cc5d3517aa3ca0c2133cf8`
+proves the focused assertion executes and fails on `d7536c8`, then executes
+and passes on the candidate. The 29 pathfinder tests, ten oil-platform exit
+tests, and five Human 7 oil-route controls all pass. The broader 36-test
+resource-approach class retains the same seven pre-existing one-tile gold
+failures on baseline and candidate, recorded under
+`.bne-test-efficacy/human7-c493-resource-approach-baseline-control/runs/ef3c230b92b3b27784af8caff617eede95c52615d3818b616ee04ec918385da9`.
+Both fixed 52-case gates pass, and the long receipt's source capsule
+authenticates and replays its engine identity exactly with one sealed new test
+input. The ordinary executable next-level gate exits zero after 209 Python
+checks (four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its 11 comparable scenarios remain 6 exact / 5 divergent with no
+regression or infrastructure failure. Remote AI discovery retains the
+documented strict SSH host-key debt for `i9beef`; no host key was modified,
+and local native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now retail
+Human 13 fixture 494, followed by Orc 11 at 503, expansion Orc 11 at 506,
+expansion Human 11 at 509, expansion Human 2 and expansion Human 10 at 512,
+Human 8 at 514, and Human 7 at 1251.
+
+## Prior release checkpoint — 2026-09-01 (paid moving-quarry tail releases renderer ownership)
 
 Accepted cycle-1,800 receipt `3a7e1718` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

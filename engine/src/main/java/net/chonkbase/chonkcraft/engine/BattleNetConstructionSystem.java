@@ -557,6 +557,17 @@ final class BattleNetConstructionSystem {
                                         worker, target, targetLeft, targetTop,
                                         targetRight, targetBottom, x, y);
                 int stride = world.battleNetMovementStride(worker);
+                // A doubled resource approach keeps 0x450350's marked-skirt
+                // wall rewrite when its first step ties the free prefix.
+                // Human 7 tanker 1502 is the direct witness: from (60,82)
+                // toward platform point (53,82), the blocked rounded goal
+                // produces W,SW,W,W while the free tip is W,W,W.  Both open
+                // west and make the same first-step progress, but retail
+                // retains the wall route and takes southwest on its second
+                // stride.  One-tile gold workers retain their independently
+                // captured free-prefix convention; refinery/depot returns
+                // use the non-resource branch below.
+                boolean doubledMarkedResourceWallOnTie = stride > 1;
                 PathFinder.Path path = BattleNetPathFinder.find(
                         worker.tileX(), worker.tileY(), point[0], point[1],
                         stride,
@@ -574,7 +585,8 @@ final class BattleNetConstructionSystem {
                         false,
                         // Gold free-prefix pure-major keep (Orc 7 peon 1582).
                         target.type().givesResource()
-                                == UnitType.Resource.GOLD);
+                                == UnitType.Resource.GOLD,
+                        doubledMarkedResourceWallOnTie);
                 world.traceBattleNetPath(worker, point[0], point[1], path);
                 return path;
             } finally {

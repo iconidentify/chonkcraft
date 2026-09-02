@@ -16,13 +16,13 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-01 is:
 
-- the accepted candidate is based on commit `245f160` and is authenticated by
+- the accepted candidate is based on commit `d7536c8` and is authenticated by
   replayable dirty-source capsule
-  `8a68a8524319a587b832be99e2374f0aff48e3f53a98a8f3858bb34c742ae067`;
+  `9a62edfad2741149e160431abbb8c6bdc9d04a410e18697af8463e1cbe3e968e`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `3a7e1718bafd3bfed20edf556fe4c55dc19401b60ff1fb81f32c0d0605a52f72`.
+  `5e908c4c57370c3a8aab6c02128c8b879e6375e2764a5e2eefdadfd6ad0aacf5`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
@@ -33,19 +33,21 @@ the global route-scratch lifecycle or path decision. Expansion Orc 8's cycle-
 356 submarine route-publication family is independently paused. Retail Orc 11
 is accepted through cycle 502 after the settled stage-three ranged-retarget
 constructor and fresh cadence removed its fixture-459 phantom arrow and the
-downstream cycle-461 critter disagreement. Retail Human 8 is accepted through
-cycle 513 after its paid moving-quarry Attack tail released the stale
-renderer, refreshed the live quarry goal, and spent the new south-east route
-byte on fixture 491. Retail Orc 8
+downstream cycle-461 critter disagreement. Retail Human 7 is accepted through
+cycle 1250 after its doubled platform approach retained the equal-gain
+marked-wall route and consumed southwest on fixture 493. Retail Human 8 is
+accepted through cycle 513 after its paid moving-quarry Attack tail released
+the stale renderer, refreshed the live quarry goal, and spent the new
+south-east route byte on fixture 491. Retail Orc 8
 is accepted through cycle 594 after a paid laden-return residual honored its
 moving same-depot sibling's full refusal band. Expansion Human 7 is accepted
 through cycle 572 after a capital Patrol residual retained its tail for one
-paid Move band behind a moving allied tanker. Retail Human 7 cycle 493 is now
-the earliest unpaused fleet finding; Human 13 follows at cycle 494, Orc 11's
-next finding is sapper slot 1573's Still-versus-Attack split at cycle 503,
-Human 8's next finding is attack-peasant slot 1526's position split at cycle
-514, and Orc 8's next finding is peasant slot 1505's position split at cycle
-595.
+paid Move band behind a moving allied tanker. Retail Human 13 cycle 494 is now
+the earliest unpaused fleet finding; Orc 11's next finding is sapper slot
+1573's Still-versus-Attack split at cycle 503, Human 8's next finding is
+attack-peasant slot 1526's position split at cycle 514, Orc 8's next finding
+is peasant slot 1505's position split at cycle 595, and Human 7's next finding
+is peon slot 1582's Still-versus-Build split at cycle 1251.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -129,7 +131,7 @@ not permission to fit a special case.
    unit.
 
 The next work selection should normally start from the earliest unpaused fleet
-finding, currently retail Human 7 cycle 493, while retaining expansion Human
+finding, currently retail Human 13 cycle 494, while retaining expansion Human
 12 cycle 333 as the shared-boundary frontier. Return to either paused
 route family only when a new native discriminator or a more upstream
 authenticated finding can price a systemic hypothesis.
