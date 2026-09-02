@@ -1252,6 +1252,27 @@ class BattleNetMovingQuarryChaseRealDataTest {
                 "the boxed replacement repeats the three-call Attack band");
         assertEquals(0x1d05557c,
                 mission.world().battleNetRandomSeed());
+
+        while (fixtureCycle(mission.world()) < 490) {
+            mission.tick();
+        }
+        assertChaser(attacker, 78, 64, 0, 0, false);
+        assertEquals(81, attacker.target().id());
+        assertEquals(2686, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
+        assertEquals(2, attacker.battleNetCollisionCounter());
+        assertTrue(attacker.battleNetAttackWrapDestArmPending());
+        assertTrue(attacker.battleNetRetargetResidualParkRefill());
+
+        mission.tick();
+        assertEquals(491, fixtureCycle(mission.world()));
+        assertChaser(attacker, 79, 65, -32, -32, true);
+        assertEquals(81, attacker.target().id(),
+                "the paid tail keeps the moving harvesting quarry");
+        assertEquals(0, attacker.pathLength(),
+                "the tail marker consumes its freshly drawn southeast byte");
+        assertEquals(2603, attacker.battleNetSequenceOffset());
+        assertEquals(1, attacker.battleNetAnimationTimer());
     }
 
     @Test

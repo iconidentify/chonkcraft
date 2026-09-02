@@ -1990,7 +1990,34 @@ final class BattleNetCombatSystem {
                                 && !world.targets.validAttackTarget(
                                         unit, sequenceBoundaryGoal))
                         || (sequenceBoundaryGoal == null && unit.fighting()));
-        if (!battleNetDeadGoalBoundary
+        boolean paidMovingQuarryTailBoundary = world.battleNetSequence != null
+                && world.battleNetAttackMarkers.contains(unit)
+                && unit.battleNetAttackOp0OutOfRange()
+                && unit.battleNetAttackWrapDestArmPending()
+                && unit.battleNetRetargetResidualParkRefill()
+                && unit.stepDrained() && unit.pathLength() == 0
+                && unit.battleNetCollisionCounter() > 0
+                && unit.battleNetRefusals() == 0
+                && unit.type() != null
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.type().maxAttackRange() <= 1
+                && sequenceBoundaryGoal != null
+                && sequenceBoundaryGoal.isAlive()
+                && sequenceBoundaryGoal.isMoving()
+                && sequenceBoundaryGoal.order() == Unit.Order.HARVEST
+                && !world.targets.inAttackRange(unit, sequenceBoundaryGoal);
+        if (paidMovingQuarryTailBoundary) {
+            // The completed Attack body, not Java's parallel presentation
+            // cursor, owns this callback. A paid moving-quarry route can finish
+            // its replacement swing with the renderer still on an unbreakable
+            // tail frame. Retail nevertheless refreshes the quarry goal, writes
+            // the next route and consumes its first byte immediately. Human 8
+            // attack-peasant 1520 reaches Attack tail 2686/1 at fixture 490 and
+            // first-steps southeast on 491; waiting for finishSwing left the
+            // authoritative OP0 parked at 2660/1 until fixture 492.
+            unit.animation().clearCurrent();
+        }
+        if (!battleNetDeadGoalBoundary && !paidMovingQuarryTailBoundary
                 && !unit.chasing() && unit.fighting()) {
             // ATTACK_TARGET animates before it validates or scans. This is
             // observable on the first cycle after a chase reaches its goal:
