@@ -15,7 +15,56 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (recurring land-patrol ranged tail handoff)
+## Current release checkpoint — 2026-09-01 (settled ranged-retarget construction and cadence)
+
+Accepted cycle-1,800 receipt `e6e6b2b5` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 50,662 to 50,704. Retail Orc 11 is the only changed case,
+advancing from exact through fixture 460 to exact through fixture 502. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`b5fd77cb`. The long receipt is retained at
+`.bne-artifacts/runs/e6e6b2b524b20a1e7859149b308ab4c4e77d82147ff2aaaf79293673c1545050`.
+Its manifest has SHA-256
+`a75db44466d39cca24f5643bba67629cee92c8b3b215433cee353544ffcbc882`
+and binds dirty engine-input identity
+`58ce4f7e6b703cf2c83fec4d421149a5cc57f5cec58ce85f31c036e0e0f7ff52`
+at base revision `479f899` to authenticated, replayable source capsule
+`346499581a507513456ff995510945b281ac1b1e7b7c94864e37b9a1847d7a1a`.
+
+Behavioral delta: when a mobile ranged chase has already drained its stride
+and completed the stage-two refusal-recovery Attack constructor, an in-range
+replacement selected from the still-live route receives its own Attack
+constructor before a fresh ranged cadence. The old route is parked; it is not
+replanned through a generic Move teardown and it does not inherit the old
+quarry's partially spent cadence. Retail Orc 11 archer slot 1560 / Java 40 is
+the positive witness: after settling against the ogre, it selects sapper slot
+1573 on fixture 447, exposes Attack `2039/3,2,1`, and enters `2039/63` on
+fixture 450. Java formerly exposed Move `1982/1`, entered windup, and created a
+phantom fixture-459 arrow whose damage, two jitter draws, and first motion draw
+shifted the asynchronous stream by four. The corrected stream leaves critter
+slot 1532 Still on fixture 461. Human 13 axethrower slot 1505 is the draining-
+stride negative control: its fixture-25 retarget is not completed stage-three
+recovery, so it retains the established teardown and spends the replacement
+route southwest on fixture 28. The implementation contains no mission, map,
+faction, coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Efficacy receipt
+`.bne-test-efficacy/orc11-c461-ranged-retarget-final/runs/7fe17c03e00f6b4fdaf06763e09bdf3b4f570c379cadb8da0a0507eb67d9ee64`
+proves the focused assertion executes and fails on `479f899`, then executes
+and passes on the candidate. All 35 selected Orc 11, ranged free-scan,
+moving-quarry, blocked-tail, and Human 13 draining-stride controls pass with
+zero skips. Both fixed 52-case gates pass, and the long receipt's source
+capsule authenticates with zero sealed untracked inputs.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Human 8
+fixture 473, followed by Orc 8 at 475, expansion Human 7 at 477, Human 7 at
+493, Human 13 at 494, and Orc 11 at 503. Orc 11's new finding is sapper slot
+1573 remaining Still in native while Java enters Attack.
+
+## Prior release checkpoint — 2026-09-01 (recurring land-patrol ranged tail handoff)
 
 Accepted cycle-1,800 receipt `f9b86fd5` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

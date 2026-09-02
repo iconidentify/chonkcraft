@@ -3560,6 +3560,22 @@ public final class Unit {
     private boolean battleNetRangedFreeScanHoldPending;
 
     /**
+     * A ranged free-scan parked a live route and constructed Attack for an
+     * already-in-range replacement. That replacement owns a fresh cadence at
+     * OP0 rather than the previous quarry's partially spent cadence.
+     */
+    public boolean battleNetRangedFreshRetargetCadencePending() {
+        return battleNetRangedFreshRetargetCadencePending;
+    }
+
+    public void setBattleNetRangedFreshRetargetCadencePending(
+            boolean pending) {
+        battleNetRangedFreshRetargetCadencePending = pending;
+    }
+
+    private boolean battleNetRangedFreshRetargetCadencePending;
+
+    /**
      * Timer-63 hold came from a ranged free-scan retarget (XHuman 10 archer 98),
      * not a pure approach+resume. Projectile free-cycle order only reorders when
      * this is set -- approach holds alone REGd Human 13 knight splash.

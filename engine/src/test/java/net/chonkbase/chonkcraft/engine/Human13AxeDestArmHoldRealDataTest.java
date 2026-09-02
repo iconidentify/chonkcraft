@@ -83,6 +83,33 @@ class Human13AxeDestArmHoldRealDataTest {
                         + " and add a third live shot");
     }
 
+    @Test
+    @DisplayName("human 13's draining-stride ranged retarget spends its route")
+    void human13sDrainingStrideRetargetDoesNotBecomeSettledRecovery() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No Warcraft II installation configured (-Dwc2.install.dir). ");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+
+        Unit axe = unitAt(world, "unit-axethrower", 125, 24);
+        assertNotNull(axe, "Human 13 has no native-slot-1505 axethrower");
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        for (int fixture = 1; fixture <= 28; fixture++) {
+            mission.tick();
+        }
+
+        assertEquals(123, axe.tileX(),
+                "the draining-stride retarget spends its fresh route");
+        assertEquals(26, axe.tileY(),
+                "the draining-stride retarget does not become a settled "
+                        + "recovery constructor");
+    }
+
     private static Unit unitAt(World world, String ident, int x, int y) {
         for (Unit unit : world.unitsSnapshot()) {
             if (unit.isAlive() && unit.isOnMap() && unit.type() != null

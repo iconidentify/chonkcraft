@@ -5076,6 +5076,58 @@ final class BattleNetCombatSystem {
                         // crowd at fixture 54, retargets the footman and spends
                         // the replacement SW immediately. Charging the generic
                         // ranged hold left it frozen through fixture 56.
+                        if (rangedInRangeChaseRetarget
+                                && unit.battleNetAttackRefusalRecoveryStage() == 3
+                                && keepPathn > 0 && !settledBlockedTail
+                                && !settledRangedResidual) {
+                            // Stage two has just completed the old quarry's
+                            // Attack constructor and exposed Move start for one
+                            // target/route decision. When that decision parks a
+                            // live tail and names an already-in-range ranged
+                            // replacement, retail constructs the replacement's
+                            // Attack before serving its cadence hold. Orc 11
+                            // archer 1560 is the sealed witness: the ogre route
+                            // parks on fixture 447, the sapper owns Attack
+                            // 2039/3,2,1, and fixture 450 enters 2039/63. Letting
+                            // the generic route-teardown delay own these visits
+                            // walked straight into windup and created a phantom
+                            // arrow on fixture 459.
+                            int retargetAttackStart = world.idle
+                                    .battleNetSequenceStart(unit,
+                                            BattleNetSequence.ATTACK_ANIMATION);
+                            if (retargetAttackStart >= 0) {
+                                unit.clearPath();
+                                unit.setRouteSpent(false);
+                                unit.setBattleNetRangedFreshRetargetCadencePending(
+                                        true);
+                                unit.setWaitCycles(0);
+                                unit.setBattleNetOrderDelay(0);
+                                unit.setBattleNetAttackRefusalRecoveryStage(0);
+                                unit.setBattleNetChaseEmptyRouteReplan(false);
+                                unit.setBattleNetChaseReplanResidualHold(false);
+                                unit.setBattleNetChaseStepReady(false);
+                                unit.setChasing(false);
+                                unit.setFighting(true);
+                                unit.setBattleNetSequenceMeleeLanded(false);
+                                unit.setBattleNetSequenceOffset(
+                                        retargetAttackStart);
+                                unit.setBattleNetAnimationTimer(3);
+                                AnimationSet set = unit.type().animationSet();
+                                Animation attack = set == null ? null
+                                        : set.get(AnimationSet.State.ATTACK);
+                                if (attack != null
+                                        && unit.animation().current() != attack) {
+                                    unit.animation().switchTo(attack);
+                                }
+                                world.turnToTarget(unit, candidate, 0, 0);
+                                world.causalTrace.event(world.cycle,
+                                        "combat.ranged-in-range-retarget-construction",
+                                        unit.id(), "from", previous.id(),
+                                        "to", candidate.id(), "old_tail",
+                                        keepPathn);
+                                return;
+                            }
+                        }
                         if (World.battleNetRangedChaseUnit(unit)
                                 && keepPathn > 0 && !settledBlockedTail
                                 && !settledRangedResidual) {
@@ -11064,6 +11116,7 @@ final class BattleNetCombatSystem {
             // it once that OP0 has advanced.
             unit.setBattleNetRangedFreeScanHoldActive(false);
             unit.setBattleNetRangedFreeScanHoldPending(false);
+            unit.setBattleNetRangedFreshRetargetCadencePending(false);
             unit.setBattleNetAttackOp0OutOfRange(true);
             unit.setFighting(false);
             unit.setChasing(true);
@@ -12053,6 +12106,8 @@ final class BattleNetCombatSystem {
                     // provenance is what distinguishes axe 79's native hold.
                     && (tgt.type() == null || !tgt.type().building()
                             || unit.battleNetRangedFreeScanHoldPending())) {
+                boolean freshRetargetCadence = unit
+                        .battleNetRangedFreshRetargetCadencePending();
                 unit.setBattleNetAttackResumeFromMove(false);
                 unit.setBattleNetAttackOp0OutOfRange(false);
                 unit.setBattleNetAttackResumeHoldActive(true);
@@ -12091,10 +12146,12 @@ final class BattleNetCombatSystem {
                         && unit.battleNetRetargetResidualRoutePark()
                         && unit.stepDrained() && unit.pathLength() == 0;
                 int hold = buildingFreeScan || exhaustedResidualFreeScan
+                        || freshRetargetCadence
                         ? Math.max(0, bodyWait - 1)
                         : remaining > 0
                                 ? remaining : Math.max(0, bodyWait - 1);
                 unit.setBattleNetAnimationTimer(hold);
+                unit.setBattleNetRangedFreshRetargetCadencePending(false);
                 if (unit.chasing() && unit.pathLength() == 0) {
                     // Dest-arm leftover residual already put the thrower in
                     // weapon range. Leaving chase set used to dest-arm again
@@ -12196,6 +12253,7 @@ final class BattleNetCombatSystem {
             unit.setBattleNetAttackResumeHoldActive(false);
             unit.setBattleNetRangedFreeScanHoldActive(false);
             unit.setBattleNetRangedFreeScanHoldPending(false);
+            unit.setBattleNetRangedFreshRetargetCadencePending(false);
             if (offset == attackStart && inRange
                     && unit.type() != null && unit.type().firesMissile()) {
                 int bodyWait = world.battleNetSequence

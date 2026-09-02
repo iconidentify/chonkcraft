@@ -16,22 +16,26 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-01 is:
 
-- the accepted candidate is based on commit `6d42a1b` and is authenticated by
-  a replayable dirty-source capsule;
+- the accepted candidate is based on commit `479f899` and is authenticated by
+  replayable dirty-source capsule
+  `346499581a507513456ff995510945b281ac1b1e7b7c94864e37b9a1847d7a1a`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `f9b86fd5d79d694bf8283f911e39971ae14b1a5c442c27dd9ea0df3ac4501584`.
+  `e6e6b2b524b20a1e7859149b308ab4c4e77d82147ff2aaaf79293673c1545050`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
 that the replacement route is emitted by ordinary `NewPath` global scratch
 and copied into the unit route buffer at `0x004505ed`; it has not yet exposed a
 safe systemic discriminator. Resume that family only with new evidence about
-the global route-scratch lifecycle or path decision. Retail Orc 11's recurring
-land-patrol ranged tail is accepted through cycle 460; its newly exposed
-critter idle-choice disagreement at cycle 461 is the earliest unpaused fleet
-finding.
+the global route-scratch lifecycle or path decision. Expansion Orc 8's cycle-
+356 submarine route-publication family is independently paused. Retail Orc 11
+is accepted through cycle 502 after the settled stage-three ranged-retarget
+constructor and fresh cadence removed its fixture-459 phantom arrow and the
+downstream cycle-461 critter disagreement. Human 8 cycle 473 is now the
+earliest unpaused fleet finding; Orc 11's next finding is sapper slot 1573's
+Still-versus-Attack split at cycle 503.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -115,8 +119,8 @@ not permission to fit a special case.
    unit.
 
 The next work selection should normally start from the earliest unpaused fleet
-finding, currently Orc 11 cycle 461, while retaining expansion Human 12 cycle
-333 as the shared-boundary frontier. Return to the paused route family only
+finding, currently Human 8 cycle 473, while retaining expansion Human 12 cycle
+333 as the shared-boundary frontier. Return to either paused route family only
 when a new native discriminator or a more upstream authenticated finding can
 price a systemic hypothesis.
 

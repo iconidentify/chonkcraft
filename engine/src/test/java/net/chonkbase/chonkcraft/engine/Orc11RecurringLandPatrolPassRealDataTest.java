@@ -274,6 +274,71 @@ class Orc11RecurringLandPatrolPassRealDataTest {
     }
 
     @Test
+    @DisplayName("orc 11's settled ranged retarget reconstructs Attack before its cadence hold")
+    void orc11sSettledRangedRetargetReconstructsAttackBeforeItsCadenceHold() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        // Authenticated pairing: Java archer 40 is native slot 1560. Its
+        // completed chase route retargets the nearby sapper on fixture 447.
+        // Retail parks the old route and constructs the replacement Attack on
+        // 3,2,1 before entering the ordinary 63-count ranged cadence hold.
+        Unit archer = unitById(world, 40);
+        assertNotNull(archer,
+                "Orc 11 has no Java 40 / native slot 1560 archer");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 446) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.ATTACK, archer.order());
+        assertNotNull(archer.target());
+        assertEquals(19, archer.target().id(),
+                "fixture 446 still owns the out-of-range ogre quarry");
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer(),
+                "the prior refusal-recovery constructor is complete");
+
+        mission.tick();
+        assertEquals(447, fixtureCycle(world));
+        assertNotNull(archer.target());
+        assertEquals(27, archer.target().id(),
+                "the settled route free-scan names the in-range sapper");
+        assertEquals(0, archer.pathLength(),
+                "the old ogre route is parked at the retarget boundary");
+        assertEquals(2039, archer.battleNetSequenceOffset(),
+                "the replacement owns a fresh Attack constructor");
+        assertEquals(3, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(448, fixtureCycle(world));
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(2, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(449, fixtureCycle(world));
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(1, archer.battleNetAnimationTimer());
+
+        mission.tick();
+        assertEquals(450, fixtureCycle(world));
+        assertEquals(2039, archer.battleNetSequenceOffset());
+        assertEquals(63, archer.battleNetAnimationTimer(),
+                "the paid replacement constructor enters native's ranged hold");
+        assertTrue(archer.battleNetAttackResumeHoldActive(),
+                "the hold suppresses the phantom fixture-459 arrow");
+    }
+
+    @Test
     @DisplayName("orc 11's unqueued archer patrol keeps the retail Move body")
     void orc11UnqueuedArcherPatrolKeepsRetailMoveBody() {
         AssetSource assets = AssetSource.fromEnvironment();
