@@ -1194,6 +1194,26 @@ second perimeter at `(76,76)`, whose north leg tests `(76,75)` and then accepts
 at `(75,75)`, never reaches the native anchor, and eventually falls back to
 the west side.
 
+## Training dropout searches the producer footprint with the trainee callback
+
+Training completion at `0x0040df48` reads the producer anchor from unit
+offsets `+0x18/+0x1a`, the trainee type from `+0x6d`, and the producer type
+from `+0x27`. It passes the anchor, trainee type, owner, and the producer
+type-table entry at `0x004cee6c` to `0x00451a70`. The wrapper dereferences the
+producer entry's packed footprint and calls the same `0x00443a40` perimeter
+walker used by resource dropout with the producer anchor as both the starting
+point and goal, a search budget of twelve, and callback `0x004512a0`.
+
+The two type roles are deliberately different: the producer footprint sizes
+the perimeter, while the callback validates the trainee's movement mask. For
+a doubled-movement trainee, `0x004512bb`--`0x004512ca` additionally rejects an
+anchor when either coordinate is odd. Expansion Human 5 is the direct
+witness: the Orc shipyard at `(35,105)` completes tanker slot 1500 on fixture
+530. The producer-sized native walk rejects odd `(34,105)` and accepts
+`(34,106)`; a generic 2x2-unit footprint ring instead starts farther outside
+the shipyard and answers `(34,108)`. Already aligned expansion Human 3 and
+expansion Human 8 tanker births retain `(80,32)` and `(34,82)` respectively.
+
 ## Depot-ready queue pops retain their action constructors
 
 The depot-ready Still callback exposes a queued order before that order may

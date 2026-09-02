@@ -10402,6 +10402,23 @@ public final class World {
 
     /** Selects the west-side birth square for a unit whose training completed. */
     int[] trainedUnitDropout(UnitType what, Unit building) {
+        if (battleNetSequence != null) {
+            // COrder_Train's completion callback 0x40df48 passes the producer
+            // anchor and its producer-type footprint to 0x451a70. That
+            // wrapper searches through the shared 0x443a40 perimeter walker,
+            // while its 0x4512a0 callback validates the trainee's movement
+            // mask and doubled grid. XHuman 5's 2x2 tanker therefore
+            // visits (34,105) and then accepts the aligned (34,106) beside
+            // its shipyard at (35,105); the generic footprint ring skips to
+            // (34,108).
+            int stride = battleNetTypeUsesDoubleStep(what) ? 2 : 1;
+            return dropOutBattleNetPerimeter(what,
+                    building.tileX(), building.tileY(),
+                    building.tileX(), building.tileY(),
+                    Math.max(1, building.type().tileWidth()),
+                    Math.max(1, building.type().tileHeight()),
+                    stride, null, building);
+        }
         // The game a trained unit comes out of the west face.
         int[] spot = dropOutOnSide(what, LOOKING_WEST, building,
                 building.tileX(), building.tileY());
@@ -10670,12 +10687,22 @@ public final class World {
      */
     private int[] dropOutResourceNearest(Unit unit, int goalX, int goalY,
             Unit container) {
-        UnitType type = unit.type();
+        return dropOutBattleNetPerimeter(unit.type(), goalX, goalY,
+                container.tileX(), container.tileY(),
+                Math.max(1, container.type().tileWidth()),
+                Math.max(1, container.type().tileHeight()),
+                battleNetMovementStride(unit), unit, container);
+    }
+
+    /** Shared BNE {@code 0x443a40} first-legal-anchor perimeter walk. */
+    private int[] dropOutBattleNetPerimeter(UnitType type,
+            int goalX, int goalY, int originX, int originY,
+            int initialScanWidth, int initialScanHeight, int stride,
+            Unit tracedUnit, Unit container) {
         long mask = Unit.movementMaskFor(type);
         long blocking = Unit.blockingFlagsFor(type);
         int width = Math.max(1, type.tileWidth());
         int height = Math.max(1, type.tileHeight());
-        int stride = battleNetMovementStride(unit);
         // Doubled naval movement validates top-left anchors, not every visual
         // tile covered by the hull. Orc 8's contained 2x2 tanker therefore
         // leaves its platform at (84,104): the anchor is legal water while
@@ -10686,14 +10713,14 @@ public final class World {
         // anchor lattice once the tanker starts home.
         int placementWidth = stride > 1 ? 1 : width;
         int placementHeight = stride > 1 ? 1 : height;
-        int x = container.tileX();
-        int y = container.tileY();
-        int scanWidth = Math.max(1, container.type().tileWidth());
-        int scanHeight = Math.max(1, container.type().tileHeight());
+        int x = originX;
+        int y = originY;
+        int scanWidth = Math.max(1, initialScanWidth);
+        int scanHeight = Math.max(1, initialScanHeight);
         String tracedDropout = System.getenv("CHONKCRAFT_TRACE_DROPOUT");
-        boolean traceDropout = tracedDropout != null
+        boolean traceDropout = tracedUnit != null && tracedDropout != null
                 && (tracedDropout.isBlank()
-                        || unit.id() == Integer.parseInt(tracedDropout.trim()));
+                        || tracedUnit.id() == Integer.parseInt(tracedDropout.trim()));
         // Native direction indices are E,S,W,N. The initial comparisons are
         // deliberately asymmetric at the top/left boundary; these are the
         // signed branches at 0x443a53..0x443aca, not rounded sprite headings.
@@ -10763,7 +10790,7 @@ public final class World {
                         System.err.printf("JDROPRESOURCE cycle=%d unit=%d type=%s container=%d "
                                         + "goal=%d,%d direction=%d pass=%d leg=%d "
                                         + "candidate=%d,%d grid=%d free=%d%n",
-                                cycle, unit.id(), unit.type().ident(), container.id(),
+                                cycle, tracedUnit.id(), tracedUnit.type().ident(), container.id(),
                                 goalX, goalY, direction, pass, leg, x, y,
                                 onMovementGrid ? 1 : 0, free ? 1 : 0);
                     }

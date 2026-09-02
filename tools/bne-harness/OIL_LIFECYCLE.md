@@ -176,6 +176,16 @@ absolute-even exit at `(92,60)` and queues action 23 behind the 25-cycle Still
 head. A generic depot-seeded resource lookup finds no candidate in this state,
 and waiting for the ordinary surfaced callback selects the platform one cycle
 too late.
+
+Freshly trained tankers use the same native perimeter walker but a distinct
+argument split. Training completion passes the shipyard's anchor and footprint
+to `0x00443a40`; callback `0x004512a0` applies the new tanker's water mask and
+absolute-even doubled grid. Thus expansion Human 5's shipyard at `(35,105)`
+rejects `(34,105)` and births tanker 1500 at `(34,106)` on fixture 530. The
+generic trained-unit ring incorrectly incorporated the 2x2 hull into its
+starting geometry and surfaced the tanker at `(34,108)`. This producer-sized
+walk also governs later campaign tanker births without changing their
+completion cycle.
 The captured player save adds the interrupted-command boundary: its tanker is
 at `(53,18)` with `IX=-36`, a Move goal of `(53,18)`, cargo 100 and action 24.
 Without another command it now finishes the owed pixels, centres on that tile
