@@ -8601,6 +8601,11 @@ public final class World {
             "unit-white-mage",
             "unit-dwarves", "unit-goblin-sappers");
 
+    /** The four special types with their own restricted native idle scan. */
+    private static final Set<String> BATTLE_NET_CASTER_IDLE_SCAN = Set.of(
+            "unit-mage", "unit-death-knight", "unit-evil-knight",
+            "unit-white-mage");
+
     /**
      * Whether a short-leftover combat ally should stay hard on a combat
      * target route.
@@ -19354,19 +19359,21 @@ public final class World {
             // XHuman 2's second volley past fixture 82.
             return;
         }
-        // Still's shared handler calls FUN_0040ad30 before FUN_0040a5e0.
-        // The latter tests native type flags 0x06000300 together with the
-        // armed/mobile 0x00080000 bit and sends workers, spellcasters and
-        // demolition units through FUN_0040a670 instead of AutoAttack. The
-        // ten-type routing mask above is the same table test; oil tankers are
-        // its only unarmed members. Orc 11 sapper 1573 / Java 27 is the
-        // standing witness: its fixture-417 offer becomes a one-tile escape
-        // on its fixture-418 marker.
+        // Still's shared handler calls FUN_0040ad30 before FUN_0040a830. Its
+        // opening hit-owned arm reaches FUN_0040a670 first. Without a usable
+        // offer, native PUD types 10, 11, 21 and 24 (the four casters) jump
+        // to a restricted 0x409ff0 scan before the general 0x06000300 test;
+        // workers, tankers and demolition units still return without one.
+        // Orc 11 sapper 1573 / Java 27 is the direct-flee and no-scan control.
+        boolean casterIdleScan = BATTLE_NET_CASTER_IDLE_SCAN.contains(
+                unit.type().ident());
         if (BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())) {
-            harvest.beginBattleNetStandingHitFlee(unit);
-            return;
+            if (harvest.beginBattleNetStandingHitFlee(unit)
+                    || !casterIdleScan) {
+                return;
+            }
         }
-        if (!unit.isAggressive()) {
+        if (!casterIdleScan && !unit.isAggressive()) {
             return;
         }
         boolean person = isPerson(unit.player());
@@ -19392,6 +19399,16 @@ public final class World {
         Unit offered = unit.offeredTarget();
         Unit target = targets.findBattleNetHostile(unit, range, offered);
         if (target != null) {
+            // The caster arm scores first and filters only the winner. Native
+            // accepts a target carrying any special 0x06000300 flag, or one
+            // lacking armed/mobile bit 0x00080000. It does not shop for a
+            // lower-scoring passive target after rejecting an armed fighter.
+            if (casterIdleScan
+                    && !BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(
+                            target.type().ident())
+                    && target.type().canAttack()) {
+                return;
+            }
             if (dataGuard && target != offered
                     && !targets.inAttackRange(unit, target)) {
                 return;

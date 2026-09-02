@@ -4,7 +4,7 @@
   "inventories": [
     {
       "test_class": "net.chonkbase.chonkcraft.engine.BattleNetIdleAttackTest",
-      "test_count": 28,
+      "test_count": 31,
       "classified_failures": [
         {
           "name": "rangedChaseRetargetHoldsThreeVisitsBeforeTheNextStep",

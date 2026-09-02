@@ -682,6 +682,47 @@ A Still unit reaches target acquisition through this chain:
 order 12 only when the unit already carries a target at `+0x88`, which
 `0x004513d0` has just written.
 
+### Coward casters retain a restricted idle acquisition arm
+
+Static analysis and local Branch Witness run
+`.bne-branch-witness/runs/43c986f9e6594de0e7c8c73ccb1585b9929aa29acc5a6e570ae11337c1881db9`
+close the special-type exception inside `0x0040a830`. Before the general
+`0x06000300` rejection at `0x0040a936`, four PUD type bytes jump directly to
+the target scan at `0x0040a972`:
+
+```text
+0x0040a8c8    cmp al, 0x0a    ; unit-mage
+0x0040a8d0    cmp al, 0x0b    ; unit-death-knight
+0x0040a8d8    cmp al, 0x15    ; unit-evil-knight
+0x0040a8e0    cmp al, 0x18    ; unit-white-mage
+0x0040a972    call 0x00409ff0
+```
+
+The scan still uses the ordinary scorer; native filters only the returned
+winner. It accepts that target when the target type carries any
+`0x06000300` special bit, or when the target lacks armed/mobile bit
+`0x00080000`. An ordinary armed winner branches to `0x0040a9b8` and the visit
+does not shop for a lower-scoring passive target:
+
+```text
+0x0040a98e    mov ecx, [edx*4 + 0x004cf574]  ; selected target type flags
+0x0040a995    test ecx, 0x06000300
+0x0040a99b    jne 0x0040a9a5                 ; special target: accept
+0x0040a99d    test ecx, 0x00080000
+0x0040a9a3    jne 0x0040a9b8                 ; ordinary armed target: reject
+0x0040a9a5    call 0x004513d0                 ; passive target: accept
+```
+
+Expansion Human 2 fixture 512 is the live accepted arm. Death knight slot
+1557 (type 11) at `(64,59)` jumps at `0x0040a8d2`, and `0x00409ff0` returns
+enemy human barracks slot 1554 at `(60,63)`. The barracks flag word is the
+passive-building `0x00000020`, so `0x004513d0` calls callback `0x004368d0`,
+`0x0045324d` writes next order 12, and the scheduler later promotes it through
+the established current-order writer at `0x00452fa2`. This is idle
+AutoAttack, not an AI-force or hit-help order. The opening hit-owned arm still
+precedes the caster scan, so the existing direct-flee constructor remains the
+first response to a usable offered attacker.
+
 `0x00409ff0` computes a square reaction rectangle centred on the unit's tile.
 The radius is `byte [0x004cf024 + type]` for a controller-type-1 player and
 `byte [0x004cf170 + type]` otherwise; `0x00453480` separately stores the unit's

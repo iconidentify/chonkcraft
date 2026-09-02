@@ -225,12 +225,13 @@ class BattleNetIdleAttackTest {
     }
 
     @Test
-    @DisplayName("special-type Still units bypass the ordinary hostile scan")
-    void specialTypeStillUnitsBypassTheOrdinaryHostileScan() {
+    @DisplayName("demolition Still units bypass the ordinary hostile scan")
+    void demolitionStillUnitsBypassTheOrdinaryHostileScan() {
         // Still's FUN_0040a5e0 dispatcher routes native type mask 0x06000300
-        // through FUN_0040a670 instead of AutoAttack. With no live hit-owned
-        // offer the special unit remains Still; Orc 11 sapper 1573 is the
-        // sealed fixture-703 witness when knight 1548 enters its range.
+        // through FUN_0040a670 instead of ordinary AutoAttack. The separate
+        // caster arm does not include demolition types, so an unoffered sapper
+        // remains Still; Orc 11 sapper 1573 is the sealed fixture-703 witness
+        // when knight 1548 enters its range.
         GameMap map = new GameMap(16, 16, new Tileset());
         for (int y = 0; y < map.height(); y++) {
             for (int x = 0; x < map.width(); x++) {
@@ -251,6 +252,80 @@ class BattleNetIdleAttackTest {
         assertEquals(Unit.Order.STILL, sapper.order(),
                 "a special type without a hit offer must not auto-acquire");
         assertNull(sapper.target());
+    }
+
+    @Test
+    @DisplayName("a coward caster auto-attacks a passive building")
+    void cowardCasterAutoAttacksAPassiveBuilding() {
+        // FUN_0040a830 explicitly sends PUD types 10, 11, 21 and 24 through
+        // 0x409ff0 even though their 0x04000000 flag makes them cowards. The
+        // selected target is admitted when it lacks armed bit 0x00080000.
+        GameMap map = new GameMap(24, 24, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        UnitType casterType = fighter("unit-death-knight", 70);
+        casterType.setCoward(true);
+        casterType.setReactRangeComputer(11);
+        UnitType barracksType = fighter("unit-human-barracks", 50);
+        barracksType.setBuilding(true);
+        barracksType.setTileSize(3, 3);
+        barracksType.setSpeed(0);
+        barracksType.setCanAttack(false);
+        Unit caster = world.createUnit(casterType, 0, 8, 8);
+        Unit barracks = world.createUnit(barracksType, 1, 12, 8);
+        caster.setBattleNetAnimationTimer(2);
+        barracks.setBattleNetAnimationTimer(8);
+
+        world.tick();
+        world.tick();
+
+        assertEquals(Unit.Order.ATTACK, caster.order(),
+                "the caster-specific native arm must bypass IsAggressive");
+        assertSame(barracks, caster.target(),
+                "a passive building is an eligible caster idle target");
+    }
+
+    @Test
+    @DisplayName("a coward caster rejects the armed winner without shopping")
+    void cowardCasterRejectsTheArmedWinnerWithoutShopping() {
+        // Native runs the ordinary scorer first and tests only its winner.
+        // An armed fighter wins the score over this passive building, but its
+        // 0x00080000 bit rejects the whole visit; native does not shop for the
+        // lower-scoring barracks after that rejection.
+        GameMap map = new GameMap(24, 24, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        UnitType casterType = fighter("unit-mage", 70);
+        casterType.setCoward(true);
+        casterType.setReactRangeComputer(11);
+        UnitType knightType = fighter("unit-knight", 90);
+        UnitType barracksType = fighter("unit-orc-barracks", 50);
+        barracksType.setBuilding(true);
+        barracksType.setTileSize(3, 3);
+        barracksType.setSpeed(0);
+        barracksType.setCanAttack(false);
+        Unit caster = world.createUnit(casterType, 0, 8, 8);
+        Unit knight = world.createUnit(knightType, 1, 9, 8);
+        Unit barracks = world.createUnit(barracksType, 1, 12, 8);
+        caster.setBattleNetAnimationTimer(2);
+        knight.setBattleNetAnimationTimer(8);
+        barracks.setBattleNetAnimationTimer(8);
+
+        world.tick();
+        world.tick();
+
+        assertEquals(Unit.Order.STILL, caster.order(),
+                "the selected armed fighter must reject the caster scan");
+        assertNull(caster.target(),
+                "the scan must not fall through to a lower-scoring building");
     }
 
     @Test

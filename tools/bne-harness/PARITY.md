@@ -15,7 +15,81 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (ready scans advance through consumed research milestones)
+## Current release checkpoint — 2026-09-01 (coward casters scan only vulnerable idle targets)
+
+Accepted cycle-1,800 receipt `764340e4` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,139 to 52,160. Expansion Human 2 advances from exact
+through fixture 511 to exact through fixture 532. The cycle-400 fleet remains
+50 clean / 2 divergent / 0 failed under receipt `b0f2642d`. The long receipt
+is retained at
+`.bne-artifacts/runs/764340e49bd6dae60611af328f397372871b9e86b3ca00ed50bde92d21890e4f`.
+Its manifest has SHA-256
+`2b8141e20171632679f88ae1818aa2acff9feac9cdde27b4587bfd09bf88402e`
+and binds dirty engine-input identity
+`301c2a9943c27e74ef6664cefe1b1a345a5c365c477e2735a9a74bda3d46ed8d`
+at base revision `1a55632` to authenticated, replayable source capsule
+`950e2e01125fc23fb1622d1df3ef21d6e9288f727f8cb4abddb2f86f0ae717be`.
+
+Behavioral delta: Still's native AutoAttack driver explicitly routes PUD
+types 10, 11, 21, and 24 -- the four coward spellcasters -- around the
+general special-type rejection and through the ordinary target scorer. It
+then filters only the selected winner: a target carrying any `0x06000300`
+special bit is eligible, as is any target lacking armed/mobile bit
+`0x00080000`; an ordinary armed winner rejects the whole visit rather than
+falling through to a lower-scoring passive target. A usable direct hit-owned
+offer retains priority and still starts the established escape constructor.
+Workers, tankers, and demolition units retain their no-scan rule. The
+implementation contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 2 death knight slot 1557 / Java unit 43 remains
+Still at `(64,59)` through fixture 511. On fixture 512, native type byte 11
+jumps at `0x0040a8d2` into `0x00409ff0`, selects enemy human barracks slot
+1554 at `(60,63)`, admits its passive-building `0x00000020` flag word, and
+queues action 12 through `0x0045324d`. The scheduler promotes the order at
+`0x00452fa2`. Java formerly returned at the broad special/coward guard; it now
+retains the same target, order, and constructor timing and matches through
+fixture 532. The newly exposed fixture-533 finding is the death knight's
+southward chase position, native Y 60 versus Java Y 61. Static disassembly and
+local Branch Witness receipt
+`.bne-branch-witness/runs/43c986f9e6594de0e7c8c73ccb1585b9929aa29acc5a6e570ae11337c1881db9`
+agree that this is idle AutoAttack rather than an AI-force or hit-help order.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman2-c512-caster-idle-scan/runs/e4e8a46dc3e0956c1e0ceb5eb6fcea7a40a2b5af2801db4d305851233cb6280f`
+proves the focused real-data assertion executes and fails on `1a55632`, then
+executes and passes on the candidate. Six focused caster, armed-winner,
+demolition, and Orc 11 direct-flee/no-scan controls pass. The idle-targeting
+gate passes its retail referee and fail-closed diagnostics: the expanded
+`BattleNetIdleAttackTest` inventory is 30 passing / 1 classified, while
+`TargetChoiceTest` remains 4 passing / 5 classified, with zero unclassified
+failures. Both fixed 52-case gates pass. The scheduler gate passes six
+retail/RNG checks and its legacy diagnostic remains 19 passing / 3 classified
+/ 0 unclassified. The long receipt's source capsule authenticates and replays
+its engine identity exactly with one sealed untracked input, the focused
+real-data test.
+
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its comparable set remains 6 exact / 5 divergent with no regression
+or infrastructure failure. The retail AI gate retains the pre-existing
+`AiCompetenceTest` route-prefix exception outside this change; control receipt
+`.bne-test-efficacy/caster-idle-ai-gate-baseline-control/runs/9334a1e7866b3667f6bd3523342c44a58800838e1b4c309b4d35a9aed2b31955`
+reproduces the same one executed test / zero failures / one error on both
+`1a55632` and the candidate. Optional remote AI discovery retains the
+documented strict SSH host-key debt for `i9beef`; no host key was modified,
+and local native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Human 8
+fixture 514, followed by expansion Human 10 at 519, Human 13 at 523, expansion
+Human 5 at 530, Orc 12 at 531, expansion Human 2 at 533, expansion Human 8 at
+536, and expansion Human 3 at 537.
+
+## Prior release checkpoint — 2026-09-01 (ready scans advance through consumed research milestones)
 
 Accepted cycle-1,800 receipt `ab9f6f1f` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
