@@ -15,7 +15,60 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (trained units use the native producer-sized perimeter)
+## Current release checkpoint — 2026-09-02 (marked target-skirt movers remain soft)
+
+Accepted cycle-1,800 receipt `c8241d4d` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,605 to 52,658. Human 8 is the only changed case,
+advancing from exact through fixture 529 to exact through fixture 582. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`9202d398`. The long receipt is retained at
+`.bne-artifacts/runs/c8241d4d732be9c80dcc9153a3d5b30b86d7720b9e0cd1edeed43771b3775bb5`.
+Its manifest has SHA-256
+`5a0993cafdb5a7cec46a68f796b5523472804947c7776c04839ebd37a04f50d0`
+and binds clean commit `d22306e` and engine-input identity
+`dbc5c1466a9b9da1b28481473211ecbc0900b725c0a2520c0da1cbaa8c6f26d4`
+to replayable source capsule
+`072d39ca411644446e091b7661e36bf0917feb024da8850f802d6b472173efad`
+with zero untracked engine inputs.
+
+Behavioral delta: the existing approach-corridor compensation no longer
+re-hardens a zero-collision moving ally already inside the marked target
+skirt. Native `0x4508f0` writes goal bit `0x8000`, but `0x4500f0` still admits
+the Move body to the occupancy clear at `0x4501d3`; wall-follow may therefore
+end on that marked square. Java keeps the compensation for one-heading combat
+allies farther up the approach. The implementation contains no mission, map,
+faction, coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Human 8 attack-peasant slot 1505 / Java unit 95 begins the paid
+route at `(78,61)` toward peasant slot 1519 at `(78,66)`. Moving allied
+attack-peasant slot 1526 / Java unit 74 occupies `(78,65)` with collision zero
+and a one-byte route. Native soft-clears that body and stores `[S,S,SE,SW]`;
+Java formerly re-hardened it and stored `[S,S,SE,S]`, producing the fixture-530
+x split (native 78, Java 79). The corrected route agrees through fixture 582;
+the newly exposed fixture-583 finding is slot 1520 x, native 77 versus Java 76.
+
+Efficacy receipt
+`.bne-test-efficacy/human8-c530-marked-skirt-soft-mover/runs/b98aa259f87ddd476a936c54c84256cb814eabba30d71969815ce1706a19fdc7`
+proves the focused Human-8 assertion executes and fails on `28d1b89`, then
+executes and passes on the candidate. All 23 moving-quarry real-data checks
+pass. Both fixed 52-case gates pass. The movement referee's inherited
+`NavalPatrolCoastGoalRealDataTest` failure reproduces identically on `28d1b89`
+and the candidate; its script also still expects 116 checks while that baseline
+runs 117, so neither issue is attributed to this change. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+99 engine/desktop checks, and 223 dual-adapter command scenarios; its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Orc 12
+fixture 531, followed by expansion Human 2 at 533, Human 5 and expansion Human
+8 at 536, expansion Human 3 at 537, and expansion Orc 11 at 539.
+
+## Prior release checkpoint — 2026-09-02 (trained units use the native producer-sized perimeter)
 
 Accepted cycle-1,800 receipt `abf9f793` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
