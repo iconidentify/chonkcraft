@@ -16,13 +16,13 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-02 is:
 
-- the accepted candidate is based on commit `8313977` and is authenticated by
+- the accepted candidate is based on commit `0293e02` and is authenticated by
   replayable dirty-source capsule
-  `a7c99dbce218ace043c33cb022dda342acebec7f7d2763a7b0aa502c513bed15`;
+  `e2ad9e23e6c84980ac16145cddb35d28859fe1763d38ab4666ea0ae2d47a0db3`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `7ae9bc42f488f4ddaaf09c893e9de27eecd3d56803d3f173f8d5498b16116150`.
+  `2b72bca24c2a47e0aed503ae951eafab9743d82f6aff92fe821e6150d4c58915`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
@@ -32,13 +32,14 @@ safe systemic discriminator. Resume that family only with new evidence about
 the global route-scratch lifecycle or path decision. Expansion Orc 8's
 cycle-356 submarine route-publication family is independently paused. The
 fleet remains 13 clean / 39 divergent / 0 failed through cycle 1,800, with a
-52-case exact-prefix sum of 52,216. Expansion Human 10 is accepted through
-cycle 561 after building-target presentation-ahead projectile preparation was
-narrowed to cursors already parked on opcode ten. A pre-opcode-ten animation
-wait now retains its pending projectile until the ordinary sequence constructor
-runs. The earliest unpaused fleet finding is Human 13 cycle 523, followed by
-Human 8 at 527, expansion Human 5 at 530, Orc 12 at 531, expansion Human 2 at
-533, and expansion Human 10's newly exposed RNG/position split at 562.
+52-case exact-prefix sum of 52,240. Human 13 is accepted through cycle 546
+after the ready-gold finder admitted a healthy worker still contained by its
+depot: hidden action 26 now assigns the mine and authors the dropout face before
+the worker surfaces. The earliest unpaused fleet finding is Human 8 cycle 527,
+followed by expansion Human 5 at 530, Orc 12 at 531, expansion Human 2 at 533,
+expansion Human 8 and Human 5 at 536, and expansion Human 3 at 537. Human 13's
+newly exposed tanker-population split is at 547, while expansion Human 10
+remains accepted through 561.
 
 This snapshot is orientation, not an instruction to overwrite newer results.
 On every resumption, derive the actual frontier from the current repository and
@@ -122,7 +123,7 @@ not permission to fit a special case.
    unit.
 
 The next work selection should normally start from the earliest unpaused fleet
-finding, currently Human 13 cycle 523, while retaining expansion Human 12
+finding, currently Human 8 cycle 527, while retaining expansion Human 12
 cycle 333 as the shared-boundary frontier. Return to either paused route family
 only when a new native discriminator or a more upstream authenticated finding
 can price a systemic hypothesis.

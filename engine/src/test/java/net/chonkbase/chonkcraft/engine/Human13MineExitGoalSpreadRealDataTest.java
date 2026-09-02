@@ -59,6 +59,64 @@ class Human13MineExitGoalSpreadRealDataTest {
         assertEquals(6, peon.queuedOrders().getFirst().y());
     }
 
+    @Test
+    @DisplayName("human 13's contained depot-ready miner selects gold before surfacing")
+    void containedDepotReadyMinerSelectsGoldBeforeSurfacing() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human/level13h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "Human 13 is not in the pack");
+        World world = mission.world();
+        Unit peon = unitById(world, 53);
+        Unit fortress = unitAt(world, "unit-fortress", 81, 2);
+        Unit mine = unitAt(world, "unit-gold-mine", 75, 9);
+        assertNotNull(peon, "Human 13 has no native-slot-1547 peon");
+        assertNotNull(fortress, "Human 13 has no native-slot-1584 fortress");
+        assertNotNull(mine, "Human 13 has no native-slot-1544 gold mine");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 522) {
+            mission.tick();
+        }
+        assertTrue(peon.removed());
+        assertEquals(81, peon.tileX());
+        assertEquals(2, peon.tileY());
+        assertSame(fortress, peon.worksite());
+        boolean[] component = world.battleNetConnectivityCell(peon);
+        assertTrue(component[fortress.tileX()
+                        + fortress.tileY() * world.map.width()],
+                "the contained worker's component must include its depot anchor");
+        assertTrue(component[mine.tileX() + mine.tileY() * world.map.width()],
+                "the contained worker's component must include the nearby mine");
+        assertTrue(fortress.isAlive() && fortress.isOnMap()
+                        && fortress.type().storesResource(
+                                net.chonkbase.chonkcraft.engine.unit.UnitType.Resource.GOLD),
+                "the fortress must remain an eligible gold depot");
+        assertTrue(mine.resourcesHeld() != 0,
+                "the nearby mine must retain gold, actual=" + mine.resourcesHeld());
+        assertSame(mine, world.findBattleNetReadyGoldMine(peon),
+                "the contained ready scan must see its connected gold mine");
+
+        mission.tick();
+        assertEquals(523, fixtureCycle(world));
+        assertFalse(peon.removed());
+        assertEquals(85, peon.tileX(),
+                "contained ready assignment must choose native's mine-authored face");
+        assertEquals(3, peon.tileY());
+        assertEquals(Unit.Order.STILL, peon.order());
+        assertEquals(25, peon.battleNetOrderDelay());
+        assertEquals(1, peon.queuedOrders().size());
+        assertEquals(Unit.QueuedOrderKind.HARVEST,
+                peon.queuedOrders().getFirst().kind());
+        assertEquals(75, peon.queuedOrders().getFirst().x());
+        assertEquals(9, peon.queuedOrders().getFirst().y());
+        assertSame(mine, peon.resourceUnit());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

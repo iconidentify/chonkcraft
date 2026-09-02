@@ -15,7 +15,73 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (pre-opcode-ten tower shots retain their constructor)
+## Current release checkpoint — 2026-09-02 (contained depot-ready workers select gold before dropout)
+
+Accepted cycle-1,800 receipt `2b72bca2` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,216 to 52,240. Human 13 advances from exact through
+fixture 522 to exact through fixture 546. The cycle-400 fleet remains 50 clean
+/ 2 divergent / 0 failed under receipt `f3187ab8`; its cycle-540 lookahead
+improves from 41 clean / 11 divergent to 42 clean / 10 divergent. The long
+receipt is retained at
+`.bne-artifacts/runs/2b72bca24c2a47e0aed503ae951eafab9743d82f6aff92fe821e6150d4c58915`.
+Its manifest has SHA-256
+`270db1defe1d5486f82e4d3899eebbc8ee137764cfee94138158634b754819c9`
+and binds dirty engine-input identity
+`630fb2476bdc60a324039d71fe3b8379867445e79e317eda2e8d67db43dda289`
+at base revision `0293e02` to authenticated, replayable source capsule
+`e2ad9e23e6c84980ac16145cddb35d28859fe1763d38ab4666ea0ae2d47a0db3`.
+
+Behavioral delta: BNE's ready-gold finder is called by both an on-map Still
+marker and hidden depot action 26. A healthy worker inside its valid worksite
+is removed from occupancy but remains a valid native ready subject. Java's
+broad `Unit.isAlive()` deliberately includes `!removed`, so using it as the
+finder's sole liveness gate discarded every contained call. The finder now
+admits only the explicit contained state -- positive HP, non-dying order, and
+a valid worksite -- while still rejecting dead or detached off-map units. The
+implementation contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Human 13 peon slot 1547 / Java unit 53 is contained in fortress
+slot 1584 at `(81,2)` through fixture 522. Its hidden action-26 wait expires on
+fixture 523. Native calls the ready worker policy before dropout, selects gold
+mine slot 1544 at `(75,9)`, writes raw current action 2 / next action 23 and the
+mine pointer, then uses that authored goal to traverse the crowded fortress
+perimeter and surface at `(85,3)` with timer 25. Java's contained finder
+formerly returned before the scan, fell through to the generic west exit at
+`(80,6)`, and only selected the same mine on the following on-map idle visit.
+The explicit contained-liveness rule restores the mine, queued Harvest, exit
+face, and ready hold on fixture 523, retaining agreement through fixture 546.
+The newly exposed fixture-547 finding is an Orc tanker population pairing.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/1d26b85cfff0496a304226d7946b65bbcfebce69b2ef2503895cd637fc9feb81`
+proves the contained-ready assertion executes and fails on `0293e02`, then
+executes and passes on the candidate. All 20 selected mine-exit and depot-ready
+real-data checks pass. The broader `BattleNetAiWoodTest` diagnostic retains its
+identical pre-existing Human-13 wall-route failure on baseline and candidate
+under control receipt
+`.bne-test-efficacy/runs/441a4984a9500a7292c203b85cbaabf02694b0ac0612314be4c8a9c1109a8d9c`.
+Both fixed 52-case gates pass, and the long receipt's source capsule
+authenticates and replays its engine identity with zero sealed untracked
+inputs.
+
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its comparable set remains 6 exact / 5 divergent with no regression
+or infrastructure failure. Optional remote AI discovery retains the documented
+strict SSH host-key debt for `i9beef`; no host key was modified, and local
+native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Human 8
+fixture 527, followed by expansion Human 5 at 530, Orc 12 at 531, expansion
+Human 2 at 533, expansion Human 8 and Human 5 at 536, expansion Human 3 at 537,
+expansion Orc 11 at 539, and Human 13's newly exposed split at 547.
+
+## Prior release checkpoint — 2026-09-02 (pre-opcode-ten tower shots retain their constructor)
 
 Accepted cycle-1,800 receipt `7ae9bc42` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

@@ -3660,9 +3660,19 @@ final class BattleNetHarvestSystem {
      * its way. Human 13 begins with a peon boxed into its fortress crowd: the
      * ordinary finder rejects that fortress as unreachable and falls back to
      * wood, while retail assigns the nearby mine.</p>
+     *
+     * <p>The same finder is called from hidden depot action 26 before the
+     * worker is placed back on the map. Java's broad {@link Unit#isAlive()}
+     * includes {@code !removed}, but a healthy worker with a valid worksite is
+     * precisely the contained native state: Human 13 slot 1547 selects mine
+     * 1544 and its east-face dropout during fixture 523. Detached or dying
+     * off-map units remain ineligible.</p>
      */
     Unit findBattleNetReadyGoldMine(Unit worker) {
-        if (worker == null || !worker.isAlive() || !worker.isOnMap()) {
+        boolean contained = worker != null && !worker.isOnMap()
+                && worker.worksite() != null && worker.hitPoints() > 0
+                && worker.order() != Unit.Order.DYING;
+        if (worker == null || (!worker.isAlive() && !contained)) {
             return null;
         }
         boolean[] component = world.battleNetConnectivityCell(worker);
