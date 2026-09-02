@@ -15,7 +15,70 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (doubled platform approach keeps the marked-wall tie)
+## Current release checkpoint — 2026-09-01 (fresh empty gold route falls through to claimed-face wood)
+
+Accepted cycle-1,800 receipt `b78ed543` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 51,719 to 51,748. Retail Human 13 is the only changed case,
+advancing from exact through fixture 493 to exact through fixture 522. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`714cd996`. The long receipt is retained at
+`.bne-artifacts/runs/b78ed5434538dbbf052559516e10b2da5445304db9d3c3ea6346cf6a6ebaf54b`.
+Its manifest has SHA-256
+`f1724f143d371b98b44b7a85af3b74e6e08a6efca4809f48a725800facf9f4f2`
+and binds dirty engine-input identity
+`29df39d7c147340906f243154d8859a8c3fbad6f69e931569b72eeaf3d8bc1de`
+at base revision `de1cc1d` to authenticated, replayable source capsule
+`502ed7160bdc274d9473ae35ba6644b38ca57d39303ec408d8eafda95eb1fbdd`.
+
+Behavioral delta: a fresh action-23 gold constructor whose first route is
+empty has no served Move to return through. UnitReady's adjacent terrain-wood
+assignment therefore falls through to StartGathering on the same visit,
+feeds native's occupied-face replacement callback, claims the replacement,
+and spends the synchronized terrain-start draw. A completed gold walk retains
+its independently authenticated north-row retry and path gate. Distant wood
+fallbacks remain ordinary harvest routes. The implementation contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: Human 13 peon slot 1393 / Java unit 211 receives a fresh gold
+Harvest assignment at `(14,3)` toward mine `(30,5)` with zero initial route,
+zero steps taken, and no drained step. Native fixture 494 falls through to
+claimed terrain face `(13,4)`, advances the synchronized seed from
+`14526d52` to `23d3b823`, and arms terrain work three visits later. Java
+formerly converted every failed gold route into the served-walk north-row
+context, selected `(14,1)`, and omitted that draw. The fresh-constructor
+handoff now matches native through fixture 522; the new fixture-523 finding is
+an independent peon position split. Human 5 peon 1567's completed six-step
+gold walk remains the negative witness: it keeps the `(104,46)` north-row
+retry and stays exact through fixture 130.
+
+Efficacy receipt
+`.bne-test-efficacy/human13-c494-fresh-empty-gold-handoff/runs/8cb8241c43fc75b625da0096d8774ee6c3839532d0bcbd477ecf78a397aa37c0`
+proves the focused real-data assertion executes and fails on `de1cc1d`, then
+executes and passes on the candidate. The expansion Human 12 fresh-regroup
+controls pass. The 36-test resource-approach class retains the same seven
+pre-existing failures documented in the prior checkpoint, while the 17-test
+AI-wood class retains its one unrelated ordinary marked-wall failure; neither
+family acquires a candidate regression. Both fixed 52-case gates pass, and
+the long receipt's source capsule authenticates and replays its engine
+identity exactly with one sealed new test input. The ordinary executable
+next-level gate exits zero after 209 Python checks (four skipped), 99
+engine/desktop checks, and 223 dual-adapter command scenarios; its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. Remote AI discovery retains the documented strict SSH
+host-key debt for `i9beef`; no host key was modified, and local native evidence
+remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now retail
+Orc 11 fixture 503, followed by expansion Orc 11 at 506, expansion Human 11
+at 509, expansion Human 2 and expansion Human 10 at 512, Human 8 at 514,
+Human 13 at 523, and expansion Human 5 at 530.
+
+## Prior release checkpoint — 2026-09-01 (doubled platform approach keeps the marked-wall tie)
 
 Accepted cycle-1,800 receipt `5e908c4c` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

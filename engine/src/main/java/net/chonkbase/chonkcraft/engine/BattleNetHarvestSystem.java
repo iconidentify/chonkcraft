@@ -3321,13 +3321,14 @@ final class BattleNetHarvestSystem {
             return ordinary;
         }
 
-        // A failed-gold UnitReady lookup whose ordinary result is already
+        // UnitReady after a served gold walk whose ordinary result is already
         // adjacent cannot take the standing chop shortcut: native supplies
         // the row immediately north to its terrain-action square ring and
         // keeps action 23 path-gated. Human 5 peon 1567 at (105,48) thereby
-        // chooses (104,46), not the adjacent southern tree (104,47). Distant
-        // fallbacks such as XHuman 12 retain the ordinary anchor-centred
-        // result and route.
+        // chooses (104,46), not the adjacent southern tree (104,47). A fresh
+        // zero-step constructor never sets this context (Human 13 peon 1393),
+        // while distant fallbacks such as XHuman 12 retain the ordinary
+        // anchor-centred result and route.
         int[] shifted = findBattleNetWoodFromCenter(
                 worker, connected, worker.tileX(), worker.tileY() - 1,
                 maximum, false);
@@ -3343,7 +3344,7 @@ final class BattleNetHarvestSystem {
      * The constructor passes the worker position and literal range 15 to the
      * same {@code 0x443cd0}/{@code 0x44e150} clockwise ring used by AI wood.
      */
-    private int[] findClaimedWoodReplacement(Unit worker) {
+    int[] findClaimedWoodReplacement(Unit worker) {
         if (worker == null || !worker.isOnMap()) {
             return null;
         }

@@ -2242,6 +2242,11 @@ final class BattleNetMovementSystem {
     /** Completes a blocked resource walk and runs its ready assignment. */
     private void battleNetEmptyResourceRouteReady(
             Unit worker, Unit failedResource) {
+        boolean freshEmptyGoldConstructor =
+                worker.carrying() == UnitType.Resource.GOLD
+                && worker.battleNetPathInitialLength() == 0
+                && worker.battleNetPathStepsTaken() == 0
+                && !worker.stepDrained();
         resetDisplacement(worker);
         worker.clearPath();
         worker.setBattleNetPlayerCommandMove(false);
@@ -2255,10 +2260,11 @@ final class BattleNetMovementSystem {
         // async stream is untouched at the peon's fixture-90 reassignment.
         UnitType.Resource failedResourceKind = worker.carrying();
         boolean failedGold = failedResourceKind == UnitType.Resource.GOLD;
-        if (failedGold) {
-            // UnitReady's failed-gold terrain lookup supplies y-1 to the
-            // square-ring walker. Mark that call before it searches; a
-            // normal AI lumber assignment remains anchor-centred.
+        if (failedGold && !freshEmptyGoldConstructor) {
+            // UnitReady after a served gold walk supplies y-1 to the terrain
+            // square-ring walker. Mark that call before it searches; a fresh
+            // constructor whose very first route is empty remains an ordinary
+            // worker-centred lumber assignment.
             worker.setBattleNetWoodReadyPathRequired(true);
         }
         world.battleNetUnitReadyAfterResourceFailure(worker, failedResource);
@@ -2273,6 +2279,28 @@ final class BattleNetMovementSystem {
             // assignHarvester retains this marker only when the ordinary
             // terrain result was adjacent and native selected its path-gated
             // fallback. Distant wood routes remain ordinary harvest walks.
+            if (freshEmptyGoldConstructor && worker.resourceUnit() == null
+                    && Math.max(
+                            Math.abs(worker.resourceTileX() - worker.tileX()),
+                            Math.abs(worker.resourceTileY() - worker.tileY())) <= 1) {
+                // A zero-step action-23 constructor has no completed Move to
+                // return through. Native Human 13 peon 1393 falls straight
+                // from the empty mine route into StartGathering. The ordinary
+                // assignment reaches an adjacent forest square, then native's
+                // 0x44e230 replacement callback rejects occupied faces and
+                // selects (13,4), claims it and spends the synchronized
+                // terrain-start draw on fixture 494. The served six-step
+                // Human 5 walk above retains its separate north-row retry and
+                // does not draw on assignment.
+                int[] replacement =
+                        world.harvest.findClaimedWoodReplacement(worker);
+                if (replacement != null) {
+                    worker.setResourceTile(replacement[0], replacement[1]);
+                    worker.setBattleNetOrderDelay(0);
+                    worker.setBattleNetWoodWalkClaim(true);
+                    world.harvest.stepHarvest(worker);
+                }
+            }
         } else if (failedGold) {
             worker.setBattleNetWoodReadyPathRequired(false);
         }
