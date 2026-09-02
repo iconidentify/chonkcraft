@@ -788,7 +788,7 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
-    @DisplayName("xorc 11's battleship restores patrol after its quarry becomes neutral")
+    @DisplayName("xorc 11's battleship retains its restored patrol service leg")
     void xorc11sBattleshipRestoresPatrolAfterItsQuarryBecomesNeutral() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
@@ -852,6 +852,50 @@ class Xorc11PatrolAttackRealDataTest {
                 "the restored Patrol first-steps north-east after construction");
         assertEquals(28, ship.tileY());
         assertEquals(Unit.Order.PATROL, ship.order());
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 452) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, ship.order());
+        assertNull(ship.pendingAttack());
+        assertEquals(21, ship.orderTargetX());
+        assertEquals(34, ship.orderTargetY());
+
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, ship.order(),
+                "the restored Move-body OP0 must not free-scan a new quarry");
+        assertEquals(12, ship.tileX());
+        assertEquals(30, ship.tileY());
+        assertEquals(320, ship.pixelX());
+        assertEquals(896, ship.pixelY());
+        assertNull(ship.pendingAttack(),
+                "native keeps next_order empty for the restored service leg");
+        assertEquals(21, ship.orderTargetX());
+        assertEquals(34, ship.orderTargetY(),
+                "the hidden goal must remain the behavior-six service point");
+        assertTrue(ship.battleNetCapitalPatrolRestoreArming(),
+                "the saved-Patrol provenance lasts until order replacement");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 505) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.PATROL, ship.order());
+        assertEquals(382, ship.pixelX());
+        assertEquals(958, ship.pixelY());
+        assertNull(ship.pendingAttack());
+
+        mission.tick();
+        assertEquals(Unit.Order.PATROL, ship.order(),
+                "the completed southeast stride remains owned by Patrol");
+        assertEquals(14, ship.tileX());
+        assertEquals(32, ship.tileY());
+        assertEquals(384, ship.pixelX());
+        assertEquals(960, ship.pixelY());
+        assertEquals(2963, ship.battleNetSequenceOffset());
+        assertEquals(1, ship.battleNetAnimationTimer());
+        assertNull(ship.pendingAttack());
+        assertEquals(21, ship.orderTargetX());
+        assertEquals(34, ship.orderTargetY());
     }
 
     @Test

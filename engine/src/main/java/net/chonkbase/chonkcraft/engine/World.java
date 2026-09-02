@@ -15952,23 +15952,30 @@ public final class World {
         }
         boolean queuedOpeningLandAttack = openingLandAssaultPatrol
                 && battleNetPatrolQueueAcquire(unit);
-        boolean restoredCapitalPatrolOp0 = patrolOp0
-                && unit.battleNetCapitalPatrolRestoreArming();
-        if (restoredCapitalPatrolOp0) {
-            unit.setBattleNetCapitalPatrolRestoreArming(false);
-        }
+        // RestoreOrder gives the saved behavior-six Patrol ownership of the
+        // whole service leg, not just its opening opcode zero.  The restored
+        // order therefore ignores spatial free scans until a later AI/player
+        // Patrol command replaces it.  XOrc 11 battleship 1539 restores on
+        // fixture 397, consumes its first stride on 400, and reaches another
+        // Move-body OP0 on 453 with destroyer 1521 in range; native keeps
+        // next_order empty and continues toward (21,34).  The recurring naval
+        // pass replaces that Patrol on 718, after which its fixture-721 OP0
+        // may bank Attack normally.  The replacement constructors clear this
+        // provenance through orderPatrol.
+        boolean restoredCapitalPatrolService =
+                unit.battleNetCapitalPatrolRestoreArming();
         boolean openingCapitalStride = standingPatrol
                 && !battleNetPatrolMoveBodyCursor(unit)
                 && unit.pathLength() == 0 && !unit.isMoving();
         boolean queuedOpeningAttack = patrolOp0 && openingCapitalStride
-                && !restoredCapitalPatrolOp0
+                && !restoredCapitalPatrolService
                 && battleNetPatrolQueueAcquire(unit);
         boolean queuedArmedFlyerAttack = armedPatrolOp0
                 && armedFlyerPatrol
                 && battleNetPatrolQueueAcquire(unit);
         boolean patrolResidualOwnsVisit = standingPatrol
                 && (unit.isMoving() || unit.walkHolding());
-        if (patrolOp0 && !restoredCapitalPatrolOp0
+        if (patrolOp0 && !restoredCapitalPatrolService
                 && !queuedOpeningAttack
                 && !patrolResidualOwnsVisit
                 && battleNetPatrolAcquire(unit)) {
@@ -16089,6 +16096,7 @@ public final class World {
             // with no attack banked and passed the enemy again at fixture 111.
             if (patrolOp0 && standingPatrol
                     && unit.order() == Unit.Order.PATROL
+                    && !restoredCapitalPatrolService
                     && unit.pendingAttack() == null) {
                 battleNetPatrolQueueAcquire(unit);
             }

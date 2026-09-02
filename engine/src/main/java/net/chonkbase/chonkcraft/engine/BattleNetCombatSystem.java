@@ -11823,7 +11823,11 @@ final class BattleNetCombatSystem {
             // ordinary spatial free scan. XOrc 11 battleship 1539 retains
             // corpse 1525 through its player-five -> neutral handoff and the
             // final Attack wait, then restores behavior six toward (21,34)
-            // on fixture 397 instead of selecting destroyer 1521.
+            // on fixture 397 instead of selecting destroyer 1521. That saved
+            // Patrol keeps ownership, including scan suppression, until a
+            // fresh Patrol constructor replaces it; otherwise its later
+            // fixture-453 Move-body OP0 banks the same destroyer and exposes
+            // a false Attack transition on fixture 506.
             world.finishAttackOrder(unit);
             unit.setOrderTarget(
                     unit.battleNetAiHomeX(), unit.battleNetAiHomeY());

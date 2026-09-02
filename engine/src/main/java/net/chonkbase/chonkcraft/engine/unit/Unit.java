@@ -4024,6 +4024,12 @@ public final class Unit {
         return battleNetCapitalPatrolRestoreArming;
     }
 
+    /**
+     * Whether this capital Patrol is the saved order restored after its
+     * Attack quarry stopped being hostile.  The provenance lasts for the
+     * restored order's complete service leg and is cleared by a replacement
+     * command, not by its first opcode zero.
+     */
     public void setBattleNetCapitalPatrolRestoreArming(boolean arming) {
         battleNetCapitalPatrolRestoreArming = arming;
     }

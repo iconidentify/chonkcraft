@@ -15,7 +15,72 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (special types own hit responses but bypass help and idle scans)
+## Current release checkpoint — 2026-09-01 (restored capital Patrol owns its complete service leg)
+
+Accepted cycle-1,800 receipt `b8c35423` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 51,958 to 51,991. Expansion Orc 11 is the only changed
+case, advancing from exact through fixture 505 to exact through fixture 538.
+The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`fc5fd123`. The long receipt is retained at
+`.bne-artifacts/runs/b8c35423c885d1e115fee1f59871f9e1e604e88f2aa530e532349050bffb5041`.
+Its manifest has SHA-256
+`070538354cfbbdf4e68e3fd945aa096b67d5810bf4de8f3cf994355f70ea581f`
+and binds dirty engine-input identity
+`203046681b907a5c67724067117b9044faeb867bfd29d2fd1dfcc08b48ada0f0`
+at base revision `da33ceb` to authenticated, replayable source capsule
+`a4e019447ce843023446e0164047062c2590bde410b57355cf7abe6dd253987c`.
+
+Behavioral delta: a behavior-six capital ship whose paid Attack loses its
+hostile quarry restores a separately saved Patrol order. That restored order,
+not merely its opening opcode zero, owns the complete service leg and suppresses
+spatial free acquisition until a fresh AI or player Patrol constructor replaces
+it. The saveable capital-restore provenance now lasts for that order lifetime;
+the established Stop, Attack, and Patrol replacement paths clear it. Fresh
+capital Patrols, small warships, flyers, and land Patrol handoffs retain their
+existing acquisition rules. The implementation contains no mission, map,
+coordinate, fixture, exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Orc 11 battleship slot 1539 / Java unit 61 restores its
+saved Patrol toward behavior-six home `(21,34)` on fixture 397 and first-steps
+north-east on fixture 400. On fixture 453 its later Move-body OP0 settles the
+next southeast stride. Native keeps current order 5, next order 60, and goal
+`(21,34)`; Java formerly selected destroyer slot 1521 / unit 79, silently
+rewrote the goal to `(8,34)`, and banked Attack while the sealed visible state
+still agreed. That latent queue became visible on fixture 506: native lands on
+`(14,32)` at pixel `(384,960)`, remains Patrol, and restarts Move at sequence
+2963 / timer one, while Java formerly stayed logically on `(12,30)` and
+promoted Attack. The candidate matches through fixture 538. Its newly exposed
+fixture-539 finding is the independent juggernaught slot-1512 HP split, native
+107 versus Java 103.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc11-c506-restored-capital-service-leg/runs/ee21e72a77f2f9b78da0c932817f4043f6da7c51678a8aa36ef1c15485e7574e`
+proves the focused real-data assertion executes and fails on `da33ceb`, then
+executes and passes on the candidate. All 16 focused XOrc 11 Patrol/Attack
+checks pass. The 149-check Patrol, sea-occupancy, and save family has 148
+passes and one pre-existing Human 7 submarine coast-goal failure; control
+receipt
+`.bne-test-efficacy/xorc11-c506-naval-patrol-baseline-control/runs/bacf647d2ca7ad2f1a717af3668735a6dbcf69c65199f65fc7240a31a10d0327`
+reproduces that same assertion failure on both `da33ceb` and the candidate.
+Both fixed 52-case gates pass. The long receipt's source capsule authenticates
+and replays its engine identity exactly with zero sealed untracked inputs.
+The ordinary executable next-level gate exits zero after 209 Python checks
+(four skipped), 99 engine/desktop checks, and 223 dual-adapter command
+scenarios; its 11 comparable scenarios remain 6 exact / 5 divergent with no
+regression or infrastructure failure. Remote AI discovery retains the
+documented strict SSH host-key debt for `i9beef`; no host key was modified,
+and local native evidence remains available directly on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 11 fixture 509, followed by expansion Human 2 and expansion Human 10 at
+512, Human 8 at 514, Human 13 at 523, expansion Human 5 at 530, and expansion
+Orc 11 at 539.
+
+## Prior release checkpoint — 2026-09-01 (special types own hit responses but bypass help and idle scans)
 
 Accepted cycle-1,800 receipt `af35d867` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
