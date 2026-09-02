@@ -4323,6 +4323,7 @@ public final class World {
                     || brother.player() != defender.player()
                     || brother.type() == null
                     || brother.type().building()
+                    || !battleNetHitHelpRecruitable(brother)
                     || !brother.type().canAttack()
                     || !brother.isAggressive()
                     || !brother.type().gathering().isEmpty()
@@ -4450,6 +4451,7 @@ public final class World {
                     || !brother.isOnMap()
                     || brother.player() != defender.player()
                     || brother.type() == null || brother.type().building()
+                    || !battleNetHitHelpRecruitable(brother)
                     || !brother.type().canAttack() || !brother.isAggressive()
                     || brother.order() != Unit.Order.STILL
                     || brother.currentAction() != Unit.Order.STILL
@@ -4538,6 +4540,7 @@ public final class World {
                     || !brother.isOnMap()
                     || brother.player() != defender.player()
                     || brother.type() == null || brother.type().building()
+                    || !battleNetHitHelpRecruitable(brother)
                     || !brother.type().canAttack()
                     || !brother.isAggressive()
                     || !brother.type().gathering().isEmpty()
@@ -4583,6 +4586,22 @@ public final class World {
         }
     }
 
+    /** Whether HitUnit's selection cache may recruit this nearby brother. */
+    private static boolean battleNetHitHelpRecruitable(Unit brother) {
+        if (brother == null || brother.type() == null) {
+            return false;
+        }
+        // FUN_0040a9d0 reads the candidate's type word at 0x0040abc5 and
+        // rejects any 0x06000300 bit before its armed/mobile test and
+        // GiveOrder writer. This is the same authenticated ten-type mask the
+        // path router consumes: workers, tankers, spellcasters and demolition
+        // units can own their direct hit response, but cannot be recruited as
+        // a nearby brother. Orc 11 sapper 1573 therefore ignores archer
+        // 1559's fixture-499 offer while ordinary ogre 1581 remains eligible.
+        return !BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(
+                brother.type().ident());
+    }
+
     /**
      * Person melee Still brothers answer a lethal splash on an ally.
      *
@@ -4615,6 +4634,7 @@ public final class World {
                     || brother.player() != defender.player()
                     || brother.type() == null
                     || brother.type().building()
+                    || !battleNetHitHelpRecruitable(brother)
                     || !brother.type().canAttack()
                     || !brother.isAggressive()
                     || !brother.type().gathering().isEmpty()
@@ -19334,8 +19354,8 @@ public final class World {
         // its only unarmed members. Orc 11 sapper 1573 / Java 27 is the
         // standing witness: its fixture-417 offer becomes a one-tile escape
         // on its fixture-418 marker.
-        if (BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())
-                && harvest.beginBattleNetStandingHitFlee(unit)) {
+        if (BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())) {
+            harvest.beginBattleNetStandingHitFlee(unit);
             return;
         }
         if (!unit.isAggressive()) {

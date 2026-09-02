@@ -544,6 +544,66 @@ class Orc11RecurringLandPatrolPassRealDataTest {
         assertEquals(21, struck.tileY());
     }
 
+    @Test
+    @DisplayName("orc 11's idle sapper skips later help and ordinary scans")
+    void orc11sIdleSapperSkipsLaterHelpAndOrdinaryScans() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc/level11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "Orc 11 is not in the pack");
+        World world = mission.world();
+
+        // Java 27 is native sapper 1573. Archer 41 / native 1559 hits ogre
+        // 19 / native 1581 on fixture 499. Native FUN_0040a9d0 rejects the
+        // sapper at its candidate type-word test (0x0040abc5), so no Attack
+        // is written behind the sapper's Still loop. Java formerly admitted
+        // it to the close-hit rectangle and promoted the queued Attack at the
+        // fixture-503 action marker.
+        Unit sapper = unitById(world, 27);
+        assertNotNull(sapper,
+                "Orc 11 has no Java 27 / native sapper 1573");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (fixtureCycle(world) < 498) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, sapper.order());
+        assertNull(sapper.battleNetPendingHelpAttack());
+
+        mission.tick();
+        assertEquals(499, fixtureCycle(world));
+        assertNull(sapper.battleNetPendingHelpAttack(),
+                "demolition units are not candidates in HitUnit's helper cache");
+
+        while (fixtureCycle(world) < 503) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, sapper.order(),
+                "the rejected help offer cannot promote on the next Still marker");
+        assertNull(sapper.target());
+        assertEquals(111, sapper.tileX());
+        assertEquals(21, sapper.tileY());
+
+        // Knight 42 / native 1548 enters range by fixture 703. Native keeps
+        // the sapper on Still because the same 0x06000300 type arm bypasses
+        // AutoAttack when no direct hit-owned offer exists. Java formerly
+        // acquired the knight at the world-cycle-705 action marker.
+        while (fixtureCycle(world) < 703) {
+            mission.tick();
+        }
+        assertEquals(Unit.Order.STILL, sapper.order(),
+                "the special-type dispatcher must bypass ordinary autoattack");
+        assertNull(sapper.target());
+        assertEquals(111, sapper.tileX());
+        assertEquals(21, sapper.tileY());
+    }
+
     private static int fixtureCycle(World world) {
         return (int) world.cycle() - BNE_INITIALIZATION_TICKS;
     }

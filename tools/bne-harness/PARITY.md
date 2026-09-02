@@ -15,7 +15,74 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (fresh empty gold route falls through to claimed-face wood)
+## Current release checkpoint — 2026-09-01 (special types own hit responses but bypass help and idle scans)
+
+Accepted cycle-1,800 receipt `af35d867` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 51,748 to 51,958. Retail Orc 11 is the only changed case,
+advancing from exact through fixture 502 to exact through fixture 712. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`fcfb8ee5`. The long receipt is retained at
+`.bne-artifacts/runs/af35d8679acfb6c058dd6c11c0008559dbe7391e7726dbe15df52cd188e9118c`.
+Its manifest has SHA-256
+`b710d89893bc22537d726cf4e179d0e447baf7db455c559677c04cfd1da66eaa`
+and binds dirty engine-input identity
+`05e0790aa0d67da0e7f0ffe72c671f785b21ef65167ac2eef61902965c2f73cc`
+at base revision `316d0d7` to authenticated, replayable source capsule
+`34c99fe9badadf77e75ae13648aa0c56c3616e1973bc7dea9353bc07f4ffca30`.
+
+Behavioral delta: HitUnit's native helper selector rejects candidates whose
+type word carries any `0x06000300` bit before its armed/mobile test and
+GiveOrder writer. Workers, oil tankers, spellcasters, and demolition units
+can therefore own their direct hit response but cannot be recruited as a
+nearby brother. Still's dispatcher applies the same type mask before ordinary
+hostile acquisition: it tries the direct hit-owned escape constructor and
+returns whether or not a live offer exists, rather than falling through to
+AutoAttack. Ordinary combat brothers remain eligible for hit help and
+ordinary combat types retain their idle scan. The implementation reuses the
+authenticated ten-type flag set and contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Orc 11 sapper slot 1573 / Java unit 27 is struck at `(112,22)`
+on fixture 417 and retains its direct one-tile northwest escape to `(111,21)`
+on fixtures 418..421. Archer slot 1559 / Java unit 41 later hits ogre slot
+1581 / Java unit 19 on fixture 499. Java formerly admitted the idle sapper to
+the close-hit helper rectangle and promoted that queued Attack on fixture
+503; native `FUN_0040a9d0` rejects its type at `0x0040abc5` under the
+`0x06000300` test. Once that helper error was removed, Java formerly
+auto-acquired knight slot 1548 / Java unit 42 on fixture 703, while native's
+`FUN_0040a5e0` type arm kept the unoffered sapper Still. Both paths now match.
+The newly exposed fixture-713 finding is a synchronized RNG draw that Java
+spends one cycle later through the melee-sync loop, not another sapper order
+split.
+
+Efficacy receipts
+`.bne-test-efficacy/orc11-c503-c703-special-type-idle/runs/1647138c7f99b038988be8615efd8ca04a5719cf9348a133840477bfcf16ade0`
+and
+`.bne-test-efficacy/special-type-idle-scan/runs/b43d3998ff284033572ecdf27d09d0f4be197e2a08d848b6e721b09bbdf915ae`
+prove the focused real-data and dispatcher assertions each execute and fail on
+`316d0d7`, then execute and pass on the candidate. The 117-test selected
+hit-help, idle, retarget, damage-timing, and patrol family retains exactly one
+pre-existing ranged-retarget failure, reproduced independently on `316d0d7`;
+the other 116 checks pass. Both fixed 52-case gates pass. The long receipt's
+source capsule authenticates and replays its engine identity exactly with
+zero sealed untracked inputs. The ordinary executable next-level gate exits
+zero after 209 Python checks (four skipped), 99 engine/desktop checks, and
+223 dual-adapter command scenarios; its 11 comparable scenarios remain 6
+exact / 5 divergent with no regression or infrastructure failure. Remote AI
+discovery retains the documented strict SSH host-key debt for `i9beef`; no
+host key was modified, and local native evidence remains available directly
+on this machine.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Orc 11 fixture 506, followed by expansion Human 11 at 509, expansion Human 2
+and expansion Human 10 at 512, Human 8 at 514, Human 13 at 523, expansion
+Human 5 at 530, and Human 5 at 536. Retail Orc 11 now follows at fixture 713.
+
+## Prior release checkpoint — 2026-09-01 (fresh empty gold route falls through to claimed-face wood)
 
 Accepted cycle-1,800 receipt `b78ed543` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

@@ -225,6 +225,35 @@ class BattleNetIdleAttackTest {
     }
 
     @Test
+    @DisplayName("special-type Still units bypass the ordinary hostile scan")
+    void specialTypeStillUnitsBypassTheOrdinaryHostileScan() {
+        // Still's FUN_0040a5e0 dispatcher routes native type mask 0x06000300
+        // through FUN_0040a670 instead of AutoAttack. With no live hit-owned
+        // offer the special unit remains Still; Orc 11 sapper 1573 is the
+        // sealed fixture-703 witness when knight 1548 enters its range.
+        GameMap map = new GameMap(16, 16, new Tileset());
+        for (int y = 0; y < map.height(); y++) {
+            for (int x = 0; x < map.width(); x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
+            }
+        }
+        World world = new World(map, opponents());
+        Unit sapper = world.createUnit(
+                fighter("unit-goblin-sappers", 50), 0, 8, 8);
+        Unit knight = world.createUnit(
+                fighter("unit-knight", 60), 1, 9, 9);
+        sapper.setBattleNetAnimationTimer(2);
+        knight.setBattleNetAnimationTimer(8);
+
+        world.tick();
+        world.tick();
+
+        assertEquals(Unit.Order.STILL, sapper.order(),
+                "a special type without a hit offer must not auto-acquire");
+        assertNull(sapper.target());
+    }
+
+    @Test
     @DisplayName("a person submarine with UNIT.Data still acquires at its idle marker")
     void personSubmarineAcquiresDespiteReadySuppressed() {
         // XHuman 7: person submarine 1422 carries non-zero PUD Data (native
