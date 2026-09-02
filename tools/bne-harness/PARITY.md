@@ -15,7 +15,64 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (paid moving-quarry residuals retain collision pressure)
+## Current release checkpoint — 2026-09-02 (trained units use the native producer-sized perimeter)
+
+Accepted cycle-1,800 receipt `abf9f793` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,243 to 52,605. Expansion Human 5 advances from exact
+through fixture 529 to exact through fixture 576. Human 10 advances from 548
+to 688, Human 13 from 546 to 643, Human 12 from 545 to 582, Orc 13 from 548 to
+575, and Human 14 from 547 to 561. The cycle-400 fleet remains 50 clean / 2
+divergent / 0 failed under receipt `a4f27ecc`. The long receipt is retained at
+`.bne-artifacts/runs/abf9f793f2c3abac8eed451596ce3b15ace6371cb904015970882de7f77bcee8`.
+Its manifest has SHA-256
+`8d6e24430889041f5653871ce3be596252cc53bbeba3e099e61f3d5136d5638a`
+and binds clean commit `9cae241` and engine-input identity
+`6dd540fb53cb5092e4d3ceeccf2e86eabfb4c598b66ae51ebe740e1202d9de3e`
+to replayable source capsule
+`c9cf6bc09144b10600a0edcda5d365e3fc1d64edc54a67ae578851e5200605ad`
+with zero untracked engine inputs.
+
+Behavioral delta: BNE training completion uses the shared `0x00443a40`
+first-legal-anchor perimeter walker. Caller `0x0040df48` passes the producer
+anchor and producer-type footprint to `0x00451a70`; callback `0x004512a0`
+validates the trainee's movement mask and rejects odd x or y anchors for a
+doubled-movement unit. Java now reuses its established native perimeter walk
+with those distinct producer and trainee roles. The ordinary non-BNE engine
+retains its prior generic dropout behavior. The implementation contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: expansion Human 5's player-three Orc shipyard, native slot 1534 /
+Java unit 66 at `(35,105)`, finishes its first tanker on fixture 530. Native
+rejects the odd first candidate `(34,105)` and accepts `(34,106)` for tanker
+slot 1500. Java formerly incorporated the 2x2 trainee hull into the generic
+footprint ring and surfaced unit 100 at `(34,108)`. The corrected anchor and
+subsequent orders agree through fixture 576. Expansion Human 3's fixture-536
+birth at `(80,32)` and expansion Human 8's fixture-532 birth at `(34,82)` are
+held-out already-correct controls.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/75ac425bb04813e75f403dc71988beadf4891423cbde256b12389d0869bee455`
+proves the focused expansion-Human-5 assertion executes and fails on
+`59f402d`, then executes and passes on the candidate. The three focused birth
+checks pass, as do 58 executed oil/dropout family checks with three documented
+asset-dependent skips. Both fixed 52-case gates pass. The ordinary executable
+next-level gate also exits zero after 209 Python checks (four skipped), 99
+engine/desktop checks, and 223 dual-adapter command scenarios; its comparable
+set remains 6 exact / 5 divergent with no regression or infrastructure
+failure. The stricter completion form correctly remains unsatisfied by the
+broader program's outstanding certification lanes.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now Human 8
+fixture 530, followed by Orc 12 at 531, expansion Human 2 at 533, Human 5 and
+expansion Human 8 at 536, expansion Human 3 at 537, and expansion Orc 11 at
+539.
+
+## Prior release checkpoint — 2026-09-02 (paid moving-quarry residuals retain collision pressure)
 
 Accepted cycle-1,800 receipt `95972c68` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
