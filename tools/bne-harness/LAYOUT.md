@@ -136,6 +136,27 @@ native distance function, and `0x004393f7` scores a mine as depot distance
 plus half the worker distance. This callback does not run ChonkCraft's A*-based
 reachable-depot test.
 
+### AI build-priority scan
+
+The ready-worker build-priority routine at `0x00439740` walks the list pointer
+stored at AI-player-state offset `0x23` alongside the player's 64-byte
+availability row at `0x004bdd30 + player * 64`. A position whose row byte is
+nonzero is skipped before its type code is considered. For a zero-row low unit
+or building code, the call to `0x0040dcd0` performs the type/resource test before
+the routine consults the per-type `UnitTypeBuilt` count at `0x004b4a38`.
+Resource failure exits the scan; a pending count is therefore not permission
+to shop past an unaffordable entry. Expansion Human 9 player 6 proves the
+ordering at fixture 507: position four is watch-tower code `0x40`, has row byte
+zero, is pending, and is unaffordable at 450 gold; execution returns before the
+later `0x80` research milestone is armed.
+
+High codes use the candidate-flag row rooted at `0x004acf34`, indexed by code
+and player. Once a producer has consumed the current high milestone, a later
+ready scan resumes after that resolved byte. Expansion Human 11 player 2
+therefore changes the `0x80` flag at `0x004acfea` from zero to one after its
+fixture-501 ready callback; the corresponding expansion Human 9 flag at
+`0x004ad056` remains zero after the blocked fixture-507 scan.
+
 ## Units
 
 `0x004aec94` holds the unit-pool pointer and `0x004ae270` its initialized slot

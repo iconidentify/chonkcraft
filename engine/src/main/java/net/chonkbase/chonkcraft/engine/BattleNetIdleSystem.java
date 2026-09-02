@@ -1202,7 +1202,15 @@ final class BattleNetIdleSystem {
             // 70/0 blacksmith c13 (freeze 4); 67 blacksmith c15 (freeze 6);
             // 65 XHuman 9 p6 third OP0 at fixture c19 (freeze 10) so axe1
             // does not fire four cycles early at c15.
-            freezeThrough = (profile == 70 || profile == 0) ? 4
+            // The secondary lumber-mill producer retains its own constructor
+            // visits beyond the blacksmith cadence. Profile 70 pulses on
+            // fixtures 4,9,...,509, one visit later; profile 67 is two visits
+            // later and spends the same 0x80 milestone on fixture 512. The
+            // distinction becomes visible only after a mine-exit ready scan
+            // exposes the second high byte.
+            freezeThrough = profile == 70 && World.battleNetIsLumberMill(hall)
+                    ? 5 : profile == 67 && World.battleNetIsLumberMill(hall)
+                    ? 8 : (profile == 70 || profile == 0) ? 4
                     : (profile == 65) ? 10 : 6;
         } else {
             freezeThrough = 2;

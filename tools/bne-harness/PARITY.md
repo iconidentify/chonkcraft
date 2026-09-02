@@ -15,7 +15,77 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-01 (restored capital Patrol owns its complete service leg)
+## Current release checkpoint — 2026-09-01 (ready scans advance through consumed research milestones)
+
+Accepted cycle-1,800 receipt `ab9f6f1f` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 51,991 to 52,139. Expansion Human 10 advances from exact
+through fixture 511 to exact through fixture 518, and expansion Human 11
+advances from exact through fixture 508 to exact through fixture 649. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`d398ce40`. The long receipt is retained at
+`.bne-artifacts/runs/ab9f6f1f6b47b91e874d7aab20219bec4ce1896cee09ef1c58798f7fe18f5da0`.
+Its manifest has SHA-256
+`871b494c8333d0ac3bf83119beb324afe8b456ea97f7745875616e131e34c73c`
+and binds dirty engine-input identity
+`4317075f6b78871a7f3f498a366b3e8bf3d4a20e3b9d6af40fe81f8ddc2af3eb`
+at base revision `2d9468c` to authenticated, replayable source capsule
+`7ce9c0faeb113c3a3bbe489d15a86639cf53a3d4444ddd3a157fd0aa1500123f`.
+
+Behavioral delta: `FUN_00439740`'s ordered ready-worker scan walks past a high
+research byte after its producer has consumed that milestone, exposing the
+next unresolved high byte on a later ready boundary. For low unit/building
+entries, the native affordability check precedes the shared
+`UnitTypeBuilt[type]` pending count: an unaffordable entry stops the scan even
+when that type already has a dispatched construction. The action-33 lumber-
+mill producer also retains its own constructor cadence, distinct from the
+same-profile blacksmith cadence, before consuming the exposed `0x80`
+milestone. The implementation contains no mission, map, coordinate, fixture,
+exact-cycle, faction, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 11 player 2 has already consumed high byte
+`0x86`; peon slot 1538's mine-exit ready scan on fixture 501 walks on and arms
+`0x80`. Lumber-mill slot 1540 then queues throwing-axe research on fixture
+509, leaving the native 1,350 gold / 900 lumber bank. Expansion Human 10
+player 2 follows its own mill cadence and queues the same second milestone on
+fixture 512, leaving 4,450 / 4,150. Expansion Human 9 player 6 is the negative
+control: its fixture-507 scan reaches zero-row list position four, watch-tower
+code `0x40`, with an existing pending tower but only 450 gold. Native
+exits there with the `0x80` candidate flag clear and does not spend 300 / 300
+at fixture 514. Host GDB execution and pinned-binary static analysis agree
+that the `0x40dcd0` resource check runs before the pending building-count
+read.
+
+Efficacy receipt
+`.bne-test-efficacy/sequential-action33-research-v2/runs/5eeab04622c732a36dd6f4ee8bee9847b4faa8b804465f4075589c14019bccab`
+proves all three real-data assertions execute: two fail on `2d9468c`, and all
+three pass on the candidate. The selected research/train/upgrade family runs
+61 checks with zero failures or errors and nine asset/profile skips. Both
+fixed 52-case gates pass. The scheduler gate passes six retail/RNG checks and
+the 22-case legacy diagnostic remains 19 passing / 3 classified / 0
+unclassified. The ordinary executable next-level gate exits zero after 209
+Python checks (four skipped), 99 engine/desktop checks, and 223 dual-adapter
+command scenarios; its comparable set remains 6 exact / 5 divergent with no
+regression or infrastructure failure.
+
+The retail AI gate retains one pre-existing `AiCompetenceTest` route-prefix
+exception outside this change. Baseline-control receipt
+`.bne-test-efficacy/sequential-action33-ai-gate-baseline-control/runs/ea99269fbba94b7346e0d2468e04db3f3f6b039f1b8b87fa26118daf105460c6`
+reproduces the same one executed test / zero failures / one error on both
+`2d9468c` and the candidate. Optional remote AI discovery also retains the
+documented strict SSH host-key debt for `i9beef`; no host key was modified,
+and local native evidence remains available directly on this machine. The
+long receipt's source capsule authenticates and replays its engine identity
+exactly with one sealed untracked input, the focused real-data test.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now
+expansion Human 2 fixture 512, followed by Human 8 at 514, expansion Human 10
+at 519, Human 13 at 523, expansion Human 5 at 530, and Orc 12 at 531.
+
+## Prior release checkpoint — 2026-09-01 (restored capital Patrol owns its complete service leg)
 
 Accepted cycle-1,800 receipt `b8c35423` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

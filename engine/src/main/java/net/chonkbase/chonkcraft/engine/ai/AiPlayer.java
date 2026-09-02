@@ -3670,9 +3670,15 @@ public final class AiPlayer {
                 // (Orc 7 profile 10: Java paid arrow1 at fixture 60; retail
                 // held both the bank and upgrade through 1,800). The scan
                 // exposes one unresolved milestone and stops at that byte.
-                if (!battleNetAction33ResolvedHigh.contains(listed)) {
-                    battleNetAction33Candidates.add(listed);
+                if (battleNetAction33ResolvedHigh.contains(listed)) {
+                    // A later ready boundary resumes the ordered scan after
+                    // the producer consumed this milestone. XHuman 11's
+                    // peon 1538 leaves its hall on fixture 501 after 0x86
+                    // was consumed; native walks on to 0x80 for the lumber
+                    // mill rather than stopping on the resolved byte again.
+                    continue;
                 }
+                battleNetAction33Candidates.add(listed);
                 return false;
             }
             if (satisfied[index]) {
@@ -3689,12 +3695,6 @@ public final class AiPlayer {
             if (wanted == null) {
                 continue;
             }
-            // UnitTypeBuilt is indexed by type rather than list occurrence.
-            // Once one building of a type has been dispatched, every later
-            // duplicate of that type is skipped until the job is delivered.
-            if (battleNetHasPending(world, wanted)) {
-                continue;
-            }
             // A forbidden or dependency-gated entry is unavailable in BNE's
             // parallel availability array, so the scan proceeds past it.
             if (world.allowed() != null
@@ -3704,15 +3704,27 @@ public final class AiPlayer {
             if (!world.dependenciesSatisfied(playerIndex, wanted.ident())) {
                 continue;
             }
+            // AiCheckUnitType's resource failure is evaluated before the
+            // UnitTypeBuilt count. XHuman 9 has a watch tower already
+            // dispatched at fixture 507, but only 450 gold: native stops on
+            // the unsatisfied 0x40 slot instead of skipping the pending type
+            // and exposing 0x80. Checking pending first made its lumber mill
+            // spend an extra 300/300 on fixture 514.
+            if (!player.canAfford(wanted.costs())) {
+                return false;
+            }
+            // UnitTypeBuilt is indexed by type rather than list occurrence.
+            // Once one building of a type has been dispatched, every later
+            // duplicate of that type is skipped until the job is delivered.
+            if (battleNetHasPending(world, wanted)) {
+                continue;
+            }
             // FUN_00439740's list mixes constructions and trainables. A peon
             // or footman code is not a site search: the ready worker asks an
             // idle hall/barracks to start that unit. Skipping non-buildings
             // left Human 13's computer halls with 1000 gold at fixture cycle
             // 15 while native had already spent 400 on a peon at each base.
             if (!wanted.building()) {
-                if (!player.canAfford(wanted.costs())) {
-                    return false;
-                }
                 if (startTrainingAtAnyIdleTrainer(world, wanted)) {
                     BuildRequest started = new BuildRequest(wanted, 1);
                     started.made = 1;
@@ -3723,11 +3735,6 @@ public final class AiPlayer {
             }
             if (!world.mayBuild(worker, wanted)) {
                 continue;
-            }
-            // AiCheckUnitType's resource failure ends this ready attempt; it
-            // does not shop farther down the priority list for a cheaper job.
-            if (!player.canAfford(wanted.costs())) {
-                return false;
             }
             int[] site = (listed & ~1) == 0x4a
                     ? world.aiFindBattleNetHallPlace(worker, wanted)
