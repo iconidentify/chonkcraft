@@ -4556,7 +4556,15 @@ public final class World {
             }
             boolean standingRecruit = brother.order() == Unit.Order.STILL
                     && brother.currentAction() == Unit.Order.STILL
-                    && brother.target() == null;
+                    && brother.target() == null
+                    && brother.offeredTarget() == null;
+            // A victim already visited by this splash walk owns the source
+            // in HitUnit's +0x54 bank and is no longer an idle brother for a
+            // later victim's AiHelpMe rectangle. XHuman 10's center knight
+            // 1493 recruits 1485/1480 first; when 1485 is visited next, the
+            // center's live offer prevents a reverse recruitment. The moved-
+            // target XOrc 11 hammer still recruits from its first accepted
+            // outer victim, before those brothers receive any local offer.
             boolean liveAttackOffer = brother.order() == Unit.Order.ATTACK
                     && brother.currentAction() == Unit.Order.ATTACK
                     && brother.target() != null

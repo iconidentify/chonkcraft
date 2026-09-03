@@ -1025,18 +1025,17 @@ final class BattleNetProjectileSystem {
                 if (person && !personNavalHit && source != null
                         && (candidate.type() == null
                                 || !candidate.type().wall())) {
-                    // The center victim crosses ordinary HitUnit, including
-                    // its close-brother selection, before the outer splash
-                    // walk. XHuman 10's center knight 1493 therefore banks
-                    // catapult 1487 locally and queues close knights 1485 and
-                    // 1480; their later outer hits add their own +0x54 offers.
-                    // Running spatial help for every outer victim recruits a
-                    // second ring which native never selected.
-                    if (candidate == missile.target()) {
-                        world.battleNetSpatialHitHelp(source, candidate);
-                    } else {
-                        world.battleNetOfferHitSource(source, candidate);
-                    }
+                    // FUN_00410680 calls HitUnit at 0x00410762 for every
+                    // positive cache victim, even when the projectile's
+                    // original target has moved outside the impact. HitUnit
+                    // then enters AiHelpMe at 0x00418524. XOrc 11's
+                    // fixture-555 gryphon hammer misses its named ogre; the
+                    // first outer axethrower still recruits four close
+                    // brothers, and the later victim receives its own offer.
+                    // XHuman 10's center knight remains the first cache victim;
+                    // the native candidate gates suppress any wider second
+                    // ring when its outer brothers are visited afterward.
+                    world.battleNetSpatialHitHelp(source, candidate);
                 }
                 candidate.setHitPoints(before - damage);
                 // Splash never calls applyDamage; OP0-damage bulk hold still

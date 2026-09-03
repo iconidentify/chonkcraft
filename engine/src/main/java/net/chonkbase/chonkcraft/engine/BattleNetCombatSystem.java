@@ -837,6 +837,57 @@ final class BattleNetCombatSystem {
                 return;
             }
         }
+        int hitOfferAttackStart = world.battleNetSequence == null ? -1
+                : world.idle.battleNetSequenceStart(unit,
+                        BattleNetSequence.ATTACK_ANIMATION);
+        boolean rangedHitOfferConstructor =
+                unit.battleNetPersonHelpFirstChase()
+                && unit.type() != null && unit.type().firesMissile()
+                && hitOfferAttackStart >= 0
+                && unit.battleNetSequenceOffset() == hitOfferAttackStart
+                && unit.target() != null && unit.target().isAlive()
+                && !unit.isMoving() && unit.pathLength() == 0
+                && !world.targets.inAttackRange(unit, unit.target());
+        if (rangedHitOfferConstructor) {
+            // The parallel renderer can publish the replaced Still program's
+            // marker again while the new native Attack constructor drains.
+            // It has no authority over this order after NewAction.
+            world.battleNetAttackMarkers.remove(unit);
+            world.battleNetInlineAttackMarkers.remove(unit);
+            if (unit.battleNetAnimationTimer() > 1) {
+                // Keep the whole quiet constructor under the pending action's
+                // ownership. The generic sequence helper deliberately returns
+                // false on a plain wait, which would let the outer order body
+                // interpret the replaced presentation marker as EndAction.
+                unit.setBattleNetAnimationTimer(
+                        unit.battleNetAnimationTimer() - 1);
+                return;
+            }
+        }
+        boolean repeatRangedHitOfferConstructor =
+                rangedHitOfferConstructor
+                && unit.battleNetAnimationTimer() == 1;
+        if (repeatRangedHitOfferConstructor) {
+            int react = Math.max(unit.type().reactRange(true),
+                    Math.max(1, unit.type().maxAttackRange()));
+            Unit hitCandidate = world.targets.findBattleNetHostile(
+                    unit, react, unit.target());
+            if (hitCandidate == unit.target()) {
+                // COrder_Attack's timer-one OP0 decrements the compact
+                // animation byte at 0x00402451. The HitUnit source remains in
+                // COrder_Attack's +0x88 incumbent bank, so AutoSelectTarget
+                // retains it and queues action 12 through 0x004513d0. The
+                // same visit promotes that pending action in
+                // 0x00452ef0 and restores timer three at 0x00453023. XOrc 11
+                // axe 1498 / Java 102 therefore repeats 887/3,2,1 while the
+                // gryphon remains outside range, rather than ending Attack
+                // at fixture 559.
+                unit.setBattleNetSequenceOffset(hitOfferAttackStart);
+                unit.setBattleNetAnimationTimer(3);
+                unit.setBattleNetOrderDelay(0);
+                return;
+            }
+        }
         boolean completedPersonHelpRetargetHandoff = false;
         // A lethal-splash help chase retains its commanded route while native
         // pays Attack construction 3,2,1, then hands ownership to automatic

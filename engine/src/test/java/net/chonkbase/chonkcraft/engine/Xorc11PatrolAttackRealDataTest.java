@@ -378,6 +378,126 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
+    @DisplayName("xorc 11's first accepted off-target splash victim recruits its close brothers")
+    void xorc11sFirstAcceptedOffTargetSplashVictimRecruitsCloseBrothers() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+
+        // The fixture-555 gryphon hammer still names native slot 1512 / Java
+        // 88, but that ogre has moved away from the impact. Native's first
+        // accepted cache victim is axe 1507 / Java 93. Its HitUnit visit
+        // writes the gryphon into +0x54 and calls AiHelpMe, which queues
+        // Attack for close brothers 1500 / Java 100 and 1508 / Java 92.
+        Unit attacker = unitById(world, 11);
+        Unit originalTarget = unitById(world, 88);
+        Unit firstVictim = unitById(world, 93);
+        Unit secondVictim = unitById(world, 102);
+        Unit upperBrother = unitById(world, 92);
+        Unit lowerBrother = unitById(world, 100);
+        assertNotNull(attacker, "native slot 1589's gryphon is absent");
+        assertNotNull(originalTarget, "native slot 1512's ogre is absent");
+        assertNotNull(firstVictim, "native slot 1507's axethrower is absent");
+        assertNotNull(secondVictim, "native slot 1498's axethrower is absent");
+        assertNotNull(upperBrother, "native slot 1508's axethrower is absent");
+        assertNotNull(lowerBrother, "native slot 1500's axethrower is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 554) {
+            mission.tick();
+        }
+        assertEquals(40, firstVictim.hitPoints());
+        assertEquals(40, secondVictim.hitPoints());
+        assertNull(upperBrother.battleNetPendingHelpAttack());
+        assertNull(lowerBrother.battleNetPendingHelpAttack());
+
+        mission.tick();
+        assertEquals(555, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(38, firstVictim.hitPoints());
+        assertEquals(37, secondVictim.hitPoints());
+        assertEquals(107, originalTarget.hitPoints(),
+                "the moved original target stays outside its old impact");
+        assertSame(attacker, firstVictim.offeredTarget(),
+                "the first accepted victim owns the native source offer");
+        assertSame(attacker, secondVictim.offeredTarget(),
+                "the later splash victim still owns its local source offer");
+        assertSame(attacker, upperBrother.battleNetPendingHelpAttack(),
+                "AiHelpMe queues native slot 1508 at the first victim's hit");
+        assertSame(attacker, lowerBrother.battleNetPendingHelpAttack(),
+                "AiHelpMe queues native slot 1500 at the first victim's hit");
+
+        mission.tick();
+        assertEquals(Unit.Order.STILL, upperBrother.order());
+        assertEquals(Unit.Order.STILL, lowerBrother.order(),
+                "both helpers wait for their fixture-557 Still marker");
+        assertEquals(Unit.Order.ATTACK, secondVictim.order());
+        assertEquals(3, secondVictim.battleNetAnimationTimer());
+        assertTrue(secondVictim.battleNetPersonHelpFirstChase());
+        mission.tick();
+        assertEquals(557, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, upperBrother.order());
+        assertEquals(Unit.Order.ATTACK, lowerBrother.order());
+        assertSame(attacker, upperBrother.target());
+        assertSame(attacker, lowerBrother.target());
+        assertEquals(887, upperBrother.battleNetSequenceOffset());
+        assertEquals(887, lowerBrother.battleNetSequenceOffset());
+        assertEquals(3, upperBrother.battleNetAnimationTimer());
+        assertEquals(3, lowerBrother.battleNetAnimationTimer());
+
+        // The second cache victim had already been recruited by the first
+        // victim before its own HitUnit visit. It promotes one fixture ahead
+        // of the two ordinary helpers and drains Attack construction 3,2,1.
+        // On the timer-one OP0 visit native's AutoSelectTarget chooses the
+        // still-live gryphon again, queues action 12, and NewAction restores
+        // this same constructor at timer three rather than ending the order.
+        assertEquals(Unit.Order.ATTACK, secondVictim.order());
+        assertEquals(2, secondVictim.battleNetAnimationTimer());
+        mission.tick();
+        assertEquals(558, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, secondVictim.order());
+        assertEquals(1, secondVictim.battleNetAnimationTimer());
+        assertTrue(secondVictim.battleNetPersonHelpFirstChase());
+        assertEquals(0, secondVictim.pathLength());
+        assertSame(attacker, secondVictim.target());
+        assertTrue(secondVictim.type().firesMissile());
+        assertTrue(!world.targets.inAttackRange(secondVictim, attacker));
+        int react = Math.max(secondVictim.type().reactRange(true),
+                Math.max(1, secondVictim.type().maxAttackRange()));
+        assertSame(attacker, world.targets.findBattleNetHostile(
+                secondVictim, react, secondVictim.target()));
+        mission.tick();
+        assertEquals(559, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, secondVictim.order(),
+                "the native OP0 rescan requeues the same hit source");
+        assertSame(attacker, secondVictim.target());
+        assertEquals(887, secondVictim.battleNetSequenceOffset());
+        assertEquals(3, secondVictim.battleNetAnimationTimer(),
+                "NewActionAttack restores the ranged constructor");
+        assertTrue(secondVictim.battleNetPersonHelpFirstChase());
+        mission.tick();
+        assertEquals(560, world.cycle() - BNE_INITIALIZATION_TICKS);
+        assertEquals(Unit.Order.ATTACK, secondVictim.order());
+        assertEquals(2, secondVictim.battleNetAnimationTimer());
+        for (int fixture = 561; fixture <= 565; fixture++) {
+            mission.tick();
+            assertEquals(Unit.Order.ATTACK, secondVictim.order(),
+                    "the retained hit source repeats at fixture " + fixture);
+            assertSame(attacker, secondVictim.target());
+            assertEquals(3 - Math.floorMod(fixture - 559, 3),
+                    secondVictim.battleNetAnimationTimer(),
+                    "native constructor cadence at fixture " + fixture);
+        }
+    }
+
+    @Test
     @DisplayName("xorc 11's responding destroyer rescans before its cold broadside")
     void xorc11sRespondingDestroyerPaysColdAttackConstructionAfterItsFinalChaseStride() {
         AssetSource assets = AssetSource.fromEnvironment();
