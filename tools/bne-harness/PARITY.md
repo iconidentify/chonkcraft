@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (owned oil-platform builds route to the patch centre)
+## Current release checkpoint — 2026-09-02 (same-cycle births stay at the action-table tail)
+
+Accepted cycle-1,800 receipt `be167741` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the directly recomputed sum
+of the 52 exact prefixes rises from 54,081 to 54,099. Expansion Orc 11 is the
+only changed case, advancing from exact through fixture 538 to exact through
+fixture 556. The newly exposed fixture-557 finding is that native axethrowers
+in slots 1500 and 1508 are in Attack while their paired Java units are Still.
+The long receipt is retained at
+`.bne-artifacts/runs/be167741745eb042722e05a95750d3b00c39e352a79732eb1ea38c9f2e780143`.
+Its manifest has SHA-256
+`e0b3219117a9ee38e4013f347bd6cfc439e20beaf3b7827ea9ed2958f60edf6d`,
+and binds clean commit `bf46c81`, engine-input identity
+`e83f07873fd7ea7392b21ffa442b8f9cc73c1c6bddecd826b87651c4ce11bf34`,
+and replayable source capsule
+`beed99e1e03afed567657e75dd3b0583498a30ea27abe473a596e49fb0833520`
+with zero untracked engine inputs.
+
+Behavioral delta: a unit born during the active UnitActions pass remains in
+the pending-birth tail until the pass closes. Releasing a unit from the active
+action table swaps in only the last already-active unit; it cannot pull a
+same-cycle newborn forward into the released slot. Pending births append after
+all active releases have completed. This is the native table lifecycle and
+contains no mission, map, faction, coordinate, fixture, exact-cycle,
+route-length, or unit-ID branch.
+
+Proof delta: expansion Orc 11's peasant native slot 1408 / Java unit 194 is
+born at fixture 482 while corpse native slot 1525 / Java unit 75 releases in
+the same cycle. Native leaves the peasant outside the active table until cycle
+close, so at fixture 487 it owns the first idle draw; Java formerly filled the
+corpse's middle action-table hole with that pending peasant and processed it
+after native slot 1524 / Java unit 76. That reorder swaps the idle result owned
+by zeppelin native slot 1502 / Java unit 98 and shifts its later rearm cadence.
+At fixture 539 the native gryphon projectile consumes its action-seven motion
+draw before damage result 13722, producing 9 damage, while Java formerly used
+the preceding result 27974 and produced 13. The corrected ogre juggernaut has
+107 HP, not 103, and the case agrees through fixture 556.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc11-same-cycle-birth-tail-real-data/runs/db19a3513f4258e4f1b2e2f7c1135f42816e7eff947c2ccca957729137abbb9b`
+proves the real-data assertion executes and fails on `4b31f88`, then executes
+and passes on the candidate. The focused real-data test passes, as do all 20
+`CorpseTest` checks. Both fixed 52-case gates pass, and the long receipt's
+source capsule authenticates and replays exactly. The ordinary executable
+next-level gate exits zero after 209 Python checks (four skipped), 99
+engine/desktop checks, and 223 dual-adapter command scenarios; its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. The optional SSH discovery still refuses the stale
+`i9beef` host key; local native capture remains available and no SSH bypass was
+used.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 2 at fixture 554, followed by expansion Orc 11 at 557, expansion Human
+10 at 562, expansion Human 7 at 573, Orc 13 at 576, and expansion Human 5 at
+577.
+
+## Prior release checkpoint — 2026-09-02 (owned oil-platform builds route to the patch centre)
 
 Accepted cycle-1,800 receipt `ec005e92` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
