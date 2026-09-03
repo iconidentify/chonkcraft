@@ -1156,11 +1156,21 @@ final class BattleNetConstructionSystem {
         // GiveOrder/0x41f430 derives the latter from the builder's position.
         // Collapsing the two happened to preserve the walk but founded a
         // four-by-four hall at its top-right approach square.
+        //
+        // Oil platforms take the explicit middle arm of 0x41f670 instead:
+        // type flag 0x00000800 increments both coordinates once. That flag
+        // belongs exactly to the two platform types. XHuman 8's 3x3 patch at
+        // 41,85 therefore remains the foundation but action 28 routes its
+        // tanker toward 42,86, the centre.
+        boolean oilPlatform = what.building()
+                && what.givesResource() == UnitType.Resource.OIL;
         worker.setBuildGoal(
-                world.battleNetFootprintGoal(worker.tileX(), tileX,
-                        Math.max(1, what.tileWidth())),
-                world.battleNetFootprintGoal(worker.tileY(), tileY,
-                        Math.max(1, what.tileHeight())));
+                oilPlatform ? tileX + 1
+                        : world.battleNetFootprintGoal(worker.tileX(), tileX,
+                                Math.max(1, what.tileWidth())),
+                oilPlatform ? tileY + 1
+                        : world.battleNetFootprintGoal(worker.tileY(), tileY,
+                                Math.max(1, what.tileHeight())));
         if (World.BNE_IDLE_TRACE) {
             System.err.printf(
                     "JBNBUILDORDER cycle=%d unit=%d at=%d,%d site=%d,%d size=%dx%d goal=%d,%d type=%s%n",
@@ -1767,46 +1777,38 @@ final class BattleNetConstructionSystem {
         }
         if (!atSite) {
             worker.setBuildWalked(true);
-            if (what.onTopRule() != null) {
-                // Aimed beside, not at: a route into the parent's own squares
-                // is a route to ground nothing can stand on, and asking for one
-                // gets no route at all and an order abandoned on its first
-                // cycle. findRouteToOrBeside is the form that knows this.
-                world.movement.walkTowards(worker, siteX, siteY);
-            } else {
-                // A paid AI build route has one terminal shape that the
-                // point finder must not turn into a brand-new journey. The
-                // final cached heading can be refused again on the same visit
-                // that drains the preceding step: one heading was left, the
-                // route had already paid at least three tile steps and one
-                // refusal, and the unit was still Moving on entry, but it
-                // leaves the visit standing with the buffer parked and another
-                // refusal in the retail counter. Native leaves Build visible for that
-                // checkpoint, then returns the worker through its ready
-                // callback on the following action visit. XHuman 12 slot
-                // 1376 does exactly this at (10,85): its final SE is occupied
-                // by a harvesting peon, Build survives fixture 135, and the
-                // ready callback selects gold on 136.
-                //
-                // Capture the transition, rather than testing the resulting
-                // empty route alone. Empty routes also mean an ordinary
-                // first path request, a free-prefix boundary, and a completed
-                // successful segment; treating any of those as terminal
-                // would make the AI abandon valid construction work.
-                int routeBeforeWalk = worker.pathLength();
-                boolean movingBeforeWalk = worker.isMoving();
-                int refusalsBeforeWalk = worker.battleNetRefusals();
-                int stepsBeforeWalk = worker.battleNetPathStepsTaken();
-                walkToSite(worker, siteX, siteY, siteW, siteH, nearest, reach);
-                if (world.battleNetAiBuildReservations.contains(worker)
-                        && worker.order() == Unit.Order.BUILD
-                        && movingBeforeWalk && routeBeforeWalk == 1
-                        && refusalsBeforeWalk > 0 && stepsBeforeWalk >= 3
-                        && !worker.isMoving() && worker.pathLength() == 0
-                        && !worker.routeSpent() && worker.stepDrained()
-                        && worker.battleNetRefusals() > refusalsBeforeWalk) {
-                    worker.setBattleNetAiBuildTerminalRetry(true);
-                }
+            // A paid AI build route has one terminal shape that the
+            // point finder must not turn into a brand-new journey. The
+            // final cached heading can be refused again on the same visit
+            // that drains the preceding step: one heading was left, the
+            // route had already paid at least three tile steps and one
+            // refusal, and the unit was still Moving on entry, but it
+            // leaves the visit standing with the buffer parked and another
+            // refusal in the retail counter. Native leaves Build visible for that
+            // checkpoint, then returns the worker through its ready
+            // callback on the following action visit. XHuman 12 slot
+            // 1376 does exactly this at (10,85): its final SE is occupied
+            // by a harvesting peon, Build survives fixture 135, and the
+            // ready callback selects gold on 136.
+            //
+            // Capture the transition, rather than testing the resulting
+            // empty route alone. Empty routes also mean an ordinary
+            // first path request, a free-prefix boundary, and a completed
+            // successful segment; treating any of those as terminal
+            // would make the AI abandon valid construction work.
+            int routeBeforeWalk = worker.pathLength();
+            boolean movingBeforeWalk = worker.isMoving();
+            int refusalsBeforeWalk = worker.battleNetRefusals();
+            int stepsBeforeWalk = worker.battleNetPathStepsTaken();
+            walkToSite(worker, siteX, siteY, siteW, siteH, nearest, reach);
+            if (world.battleNetAiBuildReservations.contains(worker)
+                    && worker.order() == Unit.Order.BUILD
+                    && movingBeforeWalk && routeBeforeWalk == 1
+                    && refusalsBeforeWalk > 0 && stepsBeforeWalk >= 3
+                    && !worker.isMoving() && worker.pathLength() == 0
+                    && !worker.routeSpent() && worker.stepDrained()
+                    && worker.battleNetRefusals() > refusalsBeforeWalk) {
+                worker.setBattleNetAiBuildTerminalRetry(true);
             }
             if (worker.order() != Unit.Order.BUILD) {
                 aiHandBackBuild(worker);

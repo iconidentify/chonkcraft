@@ -83,7 +83,8 @@ class BattleNetAiOilPlatformRealDataTest {
                     founded = true;
                 }
                 if (unit.order() == Unit.Order.BUILD
-                        && unit.buildGoalX() == 105 && unit.buildGoalY() == 49) {
+                        && unit.buildTileX() == 105 && unit.buildTileY() == 49
+                        && unit.buildGoalX() == 106 && unit.buildGoalY() == 50) {
                     walking = true;
                 }
             }
@@ -149,11 +150,34 @@ class BattleNetAiOilPlatformRealDataTest {
         assertTrue(tanker.pendingBuild() != null
                         && "unit-orc-oil-platform".equals(tanker.pendingBuild().ident()),
                 "the tanker's build order must own the orc oil platform");
+        assertEquals(41, tanker.buildTileX(),
+                "the platform foundation stays on the selected patch");
+        assertEquals(85, tanker.buildTileY(),
+                "the platform foundation stays on the selected patch");
+        assertEquals(42, tanker.buildGoalX(),
+                "native flag 0x800 shifts the route point to the patch centre");
+        assertEquals(86, tanker.buildGoalY(),
+                "native flag 0x800 shifts the route point to the patch centre");
         Player player = world.player(3);
         assertEquals(50, player.get(UnitType.Resource.GOLD),
                 "fixture 536 debits the platform's 700 gold");
         assertEquals(950, player.get(UnitType.Resource.WOOD),
                 "fixture 536 debits the platform's 450 wood");
+
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 539) {
+            mission.tick();
+        }
+        assertEquals(36, tanker.tileX(),
+                "the centred route first commits southeast");
+        assertEquals(84, tanker.tileY(),
+                "the centred route first commits southeast");
+        Unit destroyer = firstUnit(world, 3, "unit-orc-destroyer");
+        assertTrue(destroyer != null,
+                "XHuman 8 has no player-three destroyer at fixture 539");
+        assertEquals(36, destroyer.tileX(),
+                "the tanker must leave the destroyer's east square free");
+        assertEquals(82, destroyer.tileY(),
+                "the tanker must leave the destroyer's east square free");
     }
 
     private static Unit firstTanker(World world, int player) {
@@ -167,6 +191,16 @@ class BattleNetAiOilPlatformRealDataTest {
             String ident = unit.type().ident();
             if ("unit-orc-oil-tanker".equals(ident)
                     || "unit-human-oil-tanker".equals(ident)) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit firstUnit(World world, int player, String ident) {
+        for (Unit unit : world.units()) {
+            if (unit != null && unit.isAlive() && unit.player() == player
+                    && unit.type() != null && ident.equals(unit.type().ident())) {
                 return unit;
             }
         }

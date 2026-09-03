@@ -1163,6 +1163,25 @@ Grouped by word, over the types the PUD enumeration names:
 | `0c0a0001` | 2 | unit-mage (10), unit-white-mage (24) |
 | `0c0a8001` | 2 | unit-death-knight (11), unit-evil-knight (21) |
 
+### Build-order point conversion for oil platforms
+
+Raw build action 28 enters the handler at `0x00436a80`. It copies the
+foundation top-left from unit offsets `+0x80/+0x82` into the fixed movement
+point at `+0x84/+0x86`, then calls `0x0041f670` with that point and the building
+type byte at `+0x7f`. The converter reads the table above and has three ordered
+arms: flag `0x00010000` calls the connected-building point selector at
+`0x0041f4d0`; otherwise flag `0x00000800` increments both point coordinates at
+`0x0041f6a2..0x0041f6a9`; all remaining types call the ordinary footprint
+projection at `0x0041f430`.
+
+The full table proves that `0x00000800` belongs exactly to the human and orc
+oil-platform types (`00000820`). Thus a platform foundation on a 3-by-3 oil
+patch at `(x,y)` retains `(x,y)` in `+0x80`, while its build walk is aimed at
+the patch centre `(x+1,y+1)` in `+0x84`. Expansion Human 8 supplies the dynamic
+witness: native action 28 keeps patch `(41,85)`, stores point `(42,86)`, and
+the doubled tanker first commits south-east rather than taking the destroyer's
+east square.
+
 Four bits are legible straight from that grouping, and are the ones the
 assigner's arms test:
 
