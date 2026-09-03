@@ -15,7 +15,77 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (settled ranged loops leave constructors to opcode ten)
+## Current release checkpoint — 2026-09-02 (owned oil-platform builds route to the patch centre)
+
+Accepted cycle-1,800 receipt `ec005e92` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, and the directly recomputed sum of
+the 52 exact prefixes rises from 53,561 in the preceding authenticated survey
+to 54,081, a gain of 520 cycles. The preceding prose headline's 53,190 was
+arithmetically stale; its retained `d6a55c37` survey itself records 53,561.
+Expansion Human 3 advances from exact through fixture 536 to exact through
+fixture 893, expansion Human 8 advances from 535 through 634, and Human 14
+advances from 561 through 625. The cycle-400 fleet remains 50 clean / 2
+divergent / 0 failed under receipt `f1d88fd5`. The long receipt is retained at
+`.bne-artifacts/runs/ec005e92fb8ee4057639a6cc6570d38b5d6930490a2fc831136e2dbf46daa74d`.
+Its manifest has SHA-256
+`9276b2d7cab7838e2668e4dac7004291da5ef8051a7fefdb5474e2a7e74a6096`,
+and binds clean commit `25b8ecd`, engine-input identity
+`3c85517328c3ec675509b486e81782cd39da6d18f4a7cbcf3eb5e83fbfde7f86`,
+and replayable source capsule
+`0f09cafd2e3eae62c9612a6e14fe17edca2b7486ada8580866a877912fee1523`
+with zero untracked engine inputs.
+
+Behavioral delta: the constructor-ready tanker now considers only oil
+platforms on its owner's roster. An allied computer's platform cannot suppress
+the tanker's own platform build. Once action 28 is installed, an oil-platform
+foundation retains the selected patch's top-left coordinate while its fixed
+movement point is the patch centre. All on-top builds now take the same fixed
+point walk as the native Build action rather than discarding that point for a
+generic walk toward the top-left. The rule is expressed by ownership, building
+resource type, on-top construction, and native order state; it contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or unit
+ID branch.
+
+Proof delta: expansion Human 8 player three's tanker is ready at fixture 536
+while allied computer player seven owns the only reachable platform. Native
+`0x439b1f` opens the tanker's owner roster and `0x439b4c` rejects a candidate
+whose owner byte differs, so action 28 buys an orc oil platform and debits the
+bank to 50 gold / 950 wood. Its patch stays `(41,85)`. Native action handler
+`0x436a80` copies that top-left into the movement point and `0x41f670` tests
+type flag `0x00000800`, which belongs exactly to the two platform types, then
+increments both axes to `(42,86)`. The doubled tanker consequently commits
+south-east to `(36,84)` at fixture 539 while the destroyer takes `(36,82)`.
+Java formerly routed the tanker east to the destroyer's square. The corrected
+case agrees through fixture 634; the newly exposed fixture-635 finding is the
+tanker's x coordinate, native 42 versus Java 40. Human 14 and expansion Human
+3 independently exercise the same platform-centre path and account for the
+other 421 exact cycles gained.
+
+Efficacy receipts
+`.bne-test-efficacy/xhuman8-owned-platform/runs/992f6d03320c9d422e580e24d10ea01bea7556ff34b8a9fdcef473daa0c6b26b`
+and
+`.bne-test-efficacy/xhuman8-oil-platform-goal/runs/8df4ea544e6eeda82aa3a6169ff6267f5d89b95537e7e0e2807d6ca2fb564b8b`
+prove the focused real-data checks execute and fail on their respective
+pre-fix revisions, then execute and pass on the candidates. All four focused
+oil-platform real-data checks pass. The 84-check construction, placement,
+builder-permission, and oil-platform selection runs with 82 passes and two
+inherited skips. Both fixed 52-case gates pass, and the long receipt's source
+capsule authenticates and replays exactly. The ordinary executable next-level
+gate exits zero after 209 Python checks (four skipped), 99 engine/desktop
+checks, and 223 dual-adapter command scenarios; its 11 comparable scenarios
+remain 6 exact / 5 divergent with no regression or infrastructure failure.
+The optional SSH discovery still refuses the stale `i9beef` host key; local
+native capture remains available and no SSH bypass was used.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Orc 11 at fixture 539, followed by expansion Human 2 at 554, expansion Human
+10 at 562, expansion Human 7 at 573, Orc 13 at 576, and expansion Human 5 at
+577.
+
+## Prior release checkpoint — 2026-09-02 (settled ranged loops leave constructors to opcode ten)
 
 Accepted cycle-1,800 receipt `d6a55c37` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
