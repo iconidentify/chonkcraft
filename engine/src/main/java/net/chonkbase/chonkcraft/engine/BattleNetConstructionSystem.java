@@ -725,7 +725,8 @@ final class BattleNetConstructionSystem {
                     || !candidate.isMoving()
                     || candidate.pathLength() != 0
                     || !candidate.routeSpent()
-                    || candidate.battleNetCollisionCounter() != 0) {
+                    || candidate.battleNetCollisionCounter() != 0
+                    || !battleNetGoldSkirtStepJustCommitted(candidate)) {
                 return false;
             }
             found = true;
@@ -746,6 +747,20 @@ final class BattleNetConstructionSystem {
                     world.cycle(), worker.id(), target.id(), x, y);
         }
         return fixedFree;
+    }
+
+
+    /** Whether a terminal route step still owns its complete pixel debt. */
+    private boolean battleNetGoldSkirtStepJustCommitted(Unit candidate) {
+        int heading = candidate.lastStepHeading();
+        if (heading < 0 || heading >= Direction.COUNT) {
+            return false;
+        }
+        int pixels = Unit.TILE_PIXELS
+                * world.battleNetMovementStride(candidate);
+        return candidate.offsetX() == -Direction.deltaX(heading) * pixels
+                && candidate.offsetY()
+                        == -Direction.deltaY(heading) * pixels;
     }
 
 

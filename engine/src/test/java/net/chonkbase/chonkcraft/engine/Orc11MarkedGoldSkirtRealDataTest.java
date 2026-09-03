@@ -99,6 +99,12 @@ class Orc11MarkedGoldSkirtRealDataTest {
                 "the crossing worker has consumed its last route byte");
         assertTrue(crossingPeasant.routeSpent(),
                 "the crossing worker owns only its terminal residual");
+        assertEquals(Direction.fromDelta(-1, 1),
+                crossingPeasant.lastStepHeading());
+        assertEquals(Unit.TILE_PIXELS, crossingPeasant.offsetX(),
+                "the south-west step was committed earlier in this scheduler pass");
+        assertEquals(-Unit.TILE_PIXELS, crossingPeasant.offsetY(),
+                "the complete diagonal pixel debt distinguishes a fresh step");
         assertEquals(5, peasant.pathLength(),
                 "after consuming the opening SE, native's six-byte route has five left");
         assertEquals(Direction.fromDelta(1, 1), peasant.peekHeading(),
