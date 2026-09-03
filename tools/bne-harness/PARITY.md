@@ -15,7 +15,66 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (same-cycle births stay at the action-table tail)
+## Current release checkpoint — 2026-09-03 (point-to-point hit missiles finish their impact animation)
+
+Accepted cycle-1,800 receipt `66d9458f` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the directly recomputed sum
+of the 52 exact prefixes rises from 54,099 to 54,130. Expansion Human 2 is the
+only changed case, advancing from exact through fixture 553 to exact through
+fixture 584. Its newly exposed fixture-585 finding is barracks native HP 691
+versus Java HP 692. The long receipt is retained at
+`.bne-artifacts/runs/66d9458f0f6ca572d797b47356d81083036579537c8940fccbdc0205d57a70be`.
+Its manifest has SHA-256
+`bde4cb4ebf6f31bc2fc1aef6a6be7b97283a5faabe2f5e1d4c83f57021f96ea7`,
+and binds clean commit `32aee74`, engine-input identity
+`e6f19055a457504beadbd1204180a83c6978e28b2990bab39071d34f28ee485e`,
+and replayable source capsule
+`e45080bde1463bb9dee273c1fef6fbf8b131a02933a77505f056299d9c981195`
+with zero untracked engine inputs.
+
+Behavioral delta: BNE projectile type 10 reads speed 12 from native table
+`0x00494e0c` rather than the generated touch-of-death declaration's speed 16.
+The `POINT_TO_POINT_WITH_HIT` motion class keeps row zero throughout flight,
+then uses action 6 for its visible hit animation: the six stored rows advance
+at a three-projectile-pass cadence, and damage/free occurs on the visit after
+the final visible row. The implementation is selected by native projectile
+identity and motion class; it contains no mission, map, faction, coordinate,
+fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 2's death knight native slot 1557 / Java unit 43
+constructs type-10 projectile slot 3 at fixture 544 against barracks native
+slot 1554 / Java unit 46. Native remaining distance is 129 and drains by 12
+through 9 at fixture 554, crosses to -3 and enters action 6 at 555, then shows
+flattened frames 0, 5, 10, 15, 20, and 25 before freeing at fixture 571. The
+barracks therefore remains at 705 HP at fixture 554 and takes the shot's nine
+damage only at 571. Java formerly drained by 16 and used a one-pass impact,
+applying that damage at fixture 554. The corrected case agrees through fixture
+584.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman2-touch-of-death-impact/runs/94accaeb8d21e7f81e8a9f0b17fb809a62f4cc94e68c7e045b6371b245d4e48f`
+proves the real-data assertion executes and fails on `c01d964`, then executes
+and passes on the candidate. Eleven focused motion, type-table, and expansion
+Human 2 real-data checks pass. The wider projectile, missile, and save run has
+90 passes and five inherited skips. Both fixed 52-case gates pass: cycle 400
+is 50 clean / 2 divergent / 0 failed, and cycle 1,800 is 13 / 39 / 0. The
+long receipt's source capsule authenticates and replays exactly. The ordinary
+executable next-level gate exits zero after 209 Python checks (four skipped),
+99 engine/desktop checks, and 223 dual-adapter command scenarios; its 11
+comparable scenarios remain 6 exact / 5 divergent with no regression or
+infrastructure failure. The optional SSH discovery still refuses the stale
+`i9beef` host key; local native capture remains available and no SSH bypass was
+used.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Orc 11 at fixture 557, followed by expansion Human 10 at 562, expansion Human
+7 at 573, Orc 13 at 576, expansion Human 5 at 577, and expansion Human 2 at
+585.
+
+## Prior release checkpoint — 2026-09-02 (same-cycle births stay at the action-table tail)
 
 Accepted cycle-1,800 receipt `be167741` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
