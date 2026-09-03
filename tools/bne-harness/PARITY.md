@@ -15,7 +15,62 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (in-range land chasers finish the committed stride)
+## Current release checkpoint — 2026-09-02 (settled ranged loops leave constructors to opcode ten)
+
+Accepted cycle-1,800 receipt `d6a55c37` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the established 52-case
+exact-prefix score moves from 53,020 to 53,190. Retail Human 5 is the only
+changed case, advancing from exact through fixture 535 to exact through fixture
+705. The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under
+receipt `5ae5ed48`. The long receipt is retained at
+`.bne-artifacts/runs/d6a55c37e468ebdf045f160cae37ad337ca8010cd557ccfba95758b495f2f86b`.
+Its manifest has SHA-256
+`708f3fab695b87d505560c58a47607b1ba06b9fd4499cf0a431c3cacbc5f0d4a`
+and binds clean commit `da40193`, engine-input identity
+`da4049495a90e5a7a7ed536547b8124fd57b67314993d95f267814f789911e18`,
+and replayable source capsule
+`ea5c530f910ca5f290e17b322b30af967700cf89214c1f6bddd9ffec90b8f93c`
+with zero untracked engine inputs.
+
+Behavioral delta: a settled repeated ranged attack no longer lets the
+presentation callback construct its next projectile merely because its timer
+has reached the former mid-wait shortcut. Only a presentation-ahead attack
+with an open ranged residual may take that constructor path; otherwise opcode
+ten owns projectile damage and jitter at the native cadence. The obsolete
+timer-collapse path is removed. The rule contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, unit-ID, or unit-type-ID
+branch.
+
+Proof delta: retail Human 5 axethrower native slot 1534 / Java unit 66 emits
+projectiles at fixtures 17, 82, 147, 212, 277, 342, 407, and 472, establishing
+the 65-cycle loop and a next native constructor at fixture 537. Java formerly
+constructed during the fixture-534 visual callback while its sequence cursor
+was 900 and timer was 3, prematurely consuming the projectile damage and two
+jitter draws. That shifted asynchronous ownership so native critter slot 1598
+received result 5059 and did not wander at fixture 536, while Java's paired
+unit received the later result 16902 and wandered. The corrected engine leaves
+those draws to opcode ten at fixture 537, including native projectile damage
+5, and agrees through fixture 705. The newly exposed fixture-706 finding is
+peasant slot 1513 y 99 versus Java y 100.
+
+Efficacy receipt
+`.bne-test-efficacy/human5-repeated-ranged-constructor/runs/f7dcf78fb2161e0d73e1f122e59420168a9e9ba12319bfa515fde93ee7c6b8c4`
+proves the focused real-data assertion executes and fails on `643a782`, then
+executes and passes on the candidate. All 16 focused constructor and
+presentation-ahead checks pass, as do all 64 projectile-lifecycle checks. Both
+fixed 52-case gates pass. The ordinary executable next-level gate exits zero
+after 209 Python checks (four skipped), 99 engine/desktop checks, and 223
+dual-adapter command scenarios; its 11 comparable scenarios remain 6 exact /
+5 divergent with no regression or infrastructure failure.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 8 at fixture 536, followed by expansion Human 3 at 537, expansion Orc 11
+at 539, and expansion Human 2 at 554.
+
+## Prior release checkpoint — 2026-09-02 (in-range land chasers finish the committed stride)
 
 Accepted cycle-1,800 receipt `5b2e2eda` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

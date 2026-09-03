@@ -16,13 +16,13 @@ progress is genuinely blocked under the blocking rules below.
 
 The latest durable handoff frontier as of 2026-09-02 is:
 
-- the accepted candidate is clean commit `1dbe337` and is authenticated by
+- the accepted candidate is clean commit `da40193` and is authenticated by
   replayable source capsule
-  `928d5e322a053ae9d28cd535d5e60749f66179d518e2326dedf7835b8ed355af`;
+  `ea5c530f910ca5f290e17b322b30af967700cf89214c1f6bddd9ffec90b8f93c`;
 - all 52 campaign fixtures exact through cycle 332;
 - expansion Human 12 is the first shared-boundary divergence at cycle 333; and
 - the accepted 52-case receipt is
-  `5b2e2eda085526b1e4feb0821b5835790093f0cf355ad5f28506d90126606bdc`.
+  `d6a55c37e468ebdf045f160cae37ad337ca8010cd557ccfba95758b495f2f86b`.
 
 Expansion Human 12 cycle 333 remains a real frontier, but its route family is
 paused after three rejected implementations. Native Branch Witness confirms
@@ -32,7 +32,7 @@ safe systemic discriminator. Resume that family only with new evidence about
 the global route-scratch lifecycle or path decision. Expansion Orc 8's
 cycle-356 submarine route-publication family is independently paused. The
 fleet remains 13 clean / 39 divergent / 0 failed through cycle 1,800, with a
-52-case exact-prefix sum of 53,020. Human 13 is accepted through cycle 643
+52-case exact-prefix sum of 53,190. Human 13 is accepted through cycle 643
 after the ready-gold finder admitted a healthy worker still contained by its
 depot: hidden action 26 now assigns the mine and authors the dropout face before
 the worker surfaces. Human 8's paid moving-quarry residual retains collision
@@ -45,10 +45,12 @@ now use the producer-sized native perimeter and the trainee movement callback,
 advancing expansion Human 5 through cycle 576 and five other tanker-bearing
 missions. Expansion Human 2's in-range death knight now pays the final three
 pixels of its committed land chase stride without consuming the cached route
-suffix, advancing that case from cycle 533 through cycle 553. The earliest
-unpaused fleet findings are now retail Human 5 and expansion Human 8 at cycle
-536, followed by expansion Human 3 at 537, expansion Orc 11 at 539, and
-expansion Human 2 at 554.
+suffix, advancing that case from cycle 533 through cycle 553. Retail Human 5's
+settled repeated axethrower attacks now leave projectile construction to opcode
+ten rather than the presentation callback, advancing that case from cycle 535
+through cycle 705. The earliest unpaused fleet finding is now expansion Human
+8 at cycle 536, followed by expansion Human 3 at 537, expansion Orc 11 at 539,
+and expansion Human 2 at 554.
 Expansion Human 10 remains accepted through 561, while retail Human 10 is
 accepted through 688.
 
@@ -133,11 +135,12 @@ not permission to fit a special case.
    lifecycle work rather than spending the run indefinitely on one uncertain
    unit.
 
-The next work selection should normally start from the tied earliest unpaused
-fleet findings, currently retail Human 5 and expansion Human 8 at cycle 536,
-while retaining expansion Human 12 cycle 333 as the shared-boundary frontier. Return
-to either paused route family only when a new native discriminator or a more
-upstream authenticated finding can price a systemic hypothesis.
+The next work selection should normally start from the earliest unpaused fleet
+finding, currently expansion Human 8 at cycle 536, followed by expansion Human
+3 at 537, while retaining expansion Human 12 cycle 333 as the shared-boundary
+frontier. Return to either paused route family only when a new native
+discriminator or a more upstream authenticated finding can price a systemic
+hypothesis.
 
 ## Evidence and implementation loop
 
