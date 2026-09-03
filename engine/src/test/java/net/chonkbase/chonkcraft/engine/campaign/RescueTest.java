@@ -131,15 +131,132 @@ class RescueTest {
         UnitType hall = data.unitTypes().types().get("unit-town-hall");
         UnitType peasant = data.unitTypes().types().get("unit-peasant");
 
-        world.createUnit(hall, 1, 10, 10);
+        Unit rescuedHall = world.createUnit(hall, 1, 10, 10);
         Unit villager = world.createUnit(peasant, 1, 20, 20);
         world.createUnit(footman, 0, 14, 10);
 
         for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 5; cycle++) {
             world.tick();
         }
+        assertEquals(0, rescuedHall.player(),
+                "the rescuable building itself must change hands");
         assertEquals(1, villager.player(),
                 "BNE must not apply LegacyEngine's whole-player town-hall shortcut");
+    }
+
+    /**
+     * Human 8, the first mission of Act III, starts the person with soldiers
+     * but no workers. The village's peasants are already harvesting, so a
+     * rescue check confined to the Still order makes the mission impossible.
+     */
+    @Test
+    @DisplayName("Human 8's working village peasant joins the player's side")
+    void humanEightWorkingPeasantCanBeRescued() {
+        GameData data = load();
+        PudMap source = data.campaignMap("campaigns/human/level08h");
+        Mission mission = data.loadMission("campaigns/human/level08h",
+                GameData.personIn(source), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 did not load");
+        World world = mission.world();
+
+        int person = GameData.personIn(mission.source());
+        Unit worker = unitAt(world, "unit-peasant", 2, 88, 78);
+        UnitType footman = data.unitTypes().types().get("unit-footman");
+
+        // The corpus numbers its first cycle after two untimed startup calls.
+        mission.tick();
+        mission.tick();
+        for (int fixtureCycle = 1; fixtureCycle <= 142; fixtureCycle++) {
+            if (fixtureCycle == 137) {
+                world.createUnit(footman, person, 87, 83);
+            }
+            mission.tick();
+            if (fixtureCycle < 142) {
+                assertEquals(2, worker.player(),
+                        "the worker transferred before native cycle " + fixtureCycle);
+            }
+            if (fixtureCycle == 141) {
+                assertEquals(2686, worker.battleNetSequenceOffset(),
+                        "the worker must be parked on action 23's pending OP0");
+                assertEquals(1, worker.battleNetAnimationTimer());
+            }
+        }
+
+        assertEquals(person, worker.player(),
+                "a working prisoner must not wait for a Still order to be rescued");
+        assertEquals(2, worker.rescuedFrom());
+        assertEquals(Unit.Order.STILL, worker.order(),
+                "native AssignToPlayer returns the rescued worker to Still");
+        assertEquals(2595, worker.battleNetSequenceOffset());
+        assertEquals(3, worker.battleNetAnimationTimer());
+    }
+
+    /** A building transfers by itself; rescuing one does not transfer its slot. */
+    @Test
+    @DisplayName("Human 8's farm transfers without transferring the whole village")
+    void humanEightFarmRescueIsPerUnit() {
+        GameData data = load();
+        PudMap source = data.campaignMap("campaigns/human/level08h");
+        Mission mission = data.loadMission("campaigns/human/level08h",
+                GameData.personIn(source), 1);
+        Assumptions.assumeTrue(mission != null, "Human 8 did not load");
+        World world = mission.world();
+
+        int person = GameData.personIn(mission.source());
+        Unit farm = unitAt(world, "unit-farm", 2, 89, 68);
+        Unit distantFarm = unitAt(world, "unit-farm", 2, 58, 76);
+        UnitType footman = data.unitTypes().types().get("unit-footman");
+
+        mission.tick();
+        mission.tick();
+        for (int fixtureCycle = 1; fixtureCycle <= 348; fixtureCycle++) {
+            if (fixtureCycle == 345) {
+                world.createUnit(footman, person, 91, 70);
+            }
+            mission.tick();
+            if (fixtureCycle < 348) {
+                assertEquals(2, farm.player(),
+                        "the farm transferred before native cycle " + fixtureCycle);
+            }
+        }
+
+        assertEquals(person, farm.player(), "the adjacent farm did not change hands");
+        assertEquals(2, farm.rescuedFrom());
+        assertEquals(2, distantFarm.player(),
+                "rescuing one building must not invent a whole-slot handoff");
+        assertFalse(distantFarm.wasRescued());
+    }
+
+    /** Presentation yields must not move native rescue earlier than OP0. */
+    @Test
+    @DisplayName("A nearby prisoner waits for its native rescue marker")
+    void rescueDoesNotRunOnPresentationYields() {
+        GameData data = load();
+        PudMap source = data.campaignMap("campaigns/human/level09h");
+        Mission mission = data.loadMission("campaigns/human/level09h",
+                GameData.personIn(source), 1);
+        Assumptions.assumeTrue(mission != null, "Human 9 did not load");
+        World world = mission.world();
+
+        Unit prisoner = unitAt(world, "unit-man-of-light", 3, 12, 6);
+        int person = GameData.personIn(mission.source());
+
+        mission.tick();
+        mission.tick();
+        for (int fixtureCycle = 1; fixtureCycle <= 6; fixtureCycle++) {
+            mission.tick();
+            assertEquals(fixtureCycle < 6 ? 3 : person, prisoner.player(),
+                    "ownership diverged at native fixture cycle " + fixtureCycle);
+        }
+        assertEquals(3, prisoner.rescuedFrom());
+    }
+
+    private static Unit unitAt(World world, String ident, int player, int x, int y) {
+        return world.unitsSnapshot().stream()
+                .filter(unit -> unit.player() == player
+                        && ident.equals(unit.type().ident())
+                        && unit.tileX() == x && unit.tileY() == y)
+                .findFirst().orElseThrow();
     }
 
     /**

@@ -1083,7 +1083,7 @@ final class BattleNetIdleSystem {
         if (!unit.canMove()) {
             if (World.isBattleNetArmedTower(unit) && world.battleNetSequence != null) {
                 world.combat.stepBattleNetTower(unit);
-            } else if (unit.type().building() && world.battleNetBuildingCanAction33Train(unit)) {
+            } else if (unit.type().building()) {
                 stepBattleNetHallStill(unit);
             } else {
                 world.combat.stepStandGround(unit);
@@ -1155,7 +1155,7 @@ final class BattleNetIdleSystem {
 
 
     /**
-     * Advances a computer hall/barracks native Still program and train counter.
+     * Advances a building's native Still/action-33 program and train counter.
      *
      * <p>Native action 33 ({@code 0x418bb0}) increments unit+0x6e each Still
      * OP0; when the previous value exceeds the per-type limit the building
@@ -1213,6 +1213,10 @@ final class BattleNetIdleSystem {
                     ? 8 : (profile == 70 || profile == 0) ? 4
                     : (profile == 65) ? 10 : 6;
         } else {
+            // Non-producers still enter action 33 and expose its OP0 every
+            // five calls. One untimed initialization call precedes the
+            // constructor countdown: Human 8's farm at (89,68) reaches OP0
+            // on fixture 8,13,...,348.
             freezeThrough = 2;
         }
         if (world.cycle <= freezeThrough) {
@@ -1247,10 +1251,21 @@ final class BattleNetIdleSystem {
         if (timer > 0) {
             return;
         }
+        // This compact action-33 path bypasses the script interpreter, so it
+        // must publish the same native order-action boundary explicitly.
+        // Otherwise halls, farms, and other buildings can never be rescued.
+        world.rescueBattleNetUnit(hall);
+        owner = world.player(hall.player());
+        computer = owner != null
+                && (owner.type()
+                        == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER
+                    || owner.type()
+                        == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE);
         int phase = hall.battleNetIdlePhase();
         boolean openingHallConstructor = !World.battleNetIsLimit1Trainer(hall)
                 && phase == 0;
-        if (computer && !openingHallConstructor) {
+        if (computer && !openingHallConstructor
+                && world.battleNetBuildingCanAction33Train(hall)) {
             battleNetBuildingTrainPulse(hall);
         }
         hall.setBattleNetIdlePhase(phase + 1);

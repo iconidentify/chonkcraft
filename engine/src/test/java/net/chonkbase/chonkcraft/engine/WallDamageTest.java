@@ -13,6 +13,7 @@ import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.MapField;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.missile.MissileClass;
 import net.chonkbase.chonkcraft.engine.missile.MissileType;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -233,6 +234,118 @@ class WallDamageTest {
         }
         assertTrue(beside.value() < before,
                 "MissileHit runs its blast box over the ground as well as over the units");
+    }
+
+    @Test
+    @DisplayName("BNE artillery splash damages the wall struck and its neighbour")
+    void battleNetArtillerySplashReachesWalls() {
+        List<MissileType> artillery = List.of(
+                new MissileType("missile-catapult-rock", null, MissileClass.PARABOLIC,
+                        32, 32, 15, 9, 16, 1, 2, 4, 0, null, null,
+                        false, 0, 0, false, null, 0),
+                new MissileType("missile-ballista-bolt", null, MissileClass.PARABOLIC,
+                        32, 32, 15, 9, 16, 1, 2, 4, 0, null, null,
+                        false, 0, 0, false, null, 0),
+                new MissileType("missile-small-cannon", null, MissileClass.PARABOLIC,
+                        32, 32, 15, 9, 16, 1, 2, 4, 0, null, null,
+                        false, 0, 0, false, null, 0));
+
+        for (MissileType type : artillery) {
+            GameMap map = walledField(40);
+            for (int y = 18; y <= 23; y++) {
+                for (int x = 18; x <= 23; x++) {
+                    wall(map, x, y);
+                }
+            }
+            World world = new World(map);
+            Unit attacker = world.createUnit(siege("unit-artillery", type.ident()),
+                    0, 14, 20);
+            Missile shot = world.projectiles.launchGround(attacker, 20, 20, type);
+            world.prepareBattleNetProjectile(shot, true);
+
+            int before = map.field(20, 20).value();
+            for (int cycle = 0; cycle < 120
+                    && !shot.hasArrived(); cycle++) {
+                world.tick();
+            }
+
+            int impactX = shot.tileX();
+            int impactY = shot.tileY();
+            assertEquals(25, shot.damage(), "the fixture's stored BNE damage changed");
+            assertEquals(before - 12, map.field(impactX, impactY).value(),
+                    type.ident() + " did not apply six native damage steps to the impact wall");
+            for (int[] offset : List.of(
+                    new int[] {1, 0}, new int[] {-1, 0},
+                    new int[] {0, 1}, new int[] {0, -1})) {
+                assertEquals(before - 2,
+                        map.field(impactX + offset[0], impactY + offset[1]).value(),
+                        type.ident() + " did not apply one native damage step to a cardinal wall");
+            }
+            for (int[] offset : List.of(
+                    new int[] {1, 1}, new int[] {-1, 1},
+                    new int[] {1, -1}, new int[] {-1, -1})) {
+                assertEquals(before,
+                        map.field(impactX + offset[0], impactY + offset[1]).value(),
+                        type.ident() + " spread BNE wall damage into a diagonal tile");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("BNE artillery converts its 20-step wall counter to 40 wall hit points")
+    void battleNetArtilleryWallDamageBreakTimingUsesNativeCounterSteps() {
+        GameMap map = walledField(12);
+        wall(map, 5, 5);
+        wall(map, 6, 5);
+        World world = new World(map);
+        Missile shot = new Missile(boulder(), null, null, 0, 0, 0, 0);
+        shot.setDamage(20);
+
+        for (int hit = 1; hit <= 3; hit++) {
+            world.hitBattleNetFixedSplashWall(shot, 5, 5, 0);
+            assertEquals(GameMap.WALL_HIT_POINTS - hit * 10, map.field(5, 5).value(),
+                    "stored 20 should be five of the native wall's twenty damage steps");
+            assertTrue(map.field(5, 5).isWall());
+        }
+        world.hitBattleNetFixedSplashWall(shot, 5, 5, 0);
+        assertFalse(map.field(5, 5).isWall(),
+                "four five-step center hits should consume the native 20-step counter");
+
+        for (int hit = 1; hit <= 19; hit++) {
+            world.hitBattleNetFixedSplashWall(shot, 6, 5, 2);
+            assertEquals(GameMap.WALL_HIT_POINTS - hit * 2, map.field(6, 5).value(),
+                    "quarter 20 becomes one native counter step");
+            assertTrue(map.field(6, 5).isWall());
+        }
+        world.hitBattleNetFixedSplashWall(shot, 6, 5, 2);
+        assertFalse(map.field(6, 5).isWall(),
+                "twenty one-step cardinal hits should consume the native counter");
+    }
+
+    @Test
+    @DisplayName("BNE artillery wall splash is clipped safely at the map edge")
+    void battleNetArtilleryWallSplashClipsAtMapEdge() {
+        GameMap map = walledField(12);
+        wall(map, 0, 0);
+        wall(map, 1, 0);
+        wall(map, 0, 1);
+        wall(map, 1, 1);
+        World world = new World(map);
+        MissileType type = boulder();
+        Unit attacker = world.createUnit(siege("unit-catapult", type.ident()), 0, 6, 0);
+        Missile shot = world.projectiles.launchGround(attacker, 0, 0, type);
+        world.prepareBattleNetProjectile(shot, true);
+
+        int before = map.field(0, 0).value();
+        for (int cycle = 0; cycle < 120 && map.field(0, 0).value() == before; cycle++) {
+            world.tick();
+        }
+
+        assertEquals(before - 12, map.field(0, 0).value());
+        assertEquals(before - 2, map.field(1, 0).value());
+        assertEquals(before - 2, map.field(0, 1).value());
+        assertEquals(before, map.field(1, 1).value(),
+                "the clipped cardinal cross must not turn into a square");
     }
 
     @Test

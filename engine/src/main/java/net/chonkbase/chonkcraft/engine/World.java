@@ -1692,7 +1692,8 @@ public final class World {
      */
     void rescueBattleNetUnit(Unit prisoner) {
         Player owner = player(prisoner.player());
-        if (owner == null || !isRescuable(owner.type()) || !prisoner.isOnMap()) {
+        if (owner == null || !isRescuable(owner.type())
+                || !prisoner.isAlive() || !prisoner.isOnMap()) {
             return;
         }
         // Flyers are rescuable: XOrc 12's fire-breeze at (120,8) changes from
@@ -1717,7 +1718,7 @@ public final class World {
                 for (Unit other : cached) {
                     // Rescuers must be ground/sea: a flyer does not free a
                     // prisoner by flying past. Prisoners themselves may fly.
-                    if (other == prisoner || other.destroyed() || !other.isOnMap()
+                    if (other == prisoner || !other.isAlive() || !other.isOnMap()
                             || other.type() == null
                             || other.type().moveType() == UnitType.Movement.FLY) {
                         continue;
@@ -1734,7 +1735,7 @@ public final class World {
         }
     }
 
-    private static boolean isRescuable(net.chonkbase.chonkcraft.data.map.PudMap.PlayerType type) {
+    static boolean isRescuable(net.chonkbase.chonkcraft.data.map.PudMap.PlayerType type) {
         return type == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_PASSIVE
                 || type == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.RESCUE_ACTIVE;
     }
@@ -11839,13 +11840,6 @@ public final class World {
                         }
                     }
                 }
-                if (queued.kind() == Unit.QueuedOrderKind.MOVE
-                        && unit.destPathOpeningHold()) {
-                    // orderMove clears the player-click mark. Without it
-                    // a spent leftover pays PF_WAIT 10 instead of dest-arming
-                    // the next buffer -- Human 1 1597 sat 27 on 19,12.
-                    unit.setBattleNetPlayerCommandMove(true);
-                }
                 return;
             }
         }
@@ -14462,6 +14456,9 @@ public final class World {
     /** One tile, in pixels. */
     static final int TILE_SIZE = 32;
 
+    /** Number of accumulated damage steps that removes a retail BNE wall. */
+    private static final int BATTLE_NET_WALL_DAMAGE_STEPS = 20;
+
     /**
      * Knocks a piece out of a wall.
      *
@@ -14502,6 +14499,39 @@ public final class World {
             if (stood && !field.isWall()) {
                 reachable.clear();
             }
+        }
+    }
+
+    /**
+     * Applies one of the five wall hits made by BNE fixed artillery splash.
+     *
+     * <p>{@code FUN_00410520} passes the missile's stored byte unchanged for
+     * the impact square and shifted right twice for the four cardinal squares.
+     * {@code CMap::HitWall} ({@code 0x418440}) then shifts that argument right
+     * twice again, with a minimum of one, and adds the result to a 20-step
+     * damage counter. ChonkCraft stores the complementary 40 wall hit points,
+     * so one native counter step is two local hit points. Passing the stored
+     * byte through ordinary {@link #hitWall(Missile, int, int, int)} instead
+     * makes the cardinal hits twice as strong and can breach a neighbouring
+     * segment before retail does.
+     *
+     * @param splashShift zero for the impact square, two for a cardinal square
+     */
+    void hitBattleNetFixedSplashWall(Missile missile, int tileX, int tileY,
+            int splashShift) {
+        MapField field = map.fieldOrNull(tileX, tileY);
+        if (field == null || !field.isWall() || missile == null) {
+            return;
+        }
+        int passedDamage = (missile.damage() & 0xff) >>> splashShift;
+        int nativeDamageSteps = Math.max(passedDamage >>> 2, 1);
+        int maxHitPoints = wallMaxHitPoints(field);
+        int damage = nativeDamageSteps * maxHitPoints / BATTLE_NET_WALL_DAMAGE_STEPS;
+        damage = Math.max(damage, 1);
+        boolean stood = field.isWall();
+        map.hitWall(tileX, tileY, damage, maxHitPoints);
+        if (stood && !field.isWall()) {
+            reachable.clear();
         }
     }
 
@@ -19589,6 +19619,20 @@ public final class World {
             unit.setBattleNetOrderDelay(0);
         } else {
             unit.setBattleNetOrderDelay(2);
+        }
+        // A rescue-slot worker assigned terrain work owns action 23's native
+        // Attack constructor immediately. Most active orders deliberately do
+        // not retain a compact cursor in Java; keep this repair scoped to the
+        // only ownership transition that needs to observe its later OP0.
+        Player assignedOwner = player(unit.player());
+        if (battleNetSequence != null && unit.order() == Unit.Order.HARVEST
+                && assignedOwner != null && isRescuable(assignedOwner.type())) {
+            int gatherStart = idle.battleNetSequenceStart(
+                    unit, BattleNetSequence.ATTACK_ANIMATION);
+            if (gatherStart >= 0) {
+                unit.setBattleNetSequenceOffset(gatherStart);
+                unit.setBattleNetAnimationTimer(3);
+            }
         }
     }
 

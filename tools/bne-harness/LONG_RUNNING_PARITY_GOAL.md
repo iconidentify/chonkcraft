@@ -67,7 +67,7 @@ authenticated accepted receipt.
 
 1. Read the topmost **Current release checkpoint** in
    `tools/bne-harness/PARITY.md`. Its newer evidence supersedes older historical
-   sections and the stale ignored file `goal/scratch/checkpoint-live.md`.
+   sections and any stale ignored scratch checkpoint.
 2. Read `.bne-artifacts/latest-accepted.json` and the retained receipt it
    names, when present. Authenticate inputs rather than trusting a detached
    summary.
@@ -113,8 +113,8 @@ Machine-local facts confirmed after transfer:
   host, so local native capture does not require SSH;
 - the authenticated asset pack is available under
   `/home/chrisk/.chonkcraft/packs/`;
-- the local oracle tree and 52-fixture corpus are under
-  `/home/chrisk/.local/share/wargus-bne-oracle`;
+- the local oracle tree and 52-fixture corpus are installed under the current
+  user's local application-data directory;
 - the pinned BNE executable and both local Docker oracle images are present;
 - local static analysis, native capture, and local Branch Witness are usable.
 

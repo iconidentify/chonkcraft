@@ -76,8 +76,20 @@ final class BattleNetMovementSystem {
         // committed attack animation first receives the player click. Doing
         // it at issue time left long air-unit attack bodies executing over
         // an already-empty target/chase record.
+        boolean playerCommandMove = unit.battleNetPlayerCommandMove();
         world.releaseBattleNetCombatOrderForPlayerReplacement(unit);
-        return orderMove(unit, toX, toY, 0);
+        boolean accepted = orderMove(unit, toX, toY, 0);
+        if (accepted && playerCommandMove) {
+            // orderMove clears command provenance because autonomous queue
+            // pops use this entry point too. A player replacement already
+            // marked before it waited behind an unbreakable step must keep
+            // that mark: it has no route for the new destination while the
+            // predecessor's committed pixels drain. Once they land,
+            // stepMove needs the provenance to plan the replacement route
+            // instead of treating the empty buffer as a finished Move.
+            unit.setBattleNetPlayerCommandMove(true);
+        }
+        return accepted;
     }
 
     /**

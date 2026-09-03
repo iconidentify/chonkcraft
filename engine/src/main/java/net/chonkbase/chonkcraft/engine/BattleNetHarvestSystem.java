@@ -1481,7 +1481,9 @@ final class BattleNetHarvestSystem {
 
         // Working in the open: chop, wait, chop again. Not one grab.
         if (info.terrainHarvester()) {
-            chopInPlace(worker, info, targetX, targetY);
+            if (chopInPlace(worker, info, targetX, targetY)) {
+                rescueBattleNetHarvestWorker(worker);
+            }
         } else {
             gatherInPlace(worker, info, targetX, targetY);
         }
@@ -1927,7 +1929,7 @@ final class BattleNetHarvestSystem {
      * one cycle against the take clock per loop because the loop is
      * twenty-five long.
      */
-    void chopInPlace(Unit worker, ResourceInfo info, int targetX, int targetY) {
+    boolean chopInPlace(Unit worker, ResourceInfo info, int targetX, int targetY) {
         int period = Math.max(1, info.waitAtResource());
         String woodDetailTrace = System.getenv("CHONKCRAFT_TRACE_WOODDETAIL");
         if (woodDetailTrace != null
@@ -1942,7 +1944,8 @@ final class BattleNetHarvestSystem {
                     worker.chopDone() ? 1 : 0, worker.timeToHarvest(), worker.carried(),
                     worker.animation().unbreakable() ? 1 : 0);
         }
-        if (!worker.gatherClockStarted()) {
+        boolean startingGatherAnimation = !worker.gatherClockStarted();
+        if (startingGatherAnimation) {
             int targetIndex = targetX + targetY * world.map.width();
             Unit claimant = world.battleNetClaimedWood.get(targetIndex);
             if (claimant != null && !isActiveWoodClaim(claimant, targetX, targetY)) {
@@ -1972,7 +1975,7 @@ final class BattleNetHarvestSystem {
                 } else {
                     worker.setOrder(Unit.Order.STILL);
                 }
-                return;
+                return false;
             }
             // BNE 2.02b computes DirectionToHeading(unit position,
             // resource point) at 0x00424221 and writes the returned byte to
@@ -2013,6 +2016,7 @@ final class BattleNetHarvestSystem {
                         + " goal " + targetX + "," + targetY);
             }
             worker.animation().switchTo(harvestAnimation(worker));
+            startBattleNetRescueHarvestAnimation(worker);
             worker.setTimeToHarvest(period);
             // StartGathering's drop-on-change, before any wood moves.
             if (worker.heldResource() != info.resource()) {
@@ -2035,6 +2039,8 @@ final class BattleNetHarvestSystem {
             }
             worker.setBattleNetWoodSyncRemaining(left);
         }
+        boolean rescueOnActionMarker = !startingGatherAnimation
+                && stepBattleNetRescueHarvestAnimation(worker);
         world.advance(worker);
         if (System.getenv("CHONKCRAFT_TRACE_WOODANIM") != null) {
             System.err.println("JWOODANIM " + world.cycle + " unit=" + worker.id()
@@ -2070,7 +2076,7 @@ final class BattleNetHarvestSystem {
                 // standing and stepped at 807.
                 stepHarvest(worker);
             }
-            return;
+            return rescueOnActionMarker;
         }
 
         // "Target gone?" -- the tree fell under someone else's axe. The
@@ -2106,7 +2112,7 @@ final class BattleNetHarvestSystem {
                     worker.setOrder(Unit.Order.STILL);
                 }
             }
-            return;
+            return rescueOnActionMarker;
         }
 
         while (worker.timeToHarvest() < 0) {
@@ -2125,11 +2131,73 @@ final class BattleNetHarvestSystem {
             // holding twelve and walks for the hall, not for more wood.
             if (worker.carried() >= info.capacity() || !stand.isForest()) {
                 worker.setChopDone(true);
-                return;
+                return rescueOnActionMarker;
             }
             if (taken <= 0) {
-                return;
+                return rescueOnActionMarker;
             }
+        }
+        return rescueOnActionMarker;
+    }
+
+
+    /** Starts the native Attack loop used by a rescuable terrain worker. */
+    private void startBattleNetRescueHarvestAnimation(Unit worker) {
+        if (!isBattleNetRescueWorker(worker) || world.battleNetSequence == null) {
+            return;
+        }
+        int attackStart = world.idle.battleNetSequenceStart(
+                worker, BattleNetSequence.ATTACK_ANIMATION);
+        if (attackStart < 0) {
+            return;
+        }
+        BattleNetSequence.Tick opening = world.battleNetSequence.tick(attackStart, 1);
+        if (opening.valid()) {
+            worker.setBattleNetSequenceOffset(opening.offset());
+            worker.setBattleNetAnimationTimer(opening.timer());
+        }
+    }
+
+
+    /** Keeps that native Attack loop aligned while the worker chops in place. */
+    private boolean stepBattleNetRescueHarvestAnimation(Unit worker) {
+        if (!isBattleNetRescueWorker(worker) || world.battleNetSequence == null
+                || worker.battleNetSequenceOffset() < 0) {
+            return false;
+        }
+        BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+                worker.battleNetSequenceOffset(),
+                worker.battleNetAnimationTimer());
+        if (!tick.valid()) {
+            return false;
+        }
+        worker.setBattleNetSequenceOffset(tick.offset());
+        worker.setBattleNetAnimationTimer(tick.timer());
+        return tick.actionMarker();
+    }
+
+
+    private boolean isBattleNetRescueWorker(Unit worker) {
+        Player owner = world.player(worker.player());
+        return owner != null && World.isRescuable(owner.type());
+    }
+
+
+    /** Publishes action 23's OP0 after the Harvest visit has completed. */
+    private void rescueBattleNetHarvestWorker(Unit worker) {
+        int priorOwner = worker.player();
+        world.rescueBattleNetUnit(worker);
+        if (worker.player() == priorOwner) {
+            return;
+        }
+        // AssignToPlayer returns a working prisoner to Still. Human 8's
+        // peasant changes from action 23/Attack to action 3/Still at c142.
+        worker.setOrder(Unit.Order.STILL);
+        worker.animation().switchTo(world.stillAnimation(worker));
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart >= 0) {
+            worker.setBattleNetSequenceOffset(stillStart);
+            worker.setBattleNetAnimationTimer(3);
         }
     }
 

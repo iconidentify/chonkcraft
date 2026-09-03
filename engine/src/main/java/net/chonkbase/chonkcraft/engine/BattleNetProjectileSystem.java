@@ -848,6 +848,19 @@ final class BattleNetProjectileSystem {
         int stored = missile.damage();
         int impactX = (int) Math.round(missile.x());
         int impactY = (int) Math.round(missile.y());
+        int impactTileX = Math.floorDiv(impactX, World.TILE_SIZE);
+        int impactTileY = Math.floorDiv(impactY, World.TILE_SIZE);
+        // FUN_00410520 opens with five CMap::HitWall calls before it walks
+        // the unit caches: full stored damage at the impact tile, then one
+        // quarter at each cardinal neighbour. The fixed-damage BNE branch in
+        // resolve() used to return after the unit walk, bypassing the generic
+        // splash-wall loop entirely, so every production-prepared siege and
+        // naval cannon shot left wall terrain untouched.
+        world.hitBattleNetFixedSplashWall(missile, impactTileX, impactTileY, 0);
+        world.hitBattleNetFixedSplashWall(missile, impactTileX + 1, impactTileY, 2);
+        world.hitBattleNetFixedSplashWall(missile, impactTileX - 1, impactTileY, 2);
+        world.hitBattleNetFixedSplashWall(missile, impactTileX, impactTileY + 1, 2);
+        world.hitBattleNetFixedSplashWall(missile, impactTileX, impactTileY - 1, 2);
         // Collect every candidate that survives the pixel metric, then hit in
         // native cache-grid order so the battleNetRand stream matches.
         record SplashHit(Unit unit, int metric) {}
@@ -923,8 +936,6 @@ final class BattleNetProjectileSystem {
         // before the footman on the impact tile at 60,68: with the same two
         // async rolls that yields footman 41 / ogre 8 instead of native
         // footman 57 / ogre 12 (stored 80, armor 2/4, outer quarter).
-        int impactTileX = Math.floorDiv(impactX, World.TILE_SIZE);
-        int impactTileY = Math.floorDiv(impactY, World.TILE_SIZE);
         hits.sort((a, b) -> {
             boolean aCenter = a.unit().tileX() == impactTileX
                     && a.unit().tileY() == impactTileY;

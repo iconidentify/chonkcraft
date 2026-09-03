@@ -1,5 +1,16 @@
 # Gameplay Reliability Update
 
+- Fixed combat units occasionally accepting a move command and then stopping
+  at the end of their previous attack step. Footmen, archers, siege engines
+  and destroyers now finish the committed animation and continue to the new
+  destination without requiring a separate Stop command.
+- Restored Battle.net's per-unit rescue checks for allies that are working,
+  moving, or using the building animation path. The workers and buildings in
+  Human campaign mission 8 can now join the player when approached, without
+  incorrectly transferring every unit owned by that rescue slot.
+- Restored artillery splash against wall terrain. Catapults, ballistas and
+  naval cannon now deal full damage to the impact wall and quarter damage to
+  its four cardinal neighbours, matching the original Battle.net resolver.
 - Fixed loaded oil tankers stopping short of a refinery when a legal route
   anchor touched coastline. Tanker returns now use the original Battle.net
   route-grid spread before choosing the refinery edge, including mixed
