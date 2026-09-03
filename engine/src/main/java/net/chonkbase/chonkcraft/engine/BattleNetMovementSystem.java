@@ -3338,8 +3338,19 @@ final class BattleNetMovementSystem {
         stepMove(unit, replanOnExhaustion, null);
     }
 
+    void stepMove(Unit unit, boolean replanOnExhaustion,
+            boolean settleCurrentChaseStepOnly) {
+        stepMove(unit, replanOnExhaustion, null,
+                settleCurrentChaseStepOnly);
+    }
+
     private void stepMove(Unit unit, boolean replanOnExhaustion,
             Unit depotDestArmGoal) {
+        stepMove(unit, replanOnExhaustion, depotDestArmGoal, false);
+    }
+
+    private void stepMove(Unit unit, boolean replanOnExhaustion,
+            Unit depotDestArmGoal, boolean settleCurrentChaseStepOnly) {
         if (arriveMeleeLeftoverOnOccupiedQuarry(unit)) {
             return;
         }
@@ -3429,8 +3440,9 @@ final class BattleNetMovementSystem {
                 && unit.chasing()
                 && unit.canMove()
                 && world.combat.onBattleNetChaseMoveBody(unit);
+        int chaseMovePixels = 0;
         if (chaseMoveSequence) {
-            world.combat.tickBattleNetChaseMoveSequence(unit);
+            chaseMovePixels = world.combat.tickBattleNetChaseMoveSequence(unit);
         } else if (!unit.chasing()) {
             unit.setBattleNetChaseStepReady(false);
         }
@@ -3474,6 +3486,17 @@ final class BattleNetMovementSystem {
                 || (chaseMoveSequence
                         ? unit.battleNetChaseStepReady()
                         : !unit.walkHolding() && atMoveBoundary(unit));
+        if (mayDecide && settleCurrentChaseStepOnly && chaseMoveSequence) {
+            // MoveToTarget has reached an OP0 while its current logical tile is
+            // already in weapon range. The callback still owes the last pixels
+            // of the committed stride, but NextPathElement must not consume a
+            // cached suffix before COrder_Attack can take ATTACK_TARGET. The
+            // chase tail below pays those pixels with stepped=false. XHuman 2's
+            // death knight is the compact witness: its southwest residual ends
+            // at (63,60) while S,S,S remain cached; retail parks RI20 instead of
+            // moving logically to (63,61).
+            mayDecide = false;
+        }
         if (mayDecide && walkedThisCycle && unit.stepDrained()
                 && !unit.isMoving()
                 && unit.battleNetBorrowedMoveForStep()
@@ -9232,7 +9255,17 @@ final class BattleNetMovementSystem {
             // chase-boundary consult. A second walk would advance Move twice
             // on the same cycle and desync the OP0 body.
             if (!world.actionMoveWalked) {
-                if (stepped && unit.battleNetChaseLegOpensCold()) {
+                if (settleCurrentChaseStepOnly) {
+                    // This residual is yielding to an in-range Attack at the
+                    // current OP0. Advance presentation once, but pay pixels
+                    // from the authoritative script.bin tick: that tick owns
+                    // the final three-pixel southwest drain in XHuman 2.
+                    advanceMoveAnimation(unit);
+                    walkPixels(unit,
+                            Direction.deltaX(unit.lastStepHeading()),
+                            Direction.deltaY(unit.lastStepHeading()),
+                            chaseMovePixels);
+                } else if (stepped && unit.battleNetChaseLegOpensCold()) {
                     // A chase leg that opens from a standstill spends nothing
                     // on the cycle it commits, the same zero-spend the cold
                     // branch below already gives an ordinary walk. Human 13
@@ -9521,7 +9554,11 @@ final class BattleNetMovementSystem {
      * banked in the residual pair for the next step's prime to consume.
      */
     void walkPixels(Unit unit, int posdX, int posdY) {
-        int move = advanceMoveAnimation(unit);
+        walkPixels(unit, posdX, posdY, advanceMoveAnimation(unit));
+    }
+
+
+    private void walkPixels(Unit unit, int posdX, int posdY, int move) {
         int rawX = unit.offsetX() + unit.residualX();
         int rawY = unit.offsetY() + unit.residualY();
         boolean reached = false;

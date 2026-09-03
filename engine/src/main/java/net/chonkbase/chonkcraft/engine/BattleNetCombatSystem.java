@@ -2204,7 +2204,8 @@ final class BattleNetCombatSystem {
             // pixels are still owed: walking a settled unit advances Move off
             // its boundary and blocked the wise-man's post-hold step
             // (Human 13 1496 held forever past fixture 24).
-            if (world.movement.onMoveAnimation(unit) && unit.isMoving()) {
+            if (world.movement.onMoveAnimation(unit) && unit.isMoving()
+                    && !battleNetRangedChaseCurrentTileInRange(unit)) {
                 world.movement.walkPixels(unit);
                 world.actionMoveWalked = true;
                 if (openBattleNetSaturatedCardinalRouteTerminator(
@@ -8111,6 +8112,11 @@ final class BattleNetCombatSystem {
         boolean savedBorrowedMove = unit.battleNetBorrowedMoveForStep();
         boolean savedLandPatrolMoveBody = saved == Unit.Order.ATTACK
                 && unit.battleNetLandPatrolMoveBody();
+        boolean settleRangedArrival = saved == Unit.Order.ATTACK
+                && battleNetRangedChaseCurrentTileInRange(unit);
+        boolean openSettledRangedArrival = settleRangedArrival
+                && battleNetRangedResidualRouteQualifies(
+                        unit, unit.battleNetPathStepsTaken());
         unit.setOrder(Unit.Order.MOVE);
         if (savedLandPatrolMoveBody) {
             // MOVE is only the Java call-seam label below. Preserve the native
@@ -8128,7 +8134,7 @@ final class BattleNetCombatSystem {
         // ten pixels through fixture 46 before Attack owns the unit.
         unit.setBattleNetBorrowedMoveForStep(true);
         try {
-            world.movement.stepMove(unit, false);
+            world.movement.stepMove(unit, false, settleRangedArrival);
         } finally {
             unit.setBattleNetBorrowedMoveForStep(savedBorrowedMove);
         }
@@ -8153,6 +8159,25 @@ final class BattleNetCombatSystem {
         unit.setBattleNetSequenceOffset(offsetAfter);
         unit.setBattleNetAnimationTimer(timerAfter);
         unit.setBattleNetChaseStepReady(readyAfter);
+        if (settleRangedArrival && !unit.isMoving()) {
+            // The committed stride has now paid its last pixels without
+            // accepting the cached suffix. Retail parks the old route cursor
+            // and returns directly to Attack on this same MoveToTarget visit.
+            // Short, saturated and multi-step residuals have already paid OP0;
+            // the complementary one-step/four-leftover form starts cold.
+            unit.clearPath();
+            unit.setRouteSpent(false);
+            unit.setChasing(false);
+            unit.setFighting(true);
+            unit.setBattleNetResidualEmptyRouteSettle(false);
+            armBattleNetRangedAttackCadence(unit);
+            if (openSettledRangedArrival) {
+                world.openBattleNetAttackAfterChaseResidual(unit, false);
+            } else {
+                world.armBattleNetAttackStart(unit);
+            }
+            underWay = false;
+        }
         if (clearPaidMovingQuarryCollision && unit.isMoving()
                 && (unit.tileX() != tileXBeforeStep
                         || unit.tileY() != tileYBeforeStep)) {
@@ -10780,6 +10805,27 @@ final class BattleNetCombatSystem {
     }
 
 
+    /** Whether a ranged chase must finish its current stride before routing. */
+    private boolean battleNetRangedChaseCurrentTileInRange(Unit unit) {
+        if (world.battleNetSequence == null || unit == null
+                || unit.order() != Unit.Order.ATTACK
+                || !unit.chasing() || !unit.isMoving()
+                || !onBattleNetChaseMoveBody(unit)
+                || unit.type() == null
+                || unit.type().moveType() != UnitType.Movement.LAND
+                || unit.type().maxAttackRange() <= 1) {
+            return false;
+        }
+        Unit target = unit.target();
+        return target != null
+                && world.targets.validAttackTarget(unit, target)
+                // A moving quarry still owns its visible residual; tile range
+                // alone is not arrival while that body is in flight.
+                && !target.isMoving()
+                && world.targets.inAttackRange(unit, target);
+    }
+
+
     /**
      * Whether a ranged chase residual has already paid its Attack OP0.
      *
@@ -10965,24 +11011,25 @@ final class BattleNetCombatSystem {
      * Advances the retail Move sequence during a chase and marks when
      * opcode zero allows the next path heading.
      */
-    void tickBattleNetChaseMoveSequence(Unit unit) {
+    int tickBattleNetChaseMoveSequence(Unit unit) {
         // Sticky ready: OP0 may fire one visit before Moving clears; keep
         // the permit until the heading is taken.
         int offset = unit.battleNetSequenceOffset();
         if (offset < 0) {
-            return;
+            return 0;
         }
         BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
                 unit.battleNetAnimationTimer());
         if (!tick.valid()) {
             unit.setBattleNetSequenceOffset(-1);
-            return;
+            return 0;
         }
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());
         if (tick.actionMarker()) {
             unit.setBattleNetChaseStepReady(true);
         }
+        return tick.pixels();
     }
 
 

@@ -1,8 +1,10 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
@@ -57,6 +59,42 @@ class XHuman02DeathKnightIdleAttackRealDataTest {
         assertEquals(1, target.player());
         assertEquals(60, target.tileX());
         assertEquals(63, target.tileY());
+        assertSame(target, deathKnight.target());
+
+        while (fixtureCycle(world) < 515) {
+            mission.tick();
+        }
+        assertEquals(63, deathKnight.tileX());
+        assertEquals(60, deathKnight.tileY());
+        assertEquals(3, deathKnight.pathLength(),
+                "the first southwest chase step leaves S,S,S cached");
+        assertTrue(deathKnight.isMoving(),
+                "the logical southwest step still owes its pixel residual");
+
+        while (fixtureCycle(world) < 532) {
+            mission.tick();
+        }
+        assertEquals(63, deathKnight.tileX());
+        assertEquals(60, deathKnight.tileY());
+        assertEquals(3, deathKnight.offsetX());
+        assertEquals(-3, deathKnight.offsetY());
+        assertTrue(world.targets.inAttackRange(deathKnight, target),
+                "the southwest tile has already entered death-knight range");
+
+        mission.tick();
+
+        assertEquals(533, fixtureCycle(world));
+        assertEquals(63, deathKnight.tileX());
+        assertEquals(60, deathKnight.tileY(),
+                "native pays the last three pixels without consuming cached S");
+        assertEquals(0, deathKnight.offsetX());
+        assertEquals(0, deathKnight.offsetY());
+        assertEquals(0, deathKnight.pathLength(),
+                "Java's empty path represents native route index twenty");
+        assertFalse(deathKnight.routeSpent());
+        assertFalse(deathKnight.isMoving());
+        assertFalse(deathKnight.chasing());
+        assertTrue(deathKnight.fighting());
         assertSame(target, deathKnight.target());
     }
 
