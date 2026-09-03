@@ -28,14 +28,15 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Mobile projectile constructor draws may belong on the presentation impact
- * frame when the native cursor is already parked on opcode ten and its wait
- * still has more than one tick.
+ * frame when a ranged arrival has opened the native cursor on opcode ten and
+ * its wait still has more than one tick.
  *
- * <p>XHuman 12's axe fired on internal cycle 33 while the Attack sequence
- * sat mid-wait (timer 3 before OP10). Without presentation-ahead prepare the
- * three constructor draws (damage + two aim jitters) waited until OP10 at
- * cycle 36, leaving the asynchronous stream three draws short for the next
- * melee rem on tower 1370 (dmg 3 vs native 2 at fixture 32).
+ * <p>XHuman 12's residual-arrival axe fired on internal cycle 33 while the
+ * Attack sequence sat mid-wait (timer 3 before OP10). Without
+ * presentation-ahead prepare the three constructor draws (damage + two aim
+ * jitters) waited until OP10 at cycle 36, leaving the asynchronous stream
+ * three draws short for the next melee rem on tower 1370 (dmg 3 vs native 2
+ * at fixture 32). Settled repeated swings remain owned by OP10.
  */
 class PresentationAheadProjectilePrepareTest {
 
@@ -357,6 +358,7 @@ class PresentationAheadProjectilePrepareTest {
         // The cursor is already on OP10, but its native timer has not expired.
         thrower.setBattleNetSequenceOffset(op10);
         thrower.setBattleNetAnimationTimer(3);
+        thrower.setBattleNetRangedResidualOpen(true);
 
         int asyncBefore = world.battleNetRandomSeed();
         world.hit(thrower, target);
@@ -390,11 +392,9 @@ class PresentationAheadProjectilePrepareTest {
         assertTrue(!armed.battleNetMotion(),
                 "flight must still wait for OP10; early motion pulled Human "
                         + "13's critter stream (still vs MOVE at fixture 34)");
-        assertEquals(1, thrower.battleNetAnimationTimer(),
-                "building-target presentation must collapse Attack wait to 1 "
-                        + "so OP10 arms flight next visit (XHuman 12 axe "
-                        + "127→tower: timer 3 left flight three cycles late "
-                        + "and the rock splash rolled two draws short)");
+        assertEquals(3, thrower.battleNetAnimationTimer(),
+                "a residual-open constructor spends only its draws; OP10 "
+                        + "retains the native wait before arming flight");
     }
 
     @Test
@@ -445,6 +445,7 @@ class PresentationAheadProjectilePrepareTest {
         assumeTrue(op10 >= 0, "axethrower Attack must contain opcode ten");
         thrower.setBattleNetSequenceOffset(op10);
         thrower.setBattleNetAnimationTimer(3);
+        thrower.setBattleNetRangedResidualOpen(true);
 
         int asyncBefore = world.battleNetRandomSeed();
         // Simulate the mid-loop visit: old code only flushed cycle-end when
@@ -529,6 +530,7 @@ class PresentationAheadProjectilePrepareTest {
         thrower.setAutoTargeting(false);
         thrower.setBattleNetSequenceOffset(op10);
         thrower.setBattleNetAnimationTimer(3);
+        thrower.setBattleNetRangedResidualOpen(true);
         world.cycle = 10;
         world.hit(thrower, target);
 

@@ -8328,22 +8328,26 @@ final class BattleNetCombatSystem {
                 // Flight still waits for OP10 -- arming motion here was what
                 // reordered Human 13 critter 1576 (still vs MOVE at fixture
                 // 34), not the constructor draws themselves.
-                // The cursor itself is the discriminator. XHuman 10 axe 51
-                // reaches presentation impact at offset 892, the frame-30
-                // prelude before OP10 at 900; native leaves that shot pending
-                // until fixture 524. Treating every positive timer as
-                // "past OP10" debited its constructor at fixture 516 and
-                // shifted knight 1485's later melee damage. Human 5's proved
-                // building callback is already parked on opcode ten.
+                // Cursor position is necessary but not sufficient. A ranged
+                // arrival explicitly opens Attack ahead of OP10, so its
+                // residual-open latch proves that a presentation callback on
+                // opcode ten belongs to this early native constructor. A
+                // settled repeated swing has no such ownership: Human 5's
+                // axethrower presentation eventually catches its independent
+                // 65-cycle script loop at offset 900/timer 3 on fixture 534,
+                // but native waits until OP10 on fixture 537. XHuman 10 axe
+                // 51 is the earlier cursor control: its presentation reaches
+                // offset 892, the frame-30 prelude, and must wait as well.
                 if (attacker.canMove()
+                        && attacker.battleNetRangedResidualOpen()
                         && world.battleNetSequence != null
                         && world.battleNetSequence.opcodeAt(
                                 attacker.battleNetSequenceOffset()) == 10
                         && attacker.battleNetAnimationTimer() > 1
                         && target.type() != null
                         && target.type().building()) {
-                    // Building targets only: XHuman 12 tower axe. Unit
-                    // targets keep OP10 constructor timing so Human 13
+                    // Ranged-arrival building targets only: XHuman 12 tower
+                    // axe. Unit targets keep OP10 constructor timing so Human 13
                     // person/computer axes against troops do not reorder
                     // the critter stream before fixture 34.
                     Missile pend = world.battleNetPendingProjectileShots
@@ -8353,20 +8357,6 @@ final class BattleNetCombatSystem {
                                 target, pend, "building-mid-wait", -1);
                         world.projectiles.debitBattleNetProjectileConstructor(
                                 pend, true);
-                    }
-                    // Presentation left Attack wait at 3 while OP10 was
-                    // still two ticks away; debit-only draws ran now but
-                    // flight waited for that OP10, so axe 127→tower 117
-                    // rem 148 native from fixture 31 first flew in Java
-                    // around 35 (two motion draws short before the rock
-                    // free). Collapse the wait like presentation-ahead
-                    // melee so OP10 arms motion next unit visit -- except
-                    // after a ranged residual-open, where collapsing put
-                    // OP10 on the same visit as the constructor debit and
-                    // armed flight one cycle early (extra stepMissiles
-                    // draw at world 34, splash REG on tower 1370).
-                    if (!attacker.battleNetRangedResidualOpen()) {
-                        attacker.setBattleNetAnimationTimer(1);
                     }
                 }
             }
