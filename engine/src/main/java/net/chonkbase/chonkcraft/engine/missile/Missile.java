@@ -19,6 +19,9 @@ public final class Missile {
     /** Flattened sprite frames read by BNE's parabolic action at 0x00410260. */
     private static final int[] BATTLE_NET_PARABOLIC_FRAMES = {0, 5, 10, 5, 0};
 
+    /** Projectile action 6 holds each subsequent hit-animation row for three visits. */
+    private static final int BATTLE_NET_WITH_HIT_FRAME_WAIT = 3;
+
     /**
      * What kind of thing this is.
      *
@@ -191,14 +194,16 @@ public final class Missile {
     /**
      * BNE projectile action 6: remaining distance has gone negative, but the
      * hit is applied only after {@link #battleNetImpactWait} more projectile
-     * passes, not on the crossing tick. Point-to-point arms wait 1 (next
-     * pass frees): XHuman 2's tower arrow shows remaining -4 with target HP
-     * still 90 at fixture cycle 10, then frees with HP 83 at cycle 11.
+     * passes, not on the crossing tick. Plain point-to-point arms wait 1
+     * (next pass frees): XHuman 2's tower arrow shows remaining -4 with target
+     * HP still 90 at fixture cycle 10, then frees with HP 83 at cycle 11.
      * Type-13 catapult rocks arm wait 5: Human 13 slot 3 remaining goes
      * negative at fixture 30 while knight 1490 stays at 77 HP through 34,
      * and the slot frees with the HP drop only at fixture 35. Other
      * parabolic types (small-cannon) keep wait 1 -- a blanket five-pass
-     * hold delayed XHuman 10 splash four cycles.
+     * hold delayed XHuman 10 splash four cycles. Point-to-point-with-hit uses
+     * the wait as its action-6 animation clock: XHuman 2's type-10 shot shows
+     * six rows at three-pass cadence and frees on the sixteenth visit.
      */
     private boolean battleNetPendingImpact;
 
@@ -930,10 +935,16 @@ public final class Missile {
         boolean piercingFlight = type.missileClass()
                 == MissileClass.POINT_TO_POINT_BOUNCE;
         // Action 6 beat: remaining went negative on an earlier pass; free
-        // only after the type-specific wait (1 for most shots, 5 for
-        // missile-catapult-rock -- Human 13).
+        // only after the type-specific wait. Point-to-point-with-hit advances
+        // its visible impact rows here rather than animating while in flight.
         if (battleNetPendingImpact) {
-            if (--battleNetImpactWait > 0) {
+            battleNetImpactWait--;
+            if (type.missileClass() == MissileClass.POINT_TO_POINT_WITH_HIT
+                    && battleNetImpactWait > 0
+                    && battleNetImpactWait % BATTLE_NET_WITH_HIT_FRAME_WAIT == 0) {
+                frame = Math.min(type.animationSteps() - 1, frame + 1);
+            }
+            if (battleNetImpactWait > 0) {
                 return;
             }
             battleNetPendingImpact = false;
@@ -1019,7 +1030,8 @@ public final class Missile {
             armBattleNetImpact();
             return;
         }
-        if (type.missileClass() != MissileClass.PARABOLIC) {
+        if (type.missileClass() != MissileClass.PARABOLIC
+                && type.missileClass() != MissileClass.POINT_TO_POINT_WITH_HIT) {
             frame = (frame + 1) % Math.max(1, type.animationSteps());
         }
     }
@@ -1048,7 +1060,7 @@ public final class Missile {
     }
 
     /**
-     * Arms action 6 with the type-specific free delay.
+     * Arms action 6 with the type-specific free delay or hit animation.
      *
      * <p>Most BNE shots free on the next projectile pass (wait 1). Type-13
      * catapult rocks stay live for five more passes: Human 13 slot 3 has
@@ -1056,12 +1068,21 @@ public final class Missile {
      * 34, and frees with the HP drop only at 35. Applying that five-pass
      * hold to every parabolic type (including small-cannon) delayed XHuman
      * 10 splash by four cycles and reopened grunt HP at fixture 14.
+     * Point-to-point-with-hit starts at row zero and advances the remaining
+     * rows every three visits. Native XHuman 2 type 10 enters action 6 at
+     * fixture 555, shows flattened frames 0,5,10,15,20,25, and frees at 571.
      */
     private void armBattleNetImpact() {
         battleNetPendingImpact = true;
-        battleNetImpactWait = "missile-catapult-rock".equals(type.ident())
-                ? 5
-                : 1;
+        if (type.missileClass() == MissileClass.POINT_TO_POINT_WITH_HIT) {
+            frame = 0;
+            battleNetImpactWait = 1 + (type.animationSteps() - 1)
+                    * BATTLE_NET_WITH_HIT_FRAME_WAIT;
+        } else {
+            battleNetImpactWait = "missile-catapult-rock".equals(type.ident())
+                    ? 5
+                    : 1;
+        }
     }
 
     /** Whether the next BNE projectile step will resolve a landed impact. */

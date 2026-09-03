@@ -96,6 +96,29 @@ class XHuman02DeathKnightIdleAttackRealDataTest {
         assertFalse(deathKnight.chasing());
         assertTrue(deathKnight.fighting());
         assertSame(target, deathKnight.target());
+
+        // The first touch-of-death shot is constructed at fixture 544. Native
+        // type 10 drains its 129-pixel remaining distance at 12 pixels per
+        // update, enters action 6 at fixture 555, animates there through 570,
+        // and applies its nine damage only when it frees at 571. The generated
+        // declaration's speed 16 plus a one-pass impact used to take the
+        // barracks from 705 to 696 at fixture 554 instead.
+        while (fixtureCycle(world) < 554) {
+            mission.tick();
+        }
+        assertEquals(705, target.hitPoints(),
+                "touch-of-death must still be in flight at the old Java impact cycle");
+
+        while (fixtureCycle(world) < 570) {
+            mission.tick();
+        }
+        assertEquals(703, target.hitPoints(),
+                "the unrelated two-damage hit lands while native action 6 remains visible");
+
+        mission.tick();
+        assertEquals(571, fixtureCycle(world));
+        assertEquals(694, target.hitPoints(),
+                "touch-of-death damage belongs to the final action-6 visit");
     }
 
     private static int fixtureCycle(World world) {

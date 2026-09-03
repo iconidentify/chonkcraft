@@ -423,7 +423,11 @@ final class BattleNetProjectileSystem {
                     // Native action 7 reads 12 for type-2 Dragon breath. The
                     // generated legacy declaration says 16, which made both
                     // flying factions reach the target and disappear early.
-                    "missile-dragon-breath", "missile-griffon-hammer" -> 12;
+                    "missile-dragon-breath", "missile-griffon-hammer",
+                    // Table 0x00494e0c byte 10 is 12. XHuman 2's authenticated
+                    // slot-3 touch-of-death drains remaining 129,117,105...
+                    // while its generated legacy declaration says 16.
+                    "missile-touch-of-death" -> 12;
             // Table 0x00494e0c type 24 is 16; ChonkCraft missiles.legacy-declaration used 22 and
             // delivered XHuman 10 cannon bolts several ticks early.
             case "missile-small-cannon" -> 16;

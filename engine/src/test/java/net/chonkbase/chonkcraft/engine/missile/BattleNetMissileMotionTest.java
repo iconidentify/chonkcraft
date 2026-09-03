@@ -27,6 +27,13 @@ class BattleNetMissileMotionTest {
                 32, 32, 15, 9, 8, 1, 2, 2, 0, null, null, false, 0, 0, false);
     }
 
+    private static MissileType touchOfDeath() {
+        return new MissileType("missile-touch-of-death", null,
+                MissileClass.POINT_TO_POINT_WITH_HIT,
+                32, 32, 30, 9, 16, 1, 1, 1, 50,
+                null, null, false, 0, 0, false);
+    }
+
     @Test
     @DisplayName("a type-15 arrow steps the native 12-pixel bresenham path from human 13")
     void aType15ArrowStepsTheNativeTwelvePixelBresenhamPathFromHuman13() {
@@ -235,6 +242,47 @@ class BattleNetMissileMotionTest {
         assertEquals(1, freeStep - armStep,
                 "small-cannon must keep one-pass action-6; XHuman 10 splash "
                         + "landed four cycles late under a blanket rock hold");
+    }
+
+    @Test
+    @DisplayName("a point-to-point-with-hit shot animates action 6 before damage")
+    void aPointToPointWithHitShotAnimatesActionSixBeforeDamage() {
+        // XHuman 2 native type 10, slot 3: constructed at fixture 544 with
+        // remaining 129, crosses to -3 at 555, then displays flattened frames
+        // 0,5,10,15,20,25 at three-visit cadence and frees at 571. Java stores
+        // those five-facing sheet positions as animation rows 0..5.
+        Missile shot = new Missile(touchOfDeath(), null, null,
+                2032, 1936, 1972, 2065);
+        shot.enableBattleNetMotion(12, 0);
+
+        for (int step = 1; step <= 10; step++) {
+            shot.step();
+            assertEquals(0, shot.frame(),
+                    "point-to-point-with-hit stays on row zero during flight");
+        }
+        assertEquals(9, shot.battleNetRemaining());
+
+        shot.step();
+        assertEquals(-3, shot.battleNetRemaining());
+        assertTrue(shot.battleNetPendingImpact(),
+                "negative remaining arms the separate hit animation");
+        assertEquals(16, shot.battleNetImpactWait(),
+                "six rows use the immediate first beat plus five three-visit holds");
+        assertFalse(shot.consumeHit(), "arming action 6 does not deal damage");
+
+        int[] expectedRows = {1, 1, 1, 2, 2, 2, 3, 3, 3,
+                4, 4, 4, 5, 5, 5};
+        for (int row : expectedRows) {
+            shot.step();
+            assertFalse(shot.hasArrived(),
+                    "the projectile stays live through its final visible row");
+            assertEquals(row, shot.frame());
+            assertFalse(shot.consumeHit(), "visible impact rows do not damage early");
+        }
+
+        shot.step();
+        assertTrue(shot.hasArrived(), "the visit after the final row frees the shot");
+        assertTrue(shot.consumeHit(), "freeing the animated impact owes one hit");
     }
 
     @Test
