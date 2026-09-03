@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2835 tests,   27 skipped
-    no external input          2835 tests, 1213 skipped
+    authenticated inputs       2836 tests,   27 skipped
+    no external input          2836 tests, 1214 skipped
 
 Both can be green.
 
@@ -172,11 +172,12 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # deliberately add two skips here.
         # The tanker anchor-spread batch adds one more pack-backed Human 7
         # witness. It runs in authenticated profiles and deliberately adds one
-        # skip here.
+        # skip here. Issue 12's accepted-order liveness regression likewise
+        # needs the authenticated roster and adds one data-free skip.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1914, 884),
+        "engine": (1914, 885),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
