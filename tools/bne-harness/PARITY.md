@@ -15,7 +15,70 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-03 (point-to-point hit missiles finish their impact animation)
+## Current release checkpoint — 2026-09-03 (off-target splash victims retain HitUnit responses)
+
+Accepted cycle-1,800 receipt `9706be85` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the directly recomputed sum
+of the 52 exact prefixes rises from 54,130 to 54,149. Expansion Orc 11 is the
+only changed case, advancing from exact through fixture 556 to exact through
+fixture 575. Its newly exposed fixture-576 finding is axethrower native slot
+1508 / Java unit 92 Still versus Attack. The long receipt is retained at
+`.bne-artifacts/runs/9706be858f59c5cdbfcf5a15bc12c84d92df7eca62624e9a0efd9f4c6520ee8f`.
+Its manifest has SHA-256
+`91678becdb7d8fa27ee31af193409f6250ebfd6a028dafe1c3d56e3d893d2820`,
+and binds clean commit `c18a8e9`, engine-input identity
+`efffc563c538b8f8c68e52d0efdd499e0f0d8947a55a9d0c3d1b3a7ab2d3e2db`,
+and replayable source capsule
+`b8b168890f357a635b157585898789e42d096210bf84def558c6fcc44096335c`
+with zero untracked engine inputs.
+
+Behavioral delta: every positive, nonlethal land-person victim accepted by a
+splash cache walk now receives the ordinary native `HitUnit` / `AiHelpMe`
+spatial response, including an outer victim when the projectile's named
+target has moved outside its impact. A victim already carrying its own local
+hit-source offer is not reverse-recruited as an idle brother by a later
+victim's help rectangle. A ranged first-help chase whose source remains the
+native attack incumbent repeats the quiet Attack constructor at its timer-one
+rescan instead of falling through to Still. The rules are expressed by native
+projectile, offer, order, target-selection, and constructor state; they contain
+no mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: expansion Orc 11's gryphon native slot 1589 / Java unit 11 lands
+its fixture-555 hammer after its named ogre has moved outside the old impact.
+Native `0x00410762` nevertheless calls `HitUnit` for first accepted outer
+victim axethrower slot 1507 / Java unit 93, and `0x00418524` enters `AiHelpMe`,
+queuing close brothers slot 1500 / Java unit 100 and slot 1508 / Java unit 92.
+They promote to Attack at fixture 557. The later splash victim slot 1498 /
+Java unit 102 owns the gryphon in its local offer bank; at timer one native
+`COrder_Attack` rescans through `0x004513d0`, promotes action 12 in
+`0x00452ef0`, and restores timer three at `0x00453023`. Its 887/3,2,1 Attack
+constructor therefore repeats instead of ending at fixture 559. The corrected
+case agrees through fixture 575.
+
+Efficacy receipt
+`.bne-test-efficacy/xorc11-off-target-splash-hitunit/runs/fb8c92013da8711527f48c047379b7c05142cf1f9ad224be4799aa0749fb3189`
+proves the real-data assertion executes and fails on `61b8e3c`, then executes
+and passes on the candidate. The full expansion Orc 11 real-data class plus
+three expansion Human 10 splash/offer held-outs pass (20 tests total). Both
+fixed 52-case gates pass: cycle 400 is 50 clean / 2 divergent / 0 failed under
+receipt `0e22b501`, and cycle 1,800 is 13 / 39 / 0. The long receipt's source
+capsule authenticates and replays exactly. The ordinary executable next-level
+gate exits zero after 209 Python checks (four skipped), 99 engine/desktop
+checks, and 223 dual-adapter command scenarios; its 11 comparable scenarios
+remain 6 exact / 5 divergent with no regression or infrastructure failure.
+The optional SSH discovery still refuses the stale `i9beef` host key; local
+native capture remains available and no SSH bypass was used.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet findings are now
+expansion Human 10 at fixture 562, expansion Human 7 at 573, Orc 13 and
+expansion Orc 11 at 576, expansion Human 5 at 577, and expansion Human 2 at
+585.
+
+## Prior release checkpoint — 2026-09-03 (point-to-point hit missiles finish their impact animation)
 
 Accepted cycle-1,800 receipt `66d9458f` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
