@@ -15,7 +15,68 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (marked target-skirt movers remain soft)
+## Current release checkpoint — 2026-09-02 (only fresh terminal gold-skirt steps yield)
+
+Accepted cycle-1,800 receipt `fc440dc7` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,658 to 52,999. Orc 12 is the only changed case,
+advancing from exact through fixture 530 to exact through fixture 871. The
+cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`064f4cad`. The long receipt is retained at
+`.bne-artifacts/runs/fc440dc723f4e13df7dd01a3e5617f8838db5485aa1b818067d2aa4bfe496090`.
+Its manifest has SHA-256
+`f252721253067310e1b2984ff3972abe1325fc5ab6692b99f4285193cda6293f`
+and binds clean commit `4cc8598` and engine-input identity
+`a8bf3fc465869d0cc71409677e7dfb75324565c2e7c532845bd7d258b90b6eb8`
+to replayable source capsule
+`a97515186eb0335f0e511d165f2e9de6f74172b7cb2be03877e768f53129f2ee`
+with zero untracked engine inputs.
+
+Behavioral delta: the existing marked gold-skirt exception now admits only a
+same-pass terminal step whose complete pixel debt still points back along its
+last heading. A merely moving, collision-free, route-spent sibling is not
+enough. This makes the implementation match its native scheduler contract:
+the optimizer may accept a square a sibling has just entered, but an older
+stride already draining across that square remains hard to route ordering.
+The rule uses movement state and geometry and contains no mission, map,
+faction, coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Orc 12 gold worker native slot 1525 / Java unit 75 is at `(87,41)`
+on fixture 530, routing toward mine slot 1529 / Java unit 71. Outbound sibling
+slot 1415 / Java unit 185 occupies the marked skirt at `(84,42)` with an empty
+spent route and collision zero, but its older west step has already drained
+from a complete `(+32,0)` debt to `(+23,0)`. Native therefore stores
+`[W,W,W,SW]`; Java formerly treated that body like a newly committed step,
+stored `[SW,W,W,W]`, and moved to y 42 on fixture 531. The corrected route
+agrees through fixture 871. Orc 11 is the positive control: slot 1490 / Java
+unit 110 has just committed south-west onto `(8,122)` with complete
+`(+32,-32)` debt before slot 1505 / Java unit 95 routes, so that marked square
+still yields and the native six-heading approach is preserved. The newly
+exposed Orc 12 fixture-872 finding is player-three's bank.
+
+Efficacy receipt
+`.bne-test-efficacy/orc12-c531-partially-drained-skirt/runs/ea7c58de2fb5fb4bce5f74df48a181714a23c7600a0ad44478a5ae376448d9b6`
+proves the focused Orc-12 assertion executes and fails on `0c0ad78`, then
+executes and passes on the candidate. The three Orc-11/Orc-12 marked-skirt
+checks pass, as do all 73 directly affected marked-skirt, pathfinder,
+movement-playability, and moving-quarry checks. The broader 36-check synthetic
+resource-approach class retains the same seven failures on `0c0ad78` and the
+candidate, recorded by baseline-control receipt
+`.bne-test-efficacy/orc12-c531-resource-approach-baseline-control/runs/f40cd984a9417630ba794fec0223c3fe2d896ca48bfbaa9c88493ecf116bf01a`;
+it is inherited debt rather than an acceptance claim. Both fixed 52-case gates pass. The
+ordinary executable next-level gate exits zero after 209 Python checks (four
+skipped), 99 engine/desktop checks, and 223 dual-adapter command scenarios;
+its 11 comparable scenarios remain 6 exact / 5 divergent with no regression
+or infrastructure failure.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The earliest unpaused fleet finding is now expansion
+Human 2 fixture 533, followed by Human 5 and expansion Human 8 at 536,
+expansion Human 3 at 537, and expansion Orc 11 at 539.
+
+## Prior release checkpoint — 2026-09-02 (marked target-skirt movers remain soft)
 
 Accepted cycle-1,800 receipt `c8241d4d` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
