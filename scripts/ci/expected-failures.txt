@@ -64,7 +64,6 @@ unsorted	neither	net.chonkbase.chonkcraft.engine.CircleOfPowerTest#anArcherReach
 unsorted	neither	net.chonkbase.chonkcraft.engine.CircleOfPowerTest#noHitPointsMeansNoObstacle
 unsorted	legacyEngine	net.chonkbase.chonkcraft.engine.CloakingTest#armedUnitRunsFromAnUndetectedCloakedAttacker
 unsorted	neither	net.chonkbase.chonkcraft.engine.ConveniencesTest#autocastFires
-unsorted	legacyEngine	net.chonkbase.chonkcraft.engine.CorpseTest#aDieInstructionKeepsActionTableMutationOrder
 unsorted	neither	net.chonkbase.chonkcraft.engine.DropOutTest#aBlockedFaceMovesOnRoundTheRing
 unsorted	neither	net.chonkbase.chonkcraft.engine.DropOutTest#aTrainedUnitComesOutOfTheWestFaceNotTheCorner
 unsorted	legacyEngine	net.chonkbase.chonkcraft.engine.FleeTwiceTest#asecondBlowInTheSameCycleAlsoRuns

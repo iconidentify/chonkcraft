@@ -208,7 +208,7 @@ head2 "What a test run would exercise"
 
 if [[ "$wc2_ok" == 1 && "$pack_ok" == 1 && "$opus_ok" == 1 ]]; then
     printf '  All three external inputs are configured.\n'
-    printf '  Expect 2836 tests, normally 27 skipped, and about five minutes of wall time.\n'
+    printf '  Expect 2950 tests, normally 27 skipped, and about five minutes of wall time.\n'
     printf '  All three private playtest-save referees reduce that exact count to 24.\n'
     printf '  The expected skips cover display-only checks, an optional music\n'
     printf '  fixture, fixture-sensitive and custom-map checks, local playtest\n'

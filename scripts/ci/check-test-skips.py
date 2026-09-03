@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
 machine, the difference is:
 
-    authenticated inputs       2836 tests,   27 skipped
-    no external input          2836 tests, 1214 skipped
+    authenticated inputs       2950 tests,   27 skipped
+    no external input          2950 tests, 1318 skipped
 
 Both can be green.
 
@@ -172,12 +172,16 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # deliberately add two skips here.
         # The tanker anchor-spread batch adds one more pack-backed Human 7
         # witness. It runs in authenticated profiles and deliberately adds one
-        # skip here. Issue 12's accepted-order liveness regression likewise
-        # needs the authenticated roster and adds one data-free skip.
+        # skip here. Subsequent frontier work added 118 engine invocations:
+        # 103 authenticated referees and 15 data-free structural checks.
+        # Issue 12's accepted-order liveness regression and the invalid
+        # queued-return replacement regression add two more authenticated
+        # referees. The clean hosted profile therefore records 2,034 engine
+        # invocations, 989 of which skip without authenticated data.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (1914, 885),
+        "engine": (2034, 989),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -201,7 +205,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # this project's FLAC and Ogg writers against the reference decoders. Both
     # CI jobs install them; see .github/workflows/tests.yml.
     #
-    # Re-measured 28 August 2026 against the authenticated retail installation
+    # Re-measured 3 September 2026 against the authenticated retail installation
     # and its derived pack. The twenty-seven that skip are: five
     # CELT encoder tests wanting a music fixture
     # nobody is asked to have (-Dopus.music), seven window and fullscreen
@@ -231,7 +235,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (1914, 7),
+        "engine": (2034, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (357, 8),
@@ -248,7 +252,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1914, 4),
+        "engine": (2034, 4),
         "desktop": (357, 8),
         "matchmaker-server": (5, 1),
     },
@@ -270,7 +274,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (1919, 12),
+        "engine": (2039, 12),
         "desktop": (357, 6),
         "matchmaker-server": (5, 1),
     },
