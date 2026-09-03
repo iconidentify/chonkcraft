@@ -1435,11 +1435,13 @@ public final class World {
      * {@code CUnitManager::ReleaseUnit}: fill the active-table hole with its
      * final pointer, then pop the final entry.
      *
-     * <p>{@link #pending} is the suffix of that same upstream table which was
-     * born after this cycle's {@link #snapshot} was taken. If a release occurs
-     * after such a birth, upstream swaps the final newborn into the hole even
-     * though it cannot act until the next cycle; treating the two Java lists
-     * as one logical table preserves that case too.
+     * <p>{@link #pending} contains births which are not part of the active
+     * table until the cycle closes. A release during the current walk swaps
+     * only the final entry which was already active when that walk began; the
+     * newborns are appended afterwards. XOrc 11 proves the boundary: its
+     * fixture-482 peasant is born before a corpse releases later in the same
+     * pass, but still owns the first idle draw at fixture 487 rather than the
+     * released corpse's middle-table visit.
      */
     private void releaseUnitFromActionTable(Unit unit) {
         // Native FUN_00453bc0 shifts the spatial tail left; do not swap-fill.
@@ -1447,15 +1449,10 @@ public final class World {
         int index = units.indexOf(unit);
         if (index >= 0) {
             int last = units.size() - 1;
-            if (!pending.isEmpty()) {
-                Unit replacement = pending.remove(pending.size() - 1);
-                units.set(index, replacement);
-            } else {
-                if (index != last) {
-                    units.set(index, units.get(last));
-                }
-                units.remove(last);
+            if (index != last) {
+                units.set(index, units.get(last));
             }
+            units.remove(last);
             return;
         }
 

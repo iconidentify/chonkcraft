@@ -573,8 +573,8 @@ class CorpseTest {
     }
 
     @Test
-    @DisplayName("animation death releases at the unit's turn, after earlier births")
-    void aDieInstructionKeepsActionTableMutationOrder() {
+    @DisplayName("same-cycle births remain behind the active table during release")
+    void aDieInstructionLeavesSameCycleBirthAtTheActionTableTail() {
         World world = world();
         UnitType newbornType = peasant();
         UnitType spawnerType = spawner(newbornType);
@@ -587,7 +587,8 @@ class CorpseTest {
         // Put the marker on its animation's `die` immediately. It stays in
         // the action table for this cycle, then its Die order releases it at
         // its own position in the next UnitActions pass. The spawner precedes
-        // it, so the newborn exists by then and is the table's last entry.
+        // it, so the newborn exists by then, but it remains outside the active
+        // table until that pass closes.
         marker.type().animationSet().put(AnimationSet.State.STILL,
                 Animation.parse("still", List.of("die")));
         world.tick();
@@ -598,8 +599,9 @@ class CorpseTest {
         Unit newborn = world.unitsSnapshot().stream()
                 .filter(unit -> unit.type() == newbornType)
                 .findFirst().orElseThrow();
-        assertEquals(List.of(spawner, newborn, tail), world.unitsSnapshot(),
-                "the newborn made earlier in the cycle must fill the marker's hole;"
-                        + " sweeping death before UnitActions swaps the old tail instead");
+        assertEquals(List.of(spawner, tail, newborn), world.unitsSnapshot(),
+                "the active tail must fill the marker's hole before the same-cycle"
+                        + " newborn is appended; XOrc 11's fixture-482 peasant owns"
+                        + " the next pass's first idle draw from that tail position");
     }
 }
