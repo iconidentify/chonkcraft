@@ -57,6 +57,33 @@ class BattleNetTrainedUnitDropoutRealDataTest {
                 "campaigns/human-exp/levelx08h", 532, 132, 34, 82);
     }
 
+    @Test
+    @DisplayName("an XOrc 11 same-cycle peasant birth stays at the action tail")
+    void anXOrc11PeasantBirthStaysAtTheActionTail() {
+        Mission mission = loadMission("campaigns/orc-exp/levelx11o");
+        World world = mission.world();
+
+        tickThrough(mission, 481);
+        assertNull(unitById(world, 194),
+                "the trained peasant must not exist before fixture 482");
+
+        mission.tick();
+        assertEquals(482, fixtureCycle(world));
+        Unit peasant = unitById(world, 194);
+        assertNotNull(peasant,
+                "native slot 1408 / Java unit 194 is born on fixture 482");
+        assertEquals(peasant, world.units().get(world.units().size() - 1),
+                "a same-cycle corpse release must not move the newborn into its"
+                        + " middle-table hole");
+
+        tickThrough(mission, 539);
+        Unit juggernaught = unitById(world, 88);
+        assertNotNull(juggernaught,
+                "XOrc 11 has no Java unit 88 / native juggernaught 1512");
+        assertEquals(107, juggernaught.hitPoints(),
+                "the native action order must leave the c539 gryphon pulse at nine damage");
+    }
+
     private static void assertTrainedTankerBirth(String map, int birthCycle,
             int unitId, int tileX, int tileY) {
         Mission mission = loadMission(map);
