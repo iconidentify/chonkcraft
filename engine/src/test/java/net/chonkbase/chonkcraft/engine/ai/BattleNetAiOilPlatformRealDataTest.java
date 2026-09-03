@@ -5,9 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
+import net.chonkbase.chonkcraft.engine.Player;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
+import net.chonkbase.chonkcraft.engine.unit.UnitType;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -121,6 +123,37 @@ class BattleNetAiOilPlatformRealDataTest {
         }
         assertEquals(platforms, countPlatforms(world),
                 "Human 7's ready tankers harvest; they do not found a second platform");
+    }
+
+    @Test
+    @DisplayName("an XHuman 8 tanker builds instead of using another player's platform")
+    void anXHuman8TankerBuildsInsteadOfUsingAnotherPlayersPlatform() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null, SKIP);
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission("campaigns/human-exp/levelx08h", 0, 1);
+        Assumptions.assumeTrue(mission != null, "XHuman 8 is not in the pack");
+        World world = mission.world();
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 536) {
+            mission.tick();
+        }
+
+        Unit tanker = firstTanker(world, 3);
+        assertTrue(tanker != null,
+                "XHuman 8 has no player-three tanker at fixture 536");
+        assertEquals(Unit.Order.BUILD, tanker.order(),
+                "native ignores player seven's platform and orders a new one");
+        assertTrue(tanker.pendingBuild() != null
+                        && "unit-orc-oil-platform".equals(tanker.pendingBuild().ident()),
+                "the tanker's build order must own the orc oil platform");
+        Player player = world.player(3);
+        assertEquals(50, player.get(UnitType.Resource.GOLD),
+                "fixture 536 debits the platform's 700 gold");
+        assertEquals(950, player.get(UnitType.Resource.WOOD),
+                "fixture 536 debits the platform's 450 wood");
     }
 
     private static Unit firstTanker(World world, int player) {

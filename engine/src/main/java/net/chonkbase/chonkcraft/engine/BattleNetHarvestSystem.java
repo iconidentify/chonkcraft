@@ -3737,7 +3737,12 @@ final class BattleNetHarvestSystem {
      * the one beside the refinery, and retail chooses the latter. The ready
      * callback also runs while a live tanker is still contained in its depot;
      * expansion Human mission 5 proves that the selected platform owns the
-     * exit face before the tanker is placed back on the map.</p>
+     * exit face before the tanker is placed back on the map. The scan is
+     * owner-local, not merely alliance-local: {@code 0x439b1f} opens the
+     * tanker's owner's roster and {@code 0x439b4c} rejects a candidate whose
+     * owner byte differs. Expansion Human 8 distinguishes that test because
+     * player three and player seven are allied computers, but only player
+     * seven owns the otherwise reachable platform.</p>
      */
     Unit findBattleNetReadyOilPlatform(Unit tanker) {
         boolean liveContainedTanker = tanker != null
@@ -3771,6 +3776,7 @@ final class BattleNetHarvestSystem {
         int bestCost = 0xffff;
         for (Unit candidate : world.units) {
             if (!candidate.isAlive() || !candidate.isOnMap()
+                    || candidate.player() != tanker.player()
                     || !isBattleNetOilPlatform(candidate.type().ident())
                     || !world.map.contains(candidate.tileX(), candidate.tileY())
                     || !component[candidate.tileX()
