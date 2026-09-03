@@ -1083,7 +1083,12 @@ final class BattleNetIdleSystem {
         if (!unit.canMove()) {
             if (World.isBattleNetArmedTower(unit) && world.battleNetSequence != null) {
                 world.combat.stepBattleNetTower(unit);
-            } else if (unit.type().building()) {
+            } else if (unit.type().building()
+                    && (world.battleNetSequence != null
+                            || world.battleNetBuildingCanAction33Train(unit))) {
+                // The native table extends action 33 to farms and other
+                // non-producers. Without it, retain the legacy/data-free
+                // StandGround path that lets an armed building acquire.
                 stepBattleNetHallStill(unit);
             } else {
                 world.combat.stepStandGround(unit);
