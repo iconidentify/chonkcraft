@@ -189,15 +189,29 @@ class AiTest {
     void anIdleWorkerIsSentToTheMine() {
         World world = new World(grass(40), twoComputers());
         world.createUnit(townHall(), 0, 2, 2);
-        world.createUnit(goldMine(), 15, 20, 20);
+        Unit mine = world.createUnit(goldMine(), 15, 20, 20);
         Unit worker = world.createUnit(peasant(), 0, 8, 8);
         world.enableAi(0);
 
         assertEquals(Unit.Order.STILL, worker.order());
-        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 3; cycle++) {
+        int startingGold = world.player(0).get(Resource.GOLD);
+        boolean dispatched = false;
+        boolean deliveredGold = false;
+        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 4; cycle++) {
             world.tick();
+            if (worker.order() == Unit.Order.HARVEST
+                    && worker.resourceUnit() == mine) {
+                dispatched = true;
+            }
+            if (world.player(0).get(Resource.GOLD) > startingGold) {
+                deliveredGold = true;
+                break;
+            }
         }
-        assertEquals(Unit.Order.HARVEST, worker.order(), "the AI should put its worker to work");
+        assertTrue(dispatched,
+                "the AI should dispatch its idle worker to the available mine");
+        assertTrue(deliveredGold,
+                "the dispatched worker should complete a gold round trip");
     }
 
     @Test
