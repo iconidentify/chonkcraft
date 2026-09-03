@@ -276,6 +276,49 @@ class BattleNetSmallWarshipPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 8's low-refusal destroyer retains its tail behind a destroyer")
+    void xOrc8LowRefusalDestroyerRetainsNonterminalTailBehindDestroyer() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 159);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1441");
+
+        tickThrough(mission, 355);
+        Unit blocker = mission.world().blockerOnLayer(destroyer, 100, 74);
+        assertNotNull(blocker, "the cached southwest head must remain occupied");
+        assertEquals(158, blocker.id(),
+                "native destroyer 1442's twin must own the blocked head");
+        assertEquals("unit-human-destroyer", blocker.type().ident());
+        assertEquals(102, destroyer.tileX());
+        assertEquals(72, destroyer.tileY());
+        assertEquals(3, destroyer.pathLength(),
+                "native retains SW,W,W through the cooperative band");
+        assertEquals(1, destroyer.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(-1, 1), destroyer.peekHeading());
+        assertEquals(1, destroyer.battleNetRefusals());
+        assertEquals(15, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 369);
+        assertEquals(102, destroyer.tileX());
+        assertEquals(72, destroyer.tileY());
+        assertEquals(1, destroyer.battleNetAnimationTimer());
+        assertEquals(3, destroyer.pathLength());
+
+        tickThrough(mission, 370);
+        assertEquals(100, destroyer.tileX(),
+                "timer-one wake consumes the retained southwest heading");
+        assertEquals(74, destroyer.tileY());
+        assertEquals(Direction.fromDelta(-1, 1),
+                destroyer.lastStepHeading());
+        assertEquals(2, destroyer.pathLength());
+        assertEquals(2, destroyer.battleNetPathStepsTaken());
+    }
+
+    @Test
     @DisplayName("XOrc 8's paid destroyer route releases north on cycle 232")
     void xOrc8PaidDestroyerRouteReleasesNorthOnCycle232() {
         AssetSource assets = AssetSource.fromEnvironment();
@@ -391,6 +434,82 @@ class BattleNetSmallWarshipPatrolRealDataTest {
         assertEquals(5, destroyer.pathLength(),
                 "the remaining five-byte tail stays live after west commits");
         assertEquals(2, destroyer.battleNetPathStepsTaken());
+    }
+
+    @Test
+    @DisplayName("XOrc 8's saturated destroyer refusal pays before redrawing")
+    void xOrc8SaturatedConsumedDestroyerRoutePaysBeforeRedrawing() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 169);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1431");
+
+        tickThrough(mission, 374);
+        assertEquals(88, destroyer.tileX());
+        assertEquals(82, destroyer.tileY());
+        assertEquals(4, destroyer.pathLength());
+        assertEquals(3, destroyer.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(-1, -1), destroyer.peekHeading());
+        assertEquals(11, destroyer.battleNetRefusals(),
+                "the earlier fleet waits remain one refusal generation");
+
+        tickThrough(mission, 375);
+        assertEquals(88, destroyer.tileX());
+        assertEquals(82, destroyer.tileY(),
+                "the pressured submarine parks the saturated route");
+        assertEquals(0, destroyer.pathLength());
+        assertEquals(12, destroyer.battleNetRefusals());
+        assertEquals(15, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 389);
+        assertEquals(88, destroyer.tileX());
+        assertEquals(82, destroyer.tileY());
+        assertEquals(1, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 390);
+        assertEquals(88, destroyer.tileX());
+        assertEquals(80, destroyer.tileY(),
+                "the paid wake consumes the redraw's north heading");
+        assertEquals(Direction.fromDelta(0, -1),
+                destroyer.lastStepHeading());
+        assertEquals(3, destroyer.pathLength());
+        assertEquals(1, destroyer.battleNetPathStepsTaken());
+    }
+
+    @Test
+    @DisplayName("XOrc 8's bounded destroyer prefix pays its first refusal band")
+    void xOrc8BoundedDestroyerPrefixPaysFirstRefusalBand() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        GameData data = new GameData(assets);
+        Mission mission = mission(data);
+        Unit destroyer = unitById(mission.world(), 158);
+        assertNotNull(destroyer,
+                "XOrc 8 has no Java twin for native destroyer 1442");
+
+        tickThrough(mission, 388);
+        assertEquals(98, destroyer.tileX());
+        assertEquals(74, destroyer.tileY());
+        assertEquals(3, destroyer.battleNetPathStepsTaken());
+        assertEquals(2, destroyer.pathLength());
+        assertEquals(0, destroyer.battleNetRefusals());
+
+        tickThrough(mission, 389);
+        assertEquals(98, destroyer.tileX(),
+                "a three-byte prefix must not cold-redraw southwest");
+        assertEquals(74, destroyer.tileY());
+        assertEquals(1, destroyer.battleNetRefusals());
+        assertEquals(15, destroyer.battleNetAnimationTimer());
+
+        tickThrough(mission, 400);
+        assertEquals(98, destroyer.tileX(),
+                "the first refusal's complete band extends beyond c400");
+        assertEquals(74, destroyer.tileY());
     }
 
     private static Mission mission(GameData data) {

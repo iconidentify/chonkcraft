@@ -83,6 +83,39 @@ class BattleNetFlyerPatrolRealDataTest {
     }
 
     @Test
+    @DisplayName("XOrc 8's balloon replans a consumed route around its air peer")
+    void xOrc8UnarmedBalloonReplansConsumedRouteAroundAirPeer() {
+        Mission mission = mission("campaigns/orc-exp/levelx08o");
+        Unit balloon = unitById(mission.world(), 153);
+        assertNotNull(balloon,
+                "XOrc 8 has no Java twin for native slot-1447 balloon");
+
+        tickThrough(mission, 362);
+        Unit blocker = mission.world().blockerOnLayer(balloon, 94, 68);
+        assertNotNull(blocker, "the cached west head must contain its air peer");
+        assertEquals(154, blocker.id(),
+                "native slot-1446's twin must own the blocked air anchor");
+        assertEquals("unit-balloon", blocker.type().ident());
+        assertEquals(96, balloon.tileX());
+        assertEquals(68, balloon.tileY());
+        assertEquals(2, balloon.pathLength(),
+                "the blocked consumed route is replaced with NW,SW");
+        assertEquals(0, balloon.battleNetPathStepsTaken());
+        assertEquals(Direction.fromDelta(-1, -1), balloon.peekHeading());
+
+        tickThrough(mission, 363);
+        assertEquals(94, balloon.tileX(),
+                "the replacement route must commit northwest immediately");
+        assertEquals(66, balloon.tileY());
+        assertEquals(Direction.fromDelta(-1, -1),
+                balloon.lastStepHeading());
+        assertEquals(1, balloon.pathLength(),
+                "native retains the replacement route's southwest tail");
+        assertEquals(Direction.fromDelta(-1, 1), balloon.peekHeading());
+        assertEquals(1, balloon.battleNetPathStepsTaken());
+    }
+
+    @Test
     @DisplayName("XOrc 7's balloon keeps its cached north heading near the scout point")
     void xOrc7BalloonDoesNotInheritTheNavalFreeCloserRewrite() {
         Mission mission = mission("campaigns/orc-exp/levelx07o");
@@ -502,6 +535,15 @@ class BattleNetFlyerPatrolRealDataTest {
             if (unit.isAlive() && unit.isOnMap() && unit.tileX() == x
                     && unit.tileY() == y && unit.type() != null
                     && ident.equals(unit.type().ident())) {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private static Unit unitById(World world, int id) {
+        for (Unit unit : world.unitsSnapshot()) {
+            if (unit.id() == id) {
                 return unit;
             }
         }

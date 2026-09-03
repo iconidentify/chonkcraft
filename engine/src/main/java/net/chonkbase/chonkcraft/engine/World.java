@@ -6146,6 +6146,25 @@ public final class World {
             boolean preserveBlockedGoalPrefix,
             boolean preserveEmptyFailure,
             boolean autoForestFreePrefix) {
+        return findBattleNetPointPath(unit, toX, toY, goalMarker,
+                preserveBlockedGoalPrefix, preserveEmptyFailure,
+                autoForestFreePrefix, null);
+    }
+
+    /** Replans a consumed route while keeping its refused body marked. */
+    PathFinder.Path findBattleNetPointPathKeepingBlocker(
+            Unit unit, int toX, int toY, Unit retainedBlocker) {
+        return findBattleNetPointPath(unit, toX, toY, null,
+                false, false, true, retainedBlocker);
+    }
+
+    private PathFinder.Path findBattleNetPointPath(Unit unit,
+            int toX, int toY,
+            BattleNetPathFinder.GoalMarker goalMarker,
+            boolean preserveBlockedGoalPrefix,
+            boolean preserveEmptyFailure,
+            boolean autoForestFreePrefix,
+            Unit retainedBlocker) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> optimizerBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
@@ -6294,7 +6313,8 @@ public final class World {
                 // worker's route. Other point orders still see the unit's
                 // current Still/construction body: XHuman 12 ogre 1356 must
                 // wall-follow west around regrouping ogre 1358 at fixture 204.
-                if (candidate == restoredCornerBlocker
+                if (candidate == retainedBlocker
+                        || candidate == restoredCornerBlocker
                         || (unit.order() != Unit.Order.HARVEST
                                 && pendingRegroupConstruction)
                         || (!regroupThroughMovingWorker

@@ -123,6 +123,24 @@ class BattleNetNavalMapPatrolRefusalRealDataTest {
         assertEquals(64, north.offsetY());
     }
 
+    @Test
+    @DisplayName("XHuman 7's saturated destroyer redraws around another destroyer")
+    void xHuman7SaturatedDestroyerRedrawsAroundSurfaceHull() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK");
+        Mission mission = mission(new GameData(assets));
+        Unit north = at(mission.world(), 6, 28, 26);
+        assertNotNull(north, "XHuman 7 has no northern startup destroyer");
+
+        tickThrough(mission, 387);
+        assertEquals(34, north.tileX(),
+                "a surface blocker does not turn refusal ten into a fresh band");
+        assertEquals(28, north.tileY());
+        assertEquals(10, north.battleNetRefusals(),
+                "the cold redraw still advances the sticky refusal generation");
+    }
+
     private static void assertRefusalBand(Unit north, Unit south,
             int refusals) {
         assertEquals(refusals, north.battleNetRefusals());

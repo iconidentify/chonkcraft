@@ -4133,6 +4133,7 @@ final class BattleNetMovementSystem {
             boolean capitalShip = "unit-battleship".equals(unit.type().ident())
                     || "unit-ogre-juggernaught".equals(unit.type().ident());
             if (unit.battleNetDoubleStep() && capitalShip
+                    && unit.battleNetAiBehavior() != 2
                     && Direction.isDiagonal(heading) && world.map.contains(goalX, goalY)) {
                 // Match BattleNetPathFinder's even-grid snap so the pure ray
                 // is the same ray the pathfinder drew (XOrc 8's battleship
@@ -4171,8 +4172,14 @@ final class BattleNetMovementSystem {
                             int detour = Direction.fromDelta(dx, dy);
                             // Only keep a component that moves away from the
                             // goal on its own axis (true wall-follow detour).
-                            // XOrc 8's SE step toward a south-east shipyard
-                            // has both axes closer and must stay diagonal.
+                            // Behavior-two assault ships keep the compact
+                            // pathfinder route whole even after it crosses the
+                            // goal row. XOrc 8 battleship 1424 therefore keeps
+                            // SE at fixture 394 and balances it with the route's
+                            // later NE; reducing that SE to S strands it west
+                            // of native immediately. Other capital Patrols use
+                            // this detour-cardinal seam: XOrc 11 battleship
+                            // 1511 converts NW to W on its map-authored route.
                             int detourX = unit.tileX()
                                     + Direction.deltaX(detour) * strideProbe;
                             int detourY = unit.tileY()
@@ -4684,6 +4691,51 @@ final class BattleNetMovementSystem {
                 unit.setWaitCycles(0);
                 unit.setBattleNetOrderDelay(0);
                 return;
+            }
+            // An unarmed scout aircraft does not enter the doubled-hull
+            // refusal band when an allied flyer has occupied a later byte of
+            // its route. It reruns the point planner on the residual-settle
+            // visit and leaves that replacement ready for the next action
+            // visit. XOrc 8 balloon 1447 spends three bytes of W,SW,W, then
+            // finds balloon 1446 on the next W at fixture 363; native replaces
+            // the tail with NW,SW and takes NW at that published boundary.
+            if (!canTakeStep && unit.battleNetDoubleStep()
+                    && unit.type().moveType() == UnitType.Movement.FLY
+                    && !unit.type().canAttack()
+                    && unit.battleNetBorrowedMoveForStep()
+                    && unit.patrolX() >= 0
+                    && unit.stepDrained() && !unit.isMoving()
+                    && unit.battleNetPathStepsTaken() > 0
+                    && unit.pathLength() > 0) {
+                Unit airBlocker = world.blockerOnLayer(unit, nextX, nextY);
+                boolean alliedFlyer = airBlocker != null
+                        && airBlocker != unit && airBlocker.type() != null
+                        && !airBlocker.type().building()
+                        && world.isAllied(
+                                unit.player(), airBlocker.player())
+                        && airBlocker.type().moveType()
+                                == UnitType.Movement.FLY;
+                if (alliedFlyer) {
+                    PathFinder.Path replanned =
+                            world.findBattleNetPointPathKeepingBlocker(
+                                    unit, unit.orderTargetX(),
+                                    unit.orderTargetY(), airBlocker);
+                    if (replanned.result() == PathFinder.Result.FOUND
+                            && replanned.length() > 0) {
+                        unit.clearPath();
+                        unit.setPath(replanned);
+                        heading = unit.peekHeading();
+                        nextX = unit.tileX()
+                                + Direction.deltaX(heading) * stride;
+                        nextY = unit.tileY()
+                                + Direction.deltaY(heading) * stride;
+                        canTakeStep = world.canEnterBattleNetTransportAnchor(
+                                unit, nextX, nextY);
+                        if (canTakeStep) {
+                            return;
+                        }
+                    }
+                }
             }
             // Armed air Patrol does not put its first cardinal route behind
             // the generic fifteen-count body wait. When an allied flyer
@@ -5747,7 +5799,12 @@ final class BattleNetMovementSystem {
                         // on 279. The unpressured control is the same destroyer
                         // at fixture 38: submarine 1432 still has collision zero,
                         // so the cached northwest tail remains live through the
-                        // band and commits when that blocker leaves on 53.
+                        // band and commits when that blocker leaves on 53. A
+                        // refusal generation already at eight or above owns
+                        // that complete band when a submerged hull holds the
+                        // cached head: destroyer 1431 parks a three-step-
+                        // consumed route behind submarine 1432 at refusal
+                        // twelve on fixture 376 and only redraws north on 390.
                         boolean paidConsumedTail =
                                 unit.battleNetPathStepsTaken() == 1;
                         boolean terminalPaidConsumedTail =
@@ -5760,15 +5817,45 @@ final class BattleNetMovementSystem {
                                         unit.type().ident())
                                     || "unit-orc-submarine".equals(
                                             unit.type().ident()));
+                        // A bounded surface-warship generation keeps its paid
+                        // cadence after a three-byte prefix. A shorter prefix
+                        // remains a cold redraw (destroyer 1430 has steps=2,
+                        // tail=2 at fixture 339), as does a saturated prefix
+                        // (the same hull has steps=8, tail=3 at fixture 274).
+                        // Destroyer 1442 is the complementary bounded witness
+                        // with steps=3/tail=2: its first refusal opens Move
+                        // 15..1 on fixture 390.
+                        boolean consumedSurfaceWarshipRoute =
+                                unit.battleNetPathStepsTaken() >= 3
+                                && unit.battleNetPathStepsTaken() < 8
+                                && unit.type() != null
+                                && unit.type().canAttack()
+                                && !World.isBattleNetCapitalShip(
+                                        unit.type().ident())
+                                && !"unit-human-submarine".equals(
+                                        unit.type().ident())
+                                && !"unit-orc-submarine".equals(
+                                        unit.type().ident());
                         int parkedHeading = terminalPaidConsumedTail
                                 ? unit.peekHeading() : -1;
-                        battleNetRefuse(unit);
+                        int refusals = battleNetRefuse(unit);
+                        boolean submarineBlocker = blocker.type() != null
+                                && ("unit-human-submarine".equals(
+                                        blocker.type().ident())
+                                    || "unit-orc-submarine".equals(
+                                            blocker.type().ident()));
+                        boolean saturatedRefusalBand = refusals >= 8
+                                && refusals < 15 && submarineBlocker;
+                        boolean completeRefusalBand =
+                                saturatedRefusalBand
+                                || (refusals < 8
+                                        && consumedSurfaceWarshipRoute)
+                                || (paidConsumedTail
+                                        && !nonTerminalSubmarineRedraw);
                         unit.setRouteSpent(false);
                         unit.setWaitCycles(0);
                         unit.setBattleNetOrderDelay(
-                                paidConsumedTail
-                                        && !nonTerminalSubmarineRedraw
-                                                ? 14 : 0);
+                                completeRefusalBand ? 14 : 0);
                         unit.setBattleNetNavalPaidParkedRoute(
                                 terminalPaidConsumedTail);
                         if (paidConsumedTail) {
@@ -5784,8 +5871,7 @@ final class BattleNetMovementSystem {
                             unit.setBattleNetParkedRefusalHeading(
                                     parkedHeading);
                         }
-                        if (paidConsumedTail
-                                && !nonTerminalSubmarineRedraw
+                        if (completeRefusalBand
                                 && world.battleNetSequence != null
                                 && world.battleNetMoveAnimation(unit)) {
                             int moveStart = world.idle
@@ -5916,21 +6002,29 @@ final class BattleNetMovementSystem {
                         // successful NW at c53, fresh-route refusals two through
                         // eight at c85..91, timer 15..1, then NW at c106.
                         int refusals = unit.battleNetRefusals() + 1;
-                        boolean oneStepNonTerminalRedraw =
+                        boolean submarineBlockedOneStepRedraw =
                                 unit.type().canAttack()
                                 && !World.isBattleNetCapitalShip(
                                         unit.type().ident())
+                                && ("unit-human-submarine".equals(
+                                        blocker.type().ident())
+                                        || "unit-orc-submarine".equals(
+                                                blocker.type().ident()))
                                 && unit.battleNetPathStepsTaken() == 1
                                 && unit.pathLength() > 1
                                 && refusals < 8;
-                        if (oneStepNonTerminalRedraw) {
+                        if (submarineBlockedOneStepRedraw) {
                             // The first consumed heading pays for this route
                             // draw, but a blocked nonterminal head below the
                             // saturated refusal generation is stale input.
                             // Native parks it at RI20 and redraws on the next
-                            // visit: XOrc 8 destroyer 1468 raises generation
-                            // one while parking seven headings on fixture 327,
-                            // then commits the redraw's NE head on 328.
+                            // visit when a submarine owns the cached head:
+                            // XOrc 8 destroyer 1468 raises generation one while
+                            // parking seven headings on fixture 327, then
+                            // commits the redraw's NE head on 328. Destroyer
+                            // 1441 is the complementary hull-blocker witness:
+                            // it retains SW,W,W at fixture 355 and consumes SW
+                            // after the complete refusal band at 370.
                             // Submarine 1432 at fixture 225 is the held-out
                             // multi-step control (three headings consumed),
                             // and the terminal 1431 tail still retains its

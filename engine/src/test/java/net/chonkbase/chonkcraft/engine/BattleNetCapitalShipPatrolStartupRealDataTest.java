@@ -117,6 +117,30 @@ class BattleNetCapitalShipPatrolStartupRealDataTest {
     }
 
     @Test
+    @DisplayName("an XOrc 8 assault battleship keeps its southeast route after crossing the goal row")
+    void anXOrc8AssaultBattleshipKeepsSoutheastAfterCrossingGoalRow() {
+        Mission mission = mission("campaigns/orc-exp/levelx08o");
+        Unit battleship = at(mission.world(), "unit-battleship", 40, 108);
+        assertNotNull(battleship,
+                "XOrc 8 has no startup battleship at 40,108");
+        assertEquals(2, battleship.battleNetAiBehavior(),
+                "the full diagonal route belongs to the launched assault");
+
+        for (int cycle = 1; cycle <= 393; cycle++) {
+            mission.tick();
+        }
+        assertEquals(54, battleship.tileX());
+        assertEquals(122, battleship.tileY());
+
+        mission.tick();
+        assertEquals(56, battleship.tileX(),
+                "native slot 1424 keeps southeast instead of reducing it to south");
+        assertEquals(124, battleship.tileY());
+        assertEquals(Direction.fromDelta(1, 1),
+                battleship.lastStepHeading());
+    }
+
+    @Test
     @DisplayName("an XHuman 7 juggernaught stands down when its map patrol route ends")
     void anXHuman7JuggernaughtStandsDownWhenItsMapPatrolRouteEnds() {
         Mission mission = mission("campaigns/human-exp/levelx07h");
