@@ -15,7 +15,64 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-02 (only fresh terminal gold-skirt steps yield)
+## Current release checkpoint — 2026-09-02 (in-range land chasers finish the committed stride)
+
+Accepted cycle-1,800 receipt `5b2e2eda` preserves the shared clean horizon at
+fixture 332 and improves or preserves every campaign frontier. The fleet
+remains 13 clean / 39 divergent / 0 failed, while the 52 per-case exact
+prefixes move from 52,999 to 53,020. Expansion Human 2 is the only changed
+case, advancing from exact through fixture 532 to exact through fixture 553.
+The cycle-400 fleet remains 50 clean / 2 divergent / 0 failed under receipt
+`f3297938`. The long receipt is retained at
+`.bne-artifacts/runs/5b2e2eda085526b1e4feb0821b5835790093f0cf355ad5f28506d90126606bdc`.
+Its manifest has SHA-256
+`312eaad20d57b6cb4c2be5a457608948fca72f551a41bd37d217d0e4ac652f86`
+and binds clean commit `1dbe337`, engine-input identity
+`d4e17d790328e36693db1b6f8f28dcced2500167215ac0556dca409e453c2a9b`,
+and replayable source capsule
+`928d5e322a053ae9d28cd535d5e60749f66179d518e2326dedf7835b8ed355af`
+with zero untracked engine inputs.
+
+Behavioral delta: when a ranged land chaser's current logical tile has entered
+range of a stationary target, the current MoveToTarget visit no longer accepts
+another cached route heading. It instead advances the Move presentation once,
+pays the authoritative `script.bin` pixel count still owed by the committed
+stride, parks the old route, and returns ownership directly to Attack. Moving
+quarries retain their visible residual ownership, and naval chasers retain
+their separate hit-response and broadside arrival rules. The rule contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, unit-ID,
+or unit-type-ID branch.
+
+Proof delta: expansion Human 2 death knight native slot 1557 / Java unit 43
+chases barracks slot 1554 / Java unit 46. At fixture 532 it is already in range
+on `(63,60)`, has pixel debt `(+3,-3)`, and still carries cached `S,S,S` after
+the committed southwest stride. Native fixture 533 pays those last three
+pixels, stays on `(63,60)`, parks its route cursor, and opens Attack. Java
+formerly consumed south and moved logically to `(63,61)`. The corrected route
+and attack handoff agree through fixture 553; the newly exposed fixture-554
+finding is the barracks HP, native 705 versus Java 696. Expansion Orc 11 is the
+negative control: applying the land rule to its battleship made cannon damage
+arrive at fixture 91 instead of preserving that mission through fixture 538;
+the movement-class guard retains the established naval behavior and c539
+frontier.
+
+Efficacy receipt
+`.bne-test-efficacy/xhuman2-c533-ranged-arrival/runs/29b541d3e24be8af17ef6fc607de30eb2ae7e5f1b0d42aac5f4bd4d12dd785b3`
+proves the focused expansion-Human-2 assertion executes and fails on
+`f9aea06`, then executes and passes on the candidate. All 57 selected ranged
+arrival, attack-resume, moving-quarry, XOrc-11 naval, and capital-ship controls
+pass. Both fixed 52-case gates pass. The ordinary executable next-level gate
+exits zero after 209 Python checks (four skipped), 99 engine/desktop checks,
+and 223 dual-adapter command scenarios; its 11 comparable scenarios remain
+6 exact / 5 divergent with no regression or infrastructure failure.
+
+Expansion Human 12 fixture 333 remains the paused shared-boundary route
+frontier, and expansion Orc 8 fixture 356 remains paused in its submarine
+route-publication family. The tied earliest unpaused fleet findings are now
+retail Human 5 and expansion Human 8 at fixture 536, followed by expansion
+Human 3 at 537, expansion Orc 11 at 539, and expansion Human 2 at 554.
+
+## Prior release checkpoint — 2026-09-02 (only fresh terminal gold-skirt steps yield)
 
 Accepted cycle-1,800 receipt `fc440dc7` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet
