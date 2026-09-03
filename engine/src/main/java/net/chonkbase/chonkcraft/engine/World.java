@@ -8213,6 +8213,14 @@ public final class World {
             int replacementY = Direction.deltaY(planned)
                     + Direction.deltaY(following)
                     - Direction.deltaY(directAtDepth);
+            if (replacementX < -1 || replacementX > 1
+                    || replacementY < -1 || replacementY > 1) {
+                // Replacing the blocked direct byte is valid only when the
+                // following byte can preserve the original two-step endpoint.
+                // Some legitimate routes have no such one-tile replacement;
+                // keep the pathfinder's original route in that case.
+                return path;
+            }
             int replacement = Direction.fromDelta(replacementX, replacementY);
             if (replacement < 0 || replacement >= Direction.COUNT) {
                 return path;

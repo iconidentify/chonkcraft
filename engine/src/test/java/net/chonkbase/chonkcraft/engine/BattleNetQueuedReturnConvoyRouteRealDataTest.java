@@ -100,6 +100,31 @@ class BattleNetQueuedReturnConvoyRouteRealDataTest {
         assertEquals(Direction.fromDelta(-1, -1), returner.peekHeading());
     }
 
+    @Test
+    @DisplayName("XOrc 12 keeps a valid return route when a direct-prefix swap is impossible")
+    void xorc12KeepsReturnRouteWhenDirectPrefixSwapIsImpossible() {
+        Mission mission = defaultSeedMission("campaigns/orc-exp/levelx12o");
+        World world = mission.world();
+        Unit returner = unitById(world, 205);
+
+        initialize(mission);
+        while (world.cycle() < 3185) {
+            mission.tick();
+        }
+        assertEquals(32, returner.tileX());
+        assertEquals(74, returner.tileY());
+        assertTrue(returner.returningToDepot());
+        assertEquals(100, returner.carried());
+
+        mission.tick();
+        assertEquals(3186, world.cycle());
+        assertEquals(31, returner.tileX(),
+                "the original southwest return step remains usable");
+        assertEquals(75, returner.tileY());
+        assertEquals(Direction.fromDelta(-1, 1),
+                returner.lastStepHeading());
+    }
+
     private static void assertQueuedReturner(Unit unit, Unit depot,
             int x, int y) {
         assertEquals(x, unit.tileX());
@@ -123,6 +148,16 @@ class BattleNetQueuedReturnConvoyRouteRealDataTest {
         GameData data = new GameData(assets);
         Mission mission = data.loadMission(
                 map, GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, map + " is not in the pack");
+        return mission;
+    }
+
+    private static Mission defaultSeedMission(String map) {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        Mission mission = data.loadMission(map);
         Assumptions.assumeTrue(mission != null, map + " is not in the pack");
         return mission;
     }
