@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
 import net.chonkbase.chonkcraft.engine.map.Direction;
+import net.chonkbase.chonkcraft.engine.missile.Missile;
 import net.chonkbase.chonkcraft.engine.pathfinder.BattleNetPathFinder;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
@@ -63,7 +64,10 @@ class NavalPatrolCoastGoalRealDataTest {
     @Test
     @DisplayName("xhuman 07 moving submarine answers the attacked naval guard")
     void xHuman07MovingSubmarineAnswersAttackedNavalGuard() {
-        Mission mission = load().loadMission("campaigns/human-exp/levelx07h");
+        GameData data = load();
+        String map = "campaigns/human-exp/levelx07h";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
         Assumptions.assumeTrue(mission != null, "levelx07h did not load");
         Unit sub = null;
         for (Unit u : mission.world().units()) {
@@ -84,11 +88,28 @@ class NavalPatrolCoastGoalRealDataTest {
         // The naval ready callback is native behaviour six. Its opening home
         // is the service base at 22,27; the later coast rewrite changes only
         // the live order point, not that AI state.
-        for (int i = 0; i < 55; i++) {
+        // The sealed fixture is pinned to initialization seed one. Its first
+        // type-17 torpedo is constructed on fixture 45 from native IX/IY,
+        // without the target's retained Java residual bank. Direct Mission
+        // ticks retain the two-cycle initialization prefix.
+        while (mission.world().cycle() < 47) {
             mission.tick();
         }
-        assertTrue(guard.hitPoints() < guard.type().hitPoints(),
-                "the cloaked submarine hits the guarded destroyer on 55");
+        Missile torpedo = mission.world().missiles().stream()
+                .filter(missile -> missile.source() != null
+                        && missile.source().id() == 178)
+                .findFirst().orElseThrow();
+        assertEquals(2765, (int) torpedo.toX(),
+                "fixture 45 retains native's target-X jitter");
+        assertEquals(3856, (int) torpedo.toY(),
+                "fixture 45 retains native's target-Y jitter");
+        assertEquals(128, torpedo.battleNetRemaining());
+
+        while (mission.world().cycle() < 57) {
+            mission.tick();
+        }
+        assertEquals(68, guard.hitPoints(),
+                "the fixture-55 torpedo applies native's 32 damage");
         int guardHpAfterFirstHit = guard.hitPoints();
         assertEquals(6, sub.battleNetAiBehavior());
         assertEquals(22, sub.battleNetAiHomeX());
@@ -110,8 +131,8 @@ class NavalPatrolCoastGoalRealDataTest {
         assertEquals(52, sub.tileY());
         assertEquals(86, sub.orderTargetX());
         assertEquals(120, sub.orderTargetY());
-        assertEquals(1, sub.battleNetOrderDelay(),
-                "the replacement is one Java tick from its native release");
+        assertEquals(2, sub.battleNetOrderDelay(),
+                "the replacement has entered the native 3,2,1 release");
 
         while (mission.world().cycle() < 96) {
             mission.tick();
@@ -128,8 +149,9 @@ class NavalPatrolCoastGoalRealDataTest {
         while (mission.world().cycle() < 157) {
             mission.tick();
         }
-        assertTrue(guard.hitPoints() < guardHpAfterFirstHit,
-                "the later authenticated hidden-submarine hit has landed");
+        assertEquals(46, guard.hitPoints(),
+                "the fixture-155 torpedo applies native's later 22 damage");
+        assertTrue(guard.hitPoints() < guardHpAfterFirstHit);
         assertFalse(sub.hasBattleNetPendingPatrol(),
                 "an identical guard rendezvous is not queued twice");
         assertEquals(18, sub.pathLength(),
