@@ -17,24 +17,26 @@ sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
 ## Current release checkpoint — 2026-09-04 (first-collision live residuals write Move-start/15)
 
-Candidate cycle-1,800 surveys on the live-route settle rule preserve the
-shared clean horizon and improve expansion Human 12 without moving any other
-case earlier. The fleet remains 13 clean / 39 divergent / 0 failed through
-cycle 1,800, while the 52-case exact-prefix sum rises from 54,265 to 54,269.
-Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion Human 12 advances
-from exact through fixture 400 to exact through fixture 404. Its newly exposed
-fixture-405 finding is grunt native slot 1489 / Java y 39 versus 38. Expansion
-Orc 8 remains the paused naval patrol/route-publication family at fixture 404,
-so the shared proven frontier is now cycle 403.
+Accepted cycle-1,800 receipt `79d655d6` advances the shared proven frontier
+from cycle 400 to 403 and improves expansion Human 12 without moving any
+other case earlier. The fleet remains 13 clean / 39 divergent / 0 failed
+through cycle 1,800, while the 52-case exact-prefix sum rises from 54,265
+to 54,269. Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion
+Human 12 advances from exact through fixture 400 to exact through fixture
+404. Its newly exposed fixture-405 finding is grunt native slot 1489 / Java
+y 39 versus 38. Expansion Orc 8 remains the paused naval
+patrol/route-publication family at fixture 404, which is why the shared
+horizon stops at 403.
 
-The candidate 400-cycle survey is
-`.bne-surveys/candidate-coll1-c400` and the 1,800-cycle survey is
-`.bne-surveys/candidate-coll1-c1800`. Both bind HEAD `01d069d` plus this
-change, engine-input
-`e9347e8f028e23c67cc172c35887236af990a561a84a89bca5469e5dacd1b34e`,
+The 400-cycle survey is `.bne-surveys/current-7bc11b9-c400` and the
+1,800-cycle survey is `.bne-surveys/current-7bc11b9-c1800`. Both bind clean
+commit `7bc11b9`, engine-input
+`db173b4f7882331266a05a3193eff8624239d560f1b4207b73b1b438ea82d805`,
 pack SHA-256
 `3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
 and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The long receipt is retained at
+`.bne-field-evidence/current-7bc11b9-gate/runs/79d655d6729fd678dada923a8e9200c2a81b42ce01193c25c2607a6fd3343a17`.
 
 Behavioral delta: the first collision generation of a live Attack residual
 writes native Move-start/15 on the settle visit. A leftover refusal count is
