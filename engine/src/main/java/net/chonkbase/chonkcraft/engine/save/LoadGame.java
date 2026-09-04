@@ -821,6 +821,10 @@ public final class LoadGame {
             unit.setBattleNetOrderDelay(
                     integer(state.rawGet("battleNetOrderDelay")));
         }
+        if (state.rawGet("corpseOwnerHandoffPending") != null) {
+            unit.setBattleNetCorpseOwnerHandoffPending(
+                    truthy(state.rawGet("corpseOwnerHandoffPending")));
+        }
         if (state.rawGet("resourceHitRestoreIdle") != null) {
             unit.setBattleNetResourceHitRestoreIdle(
                     truthy(state.rawGet("resourceHitRestoreIdle")));
@@ -838,6 +842,10 @@ public final class LoadGame {
                     integer(state.rawGet("woodCornerRefusalHeading")));
             unit.setBattleNetWoodCornerRefusalVisits(
                     integer(state.rawGet("woodCornerRefusalVisits")));
+        }
+        if (state.rawGet("claimedWoodReplacementPending") != null) {
+            unit.setBattleNetClaimedWoodReplacementPending(
+                    truthy(state.rawGet("claimedWoodReplacementPending")));
         }
         if (state.rawGet("rangedAttackCadenceRemaining") != null) {
             unit.setBattleNetRangedAttackCadenceRemaining(integer(
@@ -858,6 +866,14 @@ public final class LoadGame {
         if (state.rawGet("paidRefusalRecoveryApproach") != null) {
             unit.setBattleNetPaidRefusalRecoveryApproach(
                     truthy(state.rawGet("paidRefusalRecoveryApproach")));
+        }
+        if (state.rawGet("paidCollisionTailRefill") != null) {
+            unit.setBattleNetPaidCollisionTailRefill(
+                    truthy(state.rawGet("paidCollisionTailRefill")));
+        }
+        if (state.rawGet("paidCardinalWallFaceRefill") != null) {
+            unit.setBattleNetPaidCardinalWallFaceRefill(
+                    truthy(state.rawGet("paidCardinalWallFaceRefill")));
         }
         if (state.rawGet("actionBeforeQueued") != null) {
             try {

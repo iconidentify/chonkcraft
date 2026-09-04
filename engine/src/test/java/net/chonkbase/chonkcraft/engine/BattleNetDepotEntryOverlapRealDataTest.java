@@ -105,6 +105,47 @@ class BattleNetDepotEntryOverlapRealDataTest {
     }
 
     @Test
+    @DisplayName("XHuman 12's staged returner enters behind a collided depot mate")
+    void xhuman12StagedReturnerEntersBehindACollidedDepotMate() {
+        Mission mission = mission("campaigns/human-exp/levelx12h");
+        World world = mission.world();
+        Unit mover = byId(world, 50);
+        Unit blocker = byId(world, 45);
+        assertNotNull(mover, "native slot 1550 must remain paired with Java 50");
+        assertNotNull(blocker, "native slot 1555 must remain paired with Java 45");
+
+        advanceToFixture(mission, 395);
+        assertEquals(6, mover.tileX());
+        assertEquals(24, mover.tileY());
+        assertEquals(7, blocker.tileX());
+        assertEquals(23, blocker.tileY());
+        assertTrue(mover.returningToDepot());
+        assertTrue(blocker.returningToDepot());
+        assertEquals(100, mover.carried());
+        assertEquals(100, blocker.carried());
+        assertTrue(mover.battleNetResourceApproachStaged());
+        assertTrue(blocker.battleNetResourceApproachStaged());
+        assertEquals(mover.returnDepotGoal(), blocker.returnDepotGoal());
+        assertTrue(blocker.isMoving());
+        assertEquals(0, blocker.pathLength());
+        assertTrue(blocker.routeSpent());
+        assertEquals(2, blocker.battleNetCollisionCounter(),
+                "the draining north entry retains its collision generation");
+        assertEquals(0, blocker.battleNetRefusals());
+        assertEquals(false, world.movement.battleNetSoftClearMoveAlly(blocker),
+                "collision history keeps the body solid outside depot entry");
+
+        mission.tick();
+        assertEquals(396, fixtureCycle(world));
+        assertEquals(7, mover.tileX(),
+                "native slot 1550 spends north-east on cycle 396");
+        assertEquals(23, mover.tileY());
+        assertEquals(blocker.tileX(), mover.tileX(),
+                "the staged same-depot exception permits the brief overlap");
+        assertEquals(blocker.tileY(), mover.tileY());
+    }
+
+    @Test
     @DisplayName("XHuman 8's pre-stage return still waits behind depot traffic")
     void xhuman8PreStageReturnStillWaitsBehindDepotTraffic() {
         Mission mission = mission("campaigns/human-exp/levelx08h");

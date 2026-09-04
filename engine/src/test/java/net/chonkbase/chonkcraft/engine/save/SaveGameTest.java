@@ -1212,6 +1212,25 @@ class SaveGameTest {
     }
 
     @Test
+    @DisplayName("pending parity handoffs survive a save")
+    void pendingParityHandoffsRoundTrip() throws IOException {
+        Bench bench = bench();
+        Unit unit = bench.world().createUnit(
+                bench.types().get("unit-grunt"), 0, 10, 10);
+        unit.setBattleNetCorpseOwnerHandoffPending(true);
+        unit.setBattleNetPaidCollisionTailRefill(true);
+        unit.setBattleNetPaidCardinalWallFaceRefill(true);
+        unit.setBattleNetClaimedWoodReplacementPending(true);
+
+        Unit loaded = find(reload(bench), "unit-grunt");
+
+        assertTrue(loaded.battleNetCorpseOwnerHandoffPending());
+        assertTrue(loaded.battleNetPaidCollisionTailRefill());
+        assertTrue(loaded.battleNetPaidCardinalWallFaceRefill());
+        assertTrue(loaded.battleNetClaimedWoodReplacementPending());
+    }
+
+    @Test
     @DisplayName("a tanker resumes the same native oil action and cadence")
     void tankerOilStateRoundTrips() throws IOException {
         Bench bench = bench();

@@ -255,6 +255,7 @@ final class BattleNetHarvestSystem {
         worker.setBattleNetSaturatedWoodConstructionRoute(false);
         worker.setBattleNetSaturatedWoodConstructionRedraw(false);
         worker.setBattleNetSaturatedWoodClaimedReplacement(false);
+        worker.setBattleNetClaimedWoodReplacementPending(false);
         // Default off; gold free-prefix forest re-aim and range-one leftover
         // routes arm the walk claim themselves. A plain adjacent wood order
         // only draws at work 2660 (standing start).
@@ -2285,6 +2286,97 @@ final class BattleNetHarvestSystem {
         // A walking chopper's period clock is not running; the next arrival
         // winds it afresh.
         worker.setGatherClockStarted(false);
+        boolean completedSaturatedConstructionTailBand =
+                !worker.isMoving() && worker.stepDrained()
+                && worker.battleNetOrderDelay() == 0
+                && worker.battleNetRefusalHold()
+                && worker.battleNetSaturatedWoodConstructionRedraw()
+                && worker.pathLength() > 1
+                && worker.battleNetPathStepsTaken() == 1
+                && worker.battleNetCollisionCounter() >= 9;
+        if (completedSaturatedConstructionTailBand) {
+            int[] replacement = findClaimedWoodReplacement(worker);
+            if (replacement != null
+                    && (replacement[0] != worker.resourceTileX()
+                            || replacement[1] != worker.resourceTileY())) {
+                // The collision-eight construction route committed one byte,
+                // then its repeated occupied tail advanced the same packed
+                // generation to nine and served a complete Move 15..1 band.
+                // On timer one native parks that stale route and returns to
+                // action 23. A tree claimed during the band is replaced now,
+                // before any cached heading can be spent. XHuman 12 peon
+                // 1385 therefore stays on (13,87), changes (14,89) to
+                // (15,89), and exposes 2657/3 at fixture 338.
+                worker.clearPath();
+                worker.setRouteSpent(false);
+                worker.setResourceTile(replacement[0], replacement[1]);
+                worker.setBattleNetWoodOrder(
+                        replacement[0], replacement[1]);
+                worker.setBattleNetCollisionCounter(0);
+                worker.setBattleNetRefusals(0);
+                worker.setBattleNetRefusalHold(false);
+                worker.setBattleNetSaturatedWoodConstructionRoute(false);
+                worker.setBattleNetSaturatedWoodConstructionRedraw(false);
+                // Keep the replacement's forest point authoritative through
+                // the 3,2,1 constructor. Its first redraw must not collapse
+                // to an occupied intermediate order square.
+                worker.setBattleNetSaturatedWoodClaimedReplacement(true);
+                worker.setWaitCycles(0);
+                worker.setBattleNetOrderDelay(2);
+                if (world.battleNetSequence != null) {
+                    int gatherStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.ATTACK_ANIMATION);
+                    if (gatherStart >= 0) {
+                        AnimationSet set = worker.type().animationSet();
+                        Animation attack = set == null ? null
+                                : set.get(AnimationSet.State.ATTACK);
+                        if (attack != null
+                                && worker.animation().current() != attack) {
+                            worker.animation().switchTo(attack);
+                        }
+                        worker.setBattleNetSequenceOffset(gatherStart);
+                        worker.setBattleNetAnimationTimer(3);
+                    }
+                }
+                return;
+            }
+        }
+        int paidFullShortcut = worker.pathLength() > 0
+                ? BattleNetPathFinder.twoHeadingShortcut(
+                        worker.lastStepHeading(), worker.peekHeading())
+                : -1;
+        boolean livePaidFullShortcut = paidFullShortcut >= 0
+                && world.canEnter(worker,
+                        worker.tileX() + Direction.deltaX(paidFullShortcut),
+                        worker.tileY() + Direction.deltaY(paidFullShortcut));
+        boolean paidFullForestPrefixRedraw = !worker.isMoving()
+                && worker.stepDrained()
+                && worker.battleNetWoodRouteIndex20()
+                && worker.battleNetGoldFreePrefix()
+                && worker.battleNetGoldFreePrefixLength()
+                        == worker.battleNetPathInitialLength()
+                && worker.battleNetPathStepsTaken() == 1
+                && worker.pathLength() > 1
+                && worker.battleNetCollisionCounter() == 2
+                && worker.battleNetWoodOrderX() == worker.resourceTileX()
+                && worker.battleNetWoodOrderY() == worker.resourceTileY()
+                && !livePaidFullShortcut;
+        if (paidFullForestPrefixRedraw) {
+            // A complete cooperative Move band does not buy another wait for
+            // the remaining bytes of the forest ray. FUN_004379e0 parks the
+            // old cursor at RI20; on the following action-23 visit NewPath
+            // resolves the original tree point and replaces the whole route.
+            // Keep this as a local constructor input because clearPath is the
+            // Java representation of that parked native cursor.
+            // A live DAT_00490e88 shortcut remains the owner instead: XHuman
+            // 11 peon 1584 must preserve NE+SE -> E on fixture 38 so its
+            // repeated east residual still pays RI20 on fixture 54.
+            worker.clearPath();
+            worker.setRouteSpent(false);
+            worker.setWaitCycles(0);
+            worker.setBattleNetOrderDelay(0);
+            worker.setBattleNetRefusalHold(false);
+        }
         MapField field = world.map.fieldOrNull(worker.resourceTileX(), worker.resourceTileY());
         if (field == null || !field.isForest()) {
             int[] found = world.findTerrainType(worker, worker.resourceTileX(), worker.resourceTileY(),
@@ -2616,6 +2708,45 @@ final class BattleNetHarvestSystem {
                 }
                 // freeLen >= 3 mid-journey: fall through to immediate replan.
             }
+            if (worker.battleNetClaimedWoodReplacementPending()) {
+                worker.setBattleNetClaimedWoodReplacementPending(false);
+                int[] replacement = findClaimedWoodReplacement(worker);
+                if (replacement == null) {
+                    worker.setOrder(Unit.Order.STILL);
+                    return;
+                }
+                // A drained terrain route landed just outside gathering
+                // range with its final byte blocked by the worker which now
+                // owns the selected tree. The next action-23 constructor
+                // performs the same fifteen-square replacement search as
+                // StartGathering. Keep the replacement forest point
+                // authoritative through its 3,2,1 cadence: XHuman 12 peon
+                // 1385 changes (15,89) to (17,89) on fixture 374, then writes
+                // E,SE and commits east on fixture 377. Recomputing an
+                // occupied intermediate skirt produced an empty route.
+                worker.setResourceTile(replacement[0], replacement[1]);
+                worker.setBattleNetWoodOrder(replacement[0], replacement[1]);
+                worker.setBattleNetSaturatedWoodClaimedReplacement(true);
+                worker.setRouteSpent(false);
+                worker.setWaitCycles(0);
+                worker.setBattleNetOrderDelay(2);
+                if (world.battleNetSequence != null) {
+                    int gatherStart = world.idle.battleNetSequenceStart(
+                            worker, BattleNetSequence.ATTACK_ANIMATION);
+                    if (gatherStart >= 0) {
+                        AnimationSet set = worker.type().animationSet();
+                        Animation attack = set == null ? null
+                                : set.get(AnimationSet.State.ATTACK);
+                        if (attack != null
+                                && worker.animation().current() != attack) {
+                            worker.animation().switchTo(attack);
+                        }
+                        worker.setBattleNetSequenceOffset(gatherStart);
+                        worker.setBattleNetAnimationTimer(3);
+                    }
+                }
+                return;
+            }
             // The spent route is served before the fresh ask here exactly as
             // in walkTowards: a refusal pops the route's last element, and
             // upstream's next attempt reads the phantom element past the
@@ -2695,7 +2826,12 @@ final class BattleNetHarvestSystem {
                     // the direct ray. XHuman 12 peon 1376 therefore routes
                     // NE,E,SE,S toward tree (15,89), rather than accepting
                     // the intervening (14,88) square as a one-byte goal.
-                    || saturatedClaimedReplacementRedraw;
+                    || saturatedClaimedReplacementRedraw
+                    // A paid full-prefix retry already owns the original
+                    // forest goal in unit+0x84. Recomputing the intermediate
+                    // wall point after RI20 shortens the replacement to one
+                    // byte and loses the native detour tail.
+                    || paidFullForestPrefixRedraw;
             int[] orderPoint = aimAtResource
                     ? new int[] {treeX, treeY}
                     : battleNetWoodOrderPoint(worker, treeX, treeY);
@@ -2705,9 +2841,13 @@ final class BattleNetHarvestSystem {
                     (x, y) -> Math.max(Math.abs(x - goalX),
                             Math.abs(y - goalY)) <= 1;
             path = aimAtResource
-                    ? world.findBattleNetPointPath(
-                            worker, goalX, goalY, woodMarker,
-                            false, false, false)
+                    ? (paidFullForestPrefixRedraw
+                            || saturatedClaimedReplacementRedraw)
+                            ? world.findBattleNetPaidWoodRedrawPath(
+                                    worker, goalX, goalY, woodMarker)
+                            : world.findBattleNetPointPath(
+                                    worker, goalX, goalY, woodMarker,
+                                    false, false, false)
                     : world.findBattleNetPointPath(
                             worker, goalX, goalY, woodMarker, true);
             if (saturatedClaimedReplacementRedraw) {

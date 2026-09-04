@@ -235,6 +235,8 @@ public final class World {
     boolean actionSettledMeleeReplacementBroadRoute;
     /** That replacement follows a completed residual Attack-four handoff. */
     boolean actionSettledMeleeReplacementAfterPaidBand;
+    /** Long cold residual retarget still owns native's live-route Move view. */
+    boolean actionSettledLongRouteMoveBodyView;
 
     /** Authoritative BNE action timing loaded from maindat entry 278. */
     BattleNetSequence battleNetSequence;
@@ -6148,14 +6150,21 @@ public final class World {
             boolean autoForestFreePrefix) {
         return findBattleNetPointPath(unit, toX, toY, goalMarker,
                 preserveBlockedGoalPrefix, preserveEmptyFailure,
-                autoForestFreePrefix, null);
+                autoForestFreePrefix, null, false);
+    }
+
+    /** Point route for action 23 after a complete forest-prefix refusal band. */
+    PathFinder.Path findBattleNetPaidWoodRedrawPath(Unit unit,
+            int toX, int toY, BattleNetPathFinder.GoalMarker goalMarker) {
+        return findBattleNetPointPath(unit, toX, toY, goalMarker,
+                false, false, false, null, true);
     }
 
     /** Replans a consumed route while keeping its refused body marked. */
     PathFinder.Path findBattleNetPointPathKeepingBlocker(
             Unit unit, int toX, int toY, Unit retainedBlocker) {
         return findBattleNetPointPath(unit, toX, toY, null,
-                false, false, true, retainedBlocker);
+                false, false, true, retainedBlocker, false);
     }
 
     private PathFinder.Path findBattleNetPointPath(Unit unit,
@@ -6164,7 +6173,8 @@ public final class World {
             boolean preserveBlockedGoalPrefix,
             boolean preserveEmptyFailure,
             boolean autoForestFreePrefix,
-            Unit retainedBlocker) {
+            Unit retainedBlocker,
+            boolean paidWoodAction23Redraw) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> optimizerBlockers = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
@@ -6207,6 +6217,7 @@ public final class World {
             boolean behaviorSixCapitalPatrolThroughMovingHull = false;
             boolean plainMoveRefusalThroughMovingAlly = false;
             boolean saturatedWoodThroughShortPrefix = false;
+            boolean paidWoodRedrawThroughMoveBody = false;
             if (isAllied(unit.player(), candidate.player())) {
                 queuedRegroupConstruction = !candidate.isMoving()
                         && candidate.battleNetAiBehavior() == 1
@@ -6261,6 +6272,11 @@ public final class World {
                         && candidate.isMoving();
                 boolean ordinaryMoveAllySoft =
                         movement.battleNetSoftClearMoveAlly(candidate);
+                paidWoodRedrawThroughMoveBody = paidWoodAction23Redraw
+                        && candidate.type() != null
+                        && candidate.type().moveType()
+                                == UnitType.Movement.LAND
+                        && movement.battleNetCurrentMoveBody(candidate);
                 boolean pendingLandAssaultYieldsToWood = movement
                         .battleNetPendingLandAssaultYieldsToWood(
                                 unit, candidate);
@@ -6322,6 +6338,7 @@ public final class World {
                                 && !behaviorSixCapitalPatrolThroughMovingHull
                                 && !plainMoveRefusalThroughMovingAlly
                                 && !ordinaryMoveAllySoft
+                                && !paidWoodRedrawThroughMoveBody
                                 && !pendingLandAssaultYieldsToWood
                                 && !saturatedWoodThroughShortPrefix)) {
                     continue;
@@ -6355,6 +6372,7 @@ public final class World {
             if (!queuedRegroupConstruction
                     && !behaviorSixCapitalPatrolThroughMovingHull
                     && !plainMoveRefusalThroughMovingAlly
+                    && !paidWoodRedrawThroughMoveBody
                     && !saturatedWoodThroughShortPrefix) {
                 optimizerBlockers.add(candidate);
             }
@@ -7251,6 +7269,7 @@ public final class World {
             boolean alignOfferedBuildingResidualAxisSkirt) {
         java.util.List<Unit> softBlockers = new ArrayList<>();
         java.util.List<Unit> reservedMoveBodies = new ArrayList<>();
+        java.util.List<Unit> currentMoveBodySoftBlockers = new ArrayList<>();
         java.util.List<Unit> transparentQueuedReturners = new ArrayList<>();
         boolean hostilesStandAside = battleNetHostilesStandAside(unit);
         for (Unit candidate : units) {
@@ -7514,10 +7533,24 @@ public final class World {
                                 && movement
                                         .battleNetSoftClearLiveRouteRefusalAlly(
                                                 candidate));
+                boolean walkedColdRetargetLiveRouteBody =
+                        actionSettledLongRouteMoveBodyView
+                        // 0x4501bc tests the packed collision nibble before
+                        // action state 3. This helper ignores only Java's
+                        // stale refusal proxy; it still requires collision
+                        // zero, a live route, and the Move body. That clears
+                        // slot 1506 at c334 and slot 1480 at c337 while the
+                        // collision-one formation rank remains a wall.
+                        && movement.battleNetSoftClearLiveRouteRefusalAlly(
+                                candidate);
                 if (!queuedReturnBehindCollidedRayBlocker
                         && !softClearMoveAlly
-                        && !paidBandSoft) {
+                        && !paidBandSoft
+                        && !walkedColdRetargetLiveRouteBody) {
                     continue;
+                }
+                if (walkedColdRetargetLiveRouteBody) {
+                    currentMoveBodySoftBlockers.add(candidate);
                 }
             } else if (!hostilesStandAside || candidate.type().building()) {
                 // 0x00450766 clears bit 0x100 and nothing else, so a hostile
@@ -7633,6 +7666,8 @@ public final class World {
                             .filter(candidate ->
                                     !reservedMoveBodies.contains(candidate)
                                     && !transparentQueuedReturners
+                                            .contains(candidate)
+                                    && !currentMoveBodySoftBlockers
                                             .contains(candidate))
                             .toList();
 
@@ -13157,6 +13192,21 @@ public final class World {
         // and this one's at 88, once per skeleton for the whole map.
         AnimationSet set = unit.type().animationSet();
         Animation death = set == null ? null : set.get(AnimationSet.State.DEATH);
+        if (unit.battleNetCorpseOwnerHandoffPending()) {
+            // Building rubble uses the presentation fallback rather than the
+            // compact native corpse program. Its first Java frame transition
+            // is one action callback ahead of the native owner handoff, so
+            // carry only that ownership edge to the following callback.
+            // XHuman 12 destroyed-place slot 1370 remains player one through
+            // fixture 375 and becomes neutral on 376. Mobile fallback bodies
+            // do not take this bridge: XHuman 2 slot 1548 and XHuman 10 slot
+            // 1492 hand ownership over on their observed frame transition.
+            unit.setBattleNetCorpseOwnerHandoffPending(false);
+            if (unit.type().vanishes() && !unit.type().revealer()
+                    && unit.player() != NEUTRAL_PLAYER) {
+                unit.setPlayer(NEUTRAL_PLAYER);
+            }
+        }
         int compactOffsetBefore = unit.battleNetSequenceOffset();
         BattleNetSequence.Tick compactDecay = tickBattleNetCorpseDecay(unit);
         if (death != null) {
@@ -13165,17 +13215,19 @@ public final class World {
             advance(unit);
             // COrder_Die leaves the living owner on the newly installed body,
             // then hands the decaying scenery to neutral when its first held
-            // frame expires.  This is a lifecycle boundary, not a corpse-type
-            // exception: all 76 observable mobile bodies and 13 building
-            // rubble records in the sealed campaign corpus make the same
-            // owner -> player-15 transition, while revealers and corpseless
-            // deaths do not.  The old owner is already absent from the unit
+            // frame expires. The old owner is already absent from the unit
             // roster (LetUnitDie paid that before the body was installed), so
-            // only the record owner changes here.
+            // only the record owner changes here. Mobile fallback bodies line
+            // up with this transition directly. Building rubble's fallback
+            // cursor reaches it one callback early and stages the owner edge.
             if (compactDecay == null && unit.frame() != frameBefore
                     && unit.type().vanishes() && !unit.type().revealer()
                     && unit.player() != NEUTRAL_PLAYER) {
-                unit.setPlayer(NEUTRAL_PLAYER);
+                if (unit.type().building()) {
+                    unit.setBattleNetCorpseOwnerHandoffPending(true);
+                } else {
+                    unit.setPlayer(NEUTRAL_PLAYER);
+                }
             }
             if (compactDecay == null && unit.animation().unbreakable()) {
                 return;
@@ -13307,6 +13359,7 @@ public final class World {
         markSight(unit, false);
         markOccupancy(unit, false);
         unit.becomeType(corpse);
+        unit.setBattleNetCorpseOwnerHandoffPending(false);
         unit.setFrame(0);
         // Place always inserts the body in CMapField::UnitCache even when
         // MarkUnitFieldFlags declines to set a flag for a Vanishes type.
@@ -13376,6 +13429,15 @@ public final class World {
      * swing even at a goal that began dying during the route's empty wait.
      */
     PathFinder.Result planTowards(Unit unit, Unit target) {
+        if (unit.battleNetPaidCardinalWallFaceRefill()) {
+            // A parked full route and its collision generation still belong to
+            // the paid wall transaction which produced the accepted cardinal
+            // run. Java represents native route index twenty as an empty path,
+            // so consume the explicit provenance here before any caller can
+            // mistake this NewPath visit for a cold chase.
+            unit.setBattleNetPaidCardinalWallFaceRefill(false);
+            return planTowards(unit, target, true, true, true);
+        }
         return planTowards(unit, target, false);
     }
 

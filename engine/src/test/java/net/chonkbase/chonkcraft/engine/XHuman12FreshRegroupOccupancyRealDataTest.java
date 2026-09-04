@@ -132,6 +132,9 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
                 "the replacement begins action 23's three-call constructor");
 
         advanceToFixture(mission, 315);
+        Unit regroupBlocker = unitById(world, 241);
+        assertNotNull(regroupBlocker,
+                "XHuman 12 has no native-slot-1359 regroup axethrower");
         assertEquals(10, worker.tileX());
         assertEquals(88, worker.tileY());
         assertEquals(9, worker.pathLength());
@@ -139,6 +142,9 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
                 "the cached east head remains behind the southeast stride");
         assertEquals(0, worker.battleNetCollisionCounter(),
                 "the fresh wood route has no stale gold refusal generation");
+        assertTrue(regroupBlocker.isMoving());
+        assertEquals(0, regroupBlocker.battleNetRefusals(),
+                "the earlier current-Move body has no sticky refusal owner");
 
         mission.tick();
         assertEquals(316, fixtureCycle(world));
@@ -165,6 +171,43 @@ class XHuman12FreshRegroupOccupancyRealDataTest {
         assertEquals(88, worker.tileY());
         assertEquals(8, worker.pathLength());
         assertEquals(Direction.fromDelta(1, 0), worker.lastStepHeading());
+
+        advanceToFixture(mission, 395);
+        assertEquals(14, worker.tileX());
+        assertEquals(86, worker.tileY());
+        assertEquals(5, worker.pathLength());
+        assertEquals(Direction.fromDelta(1, 0), worker.peekHeading());
+        assertEquals(8, worker.battleNetPathInitialLength());
+        assertEquals(3, worker.battleNetPathStepsTaken());
+        assertEquals(0, worker.battleNetCollisionCounter());
+        assertEquals(15, regroupBlocker.tileX());
+        assertEquals(86, regroupBlocker.tileY());
+        assertTrue(regroupBlocker.isMoving());
+        assertTrue(world.movement.battleNetCurrentMoveBody(regroupBlocker));
+        assertEquals(3, regroupBlocker.battleNetCollisionCounter());
+        assertEquals(1, regroupBlocker.battleNetRefusals(),
+                "the later crossing owns a sticky refusal generation");
+
+        mission.tick();
+        assertEquals(396, fixtureCycle(world));
+        assertEquals(14, worker.tileX(),
+                "the residual-settle visit parks the occupied east tail");
+        assertEquals(86, worker.tileY());
+        assertEquals(0, worker.pathLength(),
+                "native exposes route index twenty before the action-23 redraw");
+        assertEquals(1, worker.battleNetCollisionCounter());
+        assertEquals(0, worker.battleNetOrderDelay(),
+                "the sticky blocker must not buy another fifteen-count band");
+        assertFalse(worker.battleNetRefusalHold());
+
+        mission.tick();
+        assertEquals(397, fixtureCycle(world));
+        assertEquals(15, worker.tileX(),
+                "action 23 redraws around the sticky Move body immediately");
+        assertEquals(87, worker.tileY());
+        assertEquals(Direction.fromDelta(1, 1), worker.lastStepHeading());
+        assertEquals(4, worker.pathLength(),
+                "the southeast commit retains the native NE,N,N,N tail");
     }
 
     private static int fixtureCycle(World world) {

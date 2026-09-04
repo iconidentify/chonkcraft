@@ -723,6 +723,9 @@ public final class SaveGame {
             state.append(" battleNetOrderDelay = ")
                     .append(unit.battleNetOrderDelay()).append(",");
         }
+        if (unit.battleNetCorpseOwnerHandoffPending()) {
+            state.append(" corpseOwnerHandoffPending = true,");
+        }
         if (unit.battleNetResourceHitRestoreIdle()) {
             state.append(" resourceHitRestoreIdle = true,");
         }
@@ -741,6 +744,9 @@ public final class SaveGame {
             state.append(" woodCornerRefusalVisits = ")
                     .append(unit.battleNetWoodCornerRefusalVisits())
                     .append(",");
+        }
+        if (unit.battleNetClaimedWoodReplacementPending()) {
+            state.append(" claimedWoodReplacementPending = true,");
         }
         if (unit.battleNetRangedAttackCadenceRemaining() != 0) {
             state.append(" rangedAttackCadenceRemaining = ")
@@ -761,6 +767,12 @@ public final class SaveGame {
         }
         if (unit.battleNetPaidRefusalRecoveryApproach()) {
             state.append(" paidRefusalRecoveryApproach = true,");
+        }
+        if (unit.battleNetPaidCollisionTailRefill()) {
+            state.append(" paidCollisionTailRefill = true,");
+        }
+        if (unit.battleNetPaidCardinalWallFaceRefill()) {
+            state.append(" paidCardinalWallFaceRefill = true,");
         }
         if (unit.reportsActionBeforeQueued()) {
             state.append(" actionBeforeQueued = ")

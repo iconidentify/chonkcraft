@@ -316,6 +316,9 @@ public final class Unit {
     /** Whether that cursor is the compact decay program of an installed naval body. */
     private boolean battleNetCorpseDecay;
 
+    /** Building rubble whose fallback frame transition owes the owner handoff. */
+    private boolean battleNetCorpseOwnerHandoffPending;
+
     /** Number of BNE idle action markers this unit has crossed. */
     private int battleNetIdlePhase;
 
@@ -2400,6 +2403,7 @@ public final class Unit {
             // with the native eight-pixel arrival band.
             battleNetAttackWaitRefillResidual = false;
             battleNetMovingQuarryResidual = false;
+            battleNetPaidCollisionTailRefill = false;
             battleNetWrappedCollisionRetryPark = false;
             battleNetStageSixCardinalProbePark = false;
             battleNetParkedRefusalHeading = -1;
@@ -2408,6 +2412,7 @@ public final class Unit {
             battleNetColdNoProgressRefusalLoop = false;
             battleNetColdPaidWrapBodyHoldProbe = false;
             battleNetPaidLongResidualRefill = false;
+            battleNetPaidCardinalWallFaceRefill = false;
             battleNetFourStepPaidCollisionRefill = false;
             battleNetFirstSaturatedResidualProgressiveRefill = false;
         }
@@ -2501,6 +2506,14 @@ public final class Unit {
 
     public void setBattleNetCorpseDecay(boolean decay) {
         battleNetCorpseDecay = decay;
+    }
+
+    public boolean battleNetCorpseOwnerHandoffPending() {
+        return battleNetCorpseOwnerHandoffPending;
+    }
+
+    public void setBattleNetCorpseOwnerHandoffPending(boolean pending) {
+        battleNetCorpseOwnerHandoffPending = pending;
     }
 
     /**
@@ -3109,6 +3122,17 @@ public final class Unit {
 
     private boolean battleNetSaturatedWoodClaimedReplacement;
 
+    /** A terminal wood-route blocker owns the selected tree; replace it next visit. */
+    public boolean battleNetClaimedWoodReplacementPending() {
+        return battleNetClaimedWoodReplacementPending;
+    }
+
+    public void setBattleNetClaimedWoodReplacementPending(boolean pending) {
+        battleNetClaimedWoodReplacementPending = pending;
+    }
+
+    private boolean battleNetClaimedWoodReplacementPending;
+
     /**
      * Far multi-step residual refuse hold (Orc 12 peon 1521). Armed on the
      * residual-settle refuse onto a cooperative gold ally when a free closer
@@ -3222,6 +3246,21 @@ public final class Unit {
     }
 
     private boolean battleNetPaidRefusalRecoveryApproach;
+
+    /**
+     * A paid recovery probe parked a collision-owned cached tail. Its next
+     * callback redraws through the cooperative wall view without reopening
+     * Attack construction.
+     */
+    public boolean battleNetPaidCollisionTailRefill() {
+        return battleNetPaidCollisionTailRefill;
+    }
+
+    public void setBattleNetPaidCollisionTailRefill(boolean refill) {
+        battleNetPaidCollisionTailRefill = refill;
+    }
+
+    private boolean battleNetPaidCollisionTailRefill;
 
     /**
      * Melee Attack tail wrap named an out-of-range quarry after the old one
@@ -3716,6 +3755,17 @@ public final class Unit {
     }
 
     private boolean battleNetPaidLongResidualRefill;
+
+    /** A paid full-route cardinal run retains its wall face after parking. */
+    public boolean battleNetPaidCardinalWallFaceRefill() {
+        return battleNetPaidCardinalWallFaceRefill;
+    }
+
+    public void setBattleNetPaidCardinalWallFaceRefill(boolean refill) {
+        battleNetPaidCardinalWallFaceRefill = refill;
+    }
+
+    private boolean battleNetPaidCardinalWallFaceRefill;
 
     /** A generation-three paid wake must clear on its collision-four refill. */
     public boolean battleNetFourStepPaidCollisionRefill() {
@@ -5045,6 +5095,16 @@ public final class Unit {
             throw new IllegalStateException("no second path heading to replace");
         }
         path[pathLength - 2] = heading;
+    }
+
+    /** Swaps the second and third cached headings without consuming the route. */
+    public void promoteThirdHeadingAheadOfSecond() {
+        if (pathLength < 3) {
+            throw new IllegalStateException("fewer than three path headings");
+        }
+        int second = path[pathLength - 2];
+        path[pathLength - 2] = path[pathLength - 3];
+        path[pathLength - 3] = second;
     }
 
     /** Consumes the next heading. */
