@@ -15,7 +15,60 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-03 (off-target splash victims retain HitUnit responses)
+## Current release checkpoint — 2026-09-04 (first-collision live residuals write Move-start/15)
+
+Candidate cycle-1,800 surveys on the live-route settle rule preserve the
+shared clean horizon and improve expansion Human 12 without moving any other
+case earlier. The fleet remains 13 clean / 39 divergent / 0 failed through
+cycle 1,800, while the 52-case exact-prefix sum rises from 54,265 to 54,269.
+Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion Human 12 advances
+from exact through fixture 400 to exact through fixture 404. Its newly exposed
+fixture-405 finding is grunt native slot 1489 / Java y 39 versus 38. Expansion
+Orc 8 remains the paused naval patrol/route-publication family at fixture 404,
+so the shared proven frontier is now cycle 403.
+
+The candidate 400-cycle survey is
+`.bne-surveys/candidate-coll1-c400` and the 1,800-cycle survey is
+`.bne-surveys/candidate-coll1-c1800`. Both bind HEAD `01d069d` plus this
+change, engine-input
+`e9347e8f028e23c67cc172c35887236af990a561a84a89bca5469e5dacd1b34e`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+
+Behavioral delta: the first collision generation of a live Attack residual
+writes native Move-start/15 on the settle visit. A leftover refusal count is
+not that generation. Later collision generations still park Move-start/1 and
+refill on the following callback. The rule is expressed by native collision
+generation, live route ownership, and the existing full-buffer-tail exception;
+it contains no mission, map, faction, coordinate, fixture, exact-cycle,
+route-length, or unit-ID branch.
+
+Proof delta: expansion Human 12 grunt 1479 / Java 121 finishes the third
+heading of a twenty-byte chase at fixture 386 with seventeen live bytes, two
+prior refusals, and collision generation one. Native is already 2482/15 on
+that visit and consumes cached SE at fixture 401. Java used the leftover
+refusal count to stage Move-start/1 then 15, spending SE at 402. Grunt 1463
+at fixture 123 remains the shorter live-residual held-out (five headings,
+collision one, immediate 15). Grunt 1494 at fixture 102 remains the later
+collision-four held-out that must keep the extra visit so NE spends at 117.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/5c241fb05fb8e71e66f0bd266c2abbbbb474d35ab65291008527b2d6f9ef292f`
+proves the real-data assertion executes and fails on `01d069d`, then executes
+and passes on the candidate. Focused residual-refill held-outs pass (42 tests),
+including collision refill, collided chase refill, settled chase refusal,
+grunt 1492 saturated building retarget, cycle-58 route handoff, and the
+formation-refusal timer-one probe. Both fixed 52-case gates pass. Local native
+capture remains available and no SSH bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. The earliest unpaused fleet finding is now expansion Human 12 at
+fixture 405, followed by expansion Human 10 at 562, expansion Human 7 at 573,
+Orc 13 and expansion Orc 11 at 576, expansion Human 5 at 577, and expansion
+Human 2 at 585.
+
+## Prior release checkpoint — 2026-09-03 (off-target splash victims retain HitUnit responses)
 
 Accepted cycle-1,800 receipt `9706be85` preserves the shared clean horizon at
 fixture 332 and improves or preserves every campaign frontier. The fleet

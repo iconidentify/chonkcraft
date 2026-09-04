@@ -3200,12 +3200,15 @@ final class BattleNetMovementSystem {
         // its route cursor remains live and Move/15 is written on the settle
         // visit itself. Authenticated XHuman 12 grunt 1463 keeps route index
         // two and its five remaining headings while changing 2534/1 directly
-        // to 2482/15 at fixture 123. Treating every two-step residual as a
-        // staged refill delayed each later tile by one callback.
+        // to 2482/15 at fixture 123. Grunt 1479 keeps seventeen live bytes
+        // of a twenty-byte chase and does the same at fixture 386: collision
+        // generation is still one, even though two earlier refusals remain.
+        // Treating that leftover refusal count as a refill stage delayed SE
+        // from fixture 401 to 402. A later collision generation still parks
+        // Move-start/1: grunt 1494 raises collision 3 to 4 at fixture 102
+        // and must keep the extra visit so NE spends at 117, not 116.
         // A stable building goal retains the already-approved route buffer;
-        // it has no moving-quarry refill visit to stage. Its refusal enters
-        // timer fifteen immediately, while mobile-target residuals first
-        // expose Move-start/1 and refill on the following callback.
+        // it has no moving-quarry refill visit to stage.
         unit.setBattleNetAnimationTimer(
                 stagedMobileResidualRefill && !retainedBuildingResidual
                         ? 1 : 15);
@@ -3248,13 +3251,16 @@ final class BattleNetMovementSystem {
     /**
      * Whether a settled melee residual needs a separate route-refill visit.
      *
-     * <p>A full twenty-byte chase route which has consumed exactly two bytes
-     * still owns the other eighteen at the settle boundary. Native therefore
-     * writes Move-start/15 immediately even when its projected collision byte
-     * is already elevated. XHuman 12 grunt 1517 is the sealed witness: the
-     * retained E-led route settles and refuses at fixture 312, wakes to
-     * retarget at 327, and consumes the replacement E at 345. Staging a refill
-     * that never occurred shifted that whole tail one callback late.</p>
+     * <p>The first collision generation of a live residual writes
+     * Move-start/15 on the settle visit. A later generation parks
+     * Move-start/1 and refills on the following callback. Prior refusal
+     * counts are not that generation: XHuman 12 grunt 1479 still has two
+     * refusals when this settle raises collision to one, and native spends
+     * cached SE at fixture 401. Grunt 1494's collision-four settle at 102
+     * keeps the extra visit so its cached NE spends at 117. A full
+     * twenty-byte chase that still owns eighteen live bytes also writes 15
+     * immediately even when collision is already elevated (grunt 1517 at
+     * fixture 312).</p>
      */
     private boolean stagedBattleNetMobileResidualRefill(
             Unit unit, boolean settledMultiResidual) {
@@ -3266,8 +3272,7 @@ final class BattleNetMovementSystem {
                 && unit.pathLength() == BattleNetPathFinder.MAX_PATH - 2;
         return settledMultiResidual
                 && world.actionMoveWalked
-                && (unit.battleNetRefusals() > 0
-                        || unit.battleNetCollisionCounter() > 1)
+                && unit.battleNetCollisionCounter() > 1
                 && !retainedFullBufferTail;
     }
 
@@ -7155,11 +7160,11 @@ final class BattleNetMovementSystem {
                                     && unit.target() != null
                                     && unit.target().type() != null
                                     && unit.target().type().building();
-                            // A residual-settle callback parks at Move-start/1
-                            // before the following refusal callback writes 15.
-                            // Direct refusal-handler visits write 15 now, so
-                            // only the settling wrap boundary owns the extra
-                            // logical visit.
+                            // A later-collision residual-settle callback
+                            // parks at Move-start/1 before the following
+                            // refusal callback writes 15. The first collision
+                            // generation of a live residual writes 15 on this
+                            // visit, matching a direct refusal-handler.
                             unit.setBattleNetOrderDelay(
                                     quiet + (stagedMobileResidualRefill
                                             && !retainedBuildingResidual
