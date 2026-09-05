@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-04 (gold mixed leftovers pay one Move 15)
+## Current release checkpoint — 2026-09-04 (spent leftovers drop unreachable quarries)
+
+Accepted cycle-1,800 receipt `5a8e9181` keeps the shared proven frontier at
+cycle 403 and improves expansion Orc 11 without moving any other case
+earlier. The fleet remains 13 clean / 39 divergent / 0 failed through
+cycle 1,800, while the 52-case exact-prefix sum rises from 54,346 to
+54,347. Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion
+Orc 11 advances from exact through fixture 575 to exact through fixture
+576. Its newly exposed fixture-577 finding is human destroyer native slot
+1558 / Java hp 48 versus 32. Expansion Orc 8 remains the paused naval
+patrol/route-publication family at fixture 404, which is why the shared
+horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-unreachable-leftover-c400` and
+the 1,800-cycle survey is `.bne-surveys/current-unreachable-leftover-c1800`.
+Both bind engine-input
+`221bb2d8c336a7ef27c178b62e990f6922bec981d0317c13968851215009e3ec`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The long receipt is retained at
+`.bne-artifacts/runs/5a8e9181340edb906acb9bd9af5079075ae609e73a4768830f18994e9035a6dd`.
+
+Behavioral delta: a spent Attack leftover whose quarry is unreachable over
+terrain ends the order instead of paying the empty-route wait. Occupancy-empty
+but terrain-reachable chases still retry for two cycles. The rule is land
+movement, empty spent route, and terrain reachability; it contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: expansion Orc 11 axethrower 1508 / Java 92 drains its last NE
+residual onto (6,40) while chasing (14,36). Native returns to Still@825 on
+fixture 576 and clears the target. Java used to PF_WAIT two cycles and keep
+Attack. Axethrower 1517's construction-windup drop at fixture 253 remains
+the held-out.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/fef3cabe60f67f607448387f8a4b6bd37f51321ea7abeacd109d71a38e5b74ce`
+proves the real-data assertion executes and fails on `af53f58`, then
+executes and passes on the candidate. Focused unreachable-drop, gold leftover,
+and live-route held-outs pass. Both fixed 52-case gates pass. Local native
+capture remains available and no SSH bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is Orc 13 at 576, then expansion Orc 11 and expansion
+Human 5 at 577, Human 8 and Human 12 at 583, expansion Human 2 at 585, and
+expansion Human 7 at 609.
+
+## Prior release checkpoint — 2026-09-04 (gold mixed leftovers pay one Move 15)
 
 Accepted cycle-1,800 receipt `0c331136` keeps the shared proven frontier at
 cycle 403 and improves expansion Human 7 without moving any other case

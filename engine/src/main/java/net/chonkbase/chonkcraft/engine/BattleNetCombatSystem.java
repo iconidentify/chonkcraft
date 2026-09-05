@@ -7264,6 +7264,9 @@ final class BattleNetCombatSystem {
             int tileYBeforeChaseWalk = unit.tileY();
             boolean underWay = stepMoveTowardsTarget(
                     unit, deferSettledRetargetSync, chaseTargetBeforeWalk);
+            if (unit.order() == Unit.Order.STILL) {
+                return;
+            }
             if (unit.battleNetLongPaidWrapTimerOneSeen()
                     && unit.pathLength() == 4
                     && !unit.isMoving()) {
@@ -7780,40 +7783,7 @@ final class BattleNetCombatSystem {
                 }
                 if (unit.pathLength() == 0 && unit.type().landUnit()
                         && !world.battleNetTerrainReachable(unit, target)) {
-                    // An empty answer whose quarry is unreachable over terrain
-                    // alone is retail's give-up, not a route to wait on. XOrc
-                    // 11's axethrower 1517 acquires the archer row on 10,30
-                    // from its walled shore pocket at fixture 248, winds
-                    // Attack 3,2,1 across 250..252, and on 253 clears the
-                    // target and returns to Still without a step -- the
-                    // GiveOrder epilogue at 0x00453097 proved by capture.
-                    // This used to promote the chase anyway and loop the
-                    // windup timer against the wall forever. Reachable
-                    // quarries keep today's compensated retry: XHuman 4's
-                    // packed axethrower row answers empty for three visits,
-                    // stays five steps over open ground, and then opens --
-                    // its opening chase is exact.
-                    unit.setChasing(false);
-                    world.finishAttackOrder(unit);
-                    if (world.battleNetSequence != null) {
-                        // GiveOrder returns this failed Attack directly at the
-                        // fresh Still marker with one tick left. XOrc 11's
-                        // axethrower 1517 records Still@825/1 on fixture 253,
-                        // pays 0040AD58 while retaining that cursor, and
-                        // dispatches its first OP0 on 254. Reconstructing Still
-                        // through the generic order installer leaves the normal
-                        // 3,2,1 construction here, two ticks late; deferring the
-                        // active-order callback reassigns the cycle-291 cannon
-                        // shell's two aim draws and delays its impact.
-                        int stillStart = world.idle
-                                .battleNetStillSequenceStart(unit);
-                        if (stillStart >= 0) {
-                            unit.setBattleNetSequenceOffset(stillStart);
-                            unit.setBattleNetAnimationTimer(1);
-                            world.idle.advanceBattleNetActiveOrderIdleRandom(
-                                    unit);
-                        }
-                    }
+                    finishUnreachableTerrainAttack(unit);
                     return;
                 }
                 refilled = true;
@@ -8349,6 +8319,31 @@ final class BattleNetCombatSystem {
         }
     }
 
+
+    /**
+     * Ends Attack when NewPath is empty because terrain, not occupancy,
+     * walls the quarry off.
+     *
+     * <p>GiveOrder returns this failed Attack at Still@start/1 and pays the
+     * active-order idle draw on the same visit. XOrc 11 axethrower 1517 is
+     * the construction-windup witness at fixture 253; axethrower 1508 is the
+     * leftover-residual witness at fixture 576. Occupancy-empty but
+     * terrain-reachable chases keep the compensated two-cycle retry.</p>
+     */
+    void finishUnreachableTerrainAttack(Unit unit) {
+        unit.setWaitCycles(0);
+        unit.setRouteSpent(false);
+        unit.setChasing(false);
+        world.finishAttackOrder(unit);
+        if (world.battleNetSequence != null) {
+            int stillStart = world.idle.battleNetStillSequenceStart(unit);
+            if (stillStart >= 0) {
+                unit.setBattleNetSequenceOffset(stillStart);
+                unit.setBattleNetAnimationTimer(1);
+                world.idle.advanceBattleNetActiveOrderIdleRandom(unit);
+            }
+        }
+    }
 
     /**
      * One cycle of walking while under an attack order.

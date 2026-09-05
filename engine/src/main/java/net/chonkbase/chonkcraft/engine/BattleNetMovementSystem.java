@@ -667,6 +667,12 @@ final class BattleNetMovementSystem {
                 // that refill seen only next to dest.
                 unit.setRouteSpent(false);
             } else if (spendTheEmptyRoute(unit)) {
+                if (unit.order() == Unit.Order.STILL) {
+                    // Terrain-unreachable Attack already returned through
+                    // GiveOrder. Do not let the empty-route wait arm rebuild
+                    // a three-tick Still constructor over Still@825/1.
+                    return;
+                }
                 // Every PF_WAIT runs the blocker test, the count-born one
                 // included: {@code COrder_Move::Execute}'s wait arm
                 // The game does not care where the
@@ -2747,6 +2753,23 @@ final class BattleNetMovementSystem {
         if (!unit.routeSpent()) {
             return false;
         }
+        Unit chaseTarget = unit.target();
+        boolean attackChase = chaseTarget != null
+                && (unit.order() == Unit.Order.ATTACK
+                        || unit.order() == Unit.Order.ATTACK_MOVE
+                        || unit.order() == Unit.Order.STAND_GROUND
+                        || unit.chasing());
+        if (attackChase && unit.type() != null && unit.type().landUnit()
+                && chaseTarget.isAlive()
+                && !world.targets.inAttackRange(unit, chaseTarget)
+                && !world.battleNetTerrainReachable(unit, chaseTarget)) {
+            // A spent leftover whose quarry is terrain-unreachable is
+            // EndActionAttack, not PF_WAIT. XOrc 11 axethrower 1508 lands
+            // its last NE residual at (6,40) on fixture 576 and returns to
+            // Still@825/1; the two-cycle empty wait kept Attack forever.
+            world.combat.finishUnreachableTerrainAttack(unit);
+            return true;
+        }
         unit.setRouteSpent(false);
         // Attack empty-target routes pre-load a short wait in planTowards;
         // do not overwrite it with the ordinary ten-cycle move wait.
@@ -2755,11 +2778,6 @@ final class BattleNetMovementSystem {
         // refills at fixture c19 while a ten-cycle pause pushed Java's second
         // path to world cycle 32.
         if (unit.waitCycles() <= 0) {
-            boolean attackChase = unit.target() != null
-                    && (unit.order() == Unit.Order.ATTACK
-                            || unit.order() == Unit.Order.ATTACK_MOVE
-                            || unit.order() == Unit.Order.STAND_GROUND
-                            || unit.chasing());
             unit.setWaitCycles(attackChase ? 2 : 10);
         }
         // The consult that found the buffer empty read the phantom element
