@@ -15,7 +15,56 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-05 (computer shipyards pay the transport 1-in-8 roll)
+## Current release checkpoint — 2026-09-05 (a battleship cannon leaves from the ship's pixel centre)
+
+Accepted cycle-1,800 surveys on clean commit `3c34950` keep the shared
+proven frontier at cycle 403 and match native battleship muzzle remaining
+without moving any case earlier. The fleet remains 14 clean / 38
+divergent / 0 failed through cycle 1,800, and the 52-case exact-prefix
+sum stays 56,459. Cycle 400 stays 52 clean / 0 divergent / 0 failed.
+Expansion Orc 11 remains exact through fixture 576. Its fixture-577
+finding is still human destroyer native slot 1558 / Java hp 48 versus 26.
+Expansion Orc 8 remains the paused naval patrol/route-publication family
+at fixture 404, which is why the shared horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-3c34950-c400` and the
+1,800-cycle survey is `.bne-surveys/current-3c34950-c1800`. Both bind clean
+commit `3c34950`, engine-input
+`4261e2435437d094ed9735fc67c729acf16932840ca9cb86943e2385ef5a0a91`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The previous fleet-improving long receipt remains
+`.bne-artifacts/runs/ae6fada127412a2f5fa71cb7968ca1fe7d161ec072eafb69ea1d400058f6c98b`.
+
+Behavioral delta: mobile projectile constructors measure the muzzle from
+the source unit's pixel words plus the type-centre table, not from those
+words plus the invisible residual bank. Target aim already omitted that
+bank. The rule is constructor geometry against IX/IY; it contains no
+mission, map, faction, coordinate, fixture, exact-cycle, route-length, or
+unit-ID branch.
+
+Proof delta: expansion Orc 11 battleships 103 and 88 fire at fixture 530
+with residual `(+1,+1)` and `(-1,+1)`. Native stores remaining 130 and 126
+from muzzles `(336,1424)` and `(336,1296)`. Java used to add the residual
+and store 131 and 127. The 577 destroyer hit remains the next unpaused
+finding: native type-24 slot 6 is born at fixture 568 with remaining 130
+and aim `(340,974)`, and frees at 578.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/36bf0ff74877f3233b00436705ff6a5d6f292dcff44c492980c82f00dd77547c`
+proves the real-data assertion executes and fails on `40d757a`, then
+executes and passes on `3c34950`. Focused 393 aim-jitter, crossing-shell,
+leftover-drop, and live-route held-outs pass. Both fixed 52-case gates
+pass. Local native capture remains available and no SSH bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is expansion Orc 11 and expansion Human 5 at 577, Human 8
+at 583, expansion Human 2 at 585, and expansion Human 7 at 609.
+
+## Prior release checkpoint — 2026-09-05 (computer shipyards pay the transport 1-in-8 roll)
 
 Accepted cycle-1,800 receipt `ae6fada1` keeps the shared proven frontier at
 cycle 403 and improves Orc 13 and Human 12 without moving any other case
