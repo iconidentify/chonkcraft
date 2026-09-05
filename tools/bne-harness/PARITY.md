@@ -28,10 +28,10 @@ Orc 11 advances from exact through fixture 575 to exact through fixture
 patrol/route-publication family at fixture 404, which is why the shared
 horizon stops at 403.
 
-The 400-cycle survey is `.bne-surveys/current-unreachable-leftover-c400` and
-the 1,800-cycle survey is `.bne-surveys/current-unreachable-leftover-c1800`.
-Both bind engine-input
-`221bb2d8c336a7ef27c178b62e990f6922bec981d0317c13968851215009e3ec`,
+The 400-cycle survey is `.bne-surveys/current-5b359df-c400` and the
+1,800-cycle survey is `.bne-surveys/current-5b359df-c1800`. Both bind clean
+commit `5b359df`, engine-input
+`211ccb5c71a35bddd3790484f106efb74cf6e6a80ea2f680a4db0823b7cdc405`,
 pack SHA-256
 `3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
 and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
@@ -54,7 +54,7 @@ the held-out.
 Efficacy receipt
 `.bne-test-efficacy/runs/fef3cabe60f67f607448387f8a4b6bd37f51321ea7abeacd109d71a38e5b74ce`
 proves the real-data assertion executes and fails on `af53f58`, then
-executes and passes on the candidate. Focused unreachable-drop, gold leftover,
+executes and passes on `5b359df`. Focused unreachable-drop, gold leftover,
 and live-route held-outs pass. Both fixed 52-case gates pass. Local native
 capture remains available and no SSH bypass was used.
 
