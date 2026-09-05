@@ -28,10 +28,10 @@ Human 7 advances from exact through fixture 572 to exact through fixture
 patrol/route-publication family at fixture 404, which is why the shared
 horizon stops at 403.
 
-The 400-cycle survey is `.bne-surveys/current-gold-mixed-leftover-c400` and the
-1,800-cycle survey is `.bne-surveys/current-gold-mixed-leftover-c1800`. Both
-bind engine-input
-`7a48adc00ba3e1c2df541c39653ce7777d3dc28ad3c6ca1e4bf54b55706443db`,
+The 400-cycle survey is `.bne-surveys/current-af53f58-c400` and the
+1,800-cycle survey is `.bne-surveys/current-af53f58-c1800`. Both bind clean
+commit `af53f58`, engine-input
+`15203e9596b27b3d414bcca7367e2df58d4a994883b2b7e4c613613eb5730957`,
 pack SHA-256
 `3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
 and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
@@ -56,7 +56,7 @@ E,E park and XHuman 10 gold residual park remain held-outs.
 Efficacy receipt
 `.bne-test-efficacy/runs/07e725f62c2d4bb68c5e7b8c1c1e4ae85f42142abe836fdda40e040cb11f08e6`
 proves the real-data assertion executes and fails on `7e1e623`, then
-executes and passes on the candidate. Focused gold residual, vacated-ally,
+executes and passes on `af53f58`. Focused gold residual, vacated-ally,
 and harvest-terminal held-outs pass. Both fixed 52-case gates pass. Local
 native capture remains available and no SSH bypass was used.
 
