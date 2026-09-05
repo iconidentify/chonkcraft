@@ -6987,6 +6987,17 @@ public final class World {
         Unit occupant = unitAt(blockedX, blockedY);
         if (occupant == null || occupant == unit || occupant == target
                 || occupant.isDying() || !occupant.isOnMap()
+                || occupant.type() == null
+                // Dest-arm leftover used to treat a dead-vision marker as a
+                // hostile sitting two tiles along the cardinal leftover.
+                // Human 8 attack-peasant 1520 dest-armed south-west onto
+                // 76,69 around the peasant's death-vision at 77,70; native
+                // consumes NewPath's south onto 77,69. 0x00450766 stands
+                // living hostiles aside, which is why revealers that never
+                // own occupancy must not rewrite the leftover.
+                || occupant.type().revealer()
+                || occupant.type().vanishes()
+                || occupant.type().nonSolid()
                 || isAllied(unit.player(), occupant.player())
                 || occupant.type().building()) {
             return path;
