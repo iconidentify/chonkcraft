@@ -48,6 +48,8 @@ class Xorc11SpentLeftoverUnreachableDropRealDataTest {
                 "GiveOrder clears the unroutable quarry");
         assertEquals(825, thrower.battleNetSequenceOffset(),
                 "retail returns at the fresh Still marker");
+        assertEquals(1, thrower.battleNetAnimationTimer(),
+                "GiveOrder leaves one tick before the first Still opcode");
         assertEquals(6, thrower.tileX(),
                 "no chase step leaves the shore");
         assertEquals(40, thrower.tileY());

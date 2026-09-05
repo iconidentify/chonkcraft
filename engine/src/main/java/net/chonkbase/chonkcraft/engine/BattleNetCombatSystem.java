@@ -8423,9 +8423,19 @@ final class BattleNetCombatSystem {
         // orders must not overwrite a real order transition made by
         // stepMove: doing so trapped a replayed Attack-Move peon and made
         // later player Move/Attack clicks acknowledge without progressing.
-        if (unit.order() == Unit.Order.MOVE || unit.order() == Unit.Order.STILL
-                || (saved == Unit.Order.ATTACK
-                        && unit.order() == Unit.Order.ATTACK_GROUND)) {
+        // GiveOrder on a terrain-unreachable leftover has already installed
+        // Still@825/1. Restoring Attack here made finishAttackOrder run
+        // again and seed timer 3: XOrc 11 axethrower 1508 stayed Still
+        // semantically but paid two extra idle ticks before OP0.
+        boolean endedUnreachableChase = saved == Unit.Order.ATTACK
+                && unit.order() == Unit.Order.STILL
+                && unit.target() == null
+                && !unit.chasing();
+        if (!endedUnreachableChase
+                && (unit.order() == Unit.Order.MOVE
+                        || unit.order() == Unit.Order.STILL
+                        || (saved == Unit.Order.ATTACK
+                                && unit.order() == Unit.Order.ATTACK_GROUND))) {
             unit.setOrder(saved);
             if (savedLandPatrolMoveBody) {
                 unit.setBattleNetLandPatrolMoveBody(true);
