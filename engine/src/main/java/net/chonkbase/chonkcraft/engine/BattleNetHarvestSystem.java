@@ -375,6 +375,13 @@ final class BattleNetHarvestSystem {
                         && info != null && info.terrainHarvester()
                         && worker.resourceUnit() == null
                         && worker.pathLength() > 0;
+                boolean parkGoldMixedLeftover =
+                        worker.battleNetRefusalHold()
+                        && info != null
+                        && info.resource() == UnitType.Resource.GOLD
+                        && worker.resourceUnit() != null
+                        && !worker.returningToDepot()
+                        && worker.pathLength() > 0;
                 boolean saturatedWoodConstructionBand =
                         worker.battleNetSaturatedWoodConstructionRoute()
                         && info != null && info.terrainHarvester()
@@ -477,7 +484,7 @@ final class BattleNetHarvestSystem {
                 // through fixtures 235..249, while peon 1360 independently
                 // keeps E,SE at collision one from fixture 264. Route shape,
                 // not a particular collision generation, owns the cursor.
-                if (parkSaturatedWoodRoute
+                if ((parkSaturatedWoodRoute || parkGoldMixedLeftover)
                         && world.battleNetSequence != null) {
                     int moveStart = world.idle.battleNetSequenceStart(
                             worker, BattleNetSequence.MOVE_ANIMATION);

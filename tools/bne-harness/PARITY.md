@@ -15,7 +15,59 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-04 (Attack-body waits do not dest-arm)
+## Current release checkpoint — 2026-09-04 (gold mixed leftovers pay one Move 15)
+
+Accepted cycle-1,800 receipt `0c331136` keeps the shared proven frontier at
+cycle 403 and improves expansion Human 7 without moving any other case
+earlier. The fleet remains 13 clean / 39 divergent / 0 failed through
+cycle 1,800, while the 52-case exact-prefix sum rises from 54,310 to
+54,346. Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion
+Human 7 advances from exact through fixture 572 to exact through fixture
+608. Its newly exposed fixture-609 finding is orc destroyer native slot
+1562 / Java x 30 versus 28. Expansion Orc 8 remains the paused naval
+patrol/route-publication family at fixture 404, which is why the shared
+horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-gold-mixed-leftover-c400` and the
+1,800-cycle survey is `.bne-surveys/current-gold-mixed-leftover-c1800`. Both
+bind engine-input
+`7a48adc00ba3e1c2df541c39653ce7777d3dc28ad3c6ca1e4bf54b55706443db`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The long receipt is retained at
+`.bne-artifacts/runs/0c331136eb24118d10070ee76f4f72641ac2d1ef7836bb983db31d34591acef9`.
+
+Behavioral delta: a gold-approach two-byte leftover whose first residual
+is a cardinal onto an allied worker, with a different diagonal behind it,
+keeps those bytes and pays one Move 15. Same-cardinal first residuals still
+wait two fifteen-counts, and later same-cardinal residuals still park route
+index 20. The rule is leftover shape, first residual, and allied-worker
+occupancy; it contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 7 peon 1446 / Java 154 residual-settles at
+(110,106) with leftover W,SW onto allied peon 1458. Native writes
+Move-start/15 at fixture 558, keeps the two bytes, and consumes west at
+573. Java used to drop the leftover, climb collision through eight, then
+start a fourteen-count that spent west at 579. XHuman 7 peon 1458's later
+E,E park and XHuman 10 gold residual park remain held-outs.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/07e725f62c2d4bb68c5e7b8c1c1e4ae85f42142abe836fdda40e040cb11f08e6`
+proves the real-data assertion executes and fails on `7e1e623`, then
+executes and passes on the candidate. Focused gold residual, vacated-ally,
+and harvest-terminal held-outs pass. Both fixed 52-case gates pass. Local
+native capture remains available and no SSH bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is Orc 13 and expansion Orc 11 at 576, then expansion
+Human 5 at 577, Human 8 and Human 12 at 583, expansion Human 2 at 585, and
+expansion Human 7 at 609.
+
+## Prior release checkpoint — 2026-09-04 (Attack-body waits do not dest-arm)
 
 Accepted cycle-1,800 receipt `37c7cd9d` keeps the shared proven frontier at
 cycle 403 and improves expansion Human 10 without moving any other case

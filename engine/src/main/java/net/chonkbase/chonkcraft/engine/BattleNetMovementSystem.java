@@ -3811,7 +3811,6 @@ final class BattleNetMovementSystem {
                 && walkedThisCycle && unit.stepDrained()
                 && unit.pathLength() == 2
                 && !Direction.isDiagonal(unit.peekHeading())
-                && unit.peekHeading() == unit.peekHeadingAtDepth(1)
                 && unit.lastStepHeading() == unit.peekHeading()) {
             int freeNx = unit.tileX() + Direction.deltaX(unit.peekHeading());
             int freeNy = unit.tileY() + Direction.deltaY(unit.peekHeading());
@@ -3831,24 +3830,48 @@ final class BattleNetMovementSystem {
                         Math.abs(approach[0] - unit.tileX()),
                         Math.abs(approach[1] - unit.tileY()));
                 if (approachCheb >= 2) {
-                    if (unit.battleNetPathStepsTaken() == 1) {
-                        // First residual of the route: XHuman 4 peon 1570
-                        // waits two fifteen-count bands behind peon 1578
-                        // before taking its second E.
-                        unit.setBattleNetOrderDelay(29);
-                        mayDecide = false;
-                    } else if (unit.battleNetPathStepsTaken() >= 2) {
-                        // A later residual owns a different native branch.
-                        // XHuman 7 peon 1458 has already settled SE then E
-                        // when its remaining E,E meets peon 1451. Retail
-                        // parks route index 20 on fixture 53, then refills
-                        // SE,NE and takes SE on 54 instead of waiting for the
-                        // old east cell. Keep this visit as the route park;
-                        // the resource order lays the replacement next visit.
-                        unit.clearPath();
+                    if (unit.peekHeading() == unit.peekHeadingAtDepth(1)) {
+                        if (unit.battleNetPathStepsTaken() == 1) {
+                            // First residual of the route: XHuman 4 peon 1570
+                            // waits two fifteen-count bands behind peon 1578
+                            // before taking its second E.
+                            unit.setBattleNetOrderDelay(29);
+                            mayDecide = false;
+                        } else if (unit.battleNetPathStepsTaken() >= 2) {
+                            // A later residual owns a different native branch.
+                            // XHuman 7 peon 1458 has already settled SE then E
+                            // when its remaining E,E meets peon 1451. Retail
+                            // parks route index 20 on fixture 53, then refills
+                            // SE,NE and takes SE on 54 instead of waiting for the
+                            // old east cell. Keep this visit as the route park;
+                            // the resource order lays the replacement next visit.
+                            unit.clearPath();
+                            unit.setRouteSpent(false);
+                            unit.setWaitCycles(0);
+                            unit.setBattleNetOrderDelay(0);
+                            return;
+                        }
+                    } else if (unit.battleNetPathStepsTaken() == 1
+                            && Direction.isDiagonal(
+                                    unit.peekHeadingAtDepth(1))) {
+                        // Mixed leftover after the first residual: native
+                        // keeps W,SW and pays one Move 15. Dropping it used
+                        // to bump collision through eight, then start a
+                        // fourteen-count that spent west at fixture 579:
+                        // XHuman 7 peon 1446 / Java 154 vs native 573.
+                        int collision = unit.battleNetCollisionCounter() + 1;
+                        unit.setBattleNetCollisionCounter(
+                                collision > 14 ? 0 : collision);
                         unit.setRouteSpent(false);
                         unit.setWaitCycles(0);
-                        unit.setBattleNetOrderDelay(0);
+                        unit.setBattleNetOrderDelay(14);
+                        unit.setBattleNetRefusalHold(true);
+                        int moveStart = world.idle.battleNetSequenceStart(
+                                unit, BattleNetSequence.MOVE_ANIMATION);
+                        if (moveStart >= 0) {
+                            unit.setBattleNetSequenceOffset(moveStart);
+                        }
+                        unit.setBattleNetAnimationTimer(15);
                         return;
                     }
                 }
