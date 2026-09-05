@@ -28,10 +28,10 @@ Java x 101 versus 100. Expansion Orc 8 remains the paused naval
 patrol/route-publication family at fixture 404, which is why the shared
 horizon stops at 403.
 
-The 400-cycle survey is `.bne-surveys/current-c562-wait-hold-c400` and the
-1,800-cycle survey is `.bne-surveys/current-c562-wait-hold-c1800`. Both bind
-engine-input
-`d98bcaa0196f5eadfd1f5f2ff3ba4e9b1a5a27b9bd4d567dd691de42f15bbd65`,
+The 400-cycle survey is `.bne-surveys/current-7e1e623-c400` and the
+1,800-cycle survey is `.bne-surveys/current-7e1e623-c1800`. Both bind clean
+commit `7e1e623`, engine-input
+`bbb554c41739b23ed5b023b9477e2360c8fdaf89c9e620c1f4b76f035eac39f8`,
 pack SHA-256
 `3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
 and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
@@ -58,7 +58,7 @@ pending shot at offset 892.
 Efficacy receipt
 `.bne-test-efficacy/runs/a76b90c7c4f2ef4077d31dba222a93e0bc9fc1fef3dcd08cba34f1b08a4c9d13`
 proves the real-data assertion executes and fails on `01d069d`, then
-executes and passes on the candidate. Focused XHuman 10 timing, live-route
+executes and passes on `7e1e623`. Focused XHuman 10 timing, live-route
 settle, and Human 13 quarry-handoff held-outs pass. Both fixed 52-case
 gates pass. Local native capture remains available and no SSH bypass was
 used.
