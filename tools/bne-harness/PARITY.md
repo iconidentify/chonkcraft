@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-05 (a battleship cannon leaves from the ship's pixel centre)
+## Current release checkpoint — 2026-09-05 (dest-arm leftover does not walk around a death-vision marker)
+
+Accepted cycle-1,800 surveys on clean commit `1581cdd` keep the shared
+proven frontier at cycle 403 and advance Human 8 without moving any case
+earlier. The fleet remains 14 clean / 38 divergent / 0 failed through
+cycle 1,800, and the 52-case exact-prefix sum rises from 56,459 to 56,468.
+Cycle 400 stays 52 clean / 0 divergent / 0 failed. Human 8 is now exact
+through fixture 591. Its fixture-592 finding is attack-peasant native
+slot 1513 / Java y 69 versus 68. Expansion Orc 8 remains the paused naval
+patrol/route-publication family at fixture 404, which is why the shared
+horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-1581cdd-c400` and the
+1,800-cycle survey is `.bne-surveys/current-1581cdd-c1800`. Both bind clean
+commit `1581cdd`, engine-input
+`4153ee1a58e98cd4a148a5abfdbebb7cc7cbc28e9e999a7ffee928f59bab22db`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The previous fleet-improving long receipt remains
+`.bne-artifacts/runs/ae6fada127412a2f5fa71cb7968ca1fe7d161ec072eafb69ea1d400058f6c98b`.
+
+Behavioral delta: dest-arm leftover's equal-cost skirt around a hostile
+two tiles along a cardinal leftover ignores revealers, vanishing bodies,
+and non-solid occupants. Native `0x00450766` stands living hostiles aside;
+dead-vision markers never own occupancy. The rule is occupant solidity in
+the leftover skirt rewrite; it contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Human 8 attack-peasant 1520 / Java 80 dest-arms at fixture
+583 from 77,68. Pathfinder already answers native `4434` (S,S,SE,S) toward
+77,72. Java used to rewrite the first heading to leftover south-west around
+the peasant's death-vision marker at 77,70 and step onto 76,69. Native
+consumes the south byte onto 77,69 with remaining S,SE,S. Human 13 knight
+1490 dest-arming south-east around live ogre 1482 remains the held-out.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/5c5b3da050788da72776a48d39846dac8d96d6127f4660bbb2d22e64484fb81a`
+proves the real-data assertion executes and fails on `3c34950`, then
+executes and passes on `1581cdd`. Focused Human 13 dest-arm leftover,
+ogre 1549 route-refill, and leftover-chip held-outs pass. Both fixed
+52-case gates pass. Local native capture remains available and no SSH
+bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is expansion Orc 11 and expansion Human 5 at 577, expansion
+Human 2 at 585, and Human 8 at 592.
+
+## Prior release checkpoint — 2026-09-05 (a battleship cannon leaves from the ship's pixel centre)
 
 Accepted cycle-1,800 surveys on clean commit `3c34950` keep the shared
 proven frontier at cycle 403 and match native battleship muzzle remaining
