@@ -2810,6 +2810,7 @@ public final class AiPlayer {
      * <p>Native balances tanker / destroyer / transport / battleship / sub
      * wants. Sealed arms so far: tankers (XHuman 5/8), destroyers (XOrc 7 dual
      * shipyards at c18 with AI-accounted destroyer census 1 against want 3),
+     * transport 1-in-8 top-up draws (Orc 13 p3 shipyard 1509 at fixture 572),
      * and transports (Orc 14 p6 spends 600g/200w/500o at fixture 30 when want
      * exceeds the two map transports).
      */
@@ -2832,12 +2833,17 @@ public final class AiPlayer {
         int wantTankers = battleNetWantedTankers;
         int wantDestroyers = battleNetWantedDestroyers();
         int wantTransports = battleNetWantedTransports();
-        if (wantTankers <= 0 && wantDestroyers <= 0 && wantTransports <= 0) {
+        int wantBattleships = battleNetWantedBattleships();
+        int wantSubs = battleNetWantedSubs();
+        if (wantTankers <= 0 && wantDestroyers <= 0 && wantTransports <= 0
+                && wantBattleships <= 0 && wantSubs <= 0) {
             return false;
         }
         int tankers = 0;
         int destroyers = 0;
         int transports = 0;
+        int battleships = 0;
+        int subs = 0;
         boolean hasFoundry = false;
         for (Unit candidate : world.units()) {
             if (candidate.player() != playerIndex || candidate.type() == null
@@ -2878,6 +2884,16 @@ public final class AiPlayer {
             if ("unit-human-transport".equals(ident)
                     || "unit-orc-transport".equals(ident)) {
                 transports++;
+                continue;
+            }
+            if ("unit-battleship".equals(ident)
+                    || "unit-ogre-juggernaught".equals(ident)) {
+                battleships++;
+                continue;
+            }
+            if ("unit-human-submarine".equals(ident)
+                    || "unit-orc-submarine".equals(ident)) {
+                subs++;
             }
         }
         // Native 0x40eef0 gives the first missing member of the tanker,
@@ -2926,21 +2942,68 @@ public final class AiPlayer {
                 choice = registeredType(world,
                         orc ? "unit-human-transport" : "unit-orc-transport");
             }
-        } else if (wantTankers != 0 && tankers < wantTankers) {
+        } else {
+            // Native 0x40eef0 after the empty-family arms: battleship, sub,
+            // then transport each consume FUN_00479820 when want exceeds
+            // census, before the unpaid tanker fallback. Orc 13 p3 at
+            // fixture 572 is the witness: shipyard 1509 returns at
+            // 0x0040f094 (transport 1-in-8) with want 2 against census 0
+            // and no foundry, then the critter at 576 keeps choice 48.
+            // Skipping those draws left knight 34 on that seed.
+            if (wantBattleships > battleships) {
+                int draw = world.battleNetRandomForAi();
+                if ((draw & 7) == 1 && hasFoundry) {
+                    choice = registeredType(world,
+                            orc ? "unit-ogre-juggernaught" : "unit-battleship");
+                    if (choice == null) {
+                        choice = registeredType(world,
+                                orc ? "unit-battleship" : "unit-ogre-juggernaught");
+                    }
+                }
+            }
+            if (choice == null && wantSubs > subs) {
+                // Draw is unconditional once want exceeds census; the
+                // 0x4ada28 prereq is tested after FUN_00479820. Training
+                // stays foundry-gated until that word is named.
+                int draw = world.battleNetRandomForAi();
+                if ((draw & 7) == 1 && hasFoundry) {
+                    choice = registeredType(world,
+                            orc ? "unit-orc-submarine" : "unit-human-submarine");
+                    if (choice == null) {
+                        choice = registeredType(world,
+                                orc ? "unit-human-submarine" : "unit-orc-submarine");
+                    }
+                }
+            }
+            if (choice == null && wantTransports > transports) {
+                int draw = world.battleNetRandomForAi();
+                if ((draw & 7) == 1 && hasFoundry) {
+                    choice = registeredType(world,
+                            orc ? "unit-orc-transport" : "unit-human-transport");
+                    if (choice == null) {
+                        choice = registeredType(world,
+                                orc ? "unit-human-transport" : "unit-orc-transport");
+                    }
+                }
+            }
+        }
+        if (choice == null && wantTankers != 0 && tankers < wantTankers) {
             choice = registeredType(world,
                     orc ? "unit-orc-oil-tanker" : "unit-human-oil-tanker");
             if (choice == null) {
                 choice = registeredType(world,
                         orc ? "unit-human-oil-tanker" : "unit-orc-oil-tanker");
             }
-        } else if (wantDestroyers != 0 && destroyers < wantDestroyers) {
+        }
+        if (choice == null && wantDestroyers != 0 && destroyers < wantDestroyers) {
             choice = registeredType(world,
                     orc ? "unit-troll-destroyer" : "unit-elven-destroyer");
             if (choice == null) {
                 choice = registeredType(world,
                         orc ? "unit-orc-destroyer" : "unit-human-destroyer");
             }
-        } else if (wantTransports != 0 && transports < wantTransports) {
+        }
+        if (choice == null && wantTransports != 0 && transports < wantTransports) {
             choice = registeredType(world,
                     orc ? "unit-orc-transport" : "unit-human-transport");
             if (choice == null) {
@@ -2974,6 +3037,20 @@ public final class AiPlayer {
         return battleNetAiState[BattleNetAiBytecode.OFF_WANTED_TRANSPORTS] & 0xff;
     }
 
+    public int battleNetWantedBattleships() {
+        if (battleNetAiState == null) {
+            return 0;
+        }
+        return battleNetAiState[BattleNetAiBytecode.OFF_WANTED_BATTLESHIPS] & 0xff;
+    }
+
+    public int battleNetWantedSubs() {
+        if (battleNetAiState == null) {
+            return 0;
+        }
+        return battleNetAiState[BattleNetAiBytecode.OFF_WANTED_SUBS] & 0xff;
+    }
+
     /** Test-only arm for action-33 tanker wants when the profile blob is synthetic. */
     public void setBattleNetWantedTankersForTest(int want) {
         battleNetWantedTankers = Math.max(0, want);
@@ -2985,6 +3062,15 @@ public final class AiPlayer {
             battleNetAiState = new byte[BattleNetAiBytecode.STATE_BYTES];
         }
         battleNetAiState[BattleNetAiBytecode.OFF_WANTED_DESTROYERS] =
+                (byte) Math.max(0, Math.min(255, want));
+    }
+
+    /** Test-only arm for the native action-33 transport want byte. */
+    public void setBattleNetWantedTransportsForTest(int want) {
+        if (battleNetAiState == null) {
+            battleNetAiState = new byte[BattleNetAiBytecode.STATE_BYTES];
+        }
+        battleNetAiState[BattleNetAiBytecode.OFF_WANTED_TRANSPORTS] =
                 (byte) Math.max(0, Math.min(255, want));
     }
 

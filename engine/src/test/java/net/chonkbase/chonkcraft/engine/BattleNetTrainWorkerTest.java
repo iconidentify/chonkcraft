@@ -465,6 +465,37 @@ class BattleNetTrainWorkerTest {
     }
 
     @Test
+    @DisplayName("a transport-deficit shipyard consumes the 1-in-8 roll before the tanker fallback")
+    void aTransportDeficitShipyardConsumesTheOneInEightRollBeforeTheTankerFallback() {
+        // Orc 13 p3 fixture 572: native 0x40eef0 at shipyard 1509 wants 4
+        // tankers with one alive, 0 destroyers, 2 transports with none, and
+        // no foundry. The transport arm still consumes FUN_00479820
+        // (return 0x0040f094) even when the 1-in-8 misses and foundry is
+        // absent; the unpaid tanker fallback may then start a tanker.
+        World world = new World(grass(24));
+        world.setTrainers(Map.of(
+                "unit-human-oil-tanker", Set.of("unit-human-shipyard")));
+        world.player(0).setType(
+                net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.COMPUTER);
+        Unit shipyard = world.createUnit(humanShipyard(), 0, 2, 2);
+        world.createUnit(humanTanker(), 0, 20, 20);
+        world.createUnit(farm(), 0, 8, 2);
+        world.createUnit(farm(), 0, 12, 2);
+        world.player(0).set(UnitType.Resource.GOLD, 3000);
+        world.player(0).set(UnitType.Resource.WOOD, 10000);
+        world.recalculateSupply();
+        AiPlayer ai = world.enableAi(0);
+        ai.setBattleNetWantedTankersForTest(4);
+        ai.setBattleNetWantedTransportsForTest(2);
+        world.restoreBattleNetRandom(1, 0);
+
+        ai.battleNetTryTrainTanker(world, shipyard);
+        assertEquals(1, world.battleNetRandomDraws(),
+                "native consumes one FUN_00479820 at 0x40f08f even when the "
+                        + "1-in-8 misses and no foundry is present");
+    }
+
+    @Test
     @DisplayName("human fourteen death-knight temple spends fifteen hundred gold on raise-dead")
     void humanFourteenDeathKnightTempleSpendsFifteenHundredGoldOnRaiseDead()
             throws Exception {
