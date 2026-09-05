@@ -15,7 +15,62 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-04 (first-collision live residuals write Move-start/15)
+## Current release checkpoint — 2026-09-04 (Attack-body waits do not dest-arm)
+
+Accepted cycle-1,800 receipt `37c7cd9d` keeps the shared proven frontier at
+cycle 403 and improves expansion Human 10 without moving any other case
+earlier. The fleet remains 13 clean / 39 divergent / 0 failed through
+cycle 1,800, while the 52-case exact-prefix sum rises from 54,269 to
+54,310. Cycle 400 stays 52 clean / 0 divergent / 0 failed. Expansion
+Human 10 advances from exact through fixture 561 to exact through fixture
+602. Its newly exposed fixture-603 finding is ogre native slot 1538 /
+Java x 101 versus 100. Expansion Orc 8 remains the paused naval
+patrol/route-publication family at fixture 404, which is why the shared
+horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-c562-wait-hold-c400` and the
+1,800-cycle survey is `.bne-surveys/current-c562-wait-hold-c1800`. Both bind
+engine-input
+`d98bcaa0196f5eadfd1f5f2ff3ba4e9b1a5a27b9bd4d567dd691de42f15bbd65`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The long receipt is retained at
+`.bne-artifacts/runs/37c7cd9dc1750f18ee73dc4cff609b8c6a5ea886a84ff7d5873b1ed4abb4a14a`.
+
+Behavioral delta: an Attack-body wait past Attack-start still owns
+MoveToBetterPos after Java's parallel presentation has become breakable.
+Native does not dest-arm until the following OP0. Construction and OP0 at
+Attack-start keep their existing sequence-ownership flags, and AttackTarget
+still animates first so a pre-OP10 frame can queue its pending shot. The
+rule is expressed by sequence wait versus Attack-start and by min-range
+dest-arm; it contains no mission, map, faction, coordinate, fixture,
+exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: expansion Human 10 catapult 1487 / Java 113 is Attack 540/42
+at fixture 562 with a parked empty route. Native stays on (74,89) through
+a melee hit. Java's presentation wait hitting zero used to fall through to
+MoveToBetterPos, spend three synchronized direction draws, and step
+southwest to (73,90). The same catapult still wraps 540/1 onto Attack
+construction 503/3 at fixture 203. XHuman 10 axe 51 still queues its
+pending shot at offset 892.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/a76b90c7c4f2ef4077d31dba222a93e0bc9fc1fef3dcd08cba34f1b08a4c9d13`
+proves the real-data assertion executes and fails on `01d069d`, then
+executes and passes on the candidate. Focused XHuman 10 timing, live-route
+settle, and Human 13 quarry-handoff held-outs pass. Both fixed 52-case
+gates pass. Local native capture remains available and no SSH bypass was
+used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is expansion Human 7 at 573, then Orc 13 and expansion
+Orc 11 at 576, expansion Human 5 at 577, expansion Human 2 at 585, and
+expansion Human 10 at 603.
+
+## Prior release checkpoint — 2026-09-04 (first-collision live residuals write Move-start/15)
 
 Accepted cycle-1,800 receipt `79d655d6` advances the shared proven frontier
 from cycle 400 to 403 and improves expansion Human 12 without moving any
@@ -58,7 +113,7 @@ collision-four held-out that must keep the extra visit so NE spends at 117.
 Efficacy receipt
 `.bne-test-efficacy/runs/5c241fb05fb8e71e66f0bd266c2abbbbb474d35ab65291008527b2d6f9ef292f`
 proves the real-data assertion executes and fails on `01d069d`, then executes
-and passes on the candidate. Focused residual-refill held-outs pass (42 tests),
+and passes on `7bc11b9`. Focused residual-refill held-outs pass (42 tests),
 including collision refill, collided chase refill, settled chase refusal,
 grunt 1492 saturated building retarget, cycle-58 route handoff, and the
 formation-refusal timer-one probe. Both fixed 52-case gates pass. Local native
@@ -3884,6 +3939,23 @@ remains paused pending a new discriminator. The earliest unpaused fleet
 finding is now expansion Human 12 peon slot 1364 at fixture 333, followed by
 expansion Human 4 and expansion Orc 11 at 337, Orc 12 at 342, expansion Human
 6 at 344, and Human 8 at 347.
+
+Current frontier failure history: expansion Human 12 slot 1364's fixture-332
+state proves a paid north-led wood tail advances collision generation one to
+two and parks route index twenty with its five stale bytes intact; fixture 333
+then replaces it with native route `NE,N,NE,SE,E,SE`. Three implementations
+are rejected. Parking without an action-23 redraw starts another full refusal
+band. Redrawing toward the intermediate wood-order point commits the correct
+visible north-east step but loses the native five-byte tail. Redrawing toward
+the original tree produces a one-byte east prefix. Against the exact live
+fixture-333 map, retaining the rejected north face returns an empty wall for
+both rotations; all eight shared/reversed/retained wall-buffer modes return
+east, and hardening each soft-cleared ally independently does not change that
+result. Retained evidence is under
+`.bne-field-evidence/xhuman12-c333-frontier-packet` and
+`.bne-causal-evidence/xhuman12-c333-candidate{1,2,3}`. Do not retry this route
+family without a new native discriminator for the global route-buffer state or
+action-23 copy boundary.
 
 ## Prior release checkpoint — 2026-08-31 (cycle-333 offered-building front-rank ownership)
 

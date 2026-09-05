@@ -42,6 +42,12 @@ final class BattleNetCombatSystem {
 
     private final World world;
 
+    /**
+     * Quiet Attack-body wait past Attack-start. Sequence already ticked;
+     * AttackTarget still animates, then the order must not dest-arm.
+     */
+    private boolean sequenceWaitOwnsOrder;
+
     BattleNetCombatSystem(World world) {
         this.world = world;
     }
@@ -7727,6 +7733,14 @@ final class BattleNetCombatSystem {
         // by nothing, so a siege engine happily bombarded a footman leaning on
         // it and there was no reason to close.
         if (distance < unit.type().minAttackRange()) {
+            if (sequenceWaitOwnsOrder) {
+                // Attack 540's wait still owns this visit. Presentation
+                // becoming breakable used to dest-arm XHuman 10 catapult
+                // 1487 southwest at fixture 562 while native stayed on
+                // 74,89 through 540/42.
+                sequenceWaitOwnsOrder = false;
+                return;
+            }
             unit.setFighting(false);
             moveToBetterPos(unit, target);
             return;
@@ -11439,6 +11453,7 @@ final class BattleNetCombatSystem {
     }
 
     boolean stepBattleNetAttackSequence(Unit unit) {
+        sequenceWaitOwnsOrder = false;
         if (world.battleNetSequence == null || !unit.canMove()) {
             return false;
         }
@@ -12681,33 +12696,14 @@ final class BattleNetCombatSystem {
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());
         // A quarry may leave range or enter Die during the committed swing
-        // body. The last non-marker visit still belongs to Attack even when
-        // Java's parallel presentation animation becomes breakable on that
-        // visit. Native hands ownership to Move or Still only on the
-        // following OP0 marker. XHuman 9 knight 1419 is the dying-target
-        // witness: its target pointer clears on fixture 94, but Attack tail
-        // 1945/1 remains visible through fixture 108 and becomes Still on 109.
-        //
-        // A live quarry may leave range during the committed swing body.
-        // The last non-marker visit still belongs to Attack even when Java's
-        // parallel presentation animation becomes breakable on that visit.
-        // Native hands ownership to Move only on the following OP0 marker.
-        // Human 8 attack-peasant 1513 therefore remains at 70,72 on fixture
-        // 57 (Attack tail timer 1) and first-steps NE on fixture 58. Letting
-        // stepAttack continue after the timer-2 -> timer-1 tick moved it at
-        // 57, one visit before the sequence authorized a chase decision.
-        boolean recoveryMarkerNext = false;
-        if (!tick.actionMarker()
-                && unit.fighting() && !unit.isMoving()
-                && (!unit.battleNetStationaryAttack()
-                        || sequenceTarget == null
-                        || !sequenceTarget.isAlive())
-                && !settledInRange
-                && attackStart >= 0 && offset >= attackStart) {
-            BattleNetSequence.Tick next = world.battleNetSequence.tick(
-                    tick.offset(), tick.timer());
-            recoveryMarkerNext = next.valid() && next.actionMarker();
-        }
+        // body. Non-marker visits still belong to Attack even when Java's
+        // parallel presentation animation becomes breakable. Native hands
+        // ownership to Move or Still only on the following OP0 marker.
+        // XHuman 9 knight 1419 is the dying-target witness: its target
+        // pointer clears on fixture 94, but Attack tail 1945/1 remains
+        // visible through fixture 108 and becomes Still on 109. Human 8
+        // attack-peasant 1513 remains at 70,72 on fixture 57 (Attack tail
+        // timer 1) and first-steps NE on fixture 58.
         // Keep dest-arm leftover construction on Attack start through 3,2,1
         // so stepAttack does not dest-arm on the same visits (Human 13 ogre
         // 1511 holds 120,26 at 115-117).
@@ -12847,6 +12843,22 @@ final class BattleNetCombatSystem {
             world.battleNetSequenceProjectileFired.remove(unit);
         }
         if (!tick.actionMarker()) {
+            // A wait past Attack-start is still the committed swing body.
+            // Native hands the order only on the following OP0. Restricting
+            // that ownership to the last quiet visit used to dest-arm a
+            // catapult during Attack 540's fifty-count wait: XHuman 10 slot
+            // 1487 shuffled southwest at fixture 562 while native stayed on
+            // 74,89 through 540/42. Construction and OP0 at Attack-start keep
+            // the narrower flags below. The wrap 540/1 -> 503/3 at fixture
+            // 203 is an action-marker visit, so it still reaches the order.
+            //
+            // Do not return true here. AttackTarget still animates first,
+            // which is why XHuman 10 axe 51 can queue its pending shot at
+            // offset 892. The wait only suppresses MoveToBetterPos once
+            // presentation has become breakable.
+            if (attackStart >= 0 && offset != attackStart) {
+                sequenceWaitOwnsOrder = true;
+            }
             // A ranged loop-wrap retarget has installed a fresh 3,2,1 Attack
             // constructor. ResumeFromMove is its durable ownership token until
             // OP0 enters the 63-count hold; each quiet construction visit must
@@ -12869,6 +12881,17 @@ final class BattleNetCombatSystem {
                     && unit.battleNetStationaryAttack()
                     && unit.battleNetAttackResumeHoldActive()
                     && attackStart >= 0 && offset == attackStart;
+            boolean recoveryMarkerNext = false;
+            if (unit.fighting() && !unit.isMoving()
+                    && (!unit.battleNetStationaryAttack()
+                            || sequenceTarget == null
+                            || !sequenceTarget.isAlive())
+                    && !settledInRange
+                    && attackStart >= 0 && offset >= attackStart) {
+                BattleNetSequence.Tick next = world.battleNetSequence.tick(
+                        tick.offset(), tick.timer());
+                recoveryMarkerNext = next.valid() && next.actionMarker();
+            }
             return deferMeleeRetarget || chaseDecision || recoveryMarkerNext
                     || rangedRetargetConstruction
                     || rangedStationaryCommittedHold;
