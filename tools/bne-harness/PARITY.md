@@ -15,7 +15,57 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-04 (GiveOrder Still keeps its one-tick constructor)
+## Current release checkpoint — 2026-09-05 (computer shipyards pay the transport 1-in-8 roll)
+
+Accepted cycle-1,800 receipt `ae6fada1` keeps the shared proven frontier at
+cycle 403 and improves Orc 13 and Human 12 without moving any other case
+earlier. The fleet is 14 clean / 38 divergent / 0 failed through cycle
+1,800, and the 52-case exact-prefix sum rises from 54,347 to 56,459.
+Cycle 400 stays 52 clean / 0 divergent / 0 failed. Orc 13 is now exact
+through cycle 1,800. Human 12 advances from exact through fixture 582 to
+exact through fixture 1,469. Its newly exposed fixture-1,470 finding is
+peon native slot 1565 / Java x 104 versus 103. Expansion Orc 8 remains the
+paused naval patrol/route-publication family at fixture 404, which is why
+the shared horizon stops at 403.
+
+The 400-cycle survey is `.bne-surveys/current-206ff96-c400` and the
+1,800-cycle survey is `.bne-surveys/current-206ff96-c1800`. Both bind clean
+commit `206ff96`, engine-input
+`64cad26d474c3f94096651a7dce2acbf8d16a6e3de753fefec15a6f4e8b81e88`,
+pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`,
+and corpus `tools/bne-harness/work/corpus/campaign-1800/corpus-index.json`.
+The long receipt is retained at
+`.bne-artifacts/runs/ae6fada127412a2f5fa71cb7968ca1fe7d161ec072eafb69ea1d400058f6c98b`.
+
+Behavioral delta: shipyard action-33 train_fn `0x40eef0` consumes
+`FUN_00479820` when battleship, sub, or transport want exceeds census,
+before the unpaid tanker fallback. Empty-family tanker, destroyer, and
+foundry-backed transport arms still skip the roll. The rule is naval want
+versus census in `0x40eef0`; it contains no mission, map, faction,
+coordinate, fixture, exact-cycle, route-length, or unit-ID branch.
+
+Proof delta: Orc 13 computer shipyard 1509 / Java 91 wants 2 transports
+with none and no foundry. Native draws at `0x40f094` on fixture 572 even
+when the 1-in-8 misses. Java used to take the tanker fallback without that
+draw, so knight 34 stole the seed and critter 1464 / Java 136 missed
+wander choice 48 at fixture 576. Human 12's same-family critter 1563
+advances with it. XOrc 7's destroyer 1-in-4 pair remains the held-out.
+
+Efficacy receipt
+`.bne-test-efficacy/runs/c026a33888da46231cc53b0ff6cbbb9d4445534c3ada040fbde3e709e10c7c40`
+proves the real-data assertion executes and fails on `9cfd350`, then
+executes and passes on `206ff96`. Focused shipyard-train, leftover-drop,
+and live-route held-outs pass. Both fixed 52-case gates pass. Local native
+capture remains available and no SSH bypass was used.
+
+Expansion Orc 8 fixture 404 remains paused in its naval patrol/route-publication
+family. Expansion Human 12 fixture 405 remains the occupancy family that
+already failed two evidence-backed hypotheses. The earliest unpaused fleet
+finding after that is expansion Orc 11 and expansion Human 5 at 577, Human 8
+at 583, expansion Human 2 at 585, and expansion Human 7 at 609.
+
+## Prior release checkpoint — 2026-09-04 (GiveOrder Still keeps its one-tick constructor)
 
 Accepted cycle-1,800 receipt `b21917a6` keeps the shared proven frontier at
 cycle 403 and finishes the spent-leftover give-up without moving any case
