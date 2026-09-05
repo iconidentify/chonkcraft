@@ -239,10 +239,16 @@ final class BattleNetProjectileSystem {
             // free fixture 36 vs 35 (arrow damage one cycle late). Refresh
             // live pixels before the two aim-jitter draws.
             if (attacker != null && attacker.isAlive()) {
+                // FUN_0040fb10 reads the source record's IX/IY plus the type
+                // centre table, the same words as the target half below.
+                // Reapplying the invisible residual bank added a pixel to
+                // XOrc 11's fixture-530 battleship muzzles: source residual
+                // (+1,+1) and (-1,+1) produced remaining 131/127 while native
+                // stores 130/126 from (336,1424) and (336,1296).
                 shot.setBattleNetMuzzle(
-                        attacker.pixelX() + attacker.residualX()
+                        attacker.pixelX()
                                 + World.battleNetCentreOffset(attacker.type(), true),
-                        attacker.pixelY() + attacker.residualY()
+                        attacker.pixelY()
                                 + World.battleNetCentreOffset(attacker.type(), false));
             }
             if (target != null && target.isAlive() && target.isOnMap()) {
@@ -547,9 +553,9 @@ final class BattleNetProjectileSystem {
         // but one tile in the projectile table, so the old centre (+32,+32)
         // aimed at 1248,160 and landed one cycle late; native +16,+16 lands
         // and stores damage at fixture cycle 20.
-        int toX = target.pixelX() + target.residualX()
+        int toX = target.pixelX()
                 + World.battleNetCentreOffset(target.type(), true);
-        int toY = target.pixelY() + target.residualY()
+        int toY = target.pixelY()
                 + World.battleNetCentreOffset(target.type(), false);
         // Used to aim back by one land Move opcode (3px) because this implementation
         // walked the new step on the commit cycle and led native for the
@@ -560,15 +566,14 @@ final class BattleNetProjectileSystem {
         // flight step, and splash damage 6 vs 7. Do not restore the 3px aim
         // pull without re-measuring the drain phase.
         return world.spawn(new Missile(type, attacker, target,
-                // GetMapPixelPosCenter reads upstream's raw IX/IY. This implementation
-                // splits that displacement into the drawn offset and a
-                // residual bank so idle wiggles cannot masquerade as a live
-                // step; the muzzle must put the two halves back together.
-                // levelx11o's destroyer fires with IX/IY 32,1, making a
-                // five-cycle flight where the tile corner alone made six.
-                attacker.pixelX() + attacker.residualX()
+                // GetMapPixelPosCenter reads upstream's raw IX/IY. Java's
+                // pixel words are that pair; the residual bank is an invisible
+                // overshoot and is not a second muzzle component. Adding it
+                // back used to give XOrc 11's fixture-530 battleships remaining
+                // 131/127 instead of native 130/126.
+                attacker.pixelX()
                         + World.battleNetCentreOffset(attacker.type(), true),
-                attacker.pixelY() + attacker.residualY()
+                attacker.pixelY()
                         + World.battleNetCentreOffset(attacker.type(), false),
                 toX, toY));
     }
@@ -584,9 +589,9 @@ final class BattleNetProjectileSystem {
      */
     Missile launchGround(Unit attacker, int tileX, int tileY, MissileType type) {
         return world.spawn(new Missile(type, attacker, null,
-                attacker.pixelX() + attacker.residualX()
+                attacker.pixelX()
                         + World.battleNetCentreOffset(attacker.type(), true),
-                attacker.pixelY() + attacker.residualY()
+                attacker.pixelY()
                         + World.battleNetCentreOffset(attacker.type(), false),
                 tileX * World.TILE_SIZE + World.TILE_SIZE / 2,
                 tileY * World.TILE_SIZE + World.TILE_SIZE / 2));

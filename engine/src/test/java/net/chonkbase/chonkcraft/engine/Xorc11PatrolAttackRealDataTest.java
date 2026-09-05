@@ -1067,6 +1067,62 @@ class Xorc11PatrolAttackRealDataTest {
     }
 
     @Test
+    @DisplayName("xorc 11's fixture-530 battleship cannon omits the source residual from its muzzle")
+    void xorc11sFixture530BattleshipCannonOmitsTheSourceResidualFromItsMuzzle() {
+        AssetSource assets = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(assets != null,
+                "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
+        GameData data = new GameData(assets);
+        String map = "campaigns/orc-exp/levelx11o";
+        Mission mission = data.loadMission(map,
+                GameData.personIn(data.campaignMap(map)), 1);
+        Assumptions.assumeTrue(mission != null, "XOrc 11 is not in the pack");
+        World world = mission.world();
+        Unit north = unitById(world, 103);
+        Unit south = unitById(world, 88);
+        Unit northTarget = unitById(world, 81);
+        Unit southTarget = unitById(world, 69);
+        assertNotNull(north, "the northern battleship that fires at fixture 530 is absent");
+        assertNotNull(south, "the southern battleship that fires at fixture 530 is absent");
+        assertNotNull(northTarget, "the northern battleship's quarry is absent");
+        assertNotNull(southTarget, "the southern battleship's quarry is absent");
+
+        for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+            mission.tick();
+        }
+        while (world.cycle() - BNE_INITIALIZATION_TICKS < 530) {
+            mission.tick();
+        }
+
+        assertEquals(1, north.residualX(),
+                "the northern battleship's invisible X bank is the muzzle witness");
+        assertEquals(1, north.residualY(),
+                "the northern battleship's invisible Y bank is the muzzle witness");
+        assertEquals(-1, south.residualX(),
+                "the southern battleship's invisible X bank is the muzzle witness");
+        assertEquals(1, south.residualY(),
+                "the southern battleship's invisible Y bank is the muzzle witness");
+
+        Missile northShell = constructedMissileFrom(world, north.id());
+        assertSame(northTarget, northShell.target());
+        assertEquals(336, (int) northShell.fromX(),
+                "native source IX plus centre, without the +1 residual");
+        assertEquals(1424, (int) northShell.fromY(),
+                "native source IY plus centre, without the +1 residual");
+        assertEquals(130, northShell.battleNetRemaining(),
+                "native remaining 130 is the major axis of (336,1424) to (464,1294)");
+
+        Missile southShell = constructedMissileFrom(world, south.id());
+        assertSame(southTarget, southShell.target());
+        assertEquals(336, (int) southShell.fromX(),
+                "native source IX plus centre, without the -1 residual");
+        assertEquals(1296, (int) southShell.fromY(),
+                "native source IY plus centre, without the +1 residual");
+        assertEquals(126, southShell.battleNetRemaining(),
+                "native remaining 126 is the major axis of (336,1296) to (462,1230)");
+    }
+
+    @Test
     @DisplayName("xorc 11's first corpse hold hands ownership to neutral")
     void xorc11sFirstCorpseHoldHandsOwnershipToNeutral() {
         AssetSource assets = AssetSource.fromEnvironment();
