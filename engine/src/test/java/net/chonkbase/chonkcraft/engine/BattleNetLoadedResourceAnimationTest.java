@@ -61,6 +61,38 @@ class BattleNetLoadedResourceAnimationTest {
         }
     }
 
+    @Test
+    void nativePatrolAndChaseAnimateGruntsAndOgres() {
+        Scene scene = scene();
+        for (String ident : List.of("unit-grunt", "unit-ogre")) {
+            UnitType type = scene.data().unitTypes().types().get(ident);
+            assertNotNull(type);
+            for (boolean chase : List.of(false, true)) {
+                Unit unit = new Unit(9001, type, 0, 20, 20);
+                unit.setFrame(999);
+                if (chase) {
+                    scene.world().combat.armBattleNetChaseMoveBody(unit);
+                } else {
+                    unit.setBattleNetLandPatrolMoveBody(true);
+                    assertTrue(scene.world().movement.usesBattleNetMovePace(unit));
+                    scene.world().movement.armBattleNetMovePace(unit);
+                }
+                assertEquals(0, unit.frame(), ident + " must open on the walking pose");
+                Set<Integer> frames = new LinkedHashSet<>();
+                int pixels = 0;
+                for (int tick = 0; tick < 100 && pixels < 32; tick++) {
+                    frames.add(unit.frame());
+                    pixels += chase
+                            ? scene.world().combat.tickBattleNetChaseMoveSequence(unit)
+                            : scene.world().movement.advanceMoveAnimation(unit);
+                }
+                assertEquals(32, pixels);
+                assertEquals(Set.of(0, 5, 10, 15, 20), frames,
+                        ident + (chase ? " chase" : " patrol") + " must animate while moving");
+            }
+        }
+    }
+
     private static Set<Integer> walkOneTile(World world, UnitType type,
             UnitType.Resource resource) {
         Unit unit = new Unit(9000, type, 0, 20, 20);

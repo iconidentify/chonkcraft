@@ -5404,14 +5404,8 @@ final class GameScreen extends JPanel {
         int teamToX = Math.min(world.map().width() - 1, toX + 1);
         int teamToY = Math.min(world.map().height() - 1, toY + 1);
         int teamWidth = teamToX - teamFromX + 1;
-        FogOfWar.Visibility[] teamSeen = new FogOfWar.Visibility[
-                teamWidth * (teamToY - teamFromY + 1)];
-        for (int y = teamFromY; y <= teamToY; y++) {
-            for (int x = teamFromX; x <= teamToX; x++) {
-                teamSeen[(y - teamFromY) * teamWidth + x - teamFromX] =
-                        world.visibilityTo(localPlayer, x, y);
-            }
-        }
+        FogOfWar.Visibility[] teamSeen = world.visibilitySnapshot(localPlayer,
+                teamFromX, teamFromY, teamWidth, teamToY - teamFromY + 1);
         FogOfWar.VisibilityLookup teamVisibility = (x, y) -> {
             if (x < teamFromX || x > teamToX || y < teamFromY || y > teamToY) {
                 return FogOfWar.Visibility.UNEXPLORED;

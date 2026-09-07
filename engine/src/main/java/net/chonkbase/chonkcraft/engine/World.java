@@ -4902,6 +4902,22 @@ public final class World {
         return FogOfWar.Visibility.UNEXPLORED;
     }
 
+    /**
+     * Captures a row-major rectangle between simulation ticks. Sight is removed
+     * and added during a move; rendering that intermediate state makes fog
+     * edges blink. Hold the monitor only for the copy, never for drawing.
+     */
+    public synchronized FogOfWar.Visibility[] visibilitySnapshot(
+            int player, int x, int y, int width, int height) {
+        FogOfWar.Visibility[] result = new FogOfWar.Visibility[width * height];
+        for (int row = 0; row < height; row++) {
+            for (int column = 0; column < width; column++) {
+                result[row * width + column] = visibilityTo(player, x + column, y + row);
+            }
+        }
+        return result;
+    }
+
     public boolean isVisibleTo(int player, Unit unit) {
         if (unit == null || !unit.isAlive() || !unit.isOnMap()) {
             return false;
@@ -11921,8 +11937,8 @@ public final class World {
 
     // ---------------------------------------------------------------- cycle
 
-    /** Advances the simulation one cycle. */
-    public void tick() {
+    /** Advances one cycle atomically with respect to visibility snapshots. */
+    public synchronized void tick() {
         cycle++;
         battleNetForceLaunchesThisCycle.clear();
         // Retail's per-cycle player pass enters the ai.bin interpreter first

@@ -11276,6 +11276,9 @@ final class BattleNetCombatSystem {
         if (!open.valid()) {
             return;
         }
+        if (open.frame() >= 0) {
+            unit.setFrame(open.frame());
+        }
         unit.setBattleNetSequenceOffset(open.offset());
         unit.setBattleNetAnimationTimer(open.timer());
         unit.setBattleNetChaseStepReady(false);
@@ -11298,6 +11301,9 @@ final class BattleNetCombatSystem {
         if (!tick.valid()) {
             unit.setBattleNetSequenceOffset(-1);
             return 0;
+        }
+        if (tick.frame() >= 0) {
+            unit.setFrame(tick.frame());
         }
         unit.setBattleNetSequenceOffset(tick.offset());
         unit.setBattleNetAnimationTimer(tick.timer());

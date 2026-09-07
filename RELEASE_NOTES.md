@@ -1,4 +1,7 @@
-# Gameplay Reliability Update
+# Fog and Walking Animation Fixes
+
+- Fixed intermittent fog-edge flicker caused by rendering visibility during a unit movement update.
+- Restored walking poses for grunts, ogres and other units using native patrol and chase movement.
 
 - Made menu scaling use reusable graphics surfaces, avoiding full-window
   temporary images on every redraw. Waiting lobbies now redraw only when

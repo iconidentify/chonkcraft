@@ -8,7 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import net.chonkbase.chonkcraft.data.map.PudMap;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -28,9 +28,9 @@ import org.junit.jupiter.api.Test;
 class FogTilesTest {
 
     private static GameData load() {
-        InstallSource install = InstallSource.fromEnvironment();
+        AssetSource install = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(install != null,
-                "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
+                "No game assets configured. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir.");
         return new GameData(install);
     }
 

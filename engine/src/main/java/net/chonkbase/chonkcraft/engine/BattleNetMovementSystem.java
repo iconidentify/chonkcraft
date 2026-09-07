@@ -10161,9 +10161,8 @@ final class BattleNetMovementSystem {
      * <p>When a 2x2 residual pace is armed from {@code script.bin}, pixel
      * motion follows native Move waits (op13/op5) rather than ChonkCraft Move.
      * ChonkCraft Move remains selected so {@code atMoveBoundary} keeps its
-     * existing shape. Laden resource returns also draw the frame selected by
-     * the native program; other pace users retain their established
-     * presentation until their frames have their own retail proof.
+     * existing shape. The native program also supplies the sprite frame; the
+     * parked presentation script cannot animate patrols or repair strides.
      */
     int advanceMoveAnimation(Unit unit) {
         // Armed residual pace owns pixel motion and leaves the ChonkCraft Move
@@ -10267,8 +10266,7 @@ final class BattleNetMovementSystem {
             unit.setBattleNetMovePaceOffset(-1);
             return;
         }
-        if (open.frame() >= 0
-                && unit.returningToDepot() && unit.carried() > 0) {
+        if (open.frame() >= 0) {
             unit.setFrame(open.frame());
         }
         unit.setBattleNetMovePaceOffset(open.offset());
@@ -10299,8 +10297,7 @@ final class BattleNetMovementSystem {
             unit.setBattleNetMovePaceOffset(-1);
             return -1;
         }
-        if (tick.frame() >= 0
-                && unit.returningToDepot() && unit.carried() > 0) {
+        if (tick.frame() >= 0) {
             unit.setFrame(tick.frame());
         }
         int timer = tick.timer();
