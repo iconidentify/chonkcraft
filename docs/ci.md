@@ -1,7 +1,8 @@
 # Continuous integration
 
-Two workflows in `.github/workflows/`, and one script that decides whether a
-green Maven run meant anything.
+Four workflows in `.github/workflows/` cover tests, OTA game updates,
+installers, and the multiplayer service. Test results are evaluated against
+explicit coverage and known-failure inventories.
 
 - [What CI is for here](#what-ci-is-for-here)
 - [`tests.yml`](#testsyml----the-suite-on-every-push)
@@ -16,8 +17,7 @@ green Maven run meant anything.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 1,213 of 2,835 tests skip and
-the run takes 25 seconds.
+either way. With nothing configured, 1,345 of 2,992 tests skip in the September 7 data-free run.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
 it converts "nobody is checking" into "something is checking" without either
@@ -57,7 +57,7 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **27 skips of 2,835**, re-measured after the BNE
+Asserts the `full` profile: **27 expected skips**, re-measured after the BNE
 parity, explicit-team, multiplayer-wall, allied-vision, wood-command, team-outcome,
 mine-collapse-audio, and gryphon order-handoff coverage additions against the runner's
 authenticated classic retail installation. An exact Battle.net Edition source
@@ -71,9 +71,40 @@ About nine minutes.
 It builds an asset pack from the mounted installation and runs the whole suite
 against the installation, pack and Opus vectors together.
 
+
+## Reading the result
+
+The summary separates passed tests, known failures that still executed,
+unexpected failures, and skipped tests that did not execute. Both gates run
+even when one fails, so a skip mismatch cannot hide a regression. Green means
+both inventories match, not that every test passes.
+
+The September 7 audit of run 34136321688 found two independent problems:
+
+- The data-free engine inventory expected 989 skips but observed 1,008.
+  Nineteen newly added authenticated tests were missing from the inventory;
+  they ran in the full job. The new walking regression adds one more expected
+  data-free skip. The current full data-free run discovers 2,992 tests, skips
+  1,345, and executes 1,647, including 88 recorded failures.
+- The authenticated job discovered 2,990 tests, skipped the expected 27, and
+  reported 110 failures against 109 recorded ones. Its extra failure asserted
+  an internal cold-loop latch changed by the September 1 moving-quarry fix.
+  The regression now checks the constructor that owns the retry; its existing
+  route, position, timing, damage, and random-sequence assertions remain.
+
+No expected-failure entries were added or tests disabled to resolve this audit.
+The 109 authenticated known failures remain technical debt and still execute.
+
+`publish-game-update.yml` currently runs independently of `tests.yml`. It builds
+and signs the update and verifies launcher installation, but does not wait for
+the test workflow. A successful OTA deployment therefore does not certify a
+green test run. Changing this release policy is separate from reporting CI
+accurately.
+
 ## The skip gate
 
-`scripts/ci/check-test-skips.py` is what decides both jobs. The test step is
+`scripts/ci/check-test-results.py` evaluates coverage and failure identity
+for both jobs and writes their results to the GitHub Actions summary. The test step is
 `continue-on-error: true`; the gate runs after it and reads the **Surefire XML**
 rather than Maven's console output, because the XML records what each module
 actually ran. Grepping a log cannot tell "the engine module skipped 226 tests"
@@ -92,7 +123,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,213 |
+| `data-free` | none | 1,345 |
 | `full` | installation, pack, Opus vectors | 27 |
 | `full-with-playtest-saves` | full inputs plus three private save referees | 24 |
 | `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |

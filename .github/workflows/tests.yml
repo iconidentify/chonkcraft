@@ -45,22 +45,21 @@ jobs:
           python3 scripts/check-source-boundary.py
           python3 scripts/check-native-runtime.py
           python3 scripts/ci/check-comment-provenance.py
+          python3 -m unittest discover -s scripts/ci -p 'test_*.py'
           python3 scripts/check-docs.py --check
           python3 scripts/check-bne-readiness.py
       - name: Build
         working-directory: chonkcraft
         run: scripts/jbr/with-jbr-25.sh mvn -B -DskipTests install
-      - name: Run native test suite
+      - name: Run all native tests (known failures evaluated below)
         id: suite
         continue-on-error: true
         working-directory: chonkcraft
         run: scripts/run-tests.sh -B -Dwc2.install.dir=/nonexistent/no-game-data
-      - name: Assert expected coverage
+      - name: Evaluate coverage and regressions
+        if: ${{ !cancelled() && steps.suite.outcome != 'skipped' }}
         working-directory: chonkcraft
-        run: scripts/ci/check-test-skips.py --profile data-free
-      - name: Reject new or stale failures
-        working-directory: chonkcraft
-        run: scripts/ci/check-test-failures.py --baseline scripts/ci/expected-failures-data-free.txt
+        run: python3 scripts/ci/check-test-results.py --profile data-free --baseline scripts/ci/expected-failures-data-free.txt
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,6 +107,7 @@ jobs:
           python3 scripts/check-source-boundary.py
           python3 scripts/check-native-runtime.py
           python3 scripts/ci/check-comment-provenance.py
+          python3 -m unittest discover -s scripts/ci -p 'test_*.py'
           python3 scripts/check-docs.py --check
           python3 scripts/check-bne-readiness.py
       - name: Build
@@ -128,7 +128,7 @@ jobs:
         env:
           CHONKCRAFT_ASSET_PACK: ${{ runner.temp }}/wc2.chonkpack
         run: scripts/check-bne-network-gate.sh
-      - name: Run authenticated test suite
+      - name: Run all authenticated tests (known failures evaluated below)
         id: suite
         continue-on-error: true
         working-directory: chonkcraft
@@ -138,12 +138,10 @@ jobs:
             -Dchonkcraft.pack="${{ runner.temp }}/wc2.chonkpack" \
             -Dopus.testvectors=/opt/wc2/opus_testvectors \
             -Dopus.rfc="${{ runner.temp }}/rfc6716.txt"
-      - name: Assert expected coverage
+      - name: Evaluate coverage and regressions
+        if: ${{ !cancelled() && steps.suite.outcome != 'skipped' }}
         working-directory: chonkcraft
-        run: scripts/ci/check-test-skips.py --profile full
-      - name: Reject new or stale failures
-        working-directory: chonkcraft
-        run: scripts/ci/check-test-failures.py
+        run: python3 scripts/ci/check-test-results.py --profile full
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4

@@ -177,11 +177,14 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Issue 12's accepted-order liveness regression and the invalid
         # queued-return replacement regression add two more authenticated
         # referees. The clean hosted profile therefore records 2,034 engine
-        # invocations, 989 of which skip without authenticated data.
+        # invocations at that revision. The September 7 CI artifact records
+        # nineteen additional game-data tests since that inventory; all ran
+        # with authenticated inputs. The native walk-frame regression adds
+        # one more deliberate data-free skip, while the fog race runs here.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (2034, 989),
+        "engine": (2056, 1009),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -237,10 +240,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2034, 7),
+        "engine": (2056, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (370, 8),
+        "desktop": (377, 8),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that

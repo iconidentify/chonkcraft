@@ -693,8 +693,11 @@ class XHuman12BehaviorOneRetargetRealDataTest {
                 "fixture 249 drains the constructor reopened on 248");
         assertEquals(0, dyingQuarryChaser.pathLength(),
                 "construction precedes the replacement route writer");
-        assertTrue(dyingQuarryChaser.battleNetColdNoProgressRefusalLoop(),
-                "the authenticated active-order retry remains the loop owner");
+        // The moving-quarry handoff clears the cold-loop latch after buying
+        // this constructor. Stage five still owns its remaining timer; the
+        // positions, damage and random ledger below remain the retail checks.
+        assertEquals(5, dyingQuarryChaser.battleNetAttackRefusalRecoveryStage(),
+                "the paid cold Attack constructor remains the retry owner");
         assertEquals(39, defenderKnight.hitPoints(),
                 "restored idle ownership gives the fixture-249 grunt blow "
                         + "native damage five");
