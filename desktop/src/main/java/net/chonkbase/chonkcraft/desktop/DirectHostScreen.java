@@ -47,7 +47,7 @@ final class DirectHostScreen extends JPanel {
     private int endpointPort = -1;
     private List<String> endpoints = List.of();
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     DirectHostScreen(GameData data, String map, Listener listener) {
         large = GameFont.load(data, GameFont.Face.LARGE);
@@ -132,6 +132,15 @@ final class DirectHostScreen extends JPanel {
 
     int selectedPort() {
         return DirectAddress.parsePort(port);
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

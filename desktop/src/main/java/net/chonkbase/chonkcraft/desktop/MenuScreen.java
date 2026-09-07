@@ -92,7 +92,7 @@ final class MenuScreen extends JPanel {
 
     /** The menu drawn at its own size, and the scaler's working copy. */
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     private final BufferedImage background;
 
@@ -614,6 +614,15 @@ final class MenuScreen extends JPanel {
                 }
             }
         });
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

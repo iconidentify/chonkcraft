@@ -82,7 +82,7 @@ final class BriefingScreen extends JPanel {
 
     /** The briefing drawn at its own size, and the scaler's working copy. */
     private java.awt.image.BufferedImage design;
-    private java.awt.image.BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     /**
      * The wash behind the prose.
@@ -275,6 +275,15 @@ final class BriefingScreen extends JPanel {
         pressed = true;
         silence();
         onContinue.run();
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

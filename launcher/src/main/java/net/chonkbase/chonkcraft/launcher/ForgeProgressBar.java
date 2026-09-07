@@ -23,11 +23,14 @@ import javax.swing.Timer;
 final class ForgeProgressBar extends JComponent {
 
     private int percent;
-    private int pulse;
+    private double pulse;
+    private long animationStarted;
     private boolean indeterminate = true;
     private boolean active;
-    private final Timer animation = new Timer(55, event -> {
-        pulse = (pulse + 1) % 120;
+    private final Timer animation = new Timer(7, event -> {
+        // Time, rather than repaint count, keeps the original 6.6 second
+        // sweep while allowing smooth motion on a high-refresh display.
+        pulse = ((System.nanoTime() - animationStarted) % 6_600_000_000L) / 55_000_000.0;
         if (isShowing()) {
             repaint();
         }
@@ -39,15 +42,31 @@ final class ForgeProgressBar extends JComponent {
         setMinimumSize(new Dimension(180, 29));
         setFont(LauncherTheme.BOLD.deriveFont(11f));
         setToolTipText("Graphics pack import progress");
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & java.awt.event.HierarchyEvent.SHOWING_CHANGED) != 0) {
+                updateAnimation();
+            }
+        });
+    }
+
+    private void updateAnimation() {
+        if (active && isShowing()) {
+            if (!animation.isRunning()) {
+                animationStarted = System.nanoTime() - (long) (pulse * 55_000_000.0);
+                int refresh = getGraphicsConfiguration().getDevice().getDisplayMode().getRefreshRate();
+                animation.setDelay(Math.max(7, 1000 / Math.max(60, refresh)));
+                animation.start();
+            }
+        } else {
+            animation.stop();
+        }
     }
 
     void begin() {
         percent = 0;
         indeterminate = true;
         active = true;
-        if (isShowing()) {
-            animation.start();
-        }
+        updateAnimation();
         repaint();
     }
 
@@ -55,9 +74,7 @@ final class ForgeProgressBar extends JComponent {
         percent = Math.max(0, Math.min(100, value));
         indeterminate = false;
         active = true;
-        if (isShowing()) {
-            animation.start();
-        }
+        updateAnimation();
         setToolTipText(percent + " percent complete");
         repaint();
     }
@@ -76,9 +93,7 @@ final class ForgeProgressBar extends JComponent {
     @Override
     public void addNotify() {
         super.addNotify();
-        if (active) {
-            animation.start();
-        }
+        updateAnimation();
     }
 
     @Override
@@ -118,7 +133,7 @@ final class ForgeProgressBar extends JComponent {
         int fillStart = x;
         if (indeterminate) {
             fill = Math.max(36, innerWidth / 4);
-            fillStart = x + (pulse * Math.max(1, innerWidth + fill) / 120) - fill;
+            fillStart = x + (int) (pulse * Math.max(1, innerWidth + fill) / 120) - fill;
         } else {
             fill = (int) Math.round(innerWidth * percent / 100.0);
         }
@@ -148,7 +163,7 @@ final class ForgeProgressBar extends JComponent {
             }
 
             int edge = Math.min(x + innerWidth - 2, fillStart + fill - 1);
-            int glint = 72 + (pulse % 20) * 7;
+            int glint = 72 + (int) ((pulse % 20) * 7);
             g.setColor(new Color(255, 246, 190, Math.min(210, glint)));
             g.fillOval(edge - 4, y + 2, 8, Math.max(3, innerHeight - 4));
             g.setClip(oldClip);

@@ -1,5 +1,15 @@
 # Gameplay Reliability Update
 
+- Made menu scaling use reusable graphics surfaces, avoiding full-window
+  temporary images on every redraw. Waiting lobbies now redraw only when
+  their displayed information changes.
+- Fixed palette animation accumulating graphics memory outside the Java heap.
+  Terrain and sprite caches now have memory limits and release device images
+  when leaving a screen. Rendering allocates less memory while preserving
+  palette colours and changes to the ground.
+- Made stone panels reuse their existing texture during window resizing,
+  reduced the game's initial heap reservation, and smoothed the launcher's
+  progress animation while stopping its timer when hidden.
 - Fixed repeated Start clicks or holding Enter in a multiplayer lobby opening
   several copies of the same match while the map loaded. Start now becomes
   unavailable as soon as loading begins.

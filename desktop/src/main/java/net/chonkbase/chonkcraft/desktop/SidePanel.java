@@ -89,6 +89,9 @@ final class SidePanel {
     /** Reused each frame rather than reallocated. */
     private final BufferedImage minimap =
             new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_RGB);
+    // One bulk update avoids an int array allocation for every setRGB pixel
+    // while keeping the image eligible for Java2D's managed surface cache.
+    private final int[] minimapPixels = new int[SIZE * SIZE];
 
     /** The layout the game's own scripts describe, or null if unreadable. */
     private net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout layout;
@@ -550,12 +553,12 @@ final class SidePanel {
                     // nothing, which is what UiToggleTerrain
                     // The game is for on a crowded
                     // map.
-                    minimap.setRGB(x, y, 0);
+                    minimapPixels[y * SIZE + x] = 0;
                     continue;
                 }
-                minimap.setRGB(x, y, seen == FogOfWar.Visibility.UNEXPLORED
+                minimapPixels[y * SIZE + x] = seen == FogOfWar.Visibility.UNEXPLORED
                         ? veil(terrainColour(tileX, tileY, false), fogOpacity.unseen())
-                        : terrainColour(tileX, tileY, seen == FogOfWar.Visibility.EXPLORED));
+                        : terrainColour(tileX, tileY, seen == FogOfWar.Visibility.EXPLORED);
             }
         }
 
@@ -596,7 +599,7 @@ final class SidePanel {
             if (!seen || unit == withheld.unit()) {
                 continue;
             }
-            plotOnMinimap(minimap, minimapSize, mapWidth, mapHeight,
+            plotOnMinimap(minimapPixels, minimapSize, mapWidth, mapHeight,
                     unit.tileX(), unit.tileY(), unit.type(), minimapColour(unit));
         }
         // What the player remembers. The map view draws these and the minimap
@@ -606,11 +609,12 @@ final class SidePanel {
             if (!memory.type().visibleUnderFog() || memory.equals(withheld.memory())) {
                 continue;
             }
-            plotOnMinimap(minimap, minimapSize, mapWidth, mapHeight,
+            plotOnMinimap(minimapPixels, minimapSize, mapWidth, mapHeight,
                     memory.tileX(), memory.tileY(), memory.type(),
                     minimapColour(memory.owner(), memory.type(), false));
         }
 
+        minimap.setRGB(0, 0, minimapSize, minimapSize, minimapPixels, 0, SIZE);
         g2.drawImage(minimap, minimapX, minimapY, null);
 
         // The viewport rectangle, so the player can see where they are.
@@ -746,7 +750,7 @@ final class SidePanel {
      * buildings. A four by four keep and a footman used to be the same mark,
      * and a town read as a scattering of pairs.
      */
-    private static void plotOnMinimap(java.awt.image.BufferedImage minimap, int minimapSize,
+    private static void plotOnMinimap(int[] pixels, int minimapSize,
             int mapWidth, int mapHeight, int tileX, int tileY, UnitType type, int colour) {
         int x = tileX * minimapSize / mapWidth;
         int y = tileY * minimapSize / mapHeight;
@@ -757,7 +761,7 @@ final class SidePanel {
         int down = Math.max(1, Math.max(1, type.tileHeight()) * minimapSize / mapHeight);
         for (int dy = 0; dy < down && y + dy < minimapSize; dy++) {
             for (int dx = 0; dx < across && x + dx < minimapSize; dx++) {
-                minimap.setRGB(x + dx, y + dy, colour);
+                pixels[(y + dy) * SIZE + x + dx] = colour;
             }
         }
     }

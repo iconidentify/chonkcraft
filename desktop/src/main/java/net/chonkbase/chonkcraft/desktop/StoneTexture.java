@@ -1,8 +1,6 @@
 package net.chonkbase.chonkcraft.desktop;
 
 import java.awt.image.BufferedImage;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * The interface's stone, generated rather than scanned.
@@ -48,13 +46,10 @@ final class StoneTexture {
      */
     private static final int CACHE_LIMIT = 48;
 
-    private static final Map<String, BufferedImage> CACHE =
-            new LinkedHashMap<>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, BufferedImage> eldest) {
-                    return size() > CACHE_LIMIT;
-                }
-            };
+    private record Key(int width, int height, Tint tint, double scale) {}
+
+    private static final ImageCache<Key> CACHE =
+            new ImageCache<>(CACHE_LIMIT, 32L * 1024 * 1024);
 
     private StoneTexture() {
     }
@@ -88,12 +83,14 @@ final class StoneTexture {
         double factor = scale <= 0 ? 1.0 : Math.min(MAX_SCALE, scale);
         int pixelWidth = Math.max(1, (int) Math.round(width * factor));
         int pixelHeight = Math.max(1, (int) Math.round(height * factor));
-        String key = pixelWidth + "x" + pixelHeight + ":" + tint + ":" + factor;
+        Key key = new Key(pixelWidth, pixelHeight, tint, factor);
         BufferedImage found = CACHE.get(key);
         if (found != null) {
             return found;
         }
-        BufferedImage made = generate(pixelWidth, pixelHeight, tint, factor);
+        BufferedImage previous = CACHE.find(candidate -> candidate.tint() == tint
+                && candidate.scale() == factor);
+        BufferedImage made = generate(pixelWidth, pixelHeight, tint, factor, previous);
         CACHE.put(key, made);
         return made;
     }
@@ -116,15 +113,27 @@ final class StoneTexture {
      */
     private static final double GRAIN = 26.0;
 
-    private static BufferedImage generate(int width, int height, Tint tint, double scale) {
+    private static BufferedImage generate(int width, int height, Tint tint, double scale,
+            BufferedImage previous) {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        int[] pixels = new int[width * height];
+        int[] pixels = new int[width];
+        int copiedWidth = previous == null ? 0 : Math.min(width, previous.getWidth());
+        int copiedHeight = previous == null ? 0 : Math.min(height, previous.getHeight());
+        if (previous != null) {
+            // Grain depends on coordinates, tint and scale, never the slab's
+            // extent. A one-pixel resize used to recompute every octave across
+            // the whole panel; only newly exposed rows and columns need noise.
+            var into = image.createGraphics();
+            into.drawImage(previous, 0, 0, null);
+            into.dispose();
+        }
 
         // The grain is enlarged with the slab, so a panel drawn twice the size
         // is the same stone seen closer rather than a finer-grained stone.
         double grain = GRAIN * scale;
         for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
+            int fromX = y < copiedHeight ? copiedWidth : 0;
+            for (int x = fromX; x < width; x++) {
                 double u = x / grain;
                 double v = y / grain;
 
@@ -164,10 +173,13 @@ final class StoneTexture {
                         - seam * 0.16
                         + grit * 0.13
                         + fine * 0.10);
-                pixels[y * width + x] = colour(shade, tint);
+                pixels[x] = colour(shade, tint);
+            }
+            if (fromX < width) {
+                image.setRGB(fromX, y, width - fromX, 1, pixels, fromX, width);
             }
         }
-        image.setRGB(0, 0, width, height, pixels, 0, width);
+
         return image;
     }
 

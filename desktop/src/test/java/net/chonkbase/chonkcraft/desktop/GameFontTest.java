@@ -116,4 +116,30 @@ class GameFontTest {
         assertTrue(font.widthOf("Peasant the Elder") > font.widthOf("Peasant"),
                 "measurement does not grow with the string");
     }
+
+    @Test
+    @DisplayName("fitted labels keep the same letters at every available width")
+    void fittingPreservesWidthsAndComplexText() {
+        for (GameFont.Face face : GameFont.Face.values()) {
+            GameFont font = GameFont.load(null, face);
+            for (String text : new String[] {"A long multiplayer lobby name", "Gold: 1200",
+                    "   spaced name   ", "Caf\u00e9 \u6771\u4eac", "e\u0301l\u00e8ve",
+                    "\u0627\u0644\u0639\u0631\u0628\u064a\u0629", "Map \ud83c\udf0d name"}) {
+                for (int width = -1; width <= 200; width++) {
+                    String expected = text;
+                    if (font.widthOf(text) > width) {
+                        int room = width - font.widthOf("...");
+                        int end = text.length();
+                        while (end > 0 && font.widthOf(text.substring(0, end)) > room) {
+                            end--;
+                        }
+                        expected = room <= 0 || end == 0
+                                ? "" : text.substring(0, end).stripTrailing() + "...";
+                    }
+                    assertEquals(expected, font.fitted(text, width),
+                            face + " label at width " + width + ": " + text);
+                }
+            }
+        }
+    }
 }
