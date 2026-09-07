@@ -8,8 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,14 +34,35 @@ class AppWindowTest {
     }
 
     @Test
-    @DisplayName("swapping screens keeps the same window")
-    void theWindowSurvivesAScreenChange() {
+    @DisplayName("swapping screens redraws the new screen inside the same window")
+    void theWindowSurvivesAScreenChange() throws Exception {
         AppWindow window = window();
         var frame = window.frame();
-        window.show(new JPanel());
-        window.show(new JPanel());
-        assertSame(frame, window.frame(), "the window must not be replaced");
-        assertTrue(frame.isDisplayable(), "the window must not be disposed");
+        CountDownLatch presented = new CountDownLatch(1);
+        JPanel next = new JPanel() {
+            @Override
+            public void paintImmediately(int x, int y, int width, int height) {
+                super.paintImmediately(x, y, width, height);
+                if (isShowing() && getWidth() > 0 && getHeight() > 0
+                        && x == 0 && y == 0 && width == getWidth() && height == getHeight()) {
+                    presented.countDown();
+                }
+            }
+        };
+        try {
+            SwingUtilities.invokeAndWait(() -> window.show(new JPanel()));
+            SwingUtilities.invokeAndWait(() -> window.show(next));
+            // A native frame repaint reached paintComponent but left the old
+            // End Scenario picture visible with the main menu already loaded.
+            // A full Swing component repaint recovered the live game, so the
+            // transition must reach that presentation path after layout.
+            assertTrue(presented.await(2, TimeUnit.SECONDS),
+                    "the new screen needs a full component repaint after it has a visible size");
+            assertSame(frame, window.frame(), "the window must not be replaced");
+            assertTrue(frame.isDisplayable(), "the window must not be disposed");
+        } finally {
+            SwingUtilities.invokeAndWait(frame::dispose);
+        }
     }
 
     @Test

@@ -67,11 +67,10 @@ final class AppWindow {
     /** Puts a screen up, keeping the window's size, place and full-screen state. */
     void show(JComponent content) {
         frame.setContentPane(content);
-        // revalidate and repaint rather than pack: packing would resize the
+        // Revalidate rather than pack: packing would resize the
         // window to the new screen's preferred size, which is the same
         // discourtesy as replacing it.
         frame.revalidate();
-        frame.repaint();
         if (!frame.isVisible()) {
             frame.setVisible(true);
         }
@@ -80,6 +79,14 @@ final class AppWindow {
         // does not leaves the frame holding the keyboard, which is where its
         // listener is.
         SwingUtilities.invokeLater(() -> {
+            if (frame.getContentPane() != content || !frame.isDisplayable()) {
+                return;
+            }
+            // A frame-only repaint left the old End Scenario picture visible
+            // even though the main menu was already loaded and painted. The
+            // same stale picture could survive a movie skip. Repaint the new
+            // Swing screen after layout so its buffer is presented as well.
+            content.repaint();
             if (!content.requestFocusInWindow()) {
                 frame.requestFocusInWindow();
             }
