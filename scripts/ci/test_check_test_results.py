@@ -31,7 +31,7 @@ class ResultsTest(unittest.TestCase):
         (self.root / 'baseline.txt').write_text('unsorted\tneither\tFixture#known\n')
 
     def run_gate(self):
-        summary = self.root / 'summary.md'
+        summary = self.root / 'step-summary'
         result = subprocess.run([
             sys.executable, str(HERE / 'check-test-results.py'), '--profile', 'data-free',
             '--repo-root', str(self.root), '--baseline', 'baseline.txt'],
