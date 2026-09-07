@@ -2412,7 +2412,6 @@ public final class Main {
                     screen.setStatus(status.message());
                 }
             }
-            screen.scrollStep();
             screen.cycleStep();
             screen.repaint();
         });

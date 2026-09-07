@@ -246,7 +246,7 @@ public final class RenderBenchmark {
             boolean right = movement[0]++ / 30 % 2 == 0;
             scene.screen().keyDown(java.awt.event.KeyEvent.VK_RIGHT, right);
             scene.screen().keyDown(java.awt.event.KeyEvent.VK_LEFT, !right);
-            scene.screen().scrollStep();
+            scene.screen().scrollStep(1.0 / 30);
             scene.screen().cycleStep();
             paint();
         });

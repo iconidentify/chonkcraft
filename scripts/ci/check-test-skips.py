@@ -192,7 +192,9 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The sealed-null-target and explicit-unit-target physical transaction
         # referees need the Human 1 retail mission and add two deliberate
         # data-free skips.
-        "desktop": (370, 270),
+        # Six scrolling checks and the menu scrolling check use the
+        # retail map and interface, and deliberately skip without game data.
+        "desktop": (377, 277),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on

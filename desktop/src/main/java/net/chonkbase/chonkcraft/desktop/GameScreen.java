@@ -41,7 +41,8 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
  */
 final class GameScreen extends JPanel {
 
-    private static final int SCROLL_PIXELS_PER_TICK = 8;
+    /** The existing eight pixels per 30 Hz cycle, independent of game speed. */
+    private static final int SCROLL_PIXELS_PER_SECOND = 240;
     private static final int TILE = 32;
     /** The native selection packet stores at most nine ordered unit slots. */
     private static final int MAX_SELECTED_UNITS = 9;
@@ -69,6 +70,15 @@ final class GameScreen extends JPanel {
     private final AtomicBoolean[] held = new AtomicBoolean[4];
     private volatile int cameraX;
     private volatile int cameraY;
+
+    /** Small camera steps on the event thread, alongside minimap dragging. */
+    private final javax.swing.Timer scrollTimer = new javax.swing.Timer(8,
+            event -> scrollFrame(System.nanoTime()));
+    private long lastScrollNanos;
+    private double scrollRemainderX;
+    private double scrollRemainderY;
+    private int scrollDirectionX;
+    private int scrollDirectionY;
 
     /** Which player the mouse commands. */
     private final int localPlayer;
@@ -4377,6 +4387,11 @@ final class GameScreen extends JPanel {
     }
 
     void keyDown(int keyCode, boolean down) {
+        // Account for time under the previous key state before changing it.
+        // Key repeats must neither add a step nor restart the scrolling clock.
+        if (isScrollKey(keyCode) && scrollTimer.isRunning()) {
+            scrollFrame(System.nanoTime());
+        }
         switch (keyCode) {
             case KeyEvent.VK_LEFT, KeyEvent.VK_A -> held[0].set(down);
             case KeyEvent.VK_RIGHT, KeyEvent.VK_D -> held[1].set(down);
@@ -4616,8 +4631,49 @@ final class GameScreen extends JPanel {
      */
     private static final int EDGE_MARGIN = 12;
 
-    /** Advances the camera. Called from the simulation loop. */
-    void scrollStep() {
+    private void clearScrolling() {
+        for (AtomicBoolean key : held) {
+            key.set(false);
+        }
+        scrollRemainderX = 0;
+        scrollRemainderY = 0;
+        scrollDirectionX = 0;
+        scrollDirectionY = 0;
+    }
+
+    private void scrollFrame(long now) {
+        double elapsedSeconds = (now - lastScrollNanos) / 1_000_000_000.0;
+        lastScrollNanos = now;
+        java.awt.Window window = javax.swing.SwingUtilities.getWindowAncestor(this);
+        if (!isShowing() || (window != null && !window.isFocused())) {
+            clearScrolling();
+            pointer = null;
+            return;
+        }
+        int beforeX = cameraX;
+        int beforeY = cameraY;
+        scrollStep(elapsedSeconds);
+        if (cameraX != beforeX || cameraY != beforeY) {
+            repaint();
+        }
+    }
+
+    /**
+     * Advances the local view using elapsed display time, including while the
+     * simulation is paused or waiting for a peer. The menu and chat own input
+     * while open. A stalled event thread catches up by at most 50 ms, so it
+     * cannot fling the camera across the map when it resumes.
+     *
+     * <p>Keyboard and edge scrolling used to jump eight pixels on each 30 Hz
+     * simulation cycle while minimap dragging moved directly on mouse events.
+     * Keeping fractional travel between display frames preserves the same
+     * speed with smaller, pixel-aligned steps and no acceleration delay.
+     */
+    void scrollStep(double elapsedSeconds) {
+        if ((menu != null && menu.isOpen()) || (chat != null && chat.isTyping())) {
+            clearScrolling();
+            return;
+        }
         // Ctrl-T pins the view to a unit, so the camera goes wherever it does
         // and the keys and the pointer are left for something else. A unit
         // that has died stops being followed rather than holding the camera
@@ -4631,8 +4687,8 @@ final class GameScreen extends JPanel {
                 return;
             }
         }
-        int dx = (held[1].get() ? SCROLL_PIXELS_PER_TICK : 0) - (held[0].get() ? SCROLL_PIXELS_PER_TICK : 0);
-        int dy = (held[3].get() ? SCROLL_PIXELS_PER_TICK : 0) - (held[2].get() ? SCROLL_PIXELS_PER_TICK : 0);
+        int dx = (held[1].get() ? 1 : 0) - (held[0].get() ? 1 : 0);
+        int dy = (held[3].get() ? 1 : 0) - (held[2].get() ? 1 : 0);
 
         // The pointer pushes the view when it reaches an edge, as it does in
         // the original. Suppressed while dragging a selection box, or the
@@ -4645,22 +4701,34 @@ final class GameScreen extends JPanel {
         java.awt.Point at = pointer;
         if (at != null && band == null && isShowing() && edgeScrollAllowed()) {
             if (at.x >= viewportX() && at.x < viewportX() + EDGE_MARGIN) {
-                dx = -SCROLL_PIXELS_PER_TICK;
+                dx = -1;
             } else if (at.x >= getWidth() - EDGE_MARGIN && at.x < getWidth()) {
-                dx = SCROLL_PIXELS_PER_TICK;
+                dx = 1;
             }
             if (at.y >= viewportY() && at.y < viewportY() + EDGE_MARGIN) {
-                dy = -SCROLL_PIXELS_PER_TICK;
+                dy = -1;
             } else if (at.y >= getHeight() - EDGE_MARGIN && at.y < getHeight()) {
-                dy = SCROLL_PIXELS_PER_TICK;
+                dy = 1;
             }
         }
 
-        if (dx == 0 && dy == 0) {
-            return;
+        if (dx != scrollDirectionX) {
+            scrollRemainderX = 0;
         }
-        cameraX = clamp(cameraX + dx, Math.max(0, terrain.getWidth() - visibleWorldWidth()));
-        cameraY = clamp(cameraY + dy, Math.max(0, terrain.getHeight() - visibleWorldHeight()));
+        if (dy != scrollDirectionY) {
+            scrollRemainderY = 0;
+        }
+        scrollDirectionX = dx;
+        scrollDirectionY = dy;
+        double distance = SCROLL_PIXELS_PER_SECOND * Math.max(0, Math.min(0.05, elapsedSeconds));
+        int maxX = Math.max(0, terrain.getWidth() - visibleWorldWidth());
+        int maxY = Math.max(0, terrain.getHeight() - visibleWorldHeight());
+        double x = cameraX + scrollRemainderX + dx * distance;
+        double y = cameraY + scrollRemainderY + dy * distance;
+        cameraX = clamp((int) Math.round(x), maxX);
+        cameraY = clamp((int) Math.round(y), maxY);
+        scrollRemainderX = x > 0 && x < maxX ? x - cameraX : 0;
+        scrollRemainderY = y > 0 && y < maxY ? y - cameraY : 0;
     }
 
     /**
@@ -4752,7 +4820,17 @@ final class GameScreen extends JPanel {
     }
 
     @Override
+    public void addNotify() {
+        super.addNotify();
+        lastScrollNanos = System.nanoTime();
+        scrollTimer.start();
+    }
+
+    @Override
     public void removeNotify() {
+        scrollTimer.stop();
+        clearScrolling();
+        pointer = null;
         terrainView.clear();
         sprites.clear();
         dimmedFog.flush();

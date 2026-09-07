@@ -179,6 +179,10 @@ class HotkeyBindingTest {
     }
 
     private static Scene scene() {
+        return scene(32);
+    }
+
+    private static Scene scene(int terrainSize) {
         GameData data = data();
         PudMap pud = data.campaignMap(MAP);
         Assumptions.assumeTrue(pud != null, "no campaign map available");
@@ -196,7 +200,7 @@ class HotkeyBindingTest {
         CommandApplier applier = new CommandApplier(world,
                 new ArrayList<>(data.unitTypes().types().values()));
         GameScreen screen = new GameScreen(world, data,
-                new BufferedImage(32, 32, BufferedImage.TYPE_INT_RGB), tileset.palette(),
+                new BufferedImage(terrainSize, terrainSize, BufferedImage.TYPE_INT_RGB), tileset.palette(),
                 tilesetName, 0, WIDTH, HEIGHT,
                 new net.chonkbase.chonkcraft.engine.sound.GameAudio(data.sounds()),
                 panel, null, applier, CommandSink.local(applier),
@@ -214,6 +218,32 @@ class HotkeyBindingTest {
                 | (alt ? InputEvent.ALT_DOWN_MASK : 0);
         screen.keyPressed(new KeyEvent(screen, KeyEvent.KEY_PRESSED,
                 System.currentTimeMillis(), mask, code, KeyEvent.CHAR_UNDEFINED));
+    }
+
+    @Test
+    @DisplayName("opening the menu stops a held arrow without restoring it on return")
+    void theMenuStopsHeldCameraMovement() {
+        Scene scene = scene(2048);
+        GameScreen screen = scene.screen();
+        screen.setGameScale(1);
+        screen.setEdgeScroll(GameScreen.EdgeScroll.NEVER);
+        screen.centreOn(20, 20);
+        int start = screen.cameraX();
+        press(screen, KeyEvent.VK_RIGHT, false, false);
+        screen.scrollStep(0.008);
+        assertTrue(screen.cameraX() > start, "the arrow must move the map before opening the menu");
+        press(screen, KeyEvent.VK_F10, false, false);
+        assertTrue(scene.menu().isOpen(), "F10 must open the menu over the map");
+        int stopped = screen.cameraX();
+        screen.scrollStep(0.05);
+        assertEquals(stopped, screen.cameraX(), "the camera must stand still behind the menu");
+        press(screen, KeyEvent.VK_ESCAPE, false, false);
+        assertFalse(scene.menu().isOpen(), "Escape must return to the game");
+        screen.scrollStep(0.008);
+        assertEquals(stopped, screen.cameraX(), "returning must not restore the old held arrow");
+        press(screen, KeyEvent.VK_RIGHT, false, false);
+        screen.scrollStep(0.008);
+        assertTrue(screen.cameraX() > stopped, "a fresh arrow press must scroll after closing the menu");
     }
 
     @Test
