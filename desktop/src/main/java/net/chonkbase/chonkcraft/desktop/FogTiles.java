@@ -80,6 +80,15 @@ public final class FogTiles {
         return levels;
     }
 
+    /** A whole square of fog, sharing the mask compositor's alpha rules. */
+    static BufferedImage full(int alpha) {
+        BufferedImage image = new BufferedImage(SIZE, SIZE, BufferedImage.TYPE_INT_ARGB);
+        int[] pixels = new int[SIZE * SIZE];
+        java.util.Arrays.fill(pixels, alpha << 24);
+        image.setRGB(0, 0, SIZE, SIZE, pixels, 0, SIZE);
+        return image;
+    }
+
     /**
      * One mask as black at a given alpha.
      *

@@ -47,7 +47,7 @@ final class SplashScreen extends JPanel {
     private final net.chonkbase.runtime.audio.PcmClip sound;
 
     /** The scaler's intermediate, kept so a resize does not reallocate it. */
-    private BufferedImage cache;
+    private PixelScaler.Cache cache;
 
     /**
      * @param seconds how long to stay up; zero waits for a key
@@ -115,6 +115,15 @@ final class SplashScreen extends JPanel {
         if (onFinished != null) {
             onFinished.run();
         }
+    }
+
+    @Override
+    public void removeNotify() {
+        if (cache != null) {
+            cache.flush();
+            cache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

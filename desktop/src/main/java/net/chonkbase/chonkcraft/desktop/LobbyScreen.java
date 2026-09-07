@@ -126,7 +126,10 @@ final class LobbyScreen extends JPanel {
     private boolean starting;
 
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
+    private record Picture(GameLobby.State state, String notice, boolean starting,
+            int holding, String serviceProblem) {}
+    private Picture painted;
 
     LobbyScreen(GameData data, GameLobby lobby, String mapName, Listener listener) {
         this(data, lobby, mapName, null, listener);
@@ -147,7 +150,7 @@ final class LobbyScreen extends JPanel {
     }
 
     /**
-     * Carries the conversation on and redraws.
+     * Carries the conversation on and redraws changed information.
      *
      * <p>Driven from outside rather than by a timer of its own, so the screen
      * has one clock and not two.
@@ -172,7 +175,16 @@ final class LobbyScreen extends JPanel {
             listener.onStart(lobby);
             return;
         }
-        repaint();
+        // Network polling stays at its own cadence. An unchanged roster used
+        // to repaint the entire window twenty times a second while waiting.
+        if (!picture(lobby.state()).equals(painted)) {
+            repaint();
+        }
+    }
+
+    private Picture picture(GameLobby.State state) {
+        return new Picture(state, notice, starting, holding,
+                online == null ? "" : online.serviceProblem());
     }
 
     private void installInput() {
@@ -303,6 +315,15 @@ final class LobbyScreen extends JPanel {
     // ---- drawing ------------------------------------------------------
 
     @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
+    }
+
+    @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         if (design == null) {
@@ -354,6 +375,7 @@ final class LobbyScreen extends JPanel {
 
         drawTable(g2, state);
         drawFoot(g2, state);
+        painted = picture(state);
     }
 
     private String lobbyHeading() {

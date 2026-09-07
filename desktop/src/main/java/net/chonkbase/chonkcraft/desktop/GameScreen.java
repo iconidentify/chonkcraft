@@ -547,13 +547,8 @@ final class GameScreen extends JPanel {
         }
     }
 
-    /**
-     * The visible part of the map, copied out at its own size.
-     *
-     * <p>Kept and reused rather than made each frame: it is viewport sized and
-     * allocating one a frame is work the collector then has to undo.
-     */
-    private BufferedImage terrainSlice;
+    /** Bounded terrain pictures, kept separate from unit animation frames. */
+    private final TerrainView terrainView = new TerrainView();
 
     /**
      * The tile sheet the ground was rasterised out of, and the tileset that
@@ -648,13 +643,13 @@ final class GameScreen extends JPanel {
             renderer.drawTile(groundScratch, 0, 0,
                     map.tileset().graphicFor(map.field(tileX, tileY).tile()));
             raster.setDataElements(left, top, TILE, TILE, groundScratch.pixels());
+            terrainView.invalidate(left, top, TILE, TILE);
         }
-        // A fresh view over the same pixels. The raster is shared, so the
-        // squares above are already in whatever the last cycle handed out --
-        // but that image may have an accelerated copy cached behind it, and a
-        // copy taken before the axe fell is exactly the picture this method
-        // exists to stop the player seeing.
+        // The changed pieces were invalidated above. Keep the shared raster
+        // paired with the current palette, without giving the full-map view
+        // a managed device copy of its own.
         cyclingTerrain = IndexedImage.recolour(terrain, cyclingPalette);
+        cyclingTerrain.setAccelerationPriority(0);
     }
 
     /** The tile sheet, loaded on first use, or null if it cannot be had. */
@@ -689,55 +684,14 @@ final class GameScreen extends JPanel {
         return PudMap.Tileset.valueOf(name.toUpperCase(java.util.Locale.ROOT));
     }
 
-    /**
-     * Draws the ground.
-     *
-     * <p>Not the whole map. The map is rasterised once into an image the size
-     * of the map -- four million pixels on a large one -- and colour cycling
-     * hands out a fresh view of it every few ticks with a new palette. At one
-     * to one that is a blit and costs nothing worth measuring. Under a zoom it
-     * is not: an indexed-colour image put through a scaling transform drops
-     * off the accelerated path onto the software loop, and the software loop
-     * reads every source pixel, including the nine tenths of the map that are
-     * not on the screen. That is why this appeared the day the zoom did.
-     *
-     * <p>So the visible rectangle is copied out at its own size first, which
-     * is a straight blit, and the copy is what gets scaled. The scaling then
-     * has a few hundred thousand pixels to think about instead of four
-     * million, and the copy is a plain RGB image, which is the kind the
-     * pipeline can accelerate.
-     */
+    /** Draws the current ground through bounded, reusable terrain pieces. */
     private void drawTerrain(Graphics2D g2) {
-        // Before the blit, not after: what is drawn this frame is the map as
-        // it is now, not as it was when it loaded.
         refreshChangedGround();
         BufferedImage ground = cyclingTerrain;
-        if (ground == null) {
-            return;
+        if (ground != null) {
+            terrainView.draw(g2, ground, cameraX, cameraY,
+                    visibleWorldWidth(), visibleWorldHeight());
         }
-        if (gameScale <= 1.0) {
-            // No transform to fall off, and the blit is already the fast path.
-            g2.drawImage(ground, -cameraX, -cameraY, null);
-            return;
-        }
-        int left = Math.max(0, Math.min(cameraX, ground.getWidth()));
-        int top = Math.max(0, Math.min(cameraY, ground.getHeight()));
-        int width = Math.min(visibleWorldWidth() + 1, ground.getWidth() - left);
-        int height = Math.min(visibleWorldHeight() + 1, ground.getHeight() - top);
-        if (width <= 0 || height <= 0) {
-            return;
-        }
-        if (terrainSlice == null || terrainSlice.getWidth() < width
-                || terrainSlice.getHeight() < height) {
-            terrainSlice = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
-        }
-        Graphics2D slice = terrainSlice.createGraphics();
-        slice.drawImage(ground, 0, 0, width, height,
-                left, top, left + width, top + height, null);
-        slice.dispose();
-        g2.drawImage(terrainSlice, left - cameraX, top - cameraY,
-                left - cameraX + width, top - cameraY + height,
-                0, 0, width, height, null);
     }
 
     /** Advances the animated palette. Called from the simulation loop. */
@@ -748,6 +702,7 @@ final class GameScreen extends JPanel {
         cyclingPalette = cyclingPalette.cycled(cyclingRanges);
         cyclingTerrain = net.chonkbase.chonkcraft.data.graphic.IndexedImage.recolour(
                 terrain, cyclingPalette);
+        cyclingTerrain.setAccelerationPriority(0);
     }
 
     /** The nine command slots, or null when the interface art is missing. */
@@ -923,6 +878,7 @@ final class GameScreen extends JPanel {
         this.cursors = GameCursors.load(data, race);
         this.cyclingRanges = cyclingRanges == null ? java.util.List.of() : cyclingRanges;
         this.cyclingPalette = palette;
+        terrain.setAccelerationPriority(0);
         this.cyclingTerrain = terrain;
         this.commandPanel = commandPanel;
         this.applier = applier;
@@ -4796,6 +4752,15 @@ final class GameScreen extends JPanel {
     }
 
     @Override
+    public void removeNotify() {
+        terrainView.clear();
+        sprites.clear();
+        dimmedFog.flush();
+        unseenFog.flush();
+        super.removeNotify();
+    }
+
+    @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
         frameCounter++;
@@ -5347,6 +5312,8 @@ final class GameScreen extends JPanel {
      * <p>Only the squares on screen are considered.
      */
     private void drawFog(Graphics2D g2) {
+        boolean deviceSurface = g2.getDeviceConfiguration().getDevice().getType()
+                == java.awt.GraphicsDevice.TYPE_RASTER_SCREEN;
         int fromX = Math.max(0, cameraX / TILE);
         int fromY = Math.max(0, cameraY / TILE);
         int toX = Math.min(world.map().width() - 1,
@@ -5385,8 +5352,7 @@ final class GameScreen extends JPanel {
                     // fringe to draw. Upstream fills it with the fog colour
                     // and does not consult the masks at all
                     // (DrawFullShroudOfFog at the unseen opacity).
-                    g2.setColor(unseenColour);
-                    g2.fillRect(left, top, TILE, TILE);
+                    drawFogSquare(g2, left, top, unseenFog, unseenColour, deviceSurface);
                     continue;
                 }
 
@@ -5394,8 +5360,7 @@ final class GameScreen extends JPanel {
                     // A tileset whose sheet had no masks in it. Squares are
                     // wrong but visible, which beats no fog at all.
                     if (visibility == FogOfWar.Visibility.EXPLORED) {
-                        g2.setColor(dimmedColour);
-                        g2.fillRect(left, top, TILE, TILE);
+                        drawFogSquare(g2, left, top, dimmedFog, dimmedColour, deviceSurface);
                     }
                     continue;
                 }
@@ -5413,13 +5378,25 @@ final class GameScreen extends JPanel {
                         g2.drawImage(fogTiles.explored(fogFrame), left, top, null);
                     }
                 } else {
-                    g2.setColor(dimmedColour);
-                    g2.fillRect(left, top, TILE, TILE);
+                    drawFogSquare(g2, left, top, dimmedFog, dimmedColour, deviceSurface);
                 }
                 if (blackFrame != 0) {
                     g2.drawImage(fogTiles.unseen(blackFrame), left, top, null);
                 }
             }
+        }
+    }
+
+    private static void drawFogSquare(Graphics2D g, int x, int y, BufferedImage image,
+            Color colour, boolean deviceSurface) {
+        // Device pipelines have a fast translucent rectangle primitive. The
+        // software paint pipe instead allocates a raster per square, so its
+        // equivalent immutable image saves megabytes of allocation per frame.
+        if (deviceSurface) {
+            g.setColor(colour);
+            g.fillRect(x, y, TILE, TILE);
+        } else {
+            g.drawImage(image, x, y, null);
         }
     }
 
@@ -5438,11 +5415,14 @@ final class GameScreen extends JPanel {
      * The veil over ground the player remembers but cannot currently see, and
      * the fill over ground never seen.
      *
-     * <p>Kept as colours rather than made per square: a screen of fog is
-     * several hundred squares and it is redrawn sixty times a second.
+     * <p>A translucent fillRect can allocate a paint raster for every square.
+     * Immutable tiles avoid that allocation in software; the device path
+     * keeps its faster filled rectangles. Both use the same alpha and coverage.
      */
     private Color dimmedColour = new Color(0, 0, 0, FogOfWarSettings.DEFAULT.explored());
     private Color unseenColour = new Color(0, 0, 0, FogOfWarSettings.DEFAULT.unseen());
+    private BufferedImage dimmedFog = FogTiles.full(FogOfWarSettings.DEFAULT.explored());
+    private BufferedImage unseenFog = FogTiles.full(FogOfWarSettings.DEFAULT.unseen());
 
     /**
      * Sets how dark the fog is.
@@ -5458,6 +5438,10 @@ final class GameScreen extends JPanel {
         fogOpacity = levels;
         dimmedColour = new Color(0, 0, 0, levels.explored());
         unseenColour = new Color(0, 0, 0, levels.unseen());
+        dimmedFog.flush();
+        unseenFog.flush();
+        dimmedFog = FogTiles.full(levels.explored());
+        unseenFog = FogTiles.full(levels.unseen());
     }
 
     /** How dark the fog is, for a test that wants to check the plumbing. */
@@ -6156,16 +6140,8 @@ final class GameScreen extends JPanel {
      * player because the same rectangle is a different picture for each side
      * once the colour ramp is swapped in.
      */
-    private final java.util.Map<SpriteKey, BufferedImage> sprites =
-            new java.util.LinkedHashMap<>(256, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(
-                        java.util.Map.Entry<SpriteKey, BufferedImage> eldest) {
-                    // Eight sides' worth of frames, since the player is part
-                    // of the key now.
-                    return size() > 3072;
-                }
-            };
+    private final ImageCache<SpriteKey> sprites =
+            new ImageCache<>(3072, 64L * 1024 * 1024);
 
     /**
      * What identifies one cut frame: which sheet, which rectangle, whose

@@ -192,7 +192,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The sealed-null-target and explicit-unit-target physical transaction
         # referees need the Human 1 retail mission and add two deliberate
         # data-free skips.
-        "desktop": (359, 270),
+        "desktop": (370, 270),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -238,7 +238,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "engine": (2034, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (359, 8),
+        "desktop": (370, 8),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that
@@ -253,7 +253,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "launcher": (49, 0),
         "matchmaking": (2, 0),
         "engine": (2034, 4),
-        "desktop": (359, 8),
+        "desktop": (370, 8),
         "matchmaker-server": (5, 1),
     },
     # The exact authenticated Battle.net Edition source archive, its matching
@@ -275,7 +275,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "launcher": (49, 0),
         "matchmaking": (2, 0),
         "engine": (2039, 12),
-        "desktop": (359, 6),
+        "desktop": (370, 6),
         "matchmaker-server": (5, 1),
     },
 }

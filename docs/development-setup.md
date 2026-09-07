@@ -358,6 +358,10 @@ rest. Java2D's software pipeline handles all of it headless. `MenuRenderSweepTes
 additionally writes PNGs to `desktop/target/menu-qa` as diagnostics for a human
 to look at; they are not what it asserts on.
 
+[Rendering performance](render-performance.md) documents the repeatable
+paint/allocation benchmark, display checks at 1x and 2x scale, and a bounded
+memory stress run. Software and device pipelines need separate measurements.
+
 Two places in main code guard the calls that genuinely throw without a display
 (`GameCursors` asking for a custom cursor size, `SidePanel` adding an
 `AWTEventListener`), so headless runs do not trip over them.
@@ -427,8 +431,9 @@ initialises, chosen by operating system:
 Override with `SEVEN_JAVA2D_PIPELINE=metal|opengl|xrender|d3d|software` or
 `-Dseven.java2d.pipeline=`. If the game renders wrongly or crashes in the
 driver on Linux, try `xrender` and then `software` before suspecting the port.
-**Verified by inspection** of `Java2DPipeline.defaultForOs`; the OpenGL default
-has not been exercised on Linux hardware.
+The defaults are verified by inspection of `Java2DPipeline.defaultForOs`.
+OpenGL rendering and memory stress have also been exercised on Linux/Asahi;
+see the [rendering measurements](render-performance.md).
 
 ### Fullscreen
 

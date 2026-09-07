@@ -70,6 +70,41 @@ class LobbyScreenTest {
     }
 
     @Test
+    @DisplayName("an idle lobby polls without redrawing until its roster changes")
+    void idlePollingDoesNotRedrawTheScreen() throws Exception {
+        try (GameLobby lobby = GameLobby.host("Host", "garden.pud", 8, 0)) {
+            LobbyScreen screen = new LobbyScreen(null, lobby, "garden.pud", new Recording());
+            screen.setSize(640, 480);
+            screen.render();
+            AtomicInteger repaints = new AtomicInteger();
+            javax.swing.RepaintManager previous = javax.swing.RepaintManager.currentManager(screen);
+            javax.swing.RepaintManager.setCurrentManager(new javax.swing.RepaintManager() {
+                @Override
+                public void addDirtyRegion(javax.swing.JComponent component,
+                        int x, int y, int width, int height) {
+                    if (component == screen) {
+                        repaints.incrementAndGet();
+                    }
+                }
+            });
+            try {
+                for (int tick = 0; tick < 5; tick++) {
+                    screen.tick();
+                }
+                assertEquals(0, repaints.get(), "unchanged network polls should not repaint the lobby");
+                lobby.setOccupant(1, GameLobby.Occupant.COMPUTER);
+                screen.tick();
+                assertEquals(1, repaints.get(), "a changed slot must be shown on the next poll");
+                screen.render();
+                screen.tick();
+                assertEquals(1, repaints.get(), "a painted roster should become idle again");
+            } finally {
+                javax.swing.RepaintManager.setCurrentManager(previous);
+            }
+        }
+    }
+
+    @Test
     @DisplayName("A direct build mismatch leaves the lobby through the launcher update action")
     void aDirectMismatchOffersQuitToUpdate() throws Exception {
         String previous = System.getProperty("chonkcraft.network.build");

@@ -83,7 +83,7 @@ final class JoinScreen extends JPanel {
     private String service = "Connecting to ChonkCraft...";
     private long lastRefresh;
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     private record Hit(Rectangle where, Runnable action) {
     }
@@ -216,6 +216,15 @@ final class JoinScreen extends JPanel {
     }
 
     static final int DEFAULT_PORT = 7100;
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
+    }
 
     @Override
     protected void paintComponent(Graphics graphics) {

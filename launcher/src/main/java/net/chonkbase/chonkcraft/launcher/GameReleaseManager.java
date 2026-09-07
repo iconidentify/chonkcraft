@@ -347,7 +347,8 @@ public final class GameReleaseManager {
                 isWindows() ? "java.exe" : "java");
         List<String> command = new ArrayList<>();
         command.add(java.toString());
-        command.add("-Xms256m");
+        // Small menus should not commit a quarter gigabyte before a match loads.
+        command.add("-Xms64m");
         command.add("-Xmx2048m");
         // The child identifies the exact verified game JAR it is executing,
         // not the launcher's independently packaged version. Multiplayer

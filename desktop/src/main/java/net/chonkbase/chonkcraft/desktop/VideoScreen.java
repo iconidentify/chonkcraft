@@ -33,7 +33,7 @@ final class VideoScreen extends JPanel {
     private final Timer timer;
 
     /** The intermediate the scaler works through, kept between frames. */
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     /** The soundtrack, once decoded, or null when there is none. */
     private final ScreenAudio track;
@@ -227,6 +227,15 @@ final class VideoScreen extends JPanel {
         // music: skipping means leaving, and leaving means silence.
         track.silence();
         onFinished.run();
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

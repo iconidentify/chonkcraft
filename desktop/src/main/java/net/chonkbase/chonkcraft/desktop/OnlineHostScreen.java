@@ -45,7 +45,7 @@ final class OnlineHostScreen extends JPanel {
     private boolean attemptPending;
     private Timer deadline;
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     private record Hit(Rectangle where, Runnable action) {
     }
@@ -158,6 +158,15 @@ final class OnlineHostScreen extends JPanel {
 
     String detailForTest() {
         return detail;
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

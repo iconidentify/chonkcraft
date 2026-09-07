@@ -182,7 +182,7 @@ final class ResultsScreen extends JPanel {
 
     private Rectangle continueBounds;
     private BufferedImage design;
-    private BufferedImage scaleCache;
+    private PixelScaler.Cache scaleCache;
 
     /**
      * @param score the figure the rank is read off: this mission's points plus
@@ -248,6 +248,15 @@ final class ResultsScreen extends JPanel {
                 }
             }
         });
+    }
+
+    @Override
+    public void removeNotify() {
+        if (scaleCache != null) {
+            scaleCache.flush();
+            scaleCache = null;
+        }
+        super.removeNotify();
     }
 
     @Override

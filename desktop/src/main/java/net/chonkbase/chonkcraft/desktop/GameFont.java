@@ -100,6 +100,8 @@ final class GameFont {
     private static Font regularBase;
     private static Font boldBase;
     private static boolean loadAttempted;
+    private static final java.util.EnumMap<Face, GameFont> FACES =
+            new java.util.EnumMap<>(Face.class);
 
     /**
      * Whether anything has had to fall back to a font off the machine.
@@ -114,6 +116,7 @@ final class GameFont {
     private static boolean fellBack;
 
     private final Font font;
+    private final FontMetrics metrics;
     private final int lineHeight;
     private final int ascent;
 
@@ -121,6 +124,18 @@ final class GameFont {
         this.font = font;
         this.ascent = extent.ascent();
         this.lineHeight = extent.height();
+        // Labels used to allocate a raster and graphics context on every
+        // measurement. Metrics belong to the face and its fixed text hints,
+        // so retain them without retaining a graphics context or a surface.
+        var scratch = new java.awt.image.BufferedImage(1, 1,
+                java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2 = scratch.createGraphics();
+        try {
+            applyHints(g2);
+            this.metrics = g2.getFontMetrics(font);
+        } finally {
+            g2.dispose();
+        }
     }
 
     /** What a face actually marks: where its ink starts and how tall it is. */
@@ -210,10 +225,12 @@ final class GameFont {
      * drawn in whatever the runtime has, and the fallback is a real font rather
      * than nothing.
      */
-    static GameFont load(net.chonkbase.chonkcraft.engine.GameData data, Face face) {
-        Font base = base(face.style == Font.BOLD);
-        Font sized = base.deriveFont(face.style, face.size);
-        return new GameFont(sized, measure(sized));
+    static synchronized GameFont load(net.chonkbase.chonkcraft.engine.GameData data, Face face) {
+        return FACES.computeIfAbsent(face, selected -> {
+            Font base = base(selected.style == Font.BOLD);
+            Font sized = base.deriveFont(selected.style, selected.size);
+            return new GameFont(sized, measure(sized));
+        });
     }
 
     /**
@@ -307,13 +324,7 @@ final class GameFont {
         if (text == null || text.isEmpty()) {
             return 0;
         }
-        java.awt.image.BufferedImage scratch =
-                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = scratch.createGraphics();
-        applyHints(g2);
-        int width = g2.getFontMetrics(font).stringWidth(text);
-        g2.dispose();
-        return width;
+        return metrics.stringWidth(text);
     }
 
     /**
@@ -331,28 +342,20 @@ final class GameFont {
         if (text == null || text.isEmpty()) {
             return "";
         }
-        java.awt.image.BufferedImage scratch =
-                new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = scratch.createGraphics();
-        try {
-            applyHints(g2);
-            FontMetrics metrics = g2.getFontMetrics(font);
-            if (metrics.stringWidth(text) <= width) {
-                return text;
-            }
-            String ellipsis = "...";
-            int room = width - metrics.stringWidth(ellipsis);
-            if (room <= 0) {
-                return "";
-            }
-            int end = text.length();
-            while (end > 0 && metrics.stringWidth(text.substring(0, end)) > room) {
-                end--;
-            }
-            return end == 0 ? "" : text.substring(0, end).stripTrailing() + ellipsis;
-        } finally {
-            g2.dispose();
+        if (metrics.stringWidth(text) <= width) {
+            return text;
         }
+        String ellipsis = "...";
+        int room = width - metrics.stringWidth(ellipsis);
+        if (room <= 0) {
+            return "";
+        }
+        int end = text.length();
+        char[] characters = text.toCharArray();
+        while (end > 0 && metrics.charsWidth(characters, 0, end) > room) {
+            end--;
+        }
+        return end == 0 ? "" : text.substring(0, end).stripTrailing() + ellipsis;
     }
 
     /**
