@@ -1,5 +1,8 @@
 # Gameplay Reliability Update
 
+- Fixed repeated Start clicks or holding Enter in a multiplayer lobby opening
+  several copies of the same match while the map loaded. Start now becomes
+  unavailable as soon as loading begins.
 - Fixed combat units occasionally accepting a move command and then stopping
   at the end of their previous attack step. Footmen, archers, siege engines
   and destroyers now finish the committed animation and continue to the new

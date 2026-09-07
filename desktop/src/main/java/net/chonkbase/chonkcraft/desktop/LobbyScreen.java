@@ -122,7 +122,7 @@ final class LobbyScreen extends JPanel {
     /** What went wrong, shown under the table. */
     private String notice = "";
 
-    /** The lobby has handed itself onward, so another frame must not do it again. */
+    /** The lobby has handed itself onward, so frames and input must not start another game. */
     private boolean starting;
 
     private BufferedImage design;
@@ -223,7 +223,10 @@ final class LobbyScreen extends JPanel {
     }
 
     private void begin() {
-        if (!lobby.isHost()) {
+        // The lobby stays visible while the map loads. Repeated clicks or
+        // Enter used to open another game each time over the same lobby;
+        // the joiner's tick guard did not protect the host's input path.
+        if (starting || !lobby.isHost()) {
             return;
         }
         GameLobby.State state = lobby.state();
@@ -505,9 +508,10 @@ final class LobbyScreen extends JPanel {
             boolean opposingTeams = state.gameTemplate() != GameLobby.GameTemplate.TEAMS
                     || state.hasValidMatchup()
                     || state.canInferComputerOpponents();
-            boolean canStart = state.canStart();
+            boolean canStart = !starting && state.canStart();
             button(g2, TABLE_X, FOOT_Y, 160, FOOT_HEIGHT,
-                    !enoughPlayers ? "Waiting for Players"
+                    starting ? "Starting..."
+                            : !enoughPlayers ? "Waiting for Players"
                             : !opposingTeams ? "Assign Opponents"
                             : state.allPlayersReady() ? "Start Game" : "Syncing Map...",
                     canStart ? this::begin : null);

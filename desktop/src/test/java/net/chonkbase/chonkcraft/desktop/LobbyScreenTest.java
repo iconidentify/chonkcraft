@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Rectangle;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.net.InetAddress;
 import java.nio.file.Files;
@@ -236,6 +237,54 @@ class LobbyScreenTest {
             assertEquals(1, lobby.state().slots().get(0).team());
             assertEquals(2, lobby.state().slots().get(1).team(),
                     "Start should put the computer on the opposing team");
+        }
+    }
+
+    @Test
+    @DisplayName("repeated start clicks open only one game while the map loads")
+    void aHostStartsOnceFromRepeatedClicks() throws Exception {
+        Recording heard = new Recording();
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, 0)) {
+            assertTrue(lobby.setOccupant(1, GameLobby.Occupant.COMPUTER),
+                    "the host needs a computer opponent before starting");
+            LobbyScreen screen = new LobbyScreen(null, lobby, "garden.pud", heard);
+            screen.render();
+
+            assertTrue(click(screen, LobbyScreen.startBounds()),
+                    "the ready host could not start the game");
+            // The old hit regions survive until the next paint, so disabling
+            // the next frame's button alone cannot prevent another loader.
+            click(screen, LobbyScreen.startBounds());
+            click(screen, LobbyScreen.startBounds());
+            assertEquals(1, heard.startedCount.get(),
+                    "repeated Start clicks opened several games over the same lobby");
+
+            screen.render();
+            assertFalse(click(screen, LobbyScreen.startBounds()),
+                    "Start stayed clickable while the first game was loading");
+        }
+    }
+
+    @Test
+    @DisplayName("holding enter opens only one game while the map loads")
+    void aHostStartsOnceFromRepeatedEnter() throws Exception {
+        Recording heard = new Recording();
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, 0)) {
+            assertTrue(lobby.setOccupant(1, GameLobby.Occupant.COMPUTER),
+                    "the host needs a computer opponent before starting");
+            LobbyScreen screen = new LobbyScreen(null, lobby, "garden.pud", heard);
+            screen.render();
+            KeyEvent enter = new KeyEvent(screen, KeyEvent.KEY_PRESSED, 0, 0,
+                    KeyEvent.VK_ENTER, '\n');
+            for (int repeat = 0; repeat < 3; repeat++) {
+                for (var listener : screen.getKeyListeners()) {
+                    listener.keyPressed(enter);
+                }
+                screen.tick();
+                screen.render();
+            }
+            assertEquals(1, heard.startedCount.get(),
+                    "Enter key repeat opened several games over the same lobby");
         }
     }
 
