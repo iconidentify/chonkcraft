@@ -753,7 +753,7 @@ public final class Unit {
     /** Cycles left of the death animation before the corpse is cleared. */
     private int deathTimer;
 
-    /** How much of {@link #heldResource} the worker is holding. */
+    /** Cargo amount, or unfinished chopping progress while working a tree. */
     private int carried;
 
     /** What the order told the worker to go and gather. */
@@ -761,14 +761,10 @@ public final class Unit {
 
     /**
      * What kind of load the worker actually has in hand, or {@code null} when
-     * empty-handed. Distinct from {@link #carrying}: a wood chopper reassigned
-     * to gold still holds its part-felled wood for the whole walk to the mine,
-     * and only loses it the moment gathering starts on the other resource.
-     *
-     * <p>Implements {@code CUnit::CurrentResource} in {@code src/unit/unit.h},
-     * which {@code COrder_Resource::StartGathering} compares against the
-     * order's own resource and, on a change, clears together with the load
-     *
+     * empty-handed. Distinct from {@link #carrying}: a completed load keeps
+     * its resource when a new gathering job is assigned. Unfinished chopping
+     * is work progress, not a completed load, and a new Harvest clears it.
+     * Native 0x436960 clears +0x74 while preserving the cargo bits in +0x75.
      */
     private UnitType.Resource heldResource;
 
@@ -2293,7 +2289,7 @@ public final class Unit {
         this.carried = carried;
     }
 
-    /** What the worker is carrying, or {@code null}. */
+    /** The resource selected by the current gathering job, or {@code null}. */
     public UnitType.Resource carrying() {
         return carrying;
     }
@@ -2305,6 +2301,27 @@ public final class Unit {
     /** What kind of load is actually in hand, or {@code null}. */
     public UnitType.Resource heldResource() {
         return heldResource;
+    }
+
+    /** The load's resource, with the job as a fallback for older saved workers. */
+    public UnitType.Resource cargoResource() {
+        return heldResource != null ? heldResource : carrying;
+    }
+
+    /**
+     * Whether harvesting has produced a load the worker can carry away.
+     *
+     * <p>While chopping, {@code carried} also counts work towards the load.
+     * BNE keeps that progress in +0x74 and sets cargo flag +0x75 & 0x20
+     * only when the work finishes. Partial chopping must not select a
+     * loaded sprite or prevent a new resource click.</p>
+     */
+    public boolean hasHarvestLoad() {
+        if (carried <= 0) return false;
+        if (cargoResource() != UnitType.Resource.WOOD || !gatherClockStarted
+                || chopDone || returningToDepot) return true;
+        ResourceInfo wood = type == null ? null : type.gathering().get(UnitType.Resource.WOOD);
+        return wood == null || carried >= wood.capacity();
     }
 
     public void setHeldResource(UnitType.Resource heldResource) {

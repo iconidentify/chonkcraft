@@ -120,7 +120,16 @@ final class BattleNetHarvestSystem {
             return false;
         }
         Unit.Order beforeHarvest = worker.order();
+        boolean unfinishedWood = world.battleNetSequence != null
+                && worker.carried() > 0 && !worker.hasHarvestLoad();
         if (orderHarvest(worker, tileX, tileY)) {
+            if (unfinishedWood) {
+                // 0x436960 clears the chop counter when the new job is
+                // accepted, even while the old animation drains. It used to
+                // survive as a partial cargo and could become a gold sprite.
+                worker.setCarried(0);
+                worker.setHeldResource(null);
+            }
             return true;
         }
         if (!worker.type().canGather() || !worker.isAlive()
@@ -132,12 +141,19 @@ final class BattleNetHarvestSystem {
             return false;
         }
         if (world.battleNetDepotReadyDispatching()) {
-            return queueDepotHarvest(worker, wood, null, tileX, tileY);
+            if (!queueDepotHarvest(worker, wood, null, tileX, tileY)) {
+                return false;
+            }
+        } else {
+            if (!beginHarvest(worker, wood, null, tileX, tileY)) {
+                return false;
+            }
+            worker.rememberActionBeforeQueued(beforeHarvest);
         }
-        if (!beginHarvest(worker, wood, null, tileX, tileY)) {
-            return false;
+        if (unfinishedWood) {
+            worker.setCarried(0);
+            worker.setHeldResource(null);
         }
-        worker.rememberActionBeforeQueued(beforeHarvest);
         return true;
     }
 
@@ -248,6 +264,8 @@ final class BattleNetHarvestSystem {
 
 
     boolean beginHarvest(Unit worker, ResourceInfo info, Unit building, int tileX, int tileY) {
+        worker.setBattleNetPlayerCommandMove(false);
+        worker.setBattleNetStopAfterLeftover(false);
         worker.setBattleNetResourceHitRestoreIdle(false);
         worker.setGatherClockStarted(false);
         worker.setBattleNetWoodReadyPathRequired(false);
@@ -336,6 +354,21 @@ final class BattleNetHarvestSystem {
 
     private void stepHarvest(Unit worker,
             boolean activeOrderIdleRandomAlreadyPaid) {
+        if (world.battleNetSequence != null && worker.isOnMap()
+                && worker.returningToDepot()
+                && (worker.battleNetPlayerCommandMove() || worker.battleNetStopAfterLeftover())) {
+            // cargo-switch-v2-gold-20260909 replaces the delivery on 250/251.
+            // Native drains only the committed step, promotes Move at 259,
+            // and first walks towards the clicked mine at 262. The return
+            // leg used to lay another depot route and ignore the new Move.
+            if (worker.battleNetOrderDelay() > 0) {
+                worker.setBattleNetOrderDelay(worker.battleNetOrderDelay() - 1);
+            } else {
+                world.movement.walkPixels(worker);
+                world.movement.finishLeftoverReplacement(worker);
+            }
+            return;
+        }
         ResourceInfo info = worker.type().gathering().get(worker.carrying());
         // Raw retail action 24 is the authoritative homeward oil state. Older
         // schema-2 saves persisted that action but not this navigation
@@ -1691,6 +1724,11 @@ final class BattleNetHarvestSystem {
 
     /** Moves a resource order into BNE's raw action 24 homeward substate. */
     private void beginReturnToDepot(Unit worker, ResourceInfo info) {
+        if (!worker.queuedReplacementPending()) {
+            // Completing a harvest owns this new delivery leg. A historical
+            // Move flag in a resumed chopper is not a pending player redirect.
+            worker.setBattleNetPlayerCommandMove(false);
+        }
         worker.setReturningToDepot(true);
         if (info.resource() == UnitType.Resource.OIL) {
             worker.setBattleNetDoubleStep(
@@ -4442,6 +4480,21 @@ final class BattleNetHarvestSystem {
         boolean depotReadyAssigned = depotReadyBoundary
                 && world.battleNetDepotUnitReady(worker);
 
+        // A person's gold loop crosses the same timed Still head as the
+        // computer's ready callback. BNE 2.02b action 26 sets Still at
+        // 0x4244de and timer 25 at 0x4245e8 even when it bypasses AI dispatch.
+        // Capture worker-normal-gold-20260909 surfaces peon 1594 on 544,
+        // promotes Harvest on 569 and first strides on 572. Restricting the
+        // head to computer workers used to start this next trip on 545 and
+        // credit the second load on 995 instead of 1022. Keep the remembered
+        // mine behind the same constructor without invoking a person's AI.
+        if (!depotReadyBoundary && world.battleNetSequence != null
+                && info.resource() == UnitType.Resource.GOLD && mine != null) {
+            worker.setReturningToDepot(false);
+            worker.setOrder(Unit.Order.STILL);
+            depotReadyBoundary = true;
+        }
+
         // The callback may deliberately keep the current resource job. It is
         // still stored as next action 23 behind the same timed Still head:
         // XHuman 8 peon 1501 surfaces at fixture 440 with timer 25 even though
@@ -4575,7 +4628,8 @@ final class BattleNetHarvestSystem {
         // stay on Harvest, walk straight back to the mine, and never
         // spend a ready marker on a farm: Human 11 player 4 kept 720
         // gold through 1399 while retail founded 72,12 and rewrote the
-        // land box. Player-issued resource orders keep their loop.
+        // land box. A person's gold loop retains its mine behind the same
+        // timed head; other player resource continuations keep their loop.
         boolean oilReadyBoundary = pauseOilForReadyDispatch(worker, info);
         if (oilReadyBoundary) {
             // An empty AI tanker retains its remembered platform as raw next

@@ -18995,6 +18995,8 @@ public final class World {
         // steal peasant 1536's authenticated value.
         unit.setOfferedTarget(null);
         unit.setOrder(Unit.Order.RETURN_GOODS);
+        unit.setBattleNetPlayerCommandMove(false);
+        unit.setBattleNetStopAfterLeftover(false);
         unit.setReturnDepotGoal(depot);
         if (!fromPlayer && before == Unit.Order.STILL
                 && battleNetSequence != null) {

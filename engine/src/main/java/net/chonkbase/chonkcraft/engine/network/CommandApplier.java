@@ -129,7 +129,7 @@ public final class CommandApplier {
         // the artillery type flag for Attack Ground. Refused recipients keep
         // their active order and waypoints, including shift-queued requests.
         if (command.kind() == GameCommand.Kind.RETURN_GOODS
-                && (unit.type() == null || !unit.type().canGather() || unit.carried() <= 0)) {
+                && (unit.type() == null || !unit.type().canGather() || !unit.hasHarvestLoad())) {
             return false;
         }
         if (command.kind() == GameCommand.Kind.ATTACK_GROUND

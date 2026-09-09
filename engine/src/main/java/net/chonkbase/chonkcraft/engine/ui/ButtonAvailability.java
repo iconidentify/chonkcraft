@@ -95,9 +95,10 @@ public final class ButtonAvailability implements ButtonSet.Availability {
             // Not the same question as whether it can attack: only a siege
             // engine can be told to hit a patch of ground with nothing on it.
             case "attack-ground" -> unit.type().groundAttack();
-            // Sending a full worker to harvest again would only make it walk.
-            case "harvest" -> unit.carrying() == null || unit.carried() < capacity();
-            case "return-goods" -> unit.carrying() != null && unit.carried() > 0;
+            // Chopping progress is not cargo. The old amount-only check
+            // offered Return Goods while the worker had nothing to deliver.
+            case "harvest" -> !unit.hasHarvestLoad();
+            case "return-goods" -> unit.cargoResource() != null && unit.hasHarvestLoad();
             // ChonkCraft calls SetTrainingQueue(true), so a busy building keeps
             // its train buttons and appends each paid job behind the current.
             case "train-unit" -> unit.trainingJobCount()
@@ -202,9 +203,4 @@ public final class ButtonAvailability implements ButtonSet.Availability {
         return unit.researching() == null && unit.producing() == null;
     }
 
-    /** How much of its current resource the unit can hold. */
-    private int capacity() {
-        var info = unit.carrying() == null ? null : unit.type().gathering().get(unit.carrying());
-        return info == null ? Integer.MAX_VALUE : info.capacity();
-    }
 }

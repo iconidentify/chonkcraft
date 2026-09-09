@@ -7,18 +7,20 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # A failed compile must not borrow a passing report from an earlier build.
 rm -f \
+  "${repo_root}/desktop/target/surefire-reports/TEST-net.chonkbase.chonkcraft.desktop.PlayerOrderDeliveryTest.xml" \
   "${repo_root}/desktop/target/surefire-reports/TEST-net.chonkbase.chonkcraft.desktop.ControlLivenessPlayabilityTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.Issue12OrderLivenessTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetMovingAttackReplacementRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerPatrolRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerAttackTargetRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerFollowRealDataTest.xml" \
+  "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerGoldLoopRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetChaseDestArmAfterAttackWaitRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetSettleStandAndFightRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetInPlaceFirstTakeRealDataTest.xml"
 
 "${repo_root}/scripts/run-tests.sh" -pl desktop -am \
-  '-Dtest=ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
+  '-Dtest=PlayerOrderDeliveryTest,ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetPlayerGoldLoopRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${repo_root}" <<'PY'
@@ -28,12 +30,14 @@ import xml.etree.ElementTree as ET
 
 root = Path(sys.argv[1])
 inventory = (
+    ("desktop", "PlayerOrderDeliveryTest", 13),
     ("desktop", "ControlLivenessPlayabilityTest", 2),
     ("engine", "Issue12OrderLivenessTest", 2),
     ("engine", "BattleNetMovingAttackReplacementRealDataTest", 9),
     ("engine", "BattleNetPlayerPatrolRealDataTest", 3),
     ("engine", "BattleNetPlayerAttackTargetRealDataTest", 1),
     ("engine", "BattleNetPlayerFollowRealDataTest", 6),
+    ("engine", "BattleNetPlayerGoldLoopRealDataTest", 3),
     ("engine", "BattleNetChaseDestArmAfterAttackWaitRealDataTest", 1),
     ("engine", "BattleNetSettleStandAndFightRealDataTest", 1),
     ("engine", "BattleNetInPlaceFirstTakeRealDataTest", 1),
@@ -50,7 +54,7 @@ for module, name, expected in inventory:
         raise SystemExit(
             f"{name}: expected {expected}/0/0/0 tests/skips/failures/errors, "
             f"got {'/'.join(map(str, counts))}")
-print("control-liveness inventory: 26 pass, 0 skipped")
+print("control-liveness inventory: 42 pass, 0 skipped")
 PY
 
 echo "control-liveness gate passed: 1/3/9-unit controls, redirects, combat and real UDP remained responsive"

@@ -38,7 +38,60 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-09 (player controls and shared multiplayer speed)
+## Current checkpoint -- 2026-09-09 (worker cargo and gold loops)
+
+Completed worker cargo is independent of the current harvesting job. BNE
+2.02b's `0x436960` clears unfinished chopping in +0x74; `0x43697e`
+preserves the load bits in +0x75 while changing the job. Loaded peons and
+peasants keep their wood or gold sheet and side-panel resource after a
+resource click. A loaded worker's default resource click is Move, while an
+empty worker receives Harvest. Return Goods requires a completed load.
+The group forest-click path follows the same eligibility rule.
+
+Fresh native handler captures cover alternating mine/tree clicks both during
+chopping and during a laden return. In Orc 1, gold remains loaded after tree
+and mine clicks at 250/251; Move promotes at 259 and first strides at 262.
+Java now preserves those boundaries and the gold through cycle 1,800. Four
+player-input tests cover both worker races, both cargo resources, unfinished
+chopping, delivery to a lumber mill and the interrupted gold return. All four
+fail against the preceding worker-loop candidate. Existing saved workers keep
+working: a stale Move flag is cleared when a newly completed harvest starts
+its delivery, while a pending player replacement still owns its interruption.
+
+A player's empty gold worker also keeps the depot-ready Still head before
+resuming its remembered mine. Native action 26 sets Still at `0x4244de` and
+timer 25 at `0x4245e8` even when it bypasses computer dispatch. The previous
+restriction to computer workers began the player's next trip at 545 instead
+of 572 and credited the second load at 995 instead of 1022.
+Six native captures cover ordinary Harvest, repeated Return Goods, a standing
+allied obstruction and its release, and an ally entering the planned route
+with and without a later release. Each runs 1,500 cycles. Five use actual
+right-click handler pairs; Return Goods also exercises the native dispatcher.
+The worker's tile, absolute pixels, HP, containment and gold bank agree over
+all six complete windows. Three regression tests additionally cover twelve
+save/load continuations and fail against the preceding published checkpoint.
+
+Release verification requires all 121 command cases, both 52-map idle gates,
+all 18 playability lanes and 42 control checks without skips. The pack-plus-Opus
+suite contains 3,037 tests, 90 existing failures, zero errors and 318 skips;
+data-free contains 3,037 tests, 88 existing failures, zero errors and 1,382
+skips. Failure identities remain unchanged. The command baseline preserves
+the four improved loaded-peon prefixes from the gold-loop correction.
+
+Evidence lives outside the checkout under
+`$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-worker-cargo-checkpoint/`.
+Native captures and the preceding gold-loop comparisons are retained under
+`20260909-attack-retarget/` and `20260909-player-worker-loops/` in that same
+private investigations directory. Public recipes and tests contain no retail
+fixture payloads.
+
+These observations do not establish complete resource or command parity.
+The loaded gold worker's blocked forest endpoint still differs by one tile,
+and complete wood-loop timing differs from retail's fifty-chop, full-load
+transition. The separate combat-replacement candidate remains unpublished
+because its broader command campaign regresses previously matching fields.
+
+## Published checkpoint -- 2026-09-09 (player controls and shared multiplayer speed)
 
 The player-control checkpoint `b554a0d` is integrated with multiplayer changes
 through `d5eb878`. The host selects the shared match speed, both random

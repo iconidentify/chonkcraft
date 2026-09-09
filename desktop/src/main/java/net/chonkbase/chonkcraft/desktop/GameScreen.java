@@ -1991,8 +1991,7 @@ final class GameScreen extends JPanel {
                     accepted |= commands.issueAccepted(
                             GameCommand.returnGoods(localPlayer, each.id()));
                 }
-                status = unit.carrying() == null ? "Nothing to return."
-                        : accepted ? ""
+                status = accepted ? "" : !unit.hasHarvestLoad() ? "Nothing to return."
                         : bne(BattleNetMessages.Key.NOWHERE_TO_RETURN);
             }
             case "stand-ground" -> {
@@ -3071,7 +3070,8 @@ final class GameScreen extends JPanel {
             // Harvest to 12,123 and 13,122 even though both are bare ground;
             // deciding again at those per-unit squares turned them into Move
             // and left the compact crew funnelling through one approach.
-            String said = under == null && world.canHarvestAt(unit, tileX, tileY)
+            String said = under == null && !unit.hasHarvestLoad()
+                    && world.canHarvestAt(unit, tileX, tileY)
                     ? issueStatus(GameCommand.harvest(
                             localPlayer, unit.id(), destX, destY)
                             .withQueued(keys.shift()))
@@ -3396,15 +3396,19 @@ final class GameScreen extends JPanel {
         // there, because a hall at full health declined the repair branch and
         // the worker fell through to move. Nothing said so and nothing looked
         // broken; the gold simply never arrived.
-        if (under != null && under != unit && unit.carrying() != null && unit.carried() > 0
-                && under.type() != null && under.type().storesResource(unit.carrying())
+        if (under != null && under != unit && unit.cargoResource() != null && unit.hasHarvestLoad()
+                && under.type() != null && under.type().storesResource(unit.cargoResource())
                 && (under.player() == unit.player()
                         || (world.isAllied(unit.player(), under.player())
                                 && world.isAllied(under.player(), unit.player())))) {
             return issueStatus(GameCommand.returnGoods(
                     localPlayer, unit.id()).withQueued(queued));
         }
-        if (world.canHarvestAt(unit, tileX, tileY)) {
+        // A laden worker's default click is delivery or movement. Native
+        // cargo-switch-v2-gold-20260909 keeps its gold flags 0xb8 and queues
+        // Move for both the tree click at 250 and the mine click at 251.
+        // Offering Harvest here used to change the job under the load.
+        if (!unit.hasHarvestLoad() && world.canHarvestAt(unit, tileX, tileY)) {
             return issueStatus(GameCommand.harvest(
                     localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
@@ -5230,7 +5234,9 @@ final class GameScreen extends JPanel {
      * from a naming convention two of the four workers do not follow.
      */
     private String workerSprite(Unit unit, UnitType type) {
-        return type.imageFileFor(tilesetName, unit.carrying(), unit.carried() > 0);
+        boolean loaded = unit.hasHarvestLoad();
+        return type.imageFileFor(tilesetName,
+                loaded ? unit.cargoResource() : unit.carrying(), loaded);
     }
 
     /** Height of the button panel art, which anchors the command grid. */

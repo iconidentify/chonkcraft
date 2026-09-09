@@ -67490,10 +67490,10 @@
         "1594": [
           600,
           600,
-          544,
-          544,
-          545,
-          545,
+          600,
+          600,
+          600,
+          600,
           600
         ],
         "1595": [
@@ -68908,15 +68908,15 @@
     "offset_y",
     "hit_points"
   ],
-  "game_sha256": "75284145088a75128b969ad732b11f7baca1472c874e3980ca72b126b74d1113",
+  "game_sha256": "3da4c53280c8fefe89597db942ae4d500a960f249c2d315fff29f115b0aba411",
   "schema": "chonkcraft-bne-command-campaign-baseline-1",
   "scope": "Every observed unit, seven physical fields, cycles 1 through each final command plus its settle tail. Per-command acceptance. Raw orders and all other world/UI fields are excluded.",
-  "sha256": "5dd0a034568ffaa21613db6454debfc53d73e0c3ff3b979747b5895d0011dcb3",
+  "sha256": "17ead92ca01ec4bd47ac7019b6efeb81723109dcd1fd803559e57c2eb18a532c",
   "source_engine": {
     "dirty": true,
-    "engine_input_sha256": "9dba820e41af66a60851ab5cd4e4b9745565bd6972c594a928d82f0f55b9feaf",
-    "head": "48bddf46090f696522fd404b5f81b0b96f77ad85",
-    "input_count": 801,
+    "engine_input_sha256": "f98ce6b7f8e34fc5907501fbf82f55bab231683f45e83d0b5be442a7677d73a8",
+    "head": "90f8c364744985203dcf838e82e5759a57ed98d9",
+    "input_count": 802,
     "policy": "engine-input-v2",
     "schema": 3
   }

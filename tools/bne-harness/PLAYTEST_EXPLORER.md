@@ -85,10 +85,12 @@ The campaign-map prefix sum remains 6,631, with 43/52 exact through 100 and
 The four added cases cover empty-worker and soldier Return Goods refusal,
 a loaded worker's repeated Return Goods, non-artillery Attack Ground refusal,
 and a legal catapult shot alongside refused ogre/worker requests. All 1,374
-acceptance decisions now agree with BNE, including nine refusals. Three of the
-four new cases match the commanded units throughout; the loaded worker first
-differs at cycle 545 on a later trip. Its first 100-gold deposit at cycle 394
-is checked separately against the native bank trace. These captures execute
+acceptance decisions now agree with BNE, including nine refusals. All four new cases now match the commanded units throughout; the loaded
+worker's four tile/pixel prefixes advance to the complete 600-cycle window
+after correcting its depot-exit pause. All eleven observed units in that case
+also remain exact. Its first 100-gold deposit at cycle 394 is checked
+separately against the native bank trace; six fresh 1,500-cycle captures cover
+the repeated loop and allied obstructions in the parity runbook. These captures execute
 individual recipients through the player dispatcher; pack-backed desktop
 tests separately exercise mixed selections and the actual button handlers.
 

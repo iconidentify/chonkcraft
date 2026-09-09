@@ -997,8 +997,8 @@ final class SidePanel {
         boolean caster = unit.isCaster() && type.mana() > 0;
         if (caster) {
             stats.add("Mana");
-        } else if (unit.carrying() != null && unit.carried() > 0) {
-            stats.add("Carry " + unit.carried() + " " + unit.carrying().name()
+        } else if (unit.cargoResource() != null && unit.hasHarvestLoad()) {
+            stats.add("Carry " + unit.carried() + " " + unit.cargoResource().name()
                     .toLowerCase(java.util.Locale.ROOT));
         }
 

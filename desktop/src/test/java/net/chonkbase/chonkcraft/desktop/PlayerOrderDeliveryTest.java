@@ -51,24 +51,88 @@ class PlayerOrderDeliveryTest {
         }
         World world = new World(map);
         data.configureWorld(world, PudMap.Tileset.FOREST);
-        world.fog().revealAll(0);
+        return scene(data, world, 0);
+    }
+
+    private static Scene scene(GameData data, World world, int person) {
+        world.fog().revealAll(person);
 
         CommandApplier applier = new CommandApplier(world,
                 new ArrayList<>(data.unitTypes().types().values()));
         data.configureCommands(applier);
         CommandPanel commandPanel = new CommandPanel(world, data, data.userInterface("summer"),
-                data.upgrades().dependencies(), 0, "summer", "human",
+                data.upgrades().dependencies(), person, "summer", "human",
                 data.unitTypes().types(), data.uiLayout("human", 800, 600));
         GameScreen screen = new GameScreen(world, data,
                 new BufferedImage(SIZE * Unit.TILE_PIXELS, SIZE * Unit.TILE_PIXELS,
                         BufferedImage.TYPE_INT_RGB),
-                data.loadTileset(PudMap.Tileset.FOREST).palette(), "summer", 0,
+                data.loadTileset(PudMap.Tileset.FOREST).palette(), "summer", person,
                 800, 600, new net.chonkbase.chonkcraft.engine.sound.GameAudio(data.sounds()),
                 null, commandPanel, applier, CommandSink.local(applier), List.of(), "human");
         screen.setSize(800, 600);
         screen.setLayout((net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout) null);
         screen.setGameScale(1);
         return new Scene(screen, world, data);
+    }
+
+    @Test
+    @DisplayName("a laden worker's resource clicks replace the delivery walk without converting its gold")
+    void aLadenWorkersResourceClicksReplaceTheDeliveryWalkWithoutConvertingItsGold() {
+        AssetSource source = AssetSource.fromEnvironment();
+        Assumptions.assumeTrue(source != null,
+                "No authenticated BNE asset pack configured (-Dchonkcraft.pack). ");
+        GameData data = new GameData(source);
+        String map = "campaigns/orc/level01o";
+        int person = GameData.personIn(data.campaignMap(map));
+        var mission = data.loadMission(map, person, 1);
+        Scene scene = scene(data, mission.world(), person);
+        Unit worker = mission.world().unitAt(25, 18);
+        Unit mine = mission.world().unitAt(26, 13);
+        assertNotNull(worker, "Orc 1 must provide the captured peon");
+        assertNotNull(mine, "Orc 1 must provide the captured gold mine");
+        mission.tick();
+        mission.tick();
+        scene.screen().selectForTest(worker);
+        for (int cycle = 1; cycle <= 1800; cycle++) {
+            if (cycle == 5 || cycle == 251) {
+                scene.screen().selectForTest(worker);
+                scene.screen().fieldRightClickForTest(26, 13, mine);
+            }
+            if (cycle == 250 || cycle == 270) {
+                scene.screen().selectForTest(worker);
+                scene.screen().fieldRightClickForTest(28, 18, null);
+            }
+            mission.tick();
+            if (cycle >= 249) {
+                assertEquals(100, worker.carried(), "the new route must retain the full gold load at " + cycle);
+                assertEquals(UnitType.Resource.GOLD, worker.heldResource(),
+                        "clicking trees cannot turn carried gold into wood at " + cycle);
+                assertEquals(1000, mission.world().player(person).get(UnitType.Resource.GOLD),
+                        "the cancelled delivery must not deposit gold at " + cycle);
+            }
+            // cargo-switch-v2-gold-20260909: the loaded c250/c251 clicks
+            // leave action 24 at c259, then start the new stride at c262.
+            if (cycle == 259) {
+                assertEquals(Unit.Order.MOVE, worker.order(),
+                        "Move must replace the delivery when its committed stride finishes");
+                assertEquals(List.of(24, 16, 768, 512),
+                        List.of(worker.tileX(), worker.tileY(), worker.pixelX(), worker.pixelY()),
+                        "the worker must finish the old stride before changing route");
+            }
+            if (cycle == 262) {
+                assertEquals(List.of(25, 15, 768, 512),
+                        List.of(worker.tileX(), worker.tileY(), worker.pixelX(), worker.pixelY()),
+                        "the new move must begin on the native constructor callback");
+            }
+        }
+        assertEquals(Unit.Order.STILL, worker.order(),
+                "the worker must finish the final move without restarting its cancelled delivery");
+        var orders = scene.screen().intentEntriesForTest().stream()
+                .filter(entry -> "order".equals(entry.event())).toList();
+        assertEquals(List.of(GameCommand.Kind.HARVEST, GameCommand.Kind.MOVE,
+                        GameCommand.Kind.MOVE, GameCommand.Kind.MOVE),
+                orders.stream().map(entry -> entry.command().kind()).toList(),
+                "native resource clicks choose Harvest only before the worker has a load");
     }
 
     private static Unit make(Scene scene, String ident, int player, int x, int y) {
@@ -85,6 +149,129 @@ class PlayerOrderDeliveryTest {
         }
         for (Unit unit : units) {
             unit.setSelected(true);
+        }
+    }
+
+    @Test
+    @DisplayName("switching a loaded worker between wood and gold preserves the load on screen")
+    void switchingALoadedWorkerBetweenWoodAndGoldPreservesTheLoadOnScreen() throws Exception {
+        for (String worker : List.of("peon", "peasant")) {
+            for (UnitType.Resource cargo : List.of(UnitType.Resource.WOOD, UnitType.Resource.GOLD)) {
+                Scene scene = scene();
+                Unit unit = make(scene, "unit-" + worker, 0, 5, 5);
+                Unit mine = make(scene, "unit-gold-mine", 15, 20, 5);
+                scene.world().map().field(20, 12).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+                unit.setCarrying(cargo == UnitType.Resource.WOOD
+                        ? UnitType.Resource.GOLD : UnitType.Resource.WOOD);
+                unit.setHeldResource(cargo);
+                unit.setCarried(100);
+                scene.screen().selectForTest(unit);
+                String race = worker.equals("peon") ? "orc" : "human";
+                String sprite = race + "/units/" + worker + "_with_"
+                        + (cargo == UnitType.Resource.WOOD ? "wood" : "gold") + ".png";
+                var drawSheet = GameScreen.class.getDeclaredMethod("workerSprite", Unit.class, UnitType.class);
+                drawSheet.setAccessible(true);
+                // BNE 0x43697e preserves the lower six cargo flag bits while
+                // replacing the gathering job in the upper two. The field
+                // used to select its loaded sheet from the new job instead.
+                for (int click = 0; click < 6; click++) {
+                    boolean gold = click % 2 == 0;
+                    scene.screen().fieldRightClickForTest(20, gold ? 5 : 12, gold ? mine : null);
+                    assertEquals(sprite, drawSheet.invoke(scene.screen(), unit, unit.type()),
+                            worker + " must keep displaying its original load after resource click " + click);
+                    assertEquals(100, unit.carried(), "a click cannot create or consume cargo");
+                    var available = new net.chonkbase.chonkcraft.engine.ui.ButtonAvailability(
+                            scene.world(), unit, null, false);
+                    var resourceButtons = scene.data().userInterface("summer").buttons().all().stream()
+                            .filter(button -> button.appliesTo(unit.type().ident()))
+                            .filter(button -> "return-goods".equals(button.action())).toList();
+                    assertEquals(1, resourceButtons.size(), "each worker race must define one delivery button");
+                    assertTrue(available.test(resourceButtons.getFirst()),
+                            "a loaded worker must retain its delivery command after a resource click");
+                }
+                var orders = scene.screen().intentEntriesForTest().stream()
+                        .filter(entry -> "order".equals(entry.event()))
+                        .toList();
+                assertEquals(6, orders.size(), "every resource click must produce one worker command");
+                for (var order : orders) {
+                    assertEquals(GameCommand.Kind.MOVE, order.command().kind(),
+                            "BNE moves a loaded worker on a resource click without assigning Harvest");
+                    assertTrue(order.accepted(), "the loaded worker must accept each resource click");
+                }
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("unfinished chopping cannot be delivered and a new harvesting job clears it")
+    void unfinishedChoppingCannotBeDeliveredAndANewHarvestingJobClearsIt() throws Exception {
+        for (String worker : List.of("peon", "peasant")) {
+            Scene scene = scene();
+            Unit unit = make(scene, "unit-" + worker, 0, 5, 5);
+            Unit mine = make(scene, "unit-gold-mine", 15, 20, 5);
+            scene.world().map().field(6, 5).setFlags(TileFlag.FOREST | TileFlag.UNPASSABLE);
+            scene.world().map().field(6, 5).setValue(100);
+            scene.screen().selectForTest(unit);
+            scene.screen().fieldRightClickForTest(6, 5, null);
+            for (int cycle = 0; cycle < 250 && unit.carried() == 0; cycle++) scene.world().tick();
+            assertTrue(unit.carried() > 0 && unit.carried() < 100,
+                    "the worker must have made chopping progress without completing a load");
+            var sprite = GameScreen.class.getDeclaredMethod("workerSprite", Unit.class, UnitType.class);
+            sprite.setAccessible(true);
+            String race = worker.equals("peon") ? "orc" : "human";
+            assertEquals(race + "/units/" + worker + ".png",
+                    sprite.invoke(scene.screen(), unit, unit.type()),
+                    "unfinished chopping must use the empty worker sheet");
+            var available = new net.chonkbase.chonkcraft.engine.ui.ButtonAvailability(
+                    scene.world(), unit, null, false);
+            var resourceButtons = scene.data().userInterface("summer").buttons().all().stream()
+                    .filter(button -> button.appliesTo(unit.type().ident()))
+                    .filter(button -> "return-goods".equals(button.action())).toList();
+            assertEquals(1, resourceButtons.size(), "each worker race must define one delivery button");
+            assertFalse(available.test(resourceButtons.getFirst()),
+                    "unfinished chopping must not offer a delivery command that will be refused");
+            CommandApplier applier = new CommandApplier(scene.world(),
+                    new ArrayList<>(scene.data().unitTypes().types().values()));
+            scene.data().configureCommands(applier);
+            Unit.PendingOrderState pending = unit.snapshotPendingOrders();
+            assertFalse(applier.apply(GameCommand.returnGoods(0, unit.id())),
+                    "native Return Goods requires a completed load, not chopping progress");
+            assertEquals(pending, unit.snapshotPendingOrders(),
+                    "the refused return must preserve the worker's harvesting order");
+            scene.screen().fieldRightClickForTest(mine.tileX(), mine.tileY(), mine);
+            assertEquals(0, unit.carried(),
+                    "native 0x436960 clears unfinished chopping when the new Harvest is accepted");
+            var orders = scene.screen().intentEntriesForTest().stream()
+                    .filter(entry -> "order".equals(entry.event())).toList();
+            assertEquals(2, orders.size(), "both empty worker resource clicks must issue a command");
+            assertEquals(GameCommand.Kind.HARVEST, orders.getLast().command().kind(),
+                    "a worker without a completed load must accept the new mining job");
+        }
+    }
+
+    @Test
+    @DisplayName("a wood carrier reassigned to gold can still deliver wood to a lumber mill")
+    void aWoodCarrierReassignedToGoldCanStillDeliverWoodToALumberMill() {
+        for (String worker : List.of("peon", "peasant")) {
+            Scene scene = scene();
+            Unit unit = make(scene, "unit-" + worker, 0, 5, 5);
+            Unit mine = make(scene, "unit-gold-mine", 15, 20, 5);
+            Unit mill = make(scene, worker.equals("peon")
+                    ? "unit-troll-lumber-mill" : "unit-elven-lumber-mill", 0, 5, 12);
+            unit.setCarrying(UnitType.Resource.WOOD);
+            unit.setHeldResource(UnitType.Resource.WOOD);
+            unit.setCarried(100);
+            scene.screen().selectForTest(unit);
+            int wood = scene.world().player(0).get(UnitType.Resource.WOOD);
+            int gold = scene.world().player(0).get(UnitType.Resource.GOLD);
+            scene.screen().fieldRightClickForTest(mine.tileX(), mine.tileY(), mine);
+            scene.screen().fieldRightClickForTest(mill.tileX(), mill.tileY(), mill);
+            for (int cycle = 0; cycle < 900 && unit.carried() > 0; cycle++) scene.world().tick();
+            assertEquals(0, unit.carried(), "the lumber mill click must complete a delivery");
+            assertEquals(wood + 100, scene.world().player(0).get(UnitType.Resource.WOOD),
+                    "the reassigned worker must bank its original wood exactly once");
+            assertEquals(gold, scene.world().player(0).get(UnitType.Resource.GOLD),
+                    "switching the worker's job must never turn delivered wood into gold");
         }
     }
 

@@ -8,7 +8,7 @@ load from an authenticated ChonkPack built from the player's original media.
 Player orders now retain committed native movement before their replacements
 start. The current controls include the issue-12 stall fixes, consumed and
 superseded Stop handling, Patrol combat and return timing, Repair approach
-construction, explicit Attack target retention and Patrol save/load state.
+construction, verified Attack target-retention cases and Patrol save/load state.
 Follow redirects and repeated clicks retain their native movement and waiting
 state across save/load. Melee pursuit resumes on the verified attack boundary;
 wall clicks and mixed-selection Return Goods/Attack Ground enforce the native
@@ -47,7 +47,7 @@ refusals. The current evidence and reproduction workflow are in
 ## Playability and release verification
 
 All 18 playability lanes pass with their required authenticated inputs,
-including the 26-test control gate, 117 movement checks, 65 projectile
+including the 42-test control gate, 117 movement checks, 65 projectile
 checks, 42 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
@@ -56,14 +56,17 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,030 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,037 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,375 skips.
+has the same 88 expected failure identities and exactly 1,382 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 27-skip profile. Coverage rules are documented in
 [the development setup](docs/development-setup.md) and [CI guide](docs/ci.md).
 
+Workers keep their completed cargo when redirected between mines and trees.
+Unfinished chopping is cleared by a new harvesting job, and the gold loop
+retains the native depot-exit pause.
 Production game updates are published from `master`. The
 [signed update catalog](https://updates.chonkbase.net/latest.properties) is
 the authority for the current public version. Publication verifies installation
@@ -72,6 +75,10 @@ endpoint. The source checkpoint is retained in Git for comparison.
 
 ## Remaining fidelity work
 
+- Combat replacements still have an active playability defect: some units
+  continue attacking an old structure after accepting a replacement. Native
+  captures expose both the release boundary and target retention. The wider
+  candidate is withheld because it regresses command-campaign comparisons.
 - Exact everyday controls need broader coverage: group Follow redirects,
   queued orders, modifiers, congestion and visible-target attacks. Eight new
   authenticated handler pairs cover Follow and combat, but the 532-cell
@@ -80,8 +87,12 @@ endpoint. The source checkpoint is retained in Git for comparison.
 - Explicit Attack retains its quarry but later route refills still differ.
   Worker coverage must follow containment through resource return and credit;
   approach agreement alone does not certify the economic loop. Return Goods
-  eligibility now agrees with BNE; the loaded-worker case deposits correctly
-  but first differs on its next trip at cycle 545.
+  eligibility and the player gold-loop depot exit now agree with BNE. Six
+  fresh 1,500-cycle cases cover repeated credit and standing or moving allies
+  obstructing the route. Wood, oil, depleted resources and denser congestion
+  still need the same complete-loop coverage. Loaded resource clicks and
+  interrupted chopping now have native witnesses; complete wood-loop timing
+  and blocked forest destinations still differ.
 - Native handler probes do not establish operating-system hit-testing or
   actual sound playback. A distant siege-target probe requires visibility
   validation before it can represent an ordinary player click.
