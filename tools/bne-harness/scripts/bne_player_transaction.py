@@ -1597,120 +1597,103 @@ def _native_capture(directory: Path) -> dict[str, Any]:
 
 
 def _derive_java_scenario(native: dict[str, Any]) -> dict[str, Any]:
-    manifest = native["manifest"]
-    receipt = native["receipt"]
+    manifest, receipt = native["manifest"], native["receipt"]
     try:
         command_text = native["commands_bytes"].decode("utf-8")
     except UnicodeDecodeError as error:
         raise ProofError("physical command script is not UTF-8") from error
-    selects: list[int] = []
-    issue_cycle: int | None = None
-    click: tuple[int, int, int | None] | None = None
+    selected: list[int] = []
+    selection_cycle = None
+    previous_cycle = 0
+    clicks = []
     action_lines = []
     for raw in command_text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         action_lines.append(line)
-        selected = re.fullmatch(r"cycle (\d+) select unit (\d+)", line)
-        clicked = re.fullmatch(
+        selection = re.fullmatch(r"cycle (\d+) select unit (\d+)", line)
+        click = re.fullmatch(
             r"cycle (\d+) ui-right-click x (-?\d+) y (-?\d+)"
             r"(?: target (\d+))?", line)
-        if selected:
-            cycle, unit = int(selected.group(1)), int(selected.group(2))
-            if issue_cycle not in (None, cycle) or click is not None \
-                    or unit in selects:
+        if selection:
+            cycle, unit = int(selection.group(1)), int(selection.group(2))
+            if selection_cycle != cycle:
+                selected = []
+                selection_cycle = cycle
+            if unit in selected:
                 raise ProofError("physical selection script is ambiguous")
-            issue_cycle = cycle
-            selects.append(unit)
-        elif clicked:
-            cycle = int(clicked.group(1))
-            if issue_cycle not in (None, cycle) or click is not None:
-                raise ProofError("physical click script is ambiguous")
-            issue_cycle = cycle
-            click = (int(clicked.group(2)), int(clicked.group(3)),
-                     (int(clicked.group(4))
-                      if clicked.group(4) is not None else None))
+            selected.append(unit)
+        elif click:
+            cycle = int(click.group(1))
+            clicks.append((cycle, list(selected), int(click.group(2)),
+                           int(click.group(3)), int(click.group(4))
+                           if click.group(4) is not None else None))
         else:
-            raise ProofError(
-                f"unsupported physical command cannot become Java proof: {line}")
-    command_count = ((manifest.get("run") or {}).get("commands") or {}).get(
-        "count")
-    if not selects or click is None or issue_cycle is None \
-            or command_count != len(action_lines):
+            raise ProofError(f"unsupported physical command cannot become Java proof: {line}")
+        if cycle < previous_cycle or cycle < 1:
+            raise ProofError("physical command cycles are not ordered")
+        previous_cycle = cycle
+    run = manifest.get("run") or {}
+    if (run.get("commands") or {}).get("count") != len(action_lines) or not clicks:
         raise ProofError("physical command script has no closed select/click route")
     transactions = receipt.get("transactions") or []
-    if len(transactions) != 1:
-        raise ProofError("physical proof scenario must contain one transaction")
-    transaction = transactions[0]
-    gesture = transaction.get("gesture") or {}
-    decision = transaction.get("decision") or {}
-    expected_gesture = {
-        "origin": "field", "detail": "right-click", "modifiers": "plain",
-        "tile_x": click[0], "tile_y": click[1],
-        "selected_unit_ids": selects,
-    }
-    if any(gesture.get(key) != value for key, value in expected_gesture.items()) \
-            or decision.get("family") != "move" \
-            or decision.get("accepted") is not True \
-            or decision.get("queued") is not False:
-        raise ProofError("sealed commands disagree with the physical transaction")
-    commands = transaction.get("commands") or []
-    if [item.get("unit_id") for item in commands] != selects:
-        raise ProofError("sealed selection order disagrees with native fan-out")
-    identities = {
-        int(item["local_id"]): item["identity"]
-        for item in ((receipt.get("unit_identities") or {}).get("units") or [])
-    }
-    if set(selects) - set(identities):
-        raise ProofError("sealed selection omits native unit identities")
-    target_native_id = click[2]
-    command_targets = {item.get("target_id") for item in commands}
-    if command_targets != {target_native_id}:
-        raise ProofError("sealed target disagrees with native fan-out")
-    target = None
-    if target_native_id is not None:
-        if target_native_id not in identities:
-            raise ProofError("sealed target omits its native unit identity")
-        identity = identities[target_native_id]
-        target = {
-            "native_id": target_native_id,
-            "player": int(identity["owner"]),
-            "x": int(identity["x"]),
-            "y": int(identity["y"]),
-        }
-    run = manifest.get("run") or {}
-    scenario = run.get("requested_scenario")
-    seed = run.get("initialization_seed")
-    cycles = run.get("cycle_limit")
+    if len(transactions) != len(clicks):
+        raise ProofError("physical script and receipt transaction counts disagree")
+    identities = {}
+    for item in ((receipt.get("unit_identities") or {}).get("units") or []):
+        identity = item["identity"]
+        if item.get("generation") != 0 or identity.get("origin") != "initial":
+            raise ProofError("physical replay requires an initial unit lifetime")
+        unit = int(item["local_id"])
+        if unit in identities:
+            raise ProofError("physical replay repeats an initial unit identity")
+        identities[unit] = identity
+
+    def locator(unit: int) -> dict[str, int]:
+        if unit not in identities:
+            raise ProofError("sealed target or selection omits its native unit identity")
+        identity = identities[unit]
+        return {"native_id": unit, "player": int(identity["owner"]),
+                "x": int(identity["x"]), "y": int(identity["y"])}
+
+    steps = []
+    for (cycle, selects, x, y, target_id), transaction in zip(clicks, transactions):
+        gesture = transaction.get("gesture") or {}
+        decision = transaction.get("decision") or {}
+        expected = {"origin": "field", "detail": "right-click", "modifiers": "plain",
+                    "tile_x": x, "tile_y": y, "selected_unit_ids": selects}
+        if not selects or any(gesture.get(key) != value for key, value in expected.items()) \
+                or decision.get("accepted") is not True \
+                or decision.get("queued") is not False:
+            raise ProofError("sealed commands disagree with the physical transaction")
+        commands = transaction.get("commands") or []
+        if [item.get("unit_id") for item in commands] != selects:
+            raise ProofError("sealed selection order disagrees with native fan-out")
+        if {item.get("target_id") for item in commands} != {target_id}:
+            raise ProofError("sealed target disagrees with native fan-out")
+        steps.append({
+            "select": [locator(unit) for unit in selects],
+            "gesture": {"origin": "field", "detail": "right-click", "tile_x": x,
+                        "tile_y": y, "modifiers": "plain", "target_native_id": target_id},
+            "target": None if target_id is None else locator(target_id),
+            "issue_cycle": cycle,
+        })
+    scenario, seed, cycles = (run.get("requested_scenario"),
+                              run.get("initialization_seed"), run.get("cycle_limit"))
     if not isinstance(scenario, str) or not isinstance(seed, int) \
-            or not isinstance(cycles, int) or cycles < issue_cycle:
+            or not isinstance(cycles, int) or cycles < steps[-1]["issue_cycle"]:
         raise ProofError("native manifest has no executable scenario closure")
-    return {
-        "schema": "chonkcraft-bne-physical-scenario-1",
-        "setup": {
-            "scenario": scenario, "seed": seed,
-            "java_map": bne_java.scenario_to_java_map(scenario),
-        },
-        "select": [{
-            "native_id": unit,
-            "player": int(identities[unit]["owner"]),
-            "x": int(identities[unit]["x"]),
-            "y": int(identities[unit]["y"]),
-        } for unit in selects],
-        "gesture": {
-            "origin": "field", "detail": "right-click",
-            "tile_x": click[0], "tile_y": click[1], "modifiers": "plain",
-            # Preserve the exact third argument passed to retail
-            # DoRightButton. A missing target must stay null rather than
-            # becoming Java tile lookup, while a sealed target must resolve
-            # through its independently observed initial-unit identity.
-            "target_native_id": target_native_id,
-        },
-        "target": target,
-        "issue_cycle": issue_cycle,
-        "cycles": cycles,
-    }
+    result = {"schema": "chonkcraft-bne-physical-scenario-1",
+              "setup": {"scenario": scenario, "seed": seed,
+                        "java_map": bne_java.scenario_to_java_map(scenario)},
+              "cycles": cycles}
+    # Keep the single-gesture format stable for retained proof stores.
+    if len(steps) == 1:
+        result.update(steps[0])
+    else:
+        result["transactions"] = steps
+    return result
 
 
 JavaEmitter = Callable[[Path, dict[str, Any], Path, Path, Path, str, str, str], None]

@@ -18,6 +18,37 @@ import org.junit.jupiter.api.Test;
 class BnePlaytestAdapterTest {
 
     @Test
+    @DisplayName("actors rescued on the first native frame are paired after that transfer")
+    void actorsRescuedOnTheFirstNativeFrameArePairedAfterThatTransfer() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "the BNE asset pack must be available");
+        Path directory = Files.createTempDirectory("bne-playtest-rescue-");
+        Path scenario = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        Map<String, Object> input = Map.of(
+                "schema", "chonkcraft-bne-playtest-scenario-1",
+                "scenario_sha256", "a".repeat(64),
+                "seed_identity", Map.of("fixture", "xorc10-player-commands"),
+                "setup", Map.of("kind", "sealed-fixture", "java_map",
+                        "campaigns/orc-exp/levelx10o", "seed", 1),
+                "settle_cycles", 80,
+                "actors", List.of(Map.of("id", 1571, "player", 5,
+                        "x", 5, "y", 5, "domain", "land",
+                        "capabilities", List.of("move"))),
+                "targets", List.of(),
+                "commands", List.of(Map.of("kind", "move", "unit_id", 1571,
+                        "x", 9, "y", 5, "queued", false, "issue_cycle", 5)));
+        Files.writeString(scenario, Json.write(input));
+        BnePlaytestAdapter.main(new String[] {"--scenario", scenario.toString(),
+                "--output", output.toString(), "--build-sha256", "b".repeat(64)});
+        Map<?, ?> result = Json.parseObject(Files.readString(output));
+        Map<?, ?> order = (Map<?, ?>) ((List<?>) result.get("observations")).getFirst();
+        assertEquals(Boolean.TRUE, order.get("accepted"));
+        assertNotNull(order.get("first_progress_cycle"),
+                "the transferred knight must respond to its new owner's command");
+    }
+
+    @Test
     @DisplayName("an authenticated orc-1 peon move is issued through command applier")
     void anAuthenticatedOrc1PeonMoveIsIssuedThroughCommandApplier() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
@@ -82,8 +113,8 @@ class BnePlaytestAdapterTest {
     }
 
     @Test
-    @DisplayName("the native injector rejects a human 1 owner outside local slot zero")
-    void theNativeInjectorRejectsAHuman1OwnerOutsideLocalSlotZero() throws Exception {
+    @DisplayName("human campaign clicks command the player shown in the game")
+    void humanCampaignClicksCommandThePlayerShownInTheGame() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
                 "No Warcraft II installation configured (-Dwc2.install.dir). ");
         Path directory = Files.createTempDirectory("bne-playtest-human01-");
@@ -128,10 +159,43 @@ class BnePlaytestAdapterTest {
         List<?> observations = (List<?>) result.get("observations");
         assertEquals(1, observations.size(), "the footman order must be observed");
         Map<?, ?> observation = (Map<?, ?>) observations.getFirst();
-        assertEquals(Boolean.FALSE, observation.get("accepted"),
-                "the fixture injector guards GiveOrder with BNE local slot zero");
-        assertEquals("rejected", observation.get("terminal_reason"),
-                "an out-of-slot fixture command is a refusal, not no-progress");
+        assertEquals(Boolean.TRUE, observation.get("accepted"),
+                "BNE UI GiveOrder belongs to the campaign's human player 1");
+        assertNotNull(observation.get("first_progress_cycle"),
+                "the human footman must visibly start its accepted Move");
+    }
+
+    @Test
+    @DisplayName("a worker inside its depot is alive in the cycle observations")
+    void workerInsideItsDepotIsAliveInTheCycleObservations() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "the BNE asset pack must be available");
+        Path directory = Files.createTempDirectory("bne-playtest-contained-");
+        Path input = directory.resolve("scenario.json");
+        Path output = directory.resolve("result.json");
+        Map<String, Object> scenario = Map.of(
+                "schema", "chonkcraft-bne-playtest-scenario-1",
+                "scenario_sha256", "f".repeat(64),
+                "setup", Map.of("scenario", "Campaign\\Human\\Human01.pud", "seed", 1),
+                "actors", List.of(Map.of("id", 1596, "player", 1, "x", 14, "y", 9)),
+                "targets", List.of(),
+                "settle_cycles", 120,
+                "combat_observation", Map.of("unit_ids", List.of(1596)),
+                "commands", List.of(Map.of("kind", "return-goods", "unit_id", 1596,
+                        "issue_cycle", 5, "queued", false)));
+        Files.writeString(input, Json.write(scenario));
+        BnePlaytestAdapter.main(new String[] {"--scenario", input.toString(),
+                "--output", output.toString(), "--build-sha256", "b".repeat(64)});
+        Map<String, Object> result = Json.parseObject(Files.readString(output));
+        List<?> events = (List<?>) result.get("events");
+        List<?> contained = events.stream().filter(value -> value instanceof Map<?, ?> event
+                && "combat-state".equals(event.get("kind"))
+                && Boolean.FALSE.equals(event.get("on_map"))).toList();
+        assertTrue(!contained.isEmpty(), "the return must take the worker into its depot");
+        for (Object value : contained) {
+            assertEquals(Boolean.TRUE, ((Map<?, ?>) value).get("alive"),
+                    "a contained worker must not be counted as a combat death");
+        }
     }
 
     @Test
@@ -151,6 +215,7 @@ class BnePlaytestAdapterTest {
                   "setup": {
                     "kind": "sealed-fixture",
                     "scenario": "Campaign\\\\Human\\\\Human13.pud",
+                    "command_player": 0,
                     "seed": 1
                   },
                   "pattern": "single",
@@ -204,6 +269,7 @@ class BnePlaytestAdapterTest {
                   "setup": {
                     "kind": "sealed-fixture",
                     "scenario": "Campaign\\\\Human\\\\Human13.pud",
+                    "command_player": 0,
                     "seed": 1
                   },
                   "pattern": "single",

@@ -1487,7 +1487,8 @@ final class BattleNetIdleSystem {
                     if (unit.hasQueuedOrders()
                             && unit.battleNetOrderDelay() == 1) {
                         Unit.QueuedOrder next = unit.queuedOrders().getFirst();
-                        if (unit.destPathOpeningHold()
+                        if (unit.queuedReplacementPending()
+                                || unit.destPathOpeningHold()
                                 || next.kind()
                                         == Unit.QueuedOrderKind.ATTACK) {
                             // Native 0x452ef0 promotes a replacement from the

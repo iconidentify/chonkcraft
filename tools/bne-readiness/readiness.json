@@ -104,13 +104,13 @@
       "retail_evidence": [
         "The retail-data player referee sends real footman, destroyer and gryphon move commands through CommandApplier and observes friendly-formation routing, land/naval/air terrain separation and completed orders.",
         "An authenticated gryphon commanded to Move during its committed attack keeps the unbreakable BNE order head until the animation releases, then completes Move and damages a second target after a new Attack without an intervening Stop.",
-        "The movement gate runs 116 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.",
+        "The movement gate runs 117 focused checks with zero skips. Its naval referee records every commanded ship anchor's visual tile and raw terrain flags; transport coast permission is explicit while destroyers and tankers remain water-only.",
         "Large two-tile footprints, allied congestion, route exhaustion, chase refusal, the retail eight-refusal hold and fifteenth-refusal reset are all executable gate requirements rather than untracked edge notes."
       ],
       "blockers": [],
       "gate": {
         "driver": "Player wire commands move retail land, naval and air units through authenticated maps and unit data.",
-        "success": "Real units complete formation detours and terrain-domain passages while 116 large-footprint, congestion, command-handoff and refusal checks pass with zero skips.",
+        "success": "Real units complete formation detours and terrain-domain passages while 117 large-footprint, congestion, command-handoff and refusal checks pass with zero skips.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-movement-gate.sh"]
       }
@@ -312,7 +312,7 @@
       "blockers": [],
       "gate": {
         "driver": "A retail-data firer launches arrows and boulders while the referee follows native construction, pool order, integer flight, parabolic frame phases, impact damage, art and screen pixels.",
-        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its complete transient or persistent effect once and renders flight, impact and green-cross feedback across 63 zero-skip checks.",
+        "success": "Every projectile visibly leaves its source, preserves its retail launch facing, advances on the retail beat, draws the native arc frames, applies its complete transient or persistent effect once and renders flight, impact and green-cross feedback across 65 zero-skip checks.",
         "required_inputs": ["asset_pack"],
         "command": ["scripts/check-bne-projectile-gate.sh"]
       }
@@ -564,6 +564,10 @@
       ],
       "checks": [
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/ControlLivenessPlayabilityTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/Issue12OrderLivenessTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetMovingAttackReplacementRealDataTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerPatrolRealDataTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerAttackTargetRealDataTest.java",
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournalTest.java",
         "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java",
         "scripts/check-bne-control-liveness-gate.sh"
@@ -573,6 +577,7 @@
         "The 600-cycle watchdog distinguishes explicit rejection, supersession, successful settlement, unit loss and target loss from the player-breaking case: an accepted command which never produces physical or order-state progress.",
         "Authenticated retail footmen and grunts receive one-, three- and nine-unit moves, mid-stride redirects, Stop/resume and congested live-target attacks through the same CommandApplier seam used by the desktop.",
         "Two independent worlds exchange those controls through real loopback UDP and the production lockstep scheduler for 1,200 cycles; both player journals remain live and the complete synchronized world hashes agree at the end.",
+        "The issue-12 regressions cover native Move-to-Attack and repeated pursuit handoffs, a dying ranged quarry, consumed and superseded Stop requests, and Follow-to-Move command completion. The seventeen-test control inventory additionally checks cold and moving Move replacements, Patrol combat and nine save/load continuations, and explicit Attack target retention. All seventeen must execute without a skip; Follow timing remains an unpaired liveness check.",
         "The referee never retries, redirects or repairs an order. A liveness failure stays diagnostic evidence for the precision-owned movement or combat system instead of silently introducing non-retail recovery behavior."
       ],
       "blockers": [],

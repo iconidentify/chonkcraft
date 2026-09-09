@@ -632,6 +632,28 @@ class PlayerTransactionTest(unittest.TestCase):
         with self.assertRaisesRegex(transaction.ProofError, "unsupported"):
             transaction._derive_java_scenario(value)
 
+    def test_scenario_derivation_preserves_repeated_clicks_and_selection_order(self):
+        import copy
+        native = transaction.compile_evidence(store_evidence("native"), source="trace.txt")
+        second = copy.deepcopy(native["transactions"][0])
+        second["gesture"]["tile_x"] = 14
+        second["gesture"]["tile_y"] = 15
+        native["transactions"].append(second)
+        value = {
+            "manifest": {"run": {
+                "requested_scenario": "Campaign\\Human\\Human01.pud",
+                "initialization_seed": 1, "cycle_limit": 80,
+                "commands": {"count": 3},
+            }}, "receipt": native,
+            "commands_bytes": (b"cycle 9 select unit 7\n"
+                               b"cycle 10 ui-right-click x 12 y 13\n"
+                               b"cycle 20 ui-right-click x 14 y 15\n"),
+        }
+        scenario = transaction._derive_java_scenario(value)
+        self.assertEqual([10, 20], [step["issue_cycle"] for step in scenario["transactions"]])
+        self.assertEqual([7], [actor["native_id"] for actor in scenario["transactions"][1]["select"]])
+        self.assertEqual(14, scenario["transactions"][1]["gesture"]["tile_x"])
+
     def test_scenario_derivation_preserves_a_null_native_ui_target(self):
         native = transaction.compile_evidence(
             store_evidence("native"), source="trace.txt")

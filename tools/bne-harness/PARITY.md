@@ -15,7 +15,121 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current release checkpoint — 2026-09-05 (dest-arm leftover does not walk around a death-vision marker)
+## Current checkpoint -- 2026-09-09 (player controls and rendering integrated)
+
+Checkpoint `7a13f92` from `checkpoint/issue-12-player-controls` is integrated
+with master `2387035`, including the fog, walking-animation, smooth scrolling,
+menu rendering, graphics-memory and multiplayer lobby fixes. It retains
+committed movement before installing a replacement order. It also corrects
+consumed/superseded Stop state, player Patrol acquisition and return timing,
+Repair construction timing, explicit Attack target ownership, and cold and
+moving Move replacements. Mid-Patrol saves retain the live combat program,
+remaining route and return destination. No timeout, automatic Stop, command
+retry, map exception or unit-ID exception is added.
+
+The native authority is fresh local execution on i9beef of BNE 2.02b,
+executable SHA-256
+`b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807`.
+Move runs before order dispatch and promotion at `0x4524cd`, `0x452573` and
+`0x452587`. Explicit Attack is native order 9, distinct from automatic order
+12; its callback retains the commanded quarry and its routing flags keep
+enemy bodies solid. The committed regressions carry native witness cycles.
+
+Native script commands now enter the actual `0x475f80` player packet
+handler. Calling internal GiveOrder alone omitted the player's saved-order
+and hit-offer clearing, which could produce misleading Stop/replacement
+captures. Right-click captures use DoRightButton; stable initial identities
+and gesture targets survive repeated clicks. An authenticated retail refusal
+is recorded separately from a missing dispatcher signature. Earlier internal
+GiveOrder captures remain diagnostic where a complete player boundary was
+not observed.
+
+The integrated source was tested at engine-input identity
+`e878c9e7268946c98cc735bb2fbf058dcfdb7361056b40ed1689412ba4291774`.
+Its clean committed identity is
+`025a98e4c23423d25a9aef735e17c370b6756ee179b89c4fff0566bebdf0e939`.
+The identity policy includes Git index state; the retained integration
+`source-stage-attestation.json` binds the same 799 source files across the
+merge commit. No simulation source was changed between testing and committing.
+All runs use the pinned JBR 25 wrapper and BNE pack SHA-256
+`3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`.
+
+- **Retained checkpoint freeze coverage:** the 392-sequence reproduction improves from 19 stuck
+  final withdrawals to zero. A 45-type roster completes 11,340 sequences with
+  zero stuck withdrawals. Its 168 rejected attack sequences are submarine
+  attacks against a land fortress; their later Move is still checked. Separate
+  legal naval targets give each submarine 252 cases, zero rejects and zero
+  stuck withdrawals. These are Java liveness sweeps, not exact native twins.
+- **52-map player controls:** retained native captures and fresh integrated
+  Java replays cover 1,251 accepted
+  commands, 139 actors and 25 types through 600 cycles. The moving-redirect
+  correction raises commanded-actor physical equality through cycle 100 from
+  16/52 to 43/52 maps, and through cycle 600 from 0/52 to 3/52. The physical
+  exact-prefix sum rises from 3,591 to 6,631. Fields are life/on-map state,
+  tile, absolute pixel anchor and HP; raw order/sequence and the rest of the
+  world are excluded from this metric.
+- **65 Human 1 command cases:** 59 retain exact commanded-actor physical
+  state through their capture horizon; 57 match all observed units in those
+  fields. Native accepts 108/111 requests; Java accepts 111/111. The three
+  differing requests are empty-handed Return Goods. Their UI reachability
+  remains unverified. Raw order/sequence differences remain in all 65 cases.
+- **Idle-map regression:** semantic-v1 stays 52 clean / 0 divergent / 0 failed
+  through 400, and 14 clean / 38 divergent / 0 failed through 1,800. Every
+  accepted per-map prefix is preserved against the player-control checkpoint
+  and its `1581cdd` baseline; shared horizon 403,
+  exact-prefix sum 56,468. This tier compares cycle, sync RNG, banks, unit core
+  and coarse orders, not raw sequence, extended player state, projectiles or
+  mutable terrain.
+- **Playability:** all 18 lanes pass, including the 17-test control inventory,
+  117 movement checks, 65 projectile checks, 39 clean/adverse lockstep cases
+  and real two-process startup. The Patrol regression resumes nine save points.
+- **Combined inventory:** pack plus Opus runs 3,012 tests: 2,597 pass,
+  93 known failures, zero errors, 322 skip. No new failure identity appears;
+  master's corrected expansion Human 12 recovery-stage assertion now passes.
+  Eleven fog tests that skipped on the earlier checkpoint now execute and pass.
+  Data-free runs 3,012 tests: 1,561 pass, 88 known failures, zero errors and
+  exactly 1,363 skips; its coverage and failure inventories match. Matching
+  raw media was unavailable locally, so these are not the canonical 27-skip
+  authenticated CI profile.
+- **Rendering integration:** the existing renderer completes its 400-unit
+  battle modes and ten menu/match transition sessions at 1280x800 in a
+  512 MiB headless JVM. These are bounded-memory/lifecycle checks, not a
+  comparative desktop frame-rate measurement.
+
+Three retained right-click captures have verified native closures and newly
+materialized integrated Java twins. Their store meets only 1/532 fixed player-transaction cells;
+receipt verification is not full UI parity. The worker's approach matches
+through 157, before native mine containment at 158 ends the physical comparison.
+Group Follow reservations first differ at 77. A distant ballista/hall handler
+probe differs at 9, but its injected target still needs visibility/hit-testing
+validation. Explicit footman Attack retains the correct quarry but a route
+refill at 137 first changes position at 153. These are current precision work
+items; passing liveness does not close them.
+
+Retained local proof:
+
+- `target/issue12/integration/`: full-suite inventories, failure comparison,
+  all 18 playability lane logs and receipt, rendering logs, source attestation
+  and source/runtime boundary checks.
+- `.bne-surveys/issue12-integration-c400/bne-java-survey.json` and
+  `.bne-surveys/issue12-integration-c1800/bne-java-survey.json`, each gated
+  against the corresponding accepted player-control survey.
+- `target/issue12/integration/player-controls`,
+  `target/issue12/integration/player-human1` and
+  `target/issue12/integration/player-ui/proof-store`: retained native closures
+  and fresh paired Java results. Licensed fixture bytes stay outside Git.
+- `target/issue12/expanded-evidence/` retains the pre-integration checkpoint's
+  freeze sweeps, efficacy comparisons and detailed native command witnesses.
+
+The integrated master is the production publication source. The
+[signed update catalog](https://updates.chonkbase.net/latest.properties)
+identifies the public version, and the publication workflow verifies installation
+through the production launcher. The local integration report records the
+published commit, artifact digest and fresh public launcher installation.
+The reporter's exact updated build/save has not been reproduced, so the claim
+that the update itself caused the worsening remains unestablished.
+
+## Prior release checkpoint — 2026-09-05 (dest-arm leftover does not walk around a death-vision marker)
 
 Accepted cycle-1,800 surveys on clean commit `1581cdd` keep the shared
 proven frontier at cycle 403 and advance Human 8 without moving any case

@@ -1154,50 +1154,60 @@ final class BattleNetCombatSystem {
                         unit.battleNetAnimationTimer() - 1);
                 return;
             }
-            // Route bytes live on CUnit and survive the Patrol -> Attack pop,
-            // and a free retained head transfers directly to Move on the
-            // timer-one handoff. Orc 11 archer 1559 keeps N behind its opening
-            // northwest Patrol stride, completes Attack 3,2,1 and consumes N
-            // on fixture 327. An absent or refused head instead parks at route
-            // index twenty and returns; XHuman 12 ogre 1356 exposes Move-1 on
-            // fixture 75 and writes its northeast refill on fixture 76.
-            boolean retainedFreeHead = false;
-            if (unit.pathLength() > 0) {
-                int heading = unit.peekHeading();
-                int stride = world.battleNetMovementStride(unit);
-                retainedFreeHead = world.canEnter(unit,
-                        unit.tileX() + Direction.deltaX(heading) * stride,
-                        unit.tileY() + Direction.deltaY(heading) * stride);
-            }
-            unit.setBattleNetLandPatrolAttackConstruction(false);
-            // Only a newly written post-park route is the one-probe handoff
-            // tracked by LandPatrolAttackRoutePending. A transferred Patrol
-            // byte remains ordinary cached Move authority after it lands.
-            unit.setBattleNetLandPatrolAttackRoutePending(
-                    !retainedFreeHead);
-            if (!retainedFreeHead) {
-                unit.clearPath();
-                unit.setRouteSpent(false);
-                unit.setBattleNetCollisionCounter(
-                        unit.battleNetCollisionCounter() + 1);
-            }
-            unit.setChasing(true);
-            int moveStart = world.battleNetSequence == null ? -1
-                    : world.idle.battleNetSequenceStart(unit,
-                            BattleNetSequence.MOVE_ANIMATION);
-            if (moveStart >= 0) {
-                unit.setBattleNetSequenceOffset(moveStart);
-                unit.setBattleNetAnimationTimer(1);
-            }
-            AnimationSet set = unit.type() == null
-                    ? null : unit.type().animationSet();
-            Animation move = set == null ? null
-                    : set.get(AnimationSet.State.MOVE);
-            if (move != null && unit.animation().current() != move) {
-                unit.animation().switchTo(move);
-            }
-            if (!retainedFreeHead) {
-                return;
+            if (world.isPerson(unit.player()) && unit.target() != null
+                    && world.targets.inAttackRange(unit, unit.target())) {
+                // A player Patrol may land directly in reach. Its Attack
+                // constructor still counts 3,2,1 before the first OP0 may
+                // reserve damage. Human 1's footman promotes on 108 and
+                // draws on 111, after the grunt's 110 draw. Starting the
+                // swing on 109 swapped their rolls despite identical pixels.
+                unit.setBattleNetLandPatrolAttackConstruction(false);
+            } else {
+                // Route bytes live on CUnit and survive the Patrol -> Attack pop,
+                // and a free retained head transfers directly to Move on the
+                // timer-one handoff. Orc 11 archer 1559 keeps N behind its opening
+                // northwest Patrol stride, completes Attack 3,2,1 and consumes N
+                // on fixture 327. An absent or refused head instead parks at route
+                // index twenty and returns; XHuman 12 ogre 1356 exposes Move-1 on
+                // fixture 75 and writes its northeast refill on fixture 76.
+                boolean retainedFreeHead = false;
+                if (unit.pathLength() > 0) {
+                    int heading = unit.peekHeading();
+                    int stride = world.battleNetMovementStride(unit);
+                    retainedFreeHead = world.canEnter(unit,
+                            unit.tileX() + Direction.deltaX(heading) * stride,
+                            unit.tileY() + Direction.deltaY(heading) * stride);
+                }
+                unit.setBattleNetLandPatrolAttackConstruction(false);
+                // Only a newly written post-park route is the one-probe handoff
+                // tracked by LandPatrolAttackRoutePending. A transferred Patrol
+                // byte remains ordinary cached Move authority after it lands.
+                unit.setBattleNetLandPatrolAttackRoutePending(
+                        !retainedFreeHead);
+                if (!retainedFreeHead) {
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setBattleNetCollisionCounter(
+                            unit.battleNetCollisionCounter() + 1);
+                }
+                unit.setChasing(true);
+                int moveStart = world.battleNetSequence == null ? -1
+                        : world.idle.battleNetSequenceStart(unit,
+                                BattleNetSequence.MOVE_ANIMATION);
+                if (moveStart >= 0) {
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(1);
+                }
+                AnimationSet set = unit.type() == null
+                        ? null : unit.type().animationSet();
+                Animation move = set == null ? null
+                        : set.get(AnimationSet.State.MOVE);
+                if (move != null && unit.animation().current() != move) {
+                    unit.animation().switchTo(move);
+                }
+                if (!retainedFreeHead) {
+                    return;
+                }
             }
         }
         if (unit.battleNetLandPatrolAttackRoutePending()
@@ -1274,6 +1284,7 @@ final class BattleNetCombatSystem {
         }
         if (world.battleNetSequence != null
                 && unit.battleNetAttackResumeHoldActive()
+                && !unit.chasing() && !unit.isMoving()
                 && quietSequenceGoal != null && quietSequenceGoal.isDying()
                 && unit.type() != null && unit.type().firesMissile()) {
             // The OP0 reached after a ranged chase is itself a committed
@@ -1284,6 +1295,11 @@ final class BattleNetCombatSystem {
             // arm run here changed the order to Still on the marker visit,
             // paid a phantom idle draw, and reassigned every later projectile
             // and damage roll.
+            // The paid hold may also survive an out-of-range chase. That
+            // Move body must still drain after its quarry dies: native runs
+            // 0x4376c0 before the shared order handler at 0x452573. Treating
+            // that token as a stationary hold used to freeze a moving archer
+            // forever, keeping later Move and Attack clicks behind its lock.
             return;
         }
         // A cold refusal whose live harvesting quarry moved away keeps the
@@ -4288,8 +4304,15 @@ final class BattleNetCombatSystem {
                                 && previous.type() != null
                                 && previous.type().building()
                                 ? previous : null;
-                Unit candidate = world.targets.findBattleNetHostile(
-                        unit, reactRange, scanIncumbent);
+                // Native order 9 has flags 0x010c at 0x496234: the moving
+                // callback takes 0x409fb0, which validates the hit offer but
+                // does not run AutoSelectTarget. Order 12 takes 0x40a830.
+                // Human 1 explicit Attack retains southern grunt 1588 while
+                // passing grunt 1592 at fixture 89. Route-failure recovery
+                // above remains a separate native opportunity to retarget.
+                Unit candidate = unit.battleNetPlayerCommandAttack()
+                        ? previous : world.targets.findBattleNetHostile(
+                                unit, reactRange, scanIncumbent);
                 if (candidate != null && candidate != previous) {
                     // A lethal-splash help chase does not hand its just-
                     // settled commanded route straight to automatic
@@ -7944,6 +7967,15 @@ final class BattleNetCombatSystem {
 
     /** Applies the retained-route deferral after its caller proves the handoff. */
     private boolean deferBattleNetFootmanRetainedRouteSyncRand(Unit unit) {
+        // A player Patrol already constructed this Attack before handing its
+        // retained route to the chase. Its arrival is an active-order OP0,
+        // not another queued Attack: Human 1 slot 1593 lands and draws at
+        // cycle 284. Applying the retaliation-route exception below delayed
+        // its first hit from 294 to 297 and changed the whole group fight.
+        if (unit.battleNetPlayerCommandAttack()
+                || world.isPerson(unit.player()) && unit.savedOrder() == Unit.Order.PATROL) {
+            return false;
+        }
         if (unit.type() == null || PudUnitTypes.code(unit.type().ident()) != 0
                 || !unit.battleNetPendingMeleeSyncRand()
                 || unit.battleNetChaseEmptyRouteReplan()) {
@@ -8385,6 +8417,7 @@ final class BattleNetCombatSystem {
         int savedTimer = unit.battleNetAnimationTimer();
         boolean savedStepReady = unit.battleNetChaseStepReady();
         boolean savedBorrowedMove = unit.battleNetBorrowedMoveForStep();
+        boolean savedCommandAttack = unit.battleNetPlayerCommandAttack();
         boolean savedLandPatrolMoveBody = saved == Unit.Order.ATTACK
                 && unit.battleNetLandPatrolMoveBody();
         boolean settleRangedArrival = saved == Unit.Order.ATTACK
@@ -8392,6 +8425,7 @@ final class BattleNetCombatSystem {
         boolean openSettledRangedArrival = settleRangedArrival
                 && battleNetRangedResidualRouteQualifies(
                         unit, unit.battleNetPathStepsTaken());
+        unit.setBattleNetBorrowedMoveForStep(true);
         unit.setOrder(Unit.Order.MOVE);
         if (savedLandPatrolMoveBody) {
             // MOVE is only the Java call-seam label below. Preserve the native
@@ -8441,6 +8475,8 @@ final class BattleNetCombatSystem {
                 unit.setBattleNetLandPatrolMoveBody(true);
             }
         }
+        unit.setBattleNetPlayerCommandAttack(
+                unit.order() == Unit.Order.ATTACK && savedCommandAttack);
         unit.setBattleNetSequenceOffset(offsetAfter);
         unit.setBattleNetAnimationTimer(timerAfter);
         unit.setBattleNetChaseStepReady(readyAfter);
@@ -9603,7 +9639,7 @@ final class BattleNetCombatSystem {
         // the return-to-post order from cycle 470 restores that obsolete post
         // when the next target dies at cycle 670.
         unit.setSavedOrder(null);
-        if (unit.animation().unbreakable()) {
+        if (world.orderReplacementMustWait(unit)) {
             // CommandAttack(..., EFlushMode::On) flushes by marking the
             // current order finished and appending the replacement. The pop
             // itself is inside HandleUnitAction's !Anim.Unbreakable gate
@@ -9681,6 +9717,11 @@ final class BattleNetCombatSystem {
         // so a fresh one starts at nought.
         unit.setMoveRange(0);
         unit.setOrder(Unit.Order.ATTACK_MOVE);
+        // The replacement now owns the unit. A flag retained from an earlier
+        // Move describes that old order, not a pending takeover of this march.
+        // Leaving it set made stepAttackMove finish its own newly accepted
+        // command immediately (Human 4 Move at 5, Attack-Move at 6).
+        unit.setBattleNetPlayerCommandMove(false);
         unit.setBattleNetAttackWaitRefillResidual(false);
         unit.setBattleNetNavalPatrolAttackConstruction(false);
         unit.setBattleNetNavalPatrolAttackTimerOneReady(false);
@@ -9706,6 +9747,16 @@ final class BattleNetCombatSystem {
      * changes.
      */
     void stepAttackMove(Unit unit) {
+        if (world.battleNetSequence != null && unit.isMoving() && unit.fighting()) {
+            // A march scan may acquire an adjacent enemy on the same visit
+            // that commits another stride. BNE advances movement before its
+            // order handler (0x4524cd before 0x452573); the Attack program
+            // cannot take these pixels away. Starting a presentation swing
+            // here used to strand the footman between tiles while the native
+            // attack waited for arrival, so it took hits without striking.
+            world.movement.walkPixels(unit);
+            return;
+        }
         // Retail's commanded attack, attack-march and opportunistic march all
         // execute the same COrder_Attack animation program.  The Java order
         // enum separates ATTACK_MOVE so it can retain its destination, but
@@ -10785,8 +10836,15 @@ final class BattleNetCombatSystem {
                 }
                 return;
             }
-            PathFinder.Path path = world.pathFinder.find(unit.tileX(), unit.tileY(),
-                    new PathFinder.Goal(toX, toY, 1, 1, 0, unit.moveRange()), world.moverFor(unit));
+            // Player position attacks use the same native point-route query
+            // as Move and Patrol. The legacy weighted A* selected a diagonal
+            // through Human 1's farm corner where BNE first walks west.
+            PathFinder.Path path = world.battleNetSequence != null
+                    && world.isPerson(unit.player()) && unit.moveRange() == 0
+                    ? world.findBattleNetPointPath(unit, toX, toY)
+                    : world.pathFinder.find(unit.tileX(), unit.tileY(),
+                            new PathFinder.Goal(toX, toY, 1, 1, 0, unit.moveRange()),
+                            world.moverFor(unit));
             switch (path.result()) {
                 case REACHED -> {
                     // Close enough for the range the order has widened to,
@@ -10836,11 +10894,34 @@ final class BattleNetCombatSystem {
         // stepMove reads the order it is given, so the march borrows the move
         // order for the step and gives it back, exactly as a patrol does.
         Unit.Order saved = unit.order();
+        boolean nativePlayerMarch = world.battleNetSequence != null
+                && world.isPerson(unit.player());
+        int sequenceBefore = unit.battleNetSequenceOffset();
+        int timerBefore = unit.battleNetAnimationTimer();
         unit.setOrder(Unit.Order.MOVE);
+        if (nativePlayerMarch) {
+            unit.setBattleNetSequenceOffset(sequenceBefore);
+            unit.setBattleNetAnimationTimer(timerBefore);
+        }
         int waiting = unit.waitCycles();
+        boolean movingBefore = unit.isMoving();
         world.movement.stepMove(unit);
+        if (nativePlayerMarch && !movingBefore && unit.isMoving()) {
+            world.movement.armBattleNetMovePace(unit);
+        }
+        int sequenceAfter = unit.battleNetSequenceOffset();
+        int timerAfter = unit.battleNetAnimationTimer();
+        if (nativePlayerMarch && unit.isMoving()
+                && unit.battleNetMovePaceOffset() >= 0) {
+            sequenceAfter = unit.battleNetMovePaceOffset();
+            timerAfter = unit.battleNetMovePaceTimer();
+        }
         if (unit.order() != Unit.Order.DYING) {
             unit.setOrder(saved);
+            if (nativePlayerMarch) {
+                unit.setBattleNetSequenceOffset(sequenceAfter);
+                unit.setBattleNetAnimationTimer(timerAfter);
+            }
         }
         if (unit.order() != Unit.Order.ATTACK_MOVE) {
             return;

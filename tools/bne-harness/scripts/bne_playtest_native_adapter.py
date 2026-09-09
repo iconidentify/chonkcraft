@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -25,6 +26,7 @@ import bne_playtest_explorer as explorer
 from bne_fixture import (
     AUX_HEADER, BULLET_BYTES, BULLET_DELTA_HEADER, BULLET_FLAGS, BULLET_FREE,
     CHUNK_HEADER, CYCLE_HEADER, PLAYER_SIM_RECORD, STATE_HEADER,
+    validate_fixture,
 )
 from bne_routes import UNIT_FLAGS, UNIT_FREE_OR_DEAD, UNIT_ORDER, read_state_stream
 from bne_causal import parse_native_trace
@@ -198,6 +200,7 @@ def command_key(command: dict[str, Any]) -> tuple[Any, ...]:
         command.get("target_id"),
         command.get("type_index"),
         command["issue_cycle"],
+        bool(command.get("queued")),
     )
 
 
@@ -508,11 +511,10 @@ def fixture_command_events(archive: zipfile.ZipFile) -> tuple[list[str], list[st
 
 
 def event_names_command(line: str, command: dict[str, Any]) -> bool:
-    return (
-        f"cycle={command['issue_cycle']}" in line
-        and f"unit={command['unit_id']}" in line
-        and f"action={command['kind']}" in line
-    )
+    fields = dict(re.findall(r"([\w-]+)=([^ ]+)", line))
+    return (fields.get("cycle") == str(command["issue_cycle"])
+            and fields.get("unit") == str(command["unit_id"])
+            and fields.get("action") == command["kind"])
 
 
 def observe_commands(scenario: dict[str, Any], frames: list[dict[str, Any]],
@@ -705,14 +707,33 @@ def run_from_fixture(scenario: dict[str, Any], fixture: Path,
         fixture_commands = parse_fixture_commands(archive)
         applied_events, rejected_events = fixture_command_events(archive)
     fixture_authority(manifest)
+    validate_fixture(fixture)
     if not commands_match(scenario, fixture_commands):
         raise ValueError(
             "native fixture commands do not match the playtest scenario")
-    requested = (scenario.get("setup") or {}).get("scenario")
-    captured = (manifest.get("run") or {}).get("requested_scenario")
-    if requested and captured and requested != captured:
+    setup = scenario.get("setup") or {}
+    run = manifest.get("run") or {}
+    requested = setup.get("scenario")
+    captured = run.get("requested_scenario")
+    if not requested or requested != captured:
         raise ValueError("native fixture ran a different scenario")
+    if setup.get("seed", 1) != run.get("initialization_seed"):
+        raise ValueError("native fixture has a different initialization seed")
+    horizon = max(int(command["issue_cycle"]) for command in scenario["commands"]) \
+        + int(scenario.get("settle_cycles", 600))
+    if int(run.get("cycle_limit", 0)) < horizon:
+        raise ValueError("native fixture ends before the requested observation horizon")
     frames = load_frames(fixture)
+    if int(frames[-1]["cycle"]) < horizon:
+        raise ValueError("native fixture ends before the requested observation horizon")
+    for actor in [*scenario.get("actors", []), *scenario.get("targets", [])]:
+        raw = frames[0]["units"].get(actor["id"])
+        if raw is None or (actor.get("x"), actor.get("y"), actor.get("player")) != (
+                _uint(raw, 24), _uint(raw, 26), raw[44]):
+            raise ValueError(f"native fixture actor pairing differs for unit {actor['id']}")
+    # A longer capture can prove a shorter prefix, never the reverse. Both
+    # adapters must observe the same cycles even if later actions would settle.
+    frames = [frame for frame in frames if int(frame["cycle"]) <= horizon]
     observations, events = observe_commands(
         scenario, frames, applied_events, rejected_events)
     return {

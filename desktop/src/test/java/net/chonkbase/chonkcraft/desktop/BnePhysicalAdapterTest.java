@@ -19,6 +19,40 @@ import org.junit.jupiter.api.Test;
 class BnePhysicalAdapterTest {
 
     @Test
+    @DisplayName("repeated physical clicks retain unit identities after the selection moves")
+    void repeatedPhysicalClicksRetainUnitIdentitiesAfterTheSelectionMoves() throws Exception {
+        Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
+                "the BNE asset pack must be available");
+        Path directory = Files.createTempDirectory("bne-physical-repeated-");
+        Path input = directory.resolve("scenario.json");
+        Path output = directory.resolve("evidence.json");
+        Map<String, Object> actor = Map.of("native_id", 1598, "player", 1, "x", 21, "y", 5);
+        Map<String, Object> target = Map.of("native_id", 1597, "player", 1, "x", 17, "y", 7);
+        Map<String, Object> scenario = Map.of("schema", "chonkcraft-bne-physical-scenario-1",
+                "setup", Map.of("java_map", "campaigns/human/level01h", "seed", 1),
+                "cycles", 180,
+                "transactions", List.of(
+                        Map.of("select", List.of(actor), "issue_cycle", 5,
+                                "gesture", Map.of("origin", "field", "detail", "right-click",
+                                        "modifiers", "plain", "tile_x", 25, "tile_y", 9)),
+                        Map.of("select", List.of(actor), "issue_cycle", 70, "target", target,
+                                "gesture", Map.of("origin", "field", "detail", "right-click",
+                                        "modifiers", "plain", "tile_x", 17, "tile_y", 7,
+                                        "target_native_id", 1597))));
+        Files.writeString(input, Json.write(scenario));
+        BnePhysicalAdapter.main(new String[] {"--scenario", input.toString(),
+                "--output", output.toString(), "--build-sha256", "a".repeat(64)});
+        Map<?, ?> evidence = Json.parseObject(Files.readString(output));
+        List<?> intents = (List<?>) evidence.get("player_intents");
+        assertEquals(2, intents.stream().filter(value ->
+                ((Map<?, ?>) value).get("gesture") instanceof Map<?, ?>).count());
+        Map<?, ?> identities = (Map<?, ?>) evidence.get("unit_identities");
+        assertEquals(2, ((List<?>) identities.get("units")).size(),
+                "one lifetime each for the selected footman and friendly target");
+        assertEquals(2, ((List<?>) evidence.get("player_outcomes")).size());
+    }
+
+    @Test
     @DisplayName("a human 1 field click writes a gamescreen physical receipt")
     void aHuman1FieldClickWritesAGamescreenPhysicalReceipt() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,

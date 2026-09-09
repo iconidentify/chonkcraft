@@ -6,11 +6,11 @@ Why this exists
 This suite does not fail when its external inputs are missing. Tests that need
 the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 ``Assumptions.assumeTrue(...)`` and skip,
-and Maven reports BUILD SUCCESS either way. Measured on one commit, on one
-machine, the difference is:
+and Maven reports BUILD SUCCESS either way. The configured authenticated
+floor and the measured data-free inventory are:
 
-    authenticated inputs       2950 tests,   27 skipped
-    no external input          2950 tests, 1318 skipped
+    authenticated profile      3012 tests,   27 skipped
+    no external input          3012 tests, 1363 skipped
 
 Both can be green.
 
@@ -177,14 +177,23 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Issue 12's accepted-order liveness regression and the invalid
         # queued-return replacement regression add two more authenticated
         # referees. The clean hosted profile therefore records 2,034 engine
-        # invocations at that revision. The September 7 CI artifact records
-        # nineteen additional game-data tests since that inventory; all ran
-        # with authenticated inputs. The native walk-frame regression adds
-        # one more deliberate data-free skip, while the fog race runs here.
+        # invocations, 989 of which skipped without authenticated data.
+        # Since that inventory, twenty current-source checks added nineteen
+        # authenticated skips and one data-free worker-training check. The
+        # six movement, combat and replacement-order regressions add six more
+        # authenticated skips. The expanded player-command, patrol and save
+        # regressions add nine more: 2,069 engine tests and 1,023 data-free
+        # skips. Rendering adds one authenticated walking-frame check and
+        # one data-free fog-race check: 2,071 engine tests, 1,024 skips.
+        # The desktop expansion adds three authenticated and two data-free
+        # intent-journal checks. Rendering adds twenty more desktop tests;
+        # seven scrolling checks need retail data, for 382 tests and 280 skips.
+        # This inventory was measured without pack, installation or vectors;
+        # the existing full-profile skip allowances are unchanged.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (2056, 1009),
+        "engine": (2071, 1024),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -195,9 +204,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The sealed-null-target and explicit-unit-target physical transaction
         # referees need the Human 1 retail mission and add two deliberate
         # data-free skips.
-        # Six scrolling checks and the menu scrolling check use the
-        # retail map and interface, and deliberately skip without game data.
-        "desktop": (377, 277),
+        "desktop": (382, 280),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -240,10 +247,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2056, 7),
+        "engine": (2071, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (377, 8),
+        "desktop": (382, 8),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that
@@ -257,8 +264,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2034, 4),
-        "desktop": (370, 8),
+        "engine": (2071, 4),
+        "desktop": (382, 8),
         "matchmaker-server": (5, 1),
     },
     # The exact authenticated Battle.net Edition source archive, its matching
@@ -279,8 +286,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2039, 12),
-        "desktop": (370, 6),
+        "engine": (2071, 12),
+        "desktop": (382, 6),
         "matchmaker-server": (5, 1),
     },
 }

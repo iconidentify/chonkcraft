@@ -55,7 +55,9 @@ public final class BnePlaytestAdapter {
             int seed = optionalNumber(setup.get("seed"), 1);
             var source = data.campaignMap(javaMap);
             require(source != null, "campaign " + javaMap + " will not load");
-            Mission mission = data.loadMission(javaMap, GameData.personIn(source), seed);
+            int person = GameData.personIn(source);
+            int commandPlayer = optionalNumber(setup.get("command_player"), person);
+            Mission mission = data.loadMission(javaMap, person, seed);
             require(mission != null, "campaign " + javaMap + " will not load");
             var world = mission.world();
             List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
@@ -77,6 +79,16 @@ public final class BnePlaytestAdapter {
                     fixtureCycle::get, List::of, world);
 
             for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
+                mission.tick();
+            }
+            List<Object> commands = array(scenario.get("commands"), "commands");
+            // A fixture's first record is the after-state of cycle 1. Rescue
+            // can transfer units on that visit (XOrc 10 knight 1571, owner
+            // 4 -> 5). Pair against that same state when no cycle-1 command
+            // needs an earlier actor; still emit and observe cycle 1 below.
+            boolean firstCycleObserved = commands.stream().noneMatch(value ->
+                    number(object(value, "command").get("issue_cycle"), "issue cycle") == 1);
+            if (firstCycleObserved) {
                 mission.tick();
             }
             Map<Integer, Integer> nativeToJava = pairActors(
@@ -104,7 +116,7 @@ public final class BnePlaytestAdapter {
                     new IdentityHashMap<>();
             int nextProjectileId = 0;
 
-            List<Object> commands = array(scenario.get("commands"), "commands");
+
             int settle = optionalNumber(scenario.get("settle_cycles"), DEFAULT_SETTLE);
             int last = lastCycle(commands, settle);
             Map<Integer, Long> issuedIntents = new LinkedHashMap<>();
@@ -117,7 +129,7 @@ public final class BnePlaytestAdapter {
                     }
                     long before = journal.outcomeSnapshot().size();
                     issue(sink, command, nativeToJava, scenario, pudToRoster,
-                            world);
+                            world, commandPlayer);
                     List<PlayerIntentJournal.Outcome> after = journal.outcomeSnapshot();
                     if (after.size() > before) {
                         issuedIntents.put(index, after.getLast().intentId());
@@ -125,7 +137,9 @@ public final class BnePlaytestAdapter {
                         issuedIntents.put(index, -1L - index);
                     }
                 }
-                mission.tick();
+                if (cycle != 1 || !firstCycleObserved) {
+                    mission.tick();
+                }
                 journal.observe(cycle, world);
                 for (int nativeId : lifecycleUnits) {
                     lifecycleEvents.add(lifecycleState(cycle, nativeId,
@@ -196,25 +210,22 @@ public final class BnePlaytestAdapter {
     private static boolean issue(CommandSink sink, Map<String, Object> command,
             Map<Integer, Integer> nativeToJava, Map<String, Object> scenario,
             Map<Integer, Integer> pudToRoster,
-            net.chonkbase.chonkcraft.engine.World world) {
+            net.chonkbase.chonkcraft.engine.World world, int commandPlayer) {
         Integer javaId = nativeToJava.get(number(command.get("unit_id"), "unit id"));
         if (javaId == null) {
             return false;
         }
-        // This adapter twins the native fixture injector, not the campaign UI.
-        // The injector guards GiveOrder with BNE_202_LOCAL_PLAYER, which stays
-        // slot 0 even when BNE_202_UI_PLAYER (the visible campaign person) is
-        // another slot. Using the actor's owner made an enemy Orc 1 archer's
-        // patrol/stop command pass on Java after retail rejected it; using the
-        // campaign person made retail-accepted slot-0 commands fail on Human
-        // maps. Slot 0 is therefore part of this evidence protocol.
-        int nativeLocalPlayer = 0;
+        // Ordinary playtest clicks belong to the campaign's human player.
+        // The network-local byte stays zero during BNE campaign bootstrap;
+        // using it here used to reject Human 1's own footmen. Historical
+        // captures which deliberately injected computer orders can name an
+        // explicit command_player and remain distinct from UI control proof.
         Unit actor = unit(world, javaId);
-        if (actor == null || !world.canControl(nativeLocalPlayer, actor.player())) {
+        if (actor == null || !world.canControl(commandPlayer, actor.player())) {
             return false;
         }
         GameCommand order = toGameCommand(command, javaId, nativeToJava, scenario,
-                pudToRoster, nativeLocalPlayer);
+                pudToRoster, commandPlayer);
         if (order == null) {
             return false;
         }
@@ -349,7 +360,7 @@ public final class BnePlaytestAdapter {
         }
         state.put("hit_points", unit.hitPoints());
         state.put("carried", unit.carried());
-        state.put("alive", unit.isAlive());
+        state.put("alive", PlayerIntentJournal.living(unit));
         state.put("on_map", unit.isOnMap());
         state.put("missile_count", constructedMissileCount(world));
         state.put("cargo_count", unit.cargo().size());
@@ -402,7 +413,7 @@ public final class BnePlaytestAdapter {
         event.put("kind", "combat-state");
         event.put("unit_id", nativeId);
         event.put("present", unit != null);
-        event.put("alive", unit != null && unit.isAlive());
+        event.put("alive", unit != null && PlayerIntentJournal.living(unit));
         event.put("on_map", unit != null && unit.isOnMap());
         event.put("x", unit == null ? -1 : unit.tileX());
         event.put("y", unit == null ? -1 : unit.tileY());

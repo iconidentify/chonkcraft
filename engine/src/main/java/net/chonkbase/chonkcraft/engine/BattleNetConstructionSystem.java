@@ -2273,6 +2273,14 @@ final class BattleNetConstructionSystem {
             unit.setOrder(Unit.Order.STILL);
             return;
         }
+        // Repair promotes on a three-call work constructor, before NewPath.
+        // Deferring these calls until arrival matched a terminal timestamp
+        // while making every intervening click and movement happen early.
+        if (world.battleNetSequence != null && unit.battleNetOrderDelay() > 0) {
+            unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            unit.setBattleNetAnimationTimer(Math.max(1, unit.battleNetAnimationTimer() - 1));
+            return;
+        }
         if (unit.distanceTo(target) > 1) {
             // Used to stand still the moment the hall was already whole,
             // which is why a mend click on a standing town hall never
@@ -2281,6 +2289,10 @@ final class BattleNetConstructionSystem {
             // while native stood on 26,21.
             int[] dest = world.battleNetRepairApproachPoint(unit, target);
             world.movement.walkTowards(unit, dest[0], dest[1]);
+            if (world.battleNetSequence != null && unit.battleNetMovePaceOffset() >= 0) {
+                unit.setBattleNetSequenceOffset(unit.battleNetMovePaceOffset());
+                unit.setBattleNetAnimationTimer(unit.battleNetMovePaceTimer());
+            }
             // Leftover toward the blocked far corner used to walk one more
             // tile after the hull first became adjacent (45,59 -> 45,60).
             if (unit.distanceTo(target) <= 1) {
@@ -2301,34 +2313,27 @@ final class BattleNetConstructionSystem {
         }
         if (target.hitPoints() >= target.type().hitPoints()
                 || unit.type().repairRange() <= 0) {
-            // Native leftover dest-arm stays Repair until the pixels land
-            // and Still starts at that snapshot (repair-1/00 fixture 56).
-            // The leftover-land visit already served one quiet beat, so two
-            // remaining Repair visits match that stand-down. Still'ing here
-            // fulfilled at 53.
-            //
-            // A leftover Harvest-to-Repair already paid that quiet Repair
-            // start (delay 2 at the leftover-land pop). Residual settle
-            // beside a full hall is the stand-down: native 1512 Stills at
-            // 118. Arming delay 3 again Still'd at 119.
-            if (leftoverLanded) {
-                // Leftover Harvest-to-Repair already paid one quiet Repair
-                // visit at the leftover-land pop. Two remaining visits
-                // Still at 118; delay 3 Still'd at 119 and an immediate
-                // Still fulfilled at 116.
-                unit.setBattleNetOrderDelay(
-                        unit.battleNetOrderDelay() > 0 ? 2 : 3);
-                return;
-            }
-            if (unit.battleNetOrderDelay() > 0) {
-                unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
-                if (unit.battleNetOrderDelay() > 0) {
+            if (world.battleNetSequence == null) {
+                // Keep the legacy animation-only fallback's arrival timing.
+                if (leftoverLanded) {
+                    unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() > 0 ? 2 : 3);
                     return;
+                }
+                if (unit.battleNetOrderDelay() > 0) {
+                    unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                    if (unit.battleNetOrderDelay() > 0) {
+                        return;
+                    }
                 }
             }
             // A soldier on GiveOrder 27 walks and stands. It does not mend.
             unit.setTarget(null);
             unit.setOrder(Unit.Order.STILL);
+            int stillStart = world.idle.battleNetStillSequenceStart(unit);
+            if (world.battleNetSequence != null && stillStart >= 0) {
+                unit.setBattleNetSequenceOffset(stillStart);
+                unit.setBattleNetAnimationTimer(3);
+            }
             return;
         }
         world.stepWorkAnimation(unit, AnimationSet.State.REPAIR);
@@ -2370,9 +2375,8 @@ final class BattleNetConstructionSystem {
      * told to mend hall 1593: native keeps order 27 and stands on 21,23.
      * Converting that to Move toward the origin walked it to 22,21.
      *
-     * @param fromPlayer {@code true} for a GiveOrder click: a soldier on
-     *     Still writes next_order 27 and keeps Still for the remaining
-     *     Still wait. A peon who can mend still installs Repair now.
+     * @param fromPlayer {@code true} for a GiveOrder click: workers and
+     *     soldiers both retain Still until its native action marker.
      */
     boolean orderRepair(Unit unit, Unit target) {
         return orderRepair(unit, target, false);
@@ -2420,28 +2424,35 @@ final class BattleNetConstructionSystem {
                     ? world.orderCommandMove(unit, target.tileX(), target.tileY())
                     : world.orderMove(unit, target.tileX(), target.tileY());
         }
-        // Native GiveOrder 27 from Still on a no-mend actor writes
-        // next_order 27 and restarts Still: Orc 1 grunt 1592 timer 4
-        // through fixture 8, Repair at 9. Installing Repair on the
-        // issue cycle walked at 5 and stood down at 56.
+        // GiveOrder 27 uses the current Still marker for every actor. The
+        // apparent peon/grunt distinction in repair-1 was their click phase;
+        // ten Human 1 worker captures exercise both sides of that boundary.
         if (fromPlayer && unit.order() == Unit.Order.STILL
-                && unit.type().repairRange() <= 0) {
-            int[] waits = world.movement.playerCommandWaits(unit);
-            int stillWait = waits[1] > 0 ? waits[1] : waits[0];
-            unit.setTarget(target);
-            unit.setOrderTarget(target.tileX(), target.tileY());
-            unit.enqueueOrder(new Unit.QueuedOrder(
-                    Unit.QueuedOrderKind.REPAIR,
-                    target.tileX(), target.tileY(), target, null, null));
-            unit.setQueuedReplacementPending(true);
-            // The issue visit still decrements this delay, so add the beat
-            // native spends writing next_order instead of counting down.
-            unit.setBattleNetOrderDelay(stillWait + 1);
-            return true;
+                && world.battleNetSequence != null) {
+            int stillWait = world.movement.playerCommandWaits(unit)[1];
+            if (stillWait > 0) {
+                unit.setTarget(target);
+                unit.setOrderTarget(target.tileX(), target.tileY());
+                unit.enqueueOrder(new Unit.QueuedOrder(
+                        Unit.QueuedOrderKind.REPAIR,
+                        target.tileX(), target.tileY(), target, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setBattleNetOrderDelay(stillWait + 1);
+                return true;
+            }
         }
         unit.clearPath();
         unit.setTarget(target);
         unit.setOrder(Unit.Order.REPAIR);
+        if (world.battleNetSequence != null) {
+            int workStart = world.idle.battleNetSequenceStart(unit,
+                    net.chonkbase.chonkcraft.engine.animation.BattleNetSequence.ATTACK_ANIMATION);
+            if (workStart >= 0) {
+                unit.setBattleNetSequenceOffset(workStart);
+                unit.setBattleNetAnimationTimer(fromPlayer ? 4 : 3);
+                unit.setBattleNetOrderDelay(fromPlayer ? 3 : 2);
+            }
+        }
         return true;
     }
 }

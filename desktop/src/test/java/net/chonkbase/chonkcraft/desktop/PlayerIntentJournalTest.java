@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.desktop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
@@ -406,6 +407,34 @@ class PlayerIntentJournalTest {
         assertEquals("superseded", outcomes.get(0).terminalReason());
         assertEquals(Long.valueOf(0), outcomes.get(0).terminalCycle());
         assertTrue(outcomes.get(1).firstProgressCycle() != null);
+    }
+
+    @Test
+    @DisplayName("a refused click does not mark the running order superseded")
+    void refusedClickDoesNotMarkTheRunningOrderSuperseded() {
+        verifyRetainedRunningOrder(false);
+    }
+
+    @Test
+    @DisplayName("a shifted follow-up does not mark the running order superseded")
+    void shiftedFollowUpDoesNotMarkTheRunningOrderSuperseded() {
+        verifyRetainedRunningOrder(true);
+    }
+
+    private static void verifyRetainedRunningOrder(boolean shifted) {
+        World world = world();
+        UnitType type = movable("unit-footman");
+        Unit unit = world.createUnit(type, 0, 2, 2);
+        PlayerIntentJournal journal = new PlayerIntentJournal();
+        CommandSink sink = journal.wrap(CommandSink.local(
+                new net.chonkbase.chonkcraft.engine.network.CommandApplier(world, List.of(type))),
+                world::cycle, () -> List.of(unit.id()), world);
+        assertTrue(sink.issueAccepted(GameCommand.move(0, unit.id(), 4, 2)));
+        boolean accepted = sink.issueAccepted(GameCommand.move(shifted ? 0 : 1,
+                unit.id(), 7, 2).withQueued(shifted));
+        assertEquals(shifted, accepted, "an opponent's command is refused; a shifted command queues");
+        assertNull(journal.outcomeSnapshot().getFirst().terminalReason(),
+                "the original move remains active after this click");
     }
 
     @Test

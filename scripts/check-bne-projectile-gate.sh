@@ -37,7 +37,7 @@ import xml.etree.ElementTree as ET
 
 expected = {
     "BattleNetProjectilePoolOrderTest": 5,
-    "BattleNetMissileMotionTest": 8,
+    "BattleNetMissileMotionTest": 9,
     "CombatFeedbackTest": 18,
     "MissileRenderingTest": 4,
     "ImpactRenderingTest": 2,
@@ -58,7 +58,7 @@ for name, count in expected.items():
     actual = observed.get(name)
     if actual != (count, 0, 0, 0):
         raise SystemExit(f"{name}: expected {(count, 0, 0, 0)}, got {actual}")
-print("projectile lifecycle referee: 64 pass, 0 skipped")
+print("projectile lifecycle referee: 65 pass, 0 skipped")
 PY
 
 echo "projectile gate passed: flight, impact, persistent effects and click feedback"

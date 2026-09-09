@@ -76,74 +76,96 @@ public final class BnePhysicalAdapter {
                 mission.tick();
             }
 
-            List<Object> select = array(scenario.get("select"), "select");
+            List<Object> steps = scenario.get("transactions") instanceof List<?>
+                    ? array(scenario.get("transactions"), "transactions")
+                    : List.of(scenario);
+            require(!steps.isEmpty(), "physical scenario has no gestures");
+            boolean firstCycleObserved = steps.stream().noneMatch(value ->
+                    optionalNumber(object(value, "transaction").get("issue_cycle"), 5) == 1);
+            if (firstCycleObserved) {
+                mission.tick();
+            }
             List<Unit> chosen = new ArrayList<>();
             List<Map<String, Object>> identities = new ArrayList<>();
             Map<Integer, Integer> javaToNative = new LinkedHashMap<>();
             Map<Integer, Unit> nativeToJava = new LinkedHashMap<>();
-            for (Object row : select) {
-                Map<String, Object> actor = object(row, "select");
-                int nativeId = number(actor.get("native_id"), "native id");
+            Map<Integer, Map<String, Object>> locators = new LinkedHashMap<>();
+            for (Object value : steps) {
+                Map<String, Object> step = object(value, "transaction");
+                List<Object> references = new ArrayList<>(array(step.get("select"), "select"));
+                if (step.get("target") instanceof Map<?, ?>) {
+                    references.add(step.get("target"));
+                }
+                for (Object row : references) {
+                    Map<String, Object> actor = object(row, "unit locator");
+                    int nativeId = number(actor.get("native_id"), "native id");
+                    Map<String, Object> previous = locators.putIfAbsent(nativeId, actor);
+                    require(previous == null || previous.equals(actor),
+                            "conflicting initial identity for native " + nativeId);
+                }
+            }
+            // Resolve the entire lifetime table before any gesture moves a
+            // selected unit or its target. Later clicks use these object
+            // identities, not an obsolete initial square as a fresh lookup.
+            for (Map.Entry<Integer, Map<String, Object>> entry : locators.entrySet()) {
+                int nativeId = entry.getKey();
+                Map<String, Object> actor = entry.getValue();
                 int player = optionalNumber(actor.get("player"), person);
                 int x = number(actor.get("x"), "x");
                 int y = number(actor.get("y"), "y");
                 Unit match = uniqueAt(world, player, x, y);
                 require(match != null, "no Java unit at " + x + "," + y
                         + " for native " + nativeId);
-                require(nativeToJava.put(nativeId, match) == null,
-                        "duplicate native selection " + nativeId);
-                chosen.add(match);
+                require(!javaToNative.containsKey(match.id()),
+                        "two native lifetimes resolve to the same Java unit");
+                nativeToJava.put(nativeId, match);
                 javaToNative.put(match.id(), nativeId);
                 identities.add(identityOf(match, nativeId));
+                chosen.add(match);
             }
-            screen.selectForTest(chosen);
-
-            Map<String, Object> gesture = object(scenario.get("gesture"), "gesture");
-            int tileX = number(gesture.get("tile_x"), "tile_x");
-            int tileY = number(gesture.get("tile_y"), "tile_y");
-            int issueCycle = optionalNumber(scenario.get("issue_cycle"), 5);
             int last = optionalNumber(scenario.get("cycles"), 500);
             Path cycleLog = parsed.cycleLog;
             StringBuilder cycles = new StringBuilder();
-
             for (int cycle = 1; cycle <= last; cycle++) {
                 fixtureCycle.set(cycle);
-                if (cycle == issueCycle) {
+                for (Object value : steps) {
+                    Map<String, Object> step = object(value, "transaction");
+                    if (cycle != optionalNumber(step.get("issue_cycle"), 5)) {
+                        continue;
+                    }
+                    List<Unit> selection = new ArrayList<>();
+                    for (Object row : array(step.get("select"), "select")) {
+                        int id = number(object(row, "select").get("native_id"), "native id");
+                        Unit selected = nativeToJava.get(id);
+                        require(selected != null && !selection.contains(selected),
+                                "invalid ordered selection for native " + id);
+                        selection.add(selected);
+                    }
+                    screen.selectForTest(selection);
+                    Map<String, Object> gesture = object(step.get("gesture"), "gesture");
+                    int tileX = number(gesture.get("tile_x"), "tile_x");
+                    int tileY = number(gesture.get("tile_y"), "tile_y");
                     Unit under;
                     if (gesture.containsKey("target_native_id")) {
                         Object targetValue = gesture.get("target_native_id");
-                        if (targetValue == null) {
-                            under = null;
-                        } else {
-                            int targetNativeId = number(targetValue,
-                                    "target_native_id");
-                            Map<String, Object> target = object(
-                                    scenario.get("target"), "target");
-                            require(number(target.get("native_id"),
-                                            "target native id") == targetNativeId,
+                        if (targetValue != null) {
+                            Map<String, Object> target = object(step.get("target"), "target");
+                            require(number(target.get("native_id"), "target native id")
+                                            == number(targetValue, "target_native_id"),
                                     "sealed target identity does not match its locator");
-                            int targetPlayer = optionalNumber(
-                                    target.get("player"), person);
-                            int targetX = number(target.get("x"), "target x");
-                            int targetY = number(target.get("y"), "target y");
-                            under = uniqueAt(world, targetPlayer, targetX, targetY);
-                            require(under != null, "no Java target at " + targetX
-                                    + "," + targetY + " for native "
-                                    + targetNativeId);
-                            Unit known = nativeToJava.putIfAbsent(targetNativeId, under);
-                            require(known == null || known.id() == under.id(),
-                                    "native target collides with a selected unit");
-                            if (!javaToNative.containsKey(under.id())) {
-                                javaToNative.put(under.id(), targetNativeId);
-                                identities.add(identityOf(under, targetNativeId));
-                            }
                         }
+                        under = targetValue == null ? null
+                                : nativeToJava.get(number(targetValue, "target_native_id"));
+                        require(targetValue == null || under != null,
+                                "sealed target is absent from the initial lifetime table");
                     } else {
                         under = world.unitAt(tileX, tileY);
                     }
                     screen.fieldRightClickForTest(tileX, tileY, under);
                 }
-                mission.tick();
+                if (cycle != 1 || !firstCycleObserved) {
+                    mission.tick();
+                }
                 screen.observePlayerIntents();
                 if (cycleLog != null) {
                     cycles.append(cycleLine(cycle, chosen, javaToNative, world))

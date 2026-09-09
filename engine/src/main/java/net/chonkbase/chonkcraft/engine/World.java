@@ -551,6 +551,12 @@ public final class World {
      */
     public boolean orderAttackMove(Unit unit, int tileX, int tileY,
             boolean fromPlayer) {
+        if (fromPlayer && unit != null && unit.isAlive() && unit.type().canAttack()
+                && unit.type().speed() > 0 && map.contains(tileX, tileY)
+                && movement.queuePlayerColdMoveReplacement(unit,
+                        Unit.QueuedOrderKind.ATTACK_MOVE, tileX, tileY)) {
+            return true;
+        }
         if (fromPlayer && unit != null && unit.order() == Unit.Order.STILL
                 && battleNetSequence != null) {
             int[] waits = movement.playerCommandWaits(unit);
@@ -572,8 +578,7 @@ public final class World {
         }
         boolean accepted = combat.orderAttackMove(unit, tileX, tileY);
         if (accepted && fromPlayer && battleNetSequence != null
-                && unit.order() == Unit.Order.ATTACK_MOVE
-                && unit.battleNetOrderDelay() == 0) {
+                && unit.order() == Unit.Order.ATTACK_MOVE) {
             // Issue-visit dest-attack dest-arms at fixture 8: Human 1 soldier
             // 1588 installs order 10 at 5 and first walks at 8. The issue
             // visit still decrements, so delay 3 dest-arms at 8; delay 2
@@ -4134,11 +4139,12 @@ public final class World {
         // went Still even though the commanded target was alive.
         unit.setSavedOrder(null);
         unit.setBattleNetCapitalPatrolRestoreArming(false);
-        if (unit.animation().unbreakable()) {
+        if (orderReplacementMustWait(unit)) {
             unit.clearQueuedOrders();
             unit.setPendingAttack(null, null, -1, -1);
             unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.ATTACK,
-                    target.tileX(), target.tileY(), target, null, null));
+                    target.tileX(), target.tileY(), target, null,
+                    fromPlayer ? "player-command" : null));
             unit.setQueuedReplacementPending(true);
             unit.rememberActionBeforeQueued(unit.order());
             return true;
@@ -4158,7 +4164,8 @@ public final class World {
                 unit.setOrderTarget(target.tileX(), target.tileY());
                 unit.enqueueOrder(new Unit.QueuedOrder(
                         Unit.QueuedOrderKind.ATTACK,
-                        target.tileX(), target.tileY(), target, null, null));
+                        target.tileX(), target.tileY(), target, null,
+                        fromPlayer ? "player-command" : null));
                 unit.setQueuedReplacementPending(true);
                 // The issue visit still decrements this delay, so add the
                 // beat native spends writing next_order instead of counting
@@ -4176,6 +4183,7 @@ public final class World {
         // order, so retain whether visibility was part of this order.
         unit.setAttackRequiresVisibility(isVisibleTo(unit.player(), target));
         unit.setOrder(Unit.Order.ATTACK);
+        unit.setBattleNetPlayerCommandAttack(fromPlayer);
         // COrder::NewActionAttack constructs order state only. The route is
         // PathFinderOutput on CUnit and survives until the new order's first
         // DoActionMove compares its effective goal and invalidates it if
@@ -4205,13 +4213,13 @@ public final class World {
         unit.setBattleNetLandPatrolAttackRoutePending(false);
         unit.setBattleNetResidualEmptyApproachIdlePending(false);
         unit.setBattleNetRetargetResidualParkRefill(false);
-        // The target begins under commanded ownership. Retail's moving-attack
-        // callback may later surrender it to a free reaction scan; playable
-        // desktop worlds suppress that scan only for siege-on-building clicks.
-        // autoAttack and attackBack say otherwise for the targets they pick.
+        // Automatic order 12 and explicit order 9 have different movement
+        // callbacks. Keep command provenance independently of autoTargeting:
+        // an automatically promoted Patrol also starts with this flag clear.
+        // autoAttack and attackBack mark the targets they select below.
         unit.setAutoTargeting(false);
-        // Commanded attacks are action 12 (chase). Stationary action-16 is
-        // set only by battleNetAutoAttack after this returns.
+        // Java ATTACK also carries native automatic order 12 (chase).
+        // Stationary action 16 is selected by battleNetAutoAttack below.
         unit.setBattleNetStationaryAttack(false);
         unit.setBattleNetStationaryRecoveryHeld(false);
         unit.setAttackScanSleep(0);
@@ -4251,7 +4259,7 @@ public final class World {
             // Dest-arming on the issue visit arrived 10,30 three cycles
             // early (offset 10 vs 16). A Still-queued Attack already set
             // its pop delay and must keep it.
-            if (fromPlayer && unit.battleNetOrderDelay() == 0) {
+            if (fromPlayer) {
                 unit.setBattleNetOrderDelay(3);
             }
         }
@@ -5677,7 +5685,7 @@ public final class World {
                 y = bottom + 1;
             }
         }
-        if (y == top - 1) {
+        if (y == top - 1 && worker.tileX() >= left && worker.tileX() <= right) {
             x = right + 1;
         } else if (x == right + 1) {
             y = bottom;
@@ -8668,7 +8676,12 @@ public final class World {
      * authenticated copy of that routing field, and it is in focused tests.</p>
      */
     private boolean battleNetHostilesStandAside(Unit unit) {
-        if (BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())) {
+        // Explicit Attack is native order 9 (0x010c), whose flags lack the
+        // 0x0002 mask selected at 0x44fc61. Enemy bodies remain route walls.
+        // Human 1 slot 1598 redraws around grunt 1591 on fixture 266; treating
+        // it as automatic order 12 repeatedly planned through the blocker.
+        if (unit.battleNetPlayerCommandAttack()
+                || BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(unit.type().ident())) {
             return false;
         }
         Unit.Order order = unit.order();
@@ -11803,6 +11816,26 @@ public final class World {
         unit.setBattleNetRetargetResidualParkRefill(false);
     }
 
+    /**
+     * A new order cannot take ownership of an unfinished movement body.
+     *
+     * <p>The native Move program advances independently of the presentation
+     * animation. Checking only its Unbreakable bit used to let an Attack
+     * replace Move with pixels still owed. Attack then waited for movement,
+     * movement no longer ran, and every later click waited for Attack.
+     * BNE's 0x4524bb/0x4524cd movement pass precedes order promotion at
+     * 0x452587: the XHuman 10 ballista retains Move after the fixture-23
+     * click and promotes Attack when its last pixel lands on fixture 44.
+     * A repeated Attack during pursuit has the same boundary: fixture
+     * c209a0cc10870f54aa4d36dfd54fb3ab44be5ce0142ca59b09c4664293897df3
+     * drains the south step through 44 before replacing Attack with Attack.
+     */
+    boolean orderReplacementMustWait(Unit unit) {
+        return unit.animation().unbreakable()
+                || (battleNetSequence != null
+                        && movement.battleNetCurrentMoveBody(unit));
+    }
+
     /** Starts the next viable shifted command once the current order finishes. */
     private void beginNextQueuedOrder(Unit unit) {
         // HandleUnitAction cannot pop Orders[1] until the committed animation
@@ -11812,7 +11845,7 @@ public final class World {
         // simulation thread forever. A large showcase made this reachable by
         // retargeting a Still unit on the final committed frame, but it is a
         // general player-command queue invariant, not a showcase exception.
-        if (unit.animation().unbreakable()) {
+        if (orderReplacementMustWait(unit)) {
             return;
         }
         while (unit.order() == Unit.Order.STILL && unit.isOnMap()) {
@@ -11825,7 +11858,14 @@ public final class World {
             unit.setQueuedReplacementPending(false);
             boolean accepted = switch (queued.kind()) {
                 case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
-                case ATTACK -> orderAttack(unit, queued.target());
+                case ATTACK -> {
+                    boolean installed = orderAttack(unit, queued.target());
+                    if (installed) {
+                        unit.setBattleNetPlayerCommandAttack(
+                                "player-command".equals(queued.value()));
+                    }
+                    yield installed;
+                }
                 case HARVEST -> queued.target() != null
                         ? harvest.orderHarvest(unit, queued.target())
                         : harvest.orderHarvestCommand(unit, queued.x(), queued.y());
@@ -11833,7 +11873,13 @@ public final class World {
                 case CAST -> queued.target() != null
                         ? orderCast(unit, queued.value(), queued.target())
                         : orderCast(unit, queued.value(), queued.x(), queued.y());
-                case PATROL -> orderPatrol(unit, queued.x(), queued.y());
+                case PATROL -> {
+                    if ("player-command".equals(queued.value())) {
+                        releaseBattleNetCombatOrderForPlayerReplacement(unit);
+                        unit.setBattleNetPlayerCommandMove(false);
+                    }
+                    yield orderPatrol(unit, queued.x(), queued.y());
+                }
                 case REPAIR -> construction.orderRepair(unit, queued.target());
                 case EXPLORE -> orderExplore(unit);
                 case RETURN_GOODS -> orderReturnGoods(unit, false, queued.target());
@@ -11904,6 +11950,13 @@ public final class World {
                         // constant produced 12/59.
                         popDelay = Math.max(0,
                                 movement.playerCommandWaits(unit)[0] - 1);
+                    }
+                    // This promotion is at the loop head, before the new
+                    // order executes in the same visit. A cold Move's player
+                    // replacement still owes that visit; ordinary Still and
+                    // landed-stride promotions below occur at the loop tail.
+                    if ("player-cold-move".equals(queued.value())) {
+                        popDelay++;
                     }
                     unit.setBattleNetOrderDelay(popDelay);
                     if (queuedGoldHarvestOpening
@@ -12067,7 +12120,7 @@ public final class World {
                 harvest.orderHarvest(unit, toX, toY);
             }
             if (unit.orderFinished() && unit.hasQueuedOrders()
-                    && !unit.animation().unbreakable()) {
+                    && !orderReplacementMustWait(unit)) {
                 // HandleUnitAction advances a finished head to the command
                 // already behind it before executing the unit. This matters
                 // for FlushMode::Off as much as for shifted player commands:
@@ -12082,7 +12135,7 @@ public final class World {
                 beginNextQueuedOrder(unit);
             }
             if (unit.reportsActionBeforeQueued()
-                    && !unit.animation().unbreakable()
+                    && !orderReplacementMustWait(unit)
                     && !(unit.order() == Unit.Order.MOVE
                         && unit.battleNetOrderDelay()
                             > unit.actionBeforeQueuedReleaseDelay())) {
@@ -12547,41 +12600,60 @@ public final class World {
                         unit.walkHolding() ? 1 : 0, unit.pathLength(),
                         unit.routeSpent() ? 1 : 0, unit.tileX(), unit.tileY());
             }
-            switch (unit.order()) {
-                case MOVE -> movement.stepMoveOrderWithBattleNetCritter(unit);
-                case ATTACK -> combat.stepAttack(unit);
-                case DYING -> stepDying(unit);
-                case HARVEST -> harvest.stepHarvest(unit);
-                case BUILD -> construction.stepWalkToSite(unit);
-                case UNDER_CONSTRUCTION -> construction.stepConstruction(unit);
-                case STILL -> idle.stepStill(unit);
-                case STAND_GROUND -> combat.stepStandGround(unit);
-                case PATROL -> stepPatrol(unit);
-                case REPAIR -> construction.stepRepair(unit);
-                case EXPLORE -> stepExplore(unit);
-                case RETURN_GOODS -> harvest.stepReturnGoods(unit);
-                case ATTACK_GROUND -> combat.stepAttackGround(unit);
-                case ATTACK_MOVE -> combat.stepAttackMove(unit);
-                case BOARD -> stepBoard(unit);
-                case UNLOAD -> stepUnload(unit);
-                case SPELL_CAST -> stepSpellCast(unit);
-                case FOLLOW -> stepFollow(unit);
-                case DEFEND -> stepDefend(unit);
+            boolean drainingReplacedStride = battleNetSequence != null
+                    && unit.queuedReplacementPending()
+                    && unit.reportsActionBeforeQueued()
+                    && movement.battleNetCurrentMoveBody(unit);
+            if (drainingReplacedStride) {
+                // BNE advances the committed Move program before dispatching
+                // or promoting an order (0x4524bb/0x4524cd before 0x452587).
+                // This includes pursuit entered through Attack, Attack-Move
+                // and Patrol. Dispatching the old chase here used to start
+                // another route element and keep the replacement waiting.
+                if (unit.battleNetOrderDelay() > 0) {
+                    unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                } else {
+                    movement.walkPixels(unit);
+                }
+            } else {
+                switch (unit.order()) {
+                    case MOVE -> movement.stepMoveOrderWithBattleNetCritter(unit);
+                    case ATTACK -> combat.stepAttack(unit);
+                    case DYING -> stepDying(unit);
+                    case HARVEST -> harvest.stepHarvest(unit);
+                    case BUILD -> construction.stepWalkToSite(unit);
+                    case UNDER_CONSTRUCTION -> construction.stepConstruction(unit);
+                    case STILL -> idle.stepStill(unit);
+                    case STAND_GROUND -> combat.stepStandGround(unit);
+                    case PATROL -> stepPatrol(unit);
+                    case REPAIR -> construction.stepRepair(unit);
+                    case EXPLORE -> stepExplore(unit);
+                    case RETURN_GOODS -> harvest.stepReturnGoods(unit);
+                    case ATTACK_GROUND -> combat.stepAttackGround(unit);
+                    case ATTACK_MOVE -> combat.stepAttackMove(unit);
+                    case BOARD -> stepBoard(unit);
+                    case UNLOAD -> stepUnload(unit);
+                    case SPELL_CAST -> stepSpellCast(unit);
+                    case FOLLOW -> stepFollow(unit);
+                    case DEFEND -> stepDefend(unit);
+                }
             }
             combat.finishBattleNetAttackSequenceMarker(unit);
+            if (drainingReplacedStride
+                    && !orderReplacementMustWait(unit)) {
+                // Native promotes next_order on the visit which finishes
+                // the Move body, before the next unit update. Waiting for
+                // the next loop head adds a cycle to every interrupted step.
+                unit.setOrder(Unit.Order.STILL);
+                unit.setActionBeforeQueued(null);
+                unit.setWaitCycles(0);
+            }
             if (unit.order() == Unit.Order.STILL && unit.hasQueuedOrders()
                     && unit.isOnMap()) {
                 if (unit.battleNetOrderDelay() > 0) {
                     unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
                     if (unit.battleNetOrderDelay() == 0) {
                         beginNextQueuedOrder(unit);
-                        // GiveOrder 27 pops after the Still body. Native
-                        // first_progress is that Repair visit (repair-1/03
-                        // fixture 9). Waiting for the next tick's step left
-                        // first walk at 10.
-                        if (unit.order() == Unit.Order.REPAIR) {
-                            construction.stepRepair(unit);
-                        }
                     }
                 } else {
                     beginNextQueuedOrder(unit);
@@ -12954,6 +13026,15 @@ public final class World {
         unit.setAttackMoveOpening(saved == Unit.Order.ATTACK_MOVE
                 && savedAttackMoveOpening);
         unit.setOrder(saved == null ? Unit.Order.STILL : saved);
+        if (saved == Unit.Order.PATROL && isPerson(unit.player())
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && savedAttackMoveX >= 0 && savedAttackMoveY >= 0
+                && battleNetSequence != null) {
+            unit.setOrderTarget(savedAttackMoveX, savedAttackMoveY);
+            unit.setBattleNetLandPatrolMoveBody(true);
+            unit.setBattleNetOrderDelay(2);
+            restartBattleNetArmedPatrol(unit);
+        }
         if (saved == null && battleNetSequence != null) {
             // EndActionAttack creates a new COrder_Still when RestoreOrder has
             // nothing to install.  That replacement owns a fresh Still
@@ -15616,6 +15697,8 @@ public final class World {
         }
         Unit.Order interrupted = unit.order();
         if (landPatrolHandoff) {
+            int patrolGoalX = unit.savedOrderGoalX();
+            int patrolGoalY = unit.savedOrderGoalY();
             if (orderAttack(unit, target, false, false)) {
                 // Direct Attack is the continuation of this Patrol-owned Move
                 // program. Keep script.bin pixel pacing across its chase;
@@ -15627,6 +15710,10 @@ public final class World {
                 // promotion did not share a visit with the first countdown
                 // and therefore must not be reseeded to four.
                 unit.setBattleNetLandPatrolAttackConstruction(true);
+                if (isPerson(unit.player())) {
+                    rememberInterruptedOrder(unit, interrupted);
+                    unit.setSavedOrderGoal(patrolGoalX, patrolGoalY);
+                }
                 // Behavior-two's opening land Patrol is only the bootstrap
                 // carrier for this direct assault.  Its action-12 pop replaces
                 // that carrier; it is not AutoAttack's saved patrol clone.
@@ -16057,7 +16144,7 @@ public final class World {
             boolean landAssaultPatrolConstructor =
                     unit.type() != null
                     && unit.type().moveType() == UnitType.Movement.LAND
-                    && unit.battleNetAiBehavior() == 2
+                    && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()))
                     && !unit.isMoving() && unit.pathLength() == 0
                     && unit.battleNetOrderDelay() <= 1
                     && stillStart >= 0
@@ -16192,7 +16279,9 @@ public final class World {
                 return;
             }
             landPatrolMoveBodyOp0 = true;
-            if (!battleNetPatrolQueueAcquire(unit)) {
+            if ((!isPerson(unit.player()) || !battleNetPatrolEndpointReached(unit))
+                    && !battleNetPatrolQueueAcquire(unit)
+                    && !isPerson(unit.player())) {
                 unit.setBattleNetLandPatrolMoveBody(false);
             }
         }
@@ -16478,6 +16567,9 @@ public final class World {
                 && !landPatrolMoveBodyOp0
                 && !battleNetLandPatrolAttackHandoff(unit)
                 && !armedFlyerPatrol
+                && !(isPerson(unit.player())
+                        && unit.type().moveType() == UnitType.Movement.LAND
+                        && battleNetSequence != null)
                 && unit.pendingAttack() == null
                 && combat.autoAttack(unit)) {
             // The generic scan counter is only a presentation-layer surrogate
@@ -16801,7 +16893,7 @@ public final class World {
         boolean spentLandPatrolResidual = battleNetSequence != null
                 && unit.type() != null
                 && unit.type().moveType() == UnitType.Movement.LAND
-                && unit.isMoving() && unit.pathLength() == 0
+                && (unit.isMoving() || landPatrolMoveBodyOp0) && unit.pathLength() == 0
                 && unit.routeSpent();
         boolean paidSmallWarshipBlockedRouteWake = false;
         if (battleNetArmedSmallWarshipPatrol(unit)
@@ -17004,6 +17096,16 @@ public final class World {
      * left a follower that took the order and stood down on its first step.
      */
     private void stepFollow(Unit unit) {
+        if (unit.battleNetStopAfterLeftover() || unit.battleNetPlayerCommandMove()) {
+            // Move releases the old followed target at the command boundary.
+            // Testing that target first used to stand the follower down and
+            // discard the new destination before its committed pixels landed.
+            if (unit.isMoving() || unit.residualX() != 0 || unit.residualY() != 0) {
+                movement.walkPixels(unit);
+            }
+            movement.finishLeftoverReplacement(unit);
+            return;
+        }
         Unit target = unit.target();
         if (target == null || !target.isAlive() || !target.isOnMap()) {
             unit.setTarget(null);
@@ -17058,6 +17160,7 @@ public final class World {
                 || unit.type().speed() <= 0) {
             return false;
         }
+        unit.setBattleNetPlayerCommandMove(false);
         unit.clearPath();
         unit.setTarget(target);
         unit.setOrder(Unit.Order.FOLLOW);
@@ -18127,6 +18230,19 @@ public final class World {
             return false;
         }
         Unit.Order before = unit.order();
+        if (fromPlayer && orderReplacementMustWait(unit)) {
+            unit.clearQueuedOrders();
+            unit.setPendingAttack(null, null, -1, -1);
+            unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.PATROL,
+                    toX, toY, null, null, "player-command"));
+            unit.setQueuedReplacementPending(true);
+            unit.rememberActionBeforeQueued(before);
+            return true;
+        }
+        if (fromPlayer) {
+            releaseBattleNetCombatOrderForPlayerReplacement(unit);
+            unit.setBattleNetPlayerCommandMove(false);
+        }
         // Native GiveOrder 5 from Still with remaining Still wait writes
         // next_order 5 and keeps Still: Orc 1 grunt 1592 queueWait 4
         // through fixture 8, Patrol at 9, dest-arms at 12. Installing
@@ -18154,8 +18270,7 @@ public final class World {
         unit.setOrderTarget(toX, toY);
         unit.setOrder(Unit.Order.PATROL);
         armBattleNetPatrolSequence(unit, before);
-        if (fromPlayer && battleNetSequence != null
-                && unit.battleNetOrderDelay() == 0) {
+        if (fromPlayer && battleNetSequence != null) {
             // Issue-visit Patrol dest-arms at fixture 8: peon 1594
             // installs at 5 timer 3 and first walks at 8.
             unit.setBattleNetOrderDelay(3);
@@ -18187,7 +18302,7 @@ public final class World {
                 && unit.battleNetAiBehavior() == 2;
         boolean landAssaultPatrol =
                 unit.type().moveType() == UnitType.Movement.LAND
-                && unit.battleNetAiBehavior() == 2;
+                && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()));
         if (!capitalShip && !exhaustedFlyer && !assaultWarship
                 && !landAssaultPatrol) {
             return;
@@ -18433,11 +18548,20 @@ public final class World {
         if (target == null) {
             return false;
         }
+        if (isPerson(unit.player())
+                && unit.type().moveType() == UnitType.Movement.LAND
+                && unit.savedOrder() == null) {
+            // Native retains both Patrol endpoints while the attack point
+            // changes. RestoreOrder must resume the old leg, not the quarry's
+            // last square (Human 1 returns toward 21,5 after its fight).
+            unit.setSavedOrder(Unit.Order.PATROL);
+            unit.setSavedOrderGoal(unit.orderTargetX(), unit.orderTargetY());
+        }
         int goalX = target.tileX();
         int goalY = target.tileY();
         boolean openingLandAttack =
                 unit.type().moveType() == UnitType.Movement.LAND
-                        && unit.battleNetAiBehavior() == 2;
+                        && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()));
         boolean openingSmallWarshipAttack =
                 battleNetArmedSmallWarshipPatrol(unit);
         if (openingLandAttack || openingSmallWarshipAttack) {
@@ -18469,7 +18593,7 @@ public final class World {
         if (battleNetSequence == null || unit == null || unit.type() == null
                 || unit.order() != Unit.Order.PATROL
                 || unit.type().moveType() != UnitType.Movement.LAND
-                || unit.battleNetAiBehavior() != 2
+                || (unit.battleNetAiBehavior() != 2 && !isPerson(unit.player()))
                 || unit.pathLength() != 0 || unit.isMoving()) {
             return false;
         }
@@ -18480,11 +18604,11 @@ public final class World {
     }
 
     /** Direct Attack queued behind a behavior-two land Patrol stride. */
-    private static boolean battleNetLandPatrolAttackHandoff(Unit unit) {
+    private boolean battleNetLandPatrolAttackHandoff(Unit unit) {
         return unit != null && unit.type() != null
                 && unit.order() == Unit.Order.PATROL
                 && unit.type().moveType() == UnitType.Movement.LAND
-                && unit.battleNetAiBehavior() == 2
+                && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()))
                 && unit.pendingAttack() != null
                 && unit.pendingAttackFrom() == Unit.Order.PATROL;
     }
@@ -18572,7 +18696,9 @@ public final class World {
 
     /** Restarts the binary constructor owned by a Patrol endpoint exchange. */
     private void restartBattleNetPatrolAfterEndpointSwap(Unit unit) {
-        if (battleNetArmedSmallWarshipPatrol(unit)) {
+        if (battleNetArmedSmallWarshipPatrol(unit)
+                || (battleNetSequence != null && isPerson(unit.player())
+                        && unit.type().moveType() == UnitType.Movement.LAND)) {
             // Small armed warships are not standing-capital cursors, but an
             // endpoint exchange still constructs the next Patrol leg at the
             // Still head. XOrc 8 destroyer 1435 swaps 88,73 for 115,53 on

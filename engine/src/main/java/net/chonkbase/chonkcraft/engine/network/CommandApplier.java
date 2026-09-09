@@ -318,6 +318,14 @@ public final class CommandApplier {
             }
             case NONE, QUIT -> accepted = false;
         }
+        if (accepted && !command.queued() && isQueueable(command.kind())) {
+            // GiveOrder overwrites a pending Stop while its old stride still
+            // drains. XHuman 7 submarine 1422 receives Stop at 68, then Move
+            // at 75: native next_order changes 2 -> 3, lands at 95, and walks
+            // toward the new point at 99. Keeping Stop armed used to discard
+            // that accepted replacement at the end of the old stride.
+            unit.setBattleNetStopAfterLeftover(false);
+        }
         if (!accepted && pendingBefore != null) {
             unit.restorePendingOrders(pendingBefore);
         }
@@ -356,7 +364,9 @@ public final class CommandApplier {
         UnitType type = command.kind() == GameCommand.Kind.BUILD
                 ? typeAt(command.typeIndex()) : null;
         String value = command.kind() == GameCommand.Kind.CAST
-                ? spellAt(command.typeIndex()) : null;
+                ? spellAt(command.typeIndex())
+                : command.kind() == GameCommand.Kind.ATTACK
+                        || command.kind() == GameCommand.Kind.PATROL ? "player-command" : null;
         Unit.QueuedOrderKind kind = switch (command.kind()) {
             case MOVE -> Unit.QueuedOrderKind.MOVE;
             case ATTACK -> Unit.QueuedOrderKind.ATTACK;

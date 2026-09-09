@@ -379,6 +379,8 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
     """Promote the authenticated movement matrix into an exploration seed."""
     source = fixture.expanduser().resolve()
     source_manifest = bne_command_matrix._manifest(source)
+    frame = bne_command_matrix._first_frame(source)
+    player = bne_command_matrix.command_player(frame)
     source_run = source_manifest.get("run") or {}
     plan, scripts = bne_command_matrix.compile_matrix(
         source, cycles=cycles, command_cycle=command_cycle, distance=distance)
@@ -400,9 +402,12 @@ def seed_from_fixture(fixture: Path, *, cycles: int = 160,
                        if f"-{value}-" in case_id), None)
         if domain is None:
             raise ValueError(f"matrix case {case_id} has no movement domain")
+        raw = frame["units"][unit_id]
         actors.setdefault(unit_id, {
             "id": unit_id,
-            "player": 0,
+            "player": player,
+            "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
+            "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
             "domain": {"ground": "land", "air": "air", "sea": "water"}[domain],
             "capabilities": ["move"],
             "target_ids": [],
@@ -569,6 +574,7 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
     """
     validate_seed(seed)
     catalog = load_typed_command_capabilities()
+    player = bne_command_matrix.command_player(bne_command_matrix._first_frame(fixture))
     records = _frame_units(fixture)
     by_slot = dict(records)
     actors = {actor["id"]: actor for actor in seed["actors"]}
@@ -584,15 +590,15 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
         ident = bne_type_ident(raw[39])
         owner = raw[bne_command_matrix.UNIT_OWNER]
         caps = typed_capabilities_for_type(raw[39], catalog)
-        if owner != 0 and ident not in RESOURCE_TYPE_IDENTS:
+        if owner != player and ident not in RESOURCE_TYPE_IDENTS:
             hostiles.append(slot)
         if ident in RESOURCE_TYPE_IDENTS:
             resources.append(slot)
-        if owner == 0 and ident in REPAIR_TARGET_IDENTS:
+        if owner == player and ident in REPAIR_TARGET_IDENTS:
             repairables.append(slot)
-        if owner == 0 and ({"train", "research"} & caps):
+        if owner == player and ({"train", "research"} & caps):
             trainers.append(slot)
-        if owner == 0 and "harvest" in caps:
+        if owner == player and "harvest" in caps:
             harvesters.append(slot)
         if slot in actors:
             allowed = set(actors[slot]["capabilities"]) | caps
@@ -643,7 +649,9 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             allowed.add("attack-move")
         actors[slot] = {
             "id": slot,
-            "player": 0,
+            "player": player,
+            "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
+            "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
             "domain": "land" if movement == 0
             else "air" if movement == 1 else "water",
             "capabilities": sorted(allowed),
@@ -660,7 +668,9 @@ def enrich_seed_families(seed: dict[str, Any], fixture: Path) -> dict[str, Any]:
             continue
         actors[slot] = {
             "id": slot,
-            "player": 0,
+            "player": player,
+            "x": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_X),
+            "y": bne_command_matrix._u16(raw, bne_command_matrix.UNIT_Y),
             "domain": "land",
             "capabilities": production,
             "target_ids": [],
@@ -813,6 +823,18 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
     oracle = ((manifest.get("oracle") or {}).get("executable") or {})
     if oracle.get("sha256") != PINNED_BNE_EXECUTABLE_SHA256:
         raise ValueError("commanded fixture is not backed by pinned BNE 2.02b")
+    # Older tracers injected into network slot zero even when the campaign UI
+    # controlled another player. Keep those low-level witnesses explicitly
+    # labelled; never pass them off as legal clicks from the human player.
+    from bne_fixture import validate_fixture
+    validate_fixture(source)
+    with zipfile.ZipFile(source) as archive:
+        applied = {
+            (int(fields["cycle"]), int(fields["unit"]), fields["action"])
+            for line in archive.read("trace.txt").decode("utf-8", "replace").splitlines()
+            if "event=command-applied " in line
+            for fields in [dict(re.findall(r"([\w-]+)=([^ ]+)", line))]
+        }
     commands = parse_injector_script(script)
     frame = bne_command_matrix._first_frame(source)
     run = manifest.get("run") or {}
@@ -886,6 +908,17 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             "x": dest_x,
             "y": dest_y,
         }
+    human_player = bne_command_matrix.command_player(frame)
+    command_player = human_player
+    control_authority = "campaign-player"
+    owners = {actor["player"] for actor in actors.values()}
+    if owners != {human_player} and all(
+            (command["issue_cycle"], command["unit_id"], command["kind"]) in applied
+            for command in commands):
+        if len(owners) != 1:
+            raise ValueError("commanded capture uses multiple injected owners")
+        command_player = next(iter(owners))
+        control_authority = "captured-nonhuman-injection"
     seed: dict[str, Any] = {
         "schema": SEED_SCHEMA,
         "identity": {
@@ -901,6 +934,8 @@ def seed_from_commanded_fixture(fixture: Path) -> dict[str, Any]:
             "scenario": run.get("requested_scenario"),
             "seed": run.get("initialization_seed", 1),
             "cycle_limit": cycle_limit,
+            "command_player": command_player,
+            "control_authority": control_authority,
         },
         "start_cycle": start_cycle,
         # Settle is measured from the final command. Using the first command
@@ -2003,6 +2038,10 @@ def native_command_script(scenario: dict[str, Any]) -> str:
         f"# scenario-sha256 {scenario['scenario_sha256']}",
     ]
     for command in scenario["commands"]:
+        if command.get("queued"):
+            raise ValueError(
+                "native direct command injector does not prove queued orders; "
+                "use the authenticated replay-packet adapter")
         if command["kind"] in {"move", "patrol", "attack-ground", "attack-move"}:
             if not all(isinstance(command.get(key), int) for key in ("x", "y")):
                 raise ValueError(f"{command['kind']} command has no integer destination")
