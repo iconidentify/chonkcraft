@@ -754,7 +754,8 @@ public final class LoadGame {
                 unit.setSavedOrder(null);
             }
         }
-        if (unit.savedOrder() == Unit.Order.ATTACK_MOVE
+        if ((unit.savedOrder() == Unit.Order.ATTACK_MOVE
+                || unit.savedOrder() == Unit.Order.PATROL)
                 && state.rawGet("savedAttackMoveX") != null) {
             unit.setSavedAttackMove(integer(state.rawGet("savedAttackMoveX")),
                     integer(state.rawGet("savedAttackMoveY")));
@@ -887,6 +888,10 @@ public final class LoadGame {
                 unit.setActionBeforeQueued(null);
             }
         }
+        if (state.rawGet("playerCommandAttack") != null) {
+            unit.setBattleNetPlayerCommandAttack(
+                    truthy(state.rawGet("playerCommandAttack")));
+        }
         if (state.rawGet("playerCommandMove") != null) {
             unit.setBattleNetPlayerCommandMove(
                     truthy(state.rawGet("playerCommandMove")));
@@ -995,6 +1000,97 @@ public final class LoadGame {
         }
         if (state.rawGet("target") != null) {
             unit.setTarget(byId.get(integer(state.rawGet("target"))));
+        }
+        // Restore combat latches after setTarget, which clears the old quarry's state.
+        if (state.rawGet("offeredTarget") != null) {
+            unit.setOfferedTarget(byId.get(integer(state.rawGet("offeredTarget"))));
+        }
+        if (state.rawGet("battleNetIdlePhase") != null) {
+            unit.setBattleNetIdlePhase(integer(state.rawGet("battleNetIdlePhase")));
+        }
+        if (state.rawGet("battleNetPudData") != null) {
+            unit.setBattleNetPudData(integer(state.rawGet("battleNetPudData")));
+        }
+        if (state.rawGet("battleNetReadySuppressed") != null) {
+            unit.setBattleNetReadySuppressed(truthy(state.rawGet("battleNetReadySuppressed")));
+        }
+        if (state.rawGet("fighting") != null) {
+            unit.setFighting(truthy(state.rawGet("fighting")));
+        }
+        if (state.rawGet("swingAtAir") != null) {
+            unit.setSwingAtAir(truthy(state.rawGet("swingAtAir")));
+        }
+        if (state.rawGet("attackRequiresVisibility") != null) {
+            unit.setAttackRequiresVisibility(truthy(state.rawGet("attackRequiresVisibility")));
+        }
+        if (state.rawGet("attackScanSleep") != null) {
+            unit.setAttackScanSleep(integer(state.rawGet("attackScanSleep")));
+        }
+        if (state.rawGet("autoTargeting") != null) {
+            unit.setAutoTargeting(truthy(state.rawGet("autoTargeting")));
+        }
+        if (state.rawGet("attackedCycle") != null) {
+            unit.setAttackedCycle((long) number(state.rawGet("attackedCycle")));
+        }
+        if (state.rawGet("battleNetMeleeSyncRemaining") != null) {
+            unit.setBattleNetMeleeSyncRemaining(integer(state.rawGet("battleNetMeleeSyncRemaining")));
+        }
+        if (state.rawGet("battleNetSequenceMeleeLanded") != null) {
+            unit.setBattleNetSequenceMeleeLanded(truthy(state.rawGet("battleNetSequenceMeleeLanded")));
+        }
+        if (state.rawGet("battleNetChaseLegOpensCold") != null) {
+            unit.setBattleNetChaseLegOpensCold(truthy(state.rawGet("battleNetChaseLegOpensCold")));
+        }
+        if (state.rawGet("battleNetAttackOp0OutOfRange") != null) {
+            unit.setBattleNetAttackOp0OutOfRange(truthy(state.rawGet("battleNetAttackOp0OutOfRange")));
+        }
+        if (state.rawGet("battleNetPersonHelpFirstChase") != null) {
+            unit.setBattleNetPersonHelpFirstChase(truthy(state.rawGet("battleNetPersonHelpFirstChase")));
+        }
+        if (state.rawGet("lastStepHeading") != null) {
+            unit.setLastStepHeading(integer(state.rawGet("lastStepHeading")));
+        }
+        if (state.rawGet("stepDrained") != null) {
+            unit.setStepDrained(truthy(state.rawGet("stepDrained")));
+        }
+        if (state.rawGet("direction") != null) {
+            unit.setDirection(integer(state.rawGet("direction")));
+        }
+        if (state.rawGet("attackGoalX") != null) {
+            unit.setAttackGoal(integer(state.rawGet("attackGoalX")),
+                    integer(state.rawGet("attackGoalY")));
+        }
+        if (state.rawGet("battleNetMovePaceOffset") != null) {
+            unit.setBattleNetMovePaceOffset(integer(state.rawGet("battleNetMovePaceOffset")));
+            unit.setBattleNetMovePaceTimer(integer(state.rawGet("battleNetMovePaceTimer")));
+        }
+        if (state.rawGet("pendingRotation") != null) {
+            unit.setPendingRotation(integer(state.rawGet("pendingRotation")));
+        }
+        if (state.rawGet("routeSpent") != null) {
+            unit.setRouteSpent(truthy(state.rawGet("routeSpent")));
+        }
+        if (state.rawGet("path") instanceof SaveTable path) {
+            int[] headings = path.array().stream().mapToInt(LoadGame::integer).toArray();
+            unit.restorePath(headings, integer(state.rawGet("pathInitialLength")));
+        }
+        if (state.rawGet("chasing") != null) {
+            unit.setChasing(truthy(state.rawGet("chasing")));
+        }
+        if (state.rawGet("battleNetPendingMeleeSyncRand") != null) {
+            unit.setBattleNetPendingMeleeSyncRand(truthy(state.rawGet("battleNetPendingMeleeSyncRand")));
+        }
+        if (state.rawGet("battleNetLandPatrolAttackConstruction") != null) {
+            unit.setBattleNetLandPatrolAttackConstruction(truthy(state.rawGet("battleNetLandPatrolAttackConstruction")));
+        }
+        if (state.rawGet("frame") != null) {
+            unit.setFrame(integer(state.rawGet("frame")));
+        }
+        if (state.rawGet("pendingAttack") != null) {
+            Unit.Order from = Unit.Order.valueOf(string(state.rawGet("pendingAttackFrom")));
+            unit.setPendingAttack(byId.get(integer(state.rawGet("pendingAttack"))), from,
+                    integer(state.rawGet("pendingAttackX")),
+                    integer(state.rawGet("pendingAttackY")));
         }
         // Restore quarry-bound state after the target. Unit.setTarget
         // deliberately clears markers inherited from a different quarry.

@@ -336,6 +336,9 @@ public final class Unit {
     private int battleNetOrderDelay;
     private boolean battleNetPlayerCommandMove;
 
+    /** Explicit GiveOrder Attack (native order 9), distinct from automatic order 12. */
+    private boolean battleNetPlayerCommandAttack;
+
     /**
      * This player Move is the walking half of retail GiveOrder 17.
      *
@@ -1460,9 +1463,8 @@ public final class Unit {
      * the walk ends inside {@code InAttackRange} or a strike begins, and
      * left when the range check in the attack animation's breakable tail
      * finds the quarry gone.
-     * Transient combat state, deliberately not persisted: a save mid-swing
-     * reloads into the chase, exactly as a save cannot hold an animation
-     * frame.
+     * Saved together with the animation cursor so a mid-swing reload keeps
+     * the same strike, target checks and random-draw cadence.
      */
     public boolean fighting() {
         return fighting;
@@ -1736,6 +1738,10 @@ public final class Unit {
     public void setOrder(Order order) {
         Order previous = this.order;
         this.order = order;
+        if (order != Order.ATTACK && !(order == Order.MOVE
+                && battleNetBorrowedMoveForStep && previous == Order.ATTACK)) {
+            battleNetPlayerCommandAttack = false;
+        }
         boolean borrowedPatrolMove = order == Order.MOVE
                 && battleNetBorrowedMoveForStep
                 && previous == Order.PATROL;
@@ -1819,6 +1825,20 @@ public final class Unit {
     }
 
     public void setSavedAttackMove(int x, int y) {
+        savedAttackMoveX = x;
+        savedAttackMoveY = y;
+    }
+
+    /** The saved positional order's goal; the serialized field names predate Patrol support. */
+    public int savedOrderGoalX() {
+        return savedAttackMoveX;
+    }
+
+    public int savedOrderGoalY() {
+        return savedAttackMoveY;
+    }
+
+    public void setSavedOrderGoal(int x, int y) {
         savedAttackMoveX = x;
         savedAttackMoveY = y;
     }
@@ -3851,6 +3871,14 @@ public final class Unit {
         return battleNetOrderDelay;
     }
 
+    public boolean battleNetPlayerCommandAttack() {
+        return battleNetPlayerCommandAttack;
+    }
+
+    public void setBattleNetPlayerCommandAttack(boolean commanded) {
+        battleNetPlayerCommandAttack = commanded;
+    }
+
     public boolean battleNetPlayerCommandMove() {
         return battleNetPlayerCommandMove;
     }
@@ -4740,6 +4768,13 @@ public final class Unit {
         this.battleNetMoveFreeDetourPending = false;
         this.battleNetPlainMoveDirectLine = false;
         this.battleNetPlainMoveRefusalReplacement = false;
+    }
+
+    /** Restores a saved route without treating it as a newly planned path. */
+    public void restorePath(int[] remainingHeadings, int initialLength) {
+        this.path = remainingHeadings.clone();
+        this.pathLength = remainingHeadings.length;
+        this.battleNetPathInitialLength = Math.max(pathLength, initialLength);
     }
 
     public void clearPath() {

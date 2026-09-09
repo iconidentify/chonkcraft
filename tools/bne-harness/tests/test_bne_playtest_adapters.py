@@ -83,6 +83,22 @@ class PlaytestAdapterTest(unittest.TestCase):
         self.assertEqual(17, observation["state"]["tile_y"])
         self.assertEqual("STILL", observation["state"]["order"])
 
+    def test_historical_nonhuman_injections_are_explicitly_labelled(self):
+        fixture = (Path(__file__).resolve().parents[1]
+                   / "work/playtest-explorer/commanded/attack-ground-1/00.bnefx")
+        seed = explorer.seed_from_commanded_fixture(fixture)
+        self.assertEqual(0, seed["setup"]["command_player"])
+        self.assertEqual("captured-nonhuman-injection", seed["setup"]["control_authority"])
+        human = explorer.seed_from_commanded_fixture(COMMANDED)
+        self.assertEqual("campaign-player", human["setup"]["control_authority"])
+
+    def test_command_event_matching_does_not_accept_numeric_or_action_prefixes(self):
+        command = {"issue_cycle": 5, "unit_id": 15, "kind": "attack"}
+        self.assertFalse(native.event_names_command(
+            "event=command-applied cycle=50 unit=150 action=attack-ground", command))
+        self.assertTrue(native.event_names_command(
+            "event=command-applied cycle=5 unit=15 action=attack", command))
+
     def test_native_progress_ignores_a_tile_reservation_without_a_pixel_step(self):
         before = {
             "alive": True, "tile_x": 20, "tile_y": 31,
@@ -262,6 +278,47 @@ class PlaytestAdapterTest(unittest.TestCase):
             if key != "scenario_sha256"
         })
         with self.assertRaisesRegex(ValueError, "do not match"):
+            native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
+
+    def test_native_adapter_refuses_a_plain_fixture_for_a_queued_command(self):
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        scenario["commands"][0]["queued"] = True
+        scenario["scenario_sha256"] = explorer.digest({
+            key: value for key, value in scenario.items() if key != "scenario_sha256"})
+        with self.assertRaisesRegex(ValueError, "do not match"):
+            native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
+
+    def test_native_adapter_refuses_a_different_initialization_seed(self):
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        scenario["setup"]["seed"] += 1
+        with self.assertRaisesRegex(ValueError, "initialization seed"):
+            native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
+
+    def test_native_adapter_refuses_a_shorter_observation_window(self):
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        scenario["settle_cycles"] += 1
+        with self.assertRaisesRegex(ValueError, "observation horizon"):
+            native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
+
+    def test_native_adapter_observes_only_the_requested_prefix(self):
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        scenario["settle_cycles"] = 1
+        scenario["combat_observation"] = {"unit_ids": [1594]}
+        result = native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
+        self.assertEqual(6, result["observations"][0]["terminal_cycle"],
+                         "later captured movement cannot certify this short window")
+        self.assertEqual(6, max(event["cycle"] for event in result["events"]),
+                         "cycle evidence must end at the same horizon as Java")
+
+    def test_native_adapter_refuses_an_actor_paired_to_another_square(self):
+        seed = explorer.seed_from_commanded_fixture(COMMANDED)
+        scenario = explorer.generate_scenarios(seed, max_scenarios=1)[0]
+        scenario["actors"][0]["x"] += 1
+        with self.assertRaisesRegex(ValueError, "pairing"):
             native.run_from_fixture(scenario, COMMANDED, PINNED, "a" * 64)
 
     def test_native_adapter_refuses_an_unpinned_fixture(self):

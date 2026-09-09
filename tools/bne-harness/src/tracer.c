@@ -80,6 +80,8 @@ static projectile_function original_projectile = NULL;
 static mobile_damage_function original_mobile_damage = NULL;
 static give_order_function original_internal_give_order = NULL;
 static give_order_function original_give_order = NULL;
+static BYTE *script_dispatch_unit = NULL;
+static BOOL script_dispatch_applied = FALSE;
 static ai_home_function original_ai_home = NULL;
 static set_ai_behavior_function original_set_ai_behavior = NULL;
 static find_square_function original_find_square = NULL;
@@ -105,6 +107,9 @@ static BYTE previous_unit_bytes[BNE_UNIT_LIMIT][BNE_UNIT_BYTES];
 static BYTE previous_unit_live[BNE_UNIT_LIMIT];
 static BYTE unit_born_this_cycle[BNE_UNIT_LIMIT];
 static DWORD unit_generations[BNE_UNIT_LIMIT];
+static BYTE player_identity_bytes[BNE_UNIT_LIMIT][BNE_UNIT_BYTES];
+static DWORD player_identity_birth_cycle[BNE_UNIT_LIMIT];
+static DWORD player_identity_emitted_generation[BNE_UNIT_LIMIT];
 static BOOL aux_has_previous = FALSE;
 static BYTE previous_bullet_bytes[BNE_BULLET_LIMIT][BNE_BULLET_BYTES];
 static BYTE previous_bullet_live[BNE_BULLET_LIMIT];
@@ -585,6 +590,8 @@ static BOOL state_snapshot_cycle(DWORD cycle, const BYTE *pool,
         unit_born_this_cycle[index] = live && !previous_unit_live[index];
         if (unit_born_this_cycle[index]) {
             unit_generations[index]++;
+            memcpy(player_identity_bytes[index], unit, BNE_UNIT_BYTES);
+            player_identity_birth_cycle[index] = cycle;
         }
         previous_unit_live[index] = live;
         if (!state_has_previous
@@ -1399,12 +1406,50 @@ static void player_tx_flush_open(LONG cycle) {
     }
 }
 
+/* A moving unit keeps one identity for its allocation lifetime. Emitting
+ * its current coordinates on every click manufactured duplicate "initial"
+ * identities and made multi-click receipts unverifiable. Freeze the birth
+ * record alongside the authenticated state stream and emit each generation
+ * once. Later allocations are explicitly marked spawned, not initial. */
+static void player_tx_emit_identity(DWORD slot, DWORD pool_count) {
+    const BYTE *unit;
+    DWORD earlier;
+    unsigned int ordinal = 0;
+    if (slot == SCRIPT_NO_TARGET || slot >= pool_count
+            || slot >= BNE_UNIT_LIMIT || unit_generations[slot] == 0
+            || player_identity_emitted_generation[slot] == unit_generations[slot]) {
+        return;
+    }
+    unit = player_identity_bytes[slot];
+    for (earlier = 0; earlier < slot; earlier++) {
+        const BYTE *other = player_identity_bytes[earlier];
+        if (unit_generations[earlier] != 0
+                && player_identity_birth_cycle[earlier] == player_identity_birth_cycle[slot]
+                && other[BNE_UNIT_OWNER] == unit[BNE_UNIT_OWNER]
+                && other[BNE_UNIT_TYPE] == unit[BNE_UNIT_TYPE]
+                && read_word(other, BNE_UNIT_X) == read_word(unit, BNE_UNIT_X)
+                && read_word(other, BNE_UNIT_Y) == read_word(unit, BNE_UNIT_Y)) {
+            ordinal++;
+        }
+    }
+    trace_write("# bne-trace event=player-unit-identity local-id=%lu "
+            "generation=%lu origin=%s owner=%u type=%s x=%u y=%u ordinal=%u",
+            (unsigned long) slot, (unsigned long) (unit_generations[slot] - 1),
+            player_identity_birth_cycle[slot] == 1 ? "initial" : "spawned",
+            (unsigned int) unit[BNE_UNIT_OWNER],
+            bne_unit_type_name(unit[BNE_UNIT_TYPE]),
+            (unsigned int) read_word(unit, BNE_UNIT_X),
+            (unsigned int) read_word(unit, BNE_UNIT_Y), ordinal);
+    player_identity_emitted_generation[slot] = unit_generations[slot];
+}
+
 static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
         DWORD pool_count, const char *selected_list) {
     DWORD gesture_intent;
     DWORD index;
     const char *shape;
     const char *family = "unknown";
+    char gesture_target[16];
     BOOL same_family = TRUE;
 
     if (player_tx_id == 0) {
@@ -1412,6 +1457,8 @@ static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
     }
     gesture_intent = player_tx_next_intent++;
     shape = player_tx_target_shape(pool, pool_count, command->x, command->y);
+    player_tx_write_optional_slot(gesture_target, sizeof(gesture_target),
+            command->target_slot);
     if (player_tx_order_count > 0) {
         family = player_tx_family_name(player_tx_orders[0].function_index);
         for (index = 1; index < player_tx_order_count; index++) {
@@ -1427,10 +1474,10 @@ static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
     trace_write("# bne-trace event=player-gesture transaction=%lu intent=%lu "
             "cycle=%ld origin=field detail=right-click screen-x=none "
             "screen-y=none tile-x=%u tile-y=%u modifiers=plain "
-            "target-id=none target-shape=%s selected=%s",
+            "target-id=%s target-shape=%s selected=%s",
             (unsigned long) player_tx_id, (unsigned long) gesture_intent,
             command->cycle, (unsigned int) command->x,
-            (unsigned int) command->y, shape, selected_list);
+            (unsigned int) command->y, gesture_target, shape, selected_list);
     if (player_tx_order_count == 0) {
         trace_write("# bne-trace event=player-decision transaction=%lu "
                 "accepted=false family=unknown queued=false "
@@ -1449,89 +1496,11 @@ static void player_tx_emit_dispatch(const script_command *command, BYTE *pool,
                 "cycle=%ld",
                 (unsigned long) player_tx_id, family, command->cycle);
     }
-    for (index = 0; index < player_tx_order_count; index++) {
-        const player_tx_order *order = &player_tx_orders[index];
-        BYTE *unit;
-        unsigned int ordinal = 0;
-        DWORD earlier;
-
-        if (pool == NULL || order->slot == SCRIPT_NO_TARGET
-                || order->slot >= pool_count) {
-            continue;
+    if (pool != NULL) {
+        for (index = 0; index < player_tx_order_count; index++) {
+            player_tx_emit_identity(player_tx_orders[index].slot, pool_count);
+            player_tx_emit_identity(player_tx_orders[index].target_slot, pool_count);
         }
-        unit = pool + order->slot * BNE_UNIT_BYTES;
-        for (earlier = 0; earlier < order->slot; earlier++) {
-            BYTE *other = pool + earlier * BNE_UNIT_BYTES;
-            if ((other[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
-                continue;
-            }
-            if (other[BNE_UNIT_OWNER] == unit[BNE_UNIT_OWNER]
-                    && other[BNE_UNIT_TYPE] == unit[BNE_UNIT_TYPE]
-                    && read_word(other, BNE_UNIT_X) == read_word(unit, BNE_UNIT_X)
-                    && read_word(other, BNE_UNIT_Y) == read_word(unit, BNE_UNIT_Y)) {
-                ordinal++;
-            }
-        }
-        trace_write("# bne-trace event=player-unit-identity local-id=%lu "
-                "generation=%lu origin=initial owner=%u type=%s x=%u y=%u "
-                "ordinal=%u",
-                (unsigned long) order->slot,
-                (unsigned long) (unit_generations[order->slot] == 0
-                        ? 0 : unit_generations[order->slot] - 1),
-                (unsigned int) unit[BNE_UNIT_OWNER],
-                bne_unit_type_name(unit[BNE_UNIT_TYPE]),
-                (unsigned int) read_word(unit, BNE_UNIT_X),
-                (unsigned int) read_word(unit, BNE_UNIT_Y),
-                ordinal);
-    }
-    /* A targeted right-click needs the target's stable initial identity on
-     * the Java side as well. Emit each non-selected target once; the sealed
-     * GiveOrder rows below remain the authority for which target was used. */
-    for (index = 0; index < player_tx_order_count; index++) {
-        DWORD target_slot = player_tx_orders[index].target_slot;
-        BYTE *target;
-        unsigned int ordinal = 0;
-        DWORD earlier;
-        BOOL already_emitted = FALSE;
-
-        if (pool == NULL || target_slot == SCRIPT_NO_TARGET
-                || target_slot >= pool_count) {
-            continue;
-        }
-        for (earlier = 0; earlier < player_tx_order_count; earlier++) {
-            if (player_tx_orders[earlier].slot == target_slot
-                    || (earlier < index
-                        && player_tx_orders[earlier].target_slot == target_slot)) {
-                already_emitted = TRUE;
-                break;
-            }
-        }
-        if (already_emitted) {
-            continue;
-        }
-        target = pool + target_slot * BNE_UNIT_BYTES;
-        for (earlier = 0; earlier < target_slot; earlier++) {
-            BYTE *other = pool + earlier * BNE_UNIT_BYTES;
-            if ((other[BNE_UNIT_FLAGS3] & (BNE_UNIT_FREE | BNE_UNIT_DEAD)) != 0) {
-                continue;
-            }
-            if (other[BNE_UNIT_OWNER] == target[BNE_UNIT_OWNER]
-                    && other[BNE_UNIT_TYPE] == target[BNE_UNIT_TYPE]
-                    && read_word(other, BNE_UNIT_X) == read_word(target, BNE_UNIT_X)
-                    && read_word(other, BNE_UNIT_Y) == read_word(target, BNE_UNIT_Y)) {
-                ordinal++;
-            }
-        }
-        trace_write("# bne-trace event=player-unit-identity local-id=%lu "
-                "generation=%lu origin=initial owner=%u type=%s x=%u y=%u "
-                "ordinal=%u",
-                (unsigned long) target_slot,
-                (unsigned long) (unit_generations[target_slot] == 0
-                        ? 0 : unit_generations[target_slot] - 1),
-                (unsigned int) target[BNE_UNIT_OWNER],
-                bne_unit_type_name(target[BNE_UNIT_TYPE]),
-                (unsigned int) read_word(target, BNE_UNIT_X),
-                (unsigned int) read_word(target, BNE_UNIT_Y), ordinal);
     }
     for (index = 0; index < player_tx_order_count; index++) {
         const player_tx_order *order = &player_tx_orders[index];
@@ -1572,6 +1541,9 @@ static void __cdecl traced_give_order(BYTE *unit, int x, int y, BYTE *target,
 
     if (original_give_order != NULL) {
         original_give_order(unit, x, y, target, order_function);
+    }
+    if (unit == script_dispatch_unit) {
+        script_dispatch_applied = TRUE;
     }
     player_tx_record_give_order(unit, x, y, target, function_index);
 }
@@ -2177,6 +2149,49 @@ static DWORD unit_slot_of(const BYTE *pool, DWORD pool_count, const BYTE *unit) 
     return slot;
 }
 
+/* Execute the same 0x13 selection dispatcher used by retail playback.
+ * GiveOrder alone is an internal order constructor: it omits the player's
+ * saved-order flush at 0x47614b, dest normalization at 0x47616d, capability
+ * gates, and hit-offer release at 0x476187. In particular, bare Stop could
+ * resume an old position attack instead of behaving like the player's Stop.
+ * Retain the user's selection while dispatching one scripted unit. */
+static int apply_script_player_order(BYTE *unit, WORD x, WORD y,
+        DWORD target_slot, unsigned int function_index) {
+    static const BYTE expected[] = {0x83, 0xec, 0x08, 0x53, 0x56, 0x57};
+    BYTE *entry = (BYTE *) 0x00475f80;
+    BYTE packet[8];
+    BYTE *saved[BNE_SELECTION_LIMIT];
+    BYTE **selection = ui_selected_units();
+    BYTE cursor = *BNE_202_SELECTED_CURSOR;
+    BOOL applied;
+    DWORD i;
+    WORD target = target_slot == SCRIPT_NO_TARGET ? 0xffff : (WORD) target_slot;
+    if (original_give_order == NULL || !executable_page_contains(entry)
+            || memcmp(entry, expected, sizeof(expected)) != 0) {
+        return -1;
+    }
+    packet[0] = 0x13;
+    memcpy(packet + 1, &x, sizeof(x));
+    memcpy(packet + 3, &y, sizeof(y));
+    memcpy(packet + 5, &target, sizeof(target));
+    packet[7] = (BYTE) function_index;
+    for (i = 0; i < BNE_SELECTION_LIMIT; i++) {
+        saved[i] = selection[i];
+        selection[i] = i == 0 ? unit : NULL;
+    }
+    *BNE_202_SELECTED_CURSOR = 0;
+    script_dispatch_unit = unit;
+    script_dispatch_applied = FALSE;
+    ((void (__cdecl *)(BYTE *)) (void *) entry)(packet);
+    applied = script_dispatch_applied;
+    script_dispatch_unit = NULL;
+    for (i = 0; i < BNE_SELECTION_LIMIT; i++) {
+        selection[i] = saved[i];
+    }
+    *BNE_202_SELECTED_CURSOR = cursor;
+    return applied;
+}
+
 static void apply_select(const script_command *command, BYTE *unit) {
     BYTE **selected = ui_selected_units();
     DWORD index;
@@ -2332,7 +2347,11 @@ static void apply_commands(LONG cycle) {
             apply_select(command, unit);
             continue;
         }
-        if (unit[BNE_UNIT_OWNER] != *BNE_202_LOCAL_PLAYER) {
+        /* Scripted orders belong to the same campaign player as UI orders.
+         * The network LOCAL_PLAYER byte remains zero in campaign bootstrap;
+         * comparing against it rejected the human's own Move/Attack/Stop
+         * commands and left most replacement-order families unexercised. */
+        if (unit[BNE_UNIT_OWNER] != *BNE_202_UI_PLAYER) {
             reject_command(command, "unit-not-local");
             continue;
         }
@@ -2429,10 +2448,35 @@ static void apply_commands(LONG cycle) {
                 continue;
             }
         }
-        (original_give_order != NULL
-                ? original_give_order
-                : (give_order_function) (void *) BNE_202_GIVE_ORDER)(
-                unit, (int) dest_x, (int) dest_y, target, order_function);
+        if (command->action == SCRIPT_COMMAND_STAND_GROUND) {
+            /* Stand Ground uses the separate 0x0D action, but belongs to
+             * the same flush-on player boundary as an immediate order. */
+            if (*(DWORD *) 0x004ae26c != 0) {
+                unit[0x8d] = 0x3c;
+            }
+            (original_give_order != NULL
+                    ? original_give_order
+                    : (give_order_function) (void *) BNE_202_GIVE_ORDER)(
+                    unit, (int) dest_x, (int) dest_y, target, order_function);
+            memset(unit + 0x54, 0, sizeof(DWORD));
+        } else {
+            int dispatched = apply_script_player_order(unit, dest_x, dest_y,
+                    command->target_slot, function_index);
+            if (dispatched <= 0) {
+                // A missing hook/signature is an infrastructure failure.
+                // An authenticated dispatcher declining an unavailable
+                // command (such as Return Goods without cargo) is a game
+                // refusal and must remain sealable negative evidence.
+                reject_command(command, dispatched < 0
+                        ? "retail-player-dispatch-signature" : "refused");
+                continue;
+            }
+        }
+        trace_write("# bne-trace event=script-input-boundary cycle=%ld "
+                "unit=%lu boundary=%s", command->cycle,
+                (unsigned long) command->unit_slot,
+                command->action == SCRIPT_COMMAND_STAND_GROUND
+                        ? "stand-ground-player-flush" : "retail-0x13");
         trace_write("# bne-trace event=command-applied cycle=%ld action=%s "
                 "unit=%lu target=%lu x=%u y=%u function-index=%u",
                 command->cycle, script_action_name(command->action),

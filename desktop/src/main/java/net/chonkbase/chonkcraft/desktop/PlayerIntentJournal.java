@@ -292,7 +292,7 @@ final class PlayerIntentJournal {
                 && unit != null
                 && (unit.battleNetStopAfterLeftover()
                         || unit.queuedReplacementPending() || unit.isMoving());
-        if (!leftoverReplacement) {
+        if (!Boolean.FALSE.equals(accepted) && !command.queued() && !leftoverReplacement) {
             for (Tracking previous : outcomes) {
                 if (previous.terminalCycle == null
                         && previous.command.unitId() == command.unitId()) {
@@ -576,7 +576,7 @@ final class PlayerIntentJournal {
      * a worker who walked into a mine as dead because the unit is removed;
      * native still reports that peon alive and only off the map.
      */
-    private static boolean living(Unit unit) {
+    static boolean living(Unit unit) {
         return unit.hitPoints() > 0 && unit.order() != Unit.Order.DYING;
     }
 

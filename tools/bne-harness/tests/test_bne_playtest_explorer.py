@@ -187,6 +187,25 @@ class PlaytestExplorerTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not prove"):
             explorer.native_command_script(scenario)
 
+    def test_native_direct_injector_refuses_to_turn_a_queued_order_into_a_replacement(self):
+        scenario = next(item for item in explorer.generate_scenarios(
+            self.seed(), max_scenarios=500) if item["commands"][0]["kind"] == "move")
+        scenario["commands"][0]["queued"] = True
+        scenario["scenario_sha256"] = explorer.digest({
+            key: value for key, value in scenario.items() if key != "scenario_sha256"})
+        with self.assertRaisesRegex(ValueError, "queued"):
+            explorer.native_command_script(scenario)
+
+    def test_idle_seed_keeps_native_positions_and_the_human_owner_for_pairing(self):
+        fixture = matrix_test.fixture(person=1)
+        self.addCleanup(fixture.unlink, missing_ok=True)
+        seed = explorer.seed_from_idle_fixture(fixture)
+        self.assertTrue(seed["actors"], "the human movement seed must contain actors")
+        self.assertEqual({1}, {actor["player"] for actor in seed["actors"]})
+        self.assertTrue(all((actor.get("x"), actor.get("y")) == (8, 8)
+                            for actor in seed["actors"]),
+                        "the Java adapter needs each native actor's first-frame position")
+
     def test_native_direct_injector_emits_train(self):
         seed = self.seed()
         seed["actors"][0]["capabilities"] = ["train"]

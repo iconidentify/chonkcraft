@@ -203,9 +203,9 @@ class ControlLivenessPlayabilityTest {
                     player == 1 ? PudMap.Race.ORC : PudMap.Race.HUMAN);
         }
         World world = new World(map, players);
-        world.setUnitTypes(data.unitTypes().types());
-        world.setUpgrades(data.upgrades().upgrades());
-        world.setMissileTypes(data.missiles().types());
+        // The roster alone left the native movement and attack programs off,
+        // so this referee could pass while the player's BNE world froze.
+        data.configureWorld(world, PudMap.Tileset.FOREST);
         world.setAllied(0, 1, false);
         world.setAllied(1, 0, false);
         world.fog().revealAll(0);

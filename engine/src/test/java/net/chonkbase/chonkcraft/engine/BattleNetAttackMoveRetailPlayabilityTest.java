@@ -46,9 +46,9 @@ class BattleNetAttackMoveRetailPlayabilityTest {
         }
         World world = new World(map, players);
         world.establishDiplomacy();
-        world.setUnitTypes(data.unitTypes().types());
-        world.setUpgrades(data.upgrades().upgrades());
-        world.setMissileTypes(data.missiles().types());
+        // Retail types without the native programs exercised a different
+        // order scheduler from the one an authenticated game actually runs.
+        data.configureWorld(world, PudMap.Tileset.FOREST);
         world.fog().revealAll(0);
         world.fog().revealAll(1);
 

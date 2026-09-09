@@ -33,7 +33,6 @@ SCHEMA = 1
 UNIT_OWNER = 44
 UNIT_FLAGS = 30
 UNIT_HIDDEN = 0x08
-LOCAL_PLAYER = 0
 HEADING = ("n", "ne", "e", "se", "s", "sw", "w", "nw")
 
 
@@ -65,13 +64,26 @@ def _clear(frame: dict[str, Any], movement: int, x: int, y: int) -> bool:
     return (frame["squares"].get(y * size + x, 0) & mask) == 0
 
 
+def command_player(frame: dict[str, Any]) -> int:
+    """Select the campaign human from the captured controller table.
+
+    Controller 0 is the person, 1 the computer. The network-local byte
+    stays zero during campaign bootstrap even when UI GiveOrder belongs to
+    player 1. Using that byte used to generate Human 1 enemy-grunt commands
+    instead of orders for the player's footmen and peasant.
+    """
+    people = [index for index, record in enumerate(frame.get("players", []))
+              if record[0] == 0]
+    if len(people) != 1:
+        raise ValueError("command fixture must identify exactly one human player")
+    return people[0]
+
+
 def _candidates(frame: dict[str, Any], movement: int) -> list[tuple[int, bytes]]:
+    player = command_player(frame)
     return [(slot, raw) for slot, raw in sorted(frame["units"].items())
             if raw[UNIT_MOVEMENT] == movement
-            # The patched command injector calls retail GiveOrder and enforces
-            # BNE's local-player global, which is slot zero in its campaign
-            # command-line path even when scenario controller bytes differ.
-            and raw[UNIT_OWNER] == LOCAL_PLAYER
+            and raw[UNIT_OWNER] == player
             and not raw[UNIT_FLAGS] & UNIT_HIDDEN
             # BNE's unit-type table keeps ordinary mobile types below its
             # building/resource range. Heroes use separate high slots, but

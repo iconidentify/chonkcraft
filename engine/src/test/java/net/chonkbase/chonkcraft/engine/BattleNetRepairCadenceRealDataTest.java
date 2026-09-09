@@ -89,7 +89,8 @@ class BattleNetRepairCadenceRealDataTest {
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
         GameData data = new GameData(assets);
-        Mission mission = data.loadMission("campaigns/orc/level01o", 0);
+        Mission mission = data.loadMission("campaigns/orc/level01o",
+                GameData.personIn(data.campaignMap("campaigns/orc/level01o")), 1);
         Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
         World world = mission.world();
         CommandApplier commands = new CommandApplier(
@@ -118,7 +119,7 @@ class BattleNetRepairCadenceRealDataTest {
         boolean issued = false;
         Integer stillAt = null;
         while ((int) world.cycle() - 2 <= 70) {
-            if ((int) world.cycle() - 2 == 5 && !issued) {
+            if ((int) world.cycle() - 2 == 4 && !issued) {
                 assertTrue(commands.apply(GameCommand.repair(
                                 peon.player(), peon.id(), hall.id())),
                         "the hall mend click must be accepted");
@@ -129,8 +130,7 @@ class BattleNetRepairCadenceRealDataTest {
                 stillAt = (int) world.cycle() - 2;
             }
         }
-        assertTrue(stillAt != null && stillAt >= 56,
-                "retail stands Still at fixture 56 after leftover dest-arm, not "
-                        + stillAt);
+        assertEquals(56, stillAt,
+                "the cycle-5 native repair click must finish its pixels at cycle 56");
     }
 }

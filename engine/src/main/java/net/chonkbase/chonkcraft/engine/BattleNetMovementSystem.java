@@ -313,6 +313,10 @@ final class BattleNetMovementSystem {
                 || !world.map.contains(toX, toY)) {
             return false;
         }
+        if (queuePlayerColdMoveReplacement(unit, Unit.QueuedOrderKind.MOVE,
+                toX, toY)) {
+            return true;
+        }
         // A new ordinary Move supersedes any GiveOrder 17 walk provenance.
         // The attack-ground constructor sets it again only after its projected
         // Move has actually been accepted.
@@ -361,6 +365,24 @@ final class BattleNetMovementSystem {
         // A 2x2 scout's odd click overlaps its own hull, so the occupied
         // neighbour test used to swallow that click and leave Patrol walking
         // to 18,51 / 83,10. Ask leftover first.
+        if (world.battleNetSequence != null && before == Unit.Order.MOVE
+                && world.orderReplacementMustWait(unit)) {
+            // Even Move-to-Move is a new native order. Keep its constructor
+            // behind the committed stride instead of only replacing the old
+            // path goal. XOrc 12's zeppelin receives Stop at 19 and Move at
+            // 20, lands at 31, then constructs Still 3,2,1 before stepping at
+            // 34. Reusing the old Move reserved the next tile on 31 itself.
+            int[] dest = projectPlayerMovePoint(unit, toX, toY);
+            unit.clearQueuedOrders();
+            unit.setOrderTarget(dest[0], dest[1]);
+            unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.MOVE,
+                    dest[0], dest[1], null, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.setBattleNetPlayerCommandMove(true);
+            unit.setDestPathOpeningHold(true);
+            unit.rememberActionBeforeQueued(before);
+            return true;
+        }
         if (leftoverWalkBearing(before, unit)) {
             int[] dest = projectPlayerMovePoint(unit, toX, toY);
             unit.setPathGoal(dest[0], dest[1]);
@@ -438,6 +460,35 @@ final class BattleNetMovementSystem {
             unit.rememberActionBeforeQueued(before, actionWait);
         }
         return accepted;
+    }
+
+    /**
+     * GiveOrder's 0x453130 keeps next_order behind the current action marker,
+     * even before Move has reserved its first stride. Human 4's destroyer
+     * and XHuman 2's balloon receive Move at five and another click at six:
+     * the old constructor releases at eight, the replacement walks at eleven.
+     * Reconstructing immediately restarted the delay at six and walked at nine.
+     */
+    boolean queuePlayerColdMoveReplacement(Unit unit, Unit.QueuedOrderKind kind,
+            int toX, int toY) {
+        if (world.battleNetSequence == null || unit == null
+                || unit.order() != Unit.Order.MOVE
+                || !unit.battleNetPlayerCommandMove()
+                || unit.battleNetOrderDelay() <= 0
+                || unit.isMoving() || unit.offsetX() != 0 || unit.offsetY() != 0
+                || unit.pathLength() != 0) {
+            return false;
+        }
+        unit.clearQueuedOrders();
+        unit.setSavedOrder(null);
+        unit.setOrderTarget(toX, toY);
+        unit.enqueueOrder(new Unit.QueuedOrder(
+                kind, toX, toY, null, null, "player-cold-move"));
+        unit.setQueuedReplacementPending(true);
+        unit.setDestPathOpeningHold(true);
+        unit.setActionBeforeQueued(null);
+        unit.rememberActionBeforeQueued(Unit.Order.MOVE, 0);
+        return true;
     }
 
     private boolean orderMove(Unit unit, int toX, int toY, int initialDelay) {
@@ -536,6 +587,17 @@ final class BattleNetMovementSystem {
     private void stepMoveOrderVisit(Unit unit) {
         if (unit.battleNetOrderDelay() > 0) {
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            return;
+        }
+        if (unit.battleNetStopAfterLeftover()) {
+            // Stop owns only the already committed stride. Passing through
+            // ordinary empty-route completion used to leave Stop armed after
+            // the submarine stood down, so its next accepted Move was stopped
+            // as well. BNE consumes next_order 2 on the final pixel visit.
+            if (unit.isMoving() || unit.residualX() != 0 || unit.residualY() != 0) {
+                walkPixels(unit);
+            }
+            finishLeftoverReplacement(unit);
             return;
         }
         // A recurring AI force launch can replace an ordinary Move while its
@@ -1708,6 +1770,14 @@ final class BattleNetMovementSystem {
             worker.setPathGoal(-1, -1);
         }
         Unit.Order saved = worker.order();
+        // The player's Patrol owns its native cursor across this borrowed
+        // Move. Behavior-two AI Patrol has a separate constructor contract;
+        // preserving every land Patrol cursor here regressed Orc 11's
+        // knight and XHuman 12's shared worker occupancy on cycles 32/300.
+        boolean playerPatrolCursor = saved == Unit.Order.PATROL
+                && world.isPerson(worker.player()) && worker.battleNetLandPatrolMoveBody();
+        int patrolSequence = worker.battleNetSequenceOffset();
+        int patrolTimer = worker.battleNetAnimationTimer();
         worker.setBattleNetBorrowedMoveForStep(true);
         // GiveOrder 27 walks under borrowed Move. Arming script.bin pace
         // only for that stride keeps player Move on its existing cadence
@@ -1715,6 +1785,10 @@ final class BattleNetMovementSystem {
         // native holds Repair through the last Move body to 56.
         worker.setBattleNetRepairStride(saved == Unit.Order.REPAIR);
         worker.setOrder(Unit.Order.MOVE);
+        if (playerPatrolCursor) {
+            worker.setBattleNetSequenceOffset(patrolSequence);
+            worker.setBattleNetAnimationTimer(patrolTimer);
+        }
         try {
             stepMove(worker);
         } finally {
@@ -1722,7 +1796,13 @@ final class BattleNetMovementSystem {
             worker.setBattleNetRepairStride(false);
         }
         if (worker.order() != Unit.Order.DYING) {
+            patrolSequence = worker.battleNetSequenceOffset();
+            patrolTimer = worker.battleNetAnimationTimer();
             worker.setOrder(saved);
+            if (playerPatrolCursor) {
+                worker.setBattleNetSequenceOffset(patrolSequence);
+                worker.setBattleNetAnimationTimer(patrolTimer);
+            }
         }
     }
 
@@ -10273,6 +10353,11 @@ final class BattleNetMovementSystem {
         }
         unit.setBattleNetMovePaceOffset(open.offset());
         unit.setBattleNetMovePaceTimer(open.timer());
+        if ((unit.battleNetLandPatrolMoveBody() && world.isPerson(unit.player())
+                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR) {
+            unit.setBattleNetSequenceOffset(open.offset());
+            unit.setBattleNetAnimationTimer(open.timer());
+        }
     }
 
 
@@ -10315,6 +10400,11 @@ final class BattleNetMovementSystem {
         }
         unit.setBattleNetMovePaceOffset(tick.offset());
         unit.setBattleNetMovePaceTimer(timer);
+        if ((unit.battleNetLandPatrolMoveBody() && world.isPerson(unit.player())
+                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR) {
+            unit.setBattleNetSequenceOffset(tick.offset());
+            unit.setBattleNetAnimationTimer(timer);
+        }
         int pixels = tick.pixels();
         if (pixels > 0 && unit.battleNetDoubleStep()) {
             // script.bin ships emit op13 1 for each residual beat; the doubled

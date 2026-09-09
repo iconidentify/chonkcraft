@@ -1,6 +1,8 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -70,6 +72,40 @@ class Issue12OrderLivenessTest {
         Unit destroyer = place(fixture, "unit-human-destroyer", 0, 8, 16);
         Unit target = place(fixture, "unit-ogre-juggernaught", 1, 42, 16);
         exercise(fixture, destroyer, target, 20, 28);
+    }
+
+    @Test
+    @DisplayName("followers keep a replacing move after releasing their old target")
+    void followersKeepAReplacingMoveAfterReleasingTheirOldTarget() {
+        // This is a Java command-liveness witness with native unit programs.
+        // Follow's complete timing is not an authenticated BNE comparison.
+        for (String ident : List.of("unit-peasant", "unit-footman", "unit-archer",
+                "unit-ballista", "unit-catapult", "unit-human-destroyer")) {
+            Fixture fixture = fixture(ident.equals("unit-human-destroyer")
+                    ? TileFlag.WATER_ALLOWED : TileFlag.LAND_ALLOWED);
+            Unit actor = place(fixture, ident, 0, 8, 16);
+            Unit friend = place(fixture, "unit-town-hall", 0, 42, 28);
+            for (int cycle = 1; cycle <= 700; cycle++) {
+                if (cycle == 5) {
+                    assertTrue(fixture.commands().apply(GameCommand.move(
+                            0, actor.id(), 24, 8)), ident + " must accept the first Move");
+                }
+                if (cycle == 15) {
+                    assertTrue(fixture.commands().apply(GameCommand.follow(
+                            0, actor.id(), friend.id())), ident + " must accept Follow");
+                }
+                if (cycle == 110) {
+                    assertEquals(Unit.Order.FOLLOW, actor.order(),
+                            ident + " must follow the friend before withdrawal");
+                    assertTrue(fixture.commands().apply(GameCommand.move(
+                            0, actor.id(), 16, 28)), ident + " must accept withdrawal");
+                }
+                fixture.world().tick();
+            }
+            assertEquals(16, actor.tileX(), ident + " must keep the replacement X");
+            assertEquals(28, actor.tileY(), ident + " must keep the replacement Y");
+            assertFalse(actor.hasQueuedOrders(), ident + " must finish the replacement");
+        }
     }
 
     private static void exercise(Fixture fixture, Unit actor, Unit target,

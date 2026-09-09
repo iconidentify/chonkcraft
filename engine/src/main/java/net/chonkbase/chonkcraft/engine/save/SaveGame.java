@@ -609,6 +609,50 @@ public final class SaveGame {
         // whose behavior-two marker had not yet become durable.
         state.append(" aiBehavior = ")
                 .append(unit.battleNetAiBehavior()).append(",");
+        // Preserve the active combat program, including its random-draw cadence.
+        // Reconstructing a chase from only the visible order restarts a live swing.
+        state.append(" battleNetIdlePhase = ").append(unit.battleNetIdlePhase()).append(",");
+        state.append(" battleNetPudData = ").append(unit.battleNetPudData()).append(",");
+        state.append(" battleNetReadySuppressed = ").append(unit.battleNetReadySuppressed()).append(",");
+        state.append(" fighting = ").append(unit.fighting()).append(",");
+        state.append(" swingAtAir = ").append(unit.swingAtAir()).append(",");
+        state.append(" attackRequiresVisibility = ").append(unit.attackRequiresVisibility()).append(",");
+        state.append(" attackScanSleep = ").append(unit.attackScanSleep()).append(",");
+        state.append(" autoTargeting = ").append(unit.autoTargeting()).append(",");
+        state.append(" attackedCycle = ").append(unit.attackedCycle()).append(",");
+        state.append(" battleNetMeleeSyncRemaining = ").append(unit.battleNetMeleeSyncRemaining()).append(",");
+        state.append(" battleNetSequenceMeleeLanded = ").append(unit.battleNetSequenceMeleeLanded()).append(",");
+        state.append(" battleNetChaseLegOpensCold = ").append(unit.battleNetChaseLegOpensCold()).append(",");
+        state.append(" battleNetAttackOp0OutOfRange = ").append(unit.battleNetAttackOp0OutOfRange()).append(",");
+        state.append(" battleNetPersonHelpFirstChase = ").append(unit.battleNetPersonHelpFirstChase()).append(",");
+        state.append(" lastStepHeading = ").append(unit.lastStepHeading()).append(",");
+        state.append(" stepDrained = ").append(unit.stepDrained()).append(",");
+        state.append(" chasing = ").append(unit.chasing()).append(",");
+        state.append(" battleNetPendingMeleeSyncRand = ").append(unit.battleNetPendingMeleeSyncRand()).append(",");
+        state.append(" battleNetLandPatrolAttackConstruction = ").append(unit.battleNetLandPatrolAttackConstruction()).append(",");
+        state.append(" frame = ").append(unit.frame()).append(",");
+        if (unit.pendingAttack() != null) {
+            state.append(" pendingAttack = ").append(unit.pendingAttack().id()).append(",");
+            state.append(" pendingAttackFrom = ").append(quote(unit.pendingAttackFrom().name())).append(",");
+            state.append(" pendingAttackX = ").append(unit.pendingAttackX()).append(",");
+            state.append(" pendingAttackY = ").append(unit.pendingAttackY()).append(",");
+        }
+        state.append(" battleNetMovePaceOffset = ").append(unit.battleNetMovePaceOffset()).append(",");
+        state.append(" battleNetMovePaceTimer = ").append(unit.battleNetMovePaceTimer()).append(",");
+        state.append(" pendingRotation = ").append(unit.pendingRotation()).append(",");
+        state.append(" routeSpent = ").append(unit.routeSpent()).append(",");
+        state.append(" pathInitialLength = ").append(unit.battleNetPathInitialLength()).append(",");
+        state.append(" path = {");
+        for (int depth = unit.pathLength() - 1; depth >= 0; depth--) {
+            state.append(unit.peekHeadingAtDepth(depth)).append(", ");
+        }
+        state.append("},");
+        state.append(" direction = ").append(unit.direction()).append(",");
+        state.append(" attackGoalX = ").append(unit.attackGoalX()).append(",");
+        state.append(" attackGoalY = ").append(unit.attackGoalY()).append(",");
+        if (unit.offeredTarget() != null) {
+            state.append(" offeredTarget = ").append(unit.offeredTarget().id()).append(",");
+        }
         if (unit.battleNetMapPlaced()) {
             state.append(" mapPlaced = true,");
         }
@@ -659,7 +703,8 @@ public final class SaveGame {
         }
         if (unit.savedOrder() != null) {
             state.append(" savedOrder = ").append(quote(unit.savedOrder().name())).append(",");
-            if (unit.savedOrder() == Unit.Order.ATTACK_MOVE) {
+            if (unit.savedOrder() == Unit.Order.ATTACK_MOVE
+                    || unit.savedOrder() == Unit.Order.PATROL) {
                 state.append(" savedAttackMoveX = ").append(unit.savedAttackMoveX()).append(",");
                 state.append(" savedAttackMoveY = ").append(unit.savedAttackMoveY()).append(",");
                 if (unit.savedMoveRange() != 0) {
@@ -779,6 +824,9 @@ public final class SaveGame {
                     .append(quote(unit.currentAction().name())).append(",");
             state.append(" actionBeforeQueuedReleaseDelay = ")
                     .append(unit.actionBeforeQueuedReleaseDelay()).append(",");
+        }
+        if (unit.battleNetPlayerCommandAttack()) {
+            state.append(" playerCommandAttack = true,");
         }
         if (unit.battleNetPlayerCommandMove()) {
             state.append(" playerCommandMove = true,");
