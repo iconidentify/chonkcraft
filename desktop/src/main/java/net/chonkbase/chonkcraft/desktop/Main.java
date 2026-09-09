@@ -1712,7 +1712,9 @@ public final class Main {
             try {
                 PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
                         world, savePath, synchronizedMapBytes, localPlayer,
-                        network.scheduler().cyclesPerUpdate(), network.scheduler().lag(),
+                        new PassiveMultiplayerRecorder.Pacing(network.cyclesPerSecond(),
+                                network.scheduler().cyclesPerUpdate(),
+                                network.scheduler().lag()),
                         MatchmakingProtocol.gameBuild());
                 network.setCycleSink(recorder);
                 System.out.println("Multiplayer recording: " + recorder.directory());
@@ -2088,7 +2090,11 @@ public final class Main {
                 new java.util.concurrent.atomic.AtomicBoolean();
 
         // The simulation runs at its own fixed rate, independent of repaint.
-        FixedStepLoop loop = new FixedStepLoop("chonkcraft-sim", World.CYCLES_PER_SECOND);
+        // A network game opens at the tempo the lobby agreed, so every
+        // machine at the table starts at the same one; a solo game opens at
+        // the rate the simulation counts in.
+        FixedStepLoop loop = new FixedStepLoop("chonkcraft-sim",
+                network == null ? World.CYCLES_PER_SECOND : network.cyclesPerSecond());
 
         /*
          * Everything this game holds, given up in one place.
@@ -2162,7 +2168,20 @@ public final class Main {
 
             @Override
             public void setSpeed(int cyclesPerSecond) {
+                // Refused in a network game for the same reason Pause is:
+                // the table plays at one tempo, agreed in the lobby. A player
+                // who slowed only their own client held every other machine
+                // at the next net cycle boundary until it caught up, so the
+                // whole match ran at whatever the slowest slider was set to.
+                if (network != null) {
+                    return;
+                }
                 loop.setHertz(Math.max(1, cyclesPerSecond));
+            }
+
+            @Override
+            public String fixedSpeedCaption() {
+                return network == null ? null : network.gameSpeed().caption();
             }
 
             @Override
@@ -2320,8 +2339,17 @@ public final class Main {
                         networkNoticeUntil[0] = System.currentTimeMillis() + 5_000L;
                     }
                     if (step == net.chonkbase.chonkcraft.engine.network.NetworkGame.Step.DESYNC) {
-                        screen.setStatus("desynchronised at cycle " + network.desyncCycle()
-                                + " with player " + network.desyncPlayer());
+                        // Named the way every other network message names a
+                        // player. This used to print the raw slot index, so
+                        // the message about player 2 called them player 1 and
+                        // a report of it could not be matched to anybody. The
+                        // flight record that goes with it was named on stdout
+                        // when the match opened; the status line is one line
+                        // and a path would be cut off in a small window.
+                        screen.setStatus("desynchronised at net cycle "
+                                + network.desyncCycle() + ", game cycle "
+                                + network.desyncWorldCycle() + ", with "
+                                + network.playerName(network.desyncPlayer()));
                     } else if (step == net.chonkbase.chonkcraft.engine.network.NetworkGame
                             .Step.HOST_LEFT) {
                         if (System.currentTimeMillis() >= networkNoticeUntil[0]) {

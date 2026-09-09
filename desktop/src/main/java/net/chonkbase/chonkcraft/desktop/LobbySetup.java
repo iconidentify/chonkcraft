@@ -144,6 +144,7 @@ record LobbySetup(Path map, GameLobby lobby) {
             }
         }
         game.setPlayerNames(names);
+        game.setGameSpeed(state.gameSpeed());
         game.start();
         return new Started(game, world, applier);
     }

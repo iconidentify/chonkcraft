@@ -53,6 +53,9 @@ class GameMenuTest {
         private boolean synthesised;
         private List<String> objectives = List.of();
 
+        /** Set when this session stands for a machine in a network game. */
+        private String fixedSpeed;
+
         @Override
         public void setPaused(boolean value) {
             paused = value;
@@ -144,7 +147,12 @@ class GameMenuTest {
 
         @Override
         public boolean isNetworked() {
-            return false;
+            return fixedSpeed != null;
+        }
+
+        @Override
+        public String fixedSpeedCaption() {
+            return fixedSpeed;
         }
 
         @Override
@@ -383,6 +391,35 @@ class GameMenuTest {
         assertEquals(5, session.speed(), "the slow end");
         menu.drag(left + 224, trackY);
         assertEquals(60, session.speed(), "the fast end");
+    }
+
+    @Test
+    @DisplayName("In a network game the speed page says what the host chose and offers no slider")
+    void aNetworkedMatchPlaysAtTheSpeedItsHostChose() {
+        GameData data = load();
+        Recording session = new Recording();
+        session.fixedSpeed = "Slower";
+        GameMenu menu = new GameMenu(data, "human", session);
+        menu.open();
+        render(menu);
+        clickRow(menu, 1);   // Options
+        render(menu);
+        clickRow(menu, 0);   // Game Speed
+        render(menu);
+
+        int left = panelLeft() + 16;
+        int trackY = panelTop() + 40 + 30 - 5;
+        menu.click(left, trackY);
+        menu.drag(left + 224, trackY);
+        assertEquals(30, session.speed(),
+                "one player dragged the whole table's speed about; lockstep holds every"
+                        + " machine at the next agreed cycle, so a client that slows itself"
+                        + " slows everybody else's game by the same amount");
+
+        // And it says so, rather than leaving a control that does nothing.
+        assertTrue(menu.linesForTest().stream()
+                        .anyMatch(line -> line.contains("Slower")),
+                "the page does not name the speed the host set: " + menu.linesForTest());
     }
 
     /**

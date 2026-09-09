@@ -38,7 +38,17 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-09 (combat response and player controls, working tree)
+## Current checkpoint -- 2026-09-09 (player controls and shared multiplayer speed)
+
+The player-control checkpoint `b554a0d` is integrated with multiplayer changes
+through `d5eb878`. The host selects the shared match speed, both random
+streams enter the lockstep hash, and desync reports identify the peer and
+world cycle. Merge verification is retained under
+`$HOME/.local/share/chonkcraft-command-parity/checkpoints/player-orders-multiplayer-20260909/`.
+Its combined suite runs 3,030 tests: pack-plus-Opus retains 90 known failures,
+zero errors and 318 skips; data-free retains 88 known failures, zero errors
+and 1,375 skips. Both preserve the preceding failure identities. The required
+network gate covers 42 lockstep checks and real two-process startup.
 
 An exhausted, settled attack now resumes pursuit on the native Attack action
 marker instead of waiting for the separate visual animation. An already
@@ -105,7 +115,7 @@ checks. Their permissive constructors remain useful diagnostics, but no
 longer justify accepting illegal player requests. The explorer's capability
 descriptions and tests now distinguish these boundaries.
 
-The final command campaign is retained under
+The pre-integration gameplay proof and command campaign are retained under
 `$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-chase-depot-playability/verification-final/command-campaign/`.
 It runs JAR SHA-256
 `75284145088a75128b969ad732b11f7baca1472c874e3980ca72b126b74d1113`
@@ -151,8 +161,9 @@ validation receipts are retained under
 `$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-chase-depot-playability/verification-final/`.
 The preceding Follow proof remains under `investigations/20260909-follow-attack-resource/`;
 the earlier eligibility evidence remains under `investigations/20260909-return-goods/`
-in the same private store. This checkpoint is local and uncommitted; the
-publication below remains live.
+in the same private store. These pre-integration receipts retain their original
+source and build identities. The signed update catalog is the authority for
+which checkpoint has completed automatic publication.
 
 Next precision work is collision routing and the later combat divergence at
 321 in the original Follow case. Explicit footman Attack first differs at 153:
@@ -237,14 +248,14 @@ All runs use the pinned JBR 25 wrapper and BNE pack SHA-256
   and coarse orders, not raw sequence, extended player state, projectiles or
   mutable terrain.
 - **Playability:** all 18 lanes pass, including the 17-test control inventory,
-  117 movement checks, 65 projectile checks, 39 clean/adverse lockstep cases
+  117 movement checks, 65 projectile checks, 42 clean/adverse lockstep cases
   and real two-process startup. The Patrol regression resumes nine save points.
-- **Combined inventory:** pack plus Opus runs 3,012 tests: 2,597 pass,
+- **Combined inventory:** pack plus Opus runs 3,020 tests: 2,605 pass,
   93 known failures, zero errors, 322 skip. No new failure identity appears;
   master's corrected expansion Human 12 recovery-stage assertion now passes.
   Eleven fog tests that skipped on the earlier checkpoint now execute and pass.
-  Data-free runs 3,012 tests: 1,561 pass, 88 known failures, zero errors and
-  exactly 1,363 skips; its coverage and failure inventories match. Matching
+  Data-free runs 3,020 tests: 1,566 pass, 88 known failures, zero errors and
+  exactly 1,366 skips; its coverage and failure inventories match. Matching
   raw media was unavailable locally, so these are not the canonical 27-skip
   authenticated CI profile.
 - **Rendering integration:** the existing renderer completes its 400-unit

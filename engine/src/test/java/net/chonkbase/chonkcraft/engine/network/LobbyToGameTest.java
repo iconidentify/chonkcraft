@@ -2,6 +2,7 @@ package net.chonkbase.chonkcraft.engine.network;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,6 +103,52 @@ class LobbyToGameTest {
         game.setHostPlayer(state.hostSlot());
         game.start();
         return new Machine(game, world, state.localSlot());
+    }
+
+    @Test
+    @DisplayName("the speed the host picks is the speed every player joins at")
+    void theHostsChosenSpeedReachesEveryPlayer() throws Exception {
+        InetAddress local = InetAddress.getLoopbackAddress();
+        byte[] hostedMap = new byte[4_000];
+        GameLobby hostLobby = GameLobby.host("Chris", "garden.pud", hostedMap, 8, 0);
+        GameLobby annLobby = GameLobby.join("Ann", local, hostLobby.connectionPort(),
+                name -> null);
+        try {
+            pollUntil("everyone seated", () -> hostLobby.humanCount() == 2,
+                    hostLobby, annLobby);
+            assertEquals(GameLobby.GameSpeed.NORMAL, annLobby.state().gameSpeed(),
+                    "a game nobody has changed opens at the rate the simulation counts in");
+
+            assertTrue(hostLobby.setGameSpeed(GameLobby.GameSpeed.FASTEST),
+                    "the host must be able to choose the tempo of the game it created");
+            pollUntil("the joiner heard the chosen speed",
+                    () -> annLobby.state().gameSpeed() == GameLobby.GameSpeed.FASTEST,
+                    hostLobby, annLobby);
+            assertEquals(60, annLobby.state().gameSpeed().cyclesPerSecond(),
+                    "Fastest plays sixty cycles a second on every machine at the table");
+
+            // A joiner may watch the choice and may not make it. Two players
+            // cannot run one match at two tempos: lockstep holds everybody at
+            // a net cycle boundary until the slowest has reported.
+            assertFalse(annLobby.setGameSpeed(GameLobby.GameSpeed.SLOWEST),
+                    "a player who did not create the game must not set its speed");
+            pollUntil("the host is unmoved",
+                    () -> hostLobby.state().gameSpeed() == GameLobby.GameSpeed.FASTEST,
+                    hostLobby, annLobby);
+
+            // The commit record carries it too, so a host that starts before
+            // its last ordinary state packet lands still starts everybody at
+            // the speed it chose.
+            hostLobby.setGameSpeed(GameLobby.GameSpeed.SLOW);
+            hostLobby.start();
+            pollUntil("the joiner heard the start",
+                    () -> annLobby.isStarted(), hostLobby, annLobby);
+            assertEquals(GameLobby.GameSpeed.SLOW, annLobby.state().gameSpeed(),
+                    "the started game must run at the speed the host settled on");
+        } finally {
+            hostLobby.close();
+            annLobby.close();
+        }
     }
 
     @Test

@@ -1,15 +1,12 @@
-# Responsive Unit Orders and Smoother Rendering
+# Responsive Followers, Wall Attacks and Combat
 
-- Fixed units becoming stuck when Move, Attack or Attack-Move interrupted an
-  unfinished step. Units now finish the committed movement and follow the
-  replacement order without requiring another Stop command.
-- Fixed old Stop requests interrupting later movement, and restored the
-  original timing when redirecting units or replacing a newly issued Move.
-- Improved Patrol combat and return behavior, Repair approach timing, and
-  explicit attacks retaining the enemy you selected.
-- Preserved active Patrol movement, combat and return destinations when
-  saving and loading during an encounter.
-- Includes the recent fog-edge flicker and walking-animation fixes, smooth
-  arrow-key scrolling, and reduced rendering memory use in menus and matches.
-- Retains the multiplayer lobby fix that prevents repeated Start clicks from
-  opening multiple copies of a match.
+- Fixed Follow redirects and repeated clicks interrupting movement or leaving
+  followers behind. Waiting followers and queued moves now survive save/load.
+- Fixed a delay when melee units resumed pursuit after an attack, including
+  the defender's response when the pursuer arrived beside it.
+- Fixed infantry wall clicks using the wrong attack command. Ordinary units
+  can attack walls while artillery retains Attack Ground.
+- Return Goods and Attack Ground now leave ineligible members of a mixed
+  selection on their existing orders.
+- Includes the host-selected multiplayer speed and clearer desync reports,
+  alongside the earlier movement-stall, Patrol, Repair and rendering fixes.

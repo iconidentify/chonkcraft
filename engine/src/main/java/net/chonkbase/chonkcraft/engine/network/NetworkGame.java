@@ -88,7 +88,21 @@ public final class NetworkGame implements AutoCloseable {
     /** Our own hash at each net cycle, kept to compare against theirs. */
     private final java.util.Map<Long, Long> ownHashes = new java.util.HashMap<>();
 
+    /**
+     * The game cycle each of those hashes was taken at.
+     *
+     * <p>Kept because the two numbers are five apart and a player reports
+     * whichever one they were shown. Commands are batched into net cycles and
+     * the world runs {@code cyclesPerUpdate} of its own between them, so a
+     * divergence at net cycle 2,125 is a divergence at game cycle 10,626, and
+     * a report of "cycle 2125" matched nothing anybody could look up: not the
+     * cycle a save counts in, and not the {@code world_cycle} beside it in the
+     * flight record.
+     */
+    private final java.util.Map<Long, Long> ownWorldCycles = new java.util.HashMap<>();
+
     private long desyncCycle = -1;
+    private long desyncWorldCycle = -1;
     private int desyncPlayer = -1;
     private int hostPlayer = -1;
     private boolean hostLost;
@@ -201,6 +215,31 @@ public final class NetworkGame implements AutoCloseable {
     /** Configures the one machine allowed to adjudicate peer timeouts. */
     public void setHostPlayer(int hostPlayer) {
         this.hostPlayer = hostPlayer;
+    }
+
+    /**
+     * How many cycles a second every machine in this match plays.
+     *
+     * <p>Tempo, not simulation: the world still counts in cycles at
+     * {@code World.CYCLES_PER_SECOND}, and this only says how quickly they
+     * are played. It rides here because it is part of what the lobby settled,
+     * and because a match has exactly one of it -- lockstep will not pass a
+     * net cycle boundary until every player has reported, so a machine set
+     * slower than the rest sets the pace for all of them.
+     */
+    private GameLobby.GameSpeed gameSpeed = GameLobby.GameSpeed.NORMAL;
+
+    public void setGameSpeed(GameLobby.GameSpeed gameSpeed) {
+        this.gameSpeed = java.util.Objects.requireNonNull(gameSpeed, "gameSpeed");
+    }
+
+    /** The setting itself, so the running game can name it without guessing. */
+    public GameLobby.GameSpeed gameSpeed() {
+        return gameSpeed;
+    }
+
+    public int cyclesPerSecond() {
+        return gameSpeed.cyclesPerSecond();
     }
 
     /** Installs a passive observer of completed lockstep cycles. */
@@ -326,6 +365,17 @@ public final class NetworkGame implements AutoCloseable {
         return desyncCycle;
     }
 
+    /**
+     * The game cycle that net cycle's hash was taken at, or {@code -1}.
+     *
+     * <p>The number a player can act on. It is what a save counts in, what
+     * {@code World.cycle()} shows, and what the flight record files beside
+     * the net cycle.
+     */
+    public long desyncWorldCycle() {
+        return desyncWorldCycle;
+    }
+
     /** Which machine disagreed, or {@code -1}. */
     public int desyncPlayer() {
         return desyncPlayer;
@@ -393,6 +443,7 @@ public final class NetworkGame implements AutoCloseable {
 
         long hash = SyncHash.of(world);
         ownHashes.put(netCycle, hash);
+        ownWorldCycles.put(netCycle, world.cycle());
         // Keep a window rather than discarding everything we have passed. A
         // peer behind us still needs the batches we have already used, and
         // purging by our own progress is what leaves it stuck forever: we move
@@ -400,6 +451,7 @@ public final class NetworkGame implements AutoCloseable {
         // can recover.
         sentBatches.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
         ownHashes.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
+        ownWorldCycles.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
         reportedHashes.keySet().removeIf(cycle -> cycle < netCycle - RESEND_WINDOW);
         checkHashes(netCycle, hash);
         try {
@@ -609,7 +661,15 @@ public final class NetworkGame implements AutoCloseable {
         }
     }
 
-    private String playerName(int player) {
+    /**
+     * What to call a player in a message.
+     *
+     * <p>The lobby name when there is one, and the slot counted from one when
+     * there is not. Never the raw slot index: the interface counts players
+     * from one everywhere else, so a message that says "player 1" about the
+     * machine in slot 1 is talking about player 2.
+     */
+    public String playerName(int player) {
         String name = playerNames.get(player);
         return name == null || name.isBlank() ? "Player " + (player + 1) : name;
     }
@@ -745,6 +805,7 @@ public final class NetworkGame implements AutoCloseable {
             // Zero means the sender had not finished a cycle yet.
             if (entry.getValue() != 0L && entry.getValue() != ourHash) {
                 desyncCycle = netCycle;
+                desyncWorldCycle = ownWorldCycles.getOrDefault(netCycle, -1L);
                 desyncPlayer = entry.getKey();
                 return;
             }

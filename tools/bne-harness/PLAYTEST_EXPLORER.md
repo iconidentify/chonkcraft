@@ -77,7 +77,8 @@ after the last command: 26 end at 400, 26 at 401 and 13 at 414. The previous
 ad hoc headline capped their prefix sum at 400 even though the adapters
 observed the longer tails. The release's complete-window prefix sum was 24,607;
 the player-eligibility correction raises it to 25,391, with 61/65 commanded-unit
-and 59/65 all-observed-unit exact cases (previously 59 and 57).
+and 61/65 all-observed-unit exact cases after the combat-tail correction
+(previously 59 commanded and 57 all-observed).
 The campaign-map prefix sum remains 6,631, with 43/52 exact through 100 and
 3/52 through 600.
 

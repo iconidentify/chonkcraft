@@ -305,6 +305,19 @@ final class LobbyScreen extends JPanel {
         lobby.setGameTemplate(current.next());
     }
 
+    /**
+     * Cycles the tempo the whole table will play at.
+     *
+     * <p>Here rather than in the game because a network match runs at one
+     * speed or none: lockstep holds every machine at a net cycle boundary
+     * until the slowest has reported, so a player who slowed their own client
+     * slowed everybody's game by the same amount.
+     */
+    private void cycleGameSpeed() {
+        GameLobby.GameSpeed current = lobby.state().gameSpeed();
+        lobby.setGameSpeed(current.next());
+    }
+
     /** Advances one player's explicit team without changing colour or start. */
     private void cycleTeam(GameLobby.Slot slot) {
         int teamCount = Math.min(8, Math.max(2, lobby.capacity()));
@@ -531,17 +544,21 @@ final class LobbyScreen extends JPanel {
                     || state.hasValidMatchup()
                     || state.canInferComputerOpponents();
             boolean canStart = !starting && state.canStart();
-            button(g2, TABLE_X, FOOT_Y, 160, FOOT_HEIGHT,
+            button(g2, startBounds(),
                     starting ? "Starting..."
                             : !enoughPlayers ? "Waiting for Players"
                             : !opposingTeams ? "Assign Opponents"
                             : state.allPlayersReady() ? "Start Game" : "Syncing Map...",
                     canStart ? this::begin : null);
         }
-        button(g2, TABLE_X + 180, FOOT_Y, 200, FOOT_HEIGHT,
-                "Mode: " + state.gameTemplate().caption(),
+        button(g2, templateBounds(), "Mode: " + state.gameTemplate().caption(),
                 lobby.isHost() ? this::cycleGameTemplate : null);
-        button(g2, TABLE_X + TABLE_WIDTH - 160, FOOT_Y, 160, FOOT_HEIGHT,
+        // Shown to everybody and clickable only by the host, like Mode. A
+        // joiner who cannot see the speed cannot tell a match that is meant
+        // to be slow from one whose host has a struggling machine.
+        button(g2, speedBounds(), "Speed: " + state.gameSpeed().caption(),
+                lobby.isHost() ? this::cycleGameSpeed : null);
+        button(g2, cancelBounds(),
                 state.updateRequired() ? "Quit to Update" : "Cancel (Esc)",
                 state.updateRequired() ? this::quitForUpdate : this::cancel);
     }
@@ -579,6 +596,10 @@ final class LobbyScreen extends JPanel {
     }
 
     /** Draws a button and, when it does something, registers where it is. */
+    private void button(Graphics2D g2, Rectangle where, String caption, Runnable action) {
+        button(g2, where.x, where.y, where.width, where.height, caption, action);
+    }
+
     private void button(Graphics2D g2, int x, int y, int width, int height,
             String caption, Runnable action) {
         PanelArt.panel(g2, x, y, width, height,
@@ -601,6 +622,11 @@ final class LobbyScreen extends JPanel {
         return new Point(
                 (int) ((screen.x - fitted.x) * (double) DESIGN_WIDTH / fitted.width),
                 (int) ((screen.y - fitted.y) * (double) DESIGN_HEIGHT / fitted.height));
+    }
+
+    /** The face the footer's captions are drawn in, so a test can measure them. */
+    GameFont gameFaceForTest() {
+        return font;
     }
 
     /** The families this screen letters with, so a test can prove they match. */
@@ -641,19 +667,32 @@ final class LobbyScreen extends JPanel {
                 84, ROW_HEIGHT - 8);
     }
 
-    /** Where the Start button is. */
+    /**
+     * Where the Start button is.
+     *
+     * <p>The four footer controls are measured against their own longest
+     * caption in the game face rather than shared out evenly: "Waiting for
+     * Players" is 120 pixels wide and "Speed: Slowest" is 91, so an even
+     * quarter each would have left the first one overflowing its panel while
+     * the others sat half empty.
+     */
     static Rectangle startBounds() {
-        return new Rectangle(TABLE_X, FOOT_Y, 160, FOOT_HEIGHT);
+        return new Rectangle(TABLE_X, FOOT_Y, 150, FOOT_HEIGHT);
     }
 
     /** Where the synchronized game-template control is drawn. */
     static Rectangle templateBounds() {
-        return new Rectangle(TABLE_X + 180, FOOT_Y, 200, FOOT_HEIGHT);
+        return new Rectangle(TABLE_X + 160, FOOT_Y, 110, FOOT_HEIGHT);
+    }
+
+    /** Where the synchronized game-speed control is drawn. */
+    static Rectangle speedBounds() {
+        return new Rectangle(TABLE_X + 280, FOOT_Y, 130, FOOT_HEIGHT);
     }
 
     /** Where Cancel, or the build-mismatch update action, is drawn. */
     static Rectangle cancelBounds() {
-        return new Rectangle(TABLE_X + TABLE_WIDTH - 160, FOOT_Y, 160, FOOT_HEIGHT);
+        return new Rectangle(TABLE_X + TABLE_WIDTH - 140, FOOT_Y, 140, FOOT_HEIGHT);
     }
 
     /** Drives one click at a point in design pixels, for tests. */
