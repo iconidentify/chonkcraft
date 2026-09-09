@@ -138,6 +138,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
     private final String initialSaveHash;
     private final List<RecordedPlayer> players;
     private final int localPlayer;
+    private final int cyclesPerSecond;
     private final int cyclesPerUpdate;
     private final int lag;
     private final Instant createdAt;
@@ -161,7 +162,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private PassiveMultiplayerRecorder(Path root, Path directory, String mapName,
             String mapHash, long mapBytes, String build, int localPlayer,
-            int cyclesPerUpdate, int lag, Instant createdAt, World world,
+            int cyclesPerSecond, int cyclesPerUpdate, int lag, Instant createdAt, World world,
             long initialSaveBytes, String initialSaveHash, FileChannel activityChannel,
             FileLock activityLock) {
         this.root = root;
@@ -180,6 +181,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         }
         players = List.copyOf(roster);
         this.localPlayer = localPlayer;
+        this.cyclesPerSecond = cyclesPerSecond;
         this.cyclesPerUpdate = cyclesPerUpdate;
         this.lag = lag;
         this.createdAt = createdAt;
@@ -200,17 +202,26 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
                 "chonkcraft-multiplayer-recorder-shutdown");
     }
 
-    /** Starts a recorder in the player's ordinary per-user recordings directory. */
+    /**
+     * Starts a recorder in the player's ordinary per-user recordings directory.
+     *
+     * @param cyclesPerSecond the tempo the lobby agreed, which is what turns a
+     *                        cycle count in this record back into the seconds
+     *                        the players actually spent. A match the host set
+     *                        to Fastest plays 180 cycles in three seconds, not
+     *                        the six the simulation's own rate would suggest.
+     */
     static PassiveMultiplayerRecorder open(World world, String mapName, byte[] mapBytes,
-            int localPlayer, int cyclesPerUpdate, int lag, String build) throws IOException {
-        return open(world, mapName, mapBytes, localPlayer, cyclesPerUpdate, lag, build,
-                defaultDirectory(), Instant.now());
+            int localPlayer, int cyclesPerSecond, int cyclesPerUpdate, int lag, String build)
+            throws IOException {
+        return open(world, mapName, mapBytes, localPlayer, cyclesPerSecond, cyclesPerUpdate,
+                lag, build, defaultDirectory(), Instant.now());
     }
 
     /** The same operation with a caller-owned directory and clock for tests. */
     static PassiveMultiplayerRecorder open(World world, String mapName, byte[] mapBytes,
-            int localPlayer, int cyclesPerUpdate, int lag, String build, Path root,
-            Instant createdAt) throws IOException {
+            int localPlayer, int cyclesPerSecond, int cyclesPerUpdate, int lag, String build,
+            Path root, Instant createdAt) throws IOException {
         if (world == null || mapBytes == null || mapBytes.length == 0) {
             throw new IllegalArgumentException("a recording needs a world and its map bytes");
         }
@@ -231,7 +242,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
             SaveGame.write(world, mapName, null, 0, initialSave);
             PassiveMultiplayerRecorder recorder = new PassiveMultiplayerRecorder(
                     root, directory, mapName, sha256(mapBytes), mapBytes.length, build,
-                    localPlayer, cyclesPerUpdate, lag, createdAt, world,
+                    localPlayer, cyclesPerSecond, cyclesPerUpdate, lag, createdAt, world,
                     Files.size(initialSave), sha256(initialSave), channel, lock);
             recorder.writeManifest("recording", null, null, 0, 0, -1,
                     world.cycle(), SyncHash.of(world), 0, null);
@@ -418,7 +429,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         }
         out.append("  ],\n");
         out.append("  \"local_player\": ").append(localPlayer).append(",\n");
-        out.append("  \"cycles_per_second\": ").append(World.CYCLES_PER_SECOND).append(",\n");
+        out.append("  \"cycles_per_second\": ").append(cyclesPerSecond).append(",\n");
         out.append("  \"cycles_per_update\": ").append(cyclesPerUpdate).append(",\n");
         out.append("  \"lag\": ").append(lag).append(",\n");
         out.append("  \"initial_world_cycle\": ").append(initialWorldCycle).append(",\n");

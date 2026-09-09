@@ -196,6 +196,34 @@ class LobbyScreenTest {
     }
 
     @Test
+    @DisplayName("The host chooses how fast the whole table will play")
+    void gameSpeedIsChosenBeforeAnybodyStarts() throws Exception {
+        GameData data = null;
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 25)) {
+            LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", new Recording());
+            screen.render();
+
+            assertEquals(GameLobby.GameSpeed.NORMAL, lobby.state().gameSpeed(),
+                    "a new game opens at the rate the simulation counts in");
+            assertEquals(30, lobby.state().gameSpeed().cyclesPerSecond(),
+                    "Normal is thirty cycles a second, which is what the game is timed in");
+
+            assertTrue(click(screen, LobbyScreen.speedBounds()));
+            assertEquals(GameLobby.GameSpeed.FAST, lobby.state().gameSpeed(),
+                    "the control did not move the tempo on");
+
+            // All the way round, so no setting is a dead end for a host who
+            // clicked past the one they wanted.
+            for (int click = 0; click < GameLobby.GameSpeed.values().length - 1; click++) {
+                screen.render();
+                assertTrue(click(screen, LobbyScreen.speedBounds()));
+            }
+            assertEquals(GameLobby.GameSpeed.NORMAL, lobby.state().gameSpeed(),
+                    "clicking through every speed did not come back round to Normal");
+        }
+    }
+
+    @Test
     @DisplayName("The host assigns teams without changing colour or row")
     void teamsAreExplicitAndIndependentFromColour() throws Exception {
         GameData data = null;
@@ -473,6 +501,8 @@ class LobbyScreenTest {
                     "a joiner was able to pick a player up");
             assertFalse(click(screen, LobbyScreen.templateBounds()),
                     "a joiner was offered the game-template control");
+            assertFalse(click(screen, LobbyScreen.speedBounds()),
+                    "a joiner was offered the game-speed control");
         }
     }
 

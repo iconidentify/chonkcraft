@@ -87,7 +87,7 @@ The rule is enforced in two independent places:
 
 1. The online room directory filters browsing by build and returns HTTP 426 to
    a code join from another build. No relay seat or ticket is issued.
-2. Lobby wire version 7 carries the build in `JOIN`, authoritative `STATE`, and
+2. Lobby wire version 8 carries the build in `JOIN`, authoritative `STATE`, and
    `START`. A direct or relayed host compares it before allocating a player
    slot. A rejected peer receives no roster seat, map chunk, readiness state,
    or start packet.
@@ -179,6 +179,25 @@ proves exactly one mutual human teammate with shared vision, exactly one mutual
 computer enemy with its retail `ai.bin` profile active, and matching final
 simulation hashes after 180 cycles. Diplomacy and shared sight are themselves
 part of that hash from cycle zero.
+
+The lobby also settles the **game speed**, seven named steps from Slowest to
+Fastest, and every machine opens its simulation loop at the one the host chose.
+Speed is tempo and not simulation: `World.CYCLES_PER_SECOND` stays 30 and each
+step is a plain ratio of it, so a match plays the same cycles either way and
+only plays them faster or slower. It belongs to the table rather than to one
+player because lockstep holds every machine at a net cycle boundary until the
+slowest has reported: a client that slows only itself slows everybody's game by
+the same amount, with nothing on the other screens to say why. The in-game
+speed control therefore names the host's setting in a network game instead of
+offering a slider, the way Pause already refuses. The two-process gate proves
+it: the host picks Fastest and the joiner, which is never told a speed, reports
+60 cycles a second off its own running game.
+
+Retail's own lobby carries a game-speed byte with nine values at offset
+`0x1F4` of a Battle.net Edition replay header, indexing a pacing table that has
+not been read out of the pinned executable. These seven steps are therefore
+this implementation's own, and the wall-clock tempo of every setting except
+Normal is a choice rather than a measurement.
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.

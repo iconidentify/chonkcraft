@@ -203,6 +203,26 @@ public final class NetworkGame implements AutoCloseable {
         this.hostPlayer = hostPlayer;
     }
 
+    /**
+     * How many cycles a second every machine in this match plays.
+     *
+     * <p>Tempo, not simulation: the world still counts in cycles at
+     * {@code World.CYCLES_PER_SECOND}, and this only says how quickly they
+     * are played. It rides here because it is part of what the lobby settled,
+     * and because a match has exactly one of it -- lockstep will not pass a
+     * net cycle boundary until every player has reported, so a machine set
+     * slower than the rest sets the pace for all of them.
+     */
+    private int cyclesPerSecond = World.CYCLES_PER_SECOND;
+
+    public void setCyclesPerSecond(int cyclesPerSecond) {
+        this.cyclesPerSecond = Math.max(1, cyclesPerSecond);
+    }
+
+    public int cyclesPerSecond() {
+        return cyclesPerSecond;
+    }
+
     /** Installs a passive observer of completed lockstep cycles. */
     public void setCycleSink(CycleSink cycleSink) {
         this.cycleSink = java.util.Objects.requireNonNull(cycleSink, "cycleSink");
@@ -607,6 +627,18 @@ public final class NetworkGame implements AutoCloseable {
                 hostLost = true;
             }
         }
+    }
+
+    /**
+     * What to call a player in a message.
+     *
+     * <p>The lobby name when there is one, and the slot counted from one when
+     * there is not. Never the raw slot index: the interface counts players
+     * from one everywhere else, so a message that says "player 1" about the
+     * machine in slot 1 is talking about player 2.
+     */
+    public String nameOfPlayer(int player) {
+        return playerName(player);
     }
 
     private String playerName(int player) {

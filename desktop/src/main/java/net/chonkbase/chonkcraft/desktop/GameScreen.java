@@ -4228,6 +4228,15 @@ final class GameScreen extends JPanel {
         if (session == null) {
             return;
         }
+        // The table plays at the speed its host chose, the way it cannot be
+        // paused by one player either. Saying so beats a key that silently
+        // does nothing.
+        String fixed = session.fixedSpeedCaption();
+        if (fixed != null) {
+            status = "The host set this match to " + fixed + ".";
+            repaint();
+            return;
+        }
         int wanted = Math.max(1, session.speed() + by);
         session.setSpeed(wanted);
         status = by > 0 ? "Faster." : "Slower.";

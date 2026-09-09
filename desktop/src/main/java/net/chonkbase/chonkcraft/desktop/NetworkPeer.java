@@ -79,6 +79,7 @@ public final class NetworkPeer {
         boolean withoutMap = false;
         boolean computerPlayer = false;
         GameLobby.GameTemplate gameTemplate = GameLobby.GameTemplate.MELEE;
+        GameLobby.GameSpeed gameSpeed = GameLobby.GameSpeed.NORMAL;
 
         for (int i = 0; i + 1 < args.length; i += 2) {
             switch (args[i]) {
@@ -97,6 +98,8 @@ public final class NetworkPeer {
                 case "--game-template" -> gameTemplate = "teams".equalsIgnoreCase(
                         args[i + 1]) ? GameLobby.GameTemplate.TEAMS
                                 : GameLobby.GameTemplate.MELEE;
+                case "--game-speed" -> gameSpeed = GameLobby.GameSpeed.valueOf(
+                        args[i + 1].toUpperCase(java.util.Locale.ROOT));
                 default -> { }
             }
         }
@@ -136,13 +139,14 @@ public final class NetworkPeer {
         if (onlineHost != null || onlineJoin != null) {
             URI service = URI.create(onlineHost != null ? onlineHost : matchmakerUrl);
             lobbyRun = meetOnline(assets, mapName, selectedMap, service,
-                    onlineJoin, withoutMap, computerPlayer, gameTemplate);
+                    onlineJoin, withoutMap, computerPlayer, gameTemplate, gameSpeed);
             localPlayer = lobbyRun.localPlayer();
             mapName = lobbyRun.mapName();
             selectedMap = lobbyRun.mapBytes();
         } else if (lobbyHost != null || lobbyJoin != null) {
             lobbyRun = meetInLobby(assets, mapName, selectedMap,
-                    lobbyHost, lobbyJoin, withoutMap, computerPlayer, gameTemplate);
+                    lobbyHost, lobbyJoin, withoutMap, computerPlayer, gameTemplate,
+                    gameSpeed);
             localPlayer = lobbyRun.localPlayer();
             mapName = lobbyRun.mapName();
             selectedMap = lobbyRun.mapBytes();
@@ -208,6 +212,14 @@ public final class NetworkPeer {
             listeningPort = lobbyRun.lobby().localPort();
             peerCount = lobbyRun.lobby().peers().size();
             game = lobbySetup.start(data, world).game();
+            // The tempo the lobby settled, read back off the running game.
+            // This is the seam the desktop uses to open its loop, and a
+            // client that printed the host's choice heard it over the wire
+            // rather than defaulting to its own.
+            System.out.printf("peer %d game speed: %s %d cycles a second%n",
+                    localPlayer,
+                    GameLobby.GameSpeed.of(game.cyclesPerSecond()).caption(),
+                    game.cyclesPerSecond());
         } else {
             List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
             CommandApplier applier = new CommandApplier(world, roster);
@@ -363,7 +375,8 @@ public final class NetworkPeer {
     /** Meets another process through the same public HTTPS/WSS path as the desktop menus. */
     private static LobbyRun meetOnline(AssetSource assets, String mapName, byte[] selectedMap,
             URI service, String joinCode, boolean withoutMap,
-            boolean computerPlayer, GameLobby.GameTemplate gameTemplate) throws Exception {
+            boolean computerPlayer, GameLobby.GameTemplate gameTemplate,
+            GameLobby.GameSpeed gameSpeed) throws Exception {
         boolean hosting = joinCode == null;
         MatchmakingClient client = new MatchmakingClient(service);
         MatchmakingProtocol.Seat seat;
@@ -401,7 +414,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate);
+                settleAndStart(lobby, computerPlayer, gameTemplate, gameSpeed);
                 relay.markRoomStarted();
                 lobby.start();
             }
@@ -422,7 +435,8 @@ public final class NetworkPeer {
     /** Meets one other process, synchronizes the map, and leaves the socket ready for play. */
     private static LobbyRun meetInLobby(AssetSource assets, String mapName, byte[] selectedMap,
             String hostPort, String joinAddress, boolean withoutMap,
-            boolean computerPlayer, GameLobby.GameTemplate gameTemplate) throws Exception {
+            boolean computerPlayer, GameLobby.GameTemplate gameTemplate,
+            GameLobby.GameSpeed gameSpeed) throws Exception {
         boolean hosting = hostPort != null;
         GameLobby lobby;
         if (hosting) {
@@ -447,7 +461,7 @@ public final class NetworkPeer {
         while (System.currentTimeMillis() < deadline && !lobby.isStarted()) {
             lobby.poll();
             if (hosting && lobby.humanCount() >= 2 && lobby.state().allPlayersReady()) {
-                settleAndStart(lobby, computerPlayer, gameTemplate);
+                settleAndStart(lobby, computerPlayer, gameTemplate, gameSpeed);
                 lobby.start();
             }
             Thread.sleep(2);
@@ -465,8 +479,9 @@ public final class NetworkPeer {
     }
 
     private static void settleAndStart(GameLobby lobby, boolean computerPlayer,
-            GameLobby.GameTemplate gameTemplate) {
+            GameLobby.GameTemplate gameTemplate, GameLobby.GameSpeed gameSpeed) {
         lobby.setGameTemplate(gameTemplate);
+        lobby.setGameSpeed(gameSpeed);
         if (gameTemplate == GameLobby.GameTemplate.TEAMS) {
             // Exercise the common user setup directly: the two people begin
             // together, while the deliberately unsplit computer proves Start

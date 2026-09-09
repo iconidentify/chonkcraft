@@ -41,7 +41,7 @@ The current evidence and reproduction workflow are in
 
 All 18 playability lanes pass with their required authenticated inputs,
 including the 17-test control gate, 117 movement checks, 65 projectile
-checks, 39 clean/adverse lockstep cases and real two-process startup.
+checks, 41 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
 The 168 roster sequences containing invalid submarine-versus-land attacks
@@ -49,9 +49,9 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,012 tests, with 93 existing
+The integrated pack-plus-Opus suite contains 3,017 tests, with 93 existing
 specification failures, no errors and 322 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,363 skips.
+has the same 88 expected failure identities and exactly 1,364 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 27-skip profile. Coverage rules are documented in

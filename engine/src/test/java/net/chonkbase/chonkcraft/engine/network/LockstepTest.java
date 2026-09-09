@@ -333,6 +333,101 @@ class LockstepTest {
     }
 
     @Test
+    @DisplayName("a peer playing three cycles for every one of its opponent's ends in the same game")
+    void anUnevenTempoBetweenPeersDoesNotChangeTheGame() throws Exception {
+        // What a player who changes the game speed actually changes: how
+        // often their own machine is given a turn. It was suspected of
+        // desynchronising a match, and it cannot, because the boundary is
+        // where the agreement is -- a machine offered more turns spends the
+        // extra ones waiting. The speed is agreed in the lobby now, but an
+        // uneven tempo still happens by itself on a busy or slow machine, so
+        // this stays as the statement that it is harmless.
+        World hostWorld = battlefield();
+        World guestWorld = battlefield();
+        UnitType hostType = hostWorld.units().getFirst().type();
+        UnitType guestType = guestWorld.units().getFirst().type();
+
+        try (NetworkSession hostSession = new NetworkSession(0, 0);
+                NetworkSession guestSession = new NetworkSession(1, 0)) {
+            InetAddress loopback = InetAddress.getLoopbackAddress();
+            hostSession.addPeer(1, loopback, guestSession.localPort());
+            guestSession.addPeer(0, loopback, hostSession.localPort());
+            NetworkGame host = new NetworkGame(hostWorld, hostSession,
+                    new LockstepScheduler(2),
+                    new CommandApplier(hostWorld, List.of(hostType)), 0);
+            NetworkGame guest = new NetworkGame(guestWorld, guestSession,
+                    new LockstepScheduler(2),
+                    new CommandApplier(guestWorld, List.of(guestType)), 1);
+            host.start();
+            guest.start();
+
+            java.util.Set<Long> issued = new java.util.HashSet<>();
+            int attempts = 0;
+            while ((hostWorld.cycle() < 900 || guestWorld.cycle() < 900)
+                    && attempts++ < 40_000) {
+                if (hostWorld.cycle() == guestWorld.cycle()
+                        && issued.add(hostWorld.cycle())) {
+                    long cycle = hostWorld.cycle();
+                    if (cycle == 0) {
+                        for (int id : List.of(1, 3, 5, 7)) {
+                            host.issue(GameCommand.attackMove(0, id, 20, 20));
+                        }
+                        for (int id : List.of(2, 4, 6, 8)) {
+                            guest.issue(GameCommand.attackMove(1, id, 20, 20));
+                        }
+                    } else if (cycle == 300) {
+                        host.issue(GameCommand.attack(0, 3, 4));
+                        guest.issue(GameCommand.attack(1, 4, 3));
+                    }
+                }
+
+                // The fast machine, three turns to the slow one's.
+                for (int turn = 0; turn < 3; turn++) {
+                    assertNotEquals(NetworkGame.Step.DESYNC, host.update(),
+                            "the faster peer reported a desync at " + host.desyncCycle());
+                }
+                assertNotEquals(NetworkGame.Step.DESYNC, guest.update(),
+                        "the slower peer reported a desync at " + guest.desyncCycle());
+
+                // The extra turns buy a bounded lead and nothing else. A
+                // command is scheduled two net cycles ahead, so a machine can
+                // play out the batches already agreed and then has to stop:
+                // two net cycles of commands, plus the cycles inside the one
+                // it is in the middle of.
+                int lead = (LockstepScheduler.DEFAULT_LAG + 1)
+                        * LockstepScheduler.DEFAULT_CYCLES_PER_UPDATE;
+                assertTrue(Math.abs(hostWorld.cycle() - guestWorld.cycle()) <= lead,
+                        "the faster peer ran past the cycles its opponent had agreed to:"
+                                + " fast=" + hostWorld.cycle() + " slow=" + guestWorld.cycle());
+                if (hostWorld.cycle() == guestWorld.cycle()) {
+                    assertEquals(SyncHash.of(hostWorld), SyncHash.of(guestWorld),
+                            "the two players saw different battles at game cycle "
+                                    + hostWorld.cycle());
+                }
+            }
+
+            assertTrue(hostWorld.cycle() >= 900,
+                    "the faster peer only reached cycle " + hostWorld.cycle());
+            assertTrue(guestWorld.cycle() >= 900,
+                    "the slower peer only reached cycle " + guestWorld.cycle());
+
+            // The lead is a lead, not a divergence: let the slower machine
+            // finish the cycles already agreed and the two must be the same
+            // game again.
+            int settling = 0;
+            while (guestWorld.cycle() < hostWorld.cycle() && settling++ < 10_000) {
+                guest.update();
+            }
+            assertEquals(hostWorld.cycle(), guestWorld.cycle(),
+                    "the slower peer never caught up on cycles that were already agreed");
+            assertEquals(SyncHash.of(hostWorld), SyncHash.of(guestWorld),
+                    "an uneven tempo left the two players in different games");
+            assertEquals(-1, host.desyncCycle());
+            assertEquals(-1, guest.desyncCycle());
+        }
+    }
+
+    @Test
     @DisplayName("chat reaches the other peer without changing or waiting on the world")
     void chatIsSideBandAndAuthenticated() throws Exception {
         World hostWorld = battlefield();
@@ -636,6 +731,26 @@ class LockstepTest {
 
         assertNotEquals(SyncHash.of(first), SyncHash.of(second),
                 "different future random results must be reported as a desync");
+    }
+
+    @Test
+    @DisplayName("the multiplayer hash covers the stream every melee blow is rolled from")
+    void theHashCoversTheAsynchronousRandomStream() {
+        World first = battlefield();
+        World second = battlefield();
+        assertEquals(SyncHash.of(first), SyncHash.of(second));
+
+        // One number out of the second generator, which is what a single
+        // melee blow costs: the damage a footman does is half its maximum
+        // plus a draw from this stream, and so are unit headings, idle
+        // wandering, harvest approach, projectile motion and every decision a
+        // computer player makes.
+        first.battleNetRandomForAi();
+
+        assertNotEquals(SyncHash.of(first), SyncHash.of(second),
+                "a machine one melee roll ahead of the others must be caught on the cycle"
+                        + " it went wrong, not minutes later when the roll first moves a"
+                        + " hit point");
     }
 
     @Test

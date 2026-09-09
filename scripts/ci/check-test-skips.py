@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. The configured authenticated
 floor and the measured data-free inventory are:
 
-    authenticated profile      3012 tests,   27 skipped
-    no external input          3012 tests, 1363 skipped
+    authenticated profile      3017 tests,   27 skipped
+    no external input          3017 tests, 1364 skipped
 
 Both can be green.
 
@@ -193,7 +193,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (2071, 1024),
+        "engine": (2074, 1024),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -203,8 +203,11 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # BNE recording matrix likewise skips without its authenticated pack.
         # The sealed-null-target and explicit-unit-target physical transaction
         # referees need the Human 1 retail mission and add two deliberate
-        # data-free skips.
-        "desktop": (382, 280),
+        # data-free skips. The lobby game-speed batch adds three engine and
+        # two desktop referees; only the one that opens the in-game menu needs
+        # a pack for its fonts, so it alone joins this profile's skip
+        # inventory.
+        "desktop": (384, 281),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -247,10 +250,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2071, 7),
+        "engine": (2074, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (382, 8),
+        "desktop": (384, 8),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that
@@ -264,8 +267,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2071, 4),
-        "desktop": (382, 8),
+        "engine": (2074, 4),
+        "desktop": (384, 8),
         "matchmaker-server": (5, 1),
     },
     # The exact authenticated Battle.net Edition source archive, its matching
@@ -286,8 +289,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2071, 12),
-        "desktop": (382, 6),
+        "engine": (2074, 12),
+        "desktop": (384, 6),
         "matchmaker-server": (5, 1),
     },
 }

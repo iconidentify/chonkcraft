@@ -178,6 +178,11 @@ final class GameMenu {
      */
     private List<String> lines = List.of();
 
+    /** What the page is saying in prose, for the tests that read it. */
+    List<String> linesForTest() {
+        return List.copyOf(lines);
+    }
+
     private String heading = "";
 
     /** Where each item was last drawn, in screen coordinates. */
@@ -216,6 +221,19 @@ final class GameMenu {
         int speed();
 
         void setSpeed(int cyclesPerSecond);
+
+        /**
+         * The name of the tempo this match is fixed at, or null when the
+         * player may choose their own.
+         *
+         * <p>Set for a network game, where the speed is part of what the
+         * lobby agreed and belongs to the table rather than to one player.
+         * The page says which setting is in force instead of offering a
+         * slider that would move nothing.
+         */
+        default String fixedSpeedCaption() {
+            return null;
+        }
 
         /** How much bigger than its design size the interface is drawn. */
         double interfaceScale();
@@ -417,6 +435,16 @@ final class GameMenu {
         heading = "Game Speed";
         clearWidgets();
         lines = List.of();
+        String fixed = session.fixedSpeedCaption();
+        if (fixed != null) {
+            // A slider that cannot move is worse than no slider: it says the
+            // player has a choice and then refuses it. Say who made the
+            // choice and what it was instead.
+            lines = List.of("The host set this match to " + fixed + ".",
+                    "Every player runs at the same speed.");
+            addReturn("Previous (Esc)", this::showOptions);
+            return;
+        }
         addSlider("Speed", 0,
                 () -> (session.speed() - SLOWEST) / (double) (FASTEST - SLOWEST),
                 fraction -> session.setSpeed(

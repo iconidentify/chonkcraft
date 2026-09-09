@@ -56,8 +56,12 @@ class PassiveMultiplayerRecorderTest {
         World world = new World(new GameMap(12, 10, new Tileset()));
         byte[] map = {0x57, 0x41, 0x52, 0x32, 0x01, 0x02};
         Instant began = Instant.parse("2026-08-26T19:20:21.123Z");
+        // Fastest, as a lobby that chose it would open the game. The record
+        // has to say so or a cycle count in it cannot be turned back into the
+        // seconds the players spent: at sixty a second this match is half as
+        // long as the simulation's own rate would make it look.
         PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
-                world, "maps/skirmish/FAMILY.PUD", map, 1, 5, 2,
+                world, "maps/skirmish/FAMILY.PUD", map, 1, 60, 5, 2,
                 "test-build", root, began);
         Path directory = recorder.directory();
         GameCommand command = GameCommand.move(1, 42, 17, 23).withQueued(true);
@@ -109,6 +113,8 @@ class PassiveMultiplayerRecorderTest {
         String manifest = Files.readString(directory.resolve("manifest.json"));
         assertEquals("complete", json.readTree(manifest).path("status").asText(),
                 "the finished manifest is not valid, structured JSON");
+        assertTrue(manifest.contains("\"cycles_per_second\": 60"),
+                "the record does not say how fast the match was actually played: " + manifest);
         assertTrue(manifest.contains("\"status\": \"complete\"")
                         && manifest.contains("\"recorded_net_cycles\": 2")
                         && manifest.contains("\"recorded_commands\": 1")
@@ -313,7 +319,7 @@ class PassiveMultiplayerRecorderTest {
         PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
                 world, "maps/skirmish/REPLAY.PUD",
                 new byte[] {0x57, 0x41, 0x52, 0x32, 9, 8, 7},
-                0, 5, 2, "test-build", root,
+                0, 30, 5, 2, "test-build", root,
                 Instant.parse("2026-08-27T20:00:00Z"));
         Path directory = recorder.directory();
         try {
@@ -378,7 +384,7 @@ class PassiveMultiplayerRecorderTest {
         CommandApplier applier = new CommandApplier(world, roster);
         data.configureCommands(applier);
         PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
-                world, mapName, mapBytes, localPlayer, 5, 2,
+                world, mapName, mapBytes, localPlayer, 30, 5, 2,
                 "test-build", root, Instant.parse("2026-08-27T20:00:00Z"));
         Path directory = recorder.directory();
         long initialCycle = world.cycle();

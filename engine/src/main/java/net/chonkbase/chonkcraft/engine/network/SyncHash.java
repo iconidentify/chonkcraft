@@ -19,7 +19,8 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType;
  * simulation decides, so a divergence is caught, and nothing that is merely
  * presentational, or two machines with different window sizes would appear to
  * disagree. So: terrain state, unit positions, health, orders and ownership,
- * and the players' banks. Not animation frames, not the camera, not sound.
+ * the players' banks, and both random streams. Not animation frames, not the
+ * camera, not sound.
  */
 public final class SyncHash {
 
@@ -30,7 +31,7 @@ public final class SyncHash {
      * operation changes. Persisted hashes without this identity are useful for
      * diagnostics, but cannot prove an exact replay under a later engine.
      */
-    public static final int SCHEMA = 2;
+    public static final int SCHEMA = 3;
 
     private SyncHash() {
     }
@@ -49,6 +50,18 @@ public final class SyncHash {
         hash = mix(hash, world.cycle());
         hash = mix(hash, world.randomSeed());
         hash = mix(hash, world.randomDraws());
+        // Both streams, because both decide the game. "Asynchronous" is the
+        // original's name for the second generator, not a statement that it
+        // may drift: battleNetMeleeDamage rolls every melee hit out of it --
+        // half + AsyncRand() % (half + 1) -- and so do unit headings, idle
+        // wandering, harvest approach, projectile motion and every computer
+        // player's decision. It used to be left out, and a machine that had
+        // drawn one extra number then went on agreeing about the world until
+        // the difference happened to move a hit point. A player who reported
+        // "desynchronised at cycle 2125" was naming a cycle minutes after the
+        // one that went wrong, which is why nothing could be done with it.
+        hash = mix(hash, world.battleNetRandomSeed());
+        hash = mix(hash, world.battleNetRandomDraws());
 
         hash = mix(hash, world.map().width());
         hash = mix(hash, world.map().height());
