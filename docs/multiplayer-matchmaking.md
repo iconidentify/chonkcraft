@@ -182,6 +182,9 @@ part of that hash from cycle zero.
 
 The lobby also settles the **game speed**, seven named steps from Slowest to
 Fastest, and every machine opens its simulation loop at the one the host chose.
+
+![The lobby, with the host's game speed beside the game type](images/lobby-game-speed.png)
+
 Speed is tempo and not simulation: `World.CYCLES_PER_SECOND` stays 30 and each
 step is a plain ratio of it, so a match plays the same cycles either way and
 only plays them faster or slower. It belongs to the table rather than to one
