@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import net.chonkbase.chonkcraft.data.source.InstallSource;
+import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.GameData;
 import net.chonkbase.chonkcraft.engine.World;
 import net.chonkbase.chonkcraft.engine.map.GameMap;
@@ -37,7 +37,7 @@ class WallCommandTest {
     private record Rig(GameScreen screen, World world, Unit footman, List<GameCommand> sent) {}
 
     private static Rig rig() {
-        InstallSource install = InstallSource.fromEnvironment();
+        AssetSource install = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(install != null,
                 "No Warcraft II installation configured. Set -Dwc2.install.dir=/path/to/game.");
         GameData data = new GameData(install);
@@ -87,7 +87,7 @@ class WallCommandTest {
                 "BNE acknowledges an accepted attack with voice and target feedback, not"
                         + " a lowercase debug verb in the status strip");
         assertEquals(1, rig.sent().size(), "the wall click sent more than one order");
-        assertEquals(GameCommand.Kind.ATTACK_GROUND, rig.sent().getFirst().kind(),
+        assertEquals(GameCommand.Kind.ATTACK_MOVE, rig.sent().getFirst().kind(),
                 "the wall click was turned into a move rather than a tile attack");
         assertEquals(Unit.Order.ATTACK_GROUND, rig.footman().order(),
                 "the command reached the wire but not the simulation");

@@ -166,8 +166,8 @@ class BnePlaytestAdapterTest {
     }
 
     @Test
-    @DisplayName("a worker inside its depot is alive in the cycle observations")
-    void workerInsideItsDepotIsAliveInTheCycleObservations() throws Exception {
+    @DisplayName("a worker inside its mine is alive in the cycle observations")
+    void workerInsideItsMineIsAliveInTheCycleObservations() throws Exception {
         Assumptions.assumeTrue(AssetSource.fromEnvironment() != null,
                 "the BNE asset pack must be available");
         Path directory = Files.createTempDirectory("bne-playtest-contained-");
@@ -178,11 +178,11 @@ class BnePlaytestAdapterTest {
                 "scenario_sha256", "f".repeat(64),
                 "setup", Map.of("scenario", "Campaign\\Human\\Human01.pud", "seed", 1),
                 "actors", List.of(Map.of("id", 1596, "player", 1, "x", 14, "y", 9)),
-                "targets", List.of(),
+                "targets", List.of(Map.of("id", 1599, "player", 15, "x", 13, "y", 2)),
                 "settle_cycles", 120,
                 "combat_observation", Map.of("unit_ids", List.of(1596)),
-                "commands", List.of(Map.of("kind", "return-goods", "unit_id", 1596,
-                        "issue_cycle", 5, "queued", false)));
+                "commands", List.of(Map.of("kind", "harvest", "unit_id", 1596,
+                        "target_id", 1599, "issue_cycle", 5, "queued", false)));
         Files.writeString(input, Json.write(scenario));
         BnePlaytestAdapter.main(new String[] {"--scenario", input.toString(),
                 "--output", output.toString(), "--build-sha256", "b".repeat(64)});
@@ -191,7 +191,7 @@ class BnePlaytestAdapterTest {
         List<?> contained = events.stream().filter(value -> value instanceof Map<?, ?> event
                 && "combat-state".equals(event.get("kind"))
                 && Boolean.FALSE.equals(event.get("on_map"))).toList();
-        assertTrue(!contained.isEmpty(), "the return must take the worker into its depot");
+        assertTrue(!contained.isEmpty(), "the harvest command must take the worker into its mine");
         for (Object value : contained) {
             assertEquals(Boolean.TRUE, ((Map<?, ?>) value).get("alive"),
                     "a contained worker must not be counted as a combat death");

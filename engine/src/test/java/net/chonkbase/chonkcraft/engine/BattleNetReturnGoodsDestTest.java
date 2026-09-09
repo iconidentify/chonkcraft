@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -18,27 +19,30 @@ import net.chonkbase.chonkcraft.engine.unit.UnitType.Resource;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+/**
+ * An empty Return Goods request must leave the worker's current job alone.
+ * BNE's player dispatcher checks the cargo flag at 0x004760b3 before it
+ * reaches the internal constructor, which can walk even an empty unit home.
+ */
 class BattleNetReturnGoodsDestTest {
 
     @Test
-    @DisplayName("an empty send-home walks to the friendly hall")
-    void anEmptySendHomeWalksToTheFriendlyHall() {
+    @DisplayName("an empty worker ignores return goods even when a hall is nearby")
+    void anEmptyWorkerIgnoresReturnGoodsEvenWhenAHallIsNearby() {
         World world = openLand();
         UnitType peasant = peasantType();
         UnitType hallType = hallType();
-        Unit hall = world.createUnit(hallType, 0, 4, 4);
+        world.createUnit(hallType, 0, 4, 4);
         Unit worker = world.createUnit(peasant, 0, 12, 12);
         assertEquals(0, worker.carried(), "the hand starts empty");
         CommandApplier applier = new CommandApplier(world, List.of(peasant, hallType));
-        assertTrue(applier.apply(GameCommand.returnGoods(0, worker.id())),
-                "GiveOrder table 24 applies an empty send-home");
+        assertFalse(applier.apply(GameCommand.returnGoods(0, worker.id())),
+                "the player dispatcher must refuse an empty hand before choosing a depot");
         for (int i = 0; i < 200; i++) {
             world.tick();
         }
-        int chebyshev = Math.max(Math.abs(worker.tileX() - hall.tileX()),
-                Math.abs(worker.tileY() - hall.tileY()));
-        assertTrue(chebyshev <= 3,
-                "native walks the empty hand to the hall, not the spawn tile");
+        assertEquals(12, worker.tileX(), "the ignored click must not start a hall walk");
+        assertEquals(12, worker.tileY(), "the empty worker must stay on its original row");
     }
 
     @Test
@@ -48,8 +52,8 @@ class BattleNetReturnGoodsDestTest {
         UnitType peasant = peasantType();
         Unit worker = world.createUnit(peasant, 0, 12, 12);
         CommandApplier applier = new CommandApplier(world, List.of(peasant));
-        assertTrue(applier.apply(GameCommand.returnGoods(0, worker.id())),
-                "GiveOrder table 24 still applies when FindDeposit answers none");
+        assertFalse(applier.apply(GameCommand.returnGoods(0, worker.id())),
+                "the empty hand is refused before FindDeposit runs");
         for (int i = 0; i < 40; i++) {
             world.tick();
         }
@@ -59,6 +63,35 @@ class BattleNetReturnGoodsDestTest {
                 "no hall means the hull stays on its spawn rank");
         assertEquals(Unit.Order.STILL, worker.order(),
                 "native installs Still rather than a hall walk");
+    }
+
+    @Test
+    @DisplayName("an ignored return goods preserves the active move and queued waypoints")
+    void anIgnoredReturnGoodsPreservesTheActiveMoveAndQueuedWaypoints() {
+        for (boolean queued : new boolean[] {false, true}) {
+            World world = openLand();
+            UnitType peasant = peasantType();
+            UnitType hall = hallType();
+            world.createUnit(hall, 0, 4, 4);
+            Unit worker = world.createUnit(peasant, 0, 12, 12);
+            CommandApplier applier = new CommandApplier(world, List.of(peasant, hall));
+            assertTrue(applier.apply(GameCommand.move(0, worker.id(), 18, 12)),
+                    "the worker must accept its original move");
+            assertTrue(applier.apply(GameCommand.move(0, worker.id(), 18, 18).withQueued(true)),
+                    "the worker must retain a second waypoint");
+            Unit.PendingOrderState pending = worker.snapshotPendingOrders();
+            Unit.Order order = worker.order();
+            assertFalse(applier.apply(GameCommand.returnGoods(0, worker.id()).withQueued(queued)),
+                    "an empty return cannot replace or join the worker's route");
+            assertEquals(order, worker.order(), "the ignored request must keep the active walk");
+            assertEquals(pending, worker.snapshotPendingOrders(),
+                    "the ignored request must neither erase nor extend the waypoint queue");
+            for (int cycle = 0; cycle < 300; cycle++) {
+                world.tick();
+            }
+            assertEquals(18, worker.tileX(), "the worker must reach the original final column");
+            assertEquals(18, worker.tileY(), "the worker must reach the original final row");
+        }
     }
 
     private static World openLand() {

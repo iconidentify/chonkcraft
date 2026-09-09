@@ -374,10 +374,15 @@ class RightClickTableTest {
         only(scene, footman);
         rightClick(scene.screen(), sheep.tileX(), sheep.tileY(), false, false);
 
+        assertTrue(accepted(footman, Unit.Order.FOLLOW, Unit.QueuedOrderKind.FOLLOW),
+                "the right click must retain Follow while the current idle body finishes");
+        for (int cycle = 0; cycle < 30; cycle++) {
+            scene.world().tick();
+        }
         assertEquals(Unit.Order.FOLLOW, footman.order(),
-                "a footman sent at a sheep took the order " + footman.order()
-                        + ": every follow branch upstream ends"
-                        + " \"|| dest->Player->Index == PlayerNumNeutral\"");
+                "the queued click must become an active Follow");
+        assertSame(sheep, footman.target(),
+                "the follower must retain the living sheep instead of its clicked square");
     }
 
     @Test

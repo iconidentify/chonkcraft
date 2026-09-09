@@ -2222,7 +2222,7 @@ final class GameScreen extends JPanel {
                         accepted = commands.issueAccepted(GameCommand.attack(
                                 localPlayer, each.id(), under.id()).withQueued(queued));
                     } else if (wall && each.type().canAttack()) {
-                        accepted = commands.issueAccepted(GameCommand.attackGround(
+                        accepted = commands.issueAccepted(GameCommand.attackMove(
                                 localPlayer, each.id(), tileX, tileY).withQueued(queued));
                     } else {
                         accepted = commands.issueAccepted(GameCommand.move(
@@ -3335,10 +3335,12 @@ final class GameScreen extends JPanel {
         // A wall has no Unit under the pointer: it is terrain with hit points.
         // This used to fall through to every type's move branch, so the sword
         // cursor disappeared over a wall and a melee army merely walked up to
-        // it. Upstream's tile form of CommandAttack is precisely this case.
+        // it. The tile form of Attack uses native table entry 8; entry 17
+        // means artillery bombardment and the player dispatcher refuses it
+        // on infantry. The attack constructor recognizes the visible wall.
         if (unit.type() != null && unit.type().canAttack()
                 && world.map().field(tileX, tileY).isWall()) {
-            return issueStatus(GameCommand.attackGround(
+            return issueStatus(GameCommand.attackMove(
                     localPlayer, unit.id(), tileX, tileY).withQueued(queued));
         }
 

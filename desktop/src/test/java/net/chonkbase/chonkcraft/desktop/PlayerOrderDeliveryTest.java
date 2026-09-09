@@ -56,12 +56,15 @@ class PlayerOrderDeliveryTest {
         CommandApplier applier = new CommandApplier(world,
                 new ArrayList<>(data.unitTypes().types().values()));
         data.configureCommands(applier);
+        CommandPanel commandPanel = new CommandPanel(world, data, data.userInterface("summer"),
+                data.upgrades().dependencies(), 0, "summer", "human",
+                data.unitTypes().types(), data.uiLayout("human", 800, 600));
         GameScreen screen = new GameScreen(world, data,
                 new BufferedImage(SIZE * Unit.TILE_PIXELS, SIZE * Unit.TILE_PIXELS,
                         BufferedImage.TYPE_INT_RGB),
                 data.loadTileset(PudMap.Tileset.FOREST).palette(), "summer", 0,
                 800, 600, new net.chonkbase.chonkcraft.engine.sound.GameAudio(data.sounds()),
-                null, null, applier, CommandSink.local(applier), List.of(), "human");
+                null, commandPanel, applier, CommandSink.local(applier), List.of(), "human");
         screen.setSize(800, 600);
         screen.setLayout((net.chonkbase.chonkcraft.engine.ui.UiLayout.Layout) null);
         screen.setGameScale(1);
@@ -83,6 +86,104 @@ class PlayerOrderDeliveryTest {
         for (Unit unit : units) {
             unit.setSelected(true);
         }
+    }
+
+    @Test
+    @DisplayName("return goods sends the loaded worker home and preserves its empty companions' orders")
+    void returnGoodsSendsOnlyTheLoadedWorkerHome() {
+        Scene scene = scene();
+        make(scene, "unit-town-hall", 0, 4, 18);
+        Unit loaded = make(scene, "unit-peasant", 0, 5, 5);
+        Unit empty = make(scene, "unit-peasant", 0, 7, 5);
+        Unit soldier = make(scene, "unit-footman", 0, 9, 5);
+        scene.screen().selectForTest(List.of(loaded, empty, soldier));
+        scene.screen().fieldRightClickForTest(14, 5, null);
+        loaded.setCarrying(UnitType.Resource.GOLD);
+        loaded.setHeldResource(UnitType.Resource.GOLD);
+        loaded.setCarried(100);
+        Unit.Order emptyOrder = empty.order();
+        Unit.Order soldierOrder = soldier.order();
+        Unit.PendingOrderState emptyPending = empty.snapshotPendingOrders();
+        Unit.PendingOrderState soldierPending = soldier.snapshotPendingOrders();
+        var button = scene.data().userInterface("summer").buttons().all().stream()
+                .filter(b -> "return-goods".equals(b.action()) && b.appliesTo("unit-peasant"))
+                .findFirst().orElseThrow();
+        int gold = scene.world().player(0).get(UnitType.Resource.GOLD);
+
+        // Native 0x475f80 filters each selected recipient before GiveOrder:
+        // type flags & 0x300 and cargo flag +0x75 & 0x20 are both required.
+        scene.screen().press(button, false);
+
+        assertEquals(emptyOrder, empty.order(), "the empty peasant must retain its walk");
+        assertEquals(soldierOrder, soldier.order(), "a footman must never be sent into a depot");
+        assertEquals(emptyPending, empty.snapshotPendingOrders(),
+                "the empty peasant's pending move must survive the group button");
+        assertEquals(soldierPending, soldier.snapshotPendingOrders(),
+                "the soldier's pending move must survive the group button");
+        for (int cycle = 0; cycle < 900 && loaded.carried() > 0; cycle++) {
+            scene.world().tick();
+        }
+        assertEquals(0, loaded.carried(), "the eligible worker must complete the delivery");
+        assertEquals(gold + 100, scene.world().player(0).get(UnitType.Resource.GOLD),
+                "the group button must bank the loaded worker's hundred gold exactly once");
+    }
+
+    @Test
+    @DisplayName("attack ground leaves the selected infantry and worker on their previous route")
+    void attackGroundLeavesTheSelectedInfantryAndWorkerOnTheirPreviousRoute() {
+        Scene scene = scene();
+        Unit ballista = make(scene, "unit-ballista", 0, 5, 5);
+        Unit footman = make(scene, "unit-footman", 0, 8, 5);
+        Unit peasant = make(scene, "unit-peasant", 0, 10, 5);
+        scene.screen().selectForTest(List.of(ballista, footman, peasant));
+        scene.screen().fieldRightClickForTest(16, 6, null);
+        Unit.PendingOrderState footmanPending = footman.snapshotPendingOrders();
+        Unit.PendingOrderState peasantPending = peasant.snapshotPendingOrders();
+        Unit.Order footmanOrder = footman.order();
+        Unit.Order peasantOrder = peasant.order();
+        var button = scene.data().userInterface("summer").buttons().all().stream()
+                .filter(b -> "attack-ground".equals(b.action()) && b.appliesTo("unit-ballista"))
+                .findFirst().orElseThrow();
+        scene.screen().press(button, false);
+        var click = new java.awt.event.MouseEvent(scene.screen(),
+                java.awt.event.MouseEvent.MOUSE_PRESSED, 0,
+                java.awt.event.InputEvent.BUTTON1_DOWN_MASK,
+                13 * Unit.TILE_PIXELS + 16, 10 * Unit.TILE_PIXELS + 16,
+                1, false, java.awt.event.MouseEvent.BUTTON1);
+        for (var listener : scene.screen().getMouseListeners()) {
+            listener.mousePressed(click);
+        }
+        assertEquals(footmanOrder, footman.order(), "the footman must keep its previous walk");
+        assertEquals(peasantOrder, peasant.order(), "the worker must keep its previous walk");
+        assertEquals(footmanPending, footman.snapshotPendingOrders(),
+                "the ground shot must not replace the footman's pending move");
+        assertEquals(peasantPending, peasant.snapshotPendingOrders(),
+                "the ground shot must not replace the peasant's pending move");
+        boolean shot = false;
+        for (int cycle = 0; cycle < 400 && !shot; cycle++) {
+            scene.world().tick();
+            shot = !scene.world().missiles().isEmpty();
+        }
+        assertTrue(shot, "the eligible ballista must fire at the clicked ground");
+    }
+
+    @Test
+    @DisplayName("a footman's wall click uses ordinary attack and damages the wall")
+    void aFootmansWallClickUsesOrdinaryAttackAndDamagesTheWall() {
+        Scene scene = scene();
+        Unit footman = make(scene, "unit-footman", 0, 10, 10);
+        var wall = scene.world().map().field(12, 10);
+        wall.setFlags(TileFlag.LAND_ALLOWED | TileFlag.WALL | TileFlag.UNPASSABLE);
+        wall.setValue(GameMap.WALL_HIT_POINTS);
+        scene.screen().selectForTest(footman);
+        scene.screen().fieldRightClickForTest(12, 10, null);
+        boolean damaged = false;
+        for (int cycle = 0; cycle < 500 && !damaged; cycle++) {
+            scene.world().tick();
+            damaged = !wall.isWall() || wall.value() < GameMap.WALL_HIT_POINTS;
+        }
+        assertTrue(damaged,
+                "a wall attack must remain available to infantry when artillery orders are refused");
     }
 
     @Test

@@ -1,13 +1,14 @@
 # Continuous integration
 
-Four workflows in `.github/workflows/` cover tests, OTA game updates,
-installers, and the multiplayer service. Test results are evaluated against
+Workflows in `.github/workflows/` cover tests, OTA game updates,
+installers, the multiplayer service and native command parity. Test results are evaluated against
 explicit coverage and known-failure inventories.
 
 - [What CI is for here](#what-ci-is-for-here)
 - [`tests.yml`](#testsyml----the-suite-on-every-push)
 - [The skip gate](#the-skip-gate)
 - [The self-hosted runner](#the-self-hosted-runner)
+- [Native command campaign](#native-command-campaign)
 - [`release.yml`](#releaseyml----installers-on-manual-dispatch)
 - [Debugging a red run](#debugging-a-red-run)
 - [Re-baselining the skip counts](#re-baselining-the-skip-counts)
@@ -93,13 +94,45 @@ The September 7 audit of run 34136321688 found two independent problems:
   route, position, timing, damage, and random-sequence assertions remain.
 
 No expected-failure entries were added or tests disabled to resolve this audit.
-The 109 authenticated known failures remain technical debt and still execute.
+The canonical full-profile baseline now records 106 known failures. Three
+combat failures were reproduced in the pinned BNE executable and fixed at the
+swing-to-chase boundary; their original assertions now also run in the required
+26-test control-liveness gate. The remaining entries are technical debt and
+still execute. A citation label alone does not establish retail verification.
 
 `publish-game-update.yml` currently runs independently of `tests.yml`. It builds
 and signs the update and verifies launcher installation, but does not wait for
 the test workflow. A successful OTA deployment therefore does not certify a
 green test run. Changing this release policy is separate from reporting CI
 accurately.
+
+## Native command campaign
+
+`command-parity.yml` runs the fixed 121-case native command campaign on the
+private runner. It only executes trusted `master` code. Manual dispatch is
+available; push runs require `BNE_COMMAND_PARITY_ENABLED=true` in repository
+variables. Public pull requests only run the media-free campaign inventory
+and regression-gate tests in `tests.yml`.
+
+Before enabling the private workflow, mount both inputs read-only in the
+runner and configure these repository variables with their **runner-visible**
+absolute paths:
+
+- `BNE_COMMAND_PARITY_STORE`: directory containing the 121 pinned captures
+  under `objects/`.
+- `BNE_COMMAND_PARITY_PACK`: the exact authenticated BNE pack named by the
+  command campaign definition. The classic pack built by the ordinary
+  authenticated test job is not interchangeable.
+
+The existing runner's `/opt/wc2/install` and Opus mounts alone do not satisfy
+these inputs. The native workflow is prepared but automatic push execution
+stays disabled until its private mounts and variables are configured. Missing
+inputs fail a requested run; they never produce a passing parity result.
+
+The workflow retains only the regression summary as a GitHub artifact. Raw
+native fixtures, per-cycle observations and game media remain private. Local
+setup, baseline advancement and the exact metric boundaries are documented in
+the [command campaign guide](../tools/bne-harness/PLAYTEST_EXPLORER.md#fixed-command-campaign).
 
 ## The skip gate
 
@@ -123,7 +156,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,345 |
+| `data-free` | none | 1,372 |
 | `full` | installation, pack, Opus vectors | 27 |
 | `full-with-playtest-saves` | full inputs plus three private save referees | 24 |
 | `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |

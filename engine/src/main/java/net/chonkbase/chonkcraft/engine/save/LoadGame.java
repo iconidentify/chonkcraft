@@ -892,6 +892,12 @@ public final class LoadGame {
             unit.setBattleNetPlayerCommandAttack(
                     truthy(state.rawGet("playerCommandAttack")));
         }
+        if (state.rawGet("destPathOpeningHold") != null) {
+            unit.setDestPathOpeningHold(truthy(state.rawGet("destPathOpeningHold")));
+        }
+        if (state.rawGet("followWaiting") != null) {
+            unit.setBattleNetFollowWaiting(truthy(state.rawGet("followWaiting")));
+        }
         if (state.rawGet("playerCommandMove") != null) {
             unit.setBattleNetPlayerCommandMove(
                     truthy(state.rawGet("playerCommandMove")));

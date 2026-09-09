@@ -1,0 +1,61 @@
+name: BNE Command Parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'engine/**'
+      - 'desktop/**'
+      - 'data/**'
+      - 'assetpack/**'
+      - 'runtime/**'
+      - 'matchmaking/**'
+      - 'pom.xml'
+      - '*/pom.xml'
+      - 'scripts/jbr/**'
+      - 'scripts/check-bne-command-campaign.sh'
+      - 'tools/bne-harness/**'
+      - '.github/workflows/command-parity.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bne-command-parity
+  cancel-in-progress: false
+
+jobs:
+  command-campaign:
+    name: Preserve all native player-command prefixes
+    # Private captures must never be exposed to pull-request or branch code.
+    # Enable push runs only after the two read-only inputs are mounted.
+    if: >-
+      github.ref == 'refs/heads/master' &&
+      (github.event_name == 'workflow_dispatch' || vars.BNE_COMMAND_PARITY_ENABLED == 'true')
+    runs-on: arc-i9beef-chonkcraft
+    timeout-minutes: 45
+    env:
+      BNE_COMMAND_STORE: ${{ vars.BNE_COMMAND_PARITY_STORE }}
+      CHONKCRAFT_ASSET_PACK: ${{ vars.BNE_COMMAND_PARITY_PACK }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require the private command corpus and exact BNE pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$BNE_COMMAND_STORE"
+          test -n "$CHONKCRAFT_ASSET_PACK"
+          test -d "$BNE_COMMAND_STORE/objects"
+          test -r "$CHONKCRAFT_ASSET_PACK"
+      - name: Replay all 121 cases against the reviewed baseline
+        run: scripts/check-bne-command-campaign.sh --output "${{ runner.temp }}/command-campaign"
+      - name: Retain the regression summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bne-command-campaign-summary
+          # Raw native fixtures, per-cycle traces and licensed media stay private.
+          path: ${{ runner.temp }}/command-campaign/report.json
+          if-no-files-found: ignore
+          retention-days: 30

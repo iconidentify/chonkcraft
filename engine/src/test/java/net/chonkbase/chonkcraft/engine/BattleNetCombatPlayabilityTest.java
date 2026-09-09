@@ -71,21 +71,18 @@ class BattleNetCombatPlayabilityTest {
                 "GiveOrder 27 on a footman was refused instead of becoming a walk");
         assertTrue(awaitOrder(fixture.world(), footman, Unit.Order.MOVE, 16),
                 "a footman told to mend never left the native Still queue as a walk");
-        // Empty send-home and GiveOrder 17 are not refusals. Native
-        // NewActionReturnGoods walks an empty hull to the gold depot, and
-        // commanded Orc 1 grunt 1592 takes attack-ground on grass.
-        assertTrue(fixture.commands().apply(
+        // The player dispatcher filters cargo and artillery capability before
+        // invoking the permissive internal Return Goods/Attack Ground constructors.
+        assertFalse(fixture.commands().apply(
                         GameCommand.returnGoods(0, footman.id())),
-                "an empty send-home was refused");
-        assertTrue(fixture.commands().apply(
+                "a footman must not accept a gatherer's return command");
+        assertFalse(fixture.commands().apply(
                         GameCommand.attackGround(0, footman.id(), 12, 12)),
-                "GiveOrder 17 on a footman was refused");
-        assertTrue(awaitOrder(fixture.world(), footman, Unit.Order.ATTACK_GROUND, 16),
-                "the queued footman attack-ground order never left Still");
+                "a footman must not accept an artillery ground shot");
         Unit peon = place(fixture, "unit-peon", 1, 8, 12);
-        assertTrue(fixture.commands().apply(
+        assertFalse(fixture.commands().apply(
                         GameCommand.attackGround(1, peon.id(), 14, 12)),
-                "GiveOrder 17 on a peon was refused");
+                "a peon must not accept an artillery ground shot");
         assertFalse(fixture.commands().apply(
                         GameCommand.unload(0, footman.id(), 12, 12)),
                 "a footman falsely accepted a transport-only unload order");

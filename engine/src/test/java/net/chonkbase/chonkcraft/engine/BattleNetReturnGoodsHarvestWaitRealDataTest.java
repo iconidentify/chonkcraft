@@ -14,7 +14,11 @@ import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
-/** Retail preserves an in-mine gather wait when Return Goods replaces it. */
+/**
+ * Return Goods preserves the mine-exit ready wait and banks the load once.
+ * The player-dispatch capture command-parity-loaded-v2 repeats the request
+ * at 220/221 and changes the gold bank from 1000 to 1100 at cycle 394.
+ */
 class BattleNetReturnGoodsHarvestWaitRealDataTest {
 
     @Test
@@ -37,15 +41,21 @@ class BattleNetReturnGoodsHarvestWaitRealDataTest {
         Unit mine = atTile(world, 26, 13);
         assertNotNull(worker, "Orc 1 has no peon on 25,18");
         assertNotNull(mine, "Orc 1 has no gold mine on 26,13");
-        for (int cycle = 1; cycle <= 400; cycle++) {
+        for (int cycle = 1; cycle <= 600; cycle++) {
             if (cycle == 5) {
                 assertTrue(commands.apply(GameCommand.harvest(
                         0, worker.id(), mine.tileX(), mine.tileY())));
             }
-            if (cycle == 220) {
-                assertTrue(commands.apply(GameCommand.returnGoods(0, worker.id())));
+            if (cycle == 220 || cycle == 221) {
+                assertTrue(commands.apply(GameCommand.returnGoods(0, worker.id())),
+                        "the loaded worker must accept the repeated return at " + cycle);
             }
             mission.tick();
+            assertTrue(worker.hitPoints() > 0,
+                    "mine and depot containment must preserve the worker's life at " + cycle);
+            assertEquals(cycle < 394 ? 1000 : 1100,
+                    world.player(0).get(net.chonkbase.chonkcraft.engine.unit.UnitType.Resource.GOLD),
+                    "the repeated return must bank exactly one load on native cycle 394, at " + cycle);
             switch (cycle) {
                 case 209 -> {
                     assertTrue(worker.isOnMap());

@@ -354,6 +354,24 @@ final class BattleNetMovementSystem {
             unit.rememberActionBeforeQueued(before);
             return true;
         }
+        // Follow action 7 owns the same Still-body release as idle. Native
+        // single-follow-repeat queues the click at 240, promotes Move at 243
+        // and first steps at 246. Keep the leader until that release.
+        if (world.battleNetSequence != null && unit.battleNetFollowWaiting()
+                && !leftoverWalkBearing(before, unit)) {
+            int queueWait = playerCommandWaits(unit)[1];
+            if (queueWait > 0) {
+                int[] dest = projectPlayerMovePoint(unit, toX, toY);
+                unit.setOrderTarget(dest[0], dest[1]);
+                unit.clearQueuedOrders();
+                unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.MOVE,
+                        dest[0], dest[1], null, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setDestPathOpeningHold(true);
+                unit.setBattleNetOrderDelay(queueWait + 1);
+                return true;
+            }
+        }
         // ReleaseOrders destroys the replaced order object. Combat state is
         // projected onto Unit in this implementation, so release its target
         // and chase state explicitly when the player's Move replaces it.

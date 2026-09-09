@@ -11891,7 +11891,7 @@ public final class World {
                         unit, queued.x(), queued.y(), false);
                 case ATTACK_MOVE -> combat.orderAttackMove(unit, queued.x(), queued.y());
                 case BOARD -> orderBoard(unit, queued.target());
-                case FOLLOW -> orderFollow(unit, queued.target());
+                case FOLLOW -> orderFollow(unit, queued.target(), false);
                 case DEFEND -> orderDefend(unit, queued.target());
             };
             if (accepted && unit.order() != Unit.Order.STILL) {
@@ -11930,6 +11930,7 @@ public final class World {
                         && !harvest.atBattleNetResourceApproach(
                                 unit, unit.resourceUnit());
                 if (queued.kind() == Unit.QueuedOrderKind.ATTACK
+                        || queued.kind() == Unit.QueuedOrderKind.FOLLOW
                         || queued.kind() == Unit.QueuedOrderKind.PATROL
                         || queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
                         || queuedTankerHarvestOpening
@@ -17086,16 +17087,42 @@ public final class World {
     }
 
     /**
-     * Keeps a unit beside its target as that target moves.
+     * Keeps a follower beside its live leader without abandoning committed pixels.
      *
-     * <p>Whose the target is does not enter into it, here or in the order:
-     * {@code COrder_Follow::Execute} ends a follow when the goal is gone or
-     * no longer visible as one, never over
-     * diplomacy. The enemy check this used to make was the follow refusal in
-     * {@code orderFollow} written a second time, so fixing the order alone
-     * left a follower that took the order and stood down on its first step.
+     * <p>BNE action 6 at 0x40b4f0 approaches through the point pathfinder.
+     * Reaching the neighbour promotes action 7 at 0x40b550, which runs the
+     * Still program and checks the leader again at its action markers. Action
+     * 7 remains current while catching up: landing again resumes Still OP0
+     * instead of constructing another three-call wait. Restarting that wait
+     * used to shift a later ground click even when the followed path matched.
      */
     private void stepFollow(Unit unit) {
+        // A replacement issued during action 7 waits behind its current
+        // Still body. Running the old marker after promotion used to spend
+        // an extra idle draw; skipping the body started the new Move early.
+        if (unit.battleNetFollowWaiting() && !unit.isMoving()
+                && unit.queuedReplacementPending() && unit.hasQueuedOrders()) {
+            idle.stepBattleNetIdle(unit);
+            if (unit.battleNetOrderDelay() > 0) {
+                unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            }
+            if (unit.battleNetOrderDelay() == 0) {
+                unit.setOrder(Unit.Order.STILL);
+                beginNextQueuedOrder(unit);
+            }
+            return;
+        }
+        if (unit.battleNetOrderDelay() > 0) {
+            unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            return;
+        }
+        if (battleNetSequence != null && unit.queuedReplacementPending()
+                && unit.hasQueuedOrders() && !unit.isMoving()
+                && unit.residualX() == 0 && unit.residualY() == 0) {
+            unit.setOrder(Unit.Order.STILL);
+            beginNextQueuedOrder(unit);
+            return;
+        }
         if (unit.battleNetStopAfterLeftover() || unit.battleNetPlayerCommandMove()) {
             // Move releases the old followed target at the command boundary.
             // Testing that target first used to stand the follower down and
@@ -17113,9 +17140,53 @@ public final class World {
             unit.setOrder(Unit.Order.STILL);
             return;
         }
+        if (battleNetSequence != null && unit.battleNetFollowWaiting()
+                && !unit.isMoving() && unit.residualX() == 0 && unit.residualY() == 0) {
+            if (unit.distanceTo(target) > 1) {
+                if (battleNetSequence.quietTicksUntilActionMarker(
+                        unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer()) > 0) {
+                    idle.stepBattleNetIdle(unit);
+                    return;
+                }
+                unit.setBattleNetSequenceOffset(-1);
+                unit.clearPath();
+            } else {
+                idle.stepBattleNetIdle(unit);
+                return;
+            }
+        }
         if (unit.distanceTo(target) <= 1) {
-            unit.clearPath();
+            // The reserved tile can already neighbour the leader while the
+            // visible sprite still owes its last stride. Clearing that stride
+            // used to leave the follower permanently between the two tiles.
+            if (unit.isMoving() || unit.residualX() != 0 || unit.residualY() != 0) {
+                movement.walkPixels(unit);
+            }
+            if (!unit.isMoving() && unit.residualX() == 0 && unit.residualY() == 0) {
+                unit.clearPath();
+                if (battleNetSequence != null) {
+                    boolean alreadyWaiting = unit.battleNetFollowWaiting();
+                    unit.setBattleNetFollowWaiting(true);
+                    unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+                    unit.setBattleNetAnimationTimer(alreadyWaiting ? 1 : 3);
+                    if (alreadyWaiting) {
+                        idle.stepBattleNetIdle(unit);
+                    }
+                }
+            }
             return;
+        }
+
+        // Native refills an exhausted Follow route on its final pixel visit.
+        // The generic empty-route pause used to stop Human 1's first footman
+        // for ten cycles instead of reserving the next tile at fixture 73.
+        if (battleNetSequence != null && unit.isMoving() && unit.pathLength() == 0) {
+            movement.walkPixels(unit);
+            if (unit.isMoving() || unit.residualX() != 0 || unit.residualY() != 0) {
+                return;
+            }
+            unit.setRouteSpent(false);
+            unit.setWaitCycles(0);
         }
 
         boolean stale = unit.pathGoalX() != target.tileX()
@@ -17127,8 +17198,9 @@ public final class World {
                     Math.max(1, target.type().tileWidth()),
                     Math.max(1, target.type().tileHeight()),
                     0, 1);
-            PathFinder.Path path = pathFinder.find(
-                    unit.tileX(), unit.tileY(), goal, moverFor(unit));
+            PathFinder.Path path = battleNetSequence != null
+                    ? findBattleNetPointPath(unit, target.tileX(), target.tileY())
+                    : pathFinder.find(unit.tileX(), unit.tileY(), goal, moverFor(unit));
             if (path.result() != PathFinder.Result.FOUND) {
                 unit.setTarget(null);
                 unit.setOrder(Unit.Order.STILL);
@@ -17141,37 +17213,75 @@ public final class World {
     }
 
     /**
-     * Sends a unit after another.
+     * Sends a unit after another, retaining the current movement until it lands.
      *
-     * <p>After <em>anything</em>, on purpose: upstream's control-right-click
-     * is "follow anything" in as many words, and
-     * neither {@code SendCommandFollow} nor {@code CommandFollow} asks whose
-     * the target is. The one place upstream restricts a follow to own, allied
-     * or neutral units is the plain right-click table,
-     * and that lives in the interface here too. This used to refuse an enemy
-     * target, so control-following a scout's quarry was issued by the click
-     * and dropped by the world with nothing said.
+     * <p>The player right-click table chooses whether a target means Follow;
+     * this constructor retains that live target. BNE GiveOrder at 0x453130
+     * writes next_order 6 behind the current action. Replacing Move directly
+     * used to turn the group two cycles early and could strand a follower's
+     * sprite between tiles. Human 1 capture f71acde8 queues at 75, promotes
+     * the second footman at 76 and reserves its first new tile at 79.
      *
      * @return whether the order was accepted
      */
     public boolean orderFollow(Unit unit, Unit target) {
+        return orderFollow(unit, target, true);
+    }
+
+    private boolean orderFollow(Unit unit, Unit target, boolean fromPlayer) {
         if (unit == null || target == null || unit == target
                 || !unit.isAlive() || !target.isAlive() || !target.isOnMap()
                 || unit.type().speed() <= 0) {
             return false;
         }
+        if (orderReplacementMustWait(unit)) {
+            unit.clearQueuedOrders();
+            unit.setSavedOrder(null);
+            unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.FOLLOW,
+                    target.tileX(), target.tileY(), target, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.rememberActionBeforeQueued(unit.order());
+            return true;
+        }
+        if (fromPlayer && battleNetSequence != null && unit.order() == Unit.Order.FOLLOW
+                && unit.battleNetOrderDelay() > 0) {
+            // A repeated click also waits behind Follow's own constructor.
+            // Native receives repeats at 10 and 11, promotes at 12, then
+            // first steps at 15. Restarting on each click stepped at 14.
+            unit.clearQueuedOrders();
+            unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.FOLLOW,
+                    target.tileX(), target.tileY(), target, null, null));
+            unit.setQueuedReplacementPending(true);
+            return true;
+        }
+        if (fromPlayer && battleNetSequence != null
+                && (unit.order() == Unit.Order.STILL || unit.battleNetFollowWaiting())) {
+            int queueWait = movement.playerCommandWaits(unit)[1];
+            if (queueWait > 0) {
+                unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.FOLLOW,
+                        target.tileX(), target.tileY(), target, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setBattleNetOrderDelay(queueWait + 1);
+                return true;
+            }
+        }
         unit.setBattleNetPlayerCommandMove(false);
+        unit.setBattleNetFollowWaiting(false);
         unit.clearPath();
         unit.setTarget(target);
+        unit.setOrderTarget(target.tileX(), target.tileY());
         unit.setOrder(Unit.Order.FOLLOW);
+        if (fromPlayer && battleNetSequence != null) {
+            unit.setBattleNetOrderDelay(movement.playerCommandWaits(unit)[0]);
+        }
         return true;
     }
 
     /**
      * Sends a unit to stay with a friend and fight what threatens it.
      *
-     * <p>BNE's Alt-right-click. Follow never draws a weapon; this order
-     * does. A lost, dead, or hostile ward is a refusal -- Java used to
+     * <p>BNE's Alt-right-click retains a ward while choosing threats.
+     * A lost, dead, or hostile ward is a refusal -- Java used to
      * drop Alt-right-click through to Move, so the click looked accepted
      * while the unit walked away from the friend it was asked to guard.
      */
@@ -18811,11 +18921,11 @@ public final class World {
         UnitType.Resource cargo = unit.heldResource() != null
                 ? unit.heldResource() : unit.carrying();
         // NewActionReturnGoods at 0x00436ac0 installs Still when FindDeposit
-        // answers none. It does not refuse an empty hand: dest 0,0 still
-        // names the nearest reachable gold depot and the hull walks there.
-        // A local unit with no friendly depot stays Still. Used to return
-        // false on empty cargo, which made a send-home look rejected while
-        // native was already on the hall walk.
+        // answers none. This internal constructor accepts even an empty
+        // hand: dest 0,0 names the nearest reachable gold depot. The player
+        // dispatcher at 0x0047609e checks gatherer type and cargo first;
+        // CommandApplier owns that boundary. Treating the internal empty-hand
+        // witness as a legal player order used to send empty group members home.
         UnitType.Resource depotResource = cargo != null
                 ? cargo : UnitType.Resource.GOLD;
         // A mine/platform exit chooses its depot while the gatherer is still
@@ -18926,14 +19036,12 @@ public final class World {
      * That distinction is what lets a footman attack a wall: walls are map
      * terrain, so there is no unit for {@link #orderAttack} to name.
      *
-     * <p>The button table still hides Attack Ground on units that cannot
-     * bombard. The synchronized GiveOrder path does not: commanded BNE
+     * <p>The player dispatcher requires the artillery flag at 0x004760f0;
+     * CommandApplier checks it before invoking this constructor. Internal BNE
      * fixtures {@code attack-ground-1/02} (Orc 1 peon 1594 at 30,18) and
      * {@code attack-ground-1/03} (grunt 1592 at 22,23) both install order
-     * 17. Java used to refuse those packets -- no CanAttack, or melee on
-     * grass -- so the explorer recorded rejected where native walked and
-     * held ATTACK_GROUND. Buildings stay refused; they are not a GiveOrder
-     * 17 actor.
+     * 17 when called below that dispatcher. Those witnesses preserve internal
+     * construction, not player eligibility. Buildings stay refused here.
      */
     public boolean orderAttackGround(Unit unit, int toX, int toY) {
         return orderAttackGround(unit, toX, toY, false);
@@ -19664,7 +19772,9 @@ public final class World {
         // reaction range made XHuman 4's ballista Attack at fixture cycle 1
         // while native stayed Still until cycle 15. Permanent-cloak combat
         // (XHuman 7 sub) keeps the ordinary reaction-range scan.
-        if (unit.order() != Unit.Order.STILL || !unit.type().canAttack()
+        if ((unit.order() != Unit.Order.STILL
+                    && !(unit.order() == Unit.Order.FOLLOW && unit.battleNetFollowWaiting()))
+                || !unit.type().canAttack()
                 || unit.isDying() || !unit.isOnMap()
                 || isBattleNetArmedTower(unit)) {
             // Armed towers acquire only through action 14. A neighbour's

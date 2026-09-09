@@ -2063,6 +2063,31 @@ final class BattleNetCombatSystem {
                                 && !world.targets.validAttackTarget(
                                         unit, sequenceBoundaryGoal))
                         || (sequenceBoundaryGoal == null && unit.fighting()));
+        boolean spentAttackTailBoundary = world.battleNetSequence != null
+                && world.battleNetAttackMarkers.contains(unit)
+                && unit.battleNetAttackOp0OutOfRange()
+                && !unit.chasing() && unit.fighting()
+                && !unit.isMoving() && unit.stepDrained()
+                && unit.pathLength() == 0
+                && world.isSwinging(unit)
+                && unit.animation().unbreakable()
+                && !unit.battleNetStationaryAttack()
+                && sequenceBoundaryGoal != null
+                && world.targets.validAttackTarget(unit, sequenceBoundaryGoal)
+                && !world.targets.inAttackRange(unit, sequenceBoundaryGoal);
+        if (spentAttackTailBoundary) {
+            // The native Attack OP0 has completed the swing wait and owns
+            // the next chase consult. The separate visual animation used to
+            // retain Unbreakable for one more visit: Human 1 grunt 1591
+            // stepped at 322 instead of 321, which then made the player's
+            // settled footman miss its fixture-401 attack opportunity.
+            // A breakable presentation at fresh Attack construction is
+            // different: Human 8's command-campaign worker starts that body
+            // at 363. Treating it as an already-paid swing changed the next
+            // pursuit and first moved its tile too early at 452.
+            unit.animation().clearCurrent();
+            swung = true;
+        }
         boolean movingQuarryTailCommon = world.battleNetSequence != null
                 && world.battleNetAttackMarkers.contains(unit)
                 && unit.battleNetAttackOp0OutOfRange()
@@ -2101,6 +2126,7 @@ final class BattleNetCombatSystem {
             unit.animation().clearCurrent();
         }
         if (!battleNetDeadGoalBoundary && !movingQuarryTailBoundary
+                && !spentAttackTailBoundary
                 && !unit.chasing() && unit.fighting()) {
             // ATTACK_TARGET animates before it validates or scans. This is
             // observable on the first cycle after a chase reaches its goal:
@@ -2118,7 +2144,7 @@ final class BattleNetCombatSystem {
                 return;
             }
             swung = true;
-        } else if (!battleNetDeadGoalBoundary
+        } else if (!battleNetDeadGoalBoundary && !spentAttackTailBoundary
                 && !unit.chasing() && unit.animation().unbreakable()
                 && world.isSwinging(unit)) {
             // Compatibility for an order restored from state that predates

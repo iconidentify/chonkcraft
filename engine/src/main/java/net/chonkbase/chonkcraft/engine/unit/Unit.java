@@ -339,6 +339,9 @@ public final class Unit {
     /** Explicit GiveOrder Attack (native order 9), distinct from automatic order 12. */
     private boolean battleNetPlayerCommandAttack;
 
+    /** Native Follow action 7, retained while waiting or catching its leader again. */
+    private boolean battleNetFollowWaiting;
+
     /**
      * This player Move is the walking half of retail GiveOrder 17.
      *
@@ -1738,6 +1741,10 @@ public final class Unit {
     public void setOrder(Order order) {
         Order previous = this.order;
         this.order = order;
+        if (order != Order.FOLLOW && !(order == Order.MOVE
+                && battleNetBorrowedMoveForStep && previous == Order.FOLLOW)) {
+            battleNetFollowWaiting = false;
+        }
         if (order != Order.ATTACK && !(order == Order.MOVE
                 && battleNetBorrowedMoveForStep && previous == Order.ATTACK)) {
             battleNetPlayerCommandAttack = false;
@@ -3873,6 +3880,14 @@ public final class Unit {
 
     public boolean battleNetPlayerCommandAttack() {
         return battleNetPlayerCommandAttack;
+    }
+
+    public boolean battleNetFollowWaiting() {
+        return battleNetFollowWaiting;
+    }
+
+    public void setBattleNetFollowWaiting(boolean waiting) {
+        battleNetFollowWaiting = waiting;
     }
 
     public void setBattleNetPlayerCommandAttack(boolean commanded) {

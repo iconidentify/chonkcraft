@@ -15,7 +15,163 @@ The oil economy's native actions, 150-cycle dwell windows, tanker geometry,
 builder auto-haul, destruction/depletion behavior, and regression commands are
 sealed in [OIL_LIFECYCLE.md](OIL_LIFECYCLE.md).
 
-## Current checkpoint -- 2026-09-09 (player controls and rendering integrated)
+## Command campaign continuation
+
+The 52-map / 1,251-command sweep, 65 Human 1 scenarios and four player-eligibility
+cases now have a maintained
+entry point: `scripts/check-bne-command-campaign.sh`. Read the
+[fixed campaign workflow](PLAYTEST_EXPLORER.md#fixed-command-campaign) for
+private input setup, native capture-plan generation and baseline review.
+`command-campaign.json` contains the portable recipes;
+`command-campaign-baseline.json` preserves every observed unit's seven physical
+prefixes and each command's acceptance, advanced from release commit `48bddf4`
+by the player-eligibility and completed-swing corrections below.
+Complete observation windows, including Human 1's 401/414-cycle cases, are
+required. Raw order/sequence and complete physical UI parity remain separate.
+
+On i9beef, the 121 pinned native objects and new runs live under
+`$HOME/.local/share/chonkcraft-command-parity/`, outside Maven cleanup.
+The original release proof is archived under `checkpoints/48bddf4/` there.
+The workflow reconstructs scenarios from the commanded fixtures and no longer
+needs the temporary checkpoint drivers or their `target/issue12` paths.
+Public CI checks campaign integrity and failure handling. The dedicated private
+workflow requires its BNE object store and matching pack mounted in the runner
+before enabling automatic push execution.
+
+## Current checkpoint -- 2026-09-09 (combat response and player controls, working tree)
+
+An exhausted, settled attack now resumes pursuit on the native Attack action
+marker instead of waiting for the separate visual animation. An already
+breakable presentation at a fresh Attack constructor still starts its new
+body. Fresh pinned-executable capture
+`command-parity-20260909-chase-ui` drives the real Human 1 right-click to
+`25,28`: the grunt steps again at 321, the settled footman reacts at 401,
+its hit lands at 414, and the grunt returns its first blow at 427. Both units'
+tile coordinates, absolute pixels and health agree through the complete
+700-cycle window, including the dying footman. This is a bounded physical
+comparison, not full world or raw-animation parity. Nine save/reload probes
+around the swing, arrival and counterattack boundaries preserve those same
+700-cycle observations.
+
+Three unchanged regression assertions fail on the preceding retained JAR and
+pass with the fix. Their identities are removed from the canonical failure
+baseline, reducing it from 109 to 106. They now also belong to the required
+26-test control-liveness inventory, with zero skips permitted. The first broader
+candidate passed the full suite but regressed five Human 8 command-campaign
+field prefixes; it was rejected. The final boundary requires an existing,
+unbreakable swing so a fresh constructor keeps its separately verified timing.
+
+Player Follow now retains committed movement, uses the native point route,
+finishes the visible stride before waiting beside the leader, and refills an
+exhausted route on its final pixel visit. BNE's settled Follow action survives
+catch-up movement and runs the idle program at its action markers. Repeated
+clicks during the opening and a later Move respect that program's release.
+Save/load and the lockstep hash retain both the Follow action and a queued
+Move's startup hold; omitting the hold started a restored move two cycles early.
+
+Seven fresh captures run the pinned BNE executable through DoRightButton and
+replay the resulting selections and clicks through the actual Java handler.
+The measured boundary is handler dispatch, not operating-system mouse hit testing.
+Across 19 observed-unit instances and 95 tile/pixel/health prefixes, 56 improve
+and none regress against the preceding eligibility checkpoint. The sum of
+complete matching unit prefixes rises from 1,677 to 5,289 cycles. All observed
+actors remain alive and on-map throughout these windows; no cycles are excluded.
+The original moving-group case improves from a shared prefix of 76 to 320.
+Single Follow/repeat/Move agrees throughout 400 cycles; both rapid-repeat
+controls agree throughout 180. Two of three followers and their leader agree
+throughout the 500-cycle eastward-leader case; its third follower first differs
+at collision recovery on 152. The southward leader differs at 79 even in an
+isolated Move control, identifying a separate pathfinding boundary.
+
+Six new native-backed Follow tests include 23 save/load continuations. All six
+fail when the fix is removed. The maintained control-liveness gate now requires
+26 passing tests with zero skips, including these Follow and combat cases.
+The existing neutral-unit mouse-event test accepts native queueing, then requires the active
+Follow to retain the same living sheep after 30 ticks. These Follow comparisons
+are separate from the fixed 121-case campaign, which contains no Follow commands.
+
+The player command boundary now refuses Return Goods for empty workers and
+non-gatherers, and Attack Ground for non-artillery units. Refusal occurs before
+queue insertion or saved-order clearing, so ineligible members of a mixed
+selection retain their orders. Both right-click and aimed wall attacks use
+ordinary positional Attack, preserving infantry wall combat.
+
+Fresh execution of the pinned BNE 2.02b executable and its dispatcher at
+`0x475f80` establish these predicates: Return Goods checks type flags `0x300`
+and cargo byte `unit+0x75 & 0x20` at `0x47609e`; Attack Ground requires type
+flag `0x4000` at `0x4760f0`. Wall Attack uses table index 8, while artillery
+bombardment uses index 17. Earlier internal GiveOrder fixtures bypassed these
+checks. Their permissive constructors remain useful diagnostics, but no
+longer justify accepting illegal player requests. The explorer's capability
+descriptions and tests now distinguish these boundaries.
+
+The final command campaign is retained under
+`$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-chase-depot-playability/verification-final/command-campaign/`.
+It runs JAR SHA-256
+`75284145088a75128b969ad732b11f7baca1472c874e3980ca72b126b74d1113`
+at engine-input identity
+`9dba820e41af66a60851ab5cd4e4b9745565bd6972c594a928d82f0f55b9feaf`.
+
+- All 121 cases pass the regression gate. Every one of 1,374 acceptance
+  decisions agrees, including nine native refusals. Across 7,202 observed-unit
+  instances, 50,414 physical field prefixes preserve the prior baseline;
+  eight improve, with no regression. The reviewed baseline now requires those
+  two Human 1 grunts to remain exact throughout their 401-cycle windows.
+- Human 1 improves from 59 to 61 of 65 cases with exact commanded-unit
+  physical state throughout after the eligibility correction. This combat fix
+  advances exact all-observed-unit cases from 59 to 61. The commanded-unit
+  complete-window prefix sum remains 25,391.
+- The four new eligibility cases match commanded units throughout in three
+  cases. The loaded peon's repeated Return Goods banks exactly 100 gold at
+  cycle 394, agrees physically through 544, and first differs at 545 on a
+  later trip. The economic assertion is separate from the seven-field gate.
+- The original 52-map command matrix retains 43/52 exact through 100,
+  3/52 through 600 and prefix sum 6,631.
+- Both idle-map regression gates pass: 52 clean through 400; 14 clean,
+  38 divergent and zero failed through 1,800. Every accepted per-map prefix
+  survives, with shared horizon 403 and exact-prefix sum 56,468.
+- The full pack-plus-Opus suite runs 3,022 tests: 2,614 pass, 90 known
+  failures, zero errors and 318 skips. Data-free runs 3,022: 1,562 pass,
+  88 known failures, zero errors and 1,372 skips. Neither adds a failure
+  identity. Four existing wall tests now execute with a pack. The canonical
+  raw-media CI profile was not available locally.
+- All 87 explorer/adapter, 20 campaign-integrity, 32 player-transaction and
+  14 readiness tests pass.
+- All 18 playability lanes pass, including control liveness, save/load,
+  desktop command delivery, adverse-network lockstep and two-process startup.
+
+Mixed-selection desktop regressions invoke the real Return Goods button and
+Attack Ground targeting handler; the loaded worker deposits once and the
+ballista fires while ineligible companions retain their moves. A wall-click
+regression proves a footman damages the wall. Reverting the eligibility
+checks or the wall packet encoding makes the corresponding regressions fail.
+
+Fresh native captures, retained Java twins, full cycle comparisons and
+validation receipts are retained under
+`$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-chase-depot-playability/verification-final/`.
+The preceding Follow proof remains under `investigations/20260909-follow-attack-resource/`;
+the earlier eligibility evidence remains under `investigations/20260909-return-goods/`
+in the same private store. This checkpoint is local and uncommitted; the
+publication below remains live.
+
+Next precision work is collision routing and the later combat divergence at
+321 in the original Follow case. Explicit footman Attack first differs at 153:
+BNE takes the southwest heading while Java takes south after identical pixels
+through 152. The loaded worker first differs at 545 after its depot stay:
+BNE holds Still for 25 cycles, promotes the next harvest at 569, and then pays
+its constructor, while Java walks immediately. Command acceptance agreement,
+liveness and these bounded comparisons do not establish complete world or UI
+parity. The full player-transaction requirements remain incomplete.
+
+The remaining known failures are regression debt, not accepted retail behavior.
+All 88 data-free baseline entries still have an `unsorted` verdict; their
+mechanical citation labels do not establish executable verification. Prioritize
+blocked combat and worker routes, resource delivery, target selection and AI
+blocker clearing. Reproduce each in pinned BNE before changing behavior or
+correcting an obsolete test expectation, then remove resolved failure identities
+from the baseline.
+
+## Published checkpoint -- 2026-09-09 (player controls and rendering integrated)
 
 Checkpoint `7a13f92` from `checkpoint/issue-12-player-controls` is integrated
 with master `2387035`, including the fog, walking-animation, smooth scrolling,
@@ -106,19 +262,19 @@ validation. Explicit footman Attack retains the correct quarry but a route
 refill at 137 first changes position at 153. These are current precision work
 items; passing liveness does not close them.
 
-Retained local proof:
+Retained release proof is archived below
+`$HOME/.local/share/chonkcraft-command-parity/checkpoints/48bddf4/`:
 
-- `target/issue12/integration/`: full-suite inventories, failure comparison,
+- `integration/`: full-suite inventories, failure comparison,
   all 18 playability lane logs and receipt, rendering logs, source attestation
   and source/runtime boundary checks.
 - `.bne-surveys/issue12-integration-c400/bne-java-survey.json` and
   `.bne-surveys/issue12-integration-c1800/bne-java-survey.json`, each gated
   against the corresponding accepted player-control survey.
-- `target/issue12/integration/player-controls`,
-  `target/issue12/integration/player-human1` and
-  `target/issue12/integration/player-ui/proof-store`: retained native closures
+- `integration/player-controls`, `integration/player-human1` and
+  `integration/player-ui/proof-store`: retained native closures
   and fresh paired Java results. Licensed fixture bytes stay outside Git.
-- `target/issue12/expanded-evidence/` retains the pre-integration checkpoint's
+- `expanded-evidence/` retains the pre-integration checkpoint's
   freeze sweeps, efficacy comparisons and detailed native command witnesses.
 
 The integrated master is the production publication source. The

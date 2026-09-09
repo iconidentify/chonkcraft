@@ -4,11 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
-import net.chonkbase.chonkcraft.engine.network.CommandApplier;
-import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +14,9 @@ import org.junit.jupiter.api.Test;
 /**
  * An empty send-home leftover-lands on the hall ring, then dest-arms in.
  *
- * <p>Authenticated return-goods-1/00: peon 1594 leftover-lands 26,21 at
+ * <p>These are internal GiveOrder witnesses below the player dispatcher;
+ * empty player requests are refused before this constructor runs.
+ * Authenticated return-goods-1/00: peon 1594 leftover-lands 26,21 at
  * fixture 56, stands action 25 through 58, dest-arms onto 25,22, and is
  * inside at 75. Walking the connected origin leftover-landed 22,21 at 53,
  * paid PF_WAIT 10, and entered at 65.
@@ -48,9 +47,6 @@ class BattleNetReturnGoodsLeftoverLandRealDataTest {
                 data.campaignMap(map)), 1);
         Assumptions.assumeTrue(mission != null, map + " is not in the pack");
         World world = mission.world();
-        CommandApplier commands = new CommandApplier(
-                world, new ArrayList<>(data.unitTypes().types().values()));
-        data.configureCommands(commands);
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
@@ -61,9 +57,8 @@ class BattleNetReturnGoodsLeftoverLandRealDataTest {
         Integer enterAt = null;
         while (fixtureCycle(world) <= enterBy + 8) {
             if (fixtureCycle(world) == 4 && !issued) {
-                assertTrue(commands.apply(GameCommand.returnGoods(
-                                peon.player(), peon.id())),
-                        "GiveOrder 24 must accept the empty send-home");
+                assertTrue(world.orderReturnGoods(peon, true),
+                        "the internal GiveOrder 24 constructor must accept the empty send-home");
                 issued = true;
             }
             mission.tick();

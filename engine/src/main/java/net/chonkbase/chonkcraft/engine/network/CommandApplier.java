@@ -122,6 +122,21 @@ public final class CommandApplier {
             return false;
         }
 
+        // A group button used to send empty workers into depots and replace
+        // infantry moves with ground attacks. The player dispatcher filters
+        // every recipient before GiveOrder or its saved-order flush: 0x47609e
+        // requires a gatherer with cargo for Return Goods; 0x4760f0 requires
+        // the artillery type flag for Attack Ground. Refused recipients keep
+        // their active order and waypoints, including shift-queued requests.
+        if (command.kind() == GameCommand.Kind.RETURN_GOODS
+                && (unit.type() == null || !unit.type().canGather() || unit.carried() <= 0)) {
+            return false;
+        }
+        if (command.kind() == GameCommand.Kind.ATTACK_GROUND
+                && (unit.type() == null || !unit.type().groundAttack())) {
+            return false;
+        }
+
         if (command.queued() && shouldWait(unit, command.kind())) {
             Unit.QueuedOrder queued = queuedOrder(command);
             if (queued != null) {

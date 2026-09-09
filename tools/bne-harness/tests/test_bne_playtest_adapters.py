@@ -518,69 +518,42 @@ class PlaytestAdapterTest(unittest.TestCase):
             java_result["observations"][1]["state"]["tile_y"]),
             "both engines bank at the great hall")
 
-    def test_both_adapters_send_an_empty_peon_to_the_hall(self):
-        pack = Path.home() / (
-            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
-        fixture = (
-            Path(__file__).resolve().parents[1]
-            / "work/playtest-explorer/commanded/return-goods-1/00.bnefx"
-        )
+    def campaign_pair(self, name):
+        import bne_command_campaign as campaign
+        case = next(c for c in campaign.load_definition()["cases"] if c["id"] == name)
+        fixture = campaign.fixture_path(campaign.default_store(), case)
+        pack = Path.home() / ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack"
         if not fixture.is_file() or not pack.is_file():
-            self.skipTest("empty Orc 1 return-goods fixture or BNE pack missing")
-        seed = explorer.seed_from_commanded_fixture(fixture)
-        scenario = explorer.scenario_from_commanded_seed(seed)
-        native_result = native.run_from_fixture(
-            scenario, fixture, PINNED, "a" * 64)
-        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
+            self.skipTest("pinned player-dispatch capture or BNE pack missing")
+        campaign.verify_fixture(fixture, case, deep=False)
+        scenario = campaign.materialize_scenario(case, fixture)
+        native_result = native.run_from_fixture(scenario, fixture, PINNED, "a" * 64)
+        script = SCRIPTS / "bne_playtest_java_adapter.py"
         with tempfile.TemporaryDirectory() as directory:
-            adapter = explorer.Adapter("java", [
-                sys.executable, str(script),
+            adapter = explorer.Adapter("java", [sys.executable, str(script),
                 "--scenario", "{scenario}", "--output", "{output}",
-                "--asset-pack", str(pack), "--skip-build",
-            ], timeout=180.0)
+                "--asset-pack", str(pack), "--skip-build"], timeout=180.0)
             java_result = adapter.run(scenario, Path(directory))
-        explorer.validate_result(native_result, scenario, "native")
-        explorer.validate_result(java_result, scenario, "java")
-        self.assertTrue(native_result["observations"][0]["accepted"],
-                        "GiveOrder table 24 applies an empty send-home")
-        self.assertTrue(java_result["observations"][0]["accepted"],
-                        "Java must not refuse an empty send-home")
-        self.assertEqual((22, 22), (
-            java_result["observations"][0]["state"]["tile_x"],
-            java_result["observations"][0]["state"]["tile_y"]),
-            "the empty peon walks to the great hall")
+        comparison = campaign.compare_case(case, scenario, native_result, java_result)
+        self.assertEqual(comparison["native_acceptance"], comparison["java_acceptance"],
+                         "both engines must agree at the player dispatcher, before internal GiveOrder")
+        return case, comparison
 
-    def test_both_adapters_leave_a_send_home_still_when_no_depot_exists(self):
-        pack = Path.home() / (
-            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
-        fixture = (
-            Path(__file__).resolve().parents[1]
-            / "work/playtest-explorer/commanded/return-goods-2/01.bnefx"
-        )
-        if not fixture.is_file() or not pack.is_file():
-            self.skipTest("no-depot return-goods fixture or BNE pack missing")
-        seed = explorer.seed_from_commanded_fixture(fixture)
-        scenario = explorer.scenario_from_commanded_seed(seed)
-        native_result = native.run_from_fixture(
-            scenario, fixture, PINNED, "a" * 64)
-        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
-        with tempfile.TemporaryDirectory() as directory:
-            adapter = explorer.Adapter("java", [
-                sys.executable, str(script),
-                "--scenario", "{scenario}", "--output", "{output}",
-                "--asset-pack", str(pack), "--skip-build",
-            ], timeout=180.0)
-            java_result = adapter.run(scenario, Path(directory))
-        explorer.validate_result(native_result, scenario, "native")
-        explorer.validate_result(java_result, scenario, "java")
-        self.assertTrue(native_result["observations"][0]["accepted"],
-                        "GiveOrder table 24 still applies when FindDeposit fails")
-        self.assertTrue(java_result["observations"][0]["accepted"],
-                        "Java must apply the click even when there is no hall")
-        self.assertEqual((20, 31), (
-            java_result["observations"][0]["state"]["tile_x"],
-            java_result["observations"][0]["state"]["tile_y"]),
-            "no friendly depot means the hull stays put")
+    def test_both_adapters_ignore_empty_returns_and_accept_the_later_moves(self):
+        case, comparison = self.campaign_pair("command-parity-return-goods-empty")
+        self.assertEqual([False, False, True, True], comparison["java_acceptance"],
+                         "empty peon/soldier returns are refused without blocking subsequent moves")
+        for unit in {str(c["unit_id"]) for c in case["commands"]}:
+            self.assertEqual([case["horizon"]] * 7, comparison["unit_frontiers"][unit],
+                             "the ignored returns must preserve the two actors' complete physical paths")
+
+    def test_both_adapters_ignore_repeated_empty_return_requests(self):
+        case, comparison = self.campaign_pair("human1-064")
+        self.assertEqual([False, False], comparison["java_acceptance"],
+                         "repeating an empty Return Goods must never send the peasant into a hall")
+        for values in comparison["unit_frontiers"].values():
+            self.assertEqual([case["horizon"]] * 7, values,
+                             "ignoring the two clicks must preserve every observed unit")
 
     def test_both_adapters_accept_a_commanded_orc_one_repair(self):
         pack = Path.home() / (
@@ -718,33 +691,13 @@ class PlaytestAdapterTest(unittest.TestCase):
             "ATTACK_GROUND", java_result["observations"][0]["state"]["order"],
             "the catapult must stay on the ground volley")
 
-    def test_a_peon_ground_click_is_not_a_catapult_volley(self):
-        pack = Path.home() / (
-            ".chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack")
-        fixture = (
-            Path(__file__).resolve().parents[1]
-            / "work/playtest-explorer/commanded/attack-ground-1/02.bnefx"
-        )
-        if not fixture.is_file() or not pack.is_file():
-            self.skipTest("commanded peon attack-ground fixture or BNE pack missing")
-        seed = explorer.seed_from_commanded_fixture(fixture)
-        scenario = explorer.scenario_from_commanded_seed(seed)
-        native_result = native.run_from_fixture(
-            scenario, fixture, PINNED, "a" * 64)
-        script = Path(__file__).parents[1] / "scripts" / "bne_playtest_java_adapter.py"
-        with tempfile.TemporaryDirectory() as directory:
-            adapter = explorer.Adapter("java", [
-                sys.executable, str(script),
-                "--scenario", "{scenario}", "--output", "{output}",
-                "--asset-pack", str(pack), "--skip-build",
-            ], timeout=180.0)
-            java_result = adapter.run(scenario, Path(directory))
-        explorer.validate_result(native_result, scenario, "native")
-        explorer.validate_result(java_result, scenario, "java")
-        self.assertTrue(native_result["observations"][0]["accepted"],
-                        "GiveOrder table 17 still applies on a peon")
-        self.assertTrue(java_result["observations"][0]["accepted"],
-                         "GiveOrder 17 walks a peon toward the clicked grass")
+    def test_the_player_dispatcher_ignores_non_artillery_ground_attacks(self):
+        case, comparison = self.campaign_pair("command-parity-ground-invalid")
+        self.assertEqual([False, False], comparison["java_acceptance"],
+                         "a peon and grunt both lack the native artillery type flag")
+        for values in comparison["unit_frontiers"].values():
+            self.assertEqual([case["horizon"]] * 7, values,
+                             "neither invalid recipient may disturb the native physical stream")
 
     def test_both_adapters_accept_a_commanded_grunt_attack_move(self):
         pack = Path.home() / (

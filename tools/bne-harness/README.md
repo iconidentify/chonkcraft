@@ -21,6 +21,9 @@ read [`PARITY_LAB.md`](PARITY_LAB.md). Its machine policy is
 For automatically generating player orders, comparing their physical outcomes
 in both engines, shrinking failures and sealing handoff packets, read
 [`PLAYTEST_EXPLORER.md`](PLAYTEST_EXPLORER.md).
+Its [fixed command campaign](PLAYTEST_EXPLORER.md#fixed-command-campaign)
+replays the 121 checkpoint scenarios with one repository command and keeps
+private captures and results outside Maven's build directories.
 
 For authenticated native writer localization, clean/failing branch contrast,
 and bounded predicate capture, read

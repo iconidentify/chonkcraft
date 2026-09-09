@@ -22,6 +22,149 @@ The system is fail-closed: empty observations, a changed scenario identity, an
 unidentified producer, an invalid capability or an adapter failure cannot be
 reported as parity.
 
+## Fixed command campaign
+
+The maintained checkpoint campaign is
+[`command-campaign.json`](command-campaign.json). It contains portable command
+recipes for 52 maps / 1,251 commands, 65 Human 1 cases / 111 commands, and
+four player-eligibility cases / 12 commands: 121 cases and 1,374 commands.
+[`command-campaign-baseline.json`](command-campaign-baseline.json) records the
+reviewed per-unit physical prefixes and per-command acceptance, advanced from
+release commit `48bddf4` by the player-eligibility correction. These files contain recipes, identities and comparison
+summaries; native fixture bytes stay outside Git.
+
+Validate the public inventory without game media:
+
+```sh
+python3 tools/bne-harness/scripts/bne_command_campaign.py inventory
+python3 -m unittest discover -s tools/bne-harness/tests -p test_bne_command_campaign.py
+```
+
+With the private inputs installed, run the complete regression gate from the
+repository root:
+
+```sh
+scripts/check-bne-command-campaign.sh
+```
+
+The default private store is
+`$HOME/.local/share/chonkcraft-command-parity`; override it with
+`BNE_COMMAND_STORE`. The pack defaults to
+`$HOME/.chonkcraft/packs/warcraft-ii-battle-net-edition-usa.chonkpack`;
+override it with `CHONKCRAFT_ASSET_PACK` or `--asset-pack`. Its required SHA-256
+is `3db9c8f472aebed34426cbca474b37f83dd10eaaeefda16b68dbc03a0b66db75`.
+The authenticated classic-media CI pack is a different input and cannot
+substitute for this BNE pack.
+
+The gate builds once with pinned JBR 25 and runs the packaged JAR retained in
+a new `runs/TIMESTAMP/` directory in the private store. It does not execute
+incremental class directories. `--jobs 4` controls concurrency; `--output`
+must name a new directory. `--skip-build` requires the existing authenticated
+build receipt to match current engine, desktop, harness and runtime inputs.
+
+Every case must supply every requested unit on every cycle. The gate rejects
+missing or duplicate cases, omitted fields, shortened observation windows,
+adapter failures, changed recipes, changed native producers and stale Java
+builds. It preserves **each unit's prefix in each of seven fields**, so one
+unit's existing divergence cannot conceal another unit regressing:
+life, on-map state, tile x/y, absolute pixel x/y and HP. The adapter fields
+`offset_x` and `offset_y` contain absolute pixel positions in this comparison.
+Every command whose acceptance agreed with BNE must continue to agree;
+correcting an existing refusal mismatch is an improvement.
+
+The 52-map cases run through cycle 600. Human 1 cases include the full tail
+after the last command: 26 end at 400, 26 at 401 and 13 at 414. The previous
+ad hoc headline capped their prefix sum at 400 even though the adapters
+observed the longer tails. The release's complete-window prefix sum was 24,607;
+the player-eligibility correction raises it to 25,391, with 61/65 commanded-unit
+and 59/65 all-observed-unit exact cases (previously 59 and 57).
+The campaign-map prefix sum remains 6,631, with 43/52 exact through 100 and
+3/52 through 600.
+
+The four added cases cover empty-worker and soldier Return Goods refusal,
+a loaded worker's repeated Return Goods, non-artillery Attack Ground refusal,
+and a legal catapult shot alongside refused ogre/worker requests. All 1,374
+acceptance decisions now agree with BNE, including nine refusals. Three of the
+four new cases match the commanded units throughout; the loaded worker first
+differs at cycle 545 on a later trip. Its first 100-gold deposit at cycle 394
+is checked separately against the native bank trace. These captures execute
+individual recipients through the player dispatcher; pack-backed desktop
+tests separately exercise mixed selections and the actual button handlers.
+
+`report.json` records the build, input hashes, complete case inventory,
+regressions, improvements and group totals. Each case retains its reconstructed
+scenario, both adapter results, first raw-order diagnostics and per-unit
+physical frontiers. `passed` means no loss of those measured prefixes or
+acceptance agreements. `full_parity` remains false: this gate excludes raw
+order/sequence, other world fields, economic outcomes and physical UI layers.
+Continue running the idle-map and 18-lane playability gates alongside it.
+
+### Private store and i9beef handoff
+
+On i9beef the 121 pinned captures are retained as
+`$HOME/.local/share/chonkcraft-command-parity/objects/SHA256.bnefx`.
+Historical integration evidence is separately preserved below
+`$HOME/.local/share/chonkcraft-command-parity/checkpoints/48bddf4/`.
+Historical receipts keep their original path and build seals; they are not
+rewritten to appear freshly executed. New runs reconstruct scenarios from
+the commanded fixture's first frame and need no files below `target/issue12`
+or a separate idle-map corpus.
+
+To prepare another machine, restore the private object directory and install
+the matching BNE pack. Alternatively import captures from a private directory:
+
+```sh
+python3 tools/bne-harness/scripts/bne_command_campaign.py import-fixtures \
+  --from /private/native-command-captures
+python3 tools/bne-harness/scripts/bne_command_campaign.py verify
+```
+
+Import copies only captures pinned by the campaign definition and checks their
+sealed state streams. It never deletes source captures. An incomplete import
+or a missing/changed object exits unsuccessfully. Legacy capture ledgers can
+also be imported with repeated `--ledger /private/capture-ledger.json` options.
+Archive the object directory and new run directories outside build-cleanup
+paths. A fresh clone alone does not contain these private inputs.
+
+### Capture and advance the campaign
+
+Generate all native command scripts and a standard corpus plan without
+running BNE:
+
+```sh
+python3 tools/bne-harness/scripts/bne_command_campaign.py capture-plan \
+  --output "$HOME/.local/share/chonkcraft-bne-oracle/plans/player-commands"
+```
+
+The output is a new directory. Its `plan.json` and relative `commands/`
+files are accepted by the existing [corpus runner](CORPUS.md). A configured
+oracle can execute that plan with `bne_headless.py corpus`, using
+`--plan player-commands/plan.json` and a fresh `--output` directory.
+Review the deployed tracer before capture: scripted `0x13` orders must enter
+the player dispatcher at `0x475f80`. Restore the original pinned captures to
+replay the existing baseline. Fresh captures have new byte/producer identities
+and require explicit authentication and recipe/baseline review before adoption.
+They do not silently replace existing objects.
+
+After a gameplay improvement passes the full campaign, produce a baseline
+candidate for review:
+
+```sh
+python3 tools/bne-harness/scripts/bne_command_campaign.py baseline-candidate \
+  --report "$HOME/.local/share/chonkcraft-command-parity/runs/RUN/report.json" \
+  --output /private/review/command-baseline.json
+```
+
+This reopens the retained observations, checks their hashes and recipes,
+recomputes every frontier and refuses stale, failed or regressing runs.
+Review and adopt that candidate with the gameplay change; the runner never
+automatically rewrites the repository baseline. Changing the case denominator
+requires a reviewed definition and matching baseline, not dropping failed cases.
+
+The [CI guide](../../docs/ci.md#native-command-campaign) explains the private
+workflow inputs. Public CI runs the inventory and gate rejection tests without
+licensed media.
+
 ## Seed format
 
 ```json
@@ -63,8 +206,12 @@ cells in that inventory rather than a movement-only lookalike corpus.
 Each generated movement, stop, patrol, attack, harvest, return-goods,
 repair, attack-ground, attack-move, stand-ground or train scenario can be
 encoded directly for the guarded native command injector.
-Those `0x13` families use `GiveOrder` with table indices 3, 2, 5, 8, 23,
-24, 27 and 17. Stand-ground calls the order-15 installer at `0x4368b0`.
+Those `0x13` families enter the player selection dispatcher at `0x475f80`
+with table indices 3, 2, 5, 8, 23, 24, 27 and 17. That dispatcher applies
+the player's capability, saved-order, destination and hit-offer rules before
+calling GiveOrder. Earlier bare GiveOrder captures are internal diagnostics,
+not interchangeable player-command evidence. Stand-ground calls the
+order-15 installer at `0x4368b0`.
 Train calls the `0x15` inner apply at `0x40e2a0` as
 `cycle N train unit SLOT type T` (mode 0). Other families fail closed
 and must use the authenticated replay-packet adapter.

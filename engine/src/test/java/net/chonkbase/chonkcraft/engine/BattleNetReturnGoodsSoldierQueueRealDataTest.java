@@ -4,11 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
-import net.chonkbase.chonkcraft.engine.network.CommandApplier;
-import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -17,7 +14,9 @@ import org.junit.jupiter.api.Test;
 /**
  * A soldier's empty send-home from Still queues Return-Goods.
  *
- * <p>Authenticated return-goods-1/01: grunt 1592 at 18,23 keeps Still and
+ * <p>These are internal GiveOrder witnesses below the player dispatcher;
+ * empty player requests are refused before this constructor runs.
+ * Authenticated return-goods-1/01: grunt 1592 at 18,23 keeps Still and
  * next_order 24 through fixture 8, Return-Goods at 9, and is inside the
  * hall at 79. Installing the walk on the issue cycle first-progressed at
  * 5 and never left 18,23.
@@ -37,9 +36,6 @@ class BattleNetReturnGoodsSoldierQueueRealDataTest {
                 GameData.personIn(data.campaignMap("campaigns/orc/level01o")), 1);
         Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
         World world = mission.world();
-        CommandApplier commands = new CommandApplier(
-                world, new ArrayList<>(data.unitTypes().types().values()));
-        data.configureCommands(commands);
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
@@ -52,9 +48,8 @@ class BattleNetReturnGoodsSoldierQueueRealDataTest {
         Integer enterAt = null;
         while (fixtureCycle(world) <= 85) {
             if (fixtureCycle(world) == 4 && !issued) {
-                assertTrue(commands.apply(GameCommand.returnGoods(
-                                grunt.player(), grunt.id())),
-                        "GiveOrder 24 must accept the soldier send-home");
+                assertTrue(world.orderReturnGoods(grunt, true),
+                        "the internal GiveOrder 24 constructor must accept the soldier send-home");
                 issued = true;
             }
             mission.tick();

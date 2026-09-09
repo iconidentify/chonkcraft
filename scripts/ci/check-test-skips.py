@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. The configured authenticated
 floor and the measured data-free inventory are:
 
-    authenticated profile      3012 tests,   27 skipped
-    no external input          3012 tests, 1363 skipped
+    authenticated profile      3022 tests,   27 skipped
+    no external input          3022 tests, 1372 skipped
 
 Both can be green.
 
@@ -188,12 +188,18 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The desktop expansion adds three authenticated and two data-free
         # intent-journal checks. Rendering adds twenty more desktop tests;
         # seven scrolling checks need retail data, for 382 tests and 280 skips.
+        # Player eligibility adds one data-free queue-preservation check and
+        # three pack-backed desktop command checks: 2,072 engine tests / 1,024
+        # skips and 385 desktop tests / 283 skips. Four existing wall checks
+        # now accept a pack as input; they still skip with no external data.
         # This inventory was measured without pack, installation or vectors;
         # the existing full-profile skip allowances are unchanged.
         #
         # Production service smoke is opt-in because an ordinary suite run
         # must not mutate or depend on the live room directory.
-        "engine": (2071, 1024),
+        # Six Follow referees cover queued clicks, route refill, settled
+        # waiting and save/load. They require the authenticated retail pack.
+        "engine": (2078, 1030),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -204,7 +210,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # The sealed-null-target and explicit-unit-target physical transaction
         # referees need the Human 1 retail mission and add two deliberate
         # data-free skips.
-        "desktop": (382, 280),
+        "desktop": (385, 283),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -247,10 +253,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2071, 7),
+        "engine": (2078, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (382, 8),
+        "desktop": (385, 8),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that
@@ -264,8 +270,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2071, 4),
-        "desktop": (382, 8),
+        "engine": (2078, 4),
+        "desktop": (385, 8),
         "matchmaker-server": (5, 1),
     },
     # The exact authenticated Battle.net Edition source archive, its matching
@@ -286,8 +292,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2071, 12),
-        "desktop": (382, 6),
+        "engine": (2078, 12),
+        "desktop": (385, 6),
         "matchmaker-server": (5, 1),
     },
 }

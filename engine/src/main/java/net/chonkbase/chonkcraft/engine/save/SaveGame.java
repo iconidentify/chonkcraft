@@ -828,6 +828,12 @@ public final class SaveGame {
         if (unit.battleNetPlayerCommandAttack()) {
             state.append(" playerCommandAttack = true,");
         }
+        if (unit.destPathOpeningHold()) {
+            state.append(" destPathOpeningHold = true,");
+        }
+        if (unit.battleNetFollowWaiting()) {
+            state.append(" followWaiting = true,");
+        }
         if (unit.battleNetPlayerCommandMove()) {
             state.append(" playerCommandMove = true,");
         }

@@ -4,20 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.ArrayList;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 import net.chonkbase.chonkcraft.engine.campaign.Mission;
-import net.chonkbase.chonkcraft.engine.network.CommandApplier;
-import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A worker Attack Ground click into forest walks the Move leftover.
+ * Internal worker Attack Ground construction into forest walks the Move leftover.
  *
- * <p>Authenticated attack-ground-1/02: peon 1594 at 25,18 is Attack-Move
+ * <p>The player dispatcher refuses this worker request at 0x004760fc.
+ * These witnesses exercise internal GiveOrder construction below that gate.
+ * Authenticated attack-ground-1/02: peon 1594 at 25,18 is Attack-Move
  * dest 28,18 at fixture 5, leftover-lands 26,17, dest-arms onto 27,17,
  * and is Still there at 43. Installing Attack Ground on the click walked
  * due east to 27,18 and never stood down.
@@ -37,9 +36,6 @@ class BattleNetAttackGroundWorkerWalkRealDataTest {
                 GameData.personIn(data.campaignMap("campaigns/orc/level01o")), 1);
         Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
         World world = mission.world();
-        CommandApplier commands = new CommandApplier(
-                world, new ArrayList<>(data.unitTypes().types().values()));
-        data.configureCommands(commands);
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
@@ -49,9 +45,8 @@ class BattleNetAttackGroundWorkerWalkRealDataTest {
         Integer stillAt = null;
         while (fixtureCycle(world) <= 50) {
             if (fixtureCycle(world) == 4 && !issued) {
-                assertTrue(commands.apply(GameCommand.attackGround(
-                                peon.player(), peon.id(), 30, 18)),
-                        "GiveOrder 17 must accept the forest click");
+                assertTrue(world.orderAttackGround(peon, 30, 18, true),
+                        "the internal GiveOrder 17 constructor must accept the forest click");
                 issued = true;
             }
             mission.tick();
@@ -79,17 +74,13 @@ class BattleNetAttackGroundWorkerWalkRealDataTest {
                 GameData.personIn(data.campaignMap("campaigns/orc/level01o")), 1);
         Assumptions.assumeTrue(mission != null, "Orc 1 is not in the pack");
         World world = mission.world();
-        CommandApplier commands = new CommandApplier(
-                world, new ArrayList<>(data.unitTypes().types().values()));
-        data.configureCommands(commands);
         for (int tick = 0; tick < BNE_INITIALIZATION_TICKS; tick++) {
             mission.tick();
         }
         Unit peon = atTile(world, 25, 18);
         assertNotNull(peon, "Orc 1 has no peon on 25,18");
-        assertTrue(commands.apply(GameCommand.attackGround(
-                        peon.player(), peon.id(), 30, 18)),
-                "GiveOrder 17 must accept the forest click");
+        assertTrue(world.orderAttackGround(peon, 30, 18, true),
+                "the internal GiveOrder 17 constructor must accept the forest click");
         mission.tick();
         assertEquals(28, peon.orderTargetX(),
                 "retail stores the first tree 28,18, not the forest click");

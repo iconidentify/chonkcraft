@@ -752,6 +752,10 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/Issue12OrderLivenessTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetMovingAttackReplacementRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerPatrolRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerFollowRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetChaseDestArmAfterAttackWaitRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSettleStandAndFightRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetInPlaceFirstTakeRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerAttackTargetRealDataTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerIntentJournalTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/PlayerOrderDeliveryTest.java`
@@ -763,7 +767,7 @@ Retail evidence:
 - The 600-cycle watchdog distinguishes explicit rejection, supersession, successful settlement, unit loss and target loss from the player-breaking case: an accepted command which never produces physical or order-state progress.
 - Authenticated retail footmen and grunts receive one-, three- and nine-unit moves, mid-stride redirects, Stop/resume and congested live-target attacks through the same CommandApplier seam used by the desktop.
 - Two independent worlds exchange those controls through real loopback UDP and the production lockstep scheduler for 1,200 cycles; both player journals remain live and the complete synchronized world hashes agree at the end.
-- The issue-12 regressions cover native Move-to-Attack and repeated pursuit handoffs, a dying ranged quarry, consumed and superseded Stop requests, and Follow-to-Move command completion. The seventeen-test control inventory additionally checks cold and moving Move replacements, Patrol combat and nine save/load continuations, and explicit Attack target retention. All seventeen must execute without a skip; Follow timing remains an unpaired liveness check.
+- The issue-12 regressions cover native Move-to-Attack and repeated pursuit handoffs, a dying ranged quarry, consumed and superseded Stop requests, and Follow-to-Move command completion. The twenty-six-test control inventory additionally checks cold and moving Move replacements, Patrol combat and nine save/load continuations, explicit Attack target retention, and native-paired Follow opening, movement replacement, route refill, waiting and later Move timing. Follow covers twenty-three save/load continuations, including repeated clicks during its constructor. Three combat checks additionally require the spent swing to resume pursuit at fixture 321, the settled player unit to react at 401, and the first returned blow to land at 427. The mixed Human 8 class contributes only its verified Human 1 method to this gate; its separate unresolved Human 8 check continues to execute in the full suite. Every selected test must execute without a skip; collision routing and complete UI parity remain separate precision work.
 - The referee never retries, redirects or repairs an order. A liveness failure stays diagnostic evidence for the precision-owned movement or combat system instead of silently introducing non-retail recovery behavior.
 
 Known blockers:

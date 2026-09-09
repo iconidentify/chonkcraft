@@ -225,12 +225,12 @@ NATIVE_FAMILY_EVIDENCE = {
             "GiveOrder through the guarded campaign injector; script line "
             "cycle N return-goods unit SLOT. Retail 0x13 packets carry "
             "function index 24 with dest 0,0 and target -1, the same shape "
-            "as stop. The dispatcher does not apply the harvest 0x17 worker "
-            "flag test to this index."
+            "as stop. The player dispatcher at 0x0047609e requires type "
+            "flags & 0x300 and cargo flag +0x75 & 0x20 before GiveOrder."
         ),
         "arguments": ["issue_cycle", "unit_id"],
-        "supported_variants": ["laden-worker"],
-        "unsupported_variants": ["empty-worker-java-refuses"],
+        "supported_variants": ["laden-worker", "empty-worker-refusal", "non-harvester-refusal"],
+        "unsupported_variants": ["queued-follow-up"],
     },
     "repair": {
         "evidence_authority": "pinned-bne-2.02b-give-order-and-replay-0x13",
@@ -269,6 +269,8 @@ NATIVE_FAMILY_EVIDENCE = {
             "GiveOrder through the guarded campaign injector; script line "
             "cycle N attack-ground unit SLOT x X y Y. Retail 0x13 packets "
             "carry function index 17, almost always dest xy and target -1. "
+            "The player dispatcher requires artillery type flag 0x4000 at "
+            "0x004760fc; ordinary wall attacks use function index 8. "
             "The constructor at 0x004367a0 clears the unit target and "
             "installs order 17, or order 18 when that action is refused."
         ),
