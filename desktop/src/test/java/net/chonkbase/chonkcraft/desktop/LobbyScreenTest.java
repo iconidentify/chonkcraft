@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Rectangle;
+import java.util.ArrayList;
+import java.util.List;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.net.InetAddress;
@@ -192,6 +194,67 @@ class LobbyScreenTest {
             screen.render();
             assertTrue(click(screen, LobbyScreen.templateBounds()));
             assertEquals(GameLobby.GameTemplate.MELEE, lobby.state().gameTemplate());
+        }
+    }
+
+    @Test
+    @DisplayName("The four controls along the foot clear each other and hold their captions")
+    void theFooterControlsDoNotOverlapOrOverflow() throws Exception {
+        GameData data = load();
+        try (GameLobby lobby = GameLobby.host("Chris", "garden.pud", 8, PORT + 27)) {
+            LobbyScreen screen = new LobbyScreen(data, lobby, "garden.pud", new Recording());
+            screen.render();
+
+            List<Rectangle> feet = List.of(LobbyScreen.startBounds(),
+                    LobbyScreen.templateBounds(), LobbyScreen.speedBounds(),
+                    LobbyScreen.cancelBounds());
+            Rectangle table = LobbyScreen.rowBounds(0);
+            for (int i = 0; i < feet.size(); i++) {
+                Rectangle here = feet.get(i);
+                assertTrue(here.x >= table.x && here.x + here.width <= table.x + table.width,
+                        "footer control " + i + " at " + here + " hangs off the table,"
+                                + " which runs " + table.x + " to " + (table.x + table.width));
+                for (int j = i + 1; j < feet.size(); j++) {
+                    assertFalse(here.intersects(feet.get(j)),
+                            "footer controls " + i + " and " + j + " overlap: "
+                                    + here + " and " + feet.get(j)
+                                    + "; two controls sharing a pixel means one click"
+                                    + " does whichever the screen registered first");
+                }
+            }
+
+            // The buttons draw their captions centred and do not shorten
+            // them, so a caption wider than its panel spills over the bezel
+            // with nothing to stop it. The widths above were measured by hand
+            // against exactly these strings.
+            GameFont face = screen.gameFaceForTest();
+            record Fitted(Rectangle where, String caption) {}
+            List<Fitted> captions = new ArrayList<>();
+            for (String start : List.of("Starting...", "Waiting for Players",
+                    "Assign Opponents", "Start Game", "Syncing Map...")) {
+                captions.add(new Fitted(LobbyScreen.startBounds(), start));
+            }
+            for (GameLobby.GameTemplate mode : GameLobby.GameTemplate.values()) {
+                captions.add(new Fitted(LobbyScreen.templateBounds(),
+                        "Mode: " + mode.caption()));
+            }
+            for (GameLobby.GameSpeed speed : GameLobby.GameSpeed.values()) {
+                captions.add(new Fitted(LobbyScreen.speedBounds(),
+                        "Speed: " + speed.caption()));
+            }
+            for (String end : List.of("Cancel (Esc)", "Quit to Update")) {
+                captions.add(new Fitted(LobbyScreen.cancelBounds(), end));
+            }
+            assertTrue(captions.size() >= 16,
+                    "the sweep collected only " + captions.size() + " captions, so it is"
+                            + " not covering every state the footer can be drawn in");
+            for (Fitted fitted : captions) {
+                assertTrue(face.widthOf(fitted.caption()) <= fitted.where().width - 8,
+                        "\"" + fitted.caption() + "\" draws "
+                                + face.widthOf(fitted.caption()) + " pixels wide in a "
+                                + fitted.where().width + "-pixel panel and would spill"
+                                + " over its bezel");
+            }
         }
     }
 

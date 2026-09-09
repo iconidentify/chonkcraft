@@ -81,14 +81,14 @@ All runs use the pinned JBR 25 wrapper and BNE pack SHA-256
   and coarse orders, not raw sequence, extended player state, projectiles or
   mutable terrain.
 - **Playability:** all 18 lanes pass, including the 17-test control inventory,
-  117 movement checks, 65 projectile checks, 41 clean/adverse lockstep cases
+  117 movement checks, 65 projectile checks, 42 clean/adverse lockstep cases
   and real two-process startup. The Patrol regression resumes nine save points.
-- **Combined inventory:** pack plus Opus runs 3,017 tests: 2,602 pass,
+- **Combined inventory:** pack plus Opus runs 3,020 tests: 2,605 pass,
   93 known failures, zero errors, 322 skip. No new failure identity appears;
   master's corrected expansion Human 12 recovery-stage assertion now passes.
   Eleven fog tests that skipped on the earlier checkpoint now execute and pass.
-  Data-free runs 3,017 tests: 1,565 pass, 88 known failures, zero errors and
-  exactly 1,364 skips; its coverage and failure inventories match. Matching
+  Data-free runs 3,020 tests: 1,566 pass, 88 known failures, zero errors and
+  exactly 1,366 skips; its coverage and failure inventories match. Matching
   raw media was unavailable locally, so these are not the canonical 27-skip
   authenticated CI profile.
 - **Rendering integration:** the existing renderer completes its 400-unit

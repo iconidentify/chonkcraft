@@ -75,6 +75,17 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
     /** The controller and race table the lobby actually installed. */
     private record RecordedPlayer(int index, String type, String race) {}
 
+    /**
+     * How the match was paced, carried as one value rather than three ints.
+     *
+     * <p>{@code cyclesPerSecond} and {@code cyclesPerUpdate} are both small
+     * numbers with almost the same name, and side by side in an argument list
+     * a caller can swap them and still compile. The record then claims five
+     * cycles a second and sixty cycles to a net cycle, which nothing checks
+     * and nobody notices until the figures it seals are read back.
+     */
+    record Pacing(int cyclesPerSecond, int cyclesPerUpdate, int lag) {}
+
     /** The exact installed game artifact, when this is an OTA-launched build. */
     record RuntimeIdentity(String gameJarSha256, Long gameJarBytes,
             String sourceRevision) {
@@ -138,9 +149,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
     private final String initialSaveHash;
     private final List<RecordedPlayer> players;
     private final int localPlayer;
-    private final int cyclesPerSecond;
-    private final int cyclesPerUpdate;
-    private final int lag;
+    private final Pacing pacing;
     private final Instant createdAt;
     private final long initialWorldCycle;
     private final long initialSyncHash;
@@ -162,7 +171,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
 
     private PassiveMultiplayerRecorder(Path root, Path directory, String mapName,
             String mapHash, long mapBytes, String build, int localPlayer,
-            int cyclesPerSecond, int cyclesPerUpdate, int lag, Instant createdAt, World world,
+            Pacing pacing, Instant createdAt, World world,
             long initialSaveBytes, String initialSaveHash, FileChannel activityChannel,
             FileLock activityLock) {
         this.root = root;
@@ -181,9 +190,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         }
         players = List.copyOf(roster);
         this.localPlayer = localPlayer;
-        this.cyclesPerSecond = cyclesPerSecond;
-        this.cyclesPerUpdate = cyclesPerUpdate;
-        this.lag = lag;
+        this.pacing = pacing;
         this.createdAt = createdAt;
         initialWorldCycle = world.cycle();
         initialSyncHash = SyncHash.of(world);
@@ -212,15 +219,14 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
      *                        the six the simulation's own rate would suggest.
      */
     static PassiveMultiplayerRecorder open(World world, String mapName, byte[] mapBytes,
-            int localPlayer, int cyclesPerSecond, int cyclesPerUpdate, int lag, String build)
-            throws IOException {
-        return open(world, mapName, mapBytes, localPlayer, cyclesPerSecond, cyclesPerUpdate,
-                lag, build, defaultDirectory(), Instant.now());
+            int localPlayer, Pacing pacing, String build) throws IOException {
+        return open(world, mapName, mapBytes, localPlayer, pacing, build,
+                defaultDirectory(), Instant.now());
     }
 
     /** The same operation with a caller-owned directory and clock for tests. */
     static PassiveMultiplayerRecorder open(World world, String mapName, byte[] mapBytes,
-            int localPlayer, int cyclesPerSecond, int cyclesPerUpdate, int lag, String build,
+            int localPlayer, Pacing pacing, String build,
             Path root, Instant createdAt) throws IOException {
         if (world == null || mapBytes == null || mapBytes.length == 0) {
             throw new IllegalArgumentException("a recording needs a world and its map bytes");
@@ -242,7 +248,7 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
             SaveGame.write(world, mapName, null, 0, initialSave);
             PassiveMultiplayerRecorder recorder = new PassiveMultiplayerRecorder(
                     root, directory, mapName, sha256(mapBytes), mapBytes.length, build,
-                    localPlayer, cyclesPerSecond, cyclesPerUpdate, lag, createdAt, world,
+                    localPlayer, pacing, createdAt, world,
                     Files.size(initialSave), sha256(initialSave), channel, lock);
             recorder.writeManifest("recording", null, null, 0, 0, -1,
                     world.cycle(), SyncHash.of(world), 0, null);
@@ -429,9 +435,9 @@ final class PassiveMultiplayerRecorder implements NetworkGame.CycleSink, AutoClo
         }
         out.append("  ],\n");
         out.append("  \"local_player\": ").append(localPlayer).append(",\n");
-        out.append("  \"cycles_per_second\": ").append(cyclesPerSecond).append(",\n");
-        out.append("  \"cycles_per_update\": ").append(cyclesPerUpdate).append(",\n");
-        out.append("  \"lag\": ").append(lag).append(",\n");
+        out.append("  \"cycles_per_second\": ").append(pacing.cyclesPerSecond()).append(",\n");
+        out.append("  \"cycles_per_update\": ").append(pacing.cyclesPerUpdate()).append(",\n");
+        out.append("  \"lag\": ").append(pacing.lag()).append(",\n");
         out.append("  \"initial_world_cycle\": ").append(initialWorldCycle).append(",\n");
         field(out, "initial_sync_hash", hash(initialSyncHash), true);
         out.append("  \"initial_sync_rng\": {\"seed\": ").append(initialSyncSeed)

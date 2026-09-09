@@ -98,8 +98,7 @@ public final class NetworkPeer {
                 case "--game-template" -> gameTemplate = "teams".equalsIgnoreCase(
                         args[i + 1]) ? GameLobby.GameTemplate.TEAMS
                                 : GameLobby.GameTemplate.MELEE;
-                case "--game-speed" -> gameSpeed = GameLobby.GameSpeed.valueOf(
-                        args[i + 1].toUpperCase(java.util.Locale.ROOT));
+                case "--game-speed" -> gameSpeed = speedNamed(args[i + 1]);
                 default -> { }
             }
         }
@@ -217,9 +216,7 @@ public final class NetworkPeer {
             // client that printed the host's choice heard it over the wire
             // rather than defaulting to its own.
             System.out.printf("peer %d game speed: %s %d cycles a second%n",
-                    localPlayer,
-                    GameLobby.GameSpeed.of(game.cyclesPerSecond()).caption(),
-                    game.cyclesPerSecond());
+                    localPlayer, game.gameSpeed().caption(), game.cyclesPerSecond());
         } else {
             List<UnitType> roster = new ArrayList<>(data.unitTypes().types().values());
             CommandApplier applier = new CommandApplier(world, roster);
@@ -476,6 +473,29 @@ public final class NetworkPeer {
                 lobby.state().gameTemplate());
         return new LobbyRun(lobby, lobby.state().localSlot(), lobby.state().map(),
                 lobby.mapBytes());
+    }
+
+    /**
+     * The speed a flag names, or a complaint that names the choices.
+     *
+     * <p>An unrecognised value used to come out of {@code valueOf} as a bare
+     * IllegalArgumentException before the peer had bound anything, so the
+     * network gate reported a dead host and a stack trace rather than the
+     * typo that caused it.
+     */
+    private static GameLobby.GameSpeed speedNamed(String value) {
+        for (GameLobby.GameSpeed speed : GameLobby.GameSpeed.values()) {
+            if (speed.name().equalsIgnoreCase(value)) {
+                return speed;
+            }
+        }
+        StringBuilder known = new StringBuilder();
+        for (GameLobby.GameSpeed speed : GameLobby.GameSpeed.values()) {
+            known.append(known.isEmpty() ? "" : ", ").append(speed.caption().toLowerCase(
+                    java.util.Locale.ROOT));
+        }
+        throw new IllegalArgumentException("--game-speed " + value
+                + " is not a speed; choose one of " + known);
     }
 
     private static void settleAndStart(GameLobby lobby, boolean computerPlayer,

@@ -1712,8 +1712,9 @@ public final class Main {
             try {
                 PassiveMultiplayerRecorder recorder = PassiveMultiplayerRecorder.open(
                         world, savePath, synchronizedMapBytes, localPlayer,
-                        network.cyclesPerSecond(),
-                        network.scheduler().cyclesPerUpdate(), network.scheduler().lag(),
+                        new PassiveMultiplayerRecorder.Pacing(network.cyclesPerSecond(),
+                                network.scheduler().cyclesPerUpdate(),
+                                network.scheduler().lag()),
                         MatchmakingProtocol.gameBuild());
                 network.setCycleSink(recorder);
                 System.out.println("Multiplayer recording: " + recorder.directory());
@@ -2180,9 +2181,7 @@ public final class Main {
 
             @Override
             public String fixedSpeedCaption() {
-                return network == null ? null
-                        : net.chonkbase.chonkcraft.engine.network.GameLobby.GameSpeed
-                                .of(network.cyclesPerSecond()).caption();
+                return network == null ? null : network.gameSpeed().caption();
             }
 
             @Override
@@ -2347,9 +2346,10 @@ public final class Main {
                         // flight record that goes with it was named on stdout
                         // when the match opened; the status line is one line
                         // and a path would be cut off in a small window.
-                        screen.setStatus("desynchronised at cycle "
-                                + network.desyncCycle() + " with "
-                                + network.nameOfPlayer(network.desyncPlayer()));
+                        screen.setStatus("desynchronised at net cycle "
+                                + network.desyncCycle() + ", game cycle "
+                                + network.desyncWorldCycle() + ", with "
+                                + network.playerName(network.desyncPlayer()));
                     } else if (step == net.chonkbase.chonkcraft.engine.network.NetworkGame
                             .Step.HOST_LEFT) {
                         if (System.currentTimeMillis() >= networkNoticeUntil[0]) {

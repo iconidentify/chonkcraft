@@ -187,23 +187,6 @@ public final class GameLobby implements Closeable {
             GameSpeed[] speeds = values();
             return speeds[(ordinal() + 1) % speeds.length];
         }
-
-        /**
-         * The setting that plays this many cycles a second.
-         *
-         * <p>So the running game can name the host's choice back to the
-         * player. A rate no setting produces answers Normal rather than
-         * nothing: this is a caption, and a game that cannot say what speed
-         * it is running at is worse than one that rounds.
-         */
-        public static GameSpeed of(int cyclesPerSecond) {
-            for (GameSpeed speed : values()) {
-                if (speed.cyclesPerSecond == cyclesPerSecond) {
-                    return speed;
-                }
-            }
-            return NORMAL;
-        }
     }
 
     /**
@@ -656,7 +639,7 @@ public final class GameLobby implements Closeable {
 
     /** Selects the synchronized game type. Only the creator decides it. */
     public synchronized boolean setGameTemplate(GameTemplate template) {
-        if (!hosting || template == null) {
+        if (!hosting || template == null || started) {
             return false;
         }
         gameTemplate = template;
@@ -667,10 +650,12 @@ public final class GameLobby implements Closeable {
     /**
      * Selects the tempo every machine will play at. Only the creator decides it.
      *
-     * <p>Refused once the game has started, like the rest of the agreement:
-     * the speed travels in the START snapshot and each machine sets its loop
-     * from it, so a later change would reach the players who were still
-     * listening and nobody else.
+     * <p>Refused once the game has started, as the game type beside it is.
+     * Both travel in the START snapshot and each machine builds its world
+     * from what that snapshot said, so a change made afterwards reaches the
+     * peers still polling the lobby and none of the ones that have already
+     * taken their socket into the game -- which is two machines starting
+     * different matches.
      */
     public synchronized boolean setGameSpeed(GameSpeed speed) {
         if (!hosting || speed == null || started) {

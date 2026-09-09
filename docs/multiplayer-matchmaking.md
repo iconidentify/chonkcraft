@@ -198,6 +198,7 @@ Retail's own lobby carries a game-speed byte with nine values at offset
 not been read out of the pinned executable. These seven steps are therefore
 this implementation's own, and the wall-clock tempo of every setting except
 Normal is a choice rather than a measurement.
+
 `MultiplayerVisualTest` renders the online browser, local fallback,
 invite lobby, and the retry/local recovery screen at design, laptop, and
 widescreen sizes for image review.

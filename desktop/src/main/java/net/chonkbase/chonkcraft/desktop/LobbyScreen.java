@@ -316,7 +316,6 @@ final class LobbyScreen extends JPanel {
     private void cycleGameSpeed() {
         GameLobby.GameSpeed current = lobby.state().gameSpeed();
         lobby.setGameSpeed(current.next());
-        notice = "";
     }
 
     /** Advances one player's explicit team without changing colour or start. */
@@ -623,6 +622,11 @@ final class LobbyScreen extends JPanel {
         return new Point(
                 (int) ((screen.x - fitted.x) * (double) DESIGN_WIDTH / fitted.width),
                 (int) ((screen.y - fitted.y) * (double) DESIGN_HEIGHT / fitted.height));
+    }
+
+    /** The face the footer's captions are drawn in, so a test can measure them. */
+    GameFont gameFaceForTest() {
+        return font;
     }
 
     /** The families this screen letters with, so a test can prove they match. */

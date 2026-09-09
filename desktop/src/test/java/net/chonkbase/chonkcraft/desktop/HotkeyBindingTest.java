@@ -58,6 +58,9 @@ class HotkeyBindingTest {
         private float effects = 0.8f;
         private float music = 0.6f;
         private boolean synthesised;
+
+        /** Set when this session stands for a machine in a network game. */
+        private String fixedSpeed;
         private final List<String> asked = new ArrayList<>();
 
         @Override
@@ -154,7 +157,12 @@ class HotkeyBindingTest {
 
         @Override
         public boolean isNetworked() {
-            return false;
+            return fixedSpeed != null;
+        }
+
+        @Override
+        public String fixedSpeedCaption() {
+            return fixedSpeed;
         }
 
         @Override
@@ -218,6 +226,38 @@ class HotkeyBindingTest {
                 | (alt ? InputEvent.ALT_DOWN_MASK : 0);
         screen.keyPressed(new KeyEvent(screen, KeyEvent.KEY_PRESSED,
                 System.currentTimeMillis(), mask, code, KeyEvent.CHAR_UNDEFINED));
+    }
+
+    @Test
+    @DisplayName("the speed keys move a solo game and are refused in a network game")
+    void theSpeedKeysBelongToTheHostInANetworkGame() {
+        Scene scene = scene();
+        GameScreen screen = scene.screen();
+        Recording session = scene.session();
+
+        // Alone, the keys are the player's own.
+        press(screen, KeyEvent.VK_EQUALS, false, false);
+        assertTrue(session.speed > 30,
+                "the speed key did not make a solo game any faster");
+        press(screen, KeyEvent.VK_MINUS, false, false);
+        press(screen, KeyEvent.VK_MINUS, false, false);
+        assertTrue(session.speed < 31,
+                "the speed key did not make a solo game any slower");
+
+        // At a table, they are not. A client that slows only itself slows
+        // everybody's game by the same amount, because lockstep holds every
+        // machine at the next agreed cycle until the slowest has reported.
+        session.fixedSpeed = "Slower";
+        int agreed = session.speed;
+        press(screen, KeyEvent.VK_EQUALS, false, false);
+        press(screen, KeyEvent.VK_ADD, false, false);
+        press(screen, KeyEvent.VK_MINUS, false, false);
+        press(screen, KeyEvent.VK_SUBTRACT, false, false);
+        assertEquals(agreed, session.speed,
+                "one player moved the whole table's speed with the keyboard");
+        assertTrue(screen.status().contains("Slower"),
+                "the refused key said nothing about who set the speed: "
+                        + screen.status());
     }
 
     @Test

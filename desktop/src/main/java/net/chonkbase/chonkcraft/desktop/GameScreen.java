@@ -4229,11 +4229,15 @@ final class GameScreen extends JPanel {
             return;
         }
         // The table plays at the speed its host chose, the way it cannot be
-        // paused by one player either. Saying so beats a key that silently
-        // does nothing.
-        String fixed = session.fixedSpeedCaption();
-        if (fixed != null) {
-            status = "The host set this match to " + fixed + ".";
+        // paused by one player either. Asked of isNetworked rather than of
+        // the caption: the caption has a default that answers null, so a
+        // session that forgot to override it would quietly hand one player
+        // the speed of everybody else's game back.
+        if (session.isNetworked()) {
+            String fixed = session.fixedSpeedCaption();
+            status = fixed == null
+                    ? "The host sets the speed of a network game."
+                    : "The host set this match to " + fixed + ".";
             repaint();
             return;
         }
