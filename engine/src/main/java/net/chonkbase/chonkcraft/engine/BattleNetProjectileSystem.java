@@ -137,7 +137,9 @@ final class BattleNetProjectileSystem {
                     || (order == Unit.Order.STILL && !attacker.canMove());
             boolean ownsTarget = pending == null || pending.target() == null
                     || pending.target() == attacker.target();
-            if (!attacker.isAlive() || !ownsAttack || !ownsTarget) {
+            if (!attacker.isAlive() || !ownsAttack || !ownsTarget
+                    || (attacker.queuedReplacementPending()
+                            && attacker.reportsActionBeforeQueued())) {
                 interruptPendingAttack(attacker);
             }
         }
@@ -886,12 +888,14 @@ final class BattleNetProjectileSystem {
             if (!world.targets.canTarget(source, candidate)) {
                 continue;
             }
-            // Native FUN_00410680: raw_pixel (IX/IY) + type centre offset.
-            // Drawn offset and residual bank recombine into that raw pair, as
-            // the projectile constructors do for aim points.
-            int centerX = candidate.pixelX() + candidate.residualX()
+            // FUN_00410680 reads signed unit+0/+2 directly at 0x4106dd
+            // and 0x4106f2, then adds the type centre. The movement remainder
+            // is not a second position offset: adding it used to hit XHuman
+            // 10 grunt 1475 outside the splash at fixture 87, charging a
+            // fifth damage roll where retail admits only four victims.
+            int centerX = candidate.pixelX()
                     + World.battleNetCentreOffset(candidate.type(), true);
-            int centerY = candidate.pixelY() + candidate.residualY()
+            int centerY = candidate.pixelY()
                     + World.battleNetCentreOffset(candidate.type(), false);
             int dx = impactX - centerX;
             int dy = impactY - centerY;
@@ -920,9 +924,9 @@ final class BattleNetProjectileSystem {
                     maximum >>= 2;
                 }
                 maximum -= armor;
-                int bneCx = u.pixelX() + u.residualX()
+                int bneCx = u.pixelX()
                         + World.battleNetCentreOffset(u.type(), true);
-                int bneCy = u.pixelY() + u.residualY()
+                int bneCy = u.pixelY()
                         + World.battleNetCentreOffset(u.type(), false);
                 int bneMetric = Math.max(
                         (impactX - bneCx) * (impactX - bneCx),

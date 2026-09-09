@@ -186,8 +186,8 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
     }
 
     @Test
-    @DisplayName("paid refusal recovery settles with one cached heading")
-    void paidRefusalRecoveryWithOneCachedHeadingPaysFixture204Reseed() {
+    @DisplayName("paid refusal recovery settles after spending its only heading")
+    void paidRefusalRecoveryWithASpentHeadingPaysFixture204Reseed() {
         AssetSource assets = AssetSource.fromEnvironment();
         Assumptions.assumeTrue(assets != null,
                 "No asset pack/install. Set CHONKCRAFT_ASSET_PACK or wc2.install.dir");
@@ -214,8 +214,11 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 "the agreeing prefix ends before the recovery arrival debit");
         assertEquals(2534, recoveryGrunt.battleNetSequenceOffset());
         assertEquals(1, recoveryGrunt.battleNetAnimationTimer());
-        assertEquals(1, recoveryGrunt.pathLength(),
-                "the successful diagonal retains one cached cardinal heading");
+        // Native slot 1447 wrote only NE at 188 and has cursor one at
+        // 203. The prior extra E byte was a routing error, not retained
+        // native state. The spent NE still owns the arrival and its draw.
+        assertEquals(0, recoveryGrunt.pathLength(),
+                "the successful diagonal has spent the native route's only heading");
         assertEquals(true,
                 recoveryGrunt.battleNetPaidRefusalRecoveryApproach(),
                 "the residual belongs to a completed paid refusal probe");
@@ -228,7 +231,7 @@ class XHuman12MoveLoopAndApproachDamageRealDataTest {
                 "the paid residual opens past Attack OP0 on settlement");
         assertEquals(1, recoveryGrunt.battleNetAnimationTimer());
         assertEquals(0, recoveryGrunt.pathLength(),
-                "native parks the retained route at cursor twenty");
+                "native parks the spent route at cursor twenty");
         assertEquals(false, recoveryGrunt.battleNetPendingMeleeSyncRand());
         assertEquals(2539, nearbyFootman.battleNetSequenceOffset(),
                 "the adjacent footman does not own the fixture-204 draw");

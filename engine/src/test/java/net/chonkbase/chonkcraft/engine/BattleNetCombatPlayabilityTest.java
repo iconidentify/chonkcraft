@@ -276,9 +276,12 @@ class BattleNetCombatPlayabilityTest {
         boolean engaged = false;
         for (int cycle = 0; cycle < 1_000 && !engaged; cycle++) {
             fixture.world().tick();
+            // Native acquisition queues Attack behind the current stride.
+            // Its pixels live in the movement offsets; the legacy residual
+            // and fighting flags need not be set before that queue promotes.
             engaged = grunt.target() == enemy
-                    && (grunt.fighting() || grunt.chasing())
-                    && (grunt.residualX() != 0 || grunt.residualY() != 0);
+                    && grunt.isMoving()
+                    && (grunt.offsetX() != 0 || grunt.offsetY() != 0);
         }
         assertTrue(engaged,
                 "the attack-move never acquired with committed pixels in flight");

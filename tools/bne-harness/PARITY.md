@@ -38,7 +38,103 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-09 (worker cargo and gold loops)
+## Current checkpoint -- 2026-09-09 (combat command investigation)
+
+The published source remains `8c15e41` (worker cargo and gold loops below).
+The `investigate/combat-replacements` branch is an unreleased checkpoint.
+Do not advance the command baseline or publish it while any observed field
+prefix regresses. There are substantial command improvements, but the complete
+121-case gate has not passed for this candidate.
+
+The original structure-attack replacement defect is covered through the real
+`CommandApplier`: explicit Attack, Move and Stop must wait only for the
+committed native attack or movement body. A replacement suppresses the old
+uncommitted shot, keeps already-created projectiles, drains existing movement
+pixels and promotes the latest queued command on the native callback. The
+pending attack constructor survives save/load. Four real-data tests cover
+dragon replacement attacks, withdrawal, Stop and saved pending replacements.
+
+Another 37 real-data tests cover command construction, ranged reload and
+retargeting, caster target eligibility, completed pursuit, aggressor retention,
+blocked approach waits, collision reset, offered routes, worker escape/return,
+melee cooldowns, splash range, regrouping, scout arrival and subsequent damage.
+All 41 pass with the authenticated BNE pack, without skips. They are included
+in the 83-test control-liveness gate. Native negative controls
+expose the missing melee cooldown at Human 8 fixture 383, a blocked retarget
+turning east instead of waiting for north at 372, and a killing blow bypassing
+the next Attack constructor at 580. Reloading after that killing blow must
+preserve dying victims: they still supply committed attack references, and
+dropping them changes the attacker's next route. These are behavioral controls,
+not declaration checks.
+
+The worktree includes the candidate-162 implementation. Its completed 121-case
+command matrix extends 2,054 observed-unit field prefixes but regresses 23
+across XHuman 10, XHuman 12 and XOrc 8. Human 13 and Orc 14 now preserve
+all previously matching physical prefixes. All 1,374 command acceptances
+remain equal. These counts describe matching observation windows for seven
+fields per unit; they are not numbers of fixed or remaining bugs.
+
+The completed candidate-162 pack-plus-Opus suite has 3,078 tests, the same
+90 failure identities as the published source, no errors and 318 skips.
+All 41 new controls ran without skips. Against the published checkpoint's
+verification JAR, the same controls produce 39 failures and two passes; the
+dragon replacement Attack, Move and Stop controls all expose the old behavior.
+Those are failed controls, not a count of distinct gameplay bugs. The existing
+XHuman 12 worker regroup control also passes without changed expectations.
+The two newest controls
+fail against candidate 145: the scout skips its movement frame on 583 and
+the returning ogre exposes the wrong refusal marker on 267. No expected
+failure was added or removed. All 18 playability lanes pass, including the
+expanded 83-test control gate, 42 lockstep controls and real two-process startup
+through 180 cycles at agreed Fastest speed. These lanes do not override the
+separate command-prefix release blocker. The data-free suite has 3,078 tests,
+the same 88 published failure identities, no errors and exactly 1,423 skips.
+The 41 additional skips are the new authenticated controls; the CI inventory
+records them explicitly while keeping every failure baseline unchanged.
+
+Native branch captures distinguish a recorded aggressor (`unit+0x54`) from
+temporary route provenance. Reusing that field for routing selected and damaged
+the wrong axethrower. The corrected XHuman 4 command run matches all 8,927
+native asynchronous random draws through 600 ticks, including draw timing.
+The corrected XHuman 10 idle run matches all 5,897 through 600 ticks. Those
+are bounded diagnostic results, not complete world equality. The 52-map idle
+survey through 1,800 preserves every published per-map prefix on candidate
+162. Human 13's command trace agrees on all 6,417 asynchronous draws through 600, including
+timing. The extended Orc 14 retail capture matches the original capture's
+6,027 draws through 600 and proves scout arrival on 602. Raw animation and
+complete command cases remain separate gates.
+
+On i9beef the private investigation is
+`$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-attack-retarget/`.
+It retains immutable candidate JARs and test classes, native watchpoint plans,
+causal traces, negative-control reports and campaign comparisons. The native
+executable remains the pinned BNE 2.02b image documented in [LAYOUT.md](LAYOUT.md).
+Fresh captures must select `harness-issue12-audit`: the older default local
+harness has different player-command support. Require the expected applied
+and rejected command counts, and never count a trace without random events
+as a successful random-stream comparison.
+
+Next work is the first differing decision in each regressing command scenario,
+then the full authenticated release gates. Some previously matching outcomes
+depend on compensating route or timer errors; fixing a local transition can
+expose another error later. Preserve the complete observation window and the
+published baseline while resolving both sides. The cold siege Move startup,
+queued Stop landing, stranded worker resource return, melee cooldown and blocked
+retarget handoffs now have native witnesses. Human 8's completed distant-quarry
+swing at fixture 452 now reaches active idle and acquires the replacement worker.
+
+XHuman 10's next traced mismatch is fixture 92: a failed native retarget path
+ends in Still and a fresh Attack constructor; Java invents a nonprogressing
+north step. Restricting that fallback exposes a second collision/route ownership
+difference at 158, so neither partial prototype is included in this checkpoint.
+Ranged regroup also retains its older collision projection: XHuman 12
+axethrower 1359 has native collision two at 395 while Java exposes three plus
+a sticky refusal. Clearing that surrogate independently changes the worker's
+wait behind it. The melee regroup conversion is retained; ranged collision
+state and worker refusal dispatch need to be converted together. The complete
+command gate remains a release blocker.
+
+## Published checkpoint -- 2026-09-09 (worker cargo and gold loops)
 
 Completed worker cargo is independent of the current harvesting job. BNE
 2.02b's `0x436960` clears unfinished chopping in +0x74; `0x43697e`

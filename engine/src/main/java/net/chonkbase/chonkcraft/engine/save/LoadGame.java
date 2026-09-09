@@ -892,6 +892,8 @@ public final class LoadGame {
             unit.setBattleNetPlayerCommandAttack(
                     truthy(state.rawGet("playerCommandAttack")));
         }
+        unit.setBattleNetCommandAttackConstruction(
+                truthy(state.rawGet("commandAttackConstruction")));
         if (state.rawGet("destPathOpeningHold") != null) {
             unit.setDestPathOpeningHold(truthy(state.rawGet("destPathOpeningHold")));
         }
@@ -1041,6 +1043,8 @@ public final class LoadGame {
         if (state.rawGet("battleNetMeleeSyncRemaining") != null) {
             unit.setBattleNetMeleeSyncRemaining(integer(state.rawGet("battleNetMeleeSyncRemaining")));
         }
+        unit.setBattleNetAttackTargetRetired(
+                truthy(state.rawGet("attackTargetRetired")));
         if (state.rawGet("battleNetSequenceMeleeLanded") != null) {
             unit.setBattleNetSequenceMeleeLanded(truthy(state.rawGet("battleNetSequenceMeleeLanded")));
         }
@@ -1097,6 +1101,9 @@ public final class LoadGame {
             unit.setPendingAttack(byId.get(integer(state.rawGet("pendingAttack"))), from,
                     integer(state.rawGet("pendingAttackX")),
                     integer(state.rawGet("pendingAttackY")));
+        }
+        if (state.rawGet("deathTimer") != null) {
+            unit.setDeathTimer(integer(state.rawGet("deathTimer")));
         }
         // Restore quarry-bound state after the target. Unit.setTarget
         // deliberately clears markers inherited from a different quarry.

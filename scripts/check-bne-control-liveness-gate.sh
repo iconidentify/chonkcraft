@@ -11,6 +11,8 @@ rm -f \
   "${repo_root}/desktop/target/surefire-reports/TEST-net.chonkbase.chonkcraft.desktop.ControlLivenessPlayabilityTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.Issue12OrderLivenessTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetMovingAttackReplacementRealDataTest.xml" \
+  "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetCombatReplacementRealDataTest.xml" \
+  "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetCommandTransitionRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerPatrolRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerAttackTargetRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetPlayerFollowRealDataTest.xml" \
@@ -20,7 +22,7 @@ rm -f \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetInPlaceFirstTakeRealDataTest.xml"
 
 "${repo_root}/scripts/run-tests.sh" -pl desktop -am \
-  '-Dtest=PlayerOrderDeliveryTest,ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetPlayerGoldLoopRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
+  '-Dtest=PlayerOrderDeliveryTest,ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetCombatReplacementRealDataTest,BattleNetCommandTransitionRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetPlayerGoldLoopRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${repo_root}" <<'PY'
@@ -34,6 +36,8 @@ inventory = (
     ("desktop", "ControlLivenessPlayabilityTest", 2),
     ("engine", "Issue12OrderLivenessTest", 2),
     ("engine", "BattleNetMovingAttackReplacementRealDataTest", 9),
+    ("engine", "BattleNetCombatReplacementRealDataTest", 4),
+    ("engine", "BattleNetCommandTransitionRealDataTest", 37),
     ("engine", "BattleNetPlayerPatrolRealDataTest", 3),
     ("engine", "BattleNetPlayerAttackTargetRealDataTest", 1),
     ("engine", "BattleNetPlayerFollowRealDataTest", 6),
@@ -54,7 +58,7 @@ for module, name, expected in inventory:
         raise SystemExit(
             f"{name}: expected {expected}/0/0/0 tests/skips/failures/errors, "
             f"got {'/'.join(map(str, counts))}")
-print("control-liveness inventory: 42 pass, 0 skipped")
+print("control-liveness inventory: 83 pass, 0 skipped")
 PY
 
 echo "control-liveness gate passed: 1/3/9-unit controls, redirects, combat and real UDP remained responsive"

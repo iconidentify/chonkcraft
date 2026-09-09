@@ -81,6 +81,11 @@ final class BattleNetIdleSystem {
      * @return false when there is nothing left worth attacking
      */
     boolean autoSelectTarget(Unit unit) {
+        if (world.battleNetSequence != null && unit.battleNetPlayerCommandAttack()) {
+            // Native order 9's 0x010c flags select 0x409fb0 at 0x40b07e.
+            // Hit offers and spatial scans cannot replace a player's quarry.
+            return unit.target() != null;
+        }
         String astTrace = System.getenv("CHONKCRAFT_TRACE_ATTACKSTATE");
         if (astTrace != null && unit.id() == Integer.parseInt(astTrace)) {
             System.err.printf("JAUTOCALL world.cycle=%d unit=%d sleep=%d tgt=%d"
@@ -908,23 +913,24 @@ final class BattleNetIdleSystem {
     private void queueBattleNetLandRegroupMove(Unit unit, int homeX,
             int homeY) {
         unit.setBattleNetPendingMove(homeX, homeY);
-        if (unit.battleNetBuildingFootprintParkCollision()) {
-            // GiveOrder releases the collision generation owned by a retired,
-            // near-building footprint route when it writes Move into
-            // NextAction.
-            // The Still body remains current until its action marker promotes
-            // that Move, but cooperative pathing already sees the queued
-            // departure. XHuman 12 slot 1358 changes next_order 60 -> 3 and
-            // raw collision 1 -> 0 on the fixture-199 pass; retaining the Java
-            // generation makes peon 1365 route around its square instead of
-            // committing southeast.
+        // GiveOrder releases every old collision generation when it queues
+        // the regroup. At 0x45149a, 0x438410 parks RI20 and clears the packed
+        // nibble unconditionally. Human 13 ogre 1519 changes collision two
+        // to zero on 249 before its Still body promotes Move. Retaining the
+        // combat counter used to change its first return-home route and the
+        // routes of neighbours walking through the same formation.
+        // Ranged regroup still uses the older collision projection except
+        // at its already-proved building-footprint release. Retail axethrower
+        // 1359 has collision two at XHuman 12 fixture 395; Java still exposes
+        // three plus a sticky refusal. Clearing only that projection changed
+        // worker 1386's Move 15..1 band at 316. The ranged projection and its
+        // worker refusal dispatch need conversion together; the measured melee
+        // Move program below does not yet cover that dependency.
+        if (!World.battleNetRangedChaseUnit(unit)
+                || unit.battleNetBuildingFootprintParkCollision()) {
             unit.setBattleNetCollisionCounter(0);
             unit.setBattleNetRefusals(0);
         }
-        // Generic empty or live route collision surrogates are negative
-        // witnesses. Human 13 slots 1519 and 1510 must retain theirs across
-        // the same recurring pass: clearing them consumes NW too early for
-        // 1519 and lets 1510's fresh route consume N instead of native NW.
     }
 
 
@@ -977,6 +983,8 @@ final class BattleNetIdleSystem {
                     unit.type().reactRange(world.isPerson(unit.player())),
                     Math.max(1, unit.type().maxAttackRange()));
             Unit candidate = world.targets.findBattleNetHostile(unit, battleNetRange, target);
+            if (world.battleNetSequence != null
+                    && !world.battleNetAutomaticQuarryAllowed(unit, candidate)) candidate = null;
             boolean attackedByGoal = target != null && target.target() == unit
                     && world.targets.inAttackRange(target, unit);
             int reactRange = Math.max(unit.type().reactRange(world.isPerson(unit.player())),

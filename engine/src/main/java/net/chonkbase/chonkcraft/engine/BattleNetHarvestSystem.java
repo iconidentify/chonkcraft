@@ -4995,6 +4995,45 @@ final class BattleNetHarvestSystem {
     }
 
 
+    /**
+     * Restores the loaded return after its temporary escape Move completes.
+     *
+     * <p>Retail's 0x43789a completion runs active-order idle and promotes
+     * the saved resource action through 0x452fa2 on the same visit. Human 8
+     * worker 1536 lands on fixture 323; worker 1533 reaches an empty escape
+     * route on 329. Both resume action 24 with Still 3,2,1. Ordinary Still
+     * deferred the first return and let the AI replace the second with a new
+     * resource job, losing their return retries and later damage draws.</p>
+     */
+    boolean finishBattleNetResourceHitFlee(Unit worker) {
+        if (worker == null || worker.order() != Unit.Order.MOVE
+                || worker.savedOrder() != Unit.Order.HARVEST
+                || !worker.returningToDepot() || worker.carried() <= 0
+                || worker.isMoving() || worker.pathLength() != 0
+                || world.battleNetSequence == null) {
+            return false;
+        }
+        int stillStart = world.idle.battleNetStillSequenceStart(worker);
+        if (stillStart < 0) {
+            return false;
+        }
+        world.idle.advanceBattleNetActiveOrderIdleRandom(worker);
+        worker.takeSavedOrder();
+        worker.setOrder(Unit.Order.HARVEST);
+        worker.setOrderTarget(-1, -1);
+        worker.setPathGoal(-1, -1);
+        worker.setActionBeforeQueued(null);
+        worker.setOfferedTarget(null);
+        worker.setBattleNetSequenceOffset(stillStart);
+        worker.setBattleNetAnimationTimer(3);
+        // The return retains its restored-order retry until it finds a real
+        // route. Reclassifying the first empty answer as an ordinary convoy
+        // refusal stole the worker's following idle callback on fixture 326.
+        worker.setBattleNetResourceHitRestoreIdle(true);
+        return true;
+    }
+
+
     private boolean beginBattleNetStrandedResourceHitFlee(Unit worker,
             boolean retainingSavedResourceOrder) {
         Unit aggressor = worker == null ? null : worker.offeredTarget();

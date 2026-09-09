@@ -248,7 +248,8 @@ final class BattleNetMovementSystem {
         // 22). This visit already executed the walk-bearing leftover, so
         // two remaining quiet Move visits match that three-visit start.
         // Delay 3 dest-armed at 23 and settled a cycle late.
-        unit.setBattleNetOrderDelay(2);
+        unit.setBattleNetOrderDelay(world.battleNetSequence == null ? 2
+                : Math.max(0, playerCommandWaits(unit)[0] - 1));
         unit.setActionBeforeQueued(null);
         return true;
     }
@@ -261,6 +262,13 @@ final class BattleNetMovementSystem {
     boolean alreadyTouchingBlockedDest(Unit unit, int toX, int toY) {
         if (unit == null || unit.type() == null
                 || !world.map.contains(toX, toY)) {
+            return false;
+        }
+        if (toX == unit.tileX() && toY == unit.tileY()) {
+            // The unit's own occupancy does not reject a new Move. Human 7's
+            // peasant queues a click on its current tile at 75, constructs
+            // Move at 79, and completes it at 82. Swallowing the click kept
+            // the old idle callback alive instead of replacing the order.
             return false;
         }
         int width = Math.max(1, unit.type().tileWidth());
@@ -313,6 +321,14 @@ final class BattleNetMovementSystem {
                 || !world.map.contains(toX, toY)) {
             return false;
         }
+        if (world.battleNetSequence != null) {
+            // Move constructor 0x4363b0 caps the current animation timer at
+            // 10 for a person and 40 for a computer before queueing Move.
+            // A juggernaught's 127-count firing wait used to ignore this
+            // click: the native c150 command exposes timer 9 immediately.
+            unit.setBattleNetAnimationTimer(Math.min(unit.battleNetAnimationTimer(),
+                    world.isPerson(unit.player()) ? 10 : 40));
+        }
         if (queuePlayerColdMoveReplacement(unit, Unit.QueuedOrderKind.MOVE,
                 toX, toY)) {
             return true;
@@ -341,7 +357,7 @@ final class BattleNetMovementSystem {
         // until Stop reset the body.
         if (before != Unit.Order.STILL
                 && unit.animation() != null
-                && unit.animation().unbreakable()
+                && world.orderReplacementMustWait(unit)
                 && !leftoverWalkBearing(before, unit)) {
             int[] dest = projectPlayerMovePoint(unit, toX, toY);
             unit.clearQueuedOrders();
@@ -351,6 +367,7 @@ final class BattleNetMovementSystem {
                     null, null, null));
             unit.setQueuedReplacementPending(true);
             unit.setBattleNetPlayerCommandMove(true);
+            unit.setDestPathOpeningHold(true);
             unit.rememberActionBeforeQueued(before);
             return true;
         }
@@ -451,7 +468,13 @@ final class BattleNetMovementSystem {
         // 3 at the click -- so first dest-arm is fixture 11. Paying only
         // actionWait snapped Orc 8 1576 at 8 and left every later leftover
         // three cycles early.
+        // That compensation belongs only to native Still's first opcode.
+        // XOrc 11 catapult 1495 is already on shared Still at its click;
+        // charging the sprite's wait there delayed its first stride and the
+        // nearby worker's replacement route by three visits.
         if (queueWait == 0 && before == Unit.Order.STILL
+                && unit.battleNetSequenceOffset()
+                        == world.idle.battleNetStillSequenceStart(unit)
                 && siegeUsesScriptBinMovePace(unit)
                 && unit.animation() != null
                 && unit.animation().waitCycles() > 0) {
@@ -580,6 +603,21 @@ final class BattleNetMovementSystem {
     }
 
 
+    /** A behavior-one melee fighter returning home on its native Move program. */
+    private boolean battleNetLandRegroupMove(Unit unit) {
+        return world.battleNetSequence != null
+                && unit.order() == Unit.Order.MOVE
+                && !unit.battleNetPlayerCommandMove()
+                && !unit.battleNetBorrowedMoveForStep()
+                && !World.battleNetRangedChaseUnit(unit)
+                && unit.battleNetAiBehavior() == 1
+                && unit.hasBattleNetAiHome()
+                && unit.type() != null
+                && unit.type().landUnit()
+                && unit.orderTargetX() == unit.battleNetAiHomeX()
+                && unit.orderTargetY() == unit.battleNetAiHomeY();
+    }
+
     /**
      * One cycle of a plain move order, laying a course when it has none.
      *
@@ -594,9 +632,21 @@ final class BattleNetMovementSystem {
      * walks to the shore and stops there instead of refusing to set off.
      */
     void stepMoveOrder(Unit unit) {
+        boolean playerSeaStride = world.battleNetSequence != null
+                && unit.order() == Unit.Order.MOVE && unit.battleNetPlayerCommandMove()
+                && unit.type().seaUnit() && unit.isMoving()
+                && unit.battleNetMovePaceOffset() >= 0;
         moveOrderDepth++;
         try {
             stepMoveOrderVisit(unit);
+            if (playerSeaStride && unit.order() == Unit.Order.MOVE
+                    && !unit.isMoving() && unit.pathLength() == 0
+                    && !unit.hasQueuedOrders()
+                    && unit.tileX() == unit.orderTargetX() && unit.tileY() == unit.orderTargetY()) {
+                // The final native Move callback lands and constructs Still
+                // in one visit: XHuman 7's submarine at fixture 206.
+                finishBattleNetMoveAtTarget(unit);
+            }
         } finally {
             moveOrderDepth--;
         }
@@ -604,6 +654,18 @@ final class BattleNetMovementSystem {
 
     private void stepMoveOrderVisit(Unit unit) {
         if (unit.battleNetOrderDelay() > 0) {
+            // The queued Move keeps the current Still constructor until its
+            // first movement marker. Human 13 ogre 1519 counts 3,2,1 on
+            // 249..251. A logical delay without the raw timer used to leave
+            // neighbouring route queries seeing a stationary body.
+            if (battleNetLandRegroupMove(unit)
+                    && unit.battleNetAnimationTimer()
+                            == unit.battleNetOrderDelay() + 1
+                    && unit.battleNetSequenceOffset()
+                            == world.idle.battleNetStillSequenceStart(unit)) {
+                unit.setBattleNetAnimationTimer(unit.battleNetAnimationTimer() - 1);
+            }
+            syncBattleNetAttackRefusalTimer(unit);
             unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             return;
         }
@@ -824,6 +886,13 @@ final class BattleNetMovementSystem {
             unit.setBattleNetPlainMoveRefusalReplacement(false);
             switch (path.result()) {
                 case REACHED -> {
+                    if (world.battleNetSequence != null && unit.battleNetPlayerCommandMove()) {
+                        // A new Move to the current tile still completes via
+                        // Still's constructor. Human 7's peasant completes at
+                        // 82 and first idles at 85, not the following visit.
+                        finishBattleNetMoveAtTarget(unit);
+                        return;
+                    }
                     resetDisplacement(unit);
                     unit.clearPath();
                     world.finishOrder(unit);
@@ -1083,6 +1152,13 @@ final class BattleNetMovementSystem {
         resetDisplacement(unit);
         unit.clearPath();
         unit.setBattleNetPlayerCommandMove(false);
+        // An empty escape route still restores the resource order it
+        // interrupted. Dispatching ordinary idle reassigned Human 8 worker
+        // 1533 to a fresh job at 329 and abandoned its loaded return.
+        if (world.harvest.restartBattleNetStrandedResourceHitFlee(unit)
+                || world.harvest.finishBattleNetResourceHitFlee(unit)) {
+            return;
+        }
         if (unit.savedOrder() == Unit.Order.STILL) {
             unit.takeSavedOrder();
         }
@@ -1124,6 +1200,9 @@ final class BattleNetMovementSystem {
         // before RestoreOrder. Human 8 peasant 1536 lands on fixture 347,
         // authors (89,60), and remains raw Move for that three-call body.
         if (world.harvest.restartBattleNetStrandedResourceHitFlee(unit)) {
+            return;
+        }
+        if (world.harvest.finishBattleNetResourceHitFlee(unit)) {
             return;
         }
         if (unit.savedOrder() == Unit.Order.STILL) {
@@ -1614,6 +1693,27 @@ final class BattleNetMovementSystem {
             return true;
         }
         return offset >= move && (attack < 0 || offset < attack);
+    }
+
+    /** A command must also drain a stride whose native cursor is held by its residual clock. */
+    boolean battleNetCommandMoveBody(Unit unit) {
+        // A player Move can use the presentation pace while its primary
+        // cursor still names Still. XHuman 9's slot 1420 starts that stride
+        // at 100; Attack at 111 cannot spend another heading before it lands.
+        return battleNetCurrentMoveBody(unit)
+                || unit.isMoving() && world.battleNetMoveAnimation(unit)
+                || battleNetCommandRefusalBody(unit);
+    }
+
+    /** A blocked point order retains its paid Move callback until the timer expires. */
+    boolean battleNetCommandRefusalBody(Unit unit) {
+        return world.battleNetSequence != null && !unit.isMoving()
+                && (unit.battleNetOrderDelay() > 0 || unit.queuedReplacementPending()
+                        || (unit.battleNetPlayerCommandMove()
+                                && unit.battleNetCollisionCounter() > 0))
+                && unit.battleNetAnimationTimer() > 0
+                && unit.battleNetSequenceOffset() == world.idle.battleNetSequenceStart(
+                        unit, BattleNetSequence.MOVE_ANIMATION);
     }
 
     /**
@@ -2953,7 +3053,7 @@ final class BattleNetMovementSystem {
      * says the order point is already in range. Critters keep the empty
      * Still path at {@code 0x4376c0}.
      */
-    private boolean battleNetEmptyRouteRefillsImmediately(Unit unit) {
+    boolean battleNetEmptyRouteRefillsImmediately(Unit unit) {
         if (!unit.routeSpent() || battleNetCommandPointReached(unit)) {
             return false;
         }
@@ -3235,12 +3335,19 @@ final class BattleNetMovementSystem {
      * for 75 of the 101 early mobile sequence mismatches fleet-wide.</p>
      */
     private void armBattleNetAttackRefusalMove(Unit unit) {
+        // A player's point Move owns the same refusal program. XOrc 11
+        // grunt 1488 pays Move 15..1 at 95..109; Stop must see that body
+        // and construct Still on 110. A delay with no native cursor let
+        // Stop dispatch idle immediately and steal a later damage draw.
+        boolean playerPointMove = unit != null
+                && unit.order() == Unit.Order.MOVE
+                && unit.battleNetPlayerCommandMove();
         if (world.battleNetSequence == null
                 || unit == null
-                || unit.target() == null
-                || !(unit.order() == Unit.Order.ATTACK
-                        || unit.order() == Unit.Order.ATTACK_MOVE
-                        || unit.chasing())) {
+                || (!playerPointMove && (unit.target() == null
+                        || !(unit.order() == Unit.Order.ATTACK
+                                || unit.order() == Unit.Order.ATTACK_MOVE
+                                || unit.chasing())))) {
             return;
         }
         boolean executingMove = executingBattleNetMoveProgram(unit);
@@ -3293,10 +3400,19 @@ final class BattleNetMovementSystem {
                 && unit.target().type().building();
         boolean postRetargetParkRefill =
                 unit.battleNetRetargetResidualParkRefill();
-        if (executingMove && !refusedOnActionMarker
+        boolean retainedAttackTail = paidAttackTailGenerationPark(unit);
+        // A constructor-paid probe can expose Move's first body opcode
+        // before its new route is refused. It still owns a fresh full band:
+        // XHuman 12 grunt 1457 writes Move 15 at 344, then steps on 359.
+        boolean freshPaidRouteProbe = unit.battleNetAttackRefusalRecoveryStage() == 6
+                && unit.battleNetChaseEmptyRouteReplan()
+                && unit.battleNetPathStepsTaken() == 0;
+        if (executingMove && !playerPointMove && !freshPaidRouteProbe
+                && !refusedOnActionMarker
                 && !freshParkedRouteReplacement
                 && !settledMultiResidual
-                && !postRetargetParkRefill) {
+                && !postRetargetParkRefill
+                && !retainedAttackTail) {
             return;
         }
         int moveStart = world.idle.battleNetSequenceStart(unit,
@@ -3329,6 +3445,14 @@ final class BattleNetMovementSystem {
                 stagedMobileResidualRefill && !retainedBuildingResidual
                         ? 1 : 15);
         unit.setBattleNetChaseStepReady(false);
+        if (retainedAttackTail) {
+            // A completed Attack-tail pursuit retains its cached route when
+            // a moving ally blocks the next byte. Native 0x437a25 writes 15
+            // for XHuman 4 footman 1498 at 331; the east step belongs to 346.
+            // Keeping the live Move cursor let the diagonal-detour shortcut
+            // cancel this wait and step northeast on 332 instead.
+            unit.setBattleNetRefusalHold(true);
+        }
         // The Move refusal band does not hand an attacking unit straight
         // back to a walk. Native returns through Attack-start construction,
         // then gives Move one route-plan-only visit before the first heading.
@@ -4683,6 +4807,7 @@ final class BattleNetMovementSystem {
             if (!canTakeStep
                     && chaseMoveSequence
                     && unit.battleNetChaseStepReady()
+                    && unit.battleNetPathStepsTaken() > 0
                     && unit.battleNetChaseEmptyRouteReplan()
                     && unit.battleNetChaseReplanResidualHold()) {
                 Unit postHoldBlocker = world.unitAt(nextX, nextY);
@@ -5524,6 +5649,31 @@ final class BattleNetMovementSystem {
                     }
                     return;
                 }
+                // 0x437ab4 checks the incremented collision count before
+                // inspecting the blocker's next destination. Eight through
+                // fourteen keep the full fifteen-count wait even when that
+                // blocker has no route byte left (XHuman 12 grunt 1457 at
+                // 188 and 203). The Attack caller must retain this owner.
+                if (unit.battleNetAttackRefusalRecoveryStage() == 6
+                        && unit.battleNetCollisionCounter() >= 7
+                        && unit.battleNetCollisionCounter() < 14
+                        && unit.offeredTarget() == null
+                        && stageSixBlocker != null
+                        && world.isAllied(unit.player(), stageSixBlocker.player())) {
+                    unit.setBattleNetCollisionCounter(
+                            unit.battleNetCollisionCounter() + 1);
+                    unit.clearPath();
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    unit.setBattleNetOrderDelay(14);
+                    unit.setBattleNetRefusalHold(true);
+                    unit.setBattleNetChaseStepReady(false);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(15);
+                    return;
+                }
                 boolean retainedPaidRefusalFace =
                         unit.battleNetAttackRefusalRecoveryStage() == 6
                         && unit.battleNetChaseEmptyRouteReplan()
@@ -5603,14 +5753,23 @@ final class BattleNetMovementSystem {
                         && world.battleNetCooperativeBlocker(
                                 unit, stageSixBlocker);
                 boolean duplicateCardinalStageSixProbe =
-                        paidStageSixCooperativeRoute
+                        !unit.battleNetStageSixCardinalProbePark()
+                        && (paidStageSixCooperativeRoute
+                                || (unit.battleNetAttackRefusalRecoveryStage() == 6
+                                        && stageSixBlocker != null
+                                        && stageSixBlocker.isMoving()
+                                        && world.isAllied(unit.player(),
+                                                stageSixBlocker.player())
+                                        && world.combat.onBattleNetChaseMoveBody(
+                                                stageSixBlocker)))
                         && unit.battleNetChaseEmptyRouteReplan()
-                        && unit.pathLength() == 2
+                        && unit.pathLength() >= 1 && unit.pathLength() <= 2
                         && unit.battleNetPathStepsTaken() == 0
                         && unit.battleNetCollisionCounter() <= 1
                         && unit.battleNetRefusals() == 0
                         && !Direction.isDiagonal(heading)
-                        && unit.peekHeadingAtDepth(1) == heading
+                        && (unit.pathLength() == 1
+                                || unit.peekHeadingAtDepth(1) == heading)
                         && unit.target() != null
                         && unit.target().isAlive()
                         && unit.type() != null
@@ -5621,13 +5780,15 @@ final class BattleNetMovementSystem {
                         && unit.target().tileY() == unit.tileY()
                                 + Direction.deltaY(heading) * 2;
                 if (duplicateCardinalStageSixProbe) {
-                    // Attack construction's final Move probe receives E,E
-                    // from Java's ordinary path buffer here. Retail writes
-                    // only the direct E byte and parks its cursor at twenty:
+                    // Attack construction's final Move probe can receive E
+                    // or the older duplicate E,E surrogate. Retail writes
+                    // only direct E and parks its cursor at twenty:
                     // XHuman 12 slot 1434 holds byte 02 at (24,60) from
                     // fixture 189 onward while slot 1447 vacates (25,60).
                     // Keeping the second E lets the generic collision writer
                     // rotate E->S->W and walk away at fixture 191.
+                    // Initialize this park once; later visits must increment
+                    // its collision generation instead of resetting it to one.
                     unit.clearPath();
                     unit.setPath(new PathFinder.Path(
                             PathFinder.Result.FOUND,
@@ -7260,6 +7421,22 @@ final class BattleNetMovementSystem {
                                     .battleNetChaseReplanResidualHold()
                                     && unit.pathLength() > 0
                                     && !World.battleNetRangedChaseUnit(unit);
+                            // Human 8 attacker 1526 queues Attack after its
+                            // first blocked SE probe at 363. Native Move pays
+                            // fifteen visits, then Attack constructs for three;
+                            // combining the waits consumes the command early.
+                            boolean firstQueuedReplacementRefusal = replanHold
+                                    && unit.battleNetPathStepsTaken() == 0
+                                    && unit.battleNetTailWrapRouteTarget() != null
+                                    && unit.battleNetTailWrapRouteTarget()
+                                            != unit.target();
+                            if (firstQueuedReplacementRefusal) {
+                                unit.setBattleNetOrderDelay(14);
+                                armBattleNetAttackRefusalMove(unit);
+                                unit.setBattleNetChaseReplanResidualHold(false);
+                                unit.setBattleNetAttackRefusalRecoveryStage(1);
+                                return;
+                            }
                             boolean immediateReplacementRefusal = replanHold
                                     && world.actionSettledMeleeReplacementRoute;
                             if (replanHold
@@ -9505,6 +9682,33 @@ final class BattleNetMovementSystem {
                     parkPaidAttackTailGeneration(unit, heading);
                     return;
                 }
+                // A retired cold chase returns home with the same parked
+                // collision generation as its combat route. Human 13 ogre
+                // 1510 refuses cached N at 267, parks RI20 with collision
+                // one, then redraws NW,NE,NW,W at 268. Losing that generation
+                // rewrote a terrain line and refused N again on 280 instead
+                // of taking NE. Fresh routes and opening formation moves
+                // retain their own refusal handler below.
+                if (battleNetLandRegroupMove(unit)
+                        && unit.battleNetChaseLegOpensCold()
+                        && unit.battleNetAttackOp0OutOfRange()
+                        && unit.battleNetPathStepsTaken() > 0) {
+                    int collision = unit.battleNetCollisionCounter() + 1;
+                    battleNetRefuse(unit);
+                    unit.setBattleNetCollisionCounter(collision > 14 ? 0 : collision);
+                    unit.setBattleNetRefusals(0);
+                    unit.setBattleNetPlainMoveRefusalReplacement(true);
+                    unit.setRouteSpent(false);
+                    unit.setWaitCycles(0);
+                    boolean fullBand = collision >= 8 && collision < 15;
+                    unit.setBattleNetOrderDelay(fullBand ? 14 : 0);
+                    int moveStart = world.idle.battleNetSequenceStart(unit,
+                            BattleNetSequence.MOVE_ANIMATION);
+                    unit.setBattleNetSequenceOffset(moveStart);
+                    unit.setBattleNetAnimationTimer(fullBand ? 15 : 1);
+                    unit.setBattleNetChaseStepReady(false);
+                    return;
+                }
                 int refusals = battleNetRefuse(unit);
                 // FUN_004379e0 increments the packed high nibble before
                 // comparing it with 0x8000 at 0x00437ab4. Generations one
@@ -10316,6 +10520,11 @@ final class BattleNetMovementSystem {
                 && unit.pendingAttack() != null
                 && unit.pendingAttackFrom() == Unit.Order.PATROL;
         return unit.battleNetDoubleStep()
+                // A player's Move used to fall back to presentation timing.
+                // XOrc 1's death knight 1491 spent 19 visits on the stride that
+                // script.bin finishes in 18, changing where later clicks land.
+                || unit.battleNetPlayerCommandMove()
+                || battleNetLandRegroupMove(unit)
                 || unit.battleNetRepairStride()
                 || unit.returningToDepot() && unit.carried() > 0
                 // A fresh behavior-two land Patrol enters the retail Move
@@ -10370,7 +10579,8 @@ final class BattleNetMovementSystem {
         unit.setBattleNetMovePaceOffset(open.offset());
         unit.setBattleNetMovePaceTimer(open.timer());
         if ((unit.battleNetLandPatrolMoveBody() && world.isPerson(unit.player())
-                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR) {
+                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR
+                || battleNetLandRegroupMove(unit)) {
             unit.setBattleNetSequenceOffset(open.offset());
             unit.setBattleNetAnimationTimer(open.timer());
         }
@@ -10416,7 +10626,8 @@ final class BattleNetMovementSystem {
         unit.setBattleNetMovePaceOffset(tick.offset());
         unit.setBattleNetMovePaceTimer(timer);
         if ((unit.battleNetLandPatrolMoveBody() && world.isPerson(unit.player())
-                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR) {
+                && !unit.chasing()) || unit.order() == Unit.Order.REPAIR
+                || battleNetLandRegroupMove(unit)) {
             unit.setBattleNetSequenceOffset(tick.offset());
             unit.setBattleNetAnimationTimer(timer);
         }

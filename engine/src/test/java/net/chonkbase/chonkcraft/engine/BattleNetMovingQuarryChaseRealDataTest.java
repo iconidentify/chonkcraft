@@ -465,7 +465,10 @@ class BattleNetMovingQuarryChaseRealDataTest {
             mission.tick();
         }
         assertEquals(quarry, attacker.target());
-        assertEquals(quarry, attacker.offeredTarget());
+        // Native Human 8 slot 1505 has a zero +0x54 aggressor pointer
+        // at 226; the retained quarry belongs to routing provenance.
+        assertNull(attacker.offeredTarget());
+        assertSame(quarry, attacker.battleNetRouteOffer());
         assertEquals(3, attacker.pathLength());
         assertEquals(Direction.fromDelta(1, 0),
                 attacker.peekHeadingAtDepth(0));
@@ -705,8 +708,11 @@ class BattleNetMovingQuarryChaseRealDataTest {
         }
         assertSame(movingReplacement, attacker.target(),
                 "the timer-one scan replaces the dying quarry");
-        assertSame(dyingQuarry, attacker.offeredTarget(),
-                "the cold retry retains the quarry which owned the offer");
+        // Native slot 1526 has no recorded aggressor at 384. Retaining
+        // the old route owner must not manufacture a hit offer.
+        assertNull(attacker.offeredTarget());
+        assertSame(dyingQuarry, attacker.battleNetRouteOffer(),
+                "the cold retry retains the quarry which owned the old route");
         assertTrue(movingReplacement.isMoving(),
                 "the replacement is still draining its return residual");
         assertEquals(2657, attacker.battleNetSequenceOffset());
@@ -786,7 +792,9 @@ class BattleNetMovingQuarryChaseRealDataTest {
         }
         assertChaser(attacker, 79, 64, -2, -2, true);
         assertSame(movingReplacement, attacker.target());
-        assertSame(oldQuarry, attacker.offeredTarget());
+        assertNull(attacker.offeredTarget(),
+                "native slot 1526 still has no aggressor at fixture 472");
+        assertSame(oldQuarry, attacker.battleNetRouteOffer());
         assertTrue(movingReplacement.isMoving(),
                 "the quarry still owns its southbound return residual");
         assertEquals(0xde652f78, world.randomSeed());

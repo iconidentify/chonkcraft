@@ -514,9 +514,10 @@ public final class SaveGame {
     private static void writeUnits(World world, Writer out) throws IOException {
         java.util.List<Unit> saved = new java.util.ArrayList<>();
         for (Unit unit : world.units()) {
-            if (unit.type() == null || unit.isDying()) {
-                // A corpse is a few cycles of animation and no state worth
-                // keeping: it will not be there when the save is opened.
+            // Dying units still own committed attack references. Dropping the
+            // victim during Human 8's killing swing changes the next pursuit
+            // after loading; preserve it until its death animation expires.
+            if (unit.type() == null) {
                 continue;
             }
             saved.add(unit);
@@ -827,6 +828,15 @@ public final class SaveGame {
         }
         if (unit.battleNetPlayerCommandAttack()) {
             state.append(" playerCommandAttack = true,");
+        }
+        if (unit.isDying()) {
+            state.append(" deathTimer = ").append(unit.deathTimer()).append(",");
+        }
+        if (unit.battleNetAttackTargetRetired()) {
+            state.append(" attackTargetRetired = true,");
+        }
+        if (unit.battleNetCommandAttackConstruction()) {
+            state.append(" commandAttackConstruction = true,");
         }
         if (unit.destPathOpeningHold()) {
             state.append(" destPathOpeningHold = true,");

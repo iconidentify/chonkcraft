@@ -18,6 +18,8 @@ import net.chonkbase.chonkcraft.engine.map.GameMap;
 import net.chonkbase.chonkcraft.engine.map.TileFlag;
 import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.missile.Missile;
+import net.chonkbase.chonkcraft.engine.network.CommandApplier;
+import net.chonkbase.chonkcraft.engine.network.GameCommand;
 import net.chonkbase.chonkcraft.engine.save.LoadGame;
 import net.chonkbase.chonkcraft.engine.save.SaveGame;
 import net.chonkbase.chonkcraft.engine.unit.Unit;
@@ -246,24 +248,30 @@ class BattleNetSiegeCadenceTest {
     }
 
     @Test
-    @DisplayName("retail parity still permits the authenticated moving-siege reaction retarget")
-    void parityWorldRetainsRetailSiegeReactionRetarget() {
+    @DisplayName("a direct siege attack retains its reachable building target")
+    void aDirectSiegeAttackRetainsItsReachableBuildingTarget() {
         for (String ident : List.of("unit-ballista", "unit-catapult")) {
             Fixture fixture = fixture();
             Unit siege = place(fixture, ident, 0, 10, 10);
             Unit building = place(fixture, "unit-orc-barracks", 1, 23, 10);
-            Unit distractor = place(fixture, "unit-footman", 1, 16, 16);
-
-            assertTrue(fixture.world().orderAttack(siege, building, true));
-            boolean changed = false;
-            for (int cycle = 0; cycle < 500 && siege.isAlive(); cycle++) {
+            place(fixture, "unit-footman", 1, 16, 16);
+            int hitPoints = building.hitPoints();
+            CommandApplier commands = new CommandApplier(fixture.world(),
+                    new ArrayList<>(fixture.data().unitTypes().types().values()));
+            fixture.data().configureCommands(commands);
+            assertTrue(commands.apply(GameCommand.attack(0, siege.id(), building.id())),
+                    "the siege engine must accept the building click");
+            boolean acquired = false;
+            for (int cycle = 0; cycle < 1_000 && siege.isAlive()
+                    && building.hitPoints() == hitPoints; cycle++) {
                 fixture.world().tick();
-                if (siege.target() == distractor) {
-                    changed = true;
-                    break;
-                }
+                acquired |= siege.target() == building;
+                if (acquired) assertSame(building, siege.target(),
+                        ident + " surrendered an active building click to a nearby hostile");
             }
-            assertTrue(changed, ident + " no longer reproduces BNE's free reaction scan");
+            assertTrue(acquired, ident + " never promoted the player's building click");
+            assertTrue(building.hitPoints() < hitPoints,
+                    ident + " retained the target without completing a shot");
         }
     }
 

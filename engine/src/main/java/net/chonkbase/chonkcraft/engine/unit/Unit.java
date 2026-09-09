@@ -207,7 +207,8 @@ public final class Unit {
         ATTACK_MOVE,
         BOARD,
         FOLLOW,
-        DEFEND
+        DEFEND,
+        STOP
     }
 
     /**
@@ -338,6 +339,7 @@ public final class Unit {
 
     /** Explicit GiveOrder Attack (native order 9), distinct from automatic order 12. */
     private boolean battleNetPlayerCommandAttack;
+    private boolean battleNetCommandAttackConstruction;
 
     /** Native Follow action 7, retained while waiting or catching its leader again. */
     private boolean battleNetFollowWaiting;
@@ -2439,8 +2441,26 @@ public final class Unit {
         return target;
     }
 
+    /**
+     * Whether retail's weak attack goal was retired after this unit's killing blow.
+     *
+     * <p>The committed victim remains in {@link #target()} until the swing ends.
+     * Native 0x437478 clears +0x88 before that boundary, so later range decisions
+     * must distinguish this retired goal from a victim killed by another unit.
+     */
+    public boolean battleNetAttackTargetRetired() {
+        return battleNetAttackTargetRetired;
+    }
+
+    public void setBattleNetAttackTargetRetired(boolean retired) {
+        battleNetAttackTargetRetired = retired;
+    }
+
+    private boolean battleNetAttackTargetRetired;
+
     public void setTarget(Unit target) {
         if (this.target != target) {
+            battleNetAttackTargetRetired = false;
             // A post-swing route refill is evidence about one particular
             // quarry. It cannot survive AutoSelectTarget replacing that
             // quarry: the replacement's first approach is an ordinary chase
@@ -3611,12 +3631,13 @@ public final class Unit {
     private boolean battleNetAttackResumeHoldActive;
 
     /**
-     * Remaining wall-clock cadence for a mobile ranged attack.
+     * Remaining weapon cooldown for a mobile melee or ranged attack.
      *
-     * <p>BNE keeps its attack wait byte counting while a thrower is retargeting
-     * and walking.  On arrival the remaining value becomes the Attack-start
-     * hold; restarting the full animation-body wait makes ranged units stand
-     * idle for an extra chase-length before they fire.</p>
+     * <p>BNE keeps the word at unit+0x7a counting while a unit retargets and
+     * walks. On arrival the remaining value becomes the Attack-start hold.
+     * Restarting the full wait delays a thrower's shot; omitting the remaining
+     * wait lets a melee replacement hit early. The accessor and save field keep
+     * their original ranged name for compatibility.</p>
      */
     public int battleNetRangedAttackCadenceRemaining() {
         return battleNetRangedAttackCadenceRemaining;
@@ -3897,6 +3918,15 @@ public final class Unit {
 
     public boolean battleNetPlayerCommandAttack() {
         return battleNetPlayerCommandAttack;
+    }
+
+    /** A new command's first attack callback still owes any unspent weapon cooldown. */
+    public boolean battleNetCommandAttackConstruction() {
+        return battleNetCommandAttackConstruction;
+    }
+
+    public void setBattleNetCommandAttackConstruction(boolean pending) {
+        battleNetCommandAttackConstruction = pending;
     }
 
     public boolean battleNetFollowWaiting() {

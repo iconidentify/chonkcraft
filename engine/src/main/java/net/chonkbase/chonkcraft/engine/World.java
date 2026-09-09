@@ -578,6 +578,12 @@ public final class World {
         }
         boolean accepted = combat.orderAttackMove(unit, tileX, tileY);
         if (accepted && fromPlayer && battleNetSequence != null
+                && unit.queuedReplacementPending() && unit.hasQueuedOrders()
+                && unit.queuedOrders().getFirst().kind() == Unit.QueuedOrderKind.ATTACK_MOVE) {
+            unit.setDestPathOpeningHold(true);
+            return true;
+        }
+        if (accepted && fromPlayer && battleNetSequence != null
                 && unit.order() == Unit.Order.ATTACK_MOVE) {
             // Issue-visit dest-attack dest-arms at fixture 8: Human 1 soldier
             // 1588 installs order 10 at 5 and first walks at 8. The issue
@@ -1184,11 +1190,12 @@ public final class World {
     /**
      * Live-game control guard for a player-commanded ballista or catapult.
      *
-     * <p>BNE 2.02 runs its ordinary free reaction scan while siege is chasing
-     * a clicked building.  That scan may replace the building with a nearby
-     * mobile hostile, even though the player never changed the order.  The
-     * desktop enables this guard for playable games; parity worlds leave it
-     * disabled and therefore retain the authenticated retail behavior.</p>
+     * <p>A reachable building click retains its target under native order 9.
+     * This selector guard also protects that target while presentation and
+     * movement borrow other action labels. The desktop enables it; native
+     * command ownership must also work with this optional guard disabled.
+     * An unreachable pursuit releases the target before idle selection, so
+     * this guard must not prevent the subsequent automatic acquisition.</p>
      */
     private boolean playerSiegeBuildingTargetLockEnabled;
 
@@ -4140,6 +4147,7 @@ public final class World {
         unit.setSavedOrder(null);
         unit.setBattleNetCapitalPatrolRestoreArming(false);
         if (orderReplacementMustWait(unit)) {
+            projectiles.interruptPendingAttack(unit);
             unit.clearQueuedOrders();
             unit.setPendingAttack(null, null, -1, -1);
             unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.ATTACK,
@@ -4184,6 +4192,7 @@ public final class World {
         unit.setAttackRequiresVisibility(isVisibleTo(unit.player(), target));
         unit.setOrder(Unit.Order.ATTACK);
         unit.setBattleNetPlayerCommandAttack(fromPlayer);
+        unit.setBattleNetCommandAttackConstruction(fromPlayer);
         // COrder::NewActionAttack constructs order state only. The route is
         // PathFinderOutput on CUnit and survives until the new order's first
         // DoActionMove compares its effective goal and invalidates it if
@@ -6401,7 +6410,19 @@ public final class World {
                 optimizerBlockers.add(candidate);
             }
         }
-        setMovementFieldFlags(unit, false);
+        // The land wall follower tests the router's own occupied square
+        // just as it tests another ally (0x4501bc). Only a yielding Move
+        // body clears it. Human 10's armed peasant is still in action-state 2 when its
+        // replacement Attack-Move routes at 116. Clearing that square let
+        // the second wall face loop through (111,114) and win with eighteen
+        // steps; retail keeps the twenty-byte northeast route instead.
+        // Naval and air routes retain their existing footprint clearance;
+        // their doubled movement and rendered footprints need a separate
+        // native occupancy witness before applying this land rule.
+        if (unit.type().moveType() != UnitType.Movement.LAND
+                || movement.battleNetSoftClearMoveAlly(unit)) {
+            setMovementFieldFlags(unit, false);
+        }
         try {
             BattleNetPathFinder.Passability baseTraversalPassability =
                     battleNetTraversalPassability(unit);
@@ -6810,9 +6831,9 @@ public final class World {
             return null;
         }
 
-        // Only replace a clean route whose complete endpoint is the live
-        // quarry. A wall prefix (including XHuman 10 knight 1480's SW,NW)
-        // owns native buffer state that this open-ray rule cannot recreate.
+        // A complete wall route can already end beside the solid quarry.
+        // Keep that writer's bytes; only a ray ending inside the quarry needs
+        // reconstruction. An incomplete prefix remains outside this rule.
         int stride = battleNetMovementStride(unit);
         int endX = unit.tileX();
         int endY = unit.tileY();
@@ -6821,7 +6842,9 @@ public final class World {
             endX += Direction.deltaX(heading) * stride;
             endY += Direction.deltaY(heading) * stride;
         }
-        if (endX != target.tileX() || endY != target.tileY()) {
+        boolean reachesQuarry = endX == target.tileX() && endY == target.tileY();
+        if (!reachesQuarry && Math.max(Math.abs(endX - target.tileX()),
+                Math.abs(endY - target.tileY())) > 1) {
             return null;
         }
 
@@ -6832,6 +6855,12 @@ public final class World {
             return null;
         }
 
+        if (!reachesQuarry) {
+            // Native 0x44ff2a keeps all five bytes for XHuman 10 knight
+            // 1493 at fixture 438. Truncating this already-complete wall
+            // route to two changed its later refusal and attack arrival.
+            return path;
+        }
         int targetDx = target.tileX() - unit.tileX();
         int targetDy = target.tileY() - unit.tileY();
         int absDx = Math.abs(targetDx);
@@ -7172,7 +7201,7 @@ public final class World {
     }
 
     /** Target route built by Patrol before its queued Attack becomes current. */
-    private PathFinder.Path findBattleNetPatrolOpeningTargetPath(
+    PathFinder.Path findBattleNetOpeningAttackTargetPath(
             Unit unit, Unit target) {
         // Patrol OP0 has already constructed COrder_Attack's path input. Its
         // goal marker is the weapon range, not merely the mover's stride.
@@ -7790,7 +7819,7 @@ public final class World {
                                     && x <= targetRight + destArmSkirtPadding
                                     && y >= targetTop - destArmSkirtPadding
                                     && y <= targetBottom + destArmSkirtPadding;
-                            return (movableTarget
+                            return (movableTarget && hostilesStandAside
                                     && x >= targetLeft && x <= targetRight
                                     && y >= targetTop && y <= targetBottom)
                                     || (onCleanDestArmSkirt
@@ -7827,7 +7856,7 @@ public final class World {
                             }
                             // For that native branch, keep terrain and
                             // buildings hard while ignoring combatant bits.
-                            return (movableTarget
+                            return (movableTarget && hostilesStandAside
                                     && x >= targetLeft && x <= targetRight
                                     && y >= targetTop && y <= targetBottom)
                                     || map.isFootprintFree(x, y, 1, 1,
@@ -8666,16 +8695,22 @@ public final class World {
      * So a death knight closing on a target routes around the enemies in its
      * path and a grunt beside it routes through them.</p>
      *
-     * <p>Two things the table says and this implementation still cannot: the six native
+     * <p>The six native
      * order bytes 2, 14, 32, 33, 37 and 59 all arrive here as Still, and 2,
      * 14 and 32 carry the bit while 33, 37 and 59 do not. That ambiguity
      * cannot reach this method -- not one of the 842 sealed routes was laid by
-     * a unit on any of the six -- so it is left alone. And
-     * {@code 0x0044fc48}'s first arm, a non-null unit pointer at record offset
-     * {@code 0x54}, demotes 30 of the 342 chasers; this implementation has no
-     * authenticated copy of that routing field, and it is in focused tests.</p>
+     * a unit on any of the six -- so it is left alone. The earlier
+     * {@code 0x0044fc48} branch reads the recorded aggressor at unit+0x54;
+     * that pointer selects the solid-enemy view before the order table.</p>
      */
     private boolean battleNetHostilesStandAside(Unit unit) {
+        // A recorded attacker at native unit+0x54 selects the solid-enemy
+        // view before order/type flags are consulted (0x44fc48 -> 0x44fc7d).
+        // Ignoring that offer sent XHuman 4 grunt 1505 west through enemies
+        // when it retargeted the ballista at 105; retail routes southwest.
+        if (unit.offeredTarget() != null) {
+            return false;
+        }
         // Explicit Attack is native order 9 (0x010c), whose flags lack the
         // 0x0002 mask selected at 0x44fc61. Enemy bodies remain route walls.
         // Human 1 slot 1598 redraws around grunt 1591 on fixture 266; treating
@@ -8714,6 +8749,13 @@ public final class World {
     private static final Set<String> BATTLE_NET_CASTER_IDLE_SCAN = Set.of(
             "unit-mage", "unit-death-knight", "unit-evil-knight",
             "unit-white-mage");
+
+    /** The shared 0x40a830 scanner filters the winning quarry for casters. */
+    boolean battleNetAutomaticQuarryAllowed(Unit unit, Unit target) {
+        return target == null || !BATTLE_NET_CASTER_IDLE_SCAN.contains(unit.type().ident())
+                || BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(target.type().ident())
+                || !target.type().canAttack();
+    }
 
     /**
      * Whether a short-leftover combat ally should stay hard on a combat
@@ -11742,10 +11784,53 @@ public final class World {
 
     /** Cancels whatever a unit is doing, leaving it where it stands. */
     public void orderStop(Unit unit) {
+        if (battleNetSequence != null && unit.order() == Unit.Order.STILL) {
+            int queueWait = movement.playerCommandWaits(unit)[1];
+            if (queueWait > 0) {
+                // Stop replaces the idle order too. XHuman 7 paladin 1440
+                // receives it at 255 and promotes Still at 257, suppressing
+                // the old idle callback and its random draw on that visit.
+                unit.clearQueuedOrders();
+                unit.setSavedOrder(null);
+                unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.STOP,
+                        0, 0, null, null, null));
+                unit.setQueuedReplacementPending(true);
+                unit.setBattleNetOrderDelay(queueWait + 1);
+                return;
+            }
+            installStop(unit);
+            unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(4);
+            return;
+        }
         if (unit.order() == Unit.Order.UNDER_CONSTRUCTION) {
             construction.cancelConstruction(unit);
             return;
         }
+        if (battleNetSequence != null && (combat.battleNetCurrentAttackBody(unit)
+                || combat.battleNetPointCommandConstruction(unit)
+                || movement.battleNetCommandMoveBody(unit))) {
+            projectiles.interruptPendingAttack(unit);
+            unit.clearQueuedOrders();
+            unit.setSavedOrder(null);
+            unit.setPendingAttack(null, null, -1, -1);
+            unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.STOP,
+                    0, 0, null, null, null));
+            unit.setQueuedReplacementPending(true);
+            unit.rememberActionBeforeQueued(unit.order());
+            // Stop parks the route when clicked, then releases the committed
+            // movement before constructing fresh Still. Leaving route bytes
+            // visible changed a nearby knight's next path in Human 7;
+            // finishing through the generic route-end callback instead ran
+            // Orc 9 peon 1478's idle three visits early on fixture 110.
+            unit.clearPath();
+            return;
+        }
+        installStop(unit);
+    }
+
+    /** Installs Stop after the previous action releases its committed body. */
+    private void installStop(Unit unit) {
         projectiles.interruptPendingAttack(unit);
         releaseBattleNetCombatOrderForPlayerReplacement(unit);
         unit.setBattleNetAttackGroundMove(false);
@@ -11784,6 +11869,7 @@ public final class World {
         if (unit == null) {
             return;
         }
+        unit.setBattleNetCommandAttackConstruction(false);
         unit.setTarget(null);
         unit.setOfferedTarget(null);
         unit.setPendingAttack(null, null, -1, -1);
@@ -11833,11 +11919,39 @@ public final class World {
     boolean orderReplacementMustWait(Unit unit) {
         return unit.animation().unbreakable()
                 || (battleNetSequence != null
-                        && movement.battleNetCurrentMoveBody(unit));
+                        && (movement.battleNetCommandMoveBody(unit)
+                                || combat.battleNetCurrentAttackBody(unit)
+                                || combat.battleNetPointCommandConstruction(unit)));
+    }
+
+    /** Promotes a combat replacement on the retail program's action callback. */
+    void promoteBattleNetCombatReplacement(Unit unit) {
+        Unit.QueuedOrder replacement = unit.queuedOrders().getFirst();
+        releaseBattleNetCombatOrderForPlayerReplacement(unit);
+        unit.animation().clearUnbreakable();
+        unit.animation().clearCurrent();
+        unit.setOrder(Unit.Order.STILL);
+        unit.setActionBeforeQueued(null);
+        unit.setWaitCycles(0);
+        if (replacement.kind() == Unit.QueuedOrderKind.MOVE) {
+            unit.setDestPathOpeningHold(true);
+        }
+        beginNextQueuedOrder(unit);
+        if (replacement.kind() == Unit.QueuedOrderKind.MOVE
+                || replacement.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
+                || replacement.kind() == Unit.QueuedOrderKind.STOP) {
+            unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(3);
+        }
     }
 
     /** Starts the next viable shifted command once the current order finishes. */
     private void beginNextQueuedOrder(Unit unit) {
+        beginNextQueuedOrder(unit, true);
+    }
+
+    /** Accounts for whether the new order will also execute on this visit. */
+    private void beginNextQueuedOrder(Unit unit, boolean beforeUnitAction) {
         // HandleUnitAction cannot pop Orders[1] until the committed animation
         // span releases. Calling an order constructor here while Unbreakable
         // is still set only queues the same replacement again. The while loop
@@ -11856,6 +11970,9 @@ public final class World {
             // Only the head can be the delayed flush replacement. Any orders
             // remaining behind it were explicitly shifted by the caller.
             unit.setQueuedReplacementPending(false);
+            if (queued.kind() != Unit.QueuedOrderKind.STOP) {
+                unit.setBattleNetStopAfterLeftover(false);
+            }
             boolean accepted = switch (queued.kind()) {
                 case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
                 case ATTACK -> {
@@ -11863,6 +11980,9 @@ public final class World {
                     if (installed) {
                         unit.setBattleNetPlayerCommandAttack(
                                 "player-command".equals(queued.value()));
+                        unit.setBattleNetCommandAttackConstruction(
+                                "player-command".equals(queued.value())
+                                        || "native-point-acquire".equals(queued.value()));
                     }
                     yield installed;
                 }
@@ -11893,6 +12013,14 @@ public final class World {
                 case BOARD -> orderBoard(unit, queued.target());
                 case FOLLOW -> orderFollow(unit, queued.target(), false);
                 case DEFEND -> orderDefend(unit, queued.target());
+                case STOP -> {
+                    installStop(unit);
+                    if (battleNetSequence != null) {
+                        unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+                        unit.setBattleNetAnimationTimer(3);
+                    }
+                    yield true;
+                }
             };
             if (accepted && unit.order() != Unit.Order.STILL) {
                 if (queued.kind() == Unit.QueuedOrderKind.RETURN_GOODS
@@ -11959,7 +12087,22 @@ public final class World {
                     if ("player-cold-move".equals(queued.value())) {
                         popDelay++;
                     }
+                    // Acquiring after the final stride has already consumed
+                    // this visit's movement. It owes only native 3,2,1:
+                    // XHuman 4 footman 1484 promotes at 133 and steps at 136.
+                    // Adding the head-of-visit allowance here delayed every
+                    // later stride and the player's return click by one tick.
+                    if (beforeUnitAction && "native-point-acquire".equals(queued.value())) {
+                        popDelay++;
+                        unit.setBattleNetAnimationTimer(4);
+                    }
                     unit.setBattleNetOrderDelay(popDelay);
+                    if (queued.kind() == Unit.QueuedOrderKind.ATTACK_MOVE
+                            && unit.destPathOpeningHold() && battleNetSequence != null) {
+                        unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+                        unit.setBattleNetAnimationTimer(
+                                "player-cold-move".equals(queued.value()) ? 4 : 3);
+                    }
                     if (queuedGoldHarvestOpening
                             && battleNetSequence != null) {
                         // A depot-ready land continuation opens action 23 on
@@ -12109,6 +12252,14 @@ public final class World {
                 continue;
             }
             battleNetActiveActionUnit = unit;
+            // 0x452260 decrements unit+0x7a before animation and order
+            // dispatch. Restricting cooldown to Attack paused it during a
+            // replacement's Still head and delayed the submarine's next Move.
+            if (battleNetSequence != null && unit.canMove()
+                    && unit.battleNetRangedAttackCadenceRemaining() > 0) {
+                unit.setBattleNetRangedAttackCadenceRemaining(
+                        unit.battleNetRangedAttackCadenceRemaining() - 1);
+            }
             // The two combat counters run down for every unit every cycle,
             // wherever it is and whatever it is doing, as HandleBuffsEachCycle
             // does. Threshold is how long a unit refuses to re-aim; UnderAttack
@@ -12545,6 +12696,17 @@ public final class World {
             // upstream spawns its dead-vision marker at 119 while the blanket
             // gate here used to keep the death animation asleep.
             if (unit.waitCycles() > 0 && unit.order() != Unit.Order.DYING) {
+                // A failed Attack route owns a fresh 3,2,1 constructor while
+                // its two quiet visits run down. Leaving its cursor at 3 hid
+                // the native retry boundary (Human 8 attacker 1526, 455..457).
+                if (battleNetSequence != null && unit.order() == Unit.Order.ATTACK
+                        && !unit.isMoving() && unit.pathLength() == 0
+                        && unit.waitCycles() <= 2
+                        && unit.battleNetAnimationTimer() == unit.waitCycles() + 1
+                        && unit.battleNetSequenceOffset() == idle.battleNetSequenceStart(
+                                unit, BattleNetSequence.ATTACK_ANIMATION)) {
+                    unit.setBattleNetAnimationTimer(unit.battleNetAnimationTimer() - 1);
+                }
                 // A worker chopping in the open keeps swinging while the
                 // period runs down. GatherResource animates every cycle and
                 // only adds to the load when TimeToHarvest expires; skipping
@@ -12604,7 +12766,7 @@ public final class World {
             boolean drainingReplacedStride = battleNetSequence != null
                     && unit.queuedReplacementPending()
                     && unit.reportsActionBeforeQueued()
-                    && movement.battleNetCurrentMoveBody(unit);
+                    && movement.battleNetCommandMoveBody(unit);
             if (drainingReplacedStride) {
                 // BNE advances the committed Move program before dispatching
                 // or promoting an order (0x4524bb/0x4524cd before 0x452587).
@@ -12613,8 +12775,21 @@ public final class World {
                 // another route element and keep the replacement waiting.
                 if (unit.battleNetOrderDelay() > 0) {
                     unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+                    if (!unit.isMoving()) {
+                        unit.setBattleNetAnimationTimer(Math.max(1,
+                                unit.battleNetAnimationTimer() - 1));
+                    }
+                } else if (movement.battleNetCommandRefusalBody(unit)) {
+                    promoteBattleNetCombatReplacement(unit);
                 } else {
                     movement.walkPixels(unit);
+                    if (!unit.isMoving() && unit.stepDrained()) {
+                        // The residual clock completed the native Move body.
+                        // Its cached primary cursor no longer owns a refusal
+                        // wait. Human 11 archer 1450 must promote Stop on
+                        // landing at 259, not one visit later.
+                        unit.setBattleNetSequenceOffset(-1);
+                    }
                 }
             } else {
                 switch (unit.order()) {
@@ -12654,10 +12829,10 @@ public final class World {
                 if (unit.battleNetOrderDelay() > 0) {
                     unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
                     if (unit.battleNetOrderDelay() == 0) {
-                        beginNextQueuedOrder(unit);
+                        beginNextQueuedOrder(unit, false);
                     }
                 } else {
-                    beginNextQueuedOrder(unit);
+                    beginNextQueuedOrder(unit, false);
                 }
             }
             releaseUnreferencedDestroyedUnits();
@@ -16252,7 +16427,8 @@ public final class World {
                 && !restoredCapitalPatrolService
                 && battleNetPatrolQueueAcquire(unit);
         boolean queuedArmedFlyerAttack = armedPatrolOp0
-                && armedFlyerPatrol
+                && (armedFlyerPatrol || (battleNetArmedSmallWarshipPatrol(unit)
+                        && isPerson(unit.player())))
                 && battleNetPatrolQueueAcquire(unit);
         boolean patrolResidualOwnsVisit = standingPatrol
                 && (unit.isMoving() || unit.walkHolding());
@@ -16609,6 +16785,15 @@ public final class World {
             // at settle is nineteen cycles early and the 1800-cycle
             // survey disagrees there. Exact even dests (1570 on 50,4)
             // still stand down on residual settle.
+            // Entering the destination skirt with a cached overshoot byte
+            // still owes this visit's committed pixels. Clearing that byte
+            // first used to skip Orc 14 balloon 1498's frame on 583. Native
+            // moves four pixels then and completes the flight on 602 through
+            // 0x437670 -> 0x450ad0. Empty-route arrivals already drained above
+            // and must not advance twice or restart the arrival timer.
+            if (unit.pathLength() > 0 && unit.isMoving()) {
+                movement.walkPixels(unit);
+            }
             unit.clearPath();
             if (unit.isMoving() && !battleNetScoutOddDestEvenStop(unit)) {
                 return;
@@ -18407,9 +18592,9 @@ public final class World {
         // Only the exhausted flyer's later far-patrol promotion constructs a
         // fresh Still program here (XOrc 8 gryphon 1560 at fixture 52).
         boolean exhaustedFlyer = battleNetArmedFlyerPatrol(unit)
-                && unit.battleNetFlyerScoutExhausted();
+                && (unit.battleNetFlyerScoutExhausted() || isPerson(unit.player()));
         boolean assaultWarship = battleNetArmedSmallWarshipPatrol(unit)
-                && unit.battleNetAiBehavior() == 2;
+                && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()));
         boolean landAssaultPatrol =
                 unit.type().moveType() == UnitType.Movement.LAND
                 && (unit.battleNetAiBehavior() == 2 || isPerson(unit.player()));
@@ -18551,6 +18736,7 @@ public final class World {
                 || unit.isMoving()
                 || !(unit.battleNetFlyerScoutExhausted()
                         || unit.battleNetAiBehavior() == 2
+                        || isPerson(unit.player())
                         || unit.battleNetNavalGuardReturnArming())) {
             return false;
         }
@@ -18688,7 +18874,7 @@ public final class World {
                 goalY = battleNetFootprintGoal(unit.tileY(), target.tileY(),
                         Math.max(1, target.type().tileHeight()));
             }
-            PathFinder.Path path = findBattleNetPatrolOpeningTargetPath(
+            PathFinder.Path path = findBattleNetOpeningAttackTargetPath(
                     unit, target);
             unit.setPath(path);
             unit.setPathGoal(target.tileX(), target.tileY());
@@ -19829,10 +20015,7 @@ public final class World {
             // accepts a target carrying any special 0x06000300 flag, or one
             // lacking armed/mobile bit 0x00080000. It does not shop for a
             // lower-scoring passive target after rejecting an armed fighter.
-            if (casterIdleScan
-                    && !BATTLE_NET_ENEMIES_ALWAYS_WALL.contains(
-                            target.type().ident())
-                    && target.type().canAttack()) {
+            if (!battleNetAutomaticQuarryAllowed(unit, target)) {
                 return;
             }
             if (dataGuard && target != offered
@@ -20454,6 +20637,10 @@ public final class World {
      * new wander on 47, three numbers each, where this implementation's drew nothing.
      */
     void finishOrder(Unit unit) {
+        boolean completedPlayerPointAttack = battleNetSequence != null
+                && isPerson(unit.player()) && unit.order() == Unit.Order.ATTACK_MOVE
+                && unit.target() == null && !unit.isMoving()
+                && unit.tileX() == unit.attackMoveX() && unit.tileY() == unit.attackMoveY();
         // Generic order endings own the same cleanup. Most calls have no
         // pending shot; keeping the rule at both order termination boundaries
         // prevents attack-ground, weak auto-target, and queued replacements
@@ -20469,6 +20656,13 @@ public final class World {
         unit.setBattleNetRetargetResidualParkRefill(false);
         unit.rememberActionBeforeQueued(unit.order());
         unit.setOrder(Unit.Order.STILL);
+        if (completedPlayerPointAttack) {
+            // Action 10 completes through a fresh Still constructor.
+            // XHuman 7's destroyer lands at 146 and idles at 149.
+            unit.setActionBeforeQueued(null);
+            unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(3);
+        }
         unit.setRandomMoveSleep(0);
         unit.setAttackScanSleep(0);
     }

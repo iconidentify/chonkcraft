@@ -297,6 +297,26 @@ from `0x0043789a`. Thus a moving worker is not an unconditional regroup
 soft-clear: mover and blocker collision generations distinguish the initial
 cooperative route from its hard retry.
 
+Queuing that regroup releases the previous combat collision generation.
+The Human 13 command witness follows `0x45149a -> 0x438410`: the helper parks
+the cursor through `0x450ad0`, then `0x43841b` masks `unit+0x1c` with `0x0fff`
+unconditionally. Ogre 1519 changes collision two to zero on fixture 249,
+counts Still construction 3,2,1 through 251, and walks northeast on 252 with
+the actual Move body exposed to neighbouring route queries. Ogre 1511 then
+chooses northwest on 255. Retaining the old combat counter or presenting a
+stationary animation while walking changes both routes. The idle witness
+also separates a blocked cached return-home route from a fresh formation
+route: ogre 1510 parks north at 267, redraws `[NW,NE,NW,W]` on 268, and takes
+the cached northeast byte on 280.
+
+An unarmed scout retains its committed movement on the skirt of an odd
+destination. In the extended Orc 14 command capture, balloon 1498 commits west
+toward `(51,31)` on fixture 582, advances pixels from `(1728,960)` to
+`(1724,960)` on 583, and finishes at `(1664,960)` on 602. That final callback
+follows `0x437670 -> 0x4374a0 -> 0x450ad0`, parks route index twenty and
+constructs Still at sequence 2083 with timer three. The unit does not lose a
+movement visit merely because its logical anchor is already `(52,30)`.
+
 Behavior-two land Patrol has a separate cooperative worker handoff. Expansion
 Human 12 ogre 1356 is settled at (11,86) after draining its old route, while
 harvesting peon 1386 owns (10,85) in Move action state 3 with nonzero sub-tile
@@ -323,6 +343,112 @@ that head. The router's old raw collision byte `0x80` is retired with the guard
 tower quarry and the new refusal writes `0x10`, while the route index remains
 zero and the animation timer becomes fifteen. Thus the route writer's soft
 view does not imply that execution may enter the same square.
+
+The collision band also survives Attack's final movement probe. Expansion
+Human 12 slot 1457 retains Move `2482/15..1` at fixtures 188..202 and
+203..217, with collision generations nine and ten. `0x437ab4` chooses that
+band before `0x44fa20` asks whether the allied blocker has a next route byte.
+At fixture 218 the exhausted route returns through active-order acquisition;
+the hardware watch stops at `0x43841b`, where `andw $0x0fff,0x1c(%esi)`
+clears the old collision generation after `0x450ad0` parks the route.
+Attack then counts `2539/3..1`. Its later fresh route at fixture 344 starts
+collision one and Move `2482/15..1`, and its first west step belongs to 359.
+Keeping the retired collision generation makes this valid later route fail.
+
+Player point movement owns the same refusal program. In the command-campaign
+XOrc 11 recipe, grunt slot 1488 retains Move `2482/15..1` at 95..109. The
+Stop click at 110 constructs Still `2477/3..1`; the subsequent Attack-Move
+at 111 waits until 113, then takes its first northeast step at 116. A logical
+delay without the native Move cursor cannot represent this command boundary.
+
+A replacement also promotes on the final committed pixel visit. In Human 11's
+command recipe, archer 1450 receives Stop on 255, drains its northwest stride
+through 258, and constructs Still `4982/3..1` at 259..261. Its first idle
+callback is 262. A stale primary Move cursor must not create another refusal
+visit after the residual has physically landed.
+
+Temporary worker escapes return through the same active-order machinery.
+Human 8 worker 1536 lands at `(80,60)` on command fixture 323; worker 1533's
+empty escape ends on 329. Both reach Still through `0x43789a`/`0x453050`,
+execute the active-order idle callback, and restore loaded-return action 24
+at `0x452fa2` on that same visit. Subsequent blocked return retries retain
+Still's three-call constructor and the carried resource.
+
+### Aggressor identity and pursuit replacement
+
+The pointer at unit offset `+0x54` records an aggressor; it is not temporary
+pathfinding storage. In command-campaign XHuman 4, footman slot 1518 retains
+aggressor 1506 after its old quarry dies. The replacement constructor is
+written at `0x453023` on fixture 311; the solid-quarry route at 314 writes
+northeast. Slot 1506 takes the first replacement blow at 340 (40 to 33 HP)
+and the next at 365 (33 to 25). Neighboring axe 1490 retains 40 HP.
+`0x44fc48` selects the hard hostile view when `+0x54` is non-null, including
+the quarry's own square. A synthetic route target must not alter that pointer.
+
+The same command recipe exposes a separate landing transition: footman 1498
+replaces ranged quarry 1490 with 1521 on fixture 379. AutoSelectTarget queues
+action 12 through `0x436880`/`0x453130`; `0x438410` parks the old route and
+`0x453023` writes Attack construction 3. The timer counts through 381, the
+new wind-up starts at 382, and the blow lands at 415 (30 to 20 HP).
+
+An already-paid refusal against the same quarry has a different arrival.
+In idle XHuman 10, knight 1493's offered route at fixture 438 is the complete
+`SW,SW,SW,W,W` wall route. At `0x44ff2a`, `edi=6` is its optimizer score;
+`eax=-1` is not that score. After the later blocked approach, NW lands in
+range of catapult 1487 at 502 and opens Attack `1923/1` directly. The blow
+lands at 512 (99 to 92 HP). The cached SW suffix does not require a second
+Attack constructor. These two arrival cases are independent controls.
+
+Ground melee and ranged attackers both retain the weapon countdown at `+0x7a`
+while moving. Human 8 command slot 1538 retargets at 361 and `0x40b369` writes
+26 from the type's attack-period table. It moves north at 364 and lands at
+380 with seven left. After construction, `0x40b0eb` compares the remaining
+countdown and `0x40b106` holds Attack `2657/4..1` at 383..386. The swing opens
+at 387 and hits at 397. Restarting the countdown at arrival delays the hit;
+ignoring the remaining countdown advances it.
+
+A distant dying quarry can instead return directly through the movement
+callback. Human 8 command slot 1513 reaches `0x4376c0` on fixture 372,
+selects worker 1536 before `0x44fbd0` draws northeast, and parks the blocked
+route at `0x450ad0`. Its queued Attack constructs at 373..375. Move retries
+remain at `2600/1` through 380, then take north at 381. A retained wall-face
+continuation must not replace this newly drawn route's first heading.
+
+The target pointer's lifetime differs from the committed swing's lifetime.
+Idle Human 8 slot 1520 kills worker 1519 at fixture 565. The damage path
+calls `0x437410`, and `0x437478` clears `+0x88` while the attack body continues
+through 579. The remembered order point survives. The next quarry constructs
+Attack at 580..582 before movement starts at 583. The Java victim reference
+used to finish the committed body must not be read as a still-live native
+target for that later range decision; saving during this interval must retain
+the distinction.
+
+The same Human 8 command profile distinguishes a surviving but distant quarry
+at fixture 452. Slot 1526 fails its range check, and `0x437732` selects worker
+1536 before NewPath fails. `0x43789d` installs Still; the active Still callback
+then queues and promotes Attack on that visit. Its constructor occupies
+452..454 and repeats on 455..457. The worker's death releases south on 458.
+Keeping the completed swing's unbreakable flag delays the replacement.
+
+In Human 13's command profile, grunt 1507 finishes its third paid stride at
+123,28 on fixture 204, after knight 1493 dies on 203. `0x43777c` reads the
+quarry's dying flags and `0x437793` clears its target before another route byte
+is consumed. Still constructs at `2477/3`, retaining S,SW; the idle choice is
+on 207. This is the same no-successor boundary as the idle profile's shorter
+route, independent of the number of spent headings or prior refusals.
+Ogre 1519 instead encounters a blocked live-quarry suffix on 173:
+`0x44fbd0` keeps the cached SE, `0x44fab0` refuses it, and `0x4379e0`
+increments the collision generation and parks route index twenty. The next
+visit writes E,SE,SW and consumes E. Combining refusal and redraw advances
+its later idle choice from 214 to 213.
+
+Splash selection in `FUN_00410680` reads signed pixel coordinates directly
+from unit `+0/+2` at `0x4106dd` and `0x4106f2`, adds the type centre from
+`0x4ae584/0x4ae586`, and rejects a squared maximum-axis distance above `0x6ff`
+at `0x410701`/`0x410706`. A movement remainder is not added to the position.
+XHuman 10 command fixture 87 impacts at 2568,2832 and admits four victims.
+Grunt 1475 remains at 2528,2880 with 60 HP: adding its invisible remainder
+incorrectly brings it into range, damages it and consumes a fifth random roll.
 
 Wall-follow step selection at `0x450114`–`0x45020f`: an out-of-bounds
 candidate step fails the entire face (`jae 0x450315` at `0x45015c` /
@@ -821,35 +947,38 @@ exposes Move `2259/1` with two route bytes left. Thus the first out-of-range
 Attack selected by an armed-flyer Patrol owns the complete compact Attack body,
 not just its three-call constructor, before chase can spend CUnit's route.
 
-## Moving siege can surrender a player-clicked building to the free scan
+## A siege building click ends before idle may acquire another target
 
-Authenticated UI captures close the player-control question for both siege
-types.  Fixture
+Authenticated UI fixture
 `afb1f39311ef857ec3275ae79e07bf06aa6492d44b978ee07de964f869ce0600`
 selects Human ballista slot 1488 and right-clicks great hall slot 1436 at cycle
-5.  The UI fanout writes Attack (`order=2`, `next_order=9`) and retains the hall
-while moving for 228 cycles.  At cycle 233, with the hall still alive, the
-moving attack callback replaces it with nearby enemy grunt slot 1505.
+5. Retail promotes explicit Attack 9 on cycle 6 and keeps the hall through
+cycle 232. At 233 its terrain-unreachable route finishes at `(69,69)`. The
+cycle-end state names grunt 1505 under stationary Attack 16.
 
-The static path is shared combat code, not a ballista special case:
+That final target change does not establish a free retarget during explicit
+Attack. Hardware watchpoints against the pinned executable close the missing
+intermediate transition on cycle 233:
 
 ```text
-0x004376c0    moving attack callback
-0x00437901    call 0x00409ff0              ; ordinary free target scan
-0x00437920    call 0x004513d0              ; publish replacement target
-0x00437925    or byte [unit + 0x1f], 2     ; mark automatic ownership
+0x004378d2    order 9 flags = 0x010c, alternate scan predicate = 0
+0x004378d9    branch taken to 0x0043789a; free scan at 0x00437901 is skipped
+0x0043789d    call 0x00453050 with Still (2)
+0x00453097    current order changes 9 -> 2; the building target is cleared
+0x00452573    dispatch the newly current Still action through 0x0040b010
+0x0040a830    idle acquisition queues stationary Attack 16 against grunt 1505
+0x00452fa2    promote 16 on the same visit
 ```
 
-Orc fixture
-`5f9d92f5f3c700ab8818af0cf857908613cbbe92cc4d9d5806f01d76d18d9d3d`
-independently selects catapult slot 1599 through the retail UI and right-clicks
-building slot 1538.  Retail accepts the same Attack transaction and the
-catapult moves while retaining the building target.  The per-type table gives
-ballista type 4 and catapult type 5 the identical `00084004` word, and both
-dispatch through the callback above.  There is no native branch that preserves
-an explicit building click: the reaction scan may steal it from either siege
-engine.  ChonkCraft's live-game target guard is therefore a deliberate control
-overlay; parity fixtures must leave that overlay disabled.
+The same capture then alternates Attack construction at 233..235, Still at
+236..238, and Attack again at 239. The previous interpretation treated the
+cycle-end target change as proof that nearby hostiles could override an active
+siege building click. It missed the failed pursuit and the intervening Still
+order. An open, reachable building pursuit must keep its explicit target;
+finishing an unreachable pursuit must permit same-visit idle acquisition.
+Both are command regression tests. The optional desktop siege selector guard
+must not be necessary for explicit order ownership or prevent idle acquisition
+after the old order releases its target.
 
 ## A Still unit spends two asynchronous draws on a nearby random point
 

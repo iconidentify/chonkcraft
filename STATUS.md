@@ -79,6 +79,16 @@ endpoint. The source checkpoint is retained in Git for comparison.
   continue attacking an old structure after accepting a replacement. Native
   captures expose both the release boundary and target retention. The wider
   candidate is withheld because it regresses command-campaign comparisons.
+  Its 41 new real-data tests cover replacement attacks, movement, Stop,
+  save/load, weapon cooldowns, aggressor identity, blocked pursuit, dying
+  targets, splash range, regrouping, scout arrival and worker damage timing;
+  all pass with the authenticated pack and are part of the expanded 83-test
+  control gate. The candidate also preserves every published 1,800-cycle idle
+  prefix. Its 121-case command matrix improves 2,054 observed field prefixes
+  but regresses 23 across three maps, so it does not satisfy the command
+  release gate. The completed candidate suite has 3,078 tests, the same
+  published 90 failure identities, no errors and 318 skips. The existing
+  worker regroup control passes without changed expectations.
 - Exact everyday controls need broader coverage: group Follow redirects,
   queued orders, modifiers, congestion and visible-target attacks. Eight new
   authenticated handler pairs cover Follow and combat, but the 532-cell
