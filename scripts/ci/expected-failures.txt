@@ -14,7 +14,6 @@
 
 unsorted	legacyEngine	net.chonkbase.chonkcraft.desktop.CritterExplodesTest#tenClicksExplodeIt
 unsorted	neither	net.chonkbase.chonkcraft.desktop.SelectionAndMinimapTest#theMinimapUsesTheDeclaredNeutralColour
-unsorted	native	net.chonkbase.chonkcraft.desktop.WallCommandTest#aWallClickIsAnAttackCommand
 unsorted	native	net.chonkbase.chonkcraft.engine.AttackMoveTest#aBlockedArrivalRestoresTheSavedAttackOrder
 unsorted	native	net.chonkbase.chonkcraft.engine.AttackMoveTest#aBlockedChaseDoesNotReplanWhenFastCountsDownToZero
 unsorted	native	net.chonkbase.chonkcraft.engine.AttackMoveTest#aBroadsideStartsAtTheWiggledShipNotOnlyItsTile
