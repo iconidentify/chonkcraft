@@ -53,10 +53,10 @@ public final class GameLobby implements Closeable {
     /** Marks a packet as ours and pins the wire format. */
     private static final int MAGIC = 0x57474C59; // "WGLY"
 
-    // Version 7 carries an explicit team number for every slot. A different
-    // build is not allowed to receive a slot, map bytes or START: deterministic
-    // peers must run identical gameplay code.
-    private static final int VERSION = 7;
+    // Version 8 carries the agreed game speed beside the game type. A
+    // different build is not allowed to receive a slot, map bytes or START:
+    // deterministic peers must run identical gameplay code.
+    private static final int VERSION = 8;
 
     private static final int MAX_PACKET_BYTES = 1200;
 
@@ -127,6 +127,69 @@ public final class GameLobby implements Closeable {
     }
 
     /**
+     * How fast the match runs, chosen once by whoever created the game.
+     *
+     * <p>Tempo, not simulation. {@code World.CYCLES_PER_SECOND} stays 30 --
+     * unit speeds, build times and spell durations are all counted in cycles
+     * -- and this only says how many of those cycles a second each machine
+     * plays. Every step is a plain ratio of that rate, which is why the
+     * numbers are what they are and not a curve.
+     *
+     * <p>Agreed in the lobby rather than left to each player, because a
+     * network game runs no faster than its slowest machine. Lockstep will not
+     * pass a net cycle boundary until every player's commands for it have
+     * arrived, so a player who drags their own speed down to a third is not
+     * slowing their own game: they are slowing everybody's, to a third, with
+     * nothing on anyone else's screen to say why. Two machines cannot play one
+     * match at two tempos, so the lobby is where the choice belongs.
+     *
+     * <p>Deviation, stated: the retail lobby carries a game-speed byte with
+     * nine values, 0 through 8, at offset {@code 0x1F4} of a Battle.net
+     * Edition replay header, and it indexes a pacing table that has not yet
+     * been read out of the pinned executable. This offers seven named steps
+     * of its own instead, so the wall-clock tempo of every setting except
+     * Normal is this implementation's choice rather than a measured one.
+     */
+    public enum GameSpeed {
+        /** A third of the simulation rate. */
+        SLOWEST("Slowest", 10),
+        /** Half of it. */
+        SLOWER("Slower", 15),
+        /** Three quarters. */
+        SLOW("Slow", 22),
+        /** The rate the simulation counts in, and the only measured one. */
+        NORMAL("Normal", 30),
+        /** Four thirds. */
+        FAST("Fast", 40),
+        /** Five thirds. */
+        FASTER("Faster", 50),
+        /** Twice the simulation rate. */
+        FASTEST("Fastest", 60);
+
+        private final String caption;
+        private final int cyclesPerSecond;
+
+        GameSpeed(String caption, int cyclesPerSecond) {
+            this.caption = caption;
+            this.cyclesPerSecond = cyclesPerSecond;
+        }
+
+        public String caption() {
+            return caption;
+        }
+
+        /** How many simulation cycles a second every machine plays. */
+        public int cyclesPerSecond() {
+            return cyclesPerSecond;
+        }
+
+        public GameSpeed next() {
+            GameSpeed[] speeds = values();
+            return speeds[(ordinal() + 1) % speeds.length];
+        }
+    }
+
+    /**
      * One line of the lobby.
      *
      * @param index    the player slot, which is also the colour
@@ -156,6 +219,7 @@ public final class GameLobby implements Closeable {
 
     /** Everything a screen needs to draw the lobby. */
     public record State(String map, List<Slot> slots, GameTemplate gameTemplate,
+            GameSpeed gameSpeed,
             int localSlot, int hostSlot, boolean started, boolean mapReady, int mapPercent,
             boolean allPlayersReady, String mapProblem, String localBuild, String requiredBuild) {
 
@@ -211,6 +275,7 @@ public final class GameLobby implements Closeable {
     private String map;
     private String localName;
     private GameTemplate gameTemplate = GameTemplate.MELEE;
+    private GameSpeed gameSpeed = GameSpeed.NORMAL;
 
     /** The slots, index 0 to capacity - 1. */
     private final List<Slot> slots = new ArrayList<>();
@@ -398,7 +463,7 @@ public final class GameLobby implements Closeable {
                 ? connectionWarning(localSlot, mapReady, openedAt, lastMapProgressAt,
                         hostPort(), System.currentTimeMillis(), relayed)
                 : mapProblem;
-        return new State(map, List.copyOf(slots), gameTemplate, localSlot,
+        return new State(map, List.copyOf(slots), gameTemplate, gameSpeed, localSlot,
                 hosting ? localSlot : remoteHostSlot, started,
                 mapReady, mapPercent(), hosting ? everyHumanHasMap() : allPlayersReady,
                 problem, gameBuild, requiredBuild);
@@ -574,10 +639,29 @@ public final class GameLobby implements Closeable {
 
     /** Selects the synchronized game type. Only the creator decides it. */
     public synchronized boolean setGameTemplate(GameTemplate template) {
-        if (!hosting || template == null) {
+        if (!hosting || template == null || started) {
             return false;
         }
         gameTemplate = template;
+        lastSent = 0;
+        return true;
+    }
+
+    /**
+     * Selects the tempo every machine will play at. Only the creator decides it.
+     *
+     * <p>Refused once the game has started, as the game type beside it is.
+     * Both travel in the START snapshot and each machine builds its world
+     * from what that snapshot said, so a change made afterwards reaches the
+     * peers still polling the lobby and none of the ones that have already
+     * taken their socket into the game -- which is two machines starting
+     * different matches.
+     */
+    public synchronized boolean setGameSpeed(GameSpeed speed) {
+        if (!hosting || speed == null || started) {
+            return false;
+        }
+        gameSpeed = speed;
         lastSent = 0;
         return true;
     }
@@ -826,6 +910,7 @@ public final class GameLobby implements Closeable {
         buffer.put(mapHash.length == 32 ? mapHash : new byte[32]);
         buffer.put((byte) (everyHumanHasMap() ? 1 : 0));
         buffer.put((byte) gameTemplate.ordinal());
+        buffer.put((byte) gameSpeed.ordinal());
         buffer.put((byte) slots.size());
         for (Slot slot : slots) {
             buffer.put((byte) slot.occupant().ordinal());
@@ -1079,7 +1164,7 @@ public final class GameLobby implements Closeable {
             return;
         }
         String heardMap = readString(in);
-        if (in.remaining() < Integer.BYTES + 32 + 3) {
+        if (in.remaining() < Integer.BYTES + 32 + 4) {
             return;
         }
         int heardLength = in.getInt();
@@ -1090,6 +1175,10 @@ public final class GameLobby implements Closeable {
         GameTemplate heardTemplate = templateOrdinal < GameTemplate.values().length
                 ? GameTemplate.values()[templateOrdinal]
                 : GameTemplate.MELEE;
+        int speedOrdinal = in.get() & 0xFF;
+        GameSpeed heardSpeed = speedOrdinal < GameSpeed.values().length
+                ? GameSpeed.values()[speedOrdinal]
+                : GameSpeed.NORMAL;
         int count = in.get() & 0xFF;
         List<Slot> heard = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
@@ -1107,6 +1196,7 @@ public final class GameLobby implements Closeable {
         remoteHostSlot = heardHostSlot;
         map = heardMap == null ? "" : heardMap;
         gameTemplate = heardTemplate;
+        gameSpeed = heardSpeed;
         slots.clear();
         slots.addAll(heard);
         allPlayersReady = heardAllReady;

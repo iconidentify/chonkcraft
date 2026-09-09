@@ -23,12 +23,12 @@ observed = int(suite.attrib.get("tests", -1))
 skipped = int(suite.attrib.get("skipped", -1))
 failures = int(suite.attrib.get("failures", -1))
 errors = int(suite.attrib.get("errors", -1))
-if observed != 39 or skipped or failures or errors:
+if observed != 42 or skipped or failures or errors:
     raise SystemExit(
-        "LockstepTest: expected 39/0/0/0 tests/skips/failures/errors, "
+        "LockstepTest: expected 42/0/0/0 tests/skips/failures/errors, "
         f"got {observed}/{skipped}/{failures}/{errors}"
     )
-print("lockstep inventory: 39 pass, 0 skipped")
+print("lockstep inventory: 42 pass, 0 skipped")
 PY
 
 echo "network gate passed: independent peers converge through 1800 cycles and adverse UDP"
@@ -75,7 +75,7 @@ CHONKCRAFT_ASSET_PACK="${asset_pack}" \
   "${repo_root}/scripts/jbr/with-jbr-25.sh" java -cp "${classpath}" \
   net.chonkbase.chonkcraft.desktop.NetworkPeer \
   --lobby-host "${port}" --computer-player true --cycles 180 \
-  --game-template teams \
+  --game-template teams --game-speed fastest \
   >"${work}/host.log" 2>&1 &
 host_pid=$!
 sleep 1
@@ -143,6 +143,13 @@ require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1
   "${work}/host.log" "host-exact-team"
 require_log 'team-proof: human-allies=1 shared-human-allies=1 computer-enemies=1 active-computer-ais=1 attached-computer-ais=1' \
   "${work}/client.log" "client-exact-team"
+# The client is never told the speed on its command line. Reporting Fastest
+# proves the host's lobby choice crossed the wire and reached the seam the
+# desktop opens its simulation loop from.
+require_log 'game speed: Fastest 60 cycles a second' \
+  "${work}/host.log" "host-game-speed"
+require_log 'game speed: Fastest 60 cycles a second' \
+  "${work}/client.log" "client-game-speed"
 require_log 'finished: cycles=180' "${work}/host.log" "host-finish"
 require_log 'finished: cycles=180' "${work}/client.log" "client-finish"
 host_hash="$(sed -n 's/.*hash=\([0-9a-f]*\)$/\1/p' "${work}/host.log" | tail -1)"
@@ -151,7 +158,7 @@ if [[ -z "${host_hash}" || "${host_hash}" != "${client_hash}" ]]; then
   echo "real multiplayer worlds disagree: host=${host_hash}, client=${client_hash}" >&2
   exit 1
 fi
-echo "real multiplayer startup passed: transferred map, visible client frame, 180 cycles, hash ${host_hash}"
+echo "real multiplayer startup passed: transferred map, visible client frame, agreed Fastest speed, 180 cycles, hash ${host_hash}"
 
 # Opt in to the public service proof for deployment and release gates. This is
 # the same pair of real-data desktop processes as above, but room creation,
