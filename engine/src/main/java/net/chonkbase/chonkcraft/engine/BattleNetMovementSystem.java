@@ -1587,6 +1587,12 @@ final class BattleNetMovementSystem {
                 && offset >= move && (attack < 0 || offset < attack);
     }
 
+    /** A pending command must finish the stride owned by the residual movement clock. */
+    boolean battleNetCommandMoveBody(Unit unit) {
+        return battleNetCurrentMoveBody(unit)
+                || unit.isMoving() && world.battleNetMoveAnimation(unit);
+    }
+
     /**
      * Native action-state-3 occupancy view, without Java's refusal proxy.
      *

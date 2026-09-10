@@ -11570,6 +11570,17 @@ final class BattleNetCombatSystem {
         return false;
     }
 
+    /** The retail attack cursor owns command release independently of the sprite loop. */
+    boolean battleNetCurrentAttackBody(Unit unit) {
+        if (world.battleNetSequence == null || unit.order() != Unit.Order.ATTACK
+                || unit.isMoving() || world.battleNetMoveAnimation(unit)) {
+            return false;
+        }
+        int start = world.idle.battleNetSequenceStart(unit,
+                BattleNetSequence.ATTACK_ANIMATION);
+        return start >= 0 && unit.battleNetSequenceOffset() >= start;
+    }
+
     boolean stepBattleNetAttackSequence(Unit unit) {
         sequenceWaitOwnsOrder = false;
         if (world.battleNetSequence == null || !unit.canMove()) {
@@ -11855,6 +11866,7 @@ final class BattleNetCombatSystem {
             return true;
         }
         boolean freeScanWindow = unit.battleNetAnimationTimer() > 0
+                && !unit.battleNetPlayerCommandAttack()
                 && !retainedPersonNavalHitTarget
                 && (rangedOp0
                         ? unit.battleNetAnimationTimer() == 1
@@ -12261,6 +12273,15 @@ final class BattleNetCombatSystem {
             unit.setBattleNetSequenceOffset(-1);
             return false;
         }
+        if (tick.actionMarker() && unit.queuedReplacementPending()
+                && unit.reportsActionBeforeQueued() && unit.hasQueuedOrders()) {
+            // 0x452573 runs the current action and 0x452587 promotes next_order
+            // at script.bin OP0. The dragon's OP0 follows its opening wingbeats;
+            // its presentation loop ends earlier. XOrc 11 slot 1479 therefore
+            // promotes the c200 Attack on c359, not the visual wrap on c335.
+            world.promoteBattleNetCombatReplacement(unit);
+            return true;
+        }
         if (tick.actionMarker()
                 && attackStart >= 0
                 && offset != attackStart
@@ -12330,7 +12351,8 @@ final class BattleNetCombatSystem {
                 && attackStart >= 0
                 && offset != attackStart
                 && unit.canMove()
-                && unit.type() != null) {
+                && unit.type() != null
+                && !unit.battleNetPlayerCommandAttack()) {
             boolean quarryGone = sequenceTarget == null
                     || !sequenceTarget.isAlive()
                     || sequenceTarget.isDying();
@@ -13010,9 +13032,17 @@ final class BattleNetCombatSystem {
                         tick.offset(), tick.timer());
                 recoveryMarkerNext = next.valid() && next.actionMarker();
             }
+            boolean commandedConstruction = unit.battleNetPlayerCommandAttack()
+                    && !unit.chasing() && !settledInRange
+                    && attackStart >= 0
+                    && world.battleNetSequence.quietTicksUntilActionMarker(attackStart, 1) > 0;
+            if (commandedConstruction && unit.battleNetOrderDelay() > 0) {
+                unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
+            }
             return deferMeleeRetarget || chaseDecision || recoveryMarkerNext
                     || rangedRetargetConstruction
-                    || rangedStationaryCommittedHold;
+                    || rangedStationaryCommittedHold
+                    || commandedConstruction;
         }
         if (unit.battleNetPendingMeleeSyncRand()) {
             Unit target = unit.target();

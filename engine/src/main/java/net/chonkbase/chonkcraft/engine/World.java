@@ -4140,6 +4140,7 @@ public final class World {
         unit.setSavedOrder(null);
         unit.setBattleNetCapitalPatrolRestoreArming(false);
         if (orderReplacementMustWait(unit)) {
+            projectiles.interruptPendingAttack(unit);
             unit.clearQueuedOrders();
             unit.setPendingAttack(null, null, -1, -1);
             unit.enqueueOrder(new Unit.QueuedOrder(Unit.QueuedOrderKind.ATTACK,
@@ -11833,7 +11834,27 @@ public final class World {
     boolean orderReplacementMustWait(Unit unit) {
         return unit.animation().unbreakable()
                 || (battleNetSequence != null
-                        && movement.battleNetCurrentMoveBody(unit));
+                        && (movement.battleNetCommandMoveBody(unit)
+                                || combat.battleNetCurrentAttackBody(unit)));
+    }
+
+    /** Promotes a combat replacement on the retail program's action callback. */
+    void promoteBattleNetCombatReplacement(Unit unit) {
+        Unit.QueuedOrder replacement = unit.queuedOrders().getFirst();
+        releaseBattleNetCombatOrderForPlayerReplacement(unit);
+        unit.animation().clearUnbreakable();
+        unit.animation().clearCurrent();
+        unit.setOrder(Unit.Order.STILL);
+        unit.setActionBeforeQueued(null);
+        unit.setWaitCycles(0);
+        if (replacement.kind() == Unit.QueuedOrderKind.MOVE) {
+            unit.setDestPathOpeningHold(true);
+        }
+        beginNextQueuedOrder(unit);
+        if (replacement.kind() == Unit.QueuedOrderKind.MOVE) {
+            unit.setBattleNetSequenceOffset(idle.battleNetStillSequenceStart(unit));
+            unit.setBattleNetAnimationTimer(3);
+        }
     }
 
     /** Starts the next viable shifted command once the current order finishes. */
@@ -12604,7 +12625,7 @@ public final class World {
             boolean drainingReplacedStride = battleNetSequence != null
                     && unit.queuedReplacementPending()
                     && unit.reportsActionBeforeQueued()
-                    && movement.battleNetCurrentMoveBody(unit);
+                    && movement.battleNetCommandMoveBody(unit);
             if (drainingReplacedStride) {
                 // BNE advances the committed Move program before dispatching
                 // or promoting an order (0x4524bb/0x4524cd before 0x452587).
