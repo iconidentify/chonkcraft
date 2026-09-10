@@ -26,6 +26,51 @@ import org.junit.jupiter.api.Test;
 class BattleNetCommandTransitionRealDataTest {
 
     @Test
+    @DisplayName("a queued retarget advances the committed movement program before starting its attack")
+    void aQueuedRetargetAdvancesTheCommittedMovementProgramBeforeStartingItsAttack() {
+        Campaign game = new Campaign("campaigns/human/level13h");
+        Unit knight = game.unit("unit-knight", 63, 117);
+        Unit peasant = game.unit("unit-peasant", 52, 115);
+        Unit footman = game.unit("unit-footman", 54, 116);
+        Unit gryphon = game.unit("unit-gryphon-rider", 56, 108);
+        Unit attacker = game.unit("unit-axethrower", 125, 24, 0);
+        List<Unit> selected = List.of(knight, peasant, footman, gryphon);
+        int[][] home = {{63, 117}, {52, 115}, {54, 116}, {56, 108}};
+        int[][] away = {{63, 113}, {56, 115}, {50, 120}, {56, 104}};
+        // Retail slot 1505 queues its new quarry behind the southwest step
+        // on fixture 28. HandleUnitAction advances the committed Move program
+        // before promoting next_order on 44 (0x4524bb, 0x4524cd, 0x452ef0).
+        // Walking only presentation pixels used to pin script.bin at 833/1
+        // for fifteen visits, hiding the stale program from position checks.
+        int[] sequence = {833, 837, 837, 842, 846, 846, 851, 855,
+                860, 864, 864, 869, 873, 873, 878, 882};
+        int[] timer = {1, 2, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1};
+        for (int cycle = 1; cycle <= 46; cycle++) {
+            applyProfile(game, selected, home, away, cycle);
+            game.mission.tick();
+            if (cycle >= 28 && cycle <= 43) {
+                assertTrue(attacker.queuedReplacementPending(),
+                        "the replacement must wait for the committed step at " + cycle);
+                assertTrue(attacker.isMoving(),
+                        "the queued attack must leave the current step moving at " + cycle);
+                assertEquals(sequence[cycle - 28], attacker.battleNetSequenceOffset(),
+                        "the queued retarget must advance retail's movement instruction at " + cycle);
+                assertEquals(timer[cycle - 28], attacker.battleNetAnimationTimer(),
+                        "the queued retarget must preserve retail's movement wait at " + cycle);
+            }
+            if (cycle >= 44) {
+                position(attacker, 123, 26, 3936, 832, cycle);
+                assertTrue(!attacker.queuedReplacementPending(),
+                        "landing must promote the replacement without another movement visit");
+                assertEquals(887, attacker.battleNetSequenceOffset(),
+                        "the replacement must construct Attack when the movement body finishes");
+                assertEquals(47 - cycle, attacker.battleNetAnimationTimer(),
+                        "the replacement must preserve Attack construction on visits 44 through 46");
+            }
+        }
+    }
+
+    @Test
     @DisplayName("a scout advances its committed frame before completing an odd destination")
     void aScoutAdvancesItsCommittedFrameBeforeCompletingAnOddDestination() {
         Campaign game = new Campaign("campaigns/orc/level14o");

@@ -37,7 +37,7 @@ inventory = (
     ("engine", "Issue12OrderLivenessTest", 2),
     ("engine", "BattleNetMovingAttackReplacementRealDataTest", 9),
     ("engine", "BattleNetCombatReplacementRealDataTest", 4),
-    ("engine", "BattleNetCommandTransitionRealDataTest", 37),
+    ("engine", "BattleNetCommandTransitionRealDataTest", 38),
     ("engine", "BattleNetPlayerPatrolRealDataTest", 3),
     ("engine", "BattleNetPlayerAttackTargetRealDataTest", 1),
     ("engine", "BattleNetPlayerFollowRealDataTest", 6),
@@ -58,7 +58,7 @@ for module, name, expected in inventory:
         raise SystemExit(
             f"{name}: expected {expected}/0/0/0 tests/skips/failures/errors, "
             f"got {'/'.join(map(str, counts))}")
-print("control-liveness inventory: 83 pass, 0 skipped")
+print("control-liveness inventory: 84 pass, 0 skipped")
 PY
 
 echo "control-liveness gate passed: 1/3/9-unit controls, redirects, combat and real UDP remained responsive"

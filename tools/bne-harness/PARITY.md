@@ -54,12 +54,12 @@ pixels and promotes the latest queued command on the native callback. The
 pending attack constructor survives save/load. Four real-data tests cover
 dragon replacement attacks, withdrawal, Stop and saved pending replacements.
 
-Another 37 real-data tests cover command construction, ranged reload and
+Another 38 real-data tests cover command construction, ranged reload and
 retargeting, caster target eligibility, completed pursuit, aggressor retention,
 blocked approach waits, collision reset, offered routes, worker escape/return,
 melee cooldowns, splash range, regrouping, scout arrival and subsequent damage.
-All 41 pass with the authenticated BNE pack, without skips. They are included
-in the 83-test control-liveness gate. Native negative controls
+All 42 pass with the authenticated BNE pack, without skips. They are included
+in the 84-test control-liveness gate. Native negative controls
 expose the missing melee cooldown at Human 8 fixture 383, a blocked retarget
 turning east instead of waiting for north at 372, and a killing blow bypassing
 the next Attack constructor at 580. Reloading after that killing blow must
@@ -67,29 +67,40 @@ preserve dying victims: they still supply committed attack references, and
 dropping them changes the attacker's next route. These are behavioral controls,
 not declaration checks.
 
-The worktree includes the candidate-162 implementation. Its completed 121-case
+A queued retarget also advances the movement program while the old committed
+stride finishes. Human 13 axethrower 1505 used to keep instruction 833 for
+fifteen visits while its pixels moved. The retail sequence advances through
+837..882 on fixtures 29..43, then starts Attack at 887/3 on fixture 44.
+The added control fails against checkpoint `fc69b6c` at fixture 29 (expected
+837, observed 833) and passes after advancing the unarmed chase movement
+program in the queued-stride drain. Existing armed movement pace still owns
+its own sequence advancement. This correction preserves all prior physical
+field prefixes; it repairs the movement-program state rather than extending
+those already-matching position windows.
+
+The worktree includes the candidate-197 implementation. Its completed 121-case
 command matrix extends 2,054 observed-unit field prefixes but regresses 23
 across XHuman 10, XHuman 12 and XOrc 8. Human 13 and Orc 14 now preserve
 all previously matching physical prefixes. All 1,374 command acceptances
 remain equal. These counts describe matching observation windows for seven
 fields per unit; they are not numbers of fixed or remaining bugs.
 
-The completed candidate-162 pack-plus-Opus suite has 3,078 tests, the same
+The completed candidate-197 pack-plus-Opus suite has 3,079 tests, the same
 90 failure identities as the published source, no errors and 318 skips.
-All 41 new controls ran without skips. Against the published checkpoint's
-verification JAR, the same controls produce 39 failures and two passes; the
+All 42 new controls ran without skips. Against the published checkpoint's
+verification JAR, the original 41 controls produce 39 failures and two passes; the
 dragon replacement Attack, Move and Stop controls all expose the old behavior.
 Those are failed controls, not a count of distinct gameplay bugs. The existing
 XHuman 12 worker regroup control also passes without changed expectations.
-The two newest controls
+Two earlier controls
 fail against candidate 145: the scout skips its movement frame on 583 and
 the returning ogre exposes the wrong refusal marker on 267. No expected
 failure was added or removed. All 18 playability lanes pass, including the
-expanded 83-test control gate, 42 lockstep controls and real two-process startup
+expanded 84-test control gate, 42 lockstep controls and real two-process startup
 through 180 cycles at agreed Fastest speed. These lanes do not override the
-separate command-prefix release blocker. The data-free suite has 3,078 tests,
-the same 88 published failure identities, no errors and exactly 1,423 skips.
-The 41 additional skips are the new authenticated controls; the CI inventory
+separate command-prefix release blocker. The data-free suite has 3,079 tests,
+the same 88 published failure identities, no errors and exactly 1,424 skips.
+The 42 additional skips are the new authenticated controls; the CI inventory
 records them explicitly while keeping every failure baseline unchanged.
 
 Native branch captures distinguish a recorded aggressor (`unit+0x54`) from
@@ -99,7 +110,7 @@ native asynchronous random draws through 600 ticks, including draw timing.
 The corrected XHuman 10 idle run matches all 5,897 through 600 ticks. Those
 are bounded diagnostic results, not complete world equality. The 52-map idle
 survey through 1,800 preserves every published per-map prefix on candidate
-162. Human 13's command trace agrees on all 6,417 asynchronous draws through 600, including
+197. Human 13's command trace agrees on all 6,417 asynchronous draws through 600, including
 timing. The extended Orc 14 retail capture matches the original capture's
 6,027 draws through 600 and proves scout arrival on 602. Raw animation and
 complete command cases remain separate gates.

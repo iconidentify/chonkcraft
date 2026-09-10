@@ -12782,6 +12782,16 @@ public final class World {
                 } else if (movement.battleNetCommandRefusalBody(unit)) {
                     promoteBattleNetCombatReplacement(unit);
                 } else {
+                    if (unit.chasing() && unit.battleNetMovePaceOffset() < 0
+                            && combat.onBattleNetChaseMoveBody(unit)) {
+                        // The queued order still owns a running Move program.
+                        // Walking only its presentation pixels used to leave
+                        // Human 13's axethrower at instruction 833 for fifteen
+                        // visits. Retail advances that program before the
+                        // replacement callback (0x4524bb/0x4524cd). An armed
+                        // native pace already advances inside walkPixels.
+                        combat.tickBattleNetChaseMoveSequence(unit);
+                    }
                     movement.walkPixels(unit);
                     if (!unit.isMoving() && unit.stepDrained()) {
                         // The residual clock completed the native Move body.
