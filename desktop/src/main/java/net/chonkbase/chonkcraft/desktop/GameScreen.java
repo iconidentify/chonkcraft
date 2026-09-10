@@ -2291,8 +2291,10 @@ final class GameScreen extends JPanel {
                 } else {
                     int index = spellIndex(ident);
                     for (Unit each : group) {
-                        if (each.isCaster() && (under == null || each != under)) {
-                            GameCommand cast = spell.target()
+                        if (each.canUseAbility(ident) && (under == null || each != under)) {
+                            GameCommand cast = "spell-suicide-bomber".equals(ident) && under != null
+                                    ? GameCommand.cast(localPlayer, each.id(), under.id(), index)
+                                    : spell.target()
                                     == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION
                                     ? GameCommand.castAt(localPlayer, each.id(), tileX, tileY, index)
                                     : GameCommand.cast(localPlayer, each.id(),

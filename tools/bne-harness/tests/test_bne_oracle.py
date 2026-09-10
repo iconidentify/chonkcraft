@@ -95,6 +95,19 @@ class OracleIdentityTest(unittest.TestCase):
         self.assertEqual(1596, commands[1]["target"])
         self.assertEqual(1593, commands[2]["target"])
 
+    def test_demolition_preserves_ground_and_live_unit_targets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.txt"
+            path.write_text(
+                "cycle 5 demolish unit 1430 x 38 y 111\n"
+                "cycle 30 demolish unit 1430 target 1432\n",
+                encoding="ascii")
+            commands = bne_oracle.parse_command_script(path)
+        self.assertEqual(2, len(commands))
+        self.assertEqual(["demolish", "demolish"], [c["action"] for c in commands])
+        self.assertEqual((38, 111), (commands[0]["x"], commands[0]["y"]))
+        self.assertEqual(1432, commands[1]["target"])
+
     def test_parses_a_train_command_script(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.txt"

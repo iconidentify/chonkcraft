@@ -137,6 +137,14 @@ public final class CommandApplier {
             return false;
         }
 
+        // Native function 19 requires the demolition type flag before it
+        // flushes orders. A mixed selection must leave everybody else alone.
+        if (command.kind() == GameCommand.Kind.CAST
+                && "spell-suicide-bomber".equals(spellAt(command.typeIndex()))
+                && (!unit.isDemolitionSquad() || command.targetId() == unit.id())) {
+            return false;
+        }
+
         if (command.queued() && shouldWait(unit, command.kind())) {
             Unit.QueuedOrder queued = queuedOrder(command);
             if (queued != null) {
@@ -219,6 +227,9 @@ public final class CommandApplier {
                         || world.spells() == null ? null : world.spells().get(ident);
                 if (spell == null) {
                     accepted = false;
+                } else if ("spell-suicide-bomber".equals(ident) && command.targetId() != 0) {
+                    Unit target = findUnit(command.targetId());
+                    accepted = target != null && world.orderCast(unit, ident, target);
                 } else if (spell.target()
                         == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION) {
                     accepted = world.orderCast(unit, ident, command.x(), command.y());

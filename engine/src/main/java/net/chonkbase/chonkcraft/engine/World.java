@@ -50,6 +50,8 @@ public final class World {
     /** LegacyEngine/ChonkCraft's ordinary synchronized and load-time seed. */
     public static final int DEFAULT_RANDOM_SEED = 0x87654321;
 
+    final BattleNetDemolitionSystem demolition = new BattleNetDemolitionSystem(this);
+
     final GameMap map;
     final PathFinder pathFinder;
     /**
@@ -1926,6 +1928,10 @@ public final class World {
      * be told to cast only at what it is already standing beside.
      */
     public boolean orderCast(Unit caster, String spellIdent, Unit target) {
+        if ("spell-suicide-bomber".equals(spellIdent)) {
+            return demolition.order(caster, target, target == null ? -1 : target.tileX(),
+                    target == null ? -1 : target.tileY(), true);
+        }
         Spell spell = spellSet == null ? null : spellSet.get(spellIdent);
         if (spell == null || caster == null || !caster.isAlive() || !caster.isCaster()) {
             return false;
@@ -1949,6 +1955,9 @@ public final class World {
 
     /** Sends a caster to cast a position spell at the selected map square. */
     public boolean orderCast(Unit caster, String spellIdent, int tileX, int tileY) {
+        if ("spell-suicide-bomber".equals(spellIdent)) {
+            return demolition.order(caster, null, tileX, tileY, true);
+        }
         Spell spell = spellSet == null ? null : spellSet.get(spellIdent);
         if (spell == null || spell.target() != Spell.Target.POSITION
                 || caster == null || !caster.isAlive() || !caster.isCaster()
@@ -1973,6 +1982,10 @@ public final class World {
 
     /** Walks a caster into range and casts when it arrives. */
     private void stepSpellCast(Unit unit) {
+        if ("spell-suicide-bomber".equals(unit.castingSpell())) {
+            demolition.step(unit);
+            return;
+        }
         String ident = unit.castingSpell();
         Spell spell = ident == null || spellSet == null ? null : spellSet.get(ident);
         Unit target = unit.target();
@@ -2030,7 +2043,7 @@ public final class World {
     private boolean castSpell(Unit caster, String spellIdent, Unit target,
             int tileX, int tileY) {
         Spell spell = spellSet.get(spellIdent);
-        if (spell == null || !caster.isAlive() || !caster.isCaster()) {
+        if (spell == null || !caster.isAlive() || !caster.canUseAbility(spellIdent)) {
             return false;
         }
         if (caster.mana() < spell.manaCost()) {
@@ -2314,64 +2327,9 @@ public final class World {
         };
     }
 
-    /**
-     * Blows a sapper up.
-     *
-     * <p>{@code Spell_Demolish::Cast}. Two
-     * halves, and the implementation had neither. Walls, rocks and trees inside the
-     * radius are cleared, which is what a demolition squad is <em>for</em> --
-     * it is the only way an orc army opens a walled base without siege. Then
-     * everything on the ground within the range takes the declared damage,
-     * including the caster, which is how the sapper dies in its own blast.
-     *
-     * <p>Flying units are exempt: upstream skips {@code EMovement::Fly}
-     * outright, so a dragon overhead is untouched.
-     *
-     * <p>What the implementation did instead is worth recording, because it is the
-     * clearest single symptom of reading an action's arguments by position:
-     * {@code {"demolish", "range", 3, "damage", 400}} was read as
-     * "heal by three within one tile", so a demolition squad detonating in a
-     * crowd left everybody standing and slightly healthier.
-     */
+    /** Resolves retail demolition at the squad, regardless of its selected target. */
     private void demolish(Unit caster, Unit victim, Spell.Effect effect) {
-        Unit centre = victim != null ? victim : caster;
-        if (centre == null) {
-            return;
-        }
-        int range = effect.number("range", 0);
-        int damage = effect.number("damage", 0);
-        int goalX = centre.tileX();
-        int goalY = centre.tileY();
-
-        for (int x = goalX - range; x <= goalX + range; x++) {
-            for (int y = goalY - range; y <= goalY + range; y++) {
-                // A circle, not a box: upstream compares squared distances
-                // against the squared range.
-                int dx = x - goalX;
-                int dy = y - goalY;
-                if (dx * dx + dy * dy > range * range) {
-                    continue;
-                }
-                clearTile(x, y);
-            }
-        }
-        if (damage == 0) {
-            return;
-        }
-        for (Unit unit : List.copyOf(units)) {
-            if (!unit.isAlive() || unit.isDying() || !unit.isOnMap()) {
-                continue;
-            }
-            if (unit.type() != null && unit.type().airUnit()) {
-                continue;
-            }
-            if (unit.distanceTo(goalX, goalY) > range) {
-                continue;
-            }
-            // Through the ordinary hit path, which is what kills the caster,
-            // sets buildings alight and makes the survivors turn round.
-            hitDirectly(caster, unit, damage);
-        }
+        demolition.detonate(caster);
     }
 
     /**
@@ -2487,7 +2445,7 @@ public final class World {
      * it does not append LegacyEngine's separate {@code HitUnit_RunAway} /
      * {@code HitUnit_AttackBack} tail.
      */
-    private void hitDirectly(Unit attacker, Unit target, int damage) {
+    void hitDirectly(Unit attacker, Unit target, int damage) {
         if (attacker == null || damage <= 0 || target.type() != null
                 && target.type().indestructible()
                 || target.hasBuff(Unit.Buff.UNHOLY_ARMOR)) {
@@ -2535,7 +2493,7 @@ public final class World {
      * whichever the square holds. Only Demolish uses it, and it is the whole
      * reason a demolition squad exists.
      */
-    private void clearTile(int x, int y) {
+    void clearTile(int x, int y) {
         var field = map.fieldOrNull(x, y);
         if (field == null) {
             return;
@@ -11858,7 +11816,7 @@ public final class World {
     }
 
     /** Starts the next viable shifted command once the current order finishes. */
-    private void beginNextQueuedOrder(Unit unit) {
+    void beginNextQueuedOrder(Unit unit) {
         // HandleUnitAction cannot pop Orders[1] until the committed animation
         // span releases. Calling an order constructor here while Unbreakable
         // is still set only queues the same replacement again. The while loop
@@ -11891,7 +11849,9 @@ public final class World {
                         ? harvest.orderHarvest(unit, queued.target())
                         : harvest.orderHarvestCommand(unit, queued.x(), queued.y());
                 case BUILD -> construction.orderBuild(unit, queued.type(), queued.x(), queued.y());
-                case CAST -> queued.target() != null
+                case CAST -> "spell-suicide-bomber".equals(queued.value())
+                        ? demolition.order(unit, queued.target(), queued.x(), queued.y(), false)
+                        : queued.target() != null
                         ? orderCast(unit, queued.value(), queued.target())
                         : orderCast(unit, queued.value(), queued.x(), queued.y());
                 case PATROL -> {
@@ -12662,7 +12622,8 @@ public final class World {
             }
             combat.finishBattleNetAttackSequenceMarker(unit);
             if (drainingReplacedStride
-                    && !orderReplacementMustWait(unit)) {
+                    && !orderReplacementMustWait(unit)
+                    && !demolition.finishReplacement(unit)) {
                 // Native promotes next_order on the visit which finishes
                 // the Move body, before the next unit update. Waiting for
                 // the next loop head adds a cycle to every interrupted step.

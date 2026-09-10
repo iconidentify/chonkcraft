@@ -264,6 +264,7 @@ _Static_assert(sizeof(replay_schedule_record) == 20,
 #define SCRIPT_COMMAND_TRAIN 11
 #define SCRIPT_COMMAND_SELECT 12
 #define SCRIPT_COMMAND_UI_RIGHT_CLICK 13
+#define SCRIPT_COMMAND_DEMOLISH 14
 #define SCRIPT_NO_TARGET 0xffffffffUL
 #define SCRIPT_WORKER_TYPE_FLAGS 0x00000300UL
 
@@ -949,11 +950,14 @@ static BOOL read_command_file(void) {
             target = SCRIPT_NO_TARGET;
         } else {
         extra = '\0';
+        char point_name[16];
         fields = sscanf(cursor,
-                "cycle %lu move unit %lu x %lu y %lu %c",
-                &cycle, &slot, &x, &y, &extra);
-        if (fields == 4) {
-            action = SCRIPT_COMMAND_MOVE;
+                "cycle %lu %15s unit %lu x %lu y %lu %c",
+                &cycle, point_name, &slot, &x, &y, &extra);
+        if (fields == 5 && (strcmp(point_name, "move") == 0
+                || strcmp(point_name, "demolish") == 0)) {
+            action = strcmp(point_name, "demolish") == 0
+                    ? SCRIPT_COMMAND_DEMOLISH : SCRIPT_COMMAND_MOVE;
         } else {
             extra = '\0';
             fields = sscanf(cursor,
@@ -990,7 +994,11 @@ static BOOL read_command_file(void) {
                 fields = sscanf(cursor,
                         "cycle %lu %15s unit %lu target %lu %c",
                         &cycle, action_name, &slot, &target, &extra);
-                if (fields == 4 && strcmp(action_name, "attack") == 0) {
+                if (fields == 4 && strcmp(action_name, "demolish") == 0) {
+                    action = SCRIPT_COMMAND_DEMOLISH;
+                    x = 0;
+                    y = 0;
+                } else if (fields == 4 && strcmp(action_name, "attack") == 0) {
                     action = SCRIPT_COMMAND_ATTACK;
                     x = 0;
                     y = 0;
@@ -2039,6 +2047,9 @@ static void trace_selected_unit_components(LONG cycle, const BYTE *pool,
 }
 
 static const char *script_action_name(BYTE action) {
+    if (action == SCRIPT_COMMAND_DEMOLISH) {
+        return "demolish";
+    }
     if (action == SCRIPT_COMMAND_MOVE) {
         return "move";
     }
@@ -2091,6 +2102,9 @@ static unsigned int script_order_function_index(BYTE action) {
      * table[24] return-goods (382 packets, dest 0,0, target -1),
      * table[27] repair (225 packets, live building or transport target).
      * The one-byte 0x0C thunk at 0x00436ee0 is UI/speech and is unused. */
+    if (action == SCRIPT_COMMAND_DEMOLISH) {
+        return 19;
+    }
     if (action == SCRIPT_COMMAND_MOVE) {
         return 3;
     }

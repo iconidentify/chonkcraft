@@ -1216,6 +1216,16 @@ public final class Unit {
         return type.mana() > 0;
     }
 
+    /** BNE's demolition capability is type flag 0x02000000, independent of mana. */
+    public boolean isDemolitionSquad() {
+        return "unit-dwarves".equals(type.ident()) || "unit-goblin-sappers".equals(type.ident());
+    }
+
+    /** Whether this unit can receive the named ability from a group command. */
+    public boolean canUseAbility(String ident) {
+        return "spell-suicide-bomber".equals(ident) ? isDemolitionSquad() : isCaster();
+    }
+
     public boolean isAlive() {
         return hitPoints > 0 && !removed && order != Order.DYING;
     }

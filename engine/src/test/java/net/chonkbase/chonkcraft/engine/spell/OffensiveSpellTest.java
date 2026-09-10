@@ -90,6 +90,16 @@ class OffensiveSpellTest {
         return type;
     }
 
+    private static UnitType sapper() {
+        UnitType type = new UnitType("unit-goblin-sappers");
+        type.setTileSize(1, 1);
+        type.setHitPoints(40);
+        type.setSpeed(11);
+        type.setLandUnit(true);
+        type.setAnimationSet(still());
+        return type;
+    }
+
     private static UnitType footman() {
         UnitType type = new UnitType("unit-footman");
         type.setName("footman");
@@ -247,26 +257,24 @@ class OffensiveSpellTest {
     @DisplayName("a sapper's demolish kills what is round it, including the sapper")
     void demolishKillsAndTakesTheCasterWithIt() {
         World world = world(40);
-        UnitType sapperType = mage();
+        UnitType sapperType = sapper();
         sapperType.setHitPoints(200);
         Unit sapper = world.createUnit(sapperType, 0, 20, 20);
         UnitType softer = footman();
         softer.setHitPoints(60);
-        Unit victim = world.createUnit(softer, 1, 22, 20);
+        Unit victim = world.createUnit(softer, 1, 21, 20);
         Unit bystander = world.createUnit(footman(), 1, 30, 20);
         int untouched = bystander.hitPoints();
 
         assertTrue(world.castSpell(sapper, "spell-suicide-bomber", sapper),
-                "demolish is a self-cast and needs no target");
+                "a zero-mana sapper must resolve its demolition ability");
 
         assertFalse(victim.isAlive(),
-                "a footman two tiles from four hundred damage should be dead; the port "
-                        + "read the action by position and healed it for three instead");
+                "BNE hits an adjacent ground occupant for 200 twice");
         assertFalse(sapper.isAlive(),
-                "Spell_Demolish::Cast hits every non-flying unit in range, the caster "
-                        + "included, which is how a demolition squad dies");
+                "BNE removes the squad after applying the surrounding damage");
         assertEquals(untouched, bystander.hitPoints(),
-                "ten tiles away is outside a range of three");
+                "the remote bystander is outside the eight blast cells");
     }
 
     @Test
@@ -286,7 +294,7 @@ class OffensiveSpellTest {
         MapField rocks = world.map().field(18, 20);
         rocks.addFlags(TileFlag.ROCKS | TileFlag.UNPASSABLE);
 
-        Unit sapper = world.createUnit(mage(), 0, 20, 20);
+        Unit sapper = world.createUnit(sapper(), 0, 20, 20);
         assertTrue(world.castSpell(sapper, "spell-suicide-bomber", sapper));
 
         assertFalse(wall.isWall(), "the wall is what a demolition squad is for");
@@ -304,10 +312,10 @@ class OffensiveSpellTest {
         Unit dragon = world.createUnit(dragonType, 1, 21, 20);
         int before = dragon.hitPoints();
 
-        Unit sapper = world.createUnit(mage(), 0, 20, 20);
+        Unit sapper = world.createUnit(sapper(), 0, 20, 20);
         assertTrue(world.castSpell(sapper, "spell-suicide-bomber", sapper));
         assertEquals(before, dragon.hitPoints(),
-                "upstream skips EMovement::Fly outright: don't hit flying units");
+                "BNE reads ground occupancy, which excludes flyers");
     }
 
     // -------------------------------------------------------- bombardments
@@ -405,7 +413,7 @@ class OffensiveSpellTest {
         assertNotNull(demolish);
         Spell.Effect blast = demolish.effects().getFirst();
         assertEquals(Spell.EffectKind.DEMOLISH, blast.kind());
-        assertEquals(3, blast.number("range", -1),
+        assertEquals(1, blast.number("range", -1),
                 "range is the value of the range keyword, not of whichever slot it fell in");
         assertEquals(400, blast.number("damage", -1),
                 "the damage figure sat at index four and was never read");

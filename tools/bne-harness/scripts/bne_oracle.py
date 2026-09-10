@@ -38,7 +38,7 @@ CAMPAIGN_SCENARIO = re.compile(
     re.IGNORECASE,
 )
 SCRIPT_COMMAND_MOVE = re.compile(
-    r"^cycle ([1-9]\d*) (move|patrol|attack-ground|attack-move) unit (\d+) x (\d+) y (\d+)$"
+    r"^cycle ([1-9]\d*) (move|patrol|attack-ground|attack-move|demolish) unit (\d+) x (\d+) y (\d+)$"
 )
 SCRIPT_COMMAND_STANCE = re.compile(
     r"^cycle ([1-9]\d*) (stop|stand-ground|return-goods) unit (\d+)$"
@@ -47,7 +47,7 @@ SCRIPT_COMMAND_TRAIN = re.compile(
     r"^cycle ([1-9]\d*) train unit (\d+) type (\d+)$"
 )
 SCRIPT_COMMAND_TARGETED = re.compile(
-    r"^cycle ([1-9]\d*) (attack|harvest|repair) unit (\d+) target (\d+)$"
+    r"^cycle ([1-9]\d*) (attack|harvest|repair|demolish) unit (\d+) target (\d+)$"
 )
 SCRIPT_COMMAND_SELECT = re.compile(
     r"^cycle ([1-9]\d*) select unit (\d+)$"
@@ -152,10 +152,10 @@ def parse_command_script(path: Path) -> list[dict[str, int | str]]:
             else:
                 raise ValueError(
                     f"invalid command at {path}:{line_number}; expected "
-                    "'cycle N move|patrol|attack-ground|attack-move unit SLOT x X y Y', "
+                    "'cycle N move|patrol|attack-ground|attack-move|demolish unit SLOT x X y Y', "
                     "'cycle N stop|stand-ground|return-goods unit SLOT', "
                     "'cycle N train unit SLOT type T', "
-                    "'cycle N attack|harvest|repair unit SLOT target T', "
+                    "'cycle N attack|harvest|repair|demolish unit SLOT target T', "
                     "'cycle N select unit SLOT', or "
                     "'cycle N ui-right-click x X y Y [target T]'"
                 )

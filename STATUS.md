@@ -56,7 +56,7 @@ refusals. The current evidence and reproduction workflow are in
 ## Playability and release verification
 
 All 18 playability lanes pass with their required authenticated inputs,
-including the 47-test control gate, 117 movement checks, 65 projectile
+including the 61-test control gate, 117 movement checks, 65 projectile
 checks, 42 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
@@ -65,13 +65,21 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,044 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,058 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,389 skips.
+has the same 88 expected failure identities and exactly 1,403 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 27-skip profile. Coverage rules are documented in
 [the development setup](docs/development-setup.md) and [CI guide](docs/ci.md).
+
+Both demolition squads accept targeted commands, approach the selected point
+or unit, and apply the BNE blast. Native captures cover interrupted approaches,
+rapid retargeting, blast damage and forest clearing. The control gate also
+checks Move/Stop for 52 mobile types, Attack/retarget for the 43 types with
+native Attack buttons, and effects for all 50 unit/ability combinations.
+These checks establish command liveness; complete per-unit timing remains
+precision work.
 
 Workers keep their completed cargo when redirected between mines and trees.
 Unfinished chopping is cleared by a new harvesting job, and the gold loop

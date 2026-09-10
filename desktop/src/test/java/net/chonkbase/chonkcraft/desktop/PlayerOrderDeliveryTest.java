@@ -143,6 +143,203 @@ class PlayerOrderDeliveryTest {
         return unit;
     }
 
+    @Test
+    @DisplayName("both demolition squads accept a target from their button and spare units beyond the blast")
+    void bothDemolitionSquadsAcceptATargetFromTheirButtonAndSpareUnitsBeyondTheBlast() {
+        for (String ident : List.of("unit-dwarves", "unit-goblin-sappers")) {
+            Scene scene = scene();
+            Unit bomber = make(scene, ident, 0, 10, 10);
+            Unit neighbour = make(scene, "unit-footman", 0, 11, 10);
+            Unit distant = make(scene, "unit-footman", 0, 12, 10);
+            int distantHp = distant.hitPoints();
+            scene.screen().selectForTest(bomber);
+            var buttons = scene.data().userInterface("summer").buttons().all().stream()
+                    .filter(b -> "spell-suicide-bomber".equals(b.value()) && b.appliesTo(ident)).toList();
+            assertEquals(1, buttons.size(), "each race must have one Demolish button");
+            scene.screen().press(buttons.getFirst(), false);
+            assertTrue(scene.screen().intentEntriesForTest().stream()
+                            .noneMatch(e -> "order".equals(e.event())),
+                    "BNE button 0x436950 arms targeting before it sends an order");
+            fieldClick(scene, 11, 10);
+            var orders = scene.screen().intentEntriesForTest().stream()
+                    .filter(e -> "order".equals(e.event())).toList();
+            assertEquals(1, orders.size(), "the targeted Demolish click must reach the zero-mana squad");
+            assertTrue(orders.getFirst().accepted(), "the demolition squad must accept its own ability");
+            assertEquals(neighbour.id(), orders.getFirst().command().targetId(),
+                    "a unit target must remain a live target through command delivery");
+            Unit flyer = make(scene, "unit-dragon", 0, 10, 10);
+            int flyerHp = flyer.hitPoints();
+            for (int cycle = 0; cycle < 120 && bomber.isAlive(); cycle++) scene.world().tick();
+            assertFalse(bomber.isAlive(), "the commanded squad must detonate");
+            assertFalse(neighbour.isAlive(), "the adjacent ground unit must take the blast");
+            assertEquals(distantHp, distant.hitPoints(), "BNE spares a unit two tiles from the squad");
+            assertEquals(flyerHp, flyer.hitPoints(), "the ground blast must spare an overlapping flyer");
+        }
+    }
+
+    @Test
+    @DisplayName("every mobile roster type obeys a ground click and the stop button")
+    void everyMobileRosterTypeObeysAGroundClickAndTheStopButton() {
+        Scene catalog = scene();
+        List<String> mobile = mobileRoster(catalog.data());
+        assertEquals(52, mobile.size(), "the sweep must include the complete mobile roster and campaign heroes");
+        for (String ident : mobile) {
+            Scene scene = scene();
+            boolean sea = scene.data().unitTypes().types().get(ident).seaUnit();
+            if (sea) for (int y = 0; y < SIZE; y++) for (int x = 0; x < SIZE; x++) {
+                scene.world().map().field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+            Unit unit = make(scene, ident, 0, 8, 10);
+            scene.screen().selectForTest(unit);
+            scene.screen().fieldRightClickForTest(14, 10, null);
+            for (int cycle = 0; cycle < 600; cycle++) scene.world().tick();
+            assertEquals(List.of(14, 10, 448, 320),
+                    List.of(unit.tileX(), unit.tileY(), unit.pixelX(), unit.pixelY()),
+                    ident + " must arrive at the ground click with its visible stride finished");
+            scene.screen().fieldRightClickForTest(24, 10, null);
+            for (int cycle = 0; cycle < 15; cycle++) scene.world().tick();
+            var stops = scene.data().userInterface("summer").buttons().all().stream()
+                    .filter(b -> "stop".equals(b.action()) && b.appliesTo(ident))
+                    .filter(b -> new net.chonkbase.chonkcraft.engine.ui.ButtonAvailability(
+                            scene.world(), unit, null, false).test(b)).toList();
+            assertEquals(1, stops.size(), ident + " must have a Stop button");
+            scene.screen().press(stops.getFirst(), false);
+            for (int cycle = 0; cycle < 200; cycle++) scene.world().tick();
+            assertEquals(Unit.Order.STILL, unit.order(), ident + " must settle after Stop");
+            assertFalse(unit.isMoving(), ident + " must finish the committed pixels when stopped");
+        }
+    }
+
+    @Test
+    @DisplayName("every combat roster type damages a clicked target and accepts another target")
+    void everyCombatRosterTypeDamagesAClickedTargetAndAcceptsAnotherTarget() {
+        Scene catalog = scene();
+        List<String> attackers = mobileRoster(catalog.data()).stream()
+                .filter(ident -> catalog.data().unitTypes().types().get(ident).canAttack())
+                // Retail panel table 0x4a3998 gives types 16/17 Move and Stop only.
+                .filter(ident -> !List.of("unit-attack-peasant", "unit-attack-peon").contains(ident)).toList();
+        assertEquals(43, attackers.size(), "the sweep must exercise every unit and hero with a native Attack button");
+        for (String ident : attackers) {
+            Scene scene = scene();
+            boolean sea = scene.data().unitTypes().types().get(ident).seaUnit();
+            if (sea) for (int y = 0; y < SIZE; y++) for (int x = 0; x < SIZE; x++) {
+                scene.world().map().field(x, y).setFlags(TileFlag.WATER_ALLOWED);
+            }
+            Unit unit = make(scene, ident, 0, 4, 8);
+            Unit first = make(scene, sea ? "unit-orc-transport" : "unit-fortress", 1, 14, 8);
+            Unit second = make(scene, sea ? "unit-orc-transport" : "unit-fortress", 1, 14, 14);
+            scene.screen().selectForTest(unit);
+            for (Unit target : List.of(first, second)) {
+                target.setVisCount(0, 1);
+                int hp = target.hitPoints();
+                var button = scene.data().userInterface("summer").buttons().all().stream()
+                        .filter(b -> "attack".equals(b.action()) && b.appliesTo(ident))
+                        .findFirst().orElseThrow(() -> new AssertionError(ident + " must offer Attack"));
+                scene.screen().press(button, false);
+                fieldClick(scene, target.tileX() + target.type().tileWidth() / 2,
+                        target.tileY() + target.type().tileHeight() / 2);
+                var issued = scene.screen().intentEntriesForTest().stream()
+                        .filter(e -> "order".equals(e.event())).toList();
+                assertEquals(target.id(), issued.getLast().command().targetId(),
+                        ident + " must receive the selected target from the physical click");
+                for (int cycle = 0; cycle < 1200 && target.hitPoints() == hp && target.isAlive(); cycle++) {
+                    scene.world().tick();
+                }
+                assertTrue(!target.isAlive() || target.hitPoints() < hp,
+                        ident + " must damage each target selected by the player");
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("every unit ability button delivers its command and produces its effect")
+    void everyUnitAbilityButtonDeliversItsCommandAndProducesItsEffect() {
+        GameData catalog = scene().data();
+        record Ability(String unit, net.chonkbase.chonkcraft.engine.ui.UnitButton button) {}
+        List<Ability> abilities = new ArrayList<>();
+        for (String ident : mobileRoster(catalog)) {
+            for (var button : catalog.userInterface("summer").buttons().all()) {
+                if (button.appliesTo(ident) && "cast-spell".equals(button.action())) {
+                    abilities.add(new Ability(ident, button));
+                }
+            }
+        }
+        assertEquals(50, abilities.size(), "the sweep must include both races and every hero ability");
+        for (Ability ability : abilities) {
+            Scene scene = scene();
+            String ident = ability.button().value();
+            Unit actor = make(scene, ability.unit(), 0, 10, 10);
+            actor.setMana(255);
+            var spell = scene.data().spells().spells().get(ident);
+            scene.world().upgrades(0).complete(spell.dependUpgrade());
+            for (String upgrade : ability.button().allowArg()) scene.world().upgrades(0).complete(upgrade);
+            boolean friendly = List.of("spell-healing", "spell-bloodlust", "spell-bloodlust-double-head",
+                    "spell-haste", "spell-invisibility", "spell-unholy-armor", "spell-flame-shield",
+                    "spell-suicide-bomber").contains(ident);
+            Unit target = make(scene, ident.contains("exorcism") ? "unit-skeleton" : "unit-footman",
+                    friendly ? 0 : 1, 13, 10);
+            target.setHitPoints(target.hitPoints() / 2);
+            target.setVisCount(0, 1);
+            Unit corpse = make(scene, "unit-footman", 1, 12, 11);
+            scene.world().kill(corpse);
+            int initialHp = target.hitPoints();
+            scene.screen().selectForTest(actor);
+            scene.screen().press(ability.button(), false);
+            if (spell.target() != net.chonkbase.chonkcraft.engine.spell.Spell.Target.SELF) {
+                fieldClick(scene, 13, 10);
+            }
+            var orders = scene.screen().intentEntriesForTest().stream()
+                    .filter(e -> "order".equals(e.event())).toList();
+            String command = ability.unit() + " " + ident;
+            assertEquals(1, orders.size(), command + " must reach the simulation from its button");
+            assertTrue(orders.getFirst().accepted(), command + " must be accepted for its capable unit");
+            boolean effect = false;
+            for (int cycle = 0; cycle < 200 && !effect; cycle++) {
+                scene.world().tick();
+                effect = switch (ident) {
+                    case "spell-healing" -> target.hitPoints() > initialHp;
+                    case "spell-exorcism" -> !target.isAlive() || target.hitPoints() < initialHp;
+                    case "spell-polymorph" -> "unit-critter".equals(target.type().ident());
+                    case "spell-slow" -> target.hasBuff(Unit.Buff.SLOW);
+                    case "spell-haste" -> target.hasBuff(Unit.Buff.HASTE);
+                    case "spell-invisibility" -> target.hasBuff(Unit.Buff.INVISIBLE);
+                    case "spell-unholy-armor" -> target.hasBuff(Unit.Buff.UNHOLY_ARMOR);
+                    case "spell-bloodlust", "spell-bloodlust-double-head" -> target.hasBuff(Unit.Buff.BLOODLUST);
+                    case "spell-suicide-bomber" -> !actor.isAlive() && !target.isAlive();
+                    case "spell-holy-vision", "spell-eye-of-vision", "spell-eye-of-vision-double-head",
+                            "spell-raise-dead" -> scene.world().units().stream().anyMatch(u -> u.isAlive()
+                                    && u.player() == 0 && ("spell-holy-vision".equals(ident)
+                                            ? "unit-revealer" : "spell-raise-dead".equals(ident)
+                                            ? "unit-skeleton" : "unit-eye-of-vision").equals(u.type().ident()));
+                    default -> scene.world().missiles().stream().anyMatch(m ->
+                            (ident.startsWith("spell-runes") ? "missile-rune" :
+                                    ident.replace("spell-", "missile-")).equals(m.type().ident()));
+                };
+            }
+            assertTrue(effect, command + " must produce its damage, buff, summon or spell projectile");
+        }
+    }
+
+    private static List<String> mobileRoster(GameData data) {
+        List<String> result = new ArrayList<>();
+        for (int code = 0; code < net.chonkbase.chonkcraft.data.map.PudUnitTypes.count(); code++) {
+            String ident = net.chonkbase.chonkcraft.data.map.PudUnitTypes.name(code);
+            UnitType type = data.unitTypes().types().get(ident);
+            if (type != null && !type.building() && !type.vanishes()
+                    && type.speed() > 0 && !"unit-critter".equals(ident)) result.add(ident);
+        }
+        return result;
+    }
+
+    private static void fieldClick(Scene scene, int x, int y) {
+        var click = new java.awt.event.MouseEvent(scene.screen(),
+                java.awt.event.MouseEvent.MOUSE_PRESSED, 0,
+                java.awt.event.InputEvent.BUTTON1_DOWN_MASK,
+                x * Unit.TILE_PIXELS + 16, y * Unit.TILE_PIXELS + 16,
+                1, false, java.awt.event.MouseEvent.BUTTON1);
+        for (var listener : scene.screen().getMouseListeners()) listener.mousePressed(click);
+    }
+
     private static void select(Scene scene, Unit... units) {
         for (Unit existing : scene.world().unitsSnapshot()) {
             existing.setSelected(false);

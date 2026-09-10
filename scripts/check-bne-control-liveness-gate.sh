@@ -9,6 +9,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 rm -f \
   "${repo_root}/desktop/target/surefire-reports/TEST-net.chonkbase.chonkcraft.desktop.PlayerOrderDeliveryTest.xml" \
   "${repo_root}/desktop/target/surefire-reports/TEST-net.chonkbase.chonkcraft.desktop.ControlLivenessPlayabilityTest.xml" \
+  "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetDemolitionRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.Issue12OrderLivenessTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetCombatReplacementRealDataTest.xml" \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetMovingAttackReplacementRealDataTest.xml" \
@@ -21,7 +22,7 @@ rm -f \
   "${repo_root}/engine/target/surefire-reports/TEST-net.chonkbase.chonkcraft.engine.BattleNetInPlaceFirstTakeRealDataTest.xml"
 
 "${repo_root}/scripts/run-tests.sh" -pl desktop -am \
-  '-Dtest=PlayerOrderDeliveryTest,ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetCombatReplacementRealDataTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetPlayerGoldLoopRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
+  '-Dtest=BattleNetDemolitionRealDataTest,PlayerOrderDeliveryTest,ControlLivenessPlayabilityTest,Issue12OrderLivenessTest,BattleNetCombatReplacementRealDataTest,BattleNetMovingAttackReplacementRealDataTest,BattleNetPlayerPatrolRealDataTest,BattleNetPlayerAttackTargetRealDataTest,BattleNetPlayerFollowRealDataTest,BattleNetPlayerGoldLoopRealDataTest,BattleNetChaseDestArmAfterAttackWaitRealDataTest,BattleNetSettleStandAndFightRealDataTest,BattleNetInPlaceFirstTakeRealDataTest#aSettledHuman1FootmanFirstTakesSixAtCycle427' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${repo_root}" <<'PY'
@@ -31,8 +32,9 @@ import xml.etree.ElementTree as ET
 
 root = Path(sys.argv[1])
 inventory = (
-    ("desktop", "PlayerOrderDeliveryTest", 13),
+    ("desktop", "PlayerOrderDeliveryTest", 17),
     ("desktop", "ControlLivenessPlayabilityTest", 2),
+    ("engine", "BattleNetDemolitionRealDataTest", 10),
     ("engine", "Issue12OrderLivenessTest", 2),
     ("engine", "BattleNetCombatReplacementRealDataTest", 5),
     ("engine", "BattleNetMovingAttackReplacementRealDataTest", 9),
@@ -56,7 +58,7 @@ for module, name, expected in inventory:
         raise SystemExit(
             f"{name}: expected {expected}/0/0/0 tests/skips/failures/errors, "
             f"got {'/'.join(map(str, counts))}")
-print("control-liveness inventory: 47 pass, 0 skipped")
+print("control-liveness inventory: 61 pass, 0 skipped")
 PY
 
 echo "control-liveness gate passed: 1/3/9-unit controls, redirects, combat and real UDP remained responsive"
