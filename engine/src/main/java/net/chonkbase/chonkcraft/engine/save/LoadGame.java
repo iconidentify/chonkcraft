@@ -665,6 +665,12 @@ public final class LoadGame {
      */
     private static void applyUnitState(Unit unit, SaveTable state,
             java.util.Map<String, UnitType> types, java.util.Map<Integer, Unit> byId) {
+        if (state.rawGet("battleNetFlyingIdleTimer") != null) {
+            unit.setBattleNetFlyingIdleTimer(integer(state.rawGet("battleNetFlyingIdleTimer")));
+        }
+        if (state.rawGet("battleNetTransportFlyDrawn") != null) {
+            unit.setBattleNetTransportFlyDrawn(truthy(state.rawGet("battleNetTransportFlyDrawn")));
+        }
         Object order = state.rawGet("order");
         if (order != null) {
             try {

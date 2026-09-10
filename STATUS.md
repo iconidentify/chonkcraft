@@ -22,6 +22,10 @@ world cycle and peer involved in a desync.
 They are integrated with the current fog, native walking animation, scrolling,
 menu rendering, graphics-memory limits and multiplayer lobby fixes.
 
+Ships and flyers retain their idle countdown and transport idle state through
+save/load. Fourteen retail types complete five 800-cycle replay checks with
+matching movement, both random streams and subsequent commanded siege damage.
+
 ## Measured Battle.net Edition parity
 
 The 52-map campaign survey uses the authenticated BNE 2.02b executable and
@@ -61,9 +65,9 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,042 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,044 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,387 skips.
+has the same 88 expected failure identities and exactly 1,389 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 27-skip profile. Coverage rules are documented in
@@ -84,7 +88,8 @@ endpoint. The source checkpoint is retained in Git for comparison.
   That candidate remains withheld because it regresses command-campaign
   comparisons; the released Attack/Move fix does not establish complete
   command parity.
-- Saving during combat can change later damage rolls. The command and
+- Saving during active combat can still change later projectile behavior and
+  damage rolls. The lost naval/flying idle countdown is fixed; the command and
   cancellation referees preserve their observed handoffs and first-hit timing;
   they do not establish complete combat-state continuation.
 - Exact everyday controls need broader coverage: group Follow redirects,

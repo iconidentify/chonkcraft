@@ -620,12 +620,14 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/save/SaveGameTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/save/SavedTerrainTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/save/NativeSaveReaderTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetNavalSaveContinuationRealDataTest.java`
 
 Retail evidence:
 
 - The versioned native save schema retains changed terrain and live simulation state without executable script reconstruction.
 - Authenticated BNE data drives full live round trips, including the independent asynchronous LCG, complete retail projectile state and the native ai.bin program counter plus 48-byte state.
 - A restored in-flight catapult rock is run beside the original through impact, while assembled forces and both inherited AiLoop indices resume without restarting the opponent.
+- Fourteen retail ship and flyer types retain their idle countdowns across reloads. Five 800-cycle continuations check both random streams, positions, later player commands and actual siege damage; the two added referees fail the preceding public build.
 
 Known blockers:
 
@@ -634,7 +636,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine -am -Dtest=SaveGameTest,SavedTerrainTest,NativeSaveReaderTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine -am -Dtest=SaveGameTest,SavedTerrainTest,NativeSaveReaderTest,BattleNetNavalSaveContinuationRealDataTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## Rendering, UI and player input

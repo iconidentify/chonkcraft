@@ -1,8 +1,6 @@
-# Replacement Commands Cancel Unfired Attacks
+# Reloads Preserve Ship and Flyer Timing
 
-- Fixed attackers firing one more shot at their old target when an Attack or
-  Move command arrives on the firing cycle.
-- Projectiles already in flight still finish their damage, as in Battle.net
-  Edition. The replacement keeps its native movement and attack timing.
-- Verified the firing boundary against fresh Battle.net Edition captures,
-  including cancellation and command handoff across save/load.
+- Fixed lost idle timing on ships and flying units after loading a save,
+  which could change later combat damage.
+- Added replay checks covering fourteen ship and flyer types, subsequent
+  movement commands and a commanded siege battle across five save/load continuations.

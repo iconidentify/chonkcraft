@@ -38,7 +38,7 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-10 (combat replacement cancellation)
+## Current checkpoint -- 2026-09-10 (combat replacements and fleet saves)
 
 Explicit Attack keeps the player's clicked quarry through automatic scans.
 Attack and Move replacements release on the native attack-program callback.
@@ -55,17 +55,29 @@ checks both Attack and Move, and retains cancellation and first-hit timing
 through six save/load continuations. Both new tests fail the preceding
 published build `2af6176` and pass the corrected shared firing path.
 
+Naval and flying idle countdowns and the transport idle-draw state now
+survive saves. Losing them rearmed the native idle callback immediately after
+reload and changed the shared asynchronous stream before later damage rolls.
+Two additional referees exercise fourteen retail hull/flyer types through
+five 800-cycle save continuations, subsequent player moves and an actual
+catapult attack. Positions, HP and both random streams match uninterrupted
+play throughout those windows. Both tests fail public checkpoint `abd09b0`.
+These are deterministic save-continuation checks using retail data, separate
+from native command capture comparisons.
+
 The 121-case command gate preserves all 1,374 acceptance decisions and every
 physical prefix. Nine field prefixes improve against its persisted baseline;
 six of those improve on `2af6176`. All 52 idle-map boundaries through 1,800
-remain unchanged. The 3,042-test pack-plus-Opus suite retains the same 90
+remain unchanged. The 3,044-test pack-plus-Opus suite retains the same 90
 failure identities, zero errors and 318 skips; data-free retains 88 existing
-failures and 1,387 skips. The control gate contains 47 checks.
+failures and 1,389 skips. The control gate contains 47 checks.
 
 Private evidence is retained below
 `$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-attack-retarget/`,
 including the candidate219 command/idle comparisons, negative controls and
-`interrupt-release-verification/`. Fresh native captures live in the local
+`interrupt-release-verification/` and `idle-save-release-verification/`.
+The fleet continuation proof is candidate226; every command and idle-map
+comparison is identical to the preceding public checkpoint. Fresh native captures live in the local
 oracle output under `command-parity-20260910-attack-interrupt{370,387,388}`.
 No licensed fixture payloads are committed. Full Stop/point-order startup,
 blocked worker loops and exact post-save combat damage rolls remain open.

@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. The configured authenticated
 floor and the measured data-free inventory are:
 
-    authenticated profile      3042 tests,   27 skipped
-    no external input          3042 tests, 1387 skipped
+    authenticated profile      3044 tests,   27 skipped
+    no external input          3044 tests, 1389 skipped
 
 Both can be green.
 
@@ -202,7 +202,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Three player gold-loop referees cover repeated credit, an allied
         # obstruction and twelve save/load continuations. They require the pack.
         # Five dragon replacement, cancelled-shot and save-continuation referees need BNE.
-        "engine": (2090, 1038),
+        # Two fleet save referees protect subsequent movement and combat rolls.
+        "engine": (2092, 1040),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -259,7 +260,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2090, 7),
+        "engine": (2092, 7),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (393, 8),
@@ -276,7 +277,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2090, 4),
+        "engine": (2092, 4),
         "desktop": (393, 8),
         "matchmaker-server": (5, 1),
     },
@@ -298,7 +299,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2090, 12),
+        "engine": (2092, 12),
         "desktop": (393, 6),
         "matchmaker-server": (5, 1),
     },

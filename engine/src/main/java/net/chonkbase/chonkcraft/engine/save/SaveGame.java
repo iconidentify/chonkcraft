@@ -612,6 +612,11 @@ public final class SaveGame {
         // Preserve the active combat program, including its random-draw cadence.
         // Reconstructing a chase from only the visible order restarts a live swing.
         state.append(" battleNetIdlePhase = ").append(unit.battleNetIdlePhase()).append(",");
+        // Idle hulls and flyers share combat's asynchronous stream. Losing
+        // their countdown used to draw again immediately after reload and
+        // change later shot damage even when the attacker was restored.
+        state.append(" battleNetFlyingIdleTimer = ").append(unit.battleNetFlyingIdleTimer()).append(",");
+        state.append(" battleNetTransportFlyDrawn = ").append(unit.battleNetTransportFlyDrawn()).append(",");
         state.append(" battleNetPudData = ").append(unit.battleNetPudData()).append(",");
         state.append(" battleNetReadySuppressed = ").append(unit.battleNetReadySuppressed()).append(",");
         state.append(" fighting = ").append(unit.fighting()).append(",");
