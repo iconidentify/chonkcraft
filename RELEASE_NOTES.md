@@ -1,8 +1,8 @@
-# Attacking Units Honor New Targets and Moves
+# Replacement Commands Cancel Unfired Attacks
 
-- Fixed an automatic target scan switching an explicitly commanded attacker
-  back to its previous target.
-- Attack and Move replacements now take over on the Battle.net Edition attack
-  callback. Dragons leave their old building attack and carry out the new order.
-- Verified the dragon handoff, movement, first hit and save/load continuation
-  against captured Battle.net Edition gameplay.
+- Fixed attackers firing one more shot at their old target when an Attack or
+  Move command arrives on the firing cycle.
+- Projectiles already in flight still finish their damage, as in Battle.net
+  Edition. The replacement keeps its native movement and attack timing.
+- Verified the firing boundary against fresh Battle.net Edition captures,
+  including cancellation and command handoff across save/load.

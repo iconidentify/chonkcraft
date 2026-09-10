@@ -8605,6 +8605,10 @@ final class BattleNetCombatSystem {
      * the thing it was aimed at.
      */
     void hit(Unit attacker, Unit target) {
+        if (world.battleNetSequence != null && attacker.queuedReplacementPending()
+                && attacker.reportsActionBeforeQueued()) {
+            return;
+        }
         MissileType missile = world.projectiles.missileFor(attacker);
         if (missile != null && !missile.isNone()) {
             // OP10 is the authoritative retail firing boundary. On repeated
@@ -12862,6 +12866,17 @@ final class BattleNetCombatSystem {
             world.tickBattleNetMeleeSyncLoop(unit);
         }
         if (tick.inlineActionMarker()) {
+            if (unit.queuedReplacementPending() && unit.reportsActionBeforeQueued()) {
+                // BNE 0x409f75 refuses the firing callback while a replacement
+                // is pending. A click on XOrc 11 dragon's firing visit 387
+                // used to launch one more shot at the cancelled quarry.
+                // Keep draining the body, but discard its unlaunched damage.
+                world.projectiles.interruptPendingAttack(unit);
+                world.battleNetPendingMeleeHits.remove(unit);
+                unit.setBattleNetSequenceMeleeLanded(true);
+                world.battleNetSequenceProjectileFired.add(unit);
+                return true;
+            }
             unit.setBattleNetResidualEmptyRouteSettle(false);
             Unit meleeTarget = world.battleNetPendingMeleeHits.remove(unit);
             Unit currentMeleeTarget = unit.target();

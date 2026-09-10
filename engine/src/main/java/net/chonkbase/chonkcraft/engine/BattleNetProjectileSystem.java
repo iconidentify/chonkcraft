@@ -137,7 +137,8 @@ final class BattleNetProjectileSystem {
                     || (order == Unit.Order.STILL && !attacker.canMove());
             boolean ownsTarget = pending == null || pending.target() == null
                     || pending.target() == attacker.target();
-            if (!attacker.isAlive() || !ownsAttack || !ownsTarget) {
+            if (!attacker.isAlive() || !ownsAttack || !ownsTarget
+                    || (attacker.queuedReplacementPending() && attacker.reportsActionBeforeQueued())) {
                 interruptPendingAttack(attacker);
             }
         }

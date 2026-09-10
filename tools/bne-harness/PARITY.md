@@ -38,7 +38,42 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-09 (worker cargo and gold loops)
+## Current checkpoint -- 2026-09-10 (combat replacement cancellation)
+
+Explicit Attack keeps the player's clicked quarry through automatic scans.
+Attack and Move replacements release on the native attack-program callback.
+The shared firing path also suppresses unlaunched damage while a replacement
+is pending, as required by BNE `0x409f75`. Shots already in flight continue.
+
+Fresh `dragon-interrupt-{attack,move}-{370,387,388}-20260910` captures on
+XOrc 11, seed one, cover both sides of OP10: the firing visit is 387.
+Clicks on 370 or 387 leave the old refinery at 569 HP through cycle 1,000;
+a click on 388 retains the flight and its impacts at 404 and 424.
+The first replacement tower hit is 499 for the early click and 689 for the
+firing-visit click. The durable combat referee enters through CommandApplier,
+checks both Attack and Move, and retains cancellation and first-hit timing
+through six save/load continuations. Both new tests fail the preceding
+published build `2af6176` and pass the corrected shared firing path.
+
+The 121-case command gate preserves all 1,374 acceptance decisions and every
+physical prefix. Nine field prefixes improve against its persisted baseline;
+six of those improve on `2af6176`. All 52 idle-map boundaries through 1,800
+remain unchanged. The 3,042-test pack-plus-Opus suite retains the same 90
+failure identities, zero errors and 318 skips; data-free retains 88 existing
+failures and 1,387 skips. The control gate contains 47 checks.
+
+Private evidence is retained below
+`$HOME/.local/share/chonkcraft-command-parity/investigations/20260909-attack-retarget/`,
+including the candidate219 command/idle comparisons, negative controls and
+`interrupt-release-verification/`. Fresh native captures live in the local
+oracle output under `command-parity-20260910-attack-interrupt{370,387,388}`.
+No licensed fixture payloads are committed. Full Stop/point-order startup,
+blocked worker loops and exact post-save combat damage rolls remain open.
+The post-save damage difference also reproduces on `2af6176`; the command
+referees certify their bounded handoff and first-hit timing, not whole-world
+save continuation.
+
+## Worker cargo and gold-loop checkpoint
 
 Completed worker cargo is independent of the current harvesting job. BNE
 2.02b's `0x436960` clears unfinished chopping in +0x74; `0x43697e`

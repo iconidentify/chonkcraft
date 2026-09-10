@@ -23,6 +23,72 @@ import org.junit.jupiter.api.Test;
 class BattleNetCombatReplacementRealDataTest {
 
     @Test
+    @DisplayName("a replacement on the firing visit prevents another shot at the old quarry")
+    void aReplacementOnTheFiringVisitPreventsAnotherShotAtTheOldQuarry() throws IOException {
+        for (String kind : List.of("attack", "move")) {
+            cancelledShot(kind, 370, -1);
+            cancelledShot(kind, 387, -1);
+        }
+    }
+
+    @Test
+    @DisplayName("saving a cancelled shot preserves the replacement and leaves the old quarry unharmed")
+    void savingACancelledShotPreservesTheReplacementAndLeavesTheOldQuarryUnharmed() throws IOException {
+        for (String kind : List.of("attack", "move")) {
+            List<List<Integer>> expected = cancelledShot(kind, 387, -1);
+            for (int checkpoint : new int[] {387, 575, 576}) {
+                List<List<Integer>> restored = cancelledShot(kind, 387, checkpoint);
+                assertEquals(expected.size(), restored.size(), "the restored replacement must finish every visit");
+                for (int cycle = 0; cycle < expected.size(); cycle++) {
+                    assertEquals(expected.get(cycle), restored.get(cycle),
+                            "saving cancelled " + kind + " at " + checkpoint
+                                    + " must preserve its handoff and first hit at " + (cycle + 1));
+                }
+            }
+        }
+    }
+
+    private static List<List<Integer>> cancelledShot(String kind, int click, int checkpoint) throws IOException {
+        Campaign game = new Campaign();
+        List<List<Integer>> frames = new ArrayList<>();
+        for (int cycle = 1; cycle <= 1000; cycle++) {
+            if (cycle == 5) game.apply(GameCommand.move(game.person, game.dragon.id(), 16, 54));
+            if (cycle == 200) game.apply(GameCommand.attack(game.person, game.dragon.id(), game.refinery.id()));
+            if (cycle == click) game.apply(kind.equals("attack")
+                    ? GameCommand.attack(game.person, game.dragon.id(), game.tower.id())
+                    : GameCommand.move(game.person, game.dragon.id(), 8, 54));
+            game.mission.tick();
+            if (cycle == checkpoint) game.reload();
+            // Fresh pinned-executable captures dragon-interrupt-{attack,move}
+            // -{370,387}-20260910 enter through the native click handler.
+            // OP0 runs at 386 and OP10 at 387. Even a replacement arriving
+            // on 387 suppresses the old shot while the body drains to 576.
+            // Earlier attacks by other units leave the refinery at 569 HP.
+            if (cycle >= 206) assertEquals(569, game.refinery.hitPoints(),
+                    "the cancelled dragon shot must never damage its old quarry at " + cycle);
+            int firstHit = click == 370 ? 499 : 689;
+            assertEquals(kind.equals("attack") && cycle >= firstHit, game.tower.hitPoints() < 160,
+                    "the replacement tower must first take damage on its native visit at " + cycle);
+            if (cycle == 1000) {
+                if (kind.equals("attack")) {
+                    assertSame(game.tower, game.dragon.target(), "the replacement must retain the clicked tower");
+                    assertTrue(game.tower.hitPoints() < 160, "the replacement attack must actually damage the tower");
+                } else {
+                    position(game.dragon, 8, 54, 256, 1728, cycle);
+                    assertEquals(Unit.Order.STILL, game.dragon.order(), "the replacement march must finish");
+                    assertEquals(160, game.tower.hitPoints(), "moving must leave the replacement tower unharmed");
+                }
+            }
+            List<Integer> frame = new ArrayList<>(game.frame());
+            frame.add(game.refinery.hitPoints());
+            frame.add(game.tower.hitPoints() < 160 ? 1 : 0);
+            frames.add(frame);
+        }
+        assertEquals(1000, frames.size(), "the cancelled shot and completed replacement must both be observed");
+        return frames;
+    }
+
+    @Test
     @DisplayName("a dragon leaves its old building and attacks the player's replacement quarry")
     void aDragonLeavesItsOldBuildingAndAttacksThePlayersReplacementQuarry() throws IOException {
         run("attack", -1);
@@ -69,6 +135,8 @@ class BattleNetCombatReplacementRealDataTest {
             game.mission.tick();
             if (cycle == checkpoint) game.reload();
             if (firstTowerHit < 0 && game.tower.hitPoints() < towerHp) firstTowerHit = cycle;
+            if (cycle == 424) assertTrue(game.refinery.hitPoints() < 569,
+                    "a shot already in flight before the replacement click must finish damaging the old quarry");
 
             // Authenticated dragon-retarget-{attack,move}-20260909
             // captures run XOrc 11 seed one through the native click handler

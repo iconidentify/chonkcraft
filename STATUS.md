@@ -7,9 +7,11 @@ load from an authenticated ChonkPack built from the player's original media.
 
 Player orders retain committed native movement before their replacements
 start. Attack and Move replacements also wait for the native attack callback;
-explicit Attack keeps the clicked quarry through automatic scans. The dragon
-referee verifies the replacement, subsequent movement, first damage and
-save/load continuation against captured BNE cycles. The current controls include the issue-12 stall fixes, consumed and
+explicit Attack keeps the clicked quarry through automatic scans. A replacement
+received on the firing visit cancels the old attack's unlaunched shot; projectiles
+already in flight still land. The dragon referees verify the replacement,
+subsequent movement, first-hit timing and cancellation across save/load against
+captured BNE cycles. The current controls include the issue-12 stall fixes, consumed and
 superseded Stop handling, Patrol combat and return timing, Repair approach
 construction, verified Attack target-retention cases and Patrol save/load state.
 Follow redirects and repeated clicks retain their native movement and waiting
@@ -50,7 +52,7 @@ refusals. The current evidence and reproduction workflow are in
 ## Playability and release verification
 
 All 18 playability lanes pass with their required authenticated inputs,
-including the 45-test control gate, 117 movement checks, 65 projectile
+including the 47-test control gate, 117 movement checks, 65 projectile
 checks, 42 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
@@ -59,9 +61,9 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,040 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,042 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,385 skips.
+has the same 88 expected failure identities and exactly 1,387 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 27-skip profile. Coverage rules are documented in
@@ -82,6 +84,9 @@ endpoint. The source checkpoint is retained in Git for comparison.
   That candidate remains withheld because it regresses command-campaign
   comparisons; the released Attack/Move fix does not establish complete
   command parity.
+- Saving during combat can change later damage rolls. The command and
+  cancellation referees preserve their observed handoffs and first-hit timing;
+  they do not establish complete combat-state continuation.
 - Exact everyday controls need broader coverage: group Follow redirects,
   queued orders, modifiers, congestion and visible-target attacks. Eight new
   authenticated handler pairs cover Follow and combat, but the 532-cell
