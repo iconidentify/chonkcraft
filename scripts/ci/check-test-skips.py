@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. The configured authenticated
 floor and the measured data-free inventory are:
 
-    authenticated profile      3058 tests,   27 skipped
-    no external input          3058 tests, 1403 skipped
+    authenticated profile      3067 tests,   31 skipped
+    no external input          3067 tests, 1410 skipped
 
 Both can be green.
 
@@ -94,7 +94,7 @@ MODULES = (
 # Measured on the authenticated CI runner with JBR 25.0.2 and the pinned
 # authenticated retail installation and derived pack.
 #
-# Twenty-seven skip on the current `full` runner. A development machine with
+# Thirty-one skip on the current `full` runner. A development machine with
 # the three private playtest-save referees installed runs those as well and is
 # covered exactly by `full-with-playtest-saves`.
 #
@@ -204,7 +204,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Five dragon replacement, cancelled-shot and save-continuation referees need BNE.
         # Two fleet save referees protect subsequent movement and combat rolls.
         # Ten native demolition referees require the authenticated BNE pack.
-        "engine": (2102, 1050),
+        # Three soundtrack referees require authenticated BNE recordings.
+        "engine": (2105, 1053),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -219,7 +220,9 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # require pack fonts and add three data-free skips.
         # Four worker cargo-click referees require the authenticated pack.
         # Four roster/ability sweeps also require that pack.
-        "desktop": (397, 294),
+        # Four session/screen referees require retail assets; three launch
+        # real windows in child JVMs and require Xvfb on a headless runner.
+        "desktop": (403, 298),
         "matchmaker-server": (5, 1),
     },
     # Everything configured. What a developer with the game data should see on
@@ -251,6 +254,11 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
     # total. Those are correct release-dependent differences, not regressions.
     # Nothing here can tell the sources apart, because the profile is only a
     # pair of numbers per module and the release is not an input it knows about.
+    # The session/music batch adds nine checks. The classic-archive run of
+    # these additions executes five and deliberately skips four that need
+    # BNE recordings; the authenticated BNE pack executes all nine. Xvfb is
+    # installed in CI for the real-window children, independently of the
+    # seven older tests that still use Surefire's headless setting.
     "full": {
         "assetpack": (256, 5),
         "runtime": (99, 3),
@@ -262,10 +270,10 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2102, 7),
+        "engine": (2105, 10),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
-        "desktop": (397, 8),
+        "desktop": (403, 9),
         "matchmaker-server": (5, 1),
     },
     # The same authenticated inputs as `full`, on a development machine that
@@ -279,8 +287,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2102, 4),
-        "desktop": (397, 8),
+        "engine": (2105, 7),
+        "desktop": (403, 9),
         "matchmaker-server": (5, 1),
     },
     # The exact authenticated Battle.net Edition source archive, its matching
@@ -301,8 +309,8 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2102, 12),
-        "desktop": (397, 6),
+        "engine": (2105, 12),
+        "desktop": (403, 6),
         "matchmaker-server": (5, 1),
     },
 }

@@ -524,11 +524,11 @@ re-baseline the counts.
 The hosted, data-free job runs on every push and pull request. A private
 authenticated job runs only for `master` pushes or a maintainer's manual
 dispatch, using a read-only copy of the installation and authenticated pack.
-It asserts 1,403 skips, so 1,655 tests actually run without exposing licensed
-media to public pull-request code. The authenticated lane asserts 27 skips out
-of at least 3,058 tests; a development machine with the three private playtest-save
-referees installed uses `full-with-playtest-saves` and asserts 24. An exact BNE
-source plus matching pack and those saves uses
+It asserts 1,410 skips, so 1,657 tests actually run without exposing licensed
+media to public pull-request code. The authenticated classic lane asserts 31
+skips out of at least 3,067 tests; a development machine with the three private
+playtest-save referees installed uses `full-with-playtest-saves` and asserts 28.
+An exact BNE source plus matching pack and those saves uses
 `full-bne-with-playtest-saves` and asserts 30 release-format-specific skips.
 Tests backed
 by retail sequences deliberately join the hosted lane's skip inventory while

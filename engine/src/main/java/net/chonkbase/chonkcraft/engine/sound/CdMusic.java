@@ -34,22 +34,17 @@ import net.chonkbase.chonkcraft.data.source.AssetSource;
 public final class CdMusic implements AutoCloseable {
 
     /**
-     * A track, named for the disc and its number.
+     * A recording and its index in the source that supplies its samples.
      *
-     * <p>The name is the identity and has not changed: the disc image's stem
-     * and the track's own number, "WC2BTDP track 4", which is what
-     * {@link #play(String)} looks a track up by. The number is the disc's, so
-     * it starts at two -- track one holds the data.
-     *
-     * <p>Order is the other half of the identity. {@code Main} takes the third
-     * track it is given rather than one by name, because that is where the
-     * battle music sits on both discs, so a source that returns the same
-     * recordings in a different order plays the wrong music without anything
-     * looking wrong.
+     * <p>BNE imports carry musical names such as "Human Battle 1". Older
+     * imports can carry only a disc stem and track number. That number is
+     * sufficient for explicit playback, but does not identify a campaign or
+     * screen: choosing the third recording for either race made both sound
+     * the same. SoundServer requires a known role before selecting a recording.
      */
     public record Track(int index, AssetSource.MusicTrack recording) {
 
-        /** What the track is called, disc stem and number. */
+        /** The source's musical name or numbered disc label. */
         public String name() {
             return recording.name();
         }
@@ -118,6 +113,11 @@ public final class CdMusic implements AutoCloseable {
      * @return whether it started
      */
     public boolean play(Track track) {
+        return play(track, true);
+    }
+
+    /** A result plays once; a menu or battle keeps its recorded theme. */
+    boolean play(Track track, boolean looping) {
         if (track == null || source == null) {
             return false;
         }
@@ -144,7 +144,7 @@ public final class CdMusic implements AutoCloseable {
         // the mixer always stole when a battle filled all thirty-two, and
         // nothing here ever started it again, so the music stopped for good the
         // first time a dozen footmen swung at once.
-        voice = mixer.play(clip, AudioBus.MUSIC, true, BACKGROUND_GAIN_DB, 0f,
+        voice = mixer.play(clip, AudioBus.MUSIC, looping, BACKGROUND_GAIN_DB, 0f,
                 GameAudio.MUSIC_PRIORITY);
         playing = voice == AudioMixer.NO_VOICE ? null : track.name();
         return playing != null;
@@ -158,6 +158,18 @@ public final class CdMusic implements AutoCloseable {
             }
         }
         return false;
+    }
+
+    /** Resolves a musical role, without guessing from a disc's track position. */
+    Track find(List<String> names) {
+        for (String name : names) {
+            for (Track track : tracks) {
+                if (track.name().equalsIgnoreCase(name)) {
+                    return track;
+                }
+            }
+        }
+        return null;
     }
 
     public void stop() {

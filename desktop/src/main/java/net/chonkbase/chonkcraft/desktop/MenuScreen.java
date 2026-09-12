@@ -211,6 +211,27 @@ final class MenuScreen extends JPanel {
         installInput();
     }
 
+    private boolean launching;
+
+    /** A second click while a save or map loads must not start another world. */
+    private void launch(Launch request) {
+        if (launching) {
+            return;
+        }
+        launching = true;
+        try {
+            onLaunch.accept(request);
+        } catch (RuntimeException failure) {
+            launching = false;
+            throw failure;
+        }
+    }
+
+    /** A failed background load leaves this menu available for another choice. */
+    void launchFinished() {
+        launching = false;
+    }
+
     /** A piece of the widget sheet, which has its own palette. */
     private static BufferedImage widget(GameData data, String path) {
         IndexedImage image = data.widget(path);
@@ -360,7 +381,7 @@ final class MenuScreen extends JPanel {
         for (int number = first + 1; number <= last; number++) {
             int chosen = number;
             page.add(new Entry("Mission " + number, hotkeyFor(page.size()),
-                    () -> onLaunch.accept(Launch.campaignMission(campaign, chosen))));
+                    () -> launch(Launch.campaignMission(campaign, chosen))));
         }
         if (last < count) {
             page.add(new Entry("More Missions", "n",
@@ -384,7 +405,7 @@ final class MenuScreen extends JPanel {
             java.nio.file.Path map = maps.get(i);
             String name = map.getFileName().toString();
             page.add(new Entry(name.replaceFirst("(?i)\\.pud$", ""), hotkeyFor(page.size()),
-                    () -> onLaunch.accept(Launch.skirmish(map))));
+                    () -> launch(Launch.skirmish(map))));
         }
         if (last < maps.size()) {
             page.add(new Entry("More Maps", "n", () -> showMapPage(data, maps, last)));
@@ -456,7 +477,7 @@ final class MenuScreen extends JPanel {
         for (int i = first; i < last; i++) {
             java.nio.file.Path save = saves.get(i);
             page.add(new Entry(net.chonkbase.chonkcraft.engine.save.LoadGame.nameOf(save),
-                    hotkeyFor(page.size()), () -> onLaunch.accept(Launch.saved(save))));
+                    hotkeyFor(page.size()), () -> launch(Launch.saved(save))));
         }
         if (last < saves.size()) {
             page.add(new Entry("More Saved Games", "n",
@@ -487,9 +508,9 @@ final class MenuScreen extends JPanel {
                 () -> showMultiplayerMaps(data, maps, Launch.Multiplayer.HOST_DIRECT)));
         // A joiner picks no map: the host's is the one being played, and
         // asking a joiner to choose one is asking them to guess.
-        page.add(new Entry("Join Online Game", "j", () -> onLaunch.accept(Launch.join())));
+        page.add(new Entry("Join Online Game", "j", () -> launch(Launch.join())));
         page.add(new Entry("Join Direct IP Game", "i",
-                () -> onLaunch.accept(Launch.joinDirect())));
+                () -> launch(Launch.joinDirect())));
         page.add(new Entry("Previous Menu", "escape", () -> showMainMenu(data, maps)));
         // The choices name both discovery and transport, so a heading would
         // only repeat the multiplayer button the player used to reach them.
@@ -525,7 +546,7 @@ final class MenuScreen extends JPanel {
         for (int i = first; i < last; i++) {
             java.nio.file.Path map = maps.get(i);
             page.add(new Entry(map.getFileName().toString().replaceFirst("(?i)\\.pud$", ""),
-                    hotkeyFor(page.size()), () -> onLaunch.accept(Launch.host(map, kind))));
+                    hotkeyFor(page.size()), () -> launch(Launch.host(map, kind))));
         }
         if (last < maps.size()) {
             page.add(new Entry("More Maps", "n",

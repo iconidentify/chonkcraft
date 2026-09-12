@@ -426,7 +426,8 @@
       "grade": "green",
       "implementation": [
         "engine/src/main/java/net/chonkbase/chonkcraft/engine/campaign/Campaign.java",
-        "engine/src/main/java/net/chonkbase/chonkcraft/engine/trigger/TriggerSystem.java"
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/trigger/TriggerSystem.java",
+        "desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameSessions.java"
       ],
       "checks": [
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/CampaignTriggerPlayabilityTest.java",
@@ -435,19 +436,22 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/TriggerFailureTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/RescueTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/AttackPeasantTest.java",
-        "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/MissionLengthTest.java"
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/MissionLengthTest.java",
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/CampaignSessionRealDataTest.java",
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/GameSessionsTest.java"
       ],
       "retail_evidence": [
         "All 52 retail mission wrappers arm 137 trigger pairs; a fail-closed referee now constructs every map, runs every wrapper for 30 simulated seconds and rejects script faults or premature outcomes.",
         "Real campaign data proves both sides of the first mission's condition, all four campaigns' closing sequences, the Human 10 wrapper substitution and the rescue conditions that are the sole victory path of nine missions.",
-        "Authenticated BNE fixture evidence establishes per-unit rescue at the native animation marker, including a flying prisoner, rather than LegacyEngine's once-per-second whole-player town-hall shortcut."
+        "Authenticated BNE fixture evidence establishes per-unit rescue at the native animation marker, including a flying prisoner, rather than LegacyEngine's once-per-second whole-player town-hall shortcut.",
+        "Retail Human 12's 44-unit roster drives real desktop startup under an isolated display: repeated launches leave one simulation, replacement stops the discarded world, and queued defeats cannot cover a healthy mission."
       ],
       "blockers": [],
       "gate": {
-        "driver": "A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions.",
-        "success": "All 52 wrappers run without script faults or premature outcomes, real victory and defeat conditions decide correctly, rescue paths work and every campaign has a complete ending.",
+        "driver": "A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions. The session referee uses a real window in an isolated JVM, with Xvfb when available.",
+        "success": "All 52 wrappers run without script faults or premature outcomes, real victory and defeat conditions decide correctly, rescue paths work and every campaign has a complete ending. Every game transition retires the preceding simulation and its delayed results, with zero skipped checks.",
         "required_inputs": ["asset_pack"],
-        "command": ["scripts/run-tests.sh", "-pl", "engine", "-am", "-Dtest=CampaignTriggerPlayabilityTest,CampaignRealDataTest,CampaignEndingTest,TriggerFailureTest,RescueTest,AttackPeasantTest,MissionLengthTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
+        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=CampaignTriggerPlayabilityTest,CampaignRealDataTest,CampaignEndingTest,TriggerFailureTest,RescueTest,AttackPeasantTest,MissionLengthTest,CampaignSessionRealDataTest,GameSessionsTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
       }
     },
     {
@@ -527,7 +531,8 @@
         "engine/src/main/java/net/chonkbase/chonkcraft/engine/sound/SoundBindings.java",
         "desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameScreen.java",
         "engine/src/main/resources/chonkcraft/sound-bindings.tsv",
-        "engine/src/main/resources/chonkcraft/unit-sounds.tsv"
+        "engine/src/main/resources/chonkcraft/unit-sounds.tsv",
+        "engine/src/main/java/net/chonkbase/chonkcraft/engine/sound/SoundServer.java"
       ],
       "checks": [
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundWithoutScriptsRealDataTest.java",
@@ -537,21 +542,23 @@
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/CritterVoiceRealDataTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BuilderReportsWorkCompleteTest.java",
         "engine/src/test/java/net/chonkbase/chonkcraft/engine/EconomyTest.java",
-        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java"
+        "desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java",
+        "engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundtrackRealDataTest.java"
       ],
       "retail_evidence": [
         "All 371 sound bindings and all 398 voice-event bindings for 107 voiced units were sealed only after full declaration differentials, while every decoded clip comes from the retail BNE asset pack.",
         "Neutral critters resolve their audible selection and death voice from the map tileset: sheep, seal, pig or warthog; death never falls through to the old explosion placeholder.",
         "The authenticated town-hall dead binding renders audible PCM from BNE's three-clip building-destroyed group even when destroying the local hall removes the last sight that made it visible.",
         "A worker taking a gold mine's final load commits one witnessed death event before the neutral building and its sight disappear; the authenticated mine dead binding renders audible PCM from the same three-clip building-destroyed group across that fog transition and survives a saturated presentation queue.",
-        "The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer."
+        "The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer.",
+        "The authenticated 2.02b music scene and filename tables at 0x4a1898 and 0x4a184c identify 19 battle, briefing, menu and result roles. Each role reaches its real recorded samples and emits PCM; numbered catalogs fall back to authentic XMI notes for the requested scene and race."
       ],
       "blockers": [],
       "gate": {
         "driver": "A worker completes a player-issued build order while the referee follows its sound event through the script-free retail bindings and real mixer.",
-        "success": "Every retail binding matches its authority, neutral and player unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks.",
+        "success": "Every retail binding matches its authority, neutral and player unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks. Soundtrack roles survive backend changes and late cleanup of an old owner.",
         "required_inputs": ["asset_pack"],
-        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
+        "command": ["scripts/run-tests.sh", "-pl", "engine,desktop", "-am", "-Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest", "-Dsurefire.failIfNoSpecifiedTests=false"]
       }
     },
     {

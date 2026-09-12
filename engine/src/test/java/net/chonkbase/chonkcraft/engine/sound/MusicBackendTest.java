@@ -330,7 +330,7 @@ class MusicBackendTest {
 
         TonesOnly(String... names) {
             this.names = names.length == 0
-                    ? List.of("fixture track 2", "fixture track 3", "fixture track 4")
+                    ? List.of("Human Battle 1", "Orc Battle 1", "Main Menu")
                     : List.of(names);
         }
 

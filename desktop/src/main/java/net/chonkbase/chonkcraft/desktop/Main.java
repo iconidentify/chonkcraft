@@ -78,6 +78,8 @@ public final class Main {
      */
     private static AppWindow window;
 
+    private static final GameSessions gameSessions = new GameSessions();
+
     /** The window, opening it if this is the first screen to ask. */
     private static synchronized AppWindow window() {
         if (window == null) {
@@ -273,28 +275,6 @@ public final class Main {
         picture.begin();
     }
 
-    /** Shows the menu and starts whatever the player chooses. */
-    /**
-     * The music player, opened on first use.
-     *
-     * <p>{@code GameData.music()} memoises, so the menu, the briefings and the
-     * mission all drive one sequencer rather than three. Upstream has the same
-     * single player and simply changes its playlist at each transition.
-     *
-     * <p>Returns null when there is no synthesiser, which is a normal state on
-     * a machine with no MIDI device; every caller here tolerates it.
-     */
-    private static net.chonkbase.chonkcraft.engine.sound.MusicPlayer music(GameData data) {
-        var music = data.music();
-        music.start();
-        // The saved music volume, on the menus and the briefings as well as on
-        // a running game. The slider used to exist only inside a game and its
-        // effect died with it, so a player who turned the music down heard the
-        // menu theme come back at full volume the moment they left.
-        music.setVolume(settings().musicVolume());
-        return music.isAvailable() ? music : null;
-    }
-
     /**
      * The player's own settings, read once.
      *
@@ -331,6 +311,7 @@ public final class Main {
 
     private static void runMenu(GameData data, AssetSource assets, List<Path> maps,
             Java2DPipeline.Choice pipeline) {
+        gameSessions.close();
         // One front-end owner covers titles and menus, and honours the recorded
         // soundtrack default rather than unconditionally starting XMI here.
         FrontEndAudio sound = frontEndAudio(data, assets);
@@ -350,11 +331,9 @@ public final class Main {
             } else if (launch.multiplayer() == MenuScreen.Launch.Multiplayer.JOIN_DIRECT) {
                 openJoinScreen(data, assets, maps, pipeline, true);
             } else if (launch.lobby() != null) {
-                new Thread(() -> startMultiplayer(data, assets, pipeline, launch.lobby()),
-                        "chonkcraft-load").start();
+                loadFromMenu(() -> startMultiplayer(data, assets, pipeline, launch.lobby()));
             } else if (launch.save() != null) {
-                new Thread(() -> resume(data, assets, pipeline, launch.save()),
-                        "chonkcraft-load").start();
+                loadFromMenu(() -> resume(data, assets, pipeline, launch.save()));
             } else if (launch.campaign() != null) {
                 startCampaignMission(data, assets, pipeline,
                         launch.campaign(), launch.mission());
@@ -362,14 +341,28 @@ public final class Main {
                 // Off the event thread: loading a map reads and decodes
                 // several megabytes, and doing that here would freeze the menu
                 // on the frame the player pressed.
-                new Thread(() -> start(data, assets, pipeline, null, launch.map()),
-                        "chonkcraft-load").start();
+                loadFromMenu(() -> start(data, assets, pipeline, null, launch.map()));
             }
         });
         menu.showMainMenu(data, maps);
         window().setKeyListener(null);
         window().setTitle("chonkcraft");
         window().show(menu);
+    }
+
+    /** Holds the originating menu's launch guard only while its load is pending. */
+    private static void loadFromMenu(Runnable load) {
+        MenuScreen menu = (MenuScreen) window().frame().getContentPane();
+        new Thread(() -> {
+            try {
+                load.run();
+            } finally {
+                // Successful loads queued their replacement screen already.
+                // A missing or damaged save leaves this same menu visible;
+                // keeping its guard set would make every later choice inert.
+                SwingUtilities.invokeLater(menu::launchFinished);
+            }
+        }, "chonkcraft-load").start();
     }
 
     /** What to call this machine to the other players. */
@@ -1055,16 +1048,7 @@ public final class Main {
             applySavedVolumes(cutsceneAudio);
         }
         Runnable showBriefing = () -> {
-            // The briefing theme, played once and then silence -- upstream
-            // assigns an empty playlist before calling PlayMusic, so nothing
-            // follows it and the narration is not talked over.
-            var briefingMusic = music(data);
-            if (briefingMusic != null) {
-                briefingMusic.playPlaylist(briefingMusic.available(
-                        net.chonkbase.chonkcraft.engine.sound.MusicPlayer
-                                .briefingTracks("orc".equals(race))));
-                briefingMusic.setPlaylist(java.util.List.of());
-            }
+            frontEndAudio(data, assets).server().playBriefingMusic("orc".equals(race));
             BriefingScreen briefing = new BriefingScreen(data, race, WINDOW_WIDTH, WINDOW_HEIGHT,
                     mission.background(), heading, mission.briefing(), "Continue", () -> {
                         if (cutsceneAudio != null) {
@@ -1097,9 +1081,8 @@ public final class Main {
             next.run();
             return;
         }
-        var playing = music(data);
-        if (playing != null) {
-            playing.silence();
+        if (frontEndAudio != null) {
+            frontEndAudio.server().stopMusic();
         }
         var step = steps.get(at);
         Runnable after = () -> playThen(data, audio, steps, at + 1, race, next);
@@ -1275,15 +1258,7 @@ public final class Main {
         int next = won ? number + 1 : number;
         String race = campaignName.startsWith("orc") ? "orc" : "human";
 
-        // Victory and defeat each have their own theme per race, from
-        // scripts/menus/results.legacy-declaration. The end screen used to be silent.
-        var resultMusic = music(data);
-        if (resultMusic != null) {
-            resultMusic.playPlaylist(resultMusic.available(
-                    net.chonkbase.chonkcraft.engine.sound.MusicPlayer
-                            .resultTracks("orc".equals(race), won)));
-            resultMusic.setPlaylist(java.util.List.of());
-        }
+        frontEndAudio(data, assets).server().playResultMusic("orc".equals(race), won);
 
         // The last mission is not the end of the campaign. What follows it is
         // in the script -- a closing cutscene and an ending with its own
@@ -1489,7 +1464,13 @@ public final class Main {
             net.chonkbase.chonkcraft.engine.network.NetworkGame network,
             World preparedNetworkWorld, int preparedLocalPlayer,
             byte[] synchronizedMapBytes) {
-        closeFrontEndAudio();
+        GameSessions.Session gameSession = gameSessions.begin();
+        if (network != null) {
+            gameSession.closeWith(network::close);
+        }
+        if (!gameSession.runIfCurrent(Main::closeFrontEndAudio)) {
+            return;
+        }
         Path mapFile = mapFileOrNull;
         PudMap source;
         World world;
@@ -1625,6 +1606,9 @@ public final class Main {
         net.chonkbase.chonkcraft.engine.sound.GameAudio audio =
                 new net.chonkbase.chonkcraft.engine.sound.GameAudio(data.sounds());
         audio.start();
+        if (!gameSession.closeWith(audio::close)) {
+            return;
+        }
         System.out.printf("Audio: %s%n",
                 audio.isAvailable() ? "ready" : "unavailable (" + audio.unavailableReason() + ")");
 
@@ -1651,22 +1635,25 @@ public final class Main {
                 new net.chonkbase.chonkcraft.engine.sound.CdMusic(assets, audio.mixer()),
                 data.music(),
                 wanted);
+        if (!gameSession.closeWith(server::close)) {
+            return;
+        }
         server.setEffectVolume(settings.effectVolume());
         server.setMusicVolume(settings.musicVolume());
         // Unconditionally, even when nothing can start. It is the silencing
         // that matters: this is where the briefing theme or the menu theme the
         // last screen left running has to stop, and skipping the call because
         // there is no device is how it went on playing over the map.
-        server.playBattleMusic(source.races()[localPlayer] == PudMap.Race.ORC);
+        if (!gameSession.runIfCurrent(() ->
+                server.playBattleMusic(source.races()[localPlayer] == PudMap.Race.ORC))) {
+            return;
+        }
         System.out.printf("Music: %s%n", server.describe());
         // One hook, replacing the last game's. A game is put down through
         // stopPlaying below; these are only for a player who closes the window,
         // and registering three of them per launch meant loading five saves
         // left fifteen registered.
-        registerShutdown(() -> {
-            server.close();
-            audio.close();
-        });
+        gameSession.runIfCurrent(() -> registerShutdown(gameSession::close));
 
         String tilesetName = tilesetSpriteKey(source.tileset());
         Mission running = mission;
@@ -1726,7 +1713,7 @@ public final class Main {
             }
         }
         BattleShowcase.Result openingShowcase = showcase;
-        SwingUtilities.invokeLater(() -> show(
+        SwingUtilities.invokeLater(() -> gameSession.runIfCurrent(() -> show(
                 title, world, data, terrain,
                 tileset.palette(), tilesetName, localPlayer, source, audio, server, settings,
                 running, onFinished,
@@ -1735,7 +1722,8 @@ public final class Main {
                 FogTiles.from(tileset.sheet(), data.fogOfWar().levels()),
                 openingShowcase,
                 openingShowcase == null ? null
-                        : new int[] {openingShowcase.centreX(), openingShowcase.centreY()}));
+                        : new int[] {openingShowcase.centreX(), openingShowcase.centreY()},
+                gameSession)));
     }
 
     /**
@@ -1887,7 +1875,8 @@ public final class Main {
             net.chonkbase.chonkcraft.engine.network.NetworkGame network,
             java.util.List<int[]> cyclingRanges,
             AssetSource assets, Java2DPipeline.Choice pipeline,
-            FogTiles fogTiles, BattleShowcase.Result openingShowcase, int[] openingView) {
+            FogTiles fogTiles, BattleShowcase.Result openingShowcase, int[] openingView,
+            GameSessions.Session gameSession) {
 
         AppWindow shell = window();
         shell.setTitle("chonkcraft - " + title);
@@ -2095,6 +2084,7 @@ public final class Main {
         // the rate the simulation counts in.
         FixedStepLoop loop = new FixedStepLoop("chonkcraft-sim",
                 network == null ? World.CYCLES_PER_SECOND : network.cyclesPerSecond());
+        gameSession.closeWith(loop::close);
 
         /*
          * Everything this game holds, given up in one place.
@@ -2109,19 +2099,7 @@ public final class Main {
          * device open left the sounds it had already queued playing over
          * whatever came next.
          */
-        Runnable stopPlaying = () -> {
-            loop.close();
-            // The soundtrack before the device, and both of them here rather
-            // than only the device. The disc was a local of the loader and was
-            // put down by nothing but a shutdown hook: ending a scenario closed
-            // the device underneath a track that was still playing and left the
-            // player holding a voice that no longer existed.
-            server.close();
-            audio.close();
-            if (network != null) {
-                network.close();
-            }
-        };
+        Runnable stopPlaying = gameSession::close;
 
         // Loudness is kept in the sound server rather than read back from the
         // mixer, because a gain in decibels does not convert back to a slider
@@ -2312,6 +2290,9 @@ public final class Main {
         // immediately after the synchronized QUIT was applied.
         final long[] networkNoticeUntil = {0L};
         loop.register(() -> {
+            if (!gameSession.isCurrent()) {
+                return;
+            }
             if (network != null) {
                 // Lockstep: the world advances only when every machine's
                 // commands for the cycle have arrived, so this may do nothing
@@ -2393,8 +2374,6 @@ public final class Main {
             }
             screen.observePlayerIntents();
             if (mission != null) {
-                // The mission's own victory and defeat conditions, run once a
-                // second by the trigger system rather than every cycle.
                 mission.triggers().tick();
                 var outcome = mission.outcome();
                 if (outcome != TriggerSystem.Outcome.RUNNING) {
@@ -2403,7 +2382,7 @@ public final class Main {
                     // standing. The results screen is built after the game has
                     // been put down, so the figures have to be lifted now or
                     // there is nothing left to ask.
-                    lastResult = new Result(outcome,
+                    Result result = new Result(outcome,
                             ResultsScreen.statisticsOf(world, localPlayer),
                             world.player(localPlayer) == null
                                     ? 0 : world.player(localPlayer).score());
@@ -2411,17 +2390,26 @@ public final class Main {
                     // result covers it, the way the original does.
                     if (onFinished != null && !finishing.getAndSet(true)) {
                         boolean won = outcome == TriggerSystem.Outcome.VICTORY;
-                        javax.swing.Timer delay = new javax.swing.Timer(2500, event -> {
-                            // Put the game down before showing what happened.
-                            // Without this the simulation went on running
-                            // behind the result screen and behind the main
-                            // menu after it: the battle carried on being
-                            // fought, out of sight, and could still be heard.
-                            stopPlaying.run();
-                            onFinished.accept(frame, won);
-                        });
-                        delay.setRepeats(false);
-                        delay.start();
+                        // Register the timer on the event thread. Session
+                        // retirement joins this loop, so the loop must not
+                        // wait for the same ownership lock during retirement.
+                        SwingUtilities.invokeLater(() -> gameSession.runIfCurrent(() -> {
+                            javax.swing.Timer delay = new javax.swing.Timer(2500, event -> {
+                                // Put the game down before showing what happened.
+                                // Without this the simulation went on running
+                                // behind the result screen and behind the main
+                                // menu after it: the battle carried on being
+                                // fought, out of sight, and could still be heard.
+                                gameSession.runIfCurrent(() -> {
+                                    stopPlaying.run();
+                                    lastResult = result;
+                                    onFinished.accept(frame, won);
+                                });
+                            });
+                            delay.setRepeats(false);
+                            gameSession.closeWith(delay::stop);
+                            delay.start();
+                        }));
                     }
                 }
             } else if (network != null && world.cycle() > 0

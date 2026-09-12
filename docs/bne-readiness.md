@@ -42,7 +42,7 @@ The exact-fidelity frontier remains a separate, stricter proof.
 | Naval movement and oil economy | GREEN | Player commands drive ships along a retail coast and through the complete platform, loading and refinery loop while a terrain referee checks every anchor. | No blocking fact recorded. |
 | Spells and magical effects | GREEN | A scripted caster spends mana on legal targets while the referee observes missiles, delays and effects. | No blocking fact recorded. |
 | Retail ai.bin computer player | GREEN | The harness supplies only the human opening while the retail ai.bin interpreter must operate the opponent. | No blocking fact recorded. |
-| Campaign missions and triggers | GREEN | A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions. | No blocking fact recorded. |
+| Campaign missions and triggers | GREEN | A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions. The session referee uses a real window in an isolated JVM, with Xvfb when available. | No blocking fact recorded. |
 | Save, load and terrain persistence | GREEN | The harness changes terrain and live state, saves, reloads and resumes the same simulation. | No blocking fact recorded. |
 | Rendering, UI and player input | GREEN | The desktop test driver issues real command-panel and map interactions, renders deterministic frames and activates the one-action playtest evidence shortcut. | No blocking fact recorded. |
 | Sound bindings and playback policy | GREEN | A worker completes a player-issued build order while the referee follows its sound event through the script-free retail bindings and real mixer. | No blocking fact recorded. |
@@ -567,14 +567,15 @@ scripts/check-bne-ai-gate.sh
 
 Grade: **GREEN**.
 
-Automated driver: A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions.
+Automated driver: A headless referee runs every retail wrapper while focused commanders satisfy and violate representative campaign conditions. The session referee uses a real window in an isolated JVM, with Xvfb when available.
 
-Success means: All 52 wrappers run without script faults or premature outcomes, real victory and defeat conditions decide correctly, rescue paths work and every campaign has a complete ending.
+Success means: All 52 wrappers run without script faults or premature outcomes, real victory and defeat conditions decide correctly, rescue paths work and every campaign has a complete ending. Every game transition retires the preceding simulation and its delayed results, with zero skipped checks.
 
 Implementation:
 
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/campaign/Campaign.java`
 - `engine/src/main/java/net/chonkbase/chonkcraft/engine/trigger/TriggerSystem.java`
+- `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameSessions.java`
 
 Automated checks:
 
@@ -585,12 +586,15 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/RescueTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/AttackPeasantTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/campaign/MissionLengthTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/CampaignSessionRealDataTest.java`
+- `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/GameSessionsTest.java`
 
 Retail evidence:
 
 - All 52 retail mission wrappers arm 137 trigger pairs; a fail-closed referee now constructs every map, runs every wrapper for 30 simulated seconds and rejects script faults or premature outcomes.
 - Real campaign data proves both sides of the first mission's condition, all four campaigns' closing sequences, the Human 10 wrapper substitution and the rescue conditions that are the sole victory path of nine missions.
 - Authenticated BNE fixture evidence establishes per-unit rescue at the native animation marker, including a flying prisoner, rather than LegacyEngine's once-per-second whole-player town-hall shortcut.
+- Retail Human 12's 44-unit roster drives real desktop startup under an isolated display: repeated launches leave one simulation, replacement stops the discarded world, and queued defeats cannot cover a healthy mission.
 
 Known blockers:
 
@@ -599,7 +603,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine -am -Dtest=CampaignTriggerPlayabilityTest,CampaignRealDataTest,CampaignEndingTest,TriggerFailureTest,RescueTest,AttackPeasantTest,MissionLengthTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine,desktop -am -Dtest=CampaignTriggerPlayabilityTest,CampaignRealDataTest,CampaignEndingTest,TriggerFailureTest,RescueTest,AttackPeasantTest,MissionLengthTest,CampaignSessionRealDataTest,GameSessionsTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## Save, load and terrain persistence
@@ -695,7 +699,7 @@ Grade: **GREEN**.
 
 Automated driver: A worker completes a player-issued build order while the referee follows its sound event through the script-free retail bindings and real mixer.
 
-Success means: Every retail binding matches its authority, neutral and player unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks.
+Success means: Every retail binding matches its authority, neutral and player unit selection/death/work events choose the complete legal sample groups, and a completed build renders audible PCM with zero skipped checks. Soundtrack roles survive backend changes and late cleanup of an old owner.
 
 Implementation:
 
@@ -703,6 +707,7 @@ Implementation:
 - `desktop/src/main/java/net/chonkbase/chonkcraft/desktop/GameScreen.java`
 - `engine/src/main/resources/chonkcraft/sound-bindings.tsv`
 - `engine/src/main/resources/chonkcraft/unit-sounds.tsv`
+- `engine/src/main/java/net/chonkbase/chonkcraft/engine/sound/SoundServer.java`
 
 Automated checks:
 
@@ -714,6 +719,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BuilderReportsWorkCompleteTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/EconomyTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundtrackRealDataTest.java`
 
 Retail evidence:
 
@@ -722,6 +728,7 @@ Retail evidence:
 - The authenticated town-hall dead binding renders audible PCM from BNE's three-clip building-destroyed group even when destroying the local hall removes the last sight that made it visible.
 - A worker taking a gold mine's final load commits one witnessed death event before the neutral building and its sight disappear; the authenticated mine dead binding renders audible PCM from the same three-clip building-destroyed group across that fog transition and survives a saturated presentation queue.
 - The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer.
+- The authenticated 2.02b music scene and filename tables at 0x4a1898 and 0x4a184c identify 19 battle, briefing, menu and result roles. Each role reaches its real recorded samples and emits PCM; numbered catalogs fall back to authentic XMI notes for the requested scene and race.
 
 Known blockers:
 
@@ -730,7 +737,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## End-to-end player control liveness

@@ -98,7 +98,7 @@ jobs:
       - name: Install codec and font dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg flac fontconfig fonts-dejavu-core
+          sudo apt-get install -y -qq ffmpeg flac fontconfig fonts-dejavu-core xvfb xauth
       - name: Install pinned runtime
         working-directory: chonkcraft
         run: scripts/jbr/install-jbr-25.sh

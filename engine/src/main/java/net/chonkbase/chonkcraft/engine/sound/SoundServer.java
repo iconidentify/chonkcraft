@@ -7,29 +7,16 @@ import net.chonkbase.runtime.audio.AudioMixer;
 /**
  * The two volume sliders and the soundtrack they act on.
  *
- * <p>Implements the volume and music-transport half of
- * The game {@code SetEffectsVolume} and
- * {@code GetEffectsVolume} at {@code :540-551}, {@code SetMusicVolume} and
- * {@code GetMusicVolume} at {@code :627-643}, and {@code PlayMusic} and
- * {@code StopMusic} at {@code :590-620}. The menu sliders in
- * {@code scripts/menus/options.legacy-declaration:45-117} call exactly those four, and
- * {@code scripts/legacyEngine.legacy-declaration:495} and {@code :511} restore them from the
- * saved preferences at startup.
+ * <p>Recorded music goes through the PCM music bus, while archive XMI goes
+ * through a MIDI sequencer. Both sources share volume, scene and ownership
+ * here. Changing screens or sources must silence the previous soundtrack and
+ * preserve the requested musical role. Otherwise a menu can continue over a
+ * battle, or a source switch can replace a victory theme with battle music.
  *
- * <p>It exists because this implementation has the soundtrack twice and upstream does
- * not. Warcraft II ships eighteen XMI tracks for a synthesiser and the same
- * music recorded on the discs; upstream reaches both through SDL_mixer, so one
- * {@code Mix_VolumeMusic} covers them. Here the recordings are samples and go
- * through {@code AudioMixer}'s music bus while the XMI goes to the JDK's
- * sequencer, which the mixer never sees. Nothing joined the two, so the music
- * slider moved the recorded half and left the synthesised half where it was --
- * reported from play as "the music volume control has no effect". The
- * volumes and the choice between the two backends are held here so there is one
- * answer to "how loud is the music" rather than one per backend.
- *
- * <p>The choice was not a choice before either: the disc won whenever there was
- * one, on a single {@code if} in the launcher, and a player who preferred the
- * synthesised score had no way to say so.
+ * <p>Availability is checked for the requested role, not merely for any music
+ * in the import. Numbered recordings have no established race or scene; the
+ * authentic XMI score supplies those roles until their recording identities
+ * can be established from the source media.
  */
 public final class SoundServer implements AutoCloseable {
 
@@ -80,6 +67,8 @@ public final class SoundServer implements AutoCloseable {
     private final MusicPlayer synth;
 
     private Backend preferred;
+    private Backend playingBackend;
+    private Scene scene;
     private float effects = 1f;
     private float music = 1f;
 
@@ -117,6 +106,9 @@ public final class SoundServer implements AutoCloseable {
      * is how a setting comes to look as though it does nothing.
      */
     public Backend backend() {
+        if (playingBackend != null) {
+            return playingBackend;
+        }
         if (preferred == Backend.XMI) {
             return hasXmi() ? Backend.XMI : Backend.CD;
         }
@@ -125,12 +117,14 @@ public final class SoundServer implements AutoCloseable {
 
     /** Whether there is a recorded soundtrack to play. */
     private boolean hasCd() {
-        return disc != null && disc.isAvailable();
+        return disc != null && (scene == null
+                ? disc.isAvailable() : disc.find(wantedTracks()) != null);
     }
 
     /** Whether there is a synthesised soundtrack to play. */
     private boolean hasXmi() {
-        return synth != null && !synth.tracks().isEmpty();
+        return synth != null && (scene == null
+                ? !synth.tracks().isEmpty() : !synth.available(wantedTracks()).isEmpty());
     }
 
     /**
@@ -148,11 +142,41 @@ public final class SoundServer implements AutoCloseable {
             return isPlaying();
         }
         preferred = wanted;
-        return playBattleMusic(lastWasOrc);
+        return playScene(scene == null ? Scene.BATTLE : scene, lastWasOrc);
     }
 
-    /** Whose battle music was last asked for, so a switch can restart it. */
+    /** The current scene's race, retained when its backend changes. */
     private boolean lastWasOrc;
+
+    private enum Scene {
+        MENU, BRIEFING, BATTLE, VICTORY, DEFEAT
+    }
+
+    /**
+     * The music's meaning survives a change of backend or imported media.
+     * BNE 2.02b resolves its scene table at 0x4a1898 through the filename table
+     * at 0x4a184c (0x440f2c). Rows 0..11 name six battles per race, 12..15
+     * name results, and 20..22 name the briefings and menu. A numbered legacy
+     * recording does not establish any of those identities. Falling back to
+     * its third position played the same song for both campaigns; requiring
+     * named recordings only in the menu then made that screen silent.
+     *
+     * <p>Recorded playback still repeats the selected complete clip. Retail's
+     * mode-two battle rows advance after a two-second gap (0x440df9), and its
+     * human briefing has a separate loop start. Subsequent track order and
+     * that loop boundary remain different after the first playthrough.
+     */
+    private List<String> wantedTracks() {
+        String race = lastWasOrc ? "Orc" : "Human";
+        return switch (scene == null ? Scene.BATTLE : scene) {
+            case MENU -> List.of("Main Menu", "Orc Briefing");
+            case BRIEFING -> MusicPlayer.briefingTracks(lastWasOrc);
+            case BATTLE -> java.util.stream.IntStream.rangeClosed(1, 6)
+                    .mapToObj(number -> race + " Battle " + number).toList();
+            case VICTORY -> MusicPlayer.resultTracks(lastWasOrc, true);
+            case DEFEAT -> MusicPlayer.resultTracks(lastWasOrc, false);
+        };
+    }
 
     /** Whether either backend is making a sound. */
     public boolean isPlaying() {
@@ -180,83 +204,52 @@ public final class SoundServer implements AutoCloseable {
      * @return whether anything started
      */
     public boolean playBattleMusic(boolean orc) {
-        synchronized (MUSIC_FOCUS_LOCK) {
-            return playBattleMusicWithFocus(orc);
-        }
+        return playScene(Scene.BATTLE, orc);
     }
 
-    /** Starts battle music while holding the application-wide music focus. */
-    private boolean playBattleMusicWithFocus(boolean orc) {
-        lastWasOrc = orc;
-        claimMusicFocus();
-        stopMusicWithoutFocusChange();
-        if (backend() == Backend.CD) {
-            // Both backends can be absent at once, and this class is
-            // constructed that way on purpose: the title sequence and the act
-            // cards build one with no disc and no sequencer, only to carry the
-            // saved volumes onto a device of their own. Silencing is still the
-            // right thing for such a server to do; starting is not, and
-            // reaching through a null to find that out would take the launcher
-            // down on a machine with no music at all.
-            if (disc == null) {
-                return false;
-            }
-            List<CdMusic.Track> tracks = disc.tracks();
-            if (tracks.isEmpty()) {
-                return false;
-            }
-            // Battle.net Edition's recordings are named for the situation
-            // they belong to rather than numbered by a CD table of contents.
-            // Using the old disc's third-position convention here would play
-            // Human Battle 3 for an orc map as well.
-            String namedPrefix = orc ? "Orc Battle " : "Human Battle ";
-            for (CdMusic.Track track : tracks) {
-                if (track.name().startsWith(namedPrefix)) {
-                    return disc.play(track);
-                }
-            }
-            // The battle music, which on both discs follows the opening
-            // themes. Any track is better than none if the count surprises us.
-            return disc.play(tracks.get(Math.min(2, tracks.size() - 1)));
-        }
-        if (synth == null) {
-            return false;
-        }
-        synth.start();
-        // The mission playlist, as scripts/human/ui_tales.legacy-declaration and its siblings
-        // set it: all five of the race's battle tracks, drawn from at random as
-        // each one ends. Handed over even when there is no synthesiser to play
-        // it, so that what the game asked for is what the game is holding: the
-        // playlist is the record of which music this screen wants, and a
-        // machine with no MIDI device that later gets one should not be left
-        // playing the menu theme.
-        return synth.playPlaylist(synth.available(MusicPlayer.battleTracks(orc)));
-    }
-
-    /** Starts the menu theme on the player's selected soundtrack backend. */
+    /** Starts the menu on whichever backend has its theme. */
     public boolean playMenuMusic() {
+        return playScene(Scene.MENU, false);
+    }
+
+    /** Uses the same soundtrack selection for briefings as for the game. */
+    public boolean playBriefingMusic(boolean orc) {
+        return playScene(Scene.BRIEFING, orc);
+    }
+
+    /** The winner and loser each hear their race's result, played once. */
+    public boolean playResultMusic(boolean orc, boolean won) {
+        return playScene(won ? Scene.VICTORY : Scene.DEFEAT, orc);
+    }
+
+    private boolean playScene(Scene wanted, boolean orc) {
         synchronized (MUSIC_FOCUS_LOCK) {
+            scene = wanted;
+            lastWasOrc = orc;
+            playingBackend = null;
             claimMusicFocus();
             stopMusicWithoutFocusChange();
-            return playMenuMusicWithFocus();
+            Backend chosen = backend();
+            playingBackend = chosen;
+            return startScene(chosen);
         }
     }
 
-    /** Starts menu music after the caller has made this server the owner. */
-    private boolean playMenuMusicWithFocus() {
-        if (backend() == Backend.CD) {
-            if (disc == null) {
-                return false;
-            }
-            // The BNE catalog retains both logical names over the one proved
-            // recording. Orc Briefing also works on older disc catalogs.
-            return disc.play("Main Menu") || disc.play("Orc Briefing");
+    private boolean startScene(Backend chosen) {
+        boolean looping = scene != Scene.VICTORY && scene != Scene.DEFEAT;
+        if (chosen == Backend.CD) {
+            return disc != null && disc.play(disc.find(wantedTracks()), looping);
         }
         if (synth == null) {
             return false;
         }
         synth.start();
-        return synth.playPlaylist(synth.available(MusicPlayer.menuTracks()));
+        boolean started = synth.playPlaylist(synth.available(
+                scene == Scene.MENU ? MusicPlayer.menuTracks() : wantedTracks()));
+        if (!looping) {
+            synth.setPlaylist(List.of());
+        }
+        return started;
     }
 
     /** What is playing, for the line the launcher prints. */
@@ -304,9 +297,13 @@ public final class SoundServer implements AutoCloseable {
         if (disc != null) {
             disc.stop();
         }
-        if (synth != null) {
+        if (synth != null && ownsSynth()) {
             synth.silence();
         }
+    }
+
+    private boolean ownsSynth() {
+        return musicFocus == null || musicFocus == this || musicFocus.synth != synth;
     }
 
     /** Takes soundtrack focus and silences a server left by another screen. */
@@ -407,13 +404,17 @@ public final class SoundServer implements AutoCloseable {
 
     @Override
     public void close() {
-        stopMusic();
-        releaseMusicFocus();
-        if (disc != null) {
-            disc.close();
-        }
-        if (synth != null) {
-            synth.close();
+        synchronized (MUSIC_FOCUS_LOCK) {
+            stopMusicWithoutFocusChange();
+            if (disc != null) {
+                disc.close();
+            }
+            // GameData shares one sequencer. A replaced loader can finish
+            // closing after the next screen has taken ownership of it.
+            if (synth != null && ownsSynth()) {
+                synth.close();
+            }
+            releaseMusicFocus();
         }
     }
 }

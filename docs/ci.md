@@ -156,18 +156,21 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,403 |
-| `full` | installation, pack, Opus vectors | 27 |
-| `full-with-playtest-saves` | full inputs plus three private save referees | 24 |
+| `data-free` | none | 1,410 |
+| `full` | classic installation, pack, Opus vectors | 31 |
+| `full-with-playtest-saves` | full inputs plus three private save referees | 28 |
 | `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |
 
-The twenty-seven that skip even in `full` want nothing anyone should have to
+The thirty-one that skip even in `full` want nothing anyone should have to
 provide: seven need a display, five need a directory of 16-bit WAVs
 (`-Dopus.music`) that this project does not ask anybody for, four are
 fixture-sensitive, five need custom maps absent from the retail pack, three
 need private playtest saves, one three-map recording matrix needs a BNE pack,
 and the production service smoke runs only in the deploy workflow. One video
-assertion depends on which retail release is mounted.
+assertion depends on which retail release is mounted. Four soundtrack and
+screen checks require BNE recordings. Session lifecycle checks launch real
+windows in child JVMs; CI installs Xvfb so these execute despite Surefire's
+headless setting.
 
 The `full-with-playtest-saves` profile is the exact local counterpart for a
 development machine that has the three private save referees installed. It

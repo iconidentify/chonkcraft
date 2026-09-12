@@ -65,13 +65,21 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,058 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,067 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,403 skips.
+has the same 88 expected failure identities and exactly 1,410 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
-and requires its separate 27-skip profile. Coverage rules are documented in
+and requires its separate 31-skip classic profile. Coverage rules are documented in
 [the development setup](docs/development-setup.md) and [CI guide](docs/ci.md).
+
+Game startup now retires the previous simulation, audio and pending result.
+Real-window campaign checks protect repeated launch input, load-error recovery
+and replacement while a defeat is queued. Soundtrack routing preserves the
+race and screen across source changes; unidentified numbered recordings fall
+back to the matching archive score. Nineteen recorded music roles are checked
+against the BNE scene table and decoded PCM. German numbered-disc
+identities remain unverified.
 
 Both demolition squads accept targeted commands, approach the selected point
 or unit, and apply the BNE blast. Native captures cover interrupted approaches,
