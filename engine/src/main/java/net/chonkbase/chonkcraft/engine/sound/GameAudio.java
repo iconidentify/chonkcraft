@@ -1,6 +1,7 @@
 package net.chonkbase.chonkcraft.engine.sound;
 
 import java.util.function.IntUnaryOperator;
+import java.util.function.LongSupplier;
 import net.chonkbase.runtime.audio.AudioBus;
 import net.chonkbase.runtime.audio.AudioMixer;
 import net.chonkbase.runtime.audio.AudioOutputDriver;
@@ -90,13 +91,22 @@ public final class GameAudio implements AutoCloseable {
     public static final float CUTSCENE_GAIN_DB = -6f;
 
     private final SoundBank bank;
+    private final LongSupplier audioClock;
+    private final java.util.Map<String, Long> lastSoundStarts = new java.util.HashMap<>();
+    private static final long REPLAY_INTERVAL_NANOS = 80_000_000L;
     private final AudioMixer mixer = new AudioMixer();
     private AudioOutputDriver driver;
     private boolean available;
     private String unavailableReason = "not started";
 
     public GameAudio(SoundBank bank) {
+        this(bank, System::nanoTime);
+    }
+
+    /** Presentation time is injectable so admission can be tested without a sound device. */
+    GameAudio(SoundBank bank, LongSupplier audioClock) {
         this.bank = bank;
+        this.audioClock = java.util.Objects.requireNonNull(audioClock);
     }
 
     /** Opens the output device. Safe to call when there is none. */
@@ -415,7 +425,7 @@ public final class GameAudio implements AutoCloseable {
         play(path, bus, 0f, pan, priority);
     }
 
-    private void play(String path, AudioBus bus, float gainDb, float pan, int priority) {
+    private synchronized void play(String path, AudioBus bus, float gainDb, float pan, int priority) {
         if (!available || path == null) {
             return;
         }
@@ -423,7 +433,20 @@ public final class GameAudio implements AutoCloseable {
         if (clip == null) {
             return;
         }
-        mixer.play(clip, bus, false, gainDb, pan, priority);
+        // BNE 0x440792..0x4407a2 refuses the same sound within 80 ms of its
+        // last successful start. Without this gate a group of workers could
+        // stack thirty-two copies of one blow. The limiter then compressed
+        // even low slider settings back toward its ceiling. Key by decoded
+        // resource path so aliases share the native sound's replay interval;
+        // sample selection has already consumed its ordinary random choice.
+        long now = audioClock.getAsLong();
+        Long previous = lastSoundStarts.get(path);
+        if (previous != null && now - previous < REPLAY_INTERVAL_NANOS) {
+            return;
+        }
+        if (mixer.play(clip, bus, false, gainDb, pan, priority) != AudioMixer.NO_VOICE) {
+            lastSoundStarts.put(path, now);
+        }
     }
 
     private static float clampPan(float pan) {

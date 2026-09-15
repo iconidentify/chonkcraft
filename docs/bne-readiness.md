@@ -413,6 +413,8 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/ClickMarkerTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/PresentationAheadProjectilePrepareTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/RareSpellBehaviorTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSpellBehaviorTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSpellAnimationRealDataTest.java`
 - `scripts/check-bne-projectile-gate.sh`
 
 Retail evidence:
@@ -480,7 +482,7 @@ Grade: **GREEN**.
 
 Automated driver: A scripted caster spends mana on legal targets while the referee observes missiles, delays and effects.
 
-Success means: The pinned retail dispatch and rare-handler code shapes authenticate the implementation; all generated effects are explicitly modelled, spend the declared cost and pass 36 behavior checks with zero skips.
+Success means: The pinned retail dispatch and rare-handler code shapes authenticate the implementation; all generated effects are explicitly modelled, spend the declared cost and pass 41 behavior checks with zero skips.
 
 Implementation:
 
@@ -496,6 +498,8 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/SpellCastingTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/SpellBuffTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/RareSpellBehaviorTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSpellBehaviorTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSpellAnimationRealDataTest.java`
 - `tools/bne-readiness/spell-dispatch.json`
 - `tools/bne-readiness/check_spell_dispatch.py`
 - `scripts/check-bne-spell-gate.sh`
@@ -506,7 +510,7 @@ Retail evidence:
 - The authenticated 2.02b dispatch table maps all 19 spell orders to their retail handlers. Code-slice proofs establish one Fireball constructor, five Blizzard and five Death-and-Decay field constructors, ten delayed successors per field and two retail random draws selecting every field in a five-wide patch.
 - The pinned Exorcism handler reaches retail HitUnit and its 0x0040a9d0 offer boundary before damage; the Java direct-spell path now uses that same offer-and-wait policy instead of layering a second flee/attack-back tail on top.
 - Authenticated handler slices prove Polymorph's critter conversion, Eye of Kilrogg's summoned unit type and Unholy Armor's 500-cycle duration plus hit-point halving.
-- The player/referee lane proves all previously unmodelled rare effects, true position-target commands, fireball, life-returning Death Coil, persistent Flame Shield, Whirlwind and Runes, delayed Blizzard, death and decay, demolish, targeted casting, self casting and mana exhaustion for 36 passing checks and zero skips.
+- The player/referee lane proves all previously unmodelled rare effects, true position-target commands, fireball, life-returning Death Coil, persistent Flame Shield, Whirlwind and Runes, delayed Blizzard, death and decay, demolish, targeted casting, self casting and mana exhaustion for 41 passing checks and zero skips.
 
 Known blockers:
 
@@ -720,6 +724,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/EconomyTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundtrackRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BattleNetSoundAdmissionTest.java`
 
 Retail evidence:
 
@@ -737,7 +742,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest,BattleNetSoundAdmissionTest,VolumeControlTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## End-to-end player control liveness

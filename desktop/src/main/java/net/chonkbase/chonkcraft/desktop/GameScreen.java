@@ -250,7 +250,7 @@ final class GameScreen extends JPanel {
         return switch (action) {
             case "move", "patrol" -> unit.type().speed() > 0;
             case "attack" -> under == null
-                    || world.isEnemyPlayer(localPlayer, under.player());
+                    || world.canCommandAttack(unit, under);
             case "repair" -> under != null && under != unit
                     && world.canControl(localPlayer, under.player())
                     && under.hitPoints() < under.type().hitPoints();
@@ -258,15 +258,22 @@ final class GameScreen extends JPanel {
             case "attack-ground" -> unit.type().firesMissile();
             // A spell needs something to land on, and the spell itself says
             // what it will accept.
-            case "cast-spell" -> under != null && under.isAlive() && castable(under);
+            case "cast-spell" -> pendingSpell != null && selectedUnits().stream()
+                    .anyMatch(caster -> caster.canUseAbility(pendingSpell) && castable(caster, under));
             default -> true;
         };
     }
 
     /** Whether the armed spell will accept this unit as its target. */
-    private boolean castable(Unit under) {
+    private boolean castable(Unit caster, Unit under) {
         var spell = pendingSpell == null ? null : data.spells().spells().get(pendingSpell);
         if (spell == null) {
+            return false;
+        }
+        if (spell.target() == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION) {
+            return !"spell-suicide-bomber".equals(pendingSpell) || under != caster;
+        }
+        if (under == null || !under.isAlive() || under == caster) {
             return false;
         }
         if (!spell.allowBuildings() && under.type().building()) {
@@ -2291,7 +2298,10 @@ final class GameScreen extends JPanel {
                 } else {
                     int index = spellIndex(ident);
                     for (Unit each : group) {
-                        if (each.canUseAbility(ident) && (under == null || each != under)) {
+                        if (each.canUseAbility(ident)
+                                && (spell.target()
+                                        == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION
+                                        || under == null || each != under)) {
                             GameCommand cast = "spell-suicide-bomber".equals(ident) && under != null
                                     ? GameCommand.cast(localPlayer, each.id(), under.id(), index)
                                     : spell.target()

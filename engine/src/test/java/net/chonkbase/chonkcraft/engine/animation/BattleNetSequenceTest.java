@@ -5,8 +5,38 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
 
 class BattleNetSequenceTest {
+
+    /** Controlled native 0x402440 replays covered all 256 operands, three speeds and both load flags. */
+    @Test
+    @DisplayName("native waits distinguish spell speed from fixed and loaded waits")
+    void nativeWaitsDistinguishSpellSpeedFromFixedAndLoadedWaits() {
+        // opcode, operand, speed, load, native timer. These boundary results
+        // include opcode 8's unsigned test and byte overflow; a universal
+        // multiply/divide would get both wrong.
+        int[][] cases = {
+            {1, 5, -1, 0, 5}, {1, 5, 1, 1, 5},
+            {7, 5, -1, 0, 10}, {7, 5, 0, 0, 5}, {7, 5, 1, 0, 2},
+            {8, 5, -1, 0, 2}, {8, 5, 0, 0, 5}, {8, 5, 1, 0, 2},
+            {9, 5, -1, 0, 10}, {9, 5, 0, 0, 5}, {9, 5, 1, 0, 5},
+            {12, 5, -1, 1, 12}, {12, 5, 0, 1, 6}, {12, 5, 1, 1, 3},
+            {7, 0, -1, 0, 0}, {7, 0, 1, 0, 1}, {7, 255, -1, 0, 254},
+            {12, 255, -1, 1, 0}, {12, 255, 1, 1, 1}
+        };
+        for (int[] row : cases) {
+            BattleNetSequence sequence = new BattleNetSequence(
+                    new byte[] {(byte) row[0], (byte) row[1], 0});
+            BattleNetSequence.Tick wait = sequence.tick(0, 1, row[2], row[3] != 0);
+            assertEquals(row[4], wait.timer(), "native wait " + java.util.Arrays.toString(row));
+            assertEquals(2, wait.offset(), "a wait consumes its opcode and operand");
+            assertEquals(row[4] == 0 ? 255 : row[4] - 1,
+                    sequence.quietTicksUntilActionMarker(wait.offset(), wait.timer(),
+                            row[2], row[3] != 0),
+                    "queued orders must forecast the same byte countdown");
+        }
+    }
 
     @Test
     void followsStillMarkersWaitAndLoopFromTheTypeTable() {

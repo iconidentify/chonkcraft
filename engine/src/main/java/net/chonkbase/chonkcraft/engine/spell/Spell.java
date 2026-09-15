@@ -66,6 +66,8 @@ public final class Spell {
         POLYMORPH,
         /** Halve a unit's life and make it invulnerable for 500 cycles. */
         UNHOLY_ARMOR,
+        /** Spend mana damaging undead in the native ordered area scan. */
+        EXORCISM,
         /** Anything the implementation does not model yet. */
         OTHER
     }

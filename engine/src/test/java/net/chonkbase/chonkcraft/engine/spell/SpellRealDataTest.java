@@ -6,6 +6,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.file.Path;
 import java.util.List;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
+import net.chonkbase.chonkcraft.data.map.PudMap;
+import net.chonkbase.chonkcraft.engine.World;
+import net.chonkbase.chonkcraft.engine.map.GameMap;
+import net.chonkbase.chonkcraft.engine.map.TileFlag;
+import net.chonkbase.chonkcraft.engine.map.Tileset;
 import net.chonkbase.chonkcraft.engine.GameData;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
@@ -49,26 +54,28 @@ class SpellRealDataTest {
     }
 
     @Test
-    @DisplayName("healing heals and exorcism harms")
-    void theSignOfAnEffectMatchesItsPurpose() {
-        SpellSet spells = gameData().spells().spells();
-
-        // The sign is what separates a heal from a curse, and it comes
-        // straight from the data rather than from the spell's name.
-        int healing = vitalsChange(spells.get("spell-healing"));
-        int exorcism = vitalsChange(spells.get("spell-exorcism"));
-        assertTrue(healing > 0, "healing should restore hit points, got " + healing);
-        assertTrue(exorcism < 0, "exorcism should take them, got " + exorcism);
-    }
-
-    private static int vitalsChange(Spell spell) {
-        for (Spell.Effect effect : spell.effects()) {
-            if (effect.kind() == Spell.EffectKind.ADJUST_VITALS
-                    && "hit-points".equals(effect.what())) {
-                return effect.amount();
+    @DisplayName("real exorcism finds undead beside a living target without harming that target")
+    void realExorcismFindsUndeadBesideALivingTarget() {
+        var data = gameData();
+        var map = new GameMap(24, 24, new Tileset());
+        for (int y = 0; y < 24; y++) {
+            for (int x = 0; x < 24; x++) {
+                map.field(x, y).setFlags(TileFlag.LAND_ALLOWED);
             }
         }
-        return 0;
+        var world = new World(map);
+        data.configureWorld(world, PudMap.Tileset.FOREST);
+        world.upgrades(0).complete("upgrade-exorcism");
+        var paladin = world.createUnit(data.unitTypes().types().get("unit-paladin"), 0, 5, 10);
+        var mage = world.createUnit(data.unitTypes().types().get("unit-mage"), 1, 10, 10);
+        var skeleton = world.createUnit(data.unitTypes().types().get("unit-skeleton"), 1, 11, 10);
+        int livingHealth = mage.hitPoints();
+        int undeadHealth = skeleton.hitPoints();
+        paladin.setMana(20);
+        assertTrue(world.orderCast(paladin, "spell-exorcism", mage), "the real paladin must cast at the selected tile");
+        assertEquals(livingHealth, mage.hitPoints(), "mana capacity does not make the mage undead");
+        assertEquals(undeadHealth - 5, skeleton.hitPoints(), "the neighbouring skeleton takes five damage");
+        assertEquals(0, paladin.mana(), "the real spell charges four mana per point of damage");
     }
 
     @Test

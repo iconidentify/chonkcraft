@@ -103,7 +103,7 @@ final class BattleNetMovementSystem {
         int queueWait = -1;
         if (world.battleNetSequence != null
                 && unit.battleNetSequenceOffset() >= 0) {
-            queueWait = world.battleNetSequence.quietTicksUntilActionMarker(
+            queueWait = world.quietBattleNetTicks(unit,
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
         }
@@ -113,8 +113,7 @@ final class BattleNetMovementSystem {
         int actionWait = 3;
         if (world.battleNetSequence != null) {
             int stillStart = world.idle.battleNetStillSequenceStart(unit);
-            int scriptedWait = world.battleNetSequence
-                    .quietTicksUntilActionMarker(stillStart, 3);
+            int scriptedWait = world.quietBattleNetTicks(unit, stillStart, 3);
             if (scriptedWait >= 0) {
                 actionWait = scriptedWait + 1;
             }
@@ -10365,7 +10364,7 @@ final class BattleNetMovementSystem {
             unit.setBattleNetMovePaceOffset(-1);
             return;
         }
-        BattleNetSequence.Tick open = world.battleNetSequence.tick(moveStart, 1);
+        BattleNetSequence.Tick open = world.tickBattleNetSequence(unit, moveStart, 1);
         if (!open.valid()) {
             unit.setBattleNetMovePaceOffset(-1);
             return;
@@ -10400,7 +10399,7 @@ final class BattleNetMovementSystem {
                 || unit.battleNetMovePaceOffset() < 0) {
             return -1;
         }
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit,
                 unit.battleNetMovePaceOffset(), unit.battleNetMovePaceTimer());
         if (!tick.valid()) {
             unit.setBattleNetMovePaceOffset(-1);
@@ -10410,15 +10409,6 @@ final class BattleNetMovementSystem {
             unit.setFrame(tick.frame());
         }
         int timer = tick.timer();
-        if (tick.inclusiveMovementWait()
-                && unit.returningToDepot() && unit.carried() > 0) {
-            // Retail's laden peon return uses opcode 12 as an inclusive wait:
-            // op5 3 / op12 2 ends at timer 3, then counts 2,1 before the next
-            // movement beat. Other residual-pace users retain the ordinary
-            // opcode timer used by their authenticated repair/ship/siege
-            // journeys.
-            timer = (timer + 1) & 0xff;
-        }
         unit.setBattleNetMovePaceOffset(tick.offset());
         unit.setBattleNetMovePaceTimer(timer);
         if ((unit.battleNetLandPatrolMoveBody() && world.isPerson(unit.player())

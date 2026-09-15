@@ -56,7 +56,7 @@ refusals. The current evidence and reproduction workflow are in
 ## Playability and release verification
 
 All 18 playability lanes pass with their required authenticated inputs,
-including the 61-test control gate, 117 movement checks, 65 projectile
+including the 62-test control gate, 117 movement checks, 65 projectile
 checks, 42 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
@@ -65,13 +65,20 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,067 tests, with 90 existing
+The integrated pack-plus-Opus suite contains 3,076 tests, with 90 existing
 specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,410 skips.
+has the same 88 expected failure identities and exactly 1,414 skips.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 31-skip classic profile. Coverage rules are documented in
 [the development setup](docs/development-setup.md) and [CI guide](docs/ci.md).
+
+Explicit attacks now reach Human 14's neutral Dark Portal, including queued
+commands. Exorcism follows BNE's ordered undead-area scan. Slow and Haste
+reach the native animation timer, whose attack frames remain authoritative.
+Healing and Invisibility retain BNE's self-target restriction. The shared
+sound path applies BNE's 80 ms repeat limit, preserving volume response under
+coincident effects, and the zero setting emits exact silence.
 
 Game startup now retires the previous simulation, audio and pending result.
 Real-window campaign checks protect repeated launch input, load-error recovery

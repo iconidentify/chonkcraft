@@ -145,6 +145,19 @@ public final class CommandApplier {
             return false;
         }
 
+        // BNE's 0x47606a self-target check precedes ReleaseOrders. Healing
+        // and Invisibility cannot target their own caster, even when shifted;
+        // refusal must preserve the active order and every queued waypoint.
+        if (command.targetId() == unit.id()) {
+            String ident = command.kind() == GameCommand.Kind.CAST
+                    ? spellAt(command.typeIndex()) : null;
+            var spell = ident == null || world.spells() == null ? null : world.spells().get(ident);
+            if (spell == null || spell.target()
+                    != net.chonkbase.chonkcraft.engine.spell.Spell.Target.SELF) {
+                return false;
+            }
+        }
+
         if (command.queued() && shouldWait(unit, command.kind())) {
             Unit.QueuedOrder queued = queuedOrder(command);
             if (queued != null) {

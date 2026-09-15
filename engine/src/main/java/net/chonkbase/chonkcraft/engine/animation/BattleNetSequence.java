@@ -222,6 +222,21 @@ public final class BattleNetSequence {
      * order-action marker returns control.
      */
     public Tick tick(int offset, int timer) {
+        return tick(offset, timer, 0, false);
+    }
+
+    /**
+     * Advances with the signed Slow/Haste state and the carried-load flag.
+     *
+     * <p>BNE 0x452291 supplies -1, 0 or 1 from the signed spell timer.
+     * The interpreter at 0x4025d2 leaves ordinary waits alone, doubles slow
+     * waits, and halves haste waits with a floor of one. Opcode 8 uses an
+     * unsigned nonzero test, so even Slow halves that particular wait.
+     * Opcode 12 adds the load beat before applying speed; arithmetic wraps
+     * in the native byte. Scaling every presentation wait while leaving
+     * these simulation waits unchanged gave a slowed fighter two clocks.
+     */
+    public Tick tick(int offset, int timer, int speed, boolean carrying) {
         if (!contains(offset, 1)) {
             return Tick.invalid();
         }
@@ -250,21 +265,14 @@ public final class BattleNetSequence {
                     return new Tick(cursor + 1, 1, true,
                             inlineActionMarker, true, pixels, false, frame);
                 }
-                case 1, 7, 8, 9 -> {
+                case 1, 7, 8, 9, 12 -> {
                     if (!contains(cursor, 2)) {
                         return Tick.invalid();
                     }
                     return new Tick(cursor + 2,
-                            Byte.toUnsignedInt(program[cursor + 1]), false,
-                            inlineActionMarker, true, pixels, false, frame);
-                }
-                case 12 -> {
-                    if (!contains(cursor, 2)) {
-                        return Tick.invalid();
-                    }
-                    return new Tick(cursor + 2,
-                            Byte.toUnsignedInt(program[cursor + 1]), false,
-                            inlineActionMarker, true, pixels, true, frame);
+                            adjustedWait(opcode, Byte.toUnsignedInt(program[cursor + 1]),
+                                    speed, carrying), false,
+                            inlineActionMarker, true, pixels, opcode == 12, frame);
                 }
                 case 2 -> {
                     // Zero is meaningful in the native byte field: its next
@@ -341,10 +349,15 @@ public final class BattleNetSequence {
      *         non-terminating bytecode
      */
     public int quietTicksUntilActionMarker(int offset, int timer) {
+        return quietTicksUntilActionMarker(offset, timer, 0, false);
+    }
+
+    /** Forecasts the same spell-adjusted waits that the live owner executes. */
+    public int quietTicksUntilActionMarker(int offset, int timer, int speed, boolean carrying) {
         int cursor = offset;
         int countdown = timer;
         for (int quiet = 0; quiet < MAX_INSTRUCTIONS_PER_TICK; quiet++) {
-            Tick next = tick(cursor, countdown);
+            Tick next = tick(cursor, countdown, speed, carrying);
             if (!next.valid()) {
                 return -1;
             }
@@ -355,6 +368,17 @@ public final class BattleNetSequence {
             countdown = next.timer();
         }
         return -1;
+    }
+
+    private static int adjustedWait(int opcode, int wait, int speed, boolean carrying) {
+        int timer = (wait + (opcode == 12 && carrying ? 1 : 0)) & 0xff;
+        if ((opcode == 7 || opcode == 9 || opcode == 12) && speed < 0) {
+            return (timer << 1) & 0xff;
+        }
+        if ((opcode == 7 || opcode == 12) && speed > 0 || opcode == 8 && speed != 0) {
+            return Math.max(1, timer >>> 1);
+        }
+        return timer;
     }
 
     private int unsignedShort(int offset) {

@@ -24,6 +24,16 @@ public final class SpellCatalog {
             spell.setOrganicOnly(row.organicOnly());
             spell.setAllowBuildings(row.allowBuildings());
             spell.setAutoCastable(row.autoCastable());
+            // Retail order 41 at 0x4426a0 scans a position. The inherited
+            // single-unit adjust-vitals declaration damaged living targets
+            // and could not find an undead neighbour of the clicked tile.
+            if ("spell-exorcism".equals(row.ident())) {
+                spell.setTarget(Spell.Target.POSITION);
+                spell.setSoundWhenCast("");
+                spell.effects().add(new Spell.Effect(Spell.EffectKind.EXORCISM,
+                        "missile-exorcism", 0, java.util.Map.of()));
+                continue;
+            }
             for (GeneratedSpells.EffectRow effect : row.effects()) {
                 spell.effects().add(new Spell.Effect(
                         effectKind(row.ident(), effect),

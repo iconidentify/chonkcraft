@@ -59,7 +59,11 @@ class SpellTest {
     }
 
     private static UnitType footman() {
-        UnitType type = new UnitType("unit-footman");
+        return infantry("unit-footman");
+    }
+
+    private static UnitType infantry(String ident) {
+        UnitType type = new UnitType(ident);
         type.setTileSize(1, 1);
         type.setHitPoints(60);
         type.setSpeed(10);
@@ -198,7 +202,7 @@ class SpellTest {
     void exorcismHarmsAndCanKill() {
         World world = world();
         Unit mage = world.createUnit(mage(), 0, 5, 5);
-        Unit victim = world.createUnit(footman(), 1, 8, 5);
+        Unit victim = world.createUnit(infantry("unit-skeleton"), 1, 8, 5);
         victim.setHitPoints(1);
 
         assertTrue(world.castSpell(mage, "spell-exorcism", victim));
@@ -279,6 +283,7 @@ class SpellTest {
         Unit mage = world.createUnit(mage(), 0, 5, 5);
         Unit victim = world.createUnit(footman(), 1, 7, 5);
         world.kill(victim);
-        assertFalse(world.castSpell(mage, "spell-exorcism", victim));
+        assertFalse(world.castSpell(mage, "spell-healing", victim),
+                "a targeted spell must refuse a dead unit");
     }
 }

@@ -14,6 +14,18 @@ import java.util.Map;
 public final class UnitType {
 
     /**
+     * Native type flag 0x8000, captured from BNE 2.02b's initialized table.
+     * Death Knight, Gul'dan, Teron Gorefiend and Skeleton carry it; living
+     * spellcasters and Daemons do not. It is independent of mana capacity.
+     */
+    public boolean undead() {
+        return switch (net.chonkbase.chonkcraft.data.map.PudUnitTypes.code(ident)) {
+            case 11, 21, 51, 55 -> true;
+            default -> false;
+        };
+    }
+
+    /**
      * Which of the three domains a type moves in.
      *
      * <p>{@code EMovement} in {@code src/include/unittype.h:662}, set from the
