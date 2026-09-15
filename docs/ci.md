@@ -156,7 +156,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,410 |
+| `data-free` | none | 1,414 |
 | `full` | classic installation, pack, Opus vectors | 31 |
 | `full-with-playtest-saves` | full inputs plus three private save referees | 28 |
 | `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |

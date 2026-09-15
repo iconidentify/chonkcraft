@@ -475,7 +475,7 @@ final class BattleNetCombatSystem {
             unit.setBattleNetFlyerPatrolAttackBody(false);
             return false;
         }
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit,
                 offset, unit.battleNetAnimationTimer());
         if (!tick.valid()) {
             unit.setBattleNetFlyerPatrolAttackBody(false);
@@ -492,7 +492,7 @@ final class BattleNetCombatSystem {
             // Construction's opening OP0 invokes Attack, which elects to run
             // this committed body before chasing. Native immediately calls
             // the compact animator again and exposes the body's first wait.
-            tick = world.battleNetSequence.tick(
+            tick = world.tickBattleNetSequence(unit,
                     tick.offset(), tick.timer());
             if (!tick.valid() || tick.actionMarker()) {
                 unit.setBattleNetFlyerPatrolAttackBody(false);
@@ -7693,7 +7693,7 @@ final class BattleNetCombatSystem {
                     ? -1 : world.idle.battleNetSequenceStart(
                             unit, BattleNetSequence.ATTACK_ANIMATION);
             BattleNetSequence.Tick invalidOp0 = invalidAttackStart < 0
-                    ? null : world.battleNetSequence.tick(
+                    ? null : world.tickBattleNetSequence(unit,
                             invalidAttackStart, 1);
             boolean invalidatedOnFreshOp0 = invalidOp0 != null
                     && invalidOp0.valid()
@@ -8803,8 +8803,7 @@ final class BattleNetCombatSystem {
                     // retail's 46->71). Consume that opcode now so the entire
                     // repeated attack loop retains its retail period.
                     if (onPreOp10Wait) {
-                        BattleNetSequence.Tick op10 = world.battleNetSequence
-                                .tick(seqOff, 1);
+                        BattleNetSequence.Tick op10 = world.tickBattleNetSequence(attacker, seqOff, 1);
                         if (op10.valid() && op10.inlineActionMarker()) {
                             attacker.setBattleNetSequenceOffset(op10.offset());
                             attacker.setBattleNetAnimationTimer(op10.timer());
@@ -9566,7 +9565,7 @@ final class BattleNetCombatSystem {
         boolean fired = false;
         if (world.battleNetSequence != null
                 && unit.battleNetSequenceOffset() >= 0) {
-            BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+            BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit,
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
             if (!tick.valid()) {
@@ -9576,6 +9575,9 @@ final class BattleNetCombatSystem {
             unit.setBattleNetSequenceOffset(tick.offset());
             unit.setBattleNetAnimationTimer(tick.timer());
             fired = tick.inlineActionMarker();
+            if (tick.frame() >= 0) {
+                unit.setFrame(tick.frame());
+            }
         }
 
         if (unit.animation().current() != attack) {
@@ -11068,7 +11070,7 @@ final class BattleNetCombatSystem {
             tower.setBattleNetAnimationTimer(1);
         }
 
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(tower, offset,
                 tower.battleNetAnimationTimer());
         if (!tick.valid()) {
             stepBattleNetTowerFallback(tower);
@@ -11240,7 +11242,7 @@ final class BattleNetCombatSystem {
                 || !onBattleNetChaseMoveBody(unit)) {
             return false;
         }
-        BattleNetSequence.Tick next = world.battleNetSequence.tick(
+        BattleNetSequence.Tick next = world.tickBattleNetSequence(unit,
                 unit.battleNetSequenceOffset(),
                 unit.battleNetAnimationTimer());
         return next.valid() && next.actionMarker();
@@ -11258,7 +11260,7 @@ final class BattleNetCombatSystem {
                 || !onBattleNetChaseMoveBody(unit)) {
             return false;
         }
-        BattleNetSequence.Tick next = world.battleNetSequence.tick(
+        BattleNetSequence.Tick next = world.tickBattleNetSequence(unit,
                 unit.battleNetSequenceOffset(),
                 unit.battleNetAnimationTimer());
         return next.valid() && next.actionMarker();
@@ -11383,7 +11385,7 @@ final class BattleNetCombatSystem {
         }
         // Opening is frame + OP0. Tick once with timer 1 to land on the body
         // the way a just-taken step does (skeleton 1130/1 → 1133/1 action).
-        BattleNetSequence.Tick open = world.battleNetSequence.tick(moveStart, 1);
+        BattleNetSequence.Tick open = world.tickBattleNetSequence(unit, moveStart, 1);
         if (!open.valid()) {
             return;
         }
@@ -11407,7 +11409,7 @@ final class BattleNetCombatSystem {
         if (offset < 0) {
             return 0;
         }
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit, offset,
                 unit.battleNetAnimationTimer());
         if (!tick.valid()) {
             unit.setBattleNetSequenceOffset(-1);
@@ -11674,7 +11676,7 @@ final class BattleNetCombatSystem {
                 && unit.pathLength() > 0
                 && unit.battleNetAnimationTimer() == 1
                 && !unit.battleNetChaseStepReady()) {
-            BattleNetSequence.Tick nextMoveTick = world.battleNetSequence.tick(
+            BattleNetSequence.Tick nextMoveTick = world.tickBattleNetSequence(unit,
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
             if (nextMoveTick.valid() && nextMoveTick.actionMarker()) {
@@ -12246,7 +12248,7 @@ final class BattleNetCombatSystem {
                 && !world.targets.inAttackRange(unit, sequenceTarget)) {
             return false;
         }
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit, offset,
                 unit.battleNetAnimationTimer());
         if (World.BNE_IDLE_TRACE) {
             System.err.printf("JBNEATTACKSEQ cycle=%d unit=%d offset=%d->%d "
@@ -13043,14 +13045,14 @@ final class BattleNetCombatSystem {
                             || !sequenceTarget.isAlive())
                     && !settledInRange
                     && attackStart >= 0 && offset >= attackStart) {
-                BattleNetSequence.Tick next = world.battleNetSequence.tick(
+                BattleNetSequence.Tick next = world.tickBattleNetSequence(unit,
                         tick.offset(), tick.timer());
                 recoveryMarkerNext = next.valid() && next.actionMarker();
             }
             boolean commandedConstruction = unit.battleNetPlayerCommandAttack()
                     && !unit.chasing() && !settledInRange
                     && attackStart >= 0
-                    && world.battleNetSequence.quietTicksUntilActionMarker(attackStart, 1) > 0;
+                    && world.quietBattleNetTicks(unit, attackStart, 1) > 0;
             if (commandedConstruction && unit.battleNetOrderDelay() > 0) {
                 unit.setBattleNetOrderDelay(unit.battleNetOrderDelay() - 1);
             }

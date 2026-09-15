@@ -27,7 +27,7 @@ python3 "${repo_root}/tools/bne-readiness/check_spell_dispatch.py" \
   --exe "${retail_exe}" --evidence "${evidence}"
 
 CHONKCRAFT_ASSET_PACK="${asset_pack}" "${repo_root}/scripts/run-tests.sh" -pl engine -am \
-  '-Dtest=OffensiveSpellTest,SpellCastingTest,SpellRealDataTest,SpellBuffTest,RareSpellBehaviorTest' \
+  '-Dtest=OffensiveSpellTest,SpellCastingTest,SpellRealDataTest,SpellBuffTest,RareSpellBehaviorTest,BattleNetSpellBehaviorTest,BattleNetSpellAnimationRealDataTest' \
   -Dsurefire.failIfNoSpecifiedTests=false
 
 python3 - "${repo_root}/engine/target/surefire-reports" <<'PY'
@@ -42,6 +42,8 @@ expected = {
     "net.chonkbase.chonkcraft.engine.spell.SpellRealDataTest": 6,
     "net.chonkbase.chonkcraft.engine.SpellBuffTest": 7,
     "net.chonkbase.chonkcraft.engine.RareSpellBehaviorTest": 8,
+    "net.chonkbase.chonkcraft.engine.BattleNetSpellBehaviorTest": 4,
+    "net.chonkbase.chonkcraft.engine.BattleNetSpellAnimationRealDataTest": 1,
 }
 for name, count in expected.items():
     report = root / f"TEST-{name}.xml"
@@ -57,7 +59,7 @@ for name, count in expected.items():
             f"{name}: expected {count}/0/0/0 tests/skips/failures/errors, "
             f"got {observed}/{skipped}/{failures}/{errors}"
         )
-print("spell referee inventory: 36 pass, 0 skipped")
+print("spell referee inventory: 41 pass, 0 skipped")
 PY
 
 echo "spell gate passed: authenticated retail dispatcher and complete spell effects"

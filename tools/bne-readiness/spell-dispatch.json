@@ -103,6 +103,42 @@
         {"offset": "0x7b", "hex": "66c74646f401"},
         {"offset": "0x83", "hex": "66d16e22"}
       ]
+    },
+    {
+      "name": "targeted-self-command-refusal",
+      "start": "0x0047606a",
+      "size": 8,
+      "sha256": "f19a5639c94b2847be467ad631870e3389a6e4996024fc1e13e62af68e6b17f5",
+      "required_bytes": [
+        {
+          "offset": "0x0",
+          "hex": "3bf50f841c010000"
+        }
+      ]
+    },
+    {
+      "name": "exorcism-undead-eligibility-and-mana",
+      "start": "0x00442830",
+      "size": 152,
+      "sha256": "3d8ca013977f7df5e62a1d7b5c0487eab727fa920f0bd3e308e36610a16dd746",
+      "required_bytes": [
+        {
+          "offset": "0x1a",
+          "hex": "f6c580"
+        }
+      ]
+    },
+    {
+      "name": "native-spell-animation-waits",
+      "start": "0x004025d2",
+      "size": 76,
+      "sha256": "285d8f0039e471e74d21016ba1b121c3ee296a1a0771835df4e92c20cf74ab65"
+    },
+    {
+      "name": "unit-spell-speed-and-cargo-input",
+      "start": "0x00452291",
+      "size": 40,
+      "sha256": "145f1c3914171d4b8abc5dbb9dcdd0ff1c468c75222e100d68b2624ab4d0783d"
     }
   ],
   "established_semantics": [
@@ -111,6 +147,9 @@
     "Blizzard and Death and Decay each create five fields and pass ten delayed successors to every field constructor, yielding eleven shards per field.",
     "Each field independently chooses both axes with retail's random routine inside a five-wide patch.",
     "The shipped direct-damage Exorcism path reaches retail HitUnit, which offers the aggressor through 0x0040a9d0 before applying damage; no separate ChonkCraft flee/attack-back tail follows.",
-    "Polymorph's authenticated handler selects retail unit type 11, Eye of Kilrogg selects unit type 45, and Unholy Armor writes a 500-cycle timer then halves hit points when the target has at least two."
+    "Polymorph's authenticated handler selects retail unit type 11, Eye of Kilrogg selects unit type 45, and Unholy Armor writes a 500-cycle timer then halves hit points when the target has at least two.",
+    "The player dispatcher refuses a targeted command naming its own caster before releasing orders; Healing and Invisibility retain that retail restriction.",
+    "Exorcism visits square rings through radius three, south-before-north then east-before-west. Its target helper tests type flag 0x8000 and spends four mana per attempted damage point, independently of target mana. Human 14 fixture ad0b3da9bf552e928581054feef43f7c07236227aef117811e24bd4838c521d7 identifies undead types 11, 21, 51 and 55 in the initialized flag table.",
+    "The animation interpreter receives a signed Slow/Haste state and carried-load bit. Opcode 1 is fixed, 7 adjusts both ways, 8 halves on either nonzero state, 9 doubles only for Slow, and 12 adds cargo before adjusting speed, with byte arithmetic."
   ]
 }

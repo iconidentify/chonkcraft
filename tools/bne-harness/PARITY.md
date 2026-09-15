@@ -38,7 +38,50 @@ Public CI checks campaign integrity and failure handling. The dedicated private
 workflow requires its BNE object store and matching pack mounted in the runner
 before enabling automatic push execution.
 
-## Current checkpoint -- 2026-09-10 (combat replacements and fleet saves)
+## Current checkpoint -- player targeting, spell clocks and sound admission
+
+The pinned BNE 2.02b executable has SHA-256
+`b0e914a9cb7dcc81a205e700a9bb0a1d0649df19d459388051ba170783d2c807`.
+Human 14 captures `ad0b3da9bf55` (Attack) and `e833405bd914` (right click)
+show mage 1425 accepting Attack and Move respectively against neutral Dark
+Portal 1580. Explicit attacks now retain that diplomacy-independent authority
+through pursuit and queued installation; automatic scans still require enemies.
+The real campaign referee proves damage from footmen, mages and gryphons for
+both immediate and queued commands.
+
+The player dispatcher at `0x47606a` rejects targeted self-casts before order
+release. Healing and Invisibility retain this retail restriction, including
+shifted commands and cursor feedback. Exorcism instead targets a position:
+`0x4426a0` scans square rings through radius three, and `0x442830` tests undead
+type flag `0x8000`, independently of target mana. The initialized type table
+marks Death Knight, both Death Knight heroes and Skeleton. The resolver
+preserves scan order, BNE allied protection, four-mana damage pricing and the
+ordinary damage path. Living targets and empty areas spend no mana.
+
+The compact animator now receives the unit's signed spell speed and carried
+load. Controlled-input execution of unmodified `0x402440` checked 7,680 wait
+combinations, including byte wrap and opcode 8's unsigned nonzero test. Ten
+additional visits using real footman bytecode confirmed that a quiet timer
+visit retains its frame. Native Attack frames now remain authoritative while
+the presentation program maintains its order bookkeeping. Separate negative
+controls catch the missing speed input and the premature presentation frame.
+
+Sound admission now follows `0x440792..0x4407a2`: the same decoded sound cannot
+restart within 80 ms of its last accepted start. Fourteen controlled native
+prefix replays cover the boundary and clock wrap. A burst of 32 real peasant
+attacks previously drove even ten-percent volume into the mixer limiter;
+the new PCM referee measures proportional output at 100, 80, 50, 20, 10 and
+zero percent. Zero uses the mixer's exact silence value. Recorded music and
+MIDI already passed their separate volume-path probes.
+
+These controlled-input replays are bounded function experiments, not live
+snapshot receipts: Exorcism's scan used tile sentinels and explicit effect,
+sound and damage stubs; the sound prefix stubbed the clock and stopped before
+DirectSound allocation. Live portal captures, full private experiment outputs
+and negative-control logs remain outside the repository. The spell gate also
+authenticates the new native code slices against the pinned executable.
+
+## Combat replacements and fleet saves
 
 Explicit Attack keeps the player's clicked quarry through automatic scans.
 Attack and Move replacements release on the native attack-program callback.

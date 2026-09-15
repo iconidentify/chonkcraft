@@ -285,6 +285,15 @@ class PlayerOrderDeliveryTest {
             int initialHp = target.hitPoints();
             scene.screen().selectForTest(actor);
             scene.screen().press(ability.button(), false);
+            if (spell.target() == net.chonkbase.chonkcraft.engine.spell.Spell.Target.UNIT) {
+                assertEquals(GameCursors.Kind.FORBIDDEN,
+                        scene.screen().kindAtForTest(10 * 32 + 16, 10 * 32 + 16),
+                        ident + " must show the native targeted self-cast restriction");
+            } else if (spell.target() == net.chonkbase.chonkcraft.engine.spell.Spell.Target.POSITION) {
+                assertEquals(GameCursors.Kind.ACT,
+                        scene.screen().kindAtForTest(15 * 32 + 16, 10 * 32 + 16),
+                        ident + " must show that empty ground accepts a position cast");
+            }
             if (spell.target() != net.chonkbase.chonkcraft.engine.spell.Spell.Target.SELF) {
                 fieldClick(scene, 13, 10);
             }
@@ -318,6 +327,32 @@ class PlayerOrderDeliveryTest {
             }
             assertTrue(effect, command + " must produce its damage, buff, summon or spell projectile");
         }
+
+        // Native 0x475f80 skips only the self-targeted recipient while it
+        // continues through the selection. Another mage can cloak the first;
+        // checking only the primary selection gave that legal click a red cursor.
+        Scene group = scene();
+        Unit first = make(group, "unit-mage", 0, 10, 10);
+        Unit second = make(group, "unit-mage", 0, 11, 10);
+        first.setMana(255);
+        second.setMana(255);
+        group.world().upgrades(0).complete("upgrade-invisibility");
+        group.screen().selectForTest(List.of(first, second));
+        var invisibility = group.data().userInterface("summer").buttons().all().stream()
+                .filter(button -> button.appliesTo("unit-mage")
+                        && "spell-invisibility".equals(button.value()))
+                .findFirst().orElseThrow();
+        group.screen().press(invisibility, false);
+        assertEquals(GameCursors.Kind.ACT,
+                group.screen().kindAtForTest(10 * 32 + 16, 10 * 32 + 16),
+                "the second selected mage makes the first a legal target");
+        fieldClick(group, 10, 10);
+        for (int cycle = 0; cycle < 20 && !first.hasBuff(Unit.Buff.INVISIBLE); cycle++) {
+            group.world().tick();
+        }
+        assertTrue(first.hasBuff(Unit.Buff.INVISIBLE), "the other mage must cloak the selected target");
+        assertEquals(255, first.mana(), "the self-targeted mage must spend no mana");
+        assertEquals(55, second.mana(), "only the other mage must pay for Invisibility");
     }
 
     private static List<String> mobileRoster(GameData data) {

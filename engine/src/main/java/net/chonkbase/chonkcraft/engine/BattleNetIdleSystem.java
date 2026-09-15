@@ -639,7 +639,7 @@ final class BattleNetIdleSystem {
                 // the current animation timer on the player-pass write.
                 continue;
             }
-            int quiet = world.battleNetSequence.quietTicksUntilActionMarker(
+            int quiet = world.quietBattleNetTicks(unit,
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
             if (quiet < 0) {
@@ -1473,7 +1473,7 @@ final class BattleNetIdleSystem {
                 }
             }
             if (offset >= 0) {
-                BattleNetSequence.Tick tick = world.battleNetSequence.tick(offset,
+                BattleNetSequence.Tick tick = world.tickBattleNetSequence(unit, offset,
                         unit.battleNetAnimationTimer());
                 if (tick.valid()) {
                     unit.setBattleNetSequenceOffset(tick.offset());

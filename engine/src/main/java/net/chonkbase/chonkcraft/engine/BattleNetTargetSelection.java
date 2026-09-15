@@ -161,7 +161,12 @@ final class BattleNetTargetSelection {
     boolean validAttackTarget(Unit unit, Unit target) {
         return target != null && target.isAlive() && !target.isDying()
                 && target.isOnMap()
-                && world.isEnemyPlayer(unit.player(), target.player())
+                // Native player Attack (0x47617f -> 0x436850) accepts a
+                // friendly or neutral quarry. Diplomacy filters automatic
+                // acquisition, not that explicit order or its continuation.
+                // Human 14's Dark Portal belongs to neutral player 15.
+                && (unit.battleNetPlayerCommandAttack() && target == unit.target()
+                        || world.isEnemyPlayer(unit.player(), target.player()))
                 && canTarget(unit, target)
                 && (!unit.attackRequiresVisibility()
                         || isVisibleAsGoal(unit.player(), target));

@@ -2197,7 +2197,7 @@ final class BattleNetHarvestSystem {
         if (attackStart < 0) {
             return;
         }
-        BattleNetSequence.Tick opening = world.battleNetSequence.tick(attackStart, 1);
+        BattleNetSequence.Tick opening = world.tickBattleNetSequence(worker, attackStart, 1);
         if (opening.valid()) {
             worker.setBattleNetSequenceOffset(opening.offset());
             worker.setBattleNetAnimationTimer(opening.timer());
@@ -2211,7 +2211,7 @@ final class BattleNetHarvestSystem {
                 || worker.battleNetSequenceOffset() < 0) {
             return false;
         }
-        BattleNetSequence.Tick tick = world.battleNetSequence.tick(
+        BattleNetSequence.Tick tick = world.tickBattleNetSequence(worker,
                 worker.battleNetSequenceOffset(),
                 worker.battleNetAnimationTimer());
         if (!tick.valid()) {
@@ -5095,7 +5095,7 @@ final class BattleNetHarvestSystem {
                 unit, BattleNetSequence.MOVE_ANIMATION);
         if (moveStart >= 0) {
             BattleNetSequence.Tick open =
-                    world.battleNetSequence.tick(moveStart, 1);
+                    world.tickBattleNetSequence(unit, moveStart, 1);
             unit.setBattleNetSequenceOffset(
                     open.valid() ? open.offset() : moveStart);
             unit.setBattleNetAnimationTimer(open.valid() ? open.timer() : 1);
@@ -5141,7 +5141,7 @@ final class BattleNetHarvestSystem {
                     worker, BattleNetSequence.MOVE_ANIMATION);
             if (moveStart >= 0) {
                 BattleNetSequence.Tick open =
-                        world.battleNetSequence.tick(moveStart, 1);
+                        world.tickBattleNetSequence(worker, moveStart, 1);
                 worker.setBattleNetSequenceOffset(
                         open.valid() ? open.offset() : moveStart);
                 worker.setBattleNetAnimationTimer(

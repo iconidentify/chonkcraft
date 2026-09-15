@@ -56,11 +56,11 @@ public final class SoundServer implements AutoCloseable {
     /**
      * The floor a slider at nothing converts to.
      *
-     * <p>Silence is minus infinity decibels, which is not a number the mixer
-     * takes, so this stands in for it. Sixty decibels down is inaudible beside
-     * anything else in the game.
+     * <p>The runtime maps its finite silence sentinel to exactly zero gain.
+     * The old -60 dB approximation still emitted samples at the off position;
+     * BNE's zero-volume path disables playback at 0x4406c4.
      */
-    private static final float SILENT_DB = -60f;
+    private static final float SILENT_DB = AudioMixer.SILENT_DB;
 
     private final AudioMixer mixer;
     private final CdMusic disc;

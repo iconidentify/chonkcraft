@@ -994,6 +994,23 @@ public final class World {
         unit.setHeading(Math.floorMod(unit.heading() + steps, facings));
     }
 
+    /** Supplies the unit-owned spell speed to every native animation owner. */
+    BattleNetSequence.Tick tickBattleNetSequence(Unit unit, int offset, int timer) {
+        return battleNetSequence.tick(offset, timer, battleNetSpellSpeed(unit),
+                unit.hasHarvestLoad());
+    }
+
+    /** Native Slow and Haste share one signed timer, not two multipliers. */
+    int battleNetSpellSpeed(Unit unit) {
+        return unit.hasBuff(Unit.Buff.SLOW) ? -1 : unit.hasBuff(Unit.Buff.HASTE) ? 1 : 0;
+    }
+
+    /** Forecasts a pending command with the same waits as its current animation. */
+    int quietBattleNetTicks(Unit unit, int offset, int timer) {
+        return battleNetSequence.quietTicksUntilActionMarker(offset, timer,
+                battleNetSpellSpeed(unit), unit.hasHarvestLoad());
+    }
+
     AnimationRunner.Step advance(Unit unit) {
         if (RAND_TRACE_PATH != null) {
             randContext = "anim:" + unit.id();
@@ -1002,7 +1019,15 @@ public final class World {
                 unit.hasBuff(Unit.Buff.SLOW), unit.hasBuff(Unit.Buff.HASTE),
                 unit.pendingRotation(), unit.type().rotationSpeed());
         unit.setPendingRotation(step.rotation());
-        unit.setFrame(step.frame());
+        // A compact Attack owner already supplies the frame on the native
+        // wait boundary. The parallel presentation program is still needed
+        // for its order bookkeeping, but must not overwrite that frame in
+        // between native visits. Slow exposed the conflict as flickering
+        // windup frames; even an ordinary swing advanced a frame too soon.
+        if (battleNetSequence == null || unit.battleNetSequenceOffset() < 0
+                || !isSwinging(unit)) {
+            unit.setFrame(step.frame());
+        }
         // With retail script.bin loaded, opcode ten -- not the independent
         // ChonkCraft presentation program -- is the projectile launch.  The
         // two programs can drift by dozens of cycles during a long ranged
@@ -1943,8 +1968,11 @@ public final class World {
         if (spell.target() == Spell.Target.SELF) {
             return castSpell(caster, spellIdent, caster);
         }
-        if (target == null || !target.isAlive()) {
+        if (target == null || !target.isAlive() || target == caster) {
             return false;
+        }
+        if (spell.target() == Spell.Target.POSITION) {
+            return orderCast(caster, spellIdent, target.tileX(), target.tileY());
         }
         caster.clearPath();
         caster.setTarget(target);
@@ -2091,7 +2119,8 @@ public final class World {
         caster.setBuff(Unit.Buff.INVISIBLE, 0);
 
         boolean adjustsVitals = spell.effects().stream()
-                .anyMatch(effect -> effect.kind() == Spell.EffectKind.ADJUST_VITALS);
+                .anyMatch(effect -> effect.kind() == Spell.EffectKind.ADJUST_VITALS
+                        || effect.kind() == Spell.EffectKind.EXORCISM);
         // The sound the spell declares. Parsed from DefineSpell and never
         // played, because nothing ever cast anything.
         announceNamed(caster, spell.soundWhenCast());
@@ -2144,11 +2173,62 @@ public final class World {
             case EYE_OF_KILROGG -> summonEye(caster, tileX, tileY);
             case POLYMORPH -> polymorph(victim, effect);
             case UNHOLY_ARMOR -> unholyArmor(victim);
+            case EXORCISM -> exorcism(caster, tileX, tileY, spell, effect);
             // No generated spell currently carries either kind. Keeping the
             // refusal explicit prevents a future declaration silently
             // masquerading as implemented behavior.
             case REVEAL, OTHER -> throw new IllegalStateException(
                     "unimplemented spell effect " + effect.kind() + " in " + spell.ident());
+        }
+    }
+
+    /**
+     * Retail 0x4426a0 visits concentric square edges, up to radius three.
+     *
+     * <p>Each column visits south then north; the side interiors visit east
+     * then west. That order matters when mana runs out. 0x442830 tests the
+     * native undead flag (0x8000), not the target's mana. The captured type
+     * table marks Death Knight, its two heroes, and Skeleton. In BNE mode
+     * allied players below eight are protected. Effects occur at each undead
+     * victim, and empty ground or a living army costs no mana.
+     */
+    private void exorcism(Unit caster, int tileX, int tileY, Spell spell, Spell.Effect effect) {
+        if (spell.manaCost() <= 0) {
+            return;
+        }
+        for (int radius = 0; radius <= 3 && caster.mana() >= spell.manaCost(); radius++) {
+            for (int x = tileX - radius; x <= tileX + radius; x++) {
+                exorciseAt(caster, x, tileY + radius, spell, effect);
+                exorciseAt(caster, x, tileY - radius, spell, effect);
+            }
+            for (int y = tileY - radius + 1; y < tileY + radius; y++) {
+                exorciseAt(caster, tileX + radius, y, spell, effect);
+                exorciseAt(caster, tileX - radius, y, spell, effect);
+            }
+        }
+    }
+
+    private void exorciseAt(Unit caster, int x, int y, Spell spell, Spell.Effect effect) {
+        if (!map.contains(x, y)) {
+            return;
+        }
+        List<Unit> occupants = unitCache.get(x + y * map.width());
+        if (occupants == null) {
+            return;
+        }
+        for (Unit target : new ArrayList<>(occupants)) {
+            if (!target.isAlive() || !target.isOnMap() || target.type() == null
+                    || !target.type().undead()
+                    || target.player() < 8 && isAllied(caster.player(), target.player())) {
+                continue;
+            }
+            int damage = Math.min(target.hitPoints(), caster.mana() / spell.manaCost());
+            spawnMissile(caster, target, x, y, new Spell.Effect(Spell.EffectKind.SPAWN_MISSILE,
+                    effect.what(), 0, java.util.Map.of("start-point", List.of("base", "target"))));
+            announceNamed(target, "exorcism");
+            hitDirectly(caster, target, damage);
+            caster.setMana(caster.mana() - damage * spell.manaCost());
+            return;
         }
     }
 
@@ -4075,14 +4155,31 @@ public final class World {
         return orderAttack(unit, target, true, fromPlayer);
     }
 
+    /**
+     * Whether a player can explicitly attack this quarry, regardless of diplomacy.
+     *
+     * <p>BNE's player dispatcher at 0x47606a rejects the caster itself, then
+     * passes Attack to 0x436850 without an enemy check. Human 14's neutral
+     * Dark Portal therefore accepts an Attack click although right-clicking
+     * it means Move. Keep cursor feedback and command acceptance together.
+     */
+    public boolean canCommandAttack(Unit unit, Unit target) {
+        return unit != null && target != null && unit != target
+                && unit.type() != null && target.type() != null && unit.type().canAttack()
+                && unit.isAlive() && target.isAlive() && targets.canTarget(unit, target);
+    }
+
     private boolean orderAttack(Unit unit, Unit target, boolean clearOfferedTarget,
             boolean fromPlayer) {
-        if (unit == null || target == null || unit == target
-                || unit.type() == null || !unit.type().canAttack()
-                || !unit.isAlive() || !target.isAlive()) {
+        return orderAttack(unit, target, clearOfferedTarget, fromPlayer, fromPlayer);
+    }
+
+    private boolean orderAttack(Unit unit, Unit target, boolean clearOfferedTarget,
+            boolean fromPlayer, boolean playerTarget) {
+        if (!canCommandAttack(unit, target)) {
             return false;
         }
-        if (!isEnemyPlayer(unit.player(), target.player()) || !targets.canTarget(unit, target)) {
+        if (!playerTarget && !isEnemyPlayer(unit.player(), target.player())) {
             return false;
         }
         if (clearOfferedTarget) {
@@ -11838,10 +11935,14 @@ public final class World {
             boolean accepted = switch (queued.kind()) {
                 case MOVE -> movement.orderPoppedMove(unit, queued.x(), queued.y());
                 case ATTACK -> {
-                    boolean installed = orderAttack(unit, queued.target());
+                    boolean playerTarget = "player-command".equals(queued.value());
+                    // This command has already waited for its predecessor's
+                    // animation. Keep its targeting authority without adding
+                    // the initial player-command delay a second time.
+                    boolean installed = orderAttack(unit, queued.target(), true, false,
+                            playerTarget);
                     if (installed) {
-                        unit.setBattleNetPlayerCommandAttack(
-                                "player-command".equals(queued.value()));
+                        unit.setBattleNetPlayerCommandAttack(playerTarget);
                     }
                     yield installed;
                 }
@@ -12249,7 +12350,7 @@ public final class World {
                         // rectangle: XOrc 11's splash banks four destroyers at
                         // c132, then their independent idle timers promote one
                         // at c134 and the other three at c135.
-                        BattleNetSequence.Tick next = battleNetSequence.tick(
+                        BattleNetSequence.Tick next = tickBattleNetSequence(unit,
                                 unit.battleNetSequenceOffset(),
                                 unit.battleNetAnimationTimer());
                         stillActionMarker = next.valid()
@@ -13485,7 +13586,7 @@ public final class World {
         }
         int start = idle.battleNetSequenceStart(unit,
                 BattleNetSequence.CORPSE_DECAY_ANIMATION);
-        BattleNetSequence.Tick opening = battleNetSequence.tick(start, 1);
+        BattleNetSequence.Tick opening = tickBattleNetSequence(unit, start, 1);
         if (!opening.valid() || opening.actionMarker()
                 || opening.inlineActionMarker()) {
             return;
@@ -13500,7 +13601,7 @@ public final class World {
         if (battleNetSequence == null || !unit.battleNetCorpseDecay()) {
             return null;
         }
-        BattleNetSequence.Tick next = battleNetSequence.tick(
+        BattleNetSequence.Tick next = tickBattleNetSequence(unit,
                 unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer());
         if (!next.valid()) {
             unit.setBattleNetCorpseDecay(false);
@@ -15601,7 +15702,7 @@ public final class World {
             // about to visit its next opcode zero. Promoting on the following
             // Java turn made XOrc 11's battleship show Attack at fixture five
             // while still sitting on 20,40; native is Patrol on 18,40.
-            BattleNetSequence.Tick next = battleNetSequence.tick(
+            BattleNetSequence.Tick next = tickBattleNetSequence(unit,
                     unit.battleNetSequenceOffset(),
                     unit.battleNetAnimationTimer());
             if (!next.valid() || !next.actionMarker()) {
@@ -17125,7 +17226,7 @@ public final class World {
         if (battleNetSequence != null && unit.battleNetFollowWaiting()
                 && !unit.isMoving() && unit.residualX() == 0 && unit.residualY() == 0) {
             if (unit.distanceTo(target) > 1) {
-                if (battleNetSequence.quietTicksUntilActionMarker(
+                if (quietBattleNetTicks(unit,
                         unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer()) > 0) {
                     idle.stepBattleNetIdle(unit);
                     return;
@@ -18473,7 +18574,7 @@ public final class World {
         if (!battleNetStandingPatrolSequence(unit)) {
             return false;
         }
-        BattleNetSequence.Tick tick = battleNetSequence.tick(
+        BattleNetSequence.Tick tick = tickBattleNetSequence(unit,
                 unit.battleNetSequenceOffset(), unit.battleNetAnimationTimer());
         if (!tick.valid()) {
             return false;
@@ -18546,7 +18647,7 @@ public final class World {
 
     /** Advances one quiet/action visit of an armed Patrol's Still constructor. */
     private boolean tickBattleNetArmedPatrolSequence(Unit unit) {
-        BattleNetSequence.Tick tick = battleNetSequence.tick(
+        BattleNetSequence.Tick tick = tickBattleNetSequence(unit,
                 unit.battleNetSequenceOffset(),
                 unit.battleNetAnimationTimer());
         if (!tick.valid()) {
@@ -18756,7 +18857,7 @@ public final class World {
         if (moveStart < 0) {
             return;
         }
-        BattleNetSequence.Tick open = battleNetSequence.tick(moveStart, 1);
+        BattleNetSequence.Tick open = tickBattleNetSequence(unit, moveStart, 1);
         if (!open.valid()) {
             return;
         }
@@ -19648,7 +19749,7 @@ public final class World {
         if (attackStart < 0) {
             return;
         }
-        BattleNetSequence.Tick open = battleNetSequence.tick(attackStart, 1);
+        BattleNetSequence.Tick open = tickBattleNetSequence(unit, attackStart, 1);
         if (open.valid()) {
             unit.setBattleNetSequenceOffset(open.offset());
             unit.setBattleNetAnimationTimer(open.timer());
