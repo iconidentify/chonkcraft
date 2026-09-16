@@ -355,6 +355,25 @@ final class BattleNetHarvestSystem {
     private void stepHarvest(Unit worker,
             boolean activeOrderIdleRandomAlreadyPaid) {
         if (world.battleNetSequence != null && worker.isOnMap()
+                && worker.battleNetStopAfterLeftover()
+                && !worker.returningToDepot()
+                && worker.carrying() == UnitType.Resource.GOLD
+                && worker.resourceUnit() != null
+                && !atBattleNetResourceApproach(worker, worker.resourceUnit())) {
+            // Native action 23 consumes Stop after the committed stride:
+            // Orc 1 clicks at 10/20 settle at 24; 580 settles at 588.
+            // Continuing the resource planner here used to enter the mine
+            // and restart the entire harvesting loop. Action 25's final
+            // boarding approach still belongs to the mine (55 -> 59).
+            if (worker.battleNetOrderDelay() > 0) {
+                worker.setBattleNetOrderDelay(worker.battleNetOrderDelay() - 1);
+            } else {
+                world.movement.walkPixels(worker);
+                world.movement.finishLeftoverReplacement(worker);
+            }
+            return;
+        }
+        if (world.battleNetSequence != null && worker.isOnMap()
                 && worker.returningToDepot()
                 && (worker.battleNetPlayerCommandMove() || worker.battleNetStopAfterLeftover())) {
             // cargo-switch-v2-gold-20260909 replaces the delivery on 250/251.

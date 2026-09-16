@@ -1722,7 +1722,13 @@ public final class World {
      * unit found there.  The check happens in low-to-high pool order, so a
      * unit rescued earlier in the same cycle can rescue another one later.
      * This is why the attack peasants in Human 10 cross the checkerboard over
-     * several ticks instead of changing owner as one group.</p>
+     * several ticks instead of changing owner as one group.
+     *
+     * <p>A hall is the exception: type flag 0x1000 at 0x452430 transfers the
+     * old owner's remaining live roster immediately, including workers inside
+     * mines or depots. Human 8's building-first capture transfers its hall and
+     * village on cycle 1028. Treating every building as an individual rescue
+     * left the distant and contained workers outside the player's control.
      */
     void rescueBattleNetUnit(Unit prisoner) {
         Player owner = player(prisoner.player());
@@ -1761,7 +1767,20 @@ public final class World {
                     if (rescuer != null
                             && rescuer.type()
                                     == net.chonkbase.chonkcraft.data.map.PudMap.PlayerType.PERSON) {
+                        int previousOwner = prisoner.player();
                         rescue(prisoner, other.player());
+                        int type = PudUnitTypes.code(prisoner.type().ident());
+                        if (type == 74 || type == 75 || type >= 88 && type <= 91) {
+                            // The six hall tiers carry native flag 0x1000.
+                            // Native flags & 7 exclude death, not containment
+                            // (flag 8). isAlive() also excludes hidden workers.
+                            for (Unit member : List.copyOf(playerUnits(previousOwner))) {
+                                if (member.hitPoints() > 0 && !member.isDying()
+                                        && !member.destroyed()) {
+                                    rescue(member, other.player());
+                                }
+                            }
+                        }
                         return;
                     }
                 }
@@ -1781,8 +1800,11 @@ public final class World {
         unit.setRescuedFrom(unit.player());
         unit.setPlayer(toPlayer);
         registerPlayerUnit(unit);
-        unitCountSeen(unit);
-        markSight(unit, true);
+        adjustBattleNetWorkerFamilyCount(unit, 1);
+        if (unit.isOnMap()) {
+            unitCountSeen(unit);
+            markSight(unit, true);
+        }
         recalculateSupply();
         announce(unit, "rescue");
     }
@@ -12755,8 +12777,8 @@ public final class World {
         projectiles.stepMissiles();
         regenerateMana();
 
-        // BNE rescue is per-unit ({@link #rescueBattleNetUnit}), not the
-        // LegacyEngine once-per-second rescue/sight pass.
+        // Rescue runs on each unit's native action marker, including a hall's
+        // village handoff, rather than on a once-per-second sight pass.
         updateSeenBuildings();
 
         // Retail BNE does not run LegacyEngine/ChonkCraft's retired scripting language AiEachSecond
@@ -15181,6 +15203,10 @@ public final class World {
     public void remove(Unit unit) {
         markOccupancy(unit, false);
         markSight(unit, false);
+        // A campaign load discards its starting placements before restoring
+        // the save. They must leave the owner roster too, or a later hall
+        // rescue transfers those absent units and counts their workers again.
+        unregisterPlayerUnit(unit);
         releaseUnitFromActionTable(unit);
         snapshot = List.copyOf(units);
     }

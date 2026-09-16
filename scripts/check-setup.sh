@@ -5,7 +5,7 @@
 #
 # It exists because the suite skips rather than fails when its external inputs
 # are missing, so an unconfigured machine gets BUILD SUCCESS out of a run that
-# verified almost nothing. 1,414 of 3,076 tests skip that way. This prints the
+# verified almost nothing. 1,419 of 3,085 tests skip that way. This prints the
 # difference before you spend twenty-five seconds wondering why the run was
 # fast.
 #
@@ -208,7 +208,7 @@ head2 "What a test run would exercise"
 
 if [[ "$wc2_ok" == 1 && "$pack_ok" == 1 && "$opus_ok" == 1 ]]; then
     printf '  All three external inputs are configured.\n'
-    printf '  Expect 3076 tests, normally 31 skipped on the classic CI source.\n'
+    printf '  Expect 3085 tests, normally 31 skipped on the classic CI source.\n'
     printf '  A full run takes about five minutes.\n'
     printf '  All three private playtest-save referees reduce that exact count to 28.\n'
     printf '  The expected skips cover display-only checks, an optional music\n'
@@ -228,7 +228,7 @@ elif [[ "$wc2_ok" == 1 ]]; then
 else
     printf '  At least one external input is missing.\n'
     printf '  The suite will still report BUILD SUCCESS, having skipped most of itself:\n'
-    printf '  with no input at all, 1414 of 3076 tests skip.\n'
+    printf '  with no input at all, 1419 of 3085 tests skip.\n'
     printf '  That is not a passing run. See docs/development-setup.md.\n'
 fi
 

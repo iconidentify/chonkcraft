@@ -2,10 +2,13 @@ package net.chonkbase.chonkcraft.engine.sound;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import net.chonkbase.runtime.audio.AudioBus;
 import net.chonkbase.runtime.audio.AudioMixer;
 import net.chonkbase.runtime.audio.PcmClip;
 import net.chonkbase.runtime.audio.PcmFormat;
+import net.chonkbase.runtime.audio.PcmLoopRegion;
+import net.chonkbase.runtime.audio.PcmStream;
 import net.chonkbase.chonkcraft.data.source.AssetSource;
 
 /**
@@ -20,10 +23,10 @@ import net.chonkbase.chonkcraft.data.source.AssetSource;
  * is a different path from {@code MusicPlayer} rather than a variation of it:
  * one produces MIDI events and the other produces audio.
  *
- * <p>A track is loaded whole rather than streamed. Four minutes of stereo at
- * the mixer's rate is forty megabytes, which is worth it for a soundtrack that
- * plays continuously and would otherwise need a reader thread feeding the
- * mixer without ever falling behind.
+ * <p>One recording is decoded at a time. Menus, briefings and results play
+ * clips; battles use a bounded PCM stream whose producer loads the next
+ * recording during the two-second gap. The mixer never reads the asset source
+ * or waits for decoding, and the whole battle soundtrack is never resident.
  *
  * <p>Where the recordings come from is no longer this class's business. It
  * used to walk the installation looking for disc images and read raw sectors
@@ -73,6 +76,8 @@ public final class CdMusic implements AutoCloseable {
 
     private long voice = AudioMixer.NO_VOICE;
     private String playing;
+    private PcmStream stream;
+    private RecordedMusicPlaylist playlist;
 
     /**
      * Takes whatever recorded music the source has.
@@ -104,7 +109,46 @@ public final class CdMusic implements AutoCloseable {
 
     /** What is playing, or null. */
     public String playing() {
-        return playing;
+        return playlist == null || stream == null ? playing
+                : playlist.playing(stream.bufferedFrames());
+    }
+
+    /** Streams the known battle recordings in scene order, including their gaps. */
+    boolean playPlaylist(List<String> names) {
+        List<Track> selected = names.stream().map(name -> find(List.of(name)))
+                .filter(java.util.Objects::nonNull).toList();
+        stop();
+        if (selected.isEmpty() || source == null) {
+            return false;
+        }
+        playlist = new RecordedMusicPlaylist(source, selected);
+        RecordedMusicPlaylist decoder = playlist;
+        stream = PcmStream.prepare("battle recordings", () -> decoder,
+                PcmStream.BufferConfig.defaults(),
+                new PcmLoopRegion(0, decoder.frameCount(), 0));
+        try {
+            if (!stream.awaitReady(10, TimeUnit.SECONDS)) {
+                stop();
+                return false;
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            stop();
+            return false;
+        }
+        voice = mixer.play(stream, AudioBus.MUSIC, BACKGROUND_GAIN_DB, 0f,
+                GameAudio.MUSIC_PRIORITY);
+        if (voice == AudioMixer.NO_VOICE) {
+            stop();
+            return false;
+        }
+        playing = selected.getFirst().name();
+        return true;
+    }
+
+    /** Offline rendering waits for decoding without putting waits on the mixer. */
+    boolean awaitBufferedFrames(int frames) throws InterruptedException {
+        return stream == null || stream.awaitBufferedFrames(frames, 10, TimeUnit.SECONDS);
     }
 
     /**
@@ -116,13 +160,13 @@ public final class CdMusic implements AutoCloseable {
         return play(track, true);
     }
 
-    /** A result plays once; a menu or battle keeps its recorded theme. */
+    /** A result plays once; menus and briefings keep their recorded theme. */
     boolean play(Track track, boolean looping) {
         if (track == null || source == null) {
             return false;
         }
         stop();
-        // Read whole, not streamed: see the class comment.
+        // A single-scene recording is small enough to keep as one clip.
         short[] samples = source.musicSamples(track.index());
         if (samples.length == 0) {
             return false;
@@ -178,6 +222,11 @@ public final class CdMusic implements AutoCloseable {
             voice = AudioMixer.NO_VOICE;
         }
         playing = null;
+        if (stream != null) {
+            stream.close();
+            stream = null;
+        }
+        playlist = null;
     }
 
     /**

@@ -9,8 +9,8 @@ the Warcraft II data, an asset pack, or the Opus test vectors call JUnit
 and Maven reports BUILD SUCCESS either way. The configured authenticated
 floor and the measured data-free inventory are:
 
-    authenticated profile      3076 tests,   31 skipped
-    no external input          3076 tests, 1414 skipped
+    authenticated profile      3085 tests,   31 skipped
+    no external input          3085 tests, 1419 skipped
 
 Both can be green.
 
@@ -208,7 +208,9 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # Portal, native spell animation and two sound admission referees
         # add four authenticated skips; five further spell/wait checks run
         # without media. Both profiles were remeasured for this addition.
-        "engine": (2114, 1057),
+        # Three mining Stop and two village-rescue checks need retail data;
+        # four recorded-playlist PCM checks use synthetic samples.
+        "engine": (2123, 1062),
         # Seven authenticated multiplayer presentation referees cover shared
         # minimap sight, allied fog seams, restrained ping feedback, the retail
         # five-worker wood-click fan-out, team game-over presentation, and the
@@ -273,7 +275,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         # saves; the other fixture skips name custom maps absent from the
         # retail pack. The production service smoke runs in the deploy
         # workflow instead.
-        "engine": (2114, 10),
+        "engine": (2123, 10),
         # The classic hosted pack cannot run the explicit three-BNE-map
         # recording matrix, so that proof is a deliberate additional skip.
         "desktop": (403, 9),
@@ -290,7 +292,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2114, 7),
+        "engine": (2123, 7),
         "desktop": (403, 9),
         "matchmaker-server": (5, 1),
     },
@@ -312,7 +314,7 @@ PROFILES: dict[str, dict[str, tuple[int, int]]] = {
         "extractor": (9, 0),
         "launcher": (49, 0),
         "matchmaking": (2, 0),
-        "engine": (2114, 12),
+        "engine": (2123, 12),
         "desktop": (403, 6),
         "matchmaker-server": (5, 1),
     },

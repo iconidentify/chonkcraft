@@ -1,11 +1,7 @@
-# Game transitions keep the right battle and music
+# Workers stop mining approaches and rescued villages join your side
 
-- Starting a game shuts down the previous battle, its sounds and pending
-  result screen, preventing an old mission's defeat from covering a healthy game.
-- Repeated launch input starts one load. A failed save load leaves the menu
-  available for another choice.
-- Music selection follows the campaign and screen. Imports with unidentified
-  numbered recordings use the appropriate synthesized themes for the menu,
-  Human and Orc battles, briefings and results.
-- Switching music sources preserves the current theme, and cleanup from an
-  old screen no longer silences the next screen's music.
+- Workers sent to a gold mine now obey Stop after finishing their current stride.
+- Rescuing a town hall also frees the village's surviving workers and buildings,
+  including workers inside mines or depots. Farms still transfer individually.
+- Recorded battle music advances through the soundtrack with the original
+  two-second gaps instead of repeating one song.
