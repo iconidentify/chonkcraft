@@ -17,18 +17,21 @@ class ReleaseNotesViewTest {
 
     @Test
     @DisplayName("every release is represented by one history card")
-    void everyEntryIsRendered() {
-        ReleaseNotesView view = new ReleaseNotesView(() -> { });
-        view.setHistory(new ReleaseNotesCatalog.History(List.of(
-                entry("3.0.0"), entry("2.0.0"), entry("1.0.0"))));
-
-        assertEquals(3, view.entryCount());
+    void everyEntryIsRendered() throws Exception {
+        onEdt(() -> {
+            ReleaseNotesView view = new ReleaseNotesView(() -> { });
+            view.setHistory(new ReleaseNotesCatalog.History(List.of(
+                    entry("3.0.0"), entry("2.0.0"), entry("1.0.0"))));
+            assertEquals(3, view.entryCount(), "each release must have its own card");
+        });
     }
 
     @Test
     @DisplayName("showing release notes returns a bottom-laid-out viewport to newest")
     void showingStartsAtNewestEntry() throws Exception {
-        ReleaseNotesView view = new ReleaseNotesView(() -> { });
+        ReleaseNotesView[] created = new ReleaseNotesView[1];
+        onEdt(() -> created[0] = new ReleaseNotesView(() -> { }));
+        ReleaseNotesView view = created[0];
         List<ReleaseNotesCatalog.Entry> entries = new ArrayList<>();
         for (int version = 12; version > 0; version--) {
             entries.add(entry(version + ".0.0"));
@@ -40,18 +43,24 @@ class ReleaseNotesViewTest {
             view.setSize(760, 620);
             view.setHistory(history);
             layout(view);
+        });
+        // setHistory queues its own scroll reset. Let that event finish
+        // before arranging the bottom position for the showLatest check.
+        onEdt(() -> {
             scroll.getVerticalScrollBar().setValue(
                     scroll.getVerticalScrollBar().getMaximum());
+            assertTrue(scroll.getVerticalScrollBar().getValue() > 0,
+                    "the history must be long enough to reproduce the bottom layout");
         });
-        assertTrue(scroll.getVerticalScrollBar().getValue() > 0,
-                "the history must be long enough to reproduce the bottom layout");
 
         onEdt(view::showLatest);
-        onEdt(() -> layout(view));
-
-        assertEquals(scroll.getVerticalScrollBar().getMinimum(),
-                scroll.getVerticalScrollBar().getValue());
-        assertEquals(0, scroll.getViewport().getViewPosition().y);
+        onEdt(() -> {
+            layout(view);
+            assertEquals(scroll.getVerticalScrollBar().getMinimum(),
+                    scroll.getVerticalScrollBar().getValue(), "the newest release must be first");
+            assertEquals(0, scroll.getViewport().getViewPosition().y,
+                    "the viewport must remain at the newest release after layout");
+        });
     }
 
     private static ReleaseNotesCatalog.Entry entry(String version) {

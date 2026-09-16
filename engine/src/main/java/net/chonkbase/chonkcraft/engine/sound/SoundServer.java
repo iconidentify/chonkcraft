@@ -118,7 +118,7 @@ public final class SoundServer implements AutoCloseable {
     /** Whether there is a recorded soundtrack to play. */
     private boolean hasCd() {
         return disc != null && (scene == null
-                ? disc.isAvailable() : disc.find(wantedTracks()) != null);
+                ? disc.isAvailable() : disc.find(recordedTracks()) != null);
     }
 
     /** Whether there is a synthesised soundtrack to play. */
@@ -147,6 +147,7 @@ public final class SoundServer implements AutoCloseable {
 
     /** The current scene's race, retained when its backend changes. */
     private boolean lastWasOrc;
+    private boolean originalCampaign;
 
     private enum Scene {
         MENU, BRIEFING, BATTLE, VICTORY, DEFEAT
@@ -161,10 +162,9 @@ public final class SoundServer implements AutoCloseable {
      * its third position played the same song for both campaigns; requiring
      * named recordings only in the menu then made that screen silent.
      *
-     * <p>Recorded playback still repeats the selected complete clip. Retail's
-     * mode-two battle rows advance after a two-second gap (0x440df9), and its
-     * human briefing has a separate loop start. Subsequent track order and
-     * that loop boundary remain different after the first playthrough.
+     * <p>Recorded battles follow the mode-two successor rows after a
+     * two-second gap (0x440df9). The human briefing's separate loop start
+     * remains outside the battle playlist.
      */
     private List<String> wantedTracks() {
         String race = lastWasOrc ? "Orc" : "Human";
@@ -176,6 +176,13 @@ public final class SoundServer implements AutoCloseable {
             case VICTORY -> MusicPlayer.resultTracks(lastWasOrc, true);
             case DEFEAT -> MusicPlayer.resultTracks(lastWasOrc, false);
         };
+    }
+
+    private List<String> recordedTracks() {
+        List<String> names = wantedTracks();
+        // This row restriction belongs to BNE's recordings. The archive's
+        // five numbered MIDI tracks have their own identities.
+        return scene == Scene.BATTLE && originalCampaign ? names.subList(1, names.size()) : names;
     }
 
     /** Whether either backend is making a sound. */
@@ -204,7 +211,18 @@ public final class SoundServer implements AutoCloseable {
      * @return whether anything started
      */
     public boolean playBattleMusic(boolean orc) {
-        return playScene(Scene.BATTLE, orc);
+        return playBattleMusic(orc, false);
+    }
+
+    /**
+     * BNE 0x440ec9 skips the first battle row in the original campaign
+     * (selectors below 28), unless a custom or network game is active.
+     */
+    public boolean playBattleMusic(boolean orc, boolean originalCampaign) {
+        synchronized (MUSIC_FOCUS_LOCK) {
+            this.originalCampaign = originalCampaign;
+            return playScene(Scene.BATTLE, orc);
+        }
     }
 
     /** Starts the menu on whichever backend has its theme. */
@@ -238,6 +256,9 @@ public final class SoundServer implements AutoCloseable {
     private boolean startScene(Backend chosen) {
         boolean looping = scene != Scene.VICTORY && scene != Scene.DEFEAT;
         if (chosen == Backend.CD) {
+            if (scene == Scene.BATTLE) {
+                return disc != null && disc.playPlaylist(recordedTracks());
+            }
             return disc != null && disc.play(disc.find(wantedTracks()), looping);
         }
         if (synth == null) {

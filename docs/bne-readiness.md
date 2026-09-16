@@ -597,7 +597,7 @@ Retail evidence:
 
 - All 52 retail mission wrappers arm 137 trigger pairs; a fail-closed referee now constructs every map, runs every wrapper for 30 simulated seconds and rejects script faults or premature outcomes.
 - Real campaign data proves both sides of the first mission's condition, all four campaigns' closing sequences, the Human 10 wrapper substitution and the rescue conditions that are the sole victory path of nine missions.
-- Authenticated BNE fixture evidence establishes per-unit rescue at the native animation marker, including a flying prisoner, rather than LegacyEngine's once-per-second whole-player town-hall shortcut.
+- Authenticated BNE fixtures establish rescue at the native animation marker, including a flying prisoner. Hall flag 0x1000 at 0x452430 transfers the old owner's surviving village as well, including contained workers; farms transfer individually. Human 8's hall handoff is witnessed at cycle 1028, and the player-command referee verifies mining workers emerge and respond across save/load.
 - Retail Human 12's 44-unit roster drives real desktop startup under an isolated display: repeated launches leave one simulation, replacement stops the discarded world, and queued defeats cannot cover a healthy mission.
 
 Known blockers:
@@ -724,6 +724,7 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/EconomyTest.java`
 - `desktop/src/test/java/net/chonkbase/chonkcraft/desktop/BuildingVoiceTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/SoundtrackRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/RecordedPlaylistTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/sound/BattleNetSoundAdmissionTest.java`
 
 Retail evidence:
@@ -733,7 +734,7 @@ Retail evidence:
 - The authenticated town-hall dead binding renders audible PCM from BNE's three-clip building-destroyed group even when destroying the local hall removes the last sight that made it visible.
 - A worker taking a gold mine's final load commits one witnessed death event before the neutral building and its sight disappear; the authenticated mine dead binding renders audible PCM from the same three-clip building-destroyed group across that fog transition and survives a saturated presentation queue.
 - The zero-skip player/referee lane drives a worker through the normal build order, observes its work-complete event, resolves the retail oil-tanker exception and measures non-silent PCM from the real mixer.
-- The authenticated 2.02b music scene and filename tables at 0x4a1898 and 0x4a184c identify 19 battle, briefing, menu and result roles. Each role reaches its real recorded samples and emits PCM; numbered catalogs fall back to authentic XMI notes for the requested scene and race.
+- The authenticated 2.02b music scene and filename tables at 0x4a1898 and 0x4a184c identify 19 battle, briefing, menu and result roles. Each role reaches its real recorded samples and emits PCM. Recorded battles advance through the native successor rows with two-second gaps, preserve original-campaign exclusions, wrap, and stop when the screen changes; numbered catalogs fall back to authentic XMI notes for the requested scene and race.
 
 Known blockers:
 
@@ -742,7 +743,7 @@ Known blockers:
 Recheck command:
 
 ```text
-scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest,BattleNetSoundAdmissionTest,VolumeControlTest -Dsurefire.failIfNoSpecifiedTests=false
+scripts/run-tests.sh -pl engine,desktop -am -Dtest=SoundWithoutScriptsRealDataTest,UnitVoicesWithoutScriptsRealDataTest,SoundRealDataTest,SoundChoiceTest,CritterVoiceRealDataTest,BuilderReportsWorkCompleteTest,BuildingVoiceTest,SoundtrackRealDataTest,MusicBackendTest,RecordedPlaylistTest,BattleNetSoundAdmissionTest,VolumeControlTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## End-to-end player control liveness
@@ -770,6 +771,8 @@ Automated checks:
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerPatrolRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerFollowRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetPlayerGoldLoopRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetMiningStopRealDataTest.java`
+- `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetVillageRescueRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetChaseDestArmAfterAttackWaitRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetSettleStandAndFightRealDataTest.java`
 - `engine/src/test/java/net/chonkbase/chonkcraft/engine/BattleNetInPlaceFirstTakeRealDataTest.java`
@@ -784,7 +787,7 @@ Retail evidence:
 - The 600-cycle watchdog distinguishes explicit rejection, supersession, successful settlement, unit loss and target loss from the player-breaking case: an accepted command which never produces physical or order-state progress.
 - Authenticated retail footmen and grunts receive one-, three- and nine-unit moves, mid-stride redirects, Stop/resume and congested live-target attacks through the same CommandApplier seam used by the desktop.
 - Two independent worlds exchange those controls through real loopback UDP and the production lockstep scheduler for 1,200 cycles; both player journals remain live and the complete synchronized world hashes agree at the end.
-- The issue-12 regressions cover native Move-to-Attack and repeated pursuit handoffs, a dying ranged quarry, consumed and superseded Stop requests, and Follow-to-Move command completion. The sixty-one-test control inventory additionally checks cold and moving Move replacements, Patrol combat and nine save/load continuations, explicit Attack target retention, and native-paired Follow opening, movement replacement, route refill, waiting and later Move timing. Follow covers twenty-three save/load continuations, including repeated clicks during its constructor. Three combat checks additionally require the spent swing to resume pursuit at fixture 321, the settled player unit to react at 401, and the first returned blow to land at 427. The mixed Human 8 class contributes only its verified Human 1 method to this gate; its separate unresolved Human 8 check continues to execute in the full suite. Three gold-loop checks additionally require the player's depot-exit pause, second bank credit at 1022, a route around a standing ally, continuation after that ally moves, and twelve save/load continuations. Seventeen player-order delivery checks also cover cargo-preserving resource clicks, unfinished chopping, loaded delivery redirects and the existing mixed-selection command rules. Five dragon referees require an accepted Attack or Move to replace the old building attack on the captured native callback, preserve the clicked quarry and survive save/load across the handoff. A replacement on native firing visit 387 suppresses the old shot, while a projectile already in flight continues to hit. The roster sweep drives Move/Stop for 52 mobile types, Attack/retarget for the 43 types with native Attack buttons, and actual effects for all 50 unit/ability combinations. Ten demolition checks cover both zero-mana squads, BNE callback timing, ground and live targets, footprint damage, forest clearing, interruption and ten save/load continuations. Retail button table 0x4a3998 supplies Move and Stop only for attack-worker types 16/17. Every selected test must execute without a skip; full per-unit timing, collision routing and complete UI parity remain separate precision work.
+- The issue-12 regressions cover native Move-to-Attack and repeated pursuit handoffs, a dying ranged quarry, consumed and superseded Stop requests, and Follow-to-Move command completion. The sixty-seven-test control inventory additionally checks cold and moving Move replacements, Patrol combat and nine save/load continuations, explicit Attack target retention, and native-paired Follow opening, movement replacement, route refill, waiting and later Move timing. Follow covers twenty-three save/load continuations, including repeated clicks during its constructor. Three combat checks additionally require the spent swing to resume pursuit at fixture 321, the settled player unit to react at 401, and the first returned blow to land at 427. The mixed Human 8 class contributes only its verified Human 1 method to this gate; its separate unresolved Human 8 check continues to execute in the full suite. Three mining Stop checks require the outbound worker to finish its committed stride, stay out of the mine and preserve the result across save/load; the committed boarding control still enters on native cycle 59. Three gold-loop checks additionally require the player's depot-exit pause, second bank credit at 1022, a route around a standing ally, continuation after that ally moves, and twelve save/load continuations. Seventeen player-order delivery checks also cover cargo-preserving resource clicks, unfinished chopping, loaded delivery redirects and the existing mixed-selection command rules. Five dragon referees require an accepted Attack or Move to replace the old building attack on the captured native callback, preserve the clicked quarry and survive save/load across the handoff. A replacement on native firing visit 387 suppresses the old shot, while a projectile already in flight continues to hit. The roster sweep drives Move/Stop for 52 mobile types, Attack/retarget for the 43 types with native Attack buttons, and actual effects for all 50 unit/ability combinations. Ten demolition checks cover both zero-mana squads, BNE callback timing, ground and live targets, footprint damage, forest clearing, interruption and ten save/load continuations. Retail button table 0x4a3998 supplies Move and Stop only for attack-worker types 16/17. Every selected test must execute without a skip; full per-unit timing, collision routing and complete UI parity remain separate precision work.
 - The referee never retries, redirects or repairs an order. A liveness failure stays diagnostic evidence for the precision-owned movement or combat system instead of silently introducing non-retail recovery behavior.
 
 Known blockers:

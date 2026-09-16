@@ -18,7 +18,7 @@ explicit coverage and known-failure inventories.
 **This suite does not fail when its inputs are missing.** Tests that need the
 1995 Warcraft II data, an asset pack or the Opus vectors call
 `Assumptions.assumeTrue(...)` and skip, and Maven reports `BUILD SUCCESS`
-either way. With nothing configured, 1,345 of 2,992 tests skip in the September 7 data-free run.
+either way. With nothing configured, 1,419 of 3,085 tests skip.
 
 So the exit code certifies almost nothing on its own, and a CI job that trusts
 it converts "nobody is checking" into "something is checking" without either
@@ -58,10 +58,9 @@ anything subtler.
 
 ### Authenticated data -- private self-hosted inputs
 
-Asserts the `full` profile: **27 expected skips**, re-measured after the BNE
-parity, explicit-team, multiplayer-wall, allied-vision, wood-command, team-outcome,
-mine-collapse-audio, and gryphon order-handoff coverage additions against the runner's
-authenticated classic retail installation. An exact Battle.net Edition source
+Asserts the `full` profile: **31 expected skips** with the runner's
+authenticated classic retail installation, derived pack and Opus fixtures.
+An exact Battle.net Edition source
 has a different per-module inventory because its data lives in TOMEs and it
 does not expose several classic loose-file fixtures. That layout is covered by
 the separate `full-bne-with-playtest-saves` profile instead of being folded
@@ -85,8 +84,8 @@ The September 7 audit of run 34136321688 found two independent problems:
 - The data-free engine inventory expected 989 skips but observed 1,008.
   Nineteen newly added authenticated tests were missing from the inventory;
   they ran in the full job. The new walking regression adds one more expected
-  data-free skip. The current full data-free run discovers 2,992 tests, skips
-  1,345, and executes 1,647, including 88 recorded failures.
+  data-free skip. That full data-free run discovered 2,992 tests, skipped
+  1,345, and executed 1,647, including 88 recorded failures.
 - The authenticated job discovered 2,990 tests, skipped the expected 27, and
   reported 110 failures against 109 recorded ones. Its extra failure asserted
   an internal cold-loop latch changed by the September 1 moving-quarry fix.
@@ -94,17 +93,19 @@ The September 7 audit of run 34136321688 found two independent problems:
   route, position, timing, damage, and random-sequence assertions remain.
 
 No expected-failure entries were added or tests disabled to resolve this audit.
-The canonical full-profile baseline now records 106 known failures. Three
+The canonical full-profile baseline then recorded 106 known failures. Three
 combat failures were reproduced in the pinned BNE executable and fixed at the
 swing-to-chase boundary; their original assertions now also run in the required
 26-test control-liveness gate. The remaining entries are technical debt and
 still execute. A citation label alone does not establish retail verification.
 
-`publish-game-update.yml` currently runs independently of `tests.yml`. It builds
-and signs the update and verifies launcher installation, but does not wait for
-the test workflow. A successful OTA deployment therefore does not certify a
-green test run. Changing this release policy is separate from reporting CI
-accurately.
+`publish-game-update.yml` waits for `tests.yml` on the exact `master` commit.
+Both `Native Java, no game data` and `Authenticated game data` must finish
+successfully in a trusted push or manual run. A missing, skipped, cancelled or
+failed job prevents publication; an older green revision cannot qualify a new
+one. If `master` advances while the workflow waits, the superseded revision
+cannot proceed. These jobs enforce the coverage and known-failure inventories,
+so publication still does not imply that every test passed.
 
 ## Native command campaign
 
@@ -156,7 +157,7 @@ in the first place, one at a time, with nothing objecting.
 
 | Profile | Inputs | Skips |
 |---|---|---|
-| `data-free` | none | 1,414 |
+| `data-free` | none | 1,419 |
 | `full` | classic installation, pack, Opus vectors | 31 |
 | `full-with-playtest-saves` | full inputs plus three private save referees | 28 |
 | `full-bne-with-playtest-saves` | exact BNE source, matching pack, Opus references, and three private save referees | 30 |
@@ -326,8 +327,8 @@ never downloads or packages Warcraft II data.
 
 ## `publish-game-update.yml` -- automatic engine updates
 
-A push to `master` that changes a game input builds the self-contained desktop
-JAR and publishes it through `updates.chonkbase.net`. The workflow signs a
+A push to `master` that changes a game input first requires both test jobs
+on that exact revision, then builds the self-contained desktop JAR and publishes it through `updates.chonkbase.net`. The workflow signs a
 single catalog envelope, proves the production launcher installs it locally,
 uploads the content-addressed JAR to the retained Linode volume, replaces the
 catalog last, and finally repeats the install through the public HTTPS endpoint.

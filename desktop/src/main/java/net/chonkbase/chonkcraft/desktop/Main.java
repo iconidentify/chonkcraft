@@ -1645,7 +1645,9 @@ public final class Main {
         // last screen left running has to stop, and skipping the call because
         // there is no device is how it went on playing over the map.
         if (!gameSession.runIfCurrent(() ->
-                server.playBattleMusic(source.races()[localPlayer] == PudMap.Race.ORC))) {
+                server.playBattleMusic(source.races()[localPlayer] == PudMap.Race.ORC,
+                        network == null && ("human".equals(campaignName)
+                                || "orc".equals(campaignName))))) {
             return;
         }
         System.out.printf("Music: %s%n", server.describe());

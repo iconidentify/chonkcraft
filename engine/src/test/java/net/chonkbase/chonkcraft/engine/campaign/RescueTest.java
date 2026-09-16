@@ -80,6 +80,7 @@ class RescueTest {
         assertNotNull(footman);
 
         Unit prisoner = world.createUnit(peasant, 1, 10, 10);
+        Unit distantPrisoner = world.createUnit(peasant, 1, 20, 20);
         assertFalse(prisoner.wasRescued());
 
         // A soldier of yours walks up beside them.
@@ -95,6 +96,11 @@ class RescueTest {
         assertTrue(prisoner.wasRescued(), "nobody was freed");
         assertEquals(0, prisoner.player(), "the prisoner did not change hands");
         assertEquals(1, prisoner.rescuedFrom(), "it should remember whose it was");
+        assertEquals(1, distantPrisoner.player(), "an individual rescue must leave distant workers");
+        assertEquals(1, world.battleNetWorkerFamilyCount(1),
+                "the old owner must lose exactly one worker");
+        assertEquals(1, world.battleNetWorkerFamilyCount(0),
+                "the rescuer must gain exactly one worker");
     }
 
     /**
@@ -118,30 +124,33 @@ class RescueTest {
     }
 
     /**
-     * BNE rescues the unit whose animation marker performs the proximity
-     * check. It does not run LegacyEngine's once-per-second whole-player
-     * {@code RescueUnits} special case for resource-storing buildings.
+     * Native 0x452430 transfers the surviving roster when the rescued unit
+     * carries hall flag 0x1000. The old assertion generalized a farm capture
+     * to halls, which left Human 8's distant workers uncontrolled.
      */
     @Test
-    @DisplayName("A rescuable town hall does not invent a whole-side rescue")
-    void aTownHallDoesNotRescueEverything() {
+    @DisplayName("a rescued town hall brings the surviving village under player control")
+    void aTownHallRescuesItsDistantVillager() {
         GameData data = load();
-        World world = gaol(data);
-        UnitType footman = data.unitTypes().types().get("unit-footman");
-        UnitType hall = data.unitTypes().types().get("unit-town-hall");
-        UnitType peasant = data.unitTypes().types().get("unit-peasant");
+        for (String name : List.of("unit-town-hall", "unit-keep", "unit-castle",
+                "unit-great-hall", "unit-stronghold", "unit-fortress")) {
+            World world = gaol(data);
+            UnitType footman = data.unitTypes().types().get("unit-footman");
+            UnitType hall = data.unitTypes().types().get(name);
+            UnitType peasant = data.unitTypes().types().get("unit-peasant");
 
-        Unit rescuedHall = world.createUnit(hall, 1, 10, 10);
-        Unit villager = world.createUnit(peasant, 1, 20, 20);
-        world.createUnit(footman, 0, 14, 10);
+            Unit rescuedHall = world.createUnit(hall, 1, 10, 10);
+            Unit villager = world.createUnit(peasant, 1, 20, 20);
+            world.createUnit(footman, 0, 14, 10);
 
-        for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 5; cycle++) {
-            world.tick();
+            for (int cycle = 0; cycle < World.CYCLES_PER_SECOND * 5; cycle++) {
+                world.tick();
+            }
+            assertEquals(0, rescuedHall.player(),
+                    "the rescuable building itself must change hands: " + name);
+            assertEquals(0, villager.player(),
+                    "the native hall flag must transfer a distant living villager too: " + name);
         }
-        assertEquals(0, rescuedHall.player(),
-                "the rescuable building itself must change hands");
-        assertEquals(1, villager.player(),
-                "BNE must not apply LegacyEngine's whole-player town-hall shortcut");
     }
 
     /**

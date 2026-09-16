@@ -56,7 +56,7 @@ refusals. The current evidence and reproduction workflow are in
 ## Playability and release verification
 
 All 18 playability lanes pass with their required authenticated inputs,
-including the 62-test control gate, 117 movement checks, 65 projectile
+including the 67-test control gate, 117 movement checks, 65 projectile
 checks, 42 clean/adverse lockstep cases and real two-process startup.
 The original 392-sequence freeze reproduction and the 45-type,
 11,340-sequence roster complete without a stuck final withdrawal.
@@ -65,9 +65,11 @@ retain their explicit rejection classification; their final Move is still
 checked. Each submarine also passes 252 sequences against legal naval targets.
 These liveness sweeps are separate from exact native parity.
 
-The integrated pack-plus-Opus suite contains 3,076 tests, with 90 existing
-specification failures, no errors and 318 skips. Its data-free counterpart
-has the same 88 expected failure identities and exactly 1,414 skips.
+The integrated pack-plus-Opus suite contains 3,085 tests, with 90 existing
+specification failures and 318 skips. A release-notes test race found in the
+latest full run is corrected; the 49-test launcher suite and 200 repetitions
+pass after the correction. The data-free suite matches its 88 expected failure
+identities and exactly 1,419 skips, with no unexpected failures.
 Expected failures still execute; an inventory pass is not an all-tests-pass
 claim. The canonical authenticated CI job supplies the matching raw media
 and requires its separate 31-skip classic profile. Coverage rules are documented in
@@ -85,8 +87,12 @@ Real-window campaign checks protect repeated launch input, load-error recovery
 and replacement while a defeat is queued. Soundtrack routing preserves the
 race and screen across source changes; unidentified numbered recordings fall
 back to the matching archive score. Nineteen recorded music roles are checked
-against the BNE scene table and decoded PCM. German numbered-disc
-identities remain unverified.
+against the BNE scene table and decoded PCM. Recorded battles advance through
+their race's tracks with two-second gaps; the original campaigns omit the
+first battle row, matching BNE's scene selection. Playback checks exercise
+three successive recordings for both races in the standard pack and the
+German reporter's supplied pack. Arbitrary unidentified numbered-disc imports
+remain outside that verification.
 
 Both demolition squads accept targeted commands, approach the selected point
 or unit, and apply the BNE blast. Native captures cover interrupted approaches,
@@ -98,10 +104,24 @@ precision work.
 
 Workers keep their completed cargo when redirected between mines and trees.
 Unfinished chopping is cleared by a new harvesting job, and the gold loop
-retains the native depot-exit pause.
+retains the native depot-exit pause. Stop now ends an outbound mining trip
+after its committed stride; the final boarding approach retains BNE's
+different behavior. Fourteen native captures cover both worker races, loaded
+returns and blocked approaches, with continuation checks across save/load.
+
+Rescuing a hall transfers its former owner's surviving village, including
+workers inside mines or depots. Farms still transfer individually. Human 8's
+building-first native capture and controlled retail type-flag checks establish
+the exception. The regression checks cover the hidden workers' ownership,
+sight, worker counts, later commands and saving around the handoff. Loading a
+campaign also clears its starting units from owner rosters, preventing a later
+rescue from transferring absent units or counting their workers again.
+
 Production game updates are published from `master`. The
 [signed update catalog](https://updates.chonkbase.net/latest.properties) is
-the authority for the current public version. Publication verifies installation
+the authority for the current public version. Publication requires successful
+authenticated and data-free Tests jobs on the exact revision being released.
+It also verifies installation
 through the production launcher against both the built catalog and the public
 endpoint. The source checkpoint is retained in Git for comparison.
 
@@ -135,6 +155,12 @@ endpoint. The source checkpoint is retained in Git for comparison.
 - Multiplayer flight records retain map, cycle-zero save, accepted commands,
   controller/race state and build identities. Legacy recordings lack some of
   those seals and remain diagnostics, not complete fidelity certificates.
+- The reported Asahi/Wayland rendering corruption still needs target-device
+  comparison. The multiplayer desync report needs both peers' recordings if
+  it recurs; the speed and diagnostic fixes do not establish its root cause.
+- The shared runtime's fake-clock retry test can advance before the next
+  deadline is scheduled. Its correction must land in Seven Days to Tomorrow
+  and be synchronized here before the release gate can rely on stable CI.
 
 A passing playability gate and preserved campaign prefixes do not mean the
 whole game is an exact recreation. Further changes must preserve those gates

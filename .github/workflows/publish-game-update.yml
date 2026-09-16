@@ -16,6 +16,7 @@ on:
       - '*/pom.xml'
       - scripts/release/build-update-assets.sh
       - scripts/release/publish-update-kubernetes.sh
+      - scripts/ci/require-release-tests.py
       - RELEASE_NOTES.md
       - .github/workflows/publish-game-update.yml
   workflow_dispatch:
@@ -27,13 +28,30 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: chonkcraft-game-update
   cancel-in-progress: false
 
 jobs:
+  tests:
+    name: Require both test gates for this revision
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for authenticated and data-free checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/ci/require-release-tests.py
+          --repository "${{ github.repository }}"
+          --revision "${{ github.sha }}"
+
   publish:
+    needs: tests
     name: Authenticate and publish replaceable game JAR
     runs-on: ubuntu-latest
     timeout-minutes: 30
