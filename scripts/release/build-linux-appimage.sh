@@ -17,13 +17,18 @@ linux_dist="${root}/desktop/target/dist/linux"
 installer_dist="${root}/desktop/target/dist/installers"
 source_app="${linux_dist}/chonkcraft"
 appdir="${linux_dist}/ChonkCraft.AppDir"
-output="${installer_dist}/ChonkCraft-${version}-linux-x64.AppImage"
 icon="${root}/launcher/src/main/resources/icons/chonkcraft.png"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "An AppImage must be built on Linux." >&2
   exit 1
 fi
+case "$(uname -m)" in
+  x86_64) appimage_arch=x86_64; package_arch=x64 ;;
+  aarch64|arm64) appimage_arch=aarch64; package_arch=arm64 ;;
+  *) echo "Unsupported AppImage architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+output="${installer_dist}/ChonkCraft-${version}-linux-${package_arch}.AppImage"
 if [[ ! -x "${appimagetool}" ]]; then
   echo "appimagetool is not executable: ${appimagetool}" >&2
   exit 1
@@ -43,12 +48,7 @@ rm -rf "${appdir}"
 mkdir -p "${appdir}" "${installer_dist}"
 cp -R "${source_app}"/. "${appdir}"/
 
-cat > "${appdir}/AppRun" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "${here}/bin/chonkcraft" "$@"
-EOF
+cp "${root}/scripts/release/AppRun" "${appdir}/AppRun"
 chmod +x "${appdir}/AppRun"
 
 cat > "${appdir}/ChonkCraft.desktop" <<'EOF'
@@ -64,7 +64,7 @@ EOF
 cp "${icon}" "${appdir}/ChonkCraft.png"
 
 rm -f "${output}" "${output}.sha256"
-ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 VERSION="${version}" \
+ARCH="${appimage_arch}" APPIMAGE_EXTRACT_AND_RUN=1 VERSION="${version}" \
   "${appimagetool}" "${appdir}" "${output}"
 chmod +x "${output}"
 sha256sum "${output}" > "${output}.sha256"

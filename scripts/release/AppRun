@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Select the display before either the launcher or its child game starts AWT.
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+display_mode="${CHONKCRAFT_DISPLAY:-auto}"
+case "${1:-}" in
+  --wayland) display_mode=wayland; shift ;;
+  --xwayland) display_mode=x11; shift ;;
+esac
+
+wayland_socket="${WAYLAND_DISPLAY:-}"
+if [[ -n "$wayland_socket" && "$wayland_socket" != /* ]]; then
+  wayland_socket="${XDG_RUNTIME_DIR:-}/$wayland_socket"
+  [[ -n "${XDG_RUNTIME_DIR:-}" ]] || wayland_socket=""
+fi
+wayland_available=false
+if [[ -n "$wayland_socket" && -S "$wayland_socket" &&
+      -f "$here/lib/runtime/lib/libawt_wlawt.so" ]]; then
+  wayland_available=true
+fi
+
+if [[ "$display_mode" == auto ]]; then
+  display_mode=inherit
+  # An explicit toolkit or graphics pipeline belongs to the caller. Do not
+  # parse or eval JVM option strings; preserve their quoting and contents.
+  configured_java="${JDK_JAVA_OPTIONS:-} ${JAVA_TOOL_OPTIONS:-} ${_JAVA_OPTIONS:-}"
+  case "$configured_java" in
+    *-Dawt.toolkit.name=*|*-Dsun.java2d.*|*-Dseven.java2d.pipeline=*|*-Djava.awt.headless=*) ;;
+    *)
+      case "${SEVEN_JAVA2D_PIPELINE:-}" in
+        ''|software|off|none)
+          if "$wayland_available"; then display_mode=wayland; fi
+          ;;
+      esac
+      ;;
+  esac
+fi
+
+case "$display_mode" in
+  wayland)
+    if ! "$wayland_available"; then
+      echo "Native Wayland needs a Wayland socket and a bundled runtime with WLToolkit." >&2
+      exit 1
+    fi
+    # Vulkan submission stalled the event thread on the tested M3 driver.
+    # Native shared-memory presentation keeps clicks and scrolling responsive.
+    # JBR's launcher appends XToolkit after JAVA_TOOL_OPTIONS; its final
+    # _JAVA_OPTIONS pass must select WLToolkit for jpackage and bin/java alike.
+    export SEVEN_JAVA2D_PIPELINE=software
+    export _JAVA_OPTIONS="${_JAVA_OPTIONS:+$_JAVA_OPTIONS }-Dawt.toolkit.name=WLToolkit -Dsun.java2d.vulkan=false -Dsun.java2d.opengl=false -Dsun.awt.wl.WindowDecorationStyle=server -Dawt.app.id=chonkcraft"
+    ;;
+  x11)
+    export _JAVA_OPTIONS="${_JAVA_OPTIONS:+$_JAVA_OPTIONS }-Dawt.toolkit.name=XToolkit -Dsun.java2d.vulkan=false"
+    ;;
+  inherit) ;;
+  *)
+    echo "CHONKCRAFT_DISPLAY must be auto, wayland, or x11." >&2
+    exit 64
+    ;;
+esac
+
+exec "$here/bin/chonkcraft" "$@"
