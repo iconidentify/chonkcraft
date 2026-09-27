@@ -46,6 +46,7 @@ jobs:
           python3 scripts/check-native-runtime.py
           python3 scripts/ci/check-comment-provenance.py
           python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+          scripts/jbr/with-jbr-25.sh python3 scripts/release/test_appimage_entry.py
           python3 -m unittest discover -s tools/bne-harness/tests -p 'test_bne_command_campaign.py'
           python3 scripts/check-docs.py --check
           python3 scripts/check-bne-readiness.py
@@ -109,6 +110,7 @@ jobs:
           python3 scripts/check-native-runtime.py
           python3 scripts/ci/check-comment-provenance.py
           python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+          scripts/jbr/with-jbr-25.sh python3 scripts/release/test_appimage_entry.py
           python3 -m unittest discover -s tools/bne-harness/tests -p 'test_bne_command_campaign.py'
           python3 scripts/check-docs.py --check
           python3 scripts/check-bne-readiness.py

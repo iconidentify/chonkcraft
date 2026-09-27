@@ -435,6 +435,20 @@ The defaults are verified by inspection of `Java2DPipeline.defaultForOs`.
 OpenGL rendering and memory stress have also been exercised on Linux/Asahi;
 see the [rendering measurements](render-performance.md).
 
+The AppImage entry point selects native Wayland with software Java2D when
+`WAYLAND_DISPLAY` names an existing socket and the bundled runtime includes
+`WLToolkit`. The selection reaches both the launcher and its child game.
+An X11 session, an unavailable Wayland socket, or an explicit JVM graphics
+override keeps the existing Java graphics selection. Explicit
+`SEVEN_JAVA2D_PIPELINE=opengl` also keeps the X11 path.
+
+Use `ChonkCraft-<version>-linux-<arch>.AppImage --xwayland` to choose Xwayland,
+or `--wayland` to require native Wayland. The equivalent persistent choices
+are `CHONKCRAFT_DISPLAY=x11` and `CHONKCRAFT_DISPLAY=wayland`; the default is
+`auto`. Put the display switch before launcher arguments such as `--launch`.
+On the tested M3 system, Java's Vulkan renderer delayed the event thread during
+presentation; software rendering kept native Wayland input responsive.
+
 ### Fullscreen
 
 `PlatformFullscreen.detectStrategy` gives macOS the `MAC_EAWT` strategy and
@@ -444,8 +458,10 @@ plumbing, and `scripts/run-game.sh` already adds that flag only when `uname -s`
 is `Darwin`. Force borderless anywhere with
 `-Dseven.fullscreen.force.borderless=true`.
 
-On Wayland, the JDK runs under XWayland. **Unverified** whether borderless
-fullscreen behaves under a Wayland compositor.
+The AppImage can use the bundled JBR's native Wayland toolkit, while direct
+game launches retain the JVM's toolkit selection. Native Wayland map rendering,
+resizing, and menu input at 2x scale have been exercised on ChonkStep. Borderless
+fullscreen across other compositors remains unverified.
 
 ## Running the game
 
@@ -580,10 +596,17 @@ CHONKCRAFT_ASSET_PACK=/path/to/chonkcraft.chonkpack \
   scripts/release/verify-macos-app.sh desktop/target/dist/macos/ChonkCraft.app
 ```
 
-The Linux release is a Type-2 x86-64 AppImage. CI downloads the same
+The Linux release is a Type-2 x86-64 AppImage. The local build scripts also
+support aarch64, producing a `linux-arm64.AppImage` with the host's bundled JBR.
+CI downloads the same
 checksum-pinned appimagetool release used by the sister project, inspects the
 SquashFS payload, and launches it with `APPIMAGE_EXTRACT_AND_RUN=1` so the proof
 does not depend on FUSE being available on the build host.
+
+Run `scripts/jbr/with-jbr-25.sh python3 scripts/release/test_appimage_entry.py` to check display selection,
+fallbacks, and propagation to the child process. Existing AppImage downloads
+need to be replaced with a build containing this entry point; the signed game
+JAR updater cannot replace the enclosing AppImage or its launcher script.
 
 ## Linux-specific risks not yet exercised
 

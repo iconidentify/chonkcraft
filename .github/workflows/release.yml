@@ -305,7 +305,9 @@ jobs:
       - name: Stage checksum-pinned appimagetool
         run: scripts/release/install-pinned-appimagetool.sh "$RUNNER_TEMP/appimagetool"
       - name: Build portable AppImage
-        run: scripts/release/build-linux-appimage.sh "$RUNNER_TEMP/appimagetool"
+        run: |
+          scripts/jbr/with-jbr-25.sh python3 scripts/release/test_appimage_entry.py
+          scripts/release/build-linux-appimage.sh "$RUNNER_TEMP/appimagetool"
       - name: Inspect and smoke test the AppImage
         shell: bash
         run: |
